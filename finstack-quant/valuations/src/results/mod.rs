@@ -81,10 +81,12 @@
 //! - Metric and sensitivity interpretation: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
 
 pub(crate) mod dataframe;
+mod provenance;
 mod valuation_result;
 
 pub use dataframe::{ValuationLongRow, ValuationRow};
 pub use finstack_quant_core::config::ResultsMeta;
+pub use provenance::{SensitivityBumps, ValuationProvenance};
 pub use valuation_result::{
     CreditDerivativeValuationDetails, FxValuationDetails, MonteCarloValuationDetails,
     ValuationDetails, ValuationResult,

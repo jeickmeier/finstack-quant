@@ -28100,6 +28100,7 @@ def price_instrument(
     metrics: list[str] | None = None,
     metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
     market_history: MarketHistory | dict[str, Any] | str | None = None,
+    explain: bool = False,
 ) -> ValuationResult:
     """
     Price one instrument and compute explicit risk metric requests.
@@ -28154,6 +28155,13 @@ def price_instrument(
         Historical scenarios required by the ``"hvar"`` and
         ``"expected_shortfall"`` metrics; a dict or JSON string is accepted in
         place of the typed object.
+    explain : bool, default False
+        When ``True``, attach a step trace as ``result.explanation``. For the
+        ``"discounting"`` and ``"hazard_rate"`` models it holds one
+        ``cashflow_pv`` entry per projected cashflow (date, amount, discount
+        factor, curve, survival probability, present value) that sums to the
+        price, capped at 1000 entries. Other models get one
+        ``computation_step`` entry saying no per-flow decomposition exists.
 
     Returns
     -------
@@ -28161,6 +28169,9 @@ def price_instrument(
         Typed valuation envelope including the requested metric values. A
         stochastic ``"rates_credit"`` bond result also carries Monte Carlo
         convergence and reproducibility diagnostics in ``details``.
+        ``result.provenance`` records the model, requested date, declared
+        market dependencies, scenario adjustment and, when metrics are
+        requested, the finite-difference bump sizes.
 
     Raises
     ------
@@ -35924,6 +35935,22 @@ class InstrumentCashflowEnvelope:
         """
         ...
     @property
+    def scenario_price_shock_decimal(self) -> float | None:
+        """
+        Scenario price shock applied to every row ``pv`` and to ``total_pv``.
+
+        Returns
+        -------
+        float | None
+            Shock as a decimal (``-0.10`` multiplies by 0.90), or ``None``
+            when the rows are unshocked.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def flows(self) -> list[dict[str, Any]]:
         """
         Per-flow rows (serde form of ``CashflowRow``).
@@ -35976,13 +36003,19 @@ class InstrumentCashflowEnvelope:
         -------
         pd.DataFrame
             Columns ``date``, ``amount``, ``currency``, ``kind``,
-            ``accrual_factor``, ``year_fraction``, ``rate``, ``reset_date``,
-            ``discount_factor``, ``discount_curve_id``,
-            ``survival_probability``, ``conditional_default_prob``,
-            ``inflation_index_ratio``, ``prepayment_smm``,
-            ``beginning_balance``, ``ending_balance`` and ``pv``; ``date`` and
-            ``reset_date`` are ``datetime64`` and fields the model does not
-            populate are null.
+            ``accrual_factor``, ``accrual_start``, ``accrual_end``,
+            ``accrual_day_count``, ``accrual_notional`` (outstanding principal
+            at accrual start), ``index_rate`` (floating index before spread,
+            gearing, caps and floors), ``principal_delta``, ``year_fraction``,
+            ``rate``, ``reset_date``, ``discount_factor``,
+            ``discount_curve_id``, ``survival_probability``,
+            ``conditional_default_prob``, ``inflation_index_ratio``,
+            ``prepayment_smm``, ``beginning_balance``, ``ending_balance``,
+            ``native_pv`` (row currency, before FX and scenario shock),
+            ``fx_rate`` (reporting per row currency) and ``pv``. The four date
+            columns are ``datetime64`` and fields the model does not populate
+            are null. A coupon is ``accrual_notional * rate * accrual_factor``
+            when the balance is constant over its accrual period.
 
         Raises
         ------

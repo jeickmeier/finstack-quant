@@ -39,7 +39,7 @@ export type ValuationDetails =
  * Domain-specific trace entry types.
  *
  * Each variant captures relevant details for different types of computations:
- * - Calibration: iteration details, convergence status
+ * - Calibration: solver steps as generic computation steps
  * - Pricing: cashflow-level PV breakdowns
  * - Waterfall: step-by-step payment allocations
  *
@@ -50,25 +50,6 @@ export type ValuationDetails =
  * via the `definition` "TraceEntry".
  */
 export type TraceEntry =
-  | {
-      /**
-       * Whether convergence was achieved
-       */
-      converged: boolean;
-      /**
-       * Iteration number (0-based)
-       */
-      iteration: bigint;
-      kind: "calibration_iteration";
-      /**
-       * Knot points that were updated
-       */
-      knots_updated: string[];
-      /**
-       * Objective function residual
-       */
-      residual: number;
-    }
   | {
       /**
        * Cashflow amount (stored as f64 for JSON simplicity)
@@ -99,6 +80,14 @@ export type TraceEntry =
        * PV currency
        */
       pv_currency: string;
+      /**
+       * Conditional survival probability to the payment date, `S(date) / S(as_of)`.
+       *
+       * Present only for credit-risky valuations. `pv_amount` then also
+       * includes the recovery leg, so it is not `cashflow_amount ×
+       * discount_factor × survival_probability`.
+       */
+      survival_probability?: number | null;
     }
   | {
       /**
@@ -152,6 +141,36 @@ export type TraceEntry =
        */
       name: string;
     };
+/**
+ * A phantom-typed identifier that prevents mixing different kinds of IDs.
+ *
+ * This type wraps a string identifier with a phantom type parameter to ensure
+ * type safety at compile time. Different `Id<T>` types with different `T`
+ * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+ *
+ * # Type Parameters
+ *
+ * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+ *
+ * # Invariants
+ *
+ * - Storage uses `Arc<str>` for efficient cloning
+ * - The phantom marker has zero size and runtime cost
+ * - Two `Id<T>` values are equal if their string values are equal
+ * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+ *
+ * # Thread Safety
+ *
+ * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+ * safely share and clone IDs with minimal synchronization overhead.
+ *
+ * This interface was referenced by `ValuationResult1`'s JSON-Schema
+ * via the `definition` "Id".
+ *
+ * This interface was referenced by `ValuationResult`'s JSON-Schema
+ * via the `definition` "Id".
+ */
+export type Id = string;
 /**
  * ISO 4217 currency enumeration
  *
@@ -341,36 +360,6 @@ export type DateWire = string;
  * via the `definition` "DecimalWire".
  */
 export type DecimalWire = string;
-/**
- * A phantom-typed identifier that prevents mixing different kinds of IDs.
- *
- * This type wraps a string identifier with a phantom type parameter to ensure
- * type safety at compile time. Different `Id<T>` types with different `T`
- * cannot be compared or mixed accidentally, preventing entire classes of bugs.
- *
- * # Type Parameters
- *
- * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
- *
- * # Invariants
- *
- * - Storage uses `Arc<str>` for efficient cloning
- * - The phantom marker has zero size and runtime cost
- * - Two `Id<T>` values are equal if their string values are equal
- * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
- *
- * # Thread Safety
- *
- * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
- * safely share and clone IDs with minimal synchronization overhead.
- *
- * This interface was referenced by `ValuationResult1`'s JSON-Schema
- * via the `definition` "Id".
- *
- * This interface was referenced by `ValuationResult`'s JSON-Schema
- * via the `definition` "Id".
- */
-export type Id = string;
 /**
  * Pricing model selection for the pricer registry.
  *
@@ -573,8 +562,10 @@ export interface ValuationResult {
   /**
    * Optional computation explanation trace.
    *
-   * Enabled via `ExplainOpts` in configuration. Provides step-by-step
-   * trace of calculations for debugging and auditability.
+   * Requested with `PricingOptions::with_explain`. For discounting and
+   * hazard-rate valuations it holds one `cashflow_pv` entry per projected
+   * cashflow, reconciled to `value`; for other models it holds a single
+   * `computation_step` entry saying no per-flow decomposition exists.
    */
   explanation?: ExplanationTrace | null;
   /**
@@ -605,6 +596,13 @@ export interface ValuationResult {
     [k: string]: number;
   };
   meta: ResultsMeta1;
+  /**
+   * How the result was produced: model, requested date, declared market
+   * dependencies, scenario adjustment and sensitivity bump sizes.
+   *
+   * Stamped by the pricer registry. Absent on results constructed directly.
+   */
+  provenance?: ValuationProvenance | null;
   /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */
@@ -2088,8 +2086,10 @@ export interface ValuationResult1 {
   /**
    * Optional computation explanation trace.
    *
-   * Enabled via `ExplainOpts` in configuration. Provides step-by-step
-   * trace of calculations for debugging and auditability.
+   * Requested with `PricingOptions::with_explain`. For discounting and
+   * hazard-rate valuations it holds one `cashflow_pv` entry per projected
+   * cashflow, reconciled to `value`; for other models it holds a single
+   * `computation_step` entry saying no per-flow decomposition exists.
    */
   explanation?: ExplanationTrace | null;
   /**
@@ -2120,6 +2120,13 @@ export interface ValuationResult1 {
     [k: string]: number;
   };
   meta: ResultsMeta1;
+  /**
+   * How the result was produced: model, requested date, declared market
+   * dependencies, scenario adjustment and sensitivity bump sizes.
+   *
+   * Stamped by the pricer registry. Absent on results constructed directly.
+   */
+  provenance?: ValuationProvenance | null;
   /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */
@@ -2197,6 +2204,560 @@ export interface ResultsMeta1 {
    */
   version?: string | null;
   [k: string]: unknown;
+}
+/**
+ * How a valuation result was produced.
+ *
+ * Stamped by [`crate::pricer::PricerRegistry::price_with_metrics`] on every
+ * result so the number can be reproduced from the result plus the archived
+ * market: the model that priced it, the date the caller asked for, the market
+ * data the instrument declares, any scenario adjustment applied to the value,
+ * and the bump sizes behind its sensitivities.
+ *
+ * This interface was referenced by `ValuationResult1`'s JSON-Schema
+ * via the `definition` "ValuationProvenance".
+ *
+ * This interface was referenced by `ValuationResult`'s JSON-Schema
+ * via the `definition` "ValuationProvenance".
+ */
+export interface ValuationProvenance {
+  market_dependencies: MarketDependencies;
+  /**
+   * Registered pricing model that produced `value`.
+   */
+  model:
+    | "discounting"
+    | "tree"
+    | "black76"
+    | "hull_white_1f"
+    | "hazard_rate"
+    | "rates_credit"
+    | "normal"
+    | "monte_carlo_gbm"
+    | "monte_carlo_heston"
+    | "monte_carlo_hull_white_1f"
+    | "monte_carlo_three_factor"
+    | "barrier_bs_continuous"
+    | "asian_geometric_bs"
+    | "asian_turnbull_wakeman"
+    | "lookback_bs_continuous"
+    | "quanto_bs"
+    | "fx_barrier_bs_continuous"
+    | "heston_fourier"
+    | "merton_mc"
+    | "monte_carlo_schwartz_smith"
+    | "static_replication"
+    | "lmm_monte_carlo"
+    | "structured_credit_stochastic"
+    | "bond_future_clean_price_proxy"
+    | "monte_carlo_rough_bergomi"
+    | "monte_carlo_rough_heston"
+    | "rough_heston_fourier"
+    | "pde_crank_nicolson_1d"
+    | "pde_adi_2d"
+    | "bloomberg_cdso";
+  /**
+   * Valuation date the caller requested.
+   *
+   * The result's `as_of` is the effective date after the instrument resolved
+   * it (for example to the market's spot date); the two differ only when
+   * the instrument moved it.
+   */
+  requested_as_of: string;
+  /**
+   * Scenario price shock already applied to `value`, as a decimal
+   * (`-0.10` = the model value was multiplied by 0.90). Absent when the
+   * value is the unadjusted model value.
+   */
+  scenario_price_shock_decimal?: number | null;
+  /**
+   * Bump sizes in force for the requested metrics. Absent when no metric
+   * was requested.
+   */
+  sensitivity_bumps?: SensitivityBumps | null;
+}
+/**
+ * Curves, surfaces, scalars, FX pairs and series the instrument declares
+ * it reads. Identifiers refer to the `MarketContext` the result was
+ * priced against.
+ */
+export interface MarketDependencies {
+  /**
+   * Credit-index aggregates resolved through `MarketContext::get_credit_index`.
+   *
+   * These identifiers are distinct from direct hazard-curve IDs because a
+   * credit index also carries base correlation and optional issuer curves.
+   */
+  credit_index_ids?: Id[];
+  curves: InstrumentCurves;
+  /**
+   * FX pairs required for pricing (spot matrices).
+   */
+  fx_pairs: FxPair[];
+  /**
+   * Scalar market-value identifiers resolved through `MarketContext::get_price`.
+   *
+   * This includes tradable spots and non-price unitless scalars such as
+   * continuous dividend yields. [`Self::series_ids`] is reserved for
+   * `MarketContext::get_series` dependencies.
+   */
+  market_scalar_ids: string[];
+  /**
+   * Scalar time series identifiers (e.g., OHLC price series for realized variance).
+   */
+  series_ids: string[];
+  /**
+   * Typed volatility dependencies in deterministic insertion order.
+   */
+  volatility_dependencies: VolatilityDependency[];
+}
+/**
+ * Curve dependencies grouped by type.
+ */
+export interface InstrumentCurves {
+  /**
+   * Credit/hazard curves used by the instrument.
+   */
+  credit_curves: Id[];
+  /**
+   * Discount curves used by the instrument (including primary and foreign).
+   */
+  discount_curves: Id[];
+  /**
+   * Forward/projection curves used by the instrument.
+   */
+  forward_curves: Id[];
+  /**
+   * Inflation curves or published inflation indices used by the instrument.
+   */
+  inflation_curves: Id[];
+}
+/**
+ * FX pair identifier using base/quote currency ordering.
+ *
+ * This interface was referenced by `ValuationResult1`'s JSON-Schema
+ * via the `definition` "FxPair".
+ *
+ * This interface was referenced by `ValuationResult`'s JSON-Schema
+ * via the `definition` "FxPair".
+ */
+export interface FxPair {
+  /**
+   * Base currency (numerator).
+   */
+  base:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+  /**
+   * Quote currency (denominator).
+   */
+  quote:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * A volatility-surface dependency with the context needed for diagnostics.
+ *
+ * This interface was referenced by `ValuationResult1`'s JSON-Schema
+ * via the `definition` "VolatilityDependency".
+ *
+ * This interface was referenced by `ValuationResult`'s JSON-Schema
+ * via the `definition` "VolatilityDependency".
+ */
+export interface VolatilityDependency {
+  /**
+   * Optional contractual strike used by local volatility diagnostics.
+   */
+  reference_strike?: number | null;
+  /**
+   * Optional market-scalar id of the underlying spot paired with the surface.
+   */
+  spot_id?: Id | null;
+  /**
+   * A phantom-typed identifier that prevents mixing different kinds of IDs.
+   *
+   * This type wraps a string identifier with a phantom type parameter to ensure
+   * type safety at compile time. Different `Id<T>` types with different `T`
+   * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+   *
+   * # Type Parameters
+   *
+   * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+   *
+   * # Invariants
+   *
+   * - Storage uses `Arc<str>` for efficient cloning
+   * - The phantom marker has zero size and runtime cost
+   * - Two `Id<T>` values are equal if their string values are equal
+   * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+   *
+   * # Thread Safety
+   *
+   * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+   * safely share and clone IDs with minimal synchronization overhead.
+   */
+  vol_surface_id: string;
+}
+/**
+ * Finite-difference bump sizes in force for a metric request.
+ *
+ * These are the values after layering the `valuations.sensitivities.v1`
+ * configuration extension and the instrument's
+ * `metric_pricing_overrides.bump_config` over the library defaults. Bumped
+ * sensitivities are reported per unit bump (per 1bp, per 1 vol point), so
+ * these sizes describe how the difference was taken, not the reporting unit.
+ *
+ * A calculator with a fixed, documented shock of its own (for example an
+ * analytic greek, or a metric whose rustdoc names its shock) does not read
+ * these values.
+ *
+ * This interface was referenced by `ValuationResult1`'s JSON-Schema
+ * via the `definition` "SensitivityBumps".
+ *
+ * This interface was referenced by `ValuationResult`'s JSON-Schema
+ * via the `definition` "SensitivityBumps".
+ */
+export interface SensitivityBumps {
+  /**
+   * Whether spot and volatility bumps are rescaled by volatility, time to
+   * expiry and moneyness instead of applied at the fixed sizes above.
+   */
+  adaptive_bumps?: boolean;
+  /**
+   * Credit-spread bump in basis points (1.0 = 1bp).
+   */
+  credit_spread_bump_bp: number;
+  /**
+   * Parallel interest-rate bump in basis points (1.0 = 1bp).
+   */
+  rate_bump_bp: number;
+  /**
+   * Spot bump as a decimal fraction of spot (0.01 = 1%).
+   */
+  spot_bump_decimal: number;
+  /**
+   * Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
+   */
+  vol_bump_decimal: number;
+  /**
+   * Yield bump in basis points for numerical yield duration and convexity.
+   * Absent when each calculator keeps its own default shock.
+   */
+  ytm_bump_bp?: number | null;
 }
 /**
  * Present value in the instrument's native currency.
@@ -2640,6 +3201,72 @@ export interface FxValuationDetails {
    */
   fx_triangulated?: boolean | null;
   [k: string]: unknown;
+}
+/**
+ * Collection of curves used by an instrument, categorized by market role.
+ *
+ * This interface was referenced by `ValuationResult1`'s JSON-Schema
+ * via the `definition` "InstrumentCurves".
+ *
+ * This interface was referenced by `ValuationResult`'s JSON-Schema
+ * via the `definition` "InstrumentCurves".
+ */
+export interface InstrumentCurves1 {
+  /**
+   * Credit/hazard curves used by the instrument.
+   */
+  credit_curves: Id[];
+  /**
+   * Discount curves used by the instrument (including primary and foreign).
+   */
+  discount_curves: Id[];
+  /**
+   * Forward/projection curves used by the instrument.
+   */
+  forward_curves: Id[];
+  /**
+   * Inflation curves or published inflation indices used by the instrument.
+   */
+  inflation_curves: Id[];
+}
+/**
+ * Unified dependency container for instrument market data requirements.
+ *
+ * This interface was referenced by `ValuationResult1`'s JSON-Schema
+ * via the `definition` "MarketDependencies".
+ *
+ * This interface was referenced by `ValuationResult`'s JSON-Schema
+ * via the `definition` "MarketDependencies".
+ */
+export interface MarketDependencies1 {
+  /**
+   * Credit-index aggregates resolved through `MarketContext::get_credit_index`.
+   *
+   * These identifiers are distinct from direct hazard-curve IDs because a
+   * credit index also carries base correlation and optional issuer curves.
+   */
+  credit_index_ids?: Id[];
+  curves: InstrumentCurves;
+  /**
+   * FX pairs required for pricing (spot matrices).
+   */
+  fx_pairs: FxPair[];
+  /**
+   * Scalar market-value identifiers resolved through `MarketContext::get_price`.
+   *
+   * This includes tradable spots and non-price unitless scalars such as
+   * continuous dividend yields. [`Self::series_ids`] is reserved for
+   * `MarketContext::get_series` dependencies.
+   */
+  market_scalar_ids: string[];
+  /**
+   * Scalar time series identifiers (e.g., OHLC price series for realized variance).
+   */
+  series_ids: string[];
+  /**
+   * Typed volatility dependencies in deterministic insertion order.
+   */
+  volatility_dependencies: VolatilityDependency[];
 }
 /**
  * Currency-tagged monetary amount with safe arithmetic.

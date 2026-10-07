@@ -534,7 +534,7 @@ fn valuations_dts_exposes_reusable_market_handle_pricing() {
     assert!(!interface_block(&dts, "ValuationsNamespace").contains("\n  Market:"));
     assert!(contains_ignoring_ws(
         &dts,
-        "priceInstrumentWithMarket(instrumentJson: JsonInput, market: MarketContext, asOf: string, model?: string | null, metrics?: string[] | null, metricPricingOverrides?: JsonInput | null, marketHistory?: JsonInput | null): ValuationResult;",
+        "priceInstrumentWithMarket(instrumentJson: JsonInput, market: MarketContext, asOf: string, model?: string | null, metrics?: string[] | null, metricPricingOverrides?: JsonInput | null, marketHistory?: JsonInput | null, explain?: boolean | null): ValuationResult;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
@@ -633,7 +633,7 @@ fn pricing_entry_points_declare_structured_valuation_results() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "priceInstrument(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, model?: string | null, metrics?: string[] | null, metricPricingOverrides?: JsonInput | null, marketHistory?: JsonInput | null): ValuationResult;",
+        "priceInstrument(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, model?: string | null, metrics?: string[] | null, metricPricingOverrides?: JsonInput | null, marketHistory?: JsonInput | null, explain?: boolean | null): ValuationResult;",
     ));
     let pricing_doc = preceding_jsdoc(&dts, "  priceInstrument(");
     for model in ["discounting", "hazard_rate", "tree", "rates_credit"] {

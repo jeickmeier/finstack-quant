@@ -741,12 +741,22 @@ pub(crate) fn market_history_json(
 /// market_history : MarketHistory | dict | str | None
 ///     Historical scenarios required by the ``hvar`` and
 ///     ``expected_shortfall`` metrics.
+/// explain : bool
+///     When ``True``, attach a step trace as ``result.explanation``. For the
+///     ``"discounting"`` and ``"hazard_rate"`` models it holds one
+///     ``cashflow_pv`` entry per projected cashflow (date, amount, discount
+///     factor, curve, survival probability, present value) that sums to the
+///     price, capped at 1000 entries. Other models get one
+///     ``computation_step`` entry saying no per-flow decomposition exists.
+///     Default ``False`` attaches nothing.
 ///
 /// Returns
 /// -------
 /// ValuationResult
 ///     Typed valuation envelope carrying value, currency, metrics, and
-///     covenant flags. A stochastic ``"rates_credit"`` bond result also
+///     covenant flags. ``result.provenance`` records the model, requested
+///     date, declared market dependencies, scenario adjustment and (when
+///     metrics are requested) the finite-difference bump sizes. A stochastic ``"rates_credit"`` bond result also
 ///     carries Monte Carlo convergence and reproducibility diagnostics in
 ///     ``details``.
 ///
@@ -787,9 +797,9 @@ pub(crate) fn market_history_json(
 /// JSON that ``ValuationResult.from_json`` accepts, for pipelines that
 /// serialize results.
 #[pyfunction]
-#[pyo3(signature = (instrument, market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
+#[pyo3(signature = (instrument, market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None, explain=false))]
 #[pyo3(
-    text_signature = "(instrument, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)"
+    text_signature = "(instrument, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None, explain=False)"
 )]
 // PyO3 binding: the argument list mirrors the Python keyword-argument API, so
 // it cannot be collapsed into a parameter struct without changing that API.
@@ -803,6 +813,7 @@ fn price_instrument(
     metrics: Option<Vec<String>>,
     metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
     market_history: Option<&Bound<'_, PyAny>>,
+    explain: bool,
 ) -> PyResult<PyValuationResult> {
     let overrides = metric_pricing_overrides_json(py, metric_pricing_overrides)?;
     let json = extract_instrument_json(instrument)?;
@@ -814,7 +825,16 @@ fn price_instrument(
             )
         })
         .map_err(core_to_py)?;
-    super::instruments::price_prepared(py, prepared, market, as_of, model, metrics, market_history)
+    super::instruments::price_prepared(
+        py,
+        prepared,
+        market,
+        as_of,
+        model,
+        metrics,
+        market_history,
+        explain,
+    )
 }
 
 /// List all metric IDs in the standard metric registry.
@@ -1088,6 +1108,12 @@ const CASHFLOW_ROW_COLUMNS: &[(&str, &str)] = &[
     ("currency", "str"),
     ("kind", "str"),
     ("accrual_factor", "float64"),
+    ("accrual_start", "str"),
+    ("accrual_end", "str"),
+    ("accrual_day_count", "str"),
+    ("accrual_notional", "float64"),
+    ("index_rate", "float64"),
+    ("principal_delta", "float64"),
     ("year_fraction", "float64"),
     ("rate", "float64"),
     ("reset_date", "str"),
@@ -1099,6 +1125,8 @@ const CASHFLOW_ROW_COLUMNS: &[(&str, &str)] = &[
     ("prepayment_smm", "float64"),
     ("beginning_balance", "float64"),
     ("ending_balance", "float64"),
+    ("native_pv", "float64"),
+    ("fx_rate", "float64"),
     ("pv", "float64"),
 ];
 
@@ -1146,6 +1174,13 @@ impl PyInstrumentCashflowEnvelope {
         self.inner.recovery_rate
     }
 
+    /// Scenario price shock applied to every row ``pv`` and ``total_pv``, as a
+    /// decimal (``-0.10`` multiplies by 0.90); ``None`` when unshocked.
+    #[getter]
+    fn scenario_price_shock_decimal(&self) -> Option<f64> {
+        self.inner.scenario_price_shock_decimal
+    }
+
     /// Per-flow rows as a list of dicts (the serde form of ``CashflowRow``).
     #[getter]
     fn flows<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -1167,19 +1202,27 @@ impl PyInstrumentCashflowEnvelope {
     /// One row per cashflow as a pandas ``DataFrame``.
     ///
     /// Columns, in order: ``date``, ``amount``, ``currency``, ``kind``,
-    /// ``accrual_factor``, ``year_fraction``, ``rate``, ``reset_date``,
+    /// ``accrual_factor``, ``accrual_start``, ``accrual_end``,
+    /// ``accrual_day_count``, ``accrual_notional``, ``index_rate``,
+    /// ``principal_delta``, ``year_fraction``, ``rate``, ``reset_date``,
     /// ``discount_factor``, ``discount_curve_id``, ``survival_probability``,
     /// ``conditional_default_prob``, ``inflation_index_ratio``,
-    /// ``prepayment_smm``, ``beginning_balance``, ``ending_balance``, ``pv``.
-    /// ``date`` and ``reset_date`` are ``datetime64``; a field the model does
-    /// not populate is null.
+    /// ``prepayment_smm``, ``beginning_balance``, ``ending_balance``,
+    /// ``native_pv``, ``fx_rate``, ``pv``.
+    /// ``date``, ``reset_date``, ``accrual_start`` and ``accrual_end`` are
+    /// ``datetime64``; a field the model does not populate is null.
+    ///
+    /// A coupon row can be recomputed as ``accrual_notional * rate *
+    /// accrual_factor`` when the balance is constant over its accrual period,
+    /// and its value as ``native_pv * fx_rate`` (times one plus
+    /// ``scenario_price_shock_decimal`` when the envelope carries one).
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let frame =
             serde_rows_to_dataframe_with_schema(py, &self.inner.flows, CASHFLOW_ROW_COLUMNS)?;
         let to_datetime = py.import("pandas")?.getattr("to_datetime")?;
         let parsed = pyo3::types::PyDict::new(py);
-        for column in ["date", "reset_date"] {
+        for column in ["date", "reset_date", "accrual_start", "accrual_end"] {
             parsed.set_item(column, to_datetime.call1((frame.get_item(column)?,))?)?;
         }
         frame.call_method("assign", (), Some(&parsed))

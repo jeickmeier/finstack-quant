@@ -264,8 +264,8 @@ impl PyCalibrationResult {
 
     /// Per-quote residuals of one step as a pandas ``DataFrame``.
     ///
-    /// Columns: ``quote_id``, ``target``, ``fitted``, ``residual``,
-    /// ``sensitivity``. ``target`` / ``fitted`` / ``sensitivity`` are ``NaN``
+    /// Columns: ``quote_id``, ``quote_value``, ``residual``,
+    /// ``sensitivity``. ``quote_value`` / ``sensitivity`` are ``NaN``
     /// unless ``CalibrationConfig.compute_diagnostics`` was enabled.
     ///
     /// Parameters

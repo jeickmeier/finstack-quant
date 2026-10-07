@@ -3633,9 +3633,7 @@ class QuoteQuality:
     Examples:
     --------
     >>> from finstack_quant.calibration import QuoteQuality
-    >>> q = QuoteQuality.from_json(
-    ...     '{"quote_label":"s5y","target_value":0.042,"fitted_value":0.042,"residual":0.0,"sensitivity":1.0}'
-    ... )
+    >>> q = QuoteQuality.from_json('{"quote_label":"s5y","quote_value":0.042,"residual":0.0,"sensitivity":1.0}')
     >>> q.quote_label
     's5y'
 
@@ -3655,55 +3653,50 @@ class QuoteQuality:
         """
 
     @property
-    def target_value(self) -> float:
+    def quote_value(self) -> float | None:
         """
-        Quoted market value in the target's own units.
+        Market quote the calibration instrument was built from.
+
+        Native quote units: decimal rate for deposits, FRAs, swaps and
+        inflation swaps; price for rate futures; basis points for CDS par
+        spreads and cross-currency basis; percent for CDS and tranche upfronts.
 
         This property does not raise.
 
         Returns
         -------
-        float
-            Quoted market value in the target's own units.
-        """
-
-    @property
-    def fitted_value(self) -> float:
-        """
-        Value reproduced by the calibrated object, same units as the target.
-
-        This property does not raise.
-
-        Returns
-        -------
-        float
-            Value reproduced by the calibrated object, same units as the target.
+        float or None
+            The quote value, or ``None`` when diagnostics were not computed or
+            the target's quotes carry no single scalar value.
         """
 
     @property
     def residual(self) -> float:
         """
-        ``fitted_value - target_value``, in the target's own units.
+        Signed calibration residual; the calibration target is zero.
+
+        The value of the instrument built at ``quote_value``, priced on the
+        calibrated curve and divided by the target's residual notional.
 
         This property does not raise.
 
         Returns
         -------
         float
-            ``fitted_value - target_value``, in the target's own units.
+            Normalized value of the quote instrument on the calibrated curve.
         """
 
     @property
     def sensitivity(self) -> float:
         """
-        Derivative of the fitted value with respect to the solved parameter.
+        Absolute derivative of the residual with respect to the solved parameter.
 
         This property does not raise.
 
         Returns
         -------
         float
-            Derivative of the fitted value with respect to the solved parameter.
+            Absolute derivative of the residual with respect to the solved parameter.
         """
 
     def to_json(self) -> str:
@@ -3851,7 +3844,7 @@ class CalibrationDiagnostics:
         Returns
         -------
         pandas.DataFrame
-            Columns ``quote_label``, ``target``, ``fitted``, ``residual`` and
+            Columns ``quote_id``, ``quote_value``, ``residual`` and
             ``sensitivity``, one row per quote.
 
         Raises
@@ -4176,8 +4169,8 @@ class CalibrationReport:
         Returns
         -------
         pandas.DataFrame
-            Columns ``quote_id``, ``target``, ``fitted``, ``residual`` and
-            ``sensitivity``. Target, fitted and sensitivity are NaN when
+            Columns ``quote_id``, ``quote_value``, ``residual`` and
+            ``sensitivity``. Quote value and sensitivity are NaN when
             diagnostics were not computed.
 
         Raises
@@ -4537,8 +4530,9 @@ class CalibrationResult:
         Returns
         -------
         pandas.DataFrame
-            Columns ``quote_id``, ``target``, ``fitted``, ``residual`` and
-            ``sensitivity``, in the target's own units.
+            Columns ``quote_id``, ``quote_value`` (native quote units),
+            ``residual`` (normalized instrument value, target zero) and
+            ``sensitivity``.
 
         Raises
         ------

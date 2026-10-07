@@ -992,7 +992,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
-      "bytes": 16748,
+      "bytes": 19964,
       "kind": "output",
       "path": "schemas/results/1/instrument_cashflow.schema.json",
       "summary": "Native cashflow rows, reporting-currency PV and reconciliation status.",
@@ -1091,7 +1091,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
-      "bytes": 60306,
+      "bytes": 69439,
       "kind": "output",
       "path": "schemas/results/1/valuation_result.schema.json",
       "summary": "PV plus requested measures, with rounding and FX policy stamps.",

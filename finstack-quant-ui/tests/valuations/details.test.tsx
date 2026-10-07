@@ -191,17 +191,20 @@ it("shows absence distinctly", () => {
   expect(screen.queryByText("Covenants")).toBeNull();
 });
 it("preserves optional canonical trace and covenant sections as raw transport", async () => {
-  // Core explain.rs test_trace_serialization supplies this trace shape and values.
-  // Pricing's facade has no ExplainOpts input: this validates transport, not a generated pricing trace.
+  // Core explain.rs test_cashflow_pv_entry supplies this trace shape and values.
+  // This validates transport of a supplied trace, not a generated pricing trace.
   const explanation: NonNullable<ValuationResult["explanation"]> = {
-    type: "calibration",
+    type: "pricing",
     entries: [
       {
-        kind: "calibration_iteration",
-        iteration: 0n,
-        residual: 0.005,
-        knots_updated: ["2025-01-15"],
-        converged: false,
+        kind: "cashflow_pv",
+        date: "2025-01-15",
+        cashflow_amount: 50000,
+        cashflow_currency: "USD",
+        discount_factor: 0.95,
+        pv_amount: 47500,
+        pv_currency: "USD",
+        curve_id: "USD_GOVT",
       },
     ],
   };

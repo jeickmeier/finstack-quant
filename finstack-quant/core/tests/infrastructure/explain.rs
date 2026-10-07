@@ -24,11 +24,10 @@ fn test_explanation_trace_size_cap() {
     // Add more entries than the cap
     for i in 0..10 {
         trace.push(
-            TraceEntry::CalibrationIteration {
-                iteration: i,
-                residual: 0.001 * (i as f64),
-                knots_updated: vec![format!("{}y", i)],
-                converged: false,
+            TraceEntry::ComputationStep {
+                name: format!("step_{i}"),
+                description: "step".to_string(),
+                metadata: None,
             },
             opts.max_entries,
         );
@@ -51,6 +50,7 @@ fn test_explanation_trace_serialization() {
             pv_amount: 47500.0,
             pv_currency: "USD".to_string(),
             curve_id: "USD_GOVT".to_string(),
+            survival_probability: None,
         },
         None,
     );
@@ -138,11 +138,10 @@ mod property_tests {
         // Try to add many entries
         for i in 0..100 {
             trace.push(
-                TraceEntry::CalibrationIteration {
-                    iteration: i,
-                    residual: 0.001,
-                    knots_updated: vec![],
-                    converged: false,
+                TraceEntry::ComputationStep {
+                    name: format!("step_{i}"),
+                    description: "step".to_string(),
+                    metadata: None,
                 },
                 opts.max_entries,
             );

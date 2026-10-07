@@ -53,6 +53,25 @@ impl CalibrationQuote {
         }
     }
 
+    /// Market quote value in the quote's native units: decimal rate (or
+    /// futures price) for rates and inflation, basis points for CDS par spread
+    /// and cross-currency basis, percent for CDS and tranche upfronts.
+    pub(crate) fn quote_value(&self) -> f64 {
+        match self {
+            CalibrationQuote::Rates(q) => q.quote.value(),
+            CalibrationQuote::Cds(q) => match q.quote.as_ref() {
+                CdsQuote::CdsParSpread { spread_bp, .. } => *spread_bp,
+                CdsQuote::CdsUpfront { upfront_pct, .. } => *upfront_pct,
+            },
+            CalibrationQuote::CdsTranche(q) => q.prepared.quote.upfront_pct,
+            CalibrationQuote::Inflation(q) => match q.quote.as_ref() {
+                InflationQuote::InflationSwap { rate, .. }
+                | InflationQuote::YoYInflationSwap { rate, .. } => *rate,
+            },
+            CalibrationQuote::XccyBasis(q) => q.quote.value(),
+        }
+    }
+
     /// Get reference to the underlying instrument.
     pub(crate) fn get_instrument(&self) -> &dyn Instrument {
         match self {

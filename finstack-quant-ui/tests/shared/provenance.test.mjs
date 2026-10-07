@@ -50,6 +50,7 @@ it("records full pricing inputs and the supported raw and typed routes", () => {
     "metrics",
     "metricPricingOverrides",
     "marketHistory",
+    "explain",
   ]);
   expect(
     inventory.details

@@ -65,7 +65,7 @@
           "type": "null"
         }
       ],
-      "description": "Optional computation explanation trace.\n\nEnabled via `ExplainOpts` in configuration. Provides step-by-step\ntrace of calculations for debugging and auditability."
+      "description": "Optional computation explanation trace.\n\nRequested with `PricingOptions::with_explain`. For discounting and\nhazard-rate valuations it holds one `cashflow_pv` entry per projected\ncashflow, reconciled to `value`; for other models it holds a single\n`computation_step` entry saying no per-flow decomposition exists."
     },
     "instrument_id": {
       "description": "Unique identifier for the priced instrument.",
@@ -82,6 +82,17 @@
     "meta": {
       "$ref": "#/$defs/d_bbbaabd9311c14f65e9b",
       "description": "Calculation metadata and policy stamps.\n\nContains:\n- Numeric mode (Decimal vs f64)\n- Rounding context and precision\n- FX policy for cross-currency calculations\n- Calculation timing information"
+    },
+    "provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_9ac3b1be80f4eff446fb"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "How the result was produced: model, requested date, declared market\ndependencies, scenario adjustment and sensitivity bump sizes.\n\nStamped by the pricer registry. Absent on results constructed directly."
     },
     "schema_version": {
       "$ref": "#/$defs/d_9de9bcf26fa2ccd01b1f",
@@ -242,6 +253,51 @@
       ],
       "type": "object"
     },
+    "d_1a872a78f6334f77801f": {
+      "additionalProperties": false,
+      "description": "Finite-difference bump sizes in force for a metric request.\n\nThese are the values after layering the `valuations.sensitivities.v1`\nconfiguration extension and the instrument's\n`metric_pricing_overrides.bump_config` over the library defaults. Bumped\nsensitivities are reported per unit bump (per 1bp, per 1 vol point), so\nthese sizes describe how the difference was taken, not the reporting unit.\n\nA calculator with a fixed, documented shock of its own (for example an\nanalytic greek, or a metric whose rustdoc names its shock) does not read\nthese values.",
+      "properties": {
+        "adaptive_bumps": {
+          "description": "Whether spot and volatility bumps are rescaled by volatility, time to\nexpiry and moneyness instead of applied at the fixed sizes above.",
+          "type": "boolean"
+        },
+        "credit_spread_bump_bp": {
+          "description": "Credit-spread bump in basis points (1.0 = 1bp).",
+          "format": "double",
+          "type": "number"
+        },
+        "rate_bump_bp": {
+          "description": "Parallel interest-rate bump in basis points (1.0 = 1bp).",
+          "format": "double",
+          "type": "number"
+        },
+        "spot_bump_decimal": {
+          "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).",
+          "format": "double",
+          "type": "number"
+        },
+        "vol_bump_decimal": {
+          "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).",
+          "format": "double",
+          "type": "number"
+        },
+        "ytm_bump_bp": {
+          "description": "Yield bump in basis points for numerical yield duration and convexity.\nAbsent when each calculator keeps its own default shock.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "rate_bump_bp",
+        "credit_spread_bump_bp",
+        "spot_bump_decimal",
+        "vol_bump_decimal"
+      ],
+      "type": "object"
+    },
     "d_1b2ccb88c9229e7463e8": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "description": "ISO 8601 calendar date string.",
@@ -358,48 +414,8 @@
       "type": "object"
     },
     "d_35c446142142801cbb82": {
-      "description": "Domain-specific trace entry types.\n\nEach variant captures relevant details for different types of computations:\n- Calibration: iteration details, convergence status\n- Pricing: cashflow-level PV breakdowns\n- Waterfall: step-by-step payment allocations",
+      "description": "Domain-specific trace entry types.\n\nEach variant captures relevant details for different types of computations:\n- Calibration: solver steps as generic computation steps\n- Pricing: cashflow-level PV breakdowns\n- Waterfall: step-by-step payment allocations",
       "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Calibration solver iteration details",
-          "properties": {
-            "converged": {
-              "description": "Whether convergence was achieved",
-              "type": "boolean"
-            },
-            "iteration": {
-              "description": "Iteration number (0-based)",
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "kind": {
-              "const": "calibration_iteration",
-              "type": "string"
-            },
-            "knots_updated": {
-              "description": "Knot points that were updated",
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "residual": {
-              "description": "Objective function residual",
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "kind",
-            "iteration",
-            "residual",
-            "knots_updated",
-            "converged"
-          ],
-          "type": "object"
-        },
         {
           "additionalProperties": false,
           "description": "Cashflow present value breakdown",
@@ -438,6 +454,14 @@
             "pv_currency": {
               "description": "PV currency",
               "type": "string"
+            },
+            "survival_probability": {
+              "description": "Conditional survival probability to the payment date, `S(date) / S(as_of)`.\n\nPresent only for credit-risky valuations. `pv_amount` then also\nincludes the recovery leg, so it is not `cashflow_amount ×\ndiscount_factor × survival_probability`.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
             }
           },
           "required": [
@@ -543,6 +567,39 @@
           "type": "object"
         }
       ]
+    },
+    "d_3b714c6f9450267930ea": {
+      "additionalProperties": false,
+      "description": "A volatility-surface dependency with the context needed for diagnostics.",
+      "properties": {
+        "reference_strike": {
+          "description": "Optional contractual strike used by local volatility diagnostics.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "spot_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional market-scalar id of the underlying spot paired with the surface."
+        },
+        "vol_surface_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Volatility surface identifier."
+        }
+      },
+      "required": [
+        "vol_surface_id"
+      ],
+      "type": "object"
     },
     "d_3b7975306604d24b2d21": {
       "description": "Tranche seniority levels",
@@ -761,6 +818,59 @@
       ],
       "type": "object"
     },
+    "d_6f90163da686371ca49e": {
+      "additionalProperties": false,
+      "description": "Unified dependency container for instrument market data requirements.",
+      "properties": {
+        "credit_index_ids": {
+          "description": "Credit-index aggregates resolved through `MarketContext::get_credit_index`.\n\nThese identifiers are distinct from direct hazard-curve IDs because a\ncredit index also carries base correlation and optional issuer curves.",
+          "items": {
+            "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+          },
+          "type": "array"
+        },
+        "curves": {
+          "$ref": "#/$defs/d_e567683d30a4c26c8269",
+          "description": "Curve dependencies grouped by type."
+        },
+        "fx_pairs": {
+          "description": "FX pairs required for pricing (spot matrices).",
+          "items": {
+            "$ref": "#/$defs/d_b2b64fea7715cf5d4700"
+          },
+          "type": "array"
+        },
+        "market_scalar_ids": {
+          "description": "Scalar market-value identifiers resolved through `MarketContext::get_price`.\n\nThis includes tradable spots and non-price unitless scalars such as\ncontinuous dividend yields. [`Self::series_ids`] is reserved for\n`MarketContext::get_series` dependencies.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "series_ids": {
+          "description": "Scalar time series identifiers (e.g., OHLC price series for realized variance).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "volatility_dependencies": {
+          "description": "Typed volatility dependencies in deterministic insertion order.",
+          "items": {
+            "$ref": "#/$defs/d_3b714c6f9450267930ea"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "curves",
+        "market_scalar_ids",
+        "volatility_dependencies",
+        "fx_pairs",
+        "series_ids"
+      ],
+      "type": "object"
+    },
     "d_719f3377340f012e0eb2": {
       "additionalProperties": false,
       "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides configurable epsilon values for zero-checks in rate calculations\nand generic floating-point comparisons. These defaults are chosen to balance\nnumerical stability with practical precision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.rate_epsilon, 1e-12);\n\n// Customize for stricter rate comparisons\ntol.rate_epsilon = 1e-14;\n```",
@@ -867,6 +977,49 @@
           "type": "object"
         }
       ]
+    },
+    "d_9ac3b1be80f4eff446fb": {
+      "additionalProperties": false,
+      "description": "How a valuation result was produced.\n\nStamped by [`crate::pricer::PricerRegistry::price_with_metrics`] on every\nresult so the number can be reproduced from the result plus the archived\nmarket: the model that priced it, the date the caller asked for, the market\ndata the instrument declares, any scenario adjustment applied to the value,\nand the bump sizes behind its sensitivities.",
+      "properties": {
+        "market_dependencies": {
+          "$ref": "#/$defs/d_6f90163da686371ca49e",
+          "description": "Curves, surfaces, scalars, FX pairs and series the instrument declares\nit reads. Identifiers refer to the `MarketContext` the result was\npriced against."
+        },
+        "model": {
+          "$ref": "#/$defs/d_d5837ae057e724b8713e",
+          "description": "Registered pricing model that produced `value`."
+        },
+        "requested_as_of": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Valuation date the caller requested.\n\nThe result's `as_of` is the effective date after the instrument resolved\nit (for example to the market's spot date); the two differ only when\nthe instrument moved it."
+        },
+        "scenario_price_shock_decimal": {
+          "description": "Scenario price shock already applied to `value`, as a decimal\n(`-0.10` = the model value was multiplied by 0.90). Absent when the\nvalue is the unadjusted model value.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "sensitivity_bumps": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_1a872a78f6334f77801f"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Bump sizes in force for the requested metrics. Absent when no metric\nwas requested."
+        }
+      },
+      "required": [
+        "model",
+        "requested_as_of",
+        "market_dependencies"
+      ],
+      "type": "object"
     },
     "d_9bbbe0cc70b45831cb71": {
       "description": "ISO 4217 currency enumeration",
@@ -1815,6 +1968,25 @@
         "antithetic",
         "sobol",
         "brownian_bridge"
+      ],
+      "type": "object"
+    },
+    "d_b2b64fea7715cf5d4700": {
+      "additionalProperties": false,
+      "description": "FX pair identifier using base/quote currency ordering.",
+      "properties": {
+        "base": {
+          "$ref": "#/$defs/d_be98333e68c25ab5ae57",
+          "description": "Base currency (numerator)."
+        },
+        "quote": {
+          "$ref": "#/$defs/d_be98333e68c25ab5ae57",
+          "description": "Quote currency (denominator)."
+        }
+      },
+      "required": [
+        "base",
+        "quote"
       ],
       "type": "object"
     },
@@ -2989,6 +3161,47 @@
         "wal",
         "credit_duration",
         "draw_option_cost"
+      ],
+      "type": "object"
+    },
+    "d_e567683d30a4c26c8269": {
+      "additionalProperties": false,
+      "description": "Collection of curves used by an instrument, categorized by market role.",
+      "properties": {
+        "credit_curves": {
+          "description": "Credit/hazard curves used by the instrument.",
+          "items": {
+            "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+          },
+          "type": "array"
+        },
+        "discount_curves": {
+          "description": "Discount curves used by the instrument (including primary and foreign).",
+          "items": {
+            "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+          },
+          "type": "array"
+        },
+        "forward_curves": {
+          "description": "Forward/projection curves used by the instrument.",
+          "items": {
+            "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+          },
+          "type": "array"
+        },
+        "inflation_curves": {
+          "description": "Inflation curves or published inflation indices used by the instrument.",
+          "items": {
+            "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "discount_curves",
+        "forward_curves",
+        "credit_curves",
+        "inflation_curves"
       ],
       "type": "object"
     },

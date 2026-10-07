@@ -9,6 +9,7 @@ use super::traits::GlobalSolveTarget;
 use crate::constants::PENALTY;
 use crate::report::{CalibrationDiagnostics, QuoteQuality};
 use crate::{CalibrationConfig, CalibrationReport};
+use finstack_quant_core::explain::{ExplanationTrace, TraceEntry};
 use finstack_quant_core::Result;
 use std::cell::{Cell, RefCell};
 use std::collections::{btree_map::Entry, BTreeMap};
@@ -483,6 +484,26 @@ impl GlobalFitOptimizer {
                 config,
             );
             report = report.with_diagnostics(diagnostics);
+        }
+        if config.explain.enabled {
+            let mut trace = ExplanationTrace::new("global_fit");
+            trace.push(
+                TraceEntry::ComputationStep {
+                    name: "global_solve".to_string(),
+                    description: format!("{:?}", stats.termination_reason),
+                    metadata: Some(serde_json::json!({
+                        "times": times,
+                        "solved_params": solved_params,
+                        "iterations": stats.iterations,
+                        "residual_evals": stats.residual_evals,
+                        "jacobian_evals": stats.jacobian_evals,
+                        "weighted_residual_l2_norm": weighted_l2_norm,
+                        "max_abs_residual": max_abs_residual,
+                    })),
+                },
+                config.explain.max_entries,
+            );
+            report = report.with_explanation(trace);
         }
 
         Ok((final_curve, report))
@@ -1153,8 +1174,7 @@ where
 
         per_quote.push(QuoteQuality {
             quote_label: target.residual_key(quote, i),
-            target_value: 0.0, // Target is implicitly zero for residual-based calibration.
-            fitted_value: resid, // The residual IS the deviation from zero.
+            quote_value: target.quote_value(quote),
             residual: resid,
             sensitivity,
         });

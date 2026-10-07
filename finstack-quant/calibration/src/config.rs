@@ -521,8 +521,11 @@ pub struct CalibrationConfig {
     pub use_parallel: bool,
     /// Enable verbose logging of the calibration process.
     pub verbose: bool,
-    /// Explanation options (opt-in detailed trace for debugging).
-    #[serde(skip)]
+    /// Explanation options (opt-in step trace on each step report and on the
+    /// plan report). `{"enabled": true}` records every bootstrap knot and
+    /// global solve; add `max_entries` to cap the trace. Omitted from the wire
+    /// form when disabled.
+    #[serde(skip_serializing_if = "explain_is_disabled")]
     pub explain: ExplainOpts,
     /// Runtime validation mode (warnings vs errors).
     pub validation_mode: ValidationMode,
@@ -591,6 +594,10 @@ pub struct CalibrationConfig {
     /// Optional market-data hierarchy snapshot.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hierarchy: Option<MarketDataHierarchy>,
+}
+
+fn explain_is_disabled(explain: &ExplainOpts) -> bool {
+    !explain.enabled
 }
 
 fn default_fail_on_bad_fit() -> bool {

@@ -5660,6 +5660,7 @@ export interface DE1605Cebc97720Bf2277 {
    */
   compute_diagnostics?: boolean;
   discount_curve?: D_65447E12Defc07E99879;
+  explain?: D_6F5E88682Ce9F1Cd3A3C;
   /**
    * When `true`, a calibration step whose solver reports
    * `report.success == false` is propagated as a
@@ -5760,6 +5761,23 @@ export interface D_65447E12Defc07E99879 {
    * Weighting scheme for global solve residuals.
    */
   weighting_scheme?: "equal" | "linear_time" | "sqrt_time" | "inverse_duration";
+}
+/**
+ * Explanation options (opt-in step trace on each step report and on the
+ * plan report). `{"enabled": true}` records every bootstrap knot and
+ * global solve; add `max_entries` to cap the trace. Omitted from the wire
+ * form when disabled.
+ */
+export interface D_6F5E88682Ce9F1Cd3A3C {
+  /**
+   * Whether explanation tracing is enabled
+   */
+  enabled?: boolean;
+  /**
+   * Maximum number of trace entries (caps memory usage). `None` records
+   * every entry.
+   */
+  max_entries?: number | null;
 }
 /**
  * Forward-curve specific solver configuration.

@@ -15,9 +15,16 @@
 //! # Columns
 //!
 //! Always populated (null-as-needed): `date, amount, currency, kind,
-//! accrual_factor, year_fraction, rate, reset_date, discount_factor,
-//! survival_probability, conditional_default_prob, inflation_index_ratio,
-//! prepayment_smm, beginning_balance, ending_balance, pv`.
+//! accrual_factor, accrual_start, accrual_end, accrual_day_count,
+//! accrual_notional, index_rate, principal_delta, year_fraction, rate,
+//! reset_date, discount_factor, survival_probability,
+//! conditional_default_prob, inflation_index_ratio, prepayment_smm,
+//! beginning_balance, ending_balance, native_pv, fx_rate, pv`.
+//!
+//! The accrual columns carry the inputs of each coupon, so a row can be
+//! recomputed as `accrual_notional × rate × accrual_factor` when the balance
+//! is constant over its accrual period; `native_pv × fx_rate` (times one plus
+//! the envelope's `scenario_price_shock_decimal`) gives `pv`.
 //!
 //! Hazard-only columns are populated when `model = "hazard_rate"`.
 //! Inflation / MBS columns are populated by concrete-type downcasts when the
@@ -75,6 +82,10 @@ pub struct InstrumentCashflowEnvelope {
     /// Recovery rate from the hazard curve (omitted for `discounting` model).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recovery_rate: Option<f64>,
+    /// Scenario price shock applied to every row `pv` and to `total_pv`, as a
+    /// decimal (`-0.10` = multiplied by 0.90). Absent when rows are unshocked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scenario_price_shock_decimal: Option<f64>,
     /// Per-row enriched cashflows.
     pub flows: Vec<CashflowRow>,
     /// Sum of `flows[i].pv`. Matches `base_value` for supported products.
@@ -105,6 +116,41 @@ pub struct CashflowRow {
     pub kind: CFKind,
     /// Accrual factor stored on the `CashFlow`.
     pub accrual_factor: f64,
+    /// Contractual accrual-period start behind `accrual_factor`. Absent for
+    /// flows that carry no accrual metadata (principal, fees, exchanges).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(with = "finstack_quant_core::wire::optional_date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
+    pub accrual_start: Option<Date>,
+    /// Contractual accrual-period end behind `accrual_factor`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(with = "finstack_quant_core::wire::optional_date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
+    pub accrual_end: Option<Date>,
+    /// Day-count convention that turns the accrual period into `accrual_factor`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accrual_day_count: Option<finstack_quant_core::dates::DayCount>,
+    /// Outstanding principal at `accrual_start`, in row currency: the balance
+    /// the coupon accrues on when it is constant over the period. Absent when
+    /// the flow has no accrual period or the schedule has no issue date to
+    /// replay balances from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accrual_notional: Option<f64>,
+    /// Index rate (annualized decimal) before spread, gearing, caps and
+    /// floors, for floating coupons. `rate` is the all-in rate after them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_rate: Option<f64>,
+    /// Change in outstanding principal carried by this flow, in row currency
+    /// (positive increases the balance). Absent when the flow kind and amount
+    /// alone determine the balance movement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub principal_delta: Option<f64>,
     /// Year fraction from `as_of` to `date` under the discount curve's day count.
     pub year_fraction: f64,
     /// Projected / contractual rate when present (floats, real-coupon rates, etc.).
@@ -140,7 +186,15 @@ pub struct CashflowRow {
     /// Ending pool balance for the period (agency MBS only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ending_balance: Option<f64>,
-    /// Per-flow present value in the envelope reporting currency. Sums to `total_pv`.
+    /// Present value in row currency, before FX conversion and before any
+    /// scenario price shock.
+    pub native_pv: f64,
+    /// FX rate (reporting currency per unit of row currency) applied to
+    /// `native_pv`. Absent when the row is already in the reporting currency.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fx_rate: Option<f64>,
+    /// Per-flow present value in the envelope reporting currency, after FX
+    /// conversion and any scenario price shock. Sums to `total_pv`.
     pub pv: f64,
 }
 
@@ -214,42 +268,19 @@ fn build_envelope(
     as_of: &str,
     model: &str,
 ) -> Result<InstrumentCashflowEnvelope> {
-    let instrument_type = instrument.key();
-    let instrument_id = instrument.id().to_string();
-
     let model_key: ModelKey = model.parse().map_err(|e: String| {
         Error::Validation(format!(
             "unknown model '{model}': {e}. Supported: 'discounting', 'hazard_rate'"
         ))
     })?;
-    if !matches!(model_key, ModelKey::Discounting | ModelKey::HazardRate) {
-        return Err(Error::Validation(format!(
-            "model '{model}' not supported for instrument_cashflows; supported: 'discounting', 'hazard_rate'"
-        )));
-    }
-
-    if let Some(bond) = instrument.as_any().downcast_ref::<Bond>() {
-        let has_embedded_options = bond
-            .call_put
-            .as_ref()
-            .is_some_and(crate::instruments::fixed_income::bond::CallPutSchedule::has_options)
-            || bond.return_floor.is_some();
-        if has_embedded_options {
-            return Err(Error::Validation(format!(
-                "instrument_cashflows: static cashflow rows cannot decompose the \
-                 exercise-contingent value of bond '{}' under model '{}'; request the model \
-                 price directly",
-                bond.id(),
-                model_key.as_str()
-            )));
-        }
-    }
+    ensure_decomposable(instrument, model_key)?;
 
     let requested_as_of = finstack_quant_core::dates::parse_iso_date(as_of)
         .map_err(|e| Error::Validation(format!("invalid as_of '{as_of}': {e}")))?;
 
     // --- Pricer registry gate: ensure the (type, model) pair is supported ---
     let registry = shared_standard_registry();
+    let instrument_type = instrument.key();
     let pricer_key = PricerKey::new(instrument_type, model_key);
     if registry.get_pricer(pricer_key).is_none() {
         return Err(Error::Validation(format!(
@@ -270,6 +301,95 @@ fn build_envelope(
         &[],
         crate::instruments::PricingOptions::default().mark_instrument_validated(),
     )?;
+    envelope_for_priced(instrument, market, model_key, &canonical_result)
+}
+
+/// Reject models and instruments whose value is not a sum of static cashflow PVs.
+fn ensure_decomposable(instrument: &dyn Instrument, model_key: ModelKey) -> Result<()> {
+    if !matches!(model_key, ModelKey::Discounting | ModelKey::HazardRate) {
+        return Err(Error::Validation(format!(
+            "model '{model_key}' not supported for instrument_cashflows; supported: 'discounting', 'hazard_rate'"
+        )));
+    }
+
+    if let Some(bond) = instrument.as_any().downcast_ref::<Bond>() {
+        let has_embedded_options = bond
+            .call_put
+            .as_ref()
+            .is_some_and(crate::instruments::fixed_income::bond::CallPutSchedule::has_options)
+            || bond.return_floor.is_some();
+        if has_embedded_options {
+            return Err(Error::Validation(format!(
+                "instrument_cashflows: static cashflow rows cannot decompose the \
+                 exercise-contingent value of bond '{}' under model '{}'; request the model \
+                 price directly",
+                bond.id(),
+                model_key.as_str()
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Build the per-flow trace attached to a valuation result's `explanation`.
+///
+/// Uses the same rows as [`instrument_cashflows`], so the trace reconciles to
+/// `priced.value`. When the model has no static per-flow decomposition the
+/// trace holds one `computation_step` entry carrying the reason.
+pub(crate) fn pricing_trace(
+    instrument: &dyn Instrument,
+    market: &MarketContext,
+    model_key: ModelKey,
+    priced: &crate::results::ValuationResult,
+    explain: finstack_quant_core::explain::ExplainOpts,
+) -> finstack_quant_core::explain::ExplanationTrace {
+    use finstack_quant_core::explain::{ExplanationTrace, TraceEntry};
+
+    let mut trace = ExplanationTrace::new("pricing");
+    let envelope = ensure_decomposable(instrument, model_key)
+        .and_then(|()| envelope_for_priced(instrument, market, model_key, priced));
+    match envelope {
+        Ok(envelope) => {
+            for row in &envelope.flows {
+                trace.push(
+                    TraceEntry::CashflowPV {
+                        date: row.date,
+                        cashflow_amount: row.amount,
+                        cashflow_currency: row.currency.to_string(),
+                        discount_factor: row.discount_factor,
+                        pv_amount: row.pv,
+                        pv_currency: envelope.currency.to_string(),
+                        curve_id: row.discount_curve_id.to_string(),
+                        survival_probability: row.survival_probability,
+                    },
+                    explain.max_entries,
+                );
+            }
+        }
+        Err(error) => trace.push(
+            TraceEntry::ComputationStep {
+                name: "cashflow_trace_unavailable".to_string(),
+                description: error.to_string(),
+                metadata: None,
+            },
+            explain.max_entries,
+        ),
+    }
+    trace
+}
+
+/// Decompose an already priced discounting / hazard-rate result into per-flow rows.
+///
+/// `canonical_result` must come from the registered `model_key` pricer for
+/// `instrument`; its `as_of` is the effective valuation date and its `value`
+/// is the reconciliation target.
+fn envelope_for_priced(
+    instrument: &dyn Instrument,
+    market: &MarketContext,
+    model_key: ModelKey,
+    canonical_result: &crate::results::ValuationResult,
+) -> Result<InstrumentCashflowEnvelope> {
+    let instrument_id = instrument.id().to_string();
     let as_of_date = canonical_result.as_of;
 
     let deps = instrument.market_dependencies()?;
@@ -413,6 +533,8 @@ fn build_envelope(
         DateContext::new(as_of_date, primary_discount.day_count(), dc_ctx),
     )?;
 
+    let accrual_notionals = accrual_start_balances(&schedule);
+
     for (row_index, flow) in schedule.get_flows().iter().enumerate() {
         let ccy = flow.amount.currency();
         if envelope_currency.is_none() {
@@ -468,13 +590,28 @@ fn build_envelope(
         };
 
         let native_pv = native_pvs[row_index];
+        let row_reporting_currency = envelope_currency.unwrap_or(ccy);
         let base_pv = market
             .convert_money(
                 Money::new(native_pv, ccy)?,
-                envelope_currency.unwrap_or(ccy),
+                row_reporting_currency,
                 as_of_date,
             )?
             .amount();
+        let fx_rate = if row_reporting_currency == ccy {
+            None
+        } else {
+            Some(
+                market
+                    .fx_required()?
+                    .rate(finstack_quant_core::money::fx::FxQuery::new(
+                        ccy,
+                        row_reporting_currency,
+                        as_of_date,
+                    ))?
+                    .rate,
+            )
+        };
         let pv =
             crate::instruments::common_impl::helpers::apply_scenario_raw_value(instrument, base_pv);
 
@@ -507,6 +644,17 @@ fn build_envelope(
             currency: ccy,
             kind: flow.kind,
             accrual_factor: flow.accrual_factor,
+            accrual_start: flow.accrual.as_ref().map(|accrual| accrual.start),
+            accrual_end: flow.accrual.as_ref().map(|accrual| accrual.end),
+            accrual_day_count: flow.accrual.as_ref().map(|accrual| accrual.day_count),
+            accrual_notional: accrual_notionals
+                .as_ref()
+                .and_then(|balances| balances[row_index]),
+            index_rate: flow
+                .accrual
+                .as_ref()
+                .and_then(|accrual| accrual.projected_index_rate),
+            principal_delta: flow.principal_delta.map(|delta| delta.amount()),
             year_fraction,
             rate: flow.rate,
             reset_date: flow.reset_date,
@@ -518,6 +666,8 @@ fn build_envelope(
             prepayment_smm: mbs_row.map(|s| s.smm),
             beginning_balance: mbs_row.map(|s| s.beginning_balance),
             ending_balance: mbs_row.map(|s| s.ending_balance),
+            native_pv,
+            fx_rate,
             pv,
         });
     }
@@ -562,10 +712,40 @@ fn build_envelope(
         discount_curve_id,
         credit_curve_id,
         recovery_rate,
+        scenario_price_shock_decimal: instrument
+            .get_scenario_pricing_overrides()
+            .and_then(|overrides| overrides.scenario_price_shock_decimal),
         flows: rows,
         total_pv,
         reconciles_with_base_value: true,
     })
+}
+
+/// Outstanding principal at each flow's accrual start, row-aligned.
+///
+/// Returns `None` when the schedule cannot replay balances (no issue-date
+/// metadata); rows without an accrual period map to `None`.
+fn accrual_start_balances(
+    schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
+) -> Option<Vec<Option<f64>>> {
+    let flows = schedule.get_flows();
+    let mut starts: Vec<Date> = flows
+        .iter()
+        .filter_map(|flow| flow.accrual.as_ref().map(|accrual| accrual.start))
+        .collect();
+    starts.sort_unstable();
+    starts.dedup();
+    let balances = schedule.outstanding_at_dates(&starts).ok()?;
+    Some(
+        flows
+            .iter()
+            .map(|flow| {
+                let start = flow.accrual.as_ref()?.start;
+                let index = starts.binary_search(&start).ok()?;
+                Some(balances[index].amount())
+            })
+            .collect(),
+    )
 }
 
 #[derive(Clone, Copy)]
@@ -743,6 +923,14 @@ mod tests {
         assert!(envelope.flows.iter().any(|row| {
             row.currency == Currency::USD && row.discount_curve_id.as_str() == "USD-OIS"
         }));
+        for row in &envelope.flows {
+            if row.currency == Currency::EUR {
+                assert_eq!(row.fx_rate, Some(1.10));
+                assert!((row.native_pv * 1.10 - row.pv).abs() < 0.01);
+            } else {
+                assert!(row.fx_rate.is_none());
+            }
+        }
     }
 
     #[test]
@@ -810,7 +998,149 @@ mod tests {
         for row in &envelope.flows {
             assert!(row.survival_probability.is_none());
             assert!(row.discount_factor > 0.0);
+            assert!(row.fx_rate.is_none());
+            if row.date > as_of_date {
+                assert!((row.pv - row.native_pv).abs() < 1e-9);
+            }
         }
+        assert!(envelope.scenario_price_shock_decimal.is_none());
+
+        // Every coupon row carries the inputs it was computed from.
+        let coupons: Vec<_> = envelope
+            .flows
+            .iter()
+            .filter(|row| row.kind == CFKind::Fixed)
+            .collect();
+        assert!(!coupons.is_empty());
+        for row in coupons {
+            let start = row.accrual_start.expect("accrual start");
+            let end = row.accrual_end.expect("accrual end");
+            assert!(start < end && end <= row.date);
+            assert!(row.accrual_day_count.is_some());
+            let notional = row.accrual_notional.expect("accrual notional");
+            let rate = row.rate.expect("coupon rate");
+            assert!((notional - 1_000_000.0).abs() < 1e-9);
+            assert!((notional * rate * row.accrual_factor - row.amount).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn explained_price_carries_reconciling_trace_and_provenance() {
+        use crate::instruments::PricingOptions;
+        use crate::metrics::MetricId;
+        use finstack_quant_core::explain::{ExplainOpts, TraceEntry};
+
+        let issue = Date::from_calendar_date(2025, Month::January, 15).expect("date");
+        let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
+        let mut bond = Bond::fixed(
+            "BOND-EXPLAIN",
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
+            issue,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("bond");
+        bond.scenario_pricing_overrides =
+            ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.10);
+        bond.metric_pricing_overrides.bump_config.rate_bump_bp = Some(5.0);
+        let as_of = Date::from_calendar_date(2025, Month::July, 1).expect("date");
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(issue)
+                .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+                .build()
+                .expect("discount curve"),
+        );
+
+        let plain = bond
+            .price_with_metrics(&market, as_of, &[], PricingOptions::default())
+            .expect("plain price");
+        assert!(plain.explanation.is_none());
+        let provenance = plain.provenance.expect("registry stamps provenance");
+        assert_eq!(provenance.model, ModelKey::Discounting);
+        assert_eq!(provenance.requested_as_of, as_of);
+        assert_eq!(
+            provenance.market_dependencies,
+            bond.market_dependencies().expect("deps")
+        );
+        assert_eq!(provenance.scenario_price_shock_decimal, Some(-0.10));
+        assert!(provenance.sensitivity_bumps.is_none());
+
+        let explained = bond
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Dv01],
+                PricingOptions::default().with_explain(ExplainOpts::enabled()),
+            )
+            .expect("explained price");
+        assert_eq!(explained.value, plain.value);
+        let bumps = explained
+            .provenance
+            .as_ref()
+            .and_then(|p| p.sensitivity_bumps.as_ref())
+            .expect("metric request stamps bumps");
+        assert_eq!(bumps.rate_bump_bp, 5.0);
+        assert_eq!(bumps.vol_bump_decimal, 0.01);
+
+        let trace = explained.explanation.expect("trace");
+        assert_eq!(trace.trace_type, "pricing");
+        let mut total = 0.0;
+        for entry in &trace.entries {
+            let TraceEntry::CashflowPV {
+                pv_amount,
+                curve_id,
+                survival_probability,
+                ..
+            } = entry
+            else {
+                panic!("unexpected entry {entry:?}");
+            };
+            assert_eq!(curve_id, "USD-OIS");
+            assert!(survival_probability.is_none());
+            total += pv_amount;
+        }
+        assert!(!trace.entries.is_empty());
+        assert!((total - explained.value.amount()).abs() < 1e-2);
+    }
+
+    #[test]
+    fn trace_names_the_reason_when_no_decomposition_exists() {
+        use finstack_quant_core::explain::{ExplainOpts, TraceEntry};
+
+        let issue = Date::from_calendar_date(2025, Month::January, 15).expect("date");
+        let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
+        let bond = Bond::fixed(
+            "BOND-TREE",
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
+            issue,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("bond");
+        let priced = crate::results::ValuationResult::stamped(
+            "BOND-TREE",
+            issue,
+            Money::from((1_000_000_i64, Currency::USD)),
+        );
+
+        let trace = pricing_trace(
+            &bond,
+            &MarketContext::new(),
+            ModelKey::Tree,
+            &priced,
+            ExplainOpts::enabled(),
+        );
+
+        assert!(matches!(
+            trace.entries.as_slice(),
+            [TraceEntry::ComputationStep { name, description, .. }]
+                if name == "cashflow_trace_unavailable" && description.contains("tree")
+        ));
     }
 
     #[test]
@@ -861,10 +1191,12 @@ mod tests {
         .expect("shocked envelope");
 
         assert_eq!(shocked.as_of, as_of);
+        assert_eq!(shocked.scenario_price_shock_decimal, Some(-0.10));
         assert!((shocked.total_pv - baseline.total_pv * 0.90).abs() < 1e-8);
         assert!(shocked.reconciles_with_base_value);
         for (baseline_row, shocked_row) in baseline.flows.iter().zip(&shocked.flows) {
             assert!((shocked_row.pv - baseline_row.pv * 0.90).abs() < 1e-8);
+            assert_eq!(shocked_row.native_pv, baseline_row.native_pv);
         }
     }
 

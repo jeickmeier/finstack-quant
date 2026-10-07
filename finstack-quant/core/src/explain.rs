@@ -29,11 +29,10 @@
 //! };
 //!
 //! if let Some(ref mut t) = trace {
-//!     t.push(TraceEntry::CalibrationIteration {
-//!         iteration: 0,
-//!         residual: 0.005,
-//!         knots_updated: vec!["2025-01-15".to_string()],
-//!         converged: false,
+//!     t.push(TraceEntry::ComputationStep {
+//!         name: "knot_solved".to_string(),
+//!         description: "USD-SWAP-1Y".to_string(),
+//!         metadata: None,
 //!     }, opts.max_entries);
 //! }
 //! ```
@@ -46,10 +45,14 @@ use serde::{Deserialize, Serialize};
 /// Controls whether detailed execution traces are captured during computation.
 /// When disabled, there is zero runtime overhead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(default, deny_unknown_fields)]
 pub struct ExplainOpts {
     /// Whether explanation tracing is enabled
     pub enabled: bool,
-    /// Maximum number of trace entries (caps memory usage)
+    /// Maximum number of trace entries (caps memory usage). `None` records
+    /// every entry.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_entries: Option<usize>,
 }
 
@@ -151,26 +154,13 @@ impl ExplanationTrace {
 /// Domain-specific trace entry types.
 ///
 /// Each variant captures relevant details for different types of computations:
-/// - Calibration: iteration details, convergence status
+/// - Calibration: solver steps as generic computation steps
 /// - Pricing: cashflow-level PV breakdowns
 /// - Waterfall: step-by-step payment allocations
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum TraceEntry {
-    /// Calibration solver iteration details
-    #[serde(rename = "calibration_iteration")]
-    CalibrationIteration {
-        /// Iteration number (0-based)
-        iteration: usize,
-        /// Objective function residual
-        residual: f64,
-        /// Knot points that were updated
-        knots_updated: Vec<String>,
-        /// Whether convergence was achieved
-        converged: bool,
-    },
-
     /// Cashflow present value breakdown
     #[serde(rename = "cashflow_pv")]
     CashflowPV {
@@ -190,6 +180,13 @@ pub enum TraceEntry {
         pv_currency: String,
         /// Discount curve ID used
         curve_id: String,
+        /// Conditional survival probability to the payment date, `S(date) / S(as_of)`.
+        ///
+        /// Present only for credit-risky valuations. `pv_amount` then also
+        /// includes the recovery leg, so it is not `cashflow_amount ×
+        /// discount_factor × survival_probability`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        survival_probability: Option<f64>,
     },
 
     /// Structured credit waterfall step
@@ -236,11 +233,10 @@ mod tests {
     fn test_trace_serialization() {
         let mut trace = ExplanationTrace::new("calibration");
         trace.push(
-            TraceEntry::CalibrationIteration {
-                iteration: 0,
-                residual: 0.005,
-                knots_updated: vec!["2025-01-15".to_string()],
-                converged: false,
+            TraceEntry::ComputationStep {
+                name: "step".to_string(),
+                description: "step".to_string(),
+                metadata: None,
             },
             None,
         );
@@ -249,7 +245,7 @@ mod tests {
             .to_json_pretty()
             .expect("JSON serialization should succeed in test");
         assert!(json.contains("\"type\": \"calibration\""));
-        assert!(json.contains("\"kind\": \"calibration_iteration\""));
+        assert!(json.contains("\"kind\": \"computation_step\""));
 
         // Roundtrip
         let deserialized: ExplanationTrace =
@@ -268,6 +264,7 @@ mod tests {
             pv_amount: 47500.0,
             pv_currency: "USD".to_string(),
             curve_id: "USD_GOVT".to_string(),
+            survival_probability: None,
         };
 
         let json =

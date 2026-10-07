@@ -200,8 +200,20 @@ pub(crate) fn price_typed(
         model,
         metrics,
         market_history,
+        false,
     )
 }
+/// Pricing options shared by the host entry points: the recalibration
+/// provider, plus a step trace on the result when `explain` is set.
+fn pricing_options(explain: bool) -> finstack_quant_valuations::instruments::PricingOptions {
+    let options = finstack_quant_calibration::recalibration::pricing_options();
+    if explain {
+        options.with_explain(finstack_quant_core::explain::ExplainOpts::enabled())
+    } else {
+        options
+    }
+}
+
 /// Price a prepared instrument after host market/date conversion.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn price_prepared(
@@ -212,6 +224,7 @@ pub(crate) fn price_prepared(
     model: &str,
     metrics: Option<Vec<String>>,
     market_history: Option<&Bound<'_, PyAny>>,
+    explain: bool,
 ) -> PyResult<PyValuationResult> {
     let market = extract_market(py, market)?;
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
@@ -227,7 +240,7 @@ pub(crate) fn price_prepared(
                 &model,
                 &metrics,
                 market_history.as_deref(),
-                finstack_quant_calibration::recalibration::pricing_options(),
+                pricing_options(explain),
             )
         })
         .map_err(core_to_py)?;

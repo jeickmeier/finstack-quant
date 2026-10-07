@@ -55,6 +55,7 @@ pub(super) fn enrich(
             registry: Some(Arc::clone(&pricer_registry)),
             metric_registry,
             recalibration_provider,
+            explain: finstack_quant_core::explain::ExplainOpts::disabled(),
             instrument_validated: false,
         };
         let (metric_measures, details) = composite

@@ -295,7 +295,7 @@ test('calibrationResultStepReport, its JSON twin and residuals read one step', (
   );
   for (const row of rows) {
     assert.ok(Math.abs(row.residual) < 1e-8, `${row.quote_label}: ${row.residual}`);
-    assert.ok(Number.isNaN(row.target_value));
+    assert.equal(row.quote_value, undefined);
   }
   for (const read of [
     calibration.calibrationResultStepReport,

@@ -190,6 +190,46 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_1a872a78f6334f77801f",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/SensitivityBumps",
+    "description": "Finite-difference bump sizes in force for a metric request.\n\nThese are the values after layering the `valuations.sensitivities.v1`\nconfiguration extension and the instrument's\n`metric_pricing_overrides.bump_config` over the library defaults. Bumped\nsensitivities are reported per unit bump (per 1bp, per 1 vol point), so\nthese sizes describe how the difference was taken, not the reporting unit.\n\nA calculator with a fixed, documented shock of its own (for example an\nanalytic greek, or a metric whose rustdoc names its shock) does not read\nthese values."
+  },
+  {
+    "path": "#/$defs/d_1a872a78f6334f77801f/properties/adaptive_bumps",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/SensitivityBumps/properties/adaptive_bumps",
+    "description": "Whether spot and volatility bumps are rescaled by volatility, time to\nexpiry and moneyness instead of applied at the fixed sizes above."
+  },
+  {
+    "path": "#/$defs/d_1a872a78f6334f77801f/properties/credit_spread_bump_bp",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/SensitivityBumps/properties/credit_spread_bump_bp",
+    "description": "Credit-spread bump in basis points (1.0 = 1bp).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_1a872a78f6334f77801f/properties/rate_bump_bp",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/SensitivityBumps/properties/rate_bump_bp",
+    "description": "Parallel interest-rate bump in basis points (1.0 = 1bp).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_1a872a78f6334f77801f/properties/spot_bump_decimal",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/SensitivityBumps/properties/spot_bump_decimal",
+    "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_1a872a78f6334f77801f/properties/vol_bump_decimal",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/SensitivityBumps/properties/vol_bump_decimal",
+    "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_1a872a78f6334f77801f/properties/ytm_bump_bp",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/SensitivityBumps/properties/ytm_bump_bp",
+    "description": "Yield bump in basis points for numerical yield duration and convexity.\nAbsent when each calculator keeps its own default shock.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_1b2ccb88c9229e7463e8",
     "source": "https://finstack_quant.dev/schemas/common/1/date.schema.json#",
     "description": "ISO 8601 calendar date string.",
@@ -294,174 +334,176 @@ export default [
   {
     "path": "#/$defs/d_35c446142142801cbb82",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry",
-    "description": "Domain-specific trace entry types.\n\nEach variant captures relevant details for different types of computations:\n- Calibration: iteration details, convergence status\n- Pricing: cashflow-level PV breakdowns\n- Waterfall: step-by-step payment allocations"
+    "description": "Domain-specific trace entry types.\n\nEach variant captures relevant details for different types of computations:\n- Calibration: solver steps as generic computation steps\n- Pricing: cashflow-level PV breakdowns\n- Waterfall: step-by-step payment allocations"
   },
   {
     "path": "#/$defs/d_35c446142142801cbb82/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0",
-    "description": "Calibration solver iteration details"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/converged",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/converged",
-    "description": "Whether convergence was achieved"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/iteration",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/iteration",
-    "description": "Iteration number (0-based)",
-    "format": "uint",
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/kind",
-    "const": "calibration_iteration"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/knots_updated",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/knots_updated",
-    "description": "Knot points that were updated"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/knots_updated/items",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/knots_updated/items"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/residual",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/residual",
-    "description": "Objective function residual",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1",
     "description": "Cashflow present value breakdown"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/cashflow_amount",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/cashflow_amount",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/cashflow_amount",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/cashflow_amount",
     "description": "Cashflow amount (stored as f64 for JSON simplicity)",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/cashflow_currency",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/cashflow_currency",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/cashflow_currency",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/cashflow_currency",
     "description": "Cashflow currency"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/curve_id",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/curve_id",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/curve_id",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/curve_id",
     "description": "Discount curve ID used"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/date",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/date",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/date",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/date",
     "description": "Cashflow payment date (ISO8601)",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/discount_factor",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/discount_factor",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/discount_factor",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/discount_factor",
     "description": "Discount factor applied",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/kind",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/kind",
     "const": "cashflow_pv"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/pv_amount",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/pv_amount",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/pv_amount",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/pv_amount",
     "description": "Present value of this cashflow",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/pv_currency",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/pv_currency",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/pv_currency",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/pv_currency",
     "description": "PV currency"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/0/properties/survival_probability",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/0/properties/survival_probability",
+    "description": "Conditional survival probability to the payment date, `S(date) / S(as_of)`.\n\nPresent only for credit-risky valuations. `pv_amount` then also\nincludes the recovery leg, so it is not `cashflow_amount ×\ndiscount_factor × survival_probability`.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1",
     "description": "Structured credit waterfall step"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/cash_in_amount",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/cash_in_amount",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/cash_in_amount",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/cash_in_amount",
     "description": "Cash inflow amount",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/cash_in_currency",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/cash_in_currency",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/cash_in_currency",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/cash_in_currency",
     "description": "Cash inflow currency"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/cash_out_amount",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/cash_out_amount",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/cash_out_amount",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/cash_out_amount",
     "description": "Cash outflow amount",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/cash_out_currency",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/cash_out_currency",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/cash_out_currency",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/cash_out_currency",
     "description": "Cash outflow currency"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/kind",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/kind",
     "const": "waterfall_step"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/period",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/period",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/period",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/period",
     "description": "Period index",
     "format": "uint",
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/shortfall_amount",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/shortfall_amount",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/shortfall_amount",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/shortfall_amount",
     "description": "Shortfall amount if any",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/shortfall_currency",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/shortfall_currency",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/shortfall_currency",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/shortfall_currency",
     "description": "Shortfall currency"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/step_name",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/step_name",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/step_name",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/step_name",
     "description": "Step name/description"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/3",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2",
     "description": "Generic computation step (extensible)"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/3/properties/description",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/3/properties/description",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/description",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/description",
     "description": "Step description"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/3/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/3/properties/kind",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/kind",
     "const": "computation_step"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/3/properties/metadata",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/3/properties/metadata",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/metadata",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/metadata",
     "description": "Arbitrary metadata (JSON object)"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/3/properties/name",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/3/properties/name",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/name",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/name",
     "description": "Step name"
+  },
+  {
+    "path": "#/$defs/d_3b714c6f9450267930ea",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/VolatilityDependency",
+    "description": "A volatility-surface dependency with the context needed for diagnostics."
+  },
+  {
+    "path": "#/$defs/d_3b714c6f9450267930ea/properties/reference_strike",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/VolatilityDependency/properties/reference_strike",
+    "description": "Optional contractual strike used by local volatility diagnostics.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_3b714c6f9450267930ea/properties/spot_id",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/VolatilityDependency/properties/spot_id",
+    "description": "Optional market-scalar id of the underlying spot paired with the surface."
+  },
+  {
+    "path": "#/$defs/d_3b714c6f9450267930ea/properties/spot_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/VolatilityDependency/properties/spot_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_3b714c6f9450267930ea/properties/spot_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/VolatilityDependency/properties/spot_id/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_3b714c6f9450267930ea/properties/vol_surface_id",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/VolatilityDependency/properties/vol_surface_id",
+    "description": "Volatility surface identifier.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_3b7975306604d24b2d21",
@@ -703,6 +745,69 @@ export default [
     "minimum": 0
   },
   {
+    "path": "#/$defs/d_6f90163da686371ca49e",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MarketDependencies",
+    "description": "Unified dependency container for instrument market data requirements."
+  },
+  {
+    "path": "#/$defs/d_6f90163da686371ca49e/properties/credit_index_ids",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MarketDependencies/properties/credit_index_ids",
+    "description": "Credit-index aggregates resolved through `MarketContext::get_credit_index`.\n\nThese identifiers are distinct from direct hazard-curve IDs because a\ncredit index also carries base correlation and optional issuer curves."
+  },
+  {
+    "path": "#/$defs/d_6f90163da686371ca49e/properties/credit_index_ids/items",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MarketDependencies/properties/credit_index_ids/items",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6f90163da686371ca49e/properties/curves",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MarketDependencies/properties/curves",
+    "description": "Curve dependencies grouped by type.",
+    "ref": "#/$defs/InstrumentCurves",
+    "resolvedRef": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/InstrumentCurves"
+  },
+  {
+    "path": "#/$defs/d_6f90163da686371ca49e/properties/fx_pairs",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MarketDependencies/properties/fx_pairs",
+    "description": "FX pairs required for pricing (spot matrices)."
+  },
+  {
+    "path": "#/$defs/d_6f90163da686371ca49e/properties/fx_pairs/items",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MarketDependencies/properties/fx_pairs/items",
+    "ref": "#/$defs/FxPair",
+    "resolvedRef": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/FxPair"
+  },
+  {
+    "path": "#/$defs/d_6f90163da686371ca49e/properties/market_scalar_ids",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MarketDependencies/properties/market_scalar_ids",
+    "description": "Scalar market-value identifiers resolved through `MarketContext::get_price`.\n\nThis includes tradable spots and non-price unitless scalars such as\ncontinuous dividend yields. [`Self::series_ids`] is reserved for\n`MarketContext::get_series` dependencies."
+  },
+  {
+    "path": "#/$defs/d_6f90163da686371ca49e/properties/market_scalar_ids/items",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MarketDependencies/properties/market_scalar_ids/items"
+  },
+  {
+    "path": "#/$defs/d_6f90163da686371ca49e/properties/series_ids",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MarketDependencies/properties/series_ids",
+    "description": "Scalar time series identifiers (e.g., OHLC price series for realized variance)."
+  },
+  {
+    "path": "#/$defs/d_6f90163da686371ca49e/properties/series_ids/items",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MarketDependencies/properties/series_ids/items"
+  },
+  {
+    "path": "#/$defs/d_6f90163da686371ca49e/properties/volatility_dependencies",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MarketDependencies/properties/volatility_dependencies",
+    "description": "Typed volatility dependencies in deterministic insertion order."
+  },
+  {
+    "path": "#/$defs/d_6f90163da686371ca49e/properties/volatility_dependencies/items",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MarketDependencies/properties/volatility_dependencies/items",
+    "ref": "#/$defs/VolatilityDependency",
+    "resolvedRef": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/VolatilityDependency"
+  },
+  {
     "path": "#/$defs/d_719f3377340f012e0eb2",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ToleranceConfig",
     "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides configurable epsilon values for zero-checks in rate calculations\nand generic floating-point comparisons. These defaults are chosen to balance\nnumerical stability with practical precision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.rate_epsilon, 1e-12);\n\n// Customize for stricter rate comparisons\ntol.rate_epsilon = 1e-14;\n```"
@@ -807,6 +912,53 @@ export default [
     "path": "#/$defs/d_979a918a504fe5c6f8f7/oneOf/4/properties/type",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ValuationDetails/oneOf/4/properties/type",
     "const": "monte_carlo"
+  },
+  {
+    "path": "#/$defs/d_9ac3b1be80f4eff446fb",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ValuationProvenance",
+    "description": "How a valuation result was produced.\n\nStamped by [`crate::pricer::PricerRegistry::price_with_metrics`] on every\nresult so the number can be reproduced from the result plus the archived\nmarket: the model that priced it, the date the caller asked for, the market\ndata the instrument declares, any scenario adjustment applied to the value,\nand the bump sizes behind its sensitivities."
+  },
+  {
+    "path": "#/$defs/d_9ac3b1be80f4eff446fb/properties/market_dependencies",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ValuationProvenance/properties/market_dependencies",
+    "description": "Curves, surfaces, scalars, FX pairs and series the instrument declares\nit reads. Identifiers refer to the `MarketContext` the result was\npriced against.",
+    "ref": "#/$defs/MarketDependencies",
+    "resolvedRef": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MarketDependencies"
+  },
+  {
+    "path": "#/$defs/d_9ac3b1be80f4eff446fb/properties/model",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ValuationProvenance/properties/model",
+    "description": "Registered pricing model that produced `value`.",
+    "ref": "#/$defs/ModelKey",
+    "resolvedRef": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey"
+  },
+  {
+    "path": "#/$defs/d_9ac3b1be80f4eff446fb/properties/requested_as_of",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ValuationProvenance/properties/requested_as_of",
+    "description": "Valuation date the caller requested.\n\nThe result's `as_of` is the effective date after the instrument resolved\nit (for example to the market's spot date); the two differ only when\nthe instrument moved it.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_9ac3b1be80f4eff446fb/properties/scenario_price_shock_decimal",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ValuationProvenance/properties/scenario_price_shock_decimal",
+    "description": "Scenario price shock already applied to `value`, as a decimal\n(`-0.10` = the model value was multiplied by 0.90). Absent when the\nvalue is the unadjusted model value.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_9ac3b1be80f4eff446fb/properties/sensitivity_bumps",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ValuationProvenance/properties/sensitivity_bumps",
+    "description": "Bump sizes in force for the requested metrics. Absent when no metric\nwas requested."
+  },
+  {
+    "path": "#/$defs/d_9ac3b1be80f4eff446fb/properties/sensitivity_bumps/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ValuationProvenance/properties/sensitivity_bumps/anyOf/0",
+    "ref": "#/$defs/SensitivityBumps",
+    "resolvedRef": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/SensitivityBumps"
+  },
+  {
+    "path": "#/$defs/d_9ac3b1be80f4eff446fb/properties/sensitivity_bumps/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ValuationProvenance/properties/sensitivity_bumps/anyOf/1"
   },
   {
     "path": "#/$defs/d_9bbbe0cc70b45831cb71",
@@ -1922,6 +2074,25 @@ export default [
     "description": "Total factor paths simulated in the policy-training stage, including\nantithetic partners. Zero when no policy is trained.",
     "format": "uint32",
     "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_b2b64fea7715cf5d4700",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/FxPair",
+    "description": "FX pair identifier using base/quote currency ordering."
+  },
+  {
+    "path": "#/$defs/d_b2b64fea7715cf5d4700/properties/base",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/FxPair/properties/base",
+    "description": "Base currency (numerator).",
+    "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_b2b64fea7715cf5d4700/properties/quote",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/FxPair/properties/quote",
+    "description": "Quote currency (denominator).",
+    "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
   {
     "path": "#/$defs/d_b38440a627738e14b971",
@@ -3288,6 +3459,55 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_e567683d30a4c26c8269",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/InstrumentCurves",
+    "description": "Collection of curves used by an instrument, categorized by market role."
+  },
+  {
+    "path": "#/$defs/d_e567683d30a4c26c8269/properties/credit_curves",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/InstrumentCurves/properties/credit_curves",
+    "description": "Credit/hazard curves used by the instrument."
+  },
+  {
+    "path": "#/$defs/d_e567683d30a4c26c8269/properties/credit_curves/items",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/InstrumentCurves/properties/credit_curves/items",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_e567683d30a4c26c8269/properties/discount_curves",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/InstrumentCurves/properties/discount_curves",
+    "description": "Discount curves used by the instrument (including primary and foreign)."
+  },
+  {
+    "path": "#/$defs/d_e567683d30a4c26c8269/properties/discount_curves/items",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/InstrumentCurves/properties/discount_curves/items",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_e567683d30a4c26c8269/properties/forward_curves",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/InstrumentCurves/properties/forward_curves",
+    "description": "Forward/projection curves used by the instrument."
+  },
+  {
+    "path": "#/$defs/d_e567683d30a4c26c8269/properties/forward_curves/items",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/InstrumentCurves/properties/forward_curves/items",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_e567683d30a4c26c8269/properties/inflation_curves",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/InstrumentCurves/properties/inflation_curves",
+    "description": "Inflation curves or published inflation indices used by the instrument."
+  },
+  {
+    "path": "#/$defs/d_e567683d30a4c26c8269/properties/inflation_curves/items",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/InstrumentCurves/properties/inflation_curves/items",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
     "path": "#/$defs/d_ea44f9fc62fb5d9eee49",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/PrimitiveExposure",
     "description": "Path-level primitive exposure in a resolved composite tree."
@@ -3427,7 +3647,7 @@ export default [
   {
     "path": "#/properties/explanation",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/properties/explanation",
-    "description": "Optional computation explanation trace.\n\nEnabled via `ExplainOpts` in configuration. Provides step-by-step\ntrace of calculations for debugging and auditability."
+    "description": "Optional computation explanation trace.\n\nRequested with `PricingOptions::with_explain`. For discounting and\nhazard-rate valuations it holds one `cashflow_pv` entry per projected\ncashflow, reconciled to `value`; for other models it holds a single\n`computation_step` entry saying no per-flow decomposition exists."
   },
   {
     "path": "#/properties/explanation/anyOf/0",
@@ -3460,6 +3680,21 @@ export default [
     "description": "Calculation metadata and policy stamps.\n\nContains:\n- Numeric mode (Decimal vs f64)\n- Rounding context and precision\n- FX policy for cross-currency calculations\n- Calculation timing information",
     "ref": "#/$defs/ResultsMeta",
     "resolvedRef": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ResultsMeta"
+  },
+  {
+    "path": "#/properties/provenance",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/properties/provenance",
+    "description": "How the result was produced: model, requested date, declared market\ndependencies, scenario adjustment and sensitivity bump sizes.\n\nStamped by the pricer registry. Absent on results constructed directly."
+  },
+  {
+    "path": "#/properties/provenance/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/properties/provenance/anyOf/0",
+    "ref": "#/$defs/ValuationProvenance",
+    "resolvedRef": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ValuationProvenance"
+  },
+  {
+    "path": "#/properties/provenance/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/properties/provenance/anyOf/1"
   },
   {
     "path": "#/properties/schema_version",

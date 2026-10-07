@@ -138,10 +138,51 @@
     "CashflowRow": {
       "description": "Single-row enriched cashflow view.",
       "properties": {
+        "accrual_day_count": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Day-count convention that turns the accrual period into `accrual_factor`."
+        },
+        "accrual_end": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual accrual-period end behind `accrual_factor`."
+        },
         "accrual_factor": {
           "description": "Accrual factor stored on the `CashFlow`.",
           "format": "double",
           "type": "number"
+        },
+        "accrual_notional": {
+          "description": "Outstanding principal at `accrual_start`, in row currency: the balance\nthe coupon accrues on when it is constant over the period. Absent when\nthe flow has no accrual period or the schedule has no issue date to\nreplay balances from.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "accrual_start": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual accrual-period start behind `accrual_factor`. Absent for\nflows that carry no accrual metadata (principal, fees, exchanges)."
         },
         "amount": {
           "description": "Signed cashflow amount in row currency.",
@@ -189,6 +230,22 @@
             "null"
           ]
         },
+        "fx_rate": {
+          "description": "FX rate (reporting currency per unit of row currency) applied to\n`native_pv`. Absent when the row is already in the reporting currency.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "index_rate": {
+          "description": "Index rate (annualized decimal) before spread, gearing, caps and\nfloors, for floating coupons. `rate` is the all-in rate after them.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "inflation_index_ratio": {
           "description": "Inflation index ratio (populated for `InflationLinkedBond`).",
           "format": "double",
@@ -201,6 +258,11 @@
           "$ref": "#/$defs/CFKind",
           "description": "`CFKind` discriminator (serde rename: `fixed`, `notional`, …)."
         },
+        "native_pv": {
+          "description": "Present value in row currency, before FX conversion and before any\nscenario price shock.",
+          "format": "double",
+          "type": "number"
+        },
         "prepayment_smm": {
           "description": "Single Monthly Mortality for the period (populated for agency MBS).",
           "format": "double",
@@ -209,8 +271,16 @@
             "null"
           ]
         },
+        "principal_delta": {
+          "description": "Change in outstanding principal carried by this flow, in row currency\n(positive increases the balance). Absent when the flow kind and amount\nalone determine the balance movement.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "pv": {
-          "description": "Per-flow present value in the envelope reporting currency. Sums to `total_pv`.",
+          "description": "Per-flow present value in the envelope reporting currency, after FX\nconversion and any scenario price shock. Sums to `total_pv`.",
           "format": "double",
           "type": "number"
         },
@@ -256,6 +326,7 @@
         "year_fraction",
         "discount_factor",
         "discount_curve_id",
+        "native_pv",
         "pv"
       ],
       "type": "object"
@@ -271,13 +342,18 @@
       "discount_curve_id": "USD-OIS",
       "flows": [
         {
+          "accrual_day_count": "30_360",
+          "accrual_end": "2025-07-15",
           "accrual_factor": 0.5,
+          "accrual_notional": 1000000.0,
+          "accrual_start": "2025-01-15",
           "amount": 21250.0,
           "currency": "USD",
           "date": "2025-07-15",
           "discount_curve_id": "USD-OIS",
           "discount_factor": 0.9789,
           "kind": "fixed",
+          "native_pv": 20801.625,
           "pv": 20801.625,
           "rate": 0.0425,
           "year_fraction": 0.495890410959
@@ -334,6 +410,14 @@
     },
     "recovery_rate": {
       "description": "Recovery rate from the hazard curve (omitted for `discounting` model).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "scenario_price_shock_decimal": {
+      "description": "Scenario price shock applied to every row `pv` and to `total_pv`, as a\ndecimal (`-0.10` = multiplied by 0.90). Absent when rows are unshocked.",
       "format": "double",
       "type": [
         "number",

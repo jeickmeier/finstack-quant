@@ -118,9 +118,9 @@ export function CalibrationReport({
           {diagnostics ? (
             <>
               <p>
-                Target and fitted fields describe the native solver
-                representation. A zero target with fitted equal to residual is
-                not an observed-versus-repriced market quote.
+                Quote value is the market quote in its native units. Residual is
+                the quote instrument's value on the calibrated curve per unit of
+                residual notional; the calibration target is zero.
               </p>
               <FinstackTable
                 caption={`${stepId} native per-quote diagnostics`}
@@ -136,14 +136,9 @@ export function CalibrationReport({
                     accessorFn: (r) => r.quality.quote_label,
                   },
                   {
-                    id: "target",
-                    header: "Target (solver units)",
-                    accessorFn: (r) => r.quality.target_value,
-                  },
-                  {
-                    id: "fitted",
-                    header: "Fitted (solver units)",
-                    accessorFn: (r) => r.quality.fitted_value,
+                    id: "quote_value",
+                    header: "Quote value (native units)",
+                    accessorFn: (r) => r.quality.quote_value ?? null,
                   },
                   {
                     id: "residual",

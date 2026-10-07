@@ -336,10 +336,19 @@ pub struct ValuationResult {
 
     /// Optional computation explanation trace.
     ///
-    /// Enabled via `ExplainOpts` in configuration. Provides step-by-step
-    /// trace of calculations for debugging and auditability.
+    /// Requested with `PricingOptions::with_explain`. For discounting and
+    /// hazard-rate valuations it holds one `cashflow_pv` entry per projected
+    /// cashflow, reconciled to `value`; for other models it holds a single
+    /// `computation_step` entry saying no per-flow decomposition exists.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub explanation: Option<ExplanationTrace>,
+
+    /// How the result was produced: model, requested date, declared market
+    /// dependencies, scenario adjustment and sensitivity bump sizes.
+    ///
+    /// Stamped by the pricer registry. Absent on results constructed directly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<super::ValuationProvenance>,
 }
 
 impl ValuationResult {
@@ -459,6 +468,7 @@ impl ValuationResult {
             meta,
             covenants: None,
             explanation: None,
+            provenance: None,
         }
     }
 

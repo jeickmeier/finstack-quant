@@ -11,13 +11,18 @@ export default [
         "discount_curve_id": "USD-OIS",
         "flows": [
           {
+            "accrual_day_count": "30_360",
+            "accrual_end": "2025-07-15",
             "accrual_factor": 0.5,
+            "accrual_notional": 1000000,
+            "accrual_start": "2025-01-15",
             "amount": 21250,
             "currency": "USD",
             "date": "2025-07-15",
             "discount_curve_id": "USD-OIS",
             "discount_factor": 0.9789,
             "kind": "fixed",
+            "native_pv": 20801.625,
             "pv": 20801.625,
             "rate": 0.0425,
             "year_fraction": 0.495890410959
@@ -48,10 +53,61 @@ export default [
     "description": "Single-row enriched cashflow view."
   },
   {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/accrual_day_count",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/accrual_day_count",
+    "description": "Day-count convention that turns the accrual period into `accrual_factor`."
+  },
+  {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/accrual_day_count/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/accrual_day_count/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/accrual_day_count/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/accrual_day_count/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/accrual_end",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/accrual_end",
+    "description": "Contractual accrual-period end behind `accrual_factor`."
+  },
+  {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/accrual_end/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/accrual_end/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/accrual_end/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/accrual_end/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_674830a94dacf97e7ac8/properties/accrual_factor",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/accrual_factor",
     "description": "Accrual factor stored on the `CashFlow`.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/accrual_notional",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/accrual_notional",
+    "description": "Outstanding principal at `accrual_start`, in row currency: the balance\nthe coupon accrues on when it is constant over the period. Absent when\nthe flow has no accrual period or the schedule has no issue date to\nreplay balances from.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/accrual_start",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/accrual_start",
+    "description": "Contractual accrual-period start behind `accrual_factor`. Absent for\nflows that carry no accrual metadata (principal, fees, exchanges)."
+  },
+  {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/accrual_start/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/accrual_start/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/accrual_start/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/accrual_start/anyOf/1"
   },
   {
     "path": "#/$defs/d_674830a94dacf97e7ac8/properties/amount",
@@ -105,6 +161,18 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/fx_rate",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/fx_rate",
+    "description": "FX rate (reporting currency per unit of row currency) applied to\n`native_pv`. Absent when the row is already in the reporting currency.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/index_rate",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/index_rate",
+    "description": "Index rate (annualized decimal) before spread, gearing, caps and\nfloors, for floating coupons. `rate` is the all-in rate after them.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_674830a94dacf97e7ac8/properties/inflation_index_ratio",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/inflation_index_ratio",
     "description": "Inflation index ratio (populated for `InflationLinkedBond`).",
@@ -118,15 +186,27 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CFKind"
   },
   {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/native_pv",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/native_pv",
+    "description": "Present value in row currency, before FX conversion and before any\nscenario price shock.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_674830a94dacf97e7ac8/properties/prepayment_smm",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/prepayment_smm",
     "description": "Single Monthly Mortality for the period (populated for agency MBS).",
     "format": "double"
   },
   {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/principal_delta",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/principal_delta",
+    "description": "Change in outstanding principal carried by this flow, in row currency\n(positive increases the balance). Absent when the flow kind and amount\nalone determine the balance movement.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_674830a94dacf97e7ac8/properties/pv",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/pv",
-    "description": "Per-flow present value in the envelope reporting currency. Sums to `total_pv`.",
+    "description": "Per-flow present value in the envelope reporting currency, after FX\nconversion and any scenario price shock. Sums to `total_pv`.",
     "format": "double"
   },
   {
@@ -1138,6 +1218,95 @@ export default [
     "description": "Naira (566)"
   },
   {
+    "path": "#/$defs/d_c0401254ec268b317b65",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#",
+    "description": "Day-count convention.",
+    "examples": [
+      "act_360",
+      "30_360",
+      "act_act_isma"
+    ],
+    "title": "Day Count"
+  },
+  {
+    "path": "#/$defs/d_c0401254ec268b317b65/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/0",
+    "const": "one_one",
+    "description": "1/1 day count convention.\n\nOne unit per contractual accrual period, irrespective of its length.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(a) - \"1/1\""
+  },
+  {
+    "path": "#/$defs/d_c0401254ec268b317b65/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/1",
+    "const": "act_360",
+    "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French"
+  },
+  {
+    "path": "#/$defs/d_c0401254ec268b317b65/oneOf/10",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/10",
+    "const": "act_act_isma",
+    "description": "Actual/Actual (ICMA) day count convention.\n\nActual days over (actual days in the coupon period × coupons per year).\nRequires a coupon frequency. Explicit reference coupon boundaries must\nbe unadjusted regular dates from the contractual nominal month grid,\nnot payment dates.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99"
+  },
+  {
+    "path": "#/$defs/d_c0401254ec268b317b65/oneOf/11",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/11",
+    "const": "act_act_afb",
+    "description": "Actual/Actual AFB day count convention.\n\nWhole years counted backwards from the end date, plus a residual of\nactual days over 366 if it contains February 29, else 365.\n\n# Standards Reference\n\n- **QuantLib**: `ActualActual::AFB`\n- **AFB**: Association Française des Banques master agreement definitions\n- **Also known as**: Actual/Actual Euro, Act/Act AFB"
+  },
+  {
+    "path": "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/12",
+    "const": "bus_252",
+    "description": "Business/252 day count convention.\n\nYear fraction = (business days between dates) / 252. Requires a holiday\ncalendar.\n\n# Standards Reference\n\n- **ANBIMA**: standard for BRL-denominated instruments\n- **Also known as**: BUS/252, Business/252"
+  },
+  {
+    "path": "#/$defs/d_c0401254ec268b317b65/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/2",
+    "const": "act_365f",
+    "description": "Actual/365 Fixed day count convention.\n\nYear fraction = (actual days between dates) / 365\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(e)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365 Fixed\" (A005)\n- **Also known as**: Act/365F, A/365F, English"
+  },
+  {
+    "path": "#/$defs/d_c0401254ec268b317b65/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/3",
+    "const": "act_365l",
+    "description": "Actual/365 Leap day count convention (Actual/365L).\n\nYear fraction = (actual days) / (365 or 366). Requires the coupon\nfrequency and the enclosing coupon period. Annual: 366 if February 29\nfalls in (coupon_start, coupon_end]. Other frequencies: 366 if the next\ncoupon date falls in a leap year. Not Actual/Actual AFB.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year"
+  },
+  {
+    "path": "#/$defs/d_c0401254ec268b317b65/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/4",
+    "const": "30_360",
+    "description": "30/360 US (Bond Basis) day count convention.\n\n30-day months over a 360-day year with the SIA/PSA adjustments,\nincluding the February end-of-month rule that ISDA §4.16(f) omits.\n\n# Standards Reference\n\n- **SIA/PSA**: Standard Securities Calculation Methods\n- **ISO 20022**: Day Count Fraction Code \"30/360\" (A001)\n- **Also known as**: 30U/360, 30/360 US, Bond Basis, 30/360 PSA"
+  },
+  {
+    "path": "#/$defs/d_c0401254ec268b317b65/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/5",
+    "const": "30e_360",
+    "description": "30E/360 (Eurobond Basis) day count convention.\n\n30-day months over a 360-day year; day 31 becomes 30 at both ends, with\nno February adjustment.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(g) - \"30E/360\"\n- **ISO 20022**: Day Count Fraction Code \"30E/360\" (A002)\n- **Also known as**: 30/360 ISDA, 30/360 European, Eurobond Basis"
+  },
+  {
+    "path": "#/$defs/d_c0401254ec268b317b65/oneOf/6",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/6",
+    "const": "30e_360_isda",
+    "description": "30E/360 (ISDA) day count convention.\n\n30-day months over a 360-day year; the last day of any month, including\nFebruary, becomes 30, except an end date that is the termination date.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(h) - \"30E/360 (ISDA)\"\n- **Also known as**: 30E/360 ISDA, German, Eurobond Basis (ISDA 2006)"
+  },
+  {
+    "path": "#/$defs/d_c0401254ec268b317b65/oneOf/7",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/7",
+    "const": "30_360_it",
+    "description": "30/360 Italian day count convention.\n\n30-day months over a 360-day year; day 31 becomes 30, and any February\nday after the 27th becomes 30.\n\n# Standards Reference\n\n- **QuantLib**: `Thirty360::Italian`\n- **Also known as**: 30/360 Italian"
+  },
+  {
+    "path": "#/$defs/d_c0401254ec268b317b65/oneOf/8",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/8",
+    "const": "nl_365",
+    "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL"
+  },
+  {
+    "path": "#/$defs/d_c0401254ec268b317b65/oneOf/9",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/9",
+    "const": "act_act",
+    "description": "Actual/Actual (ISDA) day count convention.\n\nActual days over the actual days in the containing calendar year,\nsplit and summed across year boundaries.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(b) - \"Actual/Actual (ISDA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ISDA\" (A006)\n- **Also known as**: Act/Act (ISDA), Actual/Actual, Act/Act"
+  },
+  {
     "path": "#/$defs/d_c1062118d66ed5ee9642",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CFKind",
     "description": "Enumeration of cash-flow kinds for classification and ordering.\n\nUsed to distinguish between different types of cashflows for\nproper sequencing, risk calculation, and accounting treatment.\n\n# Sign Convention\n\nThe enum itself is **view agnostic**: individual instruments are\nresponsible for mapping these kinds into a holder or issuer view.\nBy convention in this crate:\n\n| Kind | Holder View (Long) | Issuer View (Short) |\n|------|-------------------|---------------------|\n| Interest (Fixed/Float) | Positive (receive) | Negative (pay) |\n| Notional (initial) | Negative (pay) | Positive (receive) |\n| Notional (final) | Positive (receive) | Negative (pay) |\n| Amortization | Positive (receive) | Negative (pay) |\n| PIK | Increases notional | Increases liability |\n| Fee | Negative (pay) | Positive (receive) |\n\nWhen constructing cashflow schedules, instruments should apply the appropriate\nsign based on the economic perspective being represented.\n\n# Cashflow Categories\n\nVariants are grouped by category:\n- **Interest**: `Fixed`, `FloatReset`, `Stub`\n- **Inflation**: `InflationCoupon`\n- **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`\n- **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`\n- **Revolving**: `RevolvingDraw`, `RevolvingRepayment`\n- **Credit Events**: `DefaultedNotional`, `Recovery`\n- **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc."
@@ -1364,6 +1533,12 @@ export default [
     "path": "#/properties/recovery_rate",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/properties/recovery_rate",
     "description": "Recovery rate from the hazard curve (omitted for `discounting` model).",
+    "format": "double"
+  },
+  {
+    "path": "#/properties/scenario_price_shock_decimal",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/properties/scenario_price_shock_decimal",
+    "description": "Scenario price shock applied to every row `pv` and to `total_pv`, as a\ndecimal (`-0.10` = multiplied by 0.90). Absent when rows are unshocked.",
     "format": "double"
   },
   {

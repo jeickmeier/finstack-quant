@@ -13,19 +13,26 @@ fn default_true() -> bool {
 
 /// Per-quote quality metrics from a calibration run.
 ///
-/// Captures the fitted vs target values for a single market quote,
-/// along with the residual and a local sensitivity measure.
+/// Captures the market quote, the residual left after calibration and a local
+/// sensitivity measure for a single calibration instrument.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct QuoteQuality {
     /// Human-readable label identifying this quote (e.g., "USD-1Y-SWAP").
     pub quote_label: String,
-    /// Market-observed target value for this quote.
-    pub target_value: f64,
-    /// Model-implied fitted value after calibration.
-    pub fitted_value: f64,
-    /// Residual (fitted - target) for this quote.
+    /// Market quote the calibration instrument was built from, in the quote's
+    /// native units: decimal rate for deposits, FRAs, swaps and inflation
+    /// swaps; price for rate futures; basis points for CDS par spreads and
+    /// cross-currency basis; percent for CDS and tranche upfronts.
+    ///
+    /// Absent when the target's quotes carry no single scalar value or
+    /// diagnostics were not computed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quote_value: Option<f64>,
+    /// Signed calibration residual: the value of the instrument built at
+    /// `quote_value`, priced on the calibrated curve and divided by the
+    /// target's residual notional. The calibration target is zero.
     pub residual: f64,
     /// Local sensitivity: dOutput/dParam (via finite difference or Jacobian diagonal).
     pub sensitivity: f64,
@@ -303,12 +310,11 @@ pub struct CalibrationReport {
 impl CalibrationReport {
     /// Per-quote fit rows of this report.
     ///
-    /// Returns the diagnostic rows (`target_value`, `fitted_value`,
-    /// `residual`, `sensitivity`) when `CalibrationConfig::compute_diagnostics`
-    /// populated them. Otherwise it returns one row per entry of
-    /// [`Self::residuals`], ordered by quote id, carrying the signed residual
-    /// with `NaN` for the target, fitted value and sensitivity that were not
-    /// recorded.
+    /// Returns the diagnostic rows (`quote_value`, `residual`, `sensitivity`)
+    /// when `CalibrationConfig::compute_diagnostics` populated them. Otherwise
+    /// it returns one row per entry of [`Self::residuals`], ordered by quote
+    /// id, carrying the signed residual with no quote value and `NaN` for the
+    /// sensitivity that was not recorded.
     pub fn quote_rows(&self) -> Vec<QuoteQuality> {
         if let Some(diagnostics) = &self.diagnostics {
             if !diagnostics.per_quote.is_empty() {
@@ -319,8 +325,7 @@ impl CalibrationReport {
             .iter()
             .map(|(id, residual)| QuoteQuality {
                 quote_label: id.clone(),
-                target_value: f64::NAN,
-                fitted_value: f64::NAN,
+                quote_value: None,
                 residual: *residual,
                 sensitivity: f64::NAN,
             })
@@ -674,12 +679,11 @@ mod tests {
             ["A", "B"]
         );
         assert_eq!(rows[0].residual, 1e-6);
-        assert!(rows[0].target_value.is_nan() && rows[0].sensitivity.is_nan());
+        assert!(rows[0].quote_value.is_none() && rows[0].sensitivity.is_nan());
 
         let measured = QuoteQuality {
             quote_label: "A".to_string(),
-            target_value: 0.05,
-            fitted_value: 0.050001,
+            quote_value: Some(0.05),
             residual: 1e-6,
             sensitivity: 2.0,
         };
@@ -693,7 +697,7 @@ mod tests {
         });
         let rows = report.quote_rows();
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].target_value, 0.05);
+        assert_eq!(rows[0].quote_value, Some(0.05));
     }
 
     #[test]
@@ -829,15 +833,13 @@ mod tests {
             per_quote: vec![
                 QuoteQuality {
                     quote_label: "USD-1Y-SWAP".to_string(),
-                    target_value: 0.05,
-                    fitted_value: 0.0500001,
+                    quote_value: Some(0.05),
                     residual: 1e-7,
                     sensitivity: 12.5,
                 },
                 QuoteQuality {
                     quote_label: "USD-5Y-SWAP".to_string(),
-                    target_value: 0.06,
-                    fitted_value: 0.0599998,
+                    quote_value: Some(0.06),
                     residual: -2e-7,
                     sensitivity: 8.3,
                 },
@@ -958,8 +960,7 @@ mod tests {
         let diagnostics = CalibrationDiagnostics {
             per_quote: vec![QuoteQuality {
                 quote_label: "1Y".to_string(),
-                target_value: 0.0,
-                fitted_value: 1e-10,
+                quote_value: Some(0.0),
                 residual: 1e-10,
                 sensitivity: 1.0,
             }],
@@ -988,15 +989,13 @@ mod tests {
     fn quote_quality_struct_construction_and_access() {
         let qq = QuoteQuality {
             quote_label: "EUR-3M-DEPOSIT".to_string(),
-            target_value: 0.025,
-            fitted_value: 0.0250003,
+            quote_value: Some(0.025),
             residual: 3e-7,
             sensitivity: 15.2,
         };
 
         assert_eq!(qq.quote_label, "EUR-3M-DEPOSIT");
-        assert!((qq.target_value - 0.025).abs() < 1e-15);
-        assert!((qq.fitted_value - 0.0250003).abs() < 1e-15);
+        assert_eq!(qq.quote_value, Some(0.025));
         assert!((qq.residual - 3e-7).abs() < 1e-15);
         assert!((qq.sensitivity - 15.2).abs() < 1e-10);
 

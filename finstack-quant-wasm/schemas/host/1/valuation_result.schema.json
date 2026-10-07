@@ -1048,6 +1048,25 @@
       ],
       "type": "object"
     },
+    "FxPair": {
+      "additionalProperties": false,
+      "description": "FX pair identifier using base/quote currency ordering.",
+      "properties": {
+        "base": {
+          "$ref": "#/$defs/Currency",
+          "description": "Base currency (numerator)."
+        },
+        "quote": {
+          "$ref": "#/$defs/Currency",
+          "description": "Quote currency (denominator)."
+        }
+      },
+      "required": [
+        "base",
+        "quote"
+      ],
+      "type": "object"
+    },
     "FxValuationDetails": {
       "description": "Metadata for FX-bearing valuation paths (FX forwards, FX options, quanto).\n\nCaptures the FX policy applied at pricing time so downstream audit /\nreconciliation can trace whether a quoted rate came from a direct\nmarket quote or via triangulation through the matrix pivot currency.\nMirrors the cross-cutting invariant documented in\n`.claude/rules/project-description.md` (\"FX policy visibility: Applied\nconversion strategy recorded per layer (e.g., valuations, statements,\nportfolio)\").",
       "properties": {
@@ -1064,6 +1083,100 @@
     "Id": {
       "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
       "type": "string"
+    },
+    "InstrumentCurves": {
+      "additionalProperties": false,
+      "description": "Collection of curves used by an instrument, categorized by market role.",
+      "properties": {
+        "credit_curves": {
+          "description": "Credit/hazard curves used by the instrument.",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "type": "array"
+        },
+        "discount_curves": {
+          "description": "Discount curves used by the instrument (including primary and foreign).",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "type": "array"
+        },
+        "forward_curves": {
+          "description": "Forward/projection curves used by the instrument.",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "type": "array"
+        },
+        "inflation_curves": {
+          "description": "Inflation curves or published inflation indices used by the instrument.",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "discount_curves",
+        "forward_curves",
+        "credit_curves",
+        "inflation_curves"
+      ],
+      "type": "object"
+    },
+    "MarketDependencies": {
+      "additionalProperties": false,
+      "description": "Unified dependency container for instrument market data requirements.",
+      "properties": {
+        "credit_index_ids": {
+          "description": "Credit-index aggregates resolved through `MarketContext::get_credit_index`.\n\nThese identifiers are distinct from direct hazard-curve IDs because a\ncredit index also carries base correlation and optional issuer curves.",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "type": "array"
+        },
+        "curves": {
+          "$ref": "#/$defs/InstrumentCurves",
+          "description": "Curve dependencies grouped by type."
+        },
+        "fx_pairs": {
+          "description": "FX pairs required for pricing (spot matrices).",
+          "items": {
+            "$ref": "#/$defs/FxPair"
+          },
+          "type": "array"
+        },
+        "market_scalar_ids": {
+          "description": "Scalar market-value identifiers resolved through `MarketContext::get_price`.\n\nThis includes tradable spots and non-price unitless scalars such as\ncontinuous dividend yields. [`Self::series_ids`] is reserved for\n`MarketContext::get_series` dependencies.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "series_ids": {
+          "description": "Scalar time series identifiers (e.g., OHLC price series for realized variance).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "volatility_dependencies": {
+          "description": "Typed volatility dependencies in deterministic insertion order.",
+          "items": {
+            "$ref": "#/$defs/VolatilityDependency"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "curves",
+        "market_scalar_ids",
+        "volatility_dependencies",
+        "fx_pairs",
+        "series_ids"
+      ],
+      "type": "object"
     },
     "ModelKey": {
       "description": "Pricing model selection for the pricer registry.\n\nDetermines which mathematical model is used to price an instrument.\nEach model has different computational characteristics and accuracy\nprofiles for different instrument types.\n\n# Model Categories\n\n## Analytical Models\n- [`Discounting`](Self::Discounting): Simple present value discounting\n- [`Black76`](Self::Black76): Black-76 formula for options\n- [`Normal`](Self::Normal): Bachelier (normal) model for rate options\n\n## Tree Models\n- [`Tree`](Self::Tree): Binomial/trinomial lattice\n- [`HullWhite1F`](Self::HullWhite1F): Hull-White one-factor short rate\n\n## Credit Models\n- [`HazardRate`](Self::HazardRate): Fractional-recovery hazard-rate pricing\n- [`RatesCredit`](Self::RatesCredit): Joint short-rate and hazard-rate pricing\n\n## Monte Carlo Models\n- [`MonteCarloGBM`](Self::MonteCarloGBM): GBM simulation\n- [`MonteCarloHeston`](Self::MonteCarloHeston): Heston stochastic vol\n- [`MonteCarloThreeFactor`](Self::MonteCarloThreeFactor): revolver\n  utilization, short-rate and credit-spread simulation\n\n## Exotic Analytical\n- [`BarrierBSContinuous`](Self::BarrierBSContinuous): Reiner-Rubinstein barriers\n- [`AsianGeometricBS`](Self::AsianGeometricBS): Geometric Asian (exact)\n- [`AsianTurnbullWakeman`](Self::AsianTurnbullWakeman): Arithmetic Asian (approx)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::pricer::ModelKey;\n\n// Select appropriate model for instrument type\nlet model = ModelKey::Discounting;  // For bonds\nlet model = ModelKey::Black76;      // For caps/floors\nlet model = ModelKey::MonteCarloGBM; // For path-dependent exotics\n\n// Parse from string\nlet model: ModelKey = \"black76\".parse().unwrap();\nassert_eq!(model, ModelKey::Black76);\n```",
@@ -1592,6 +1705,51 @@
       "minimum": 1,
       "type": "integer"
     },
+    "SensitivityBumps": {
+      "additionalProperties": false,
+      "description": "Finite-difference bump sizes in force for a metric request.\n\nThese are the values after layering the `valuations.sensitivities.v1`\nconfiguration extension and the instrument's\n`metric_pricing_overrides.bump_config` over the library defaults. Bumped\nsensitivities are reported per unit bump (per 1bp, per 1 vol point), so\nthese sizes describe how the difference was taken, not the reporting unit.\n\nA calculator with a fixed, documented shock of its own (for example an\nanalytic greek, or a metric whose rustdoc names its shock) does not read\nthese values.",
+      "properties": {
+        "adaptive_bumps": {
+          "description": "Whether spot and volatility bumps are rescaled by volatility, time to\nexpiry and moneyness instead of applied at the fixed sizes above.",
+          "type": "boolean"
+        },
+        "credit_spread_bump_bp": {
+          "description": "Credit-spread bump in basis points (1.0 = 1bp).",
+          "format": "double",
+          "type": "number"
+        },
+        "rate_bump_bp": {
+          "description": "Parallel interest-rate bump in basis points (1.0 = 1bp).",
+          "format": "double",
+          "type": "number"
+        },
+        "spot_bump_decimal": {
+          "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).",
+          "format": "double",
+          "type": "number"
+        },
+        "vol_bump_decimal": {
+          "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).",
+          "format": "double",
+          "type": "number"
+        },
+        "ytm_bump_bp": {
+          "description": "Yield bump in basis points for numerical yield duration and convexity.\nAbsent when each calculator keeps its own default shock.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "rate_bump_bp",
+        "credit_spread_bump_bp",
+        "spot_bump_decimal",
+        "vol_bump_decimal"
+      ],
+      "type": "object"
+    },
     "StochasticPricingResult": {
       "description": "Stochastic pricing result for a structured credit deal.",
       "properties": {
@@ -1795,48 +1953,8 @@
       "type": "object"
     },
     "TraceEntry": {
-      "description": "Domain-specific trace entry types.\n\nEach variant captures relevant details for different types of computations:\n- Calibration: iteration details, convergence status\n- Pricing: cashflow-level PV breakdowns\n- Waterfall: step-by-step payment allocations",
+      "description": "Domain-specific trace entry types.\n\nEach variant captures relevant details for different types of computations:\n- Calibration: solver steps as generic computation steps\n- Pricing: cashflow-level PV breakdowns\n- Waterfall: step-by-step payment allocations",
       "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Calibration solver iteration details",
-          "properties": {
-            "converged": {
-              "description": "Whether convergence was achieved",
-              "type": "boolean"
-            },
-            "iteration": {
-              "description": "Iteration number (0-based)",
-              "format": "uint64",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "kind": {
-              "const": "calibration_iteration",
-              "type": "string"
-            },
-            "knots_updated": {
-              "description": "Knot points that were updated",
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "residual": {
-              "description": "Objective function residual",
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "kind",
-            "iteration",
-            "residual",
-            "knots_updated",
-            "converged"
-          ],
-          "type": "object"
-        },
         {
           "additionalProperties": false,
           "description": "Cashflow present value breakdown",
@@ -1875,6 +1993,14 @@
             "pv_currency": {
               "description": "PV currency",
               "type": "string"
+            },
+            "survival_probability": {
+              "description": "Conditional survival probability to the payment date, `S(date) / S(as_of)`.\n\nPresent only for credit-risky valuations. `pv_amount` then also\nincludes the recovery leg, so it is not `cashflow_amount ×\ndiscount_factor × survival_probability`.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
             }
           },
           "required": [
@@ -2175,6 +2301,82 @@
           "type": "object"
         }
       ]
+    },
+    "ValuationProvenance": {
+      "additionalProperties": false,
+      "description": "How a valuation result was produced.\n\nStamped by [`crate::pricer::PricerRegistry::price_with_metrics`] on every\nresult so the number can be reproduced from the result plus the archived\nmarket: the model that priced it, the date the caller asked for, the market\ndata the instrument declares, any scenario adjustment applied to the value,\nand the bump sizes behind its sensitivities.",
+      "properties": {
+        "market_dependencies": {
+          "$ref": "#/$defs/MarketDependencies",
+          "description": "Curves, surfaces, scalars, FX pairs and series the instrument declares\nit reads. Identifiers refer to the `MarketContext` the result was\npriced against."
+        },
+        "model": {
+          "$ref": "#/$defs/ModelKey",
+          "description": "Registered pricing model that produced `value`."
+        },
+        "requested_as_of": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Valuation date the caller requested.\n\nThe result's `as_of` is the effective date after the instrument resolved\nit (for example to the market's spot date); the two differ only when\nthe instrument moved it."
+        },
+        "scenario_price_shock_decimal": {
+          "description": "Scenario price shock already applied to `value`, as a decimal\n(`-0.10` = the model value was multiplied by 0.90). Absent when the\nvalue is the unadjusted model value.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "sensitivity_bumps": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SensitivityBumps"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Bump sizes in force for the requested metrics. Absent when no metric\nwas requested."
+        }
+      },
+      "required": [
+        "model",
+        "requested_as_of",
+        "market_dependencies"
+      ],
+      "type": "object"
+    },
+    "VolatilityDependency": {
+      "additionalProperties": false,
+      "description": "A volatility-surface dependency with the context needed for diagnostics.",
+      "properties": {
+        "reference_strike": {
+          "description": "Optional contractual strike used by local volatility diagnostics.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "spot_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional market-scalar id of the underlying spot paired with the surface."
+        },
+        "vol_surface_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Volatility surface identifier."
+        }
+      },
+      "required": [
+        "vol_surface_id"
+      ],
+      "type": "object"
     }
   },
   "$id": "https://finstack_quant.dev/schemas/wasm/1/valuation_result.schema.json",
@@ -2216,7 +2418,7 @@
           "type": "null"
         }
       ],
-      "description": "Optional computation explanation trace.\n\nEnabled via `ExplainOpts` in configuration. Provides step-by-step\ntrace of calculations for debugging and auditability."
+      "description": "Optional computation explanation trace.\n\nRequested with `PricingOptions::with_explain`. For discounting and\nhazard-rate valuations it holds one `cashflow_pv` entry per projected\ncashflow, reconciled to `value`; for other models it holds a single\n`computation_step` entry saying no per-flow decomposition exists."
     },
     "instrument_id": {
       "description": "Unique identifier for the priced instrument.",
@@ -2233,6 +2435,17 @@
     "meta": {
       "$ref": "#/$defs/ResultsMeta",
       "description": "Calculation metadata and policy stamps.\n\nContains:\n- Numeric mode (Decimal vs f64)\n- Rounding context and precision\n- FX policy for cross-currency calculations\n- Calculation timing information"
+    },
+    "provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ValuationProvenance"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "How the result was produced: model, requested date, declared market\ndependencies, scenario adjustment and sensitivity bump sizes.\n\nStamped by the pricer registry. Absent on results constructed directly."
     },
     "schema_version": {
       "$ref": "#/$defs/SchemaVersion",

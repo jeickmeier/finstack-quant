@@ -413,9 +413,11 @@ impl PricerRegistry {
             market_history,
             metric_registry,
             recalibration_provider,
+            explain,
             instrument_validated,
             ..
         } = options;
+        let requested_as_of = as_of;
 
         // --- Base PV through the registered pricer ---
         tracing::debug!(
@@ -450,6 +452,30 @@ impl PricerRegistry {
                 crate::pricer::PricingErrorContext::from_instrument(instrument),
             )
         })?;
+
+        base_result.provenance = Some(
+            valuation_provenance(
+                instrument,
+                model,
+                requested_as_of,
+                &effective_cfg,
+                !metrics.is_empty(),
+            )
+            .map_err(|error| {
+                PricingError::from_core(error, PricingErrorContext::from_instrument(instrument))
+            })?,
+        );
+        if explain.enabled && base_result.explanation.is_none() {
+            base_result.explanation = Some(
+                crate::instruments::common_impl::cashflow_export::pricing_trace(
+                    instrument,
+                    market,
+                    model,
+                    &base_result,
+                    explain,
+                ),
+            );
+        }
 
         if metrics.is_empty() && instrument.key() != InstrumentType::Composite {
             return Ok(base_result);
@@ -503,6 +529,41 @@ impl PricerRegistry {
 /// policy stamp, they are joined with ` | ` so the audit trail records every
 /// policy that fed into the valuation. Single-stamp results return the
 /// policy verbatim.
+/// Record how a result was produced: model, requested date, declared market
+/// dependencies, scenario adjustment and (for metric requests) bump sizes.
+fn valuation_provenance(
+    instrument: &dyn Priceable,
+    model: ModelKey,
+    requested_as_of: finstack_quant_core::dates::Date,
+    cfg: &FinstackConfig,
+    with_metrics: bool,
+) -> finstack_quant_core::Result<crate::results::ValuationProvenance> {
+    let overrides = instrument.get_metric_pricing_overrides();
+    let sensitivity_bumps = if with_metrics {
+        let resolved =
+            crate::metrics::sensitivities::config::from_context_or_default(cfg, overrides)?;
+        Some(crate::results::SensitivityBumps {
+            rate_bump_bp: resolved.rate_bump_bp,
+            credit_spread_bump_bp: resolved.credit_spread_bump_bp,
+            spot_bump_decimal: resolved.spot_bump_decimal,
+            vol_bump_decimal: resolved.vol_bump_decimal,
+            ytm_bump_bp: resolved.ytm_bump_bp,
+            adaptive_bumps: overrides.is_some_and(|o| o.bump_config.adaptive_bumps),
+        })
+    } else {
+        None
+    };
+    Ok(crate::results::ValuationProvenance {
+        model,
+        requested_as_of,
+        market_dependencies: instrument.market_dependencies()?,
+        scenario_price_shock_decimal: instrument
+            .get_scenario_pricing_overrides()
+            .and_then(|overrides| overrides.scenario_price_shock_decimal),
+        sensitivity_bumps,
+    })
+}
+
 fn stamp_results_meta(
     cfg: &FinstackConfig,
     instrument: &dyn Priceable,

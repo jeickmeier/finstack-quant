@@ -3889,30 +3889,11 @@ export type StructuredCreditPricingMode =
  * Domain-specific trace entry types.
  *
  * Each variant captures relevant details for different types of computations:
- * - Calibration: iteration details, convergence status
+ * - Calibration: solver steps as generic computation steps
  * - Pricing: cashflow-level PV breakdowns
  * - Waterfall: step-by-step payment allocations
  */
 export type TraceEntry =
-  | {
-      /**
-       * Whether convergence was achieved
-       */
-      converged: boolean;
-      /**
-       * Iteration number (0-based)
-       */
-      iteration: number;
-      kind: "calibration_iteration";
-      /**
-       * Knot points that were updated
-       */
-      knots_updated: string[];
-      /**
-       * Objective function residual
-       */
-      residual: number;
-    }
   | {
       /**
        * Cashflow amount (stored as f64 for JSON simplicity)
@@ -3943,6 +3924,14 @@ export type TraceEntry =
        * PV currency
        */
       pv_currency: string;
+      /**
+       * Conditional survival probability to the payment date, `S(date) / S(as_of)`.
+       *
+       * Present only for credit-risky valuations. `pv_amount` then also
+       * includes the recovery leg, so it is not `cashflow_amount ×
+       * discount_factor × survival_probability`.
+       */
+      survival_probability?: number | null;
     }
   | {
       /**
@@ -17622,9 +17611,29 @@ export interface BorrowingBaseReport {
  */
 export interface CashflowRow {
   /**
+   * Day-count convention that turns the accrual period into `accrual_factor`.
+   */
+  accrual_day_count?: DayCount | null;
+  /**
+   * Contractual accrual-period end behind `accrual_factor`.
+   */
+  accrual_end?: DateWire | null;
+  /**
    * Accrual factor stored on the `CashFlow`.
    */
   accrual_factor: number;
+  /**
+   * Outstanding principal at `accrual_start`, in row currency: the balance
+   * the coupon accrues on when it is constant over the period. Absent when
+   * the flow has no accrual period or the schedule has no issue date to
+   * replay balances from.
+   */
+  accrual_notional?: number | null;
+  /**
+   * Contractual accrual-period start behind `accrual_factor`. Absent for
+   * flows that carry no accrual metadata (principal, fees, exchanges).
+   */
+  accrual_start?: DateWire | null;
   /**
    * Signed cashflow amount in row currency.
    */
@@ -17658,6 +17667,16 @@ export interface CashflowRow {
    */
   ending_balance?: number | null;
   /**
+   * FX rate (reporting currency per unit of row currency) applied to
+   * `native_pv`. Absent when the row is already in the reporting currency.
+   */
+  fx_rate?: number | null;
+  /**
+   * Index rate (annualized decimal) before spread, gearing, caps and
+   * floors, for floating coupons. `rate` is the all-in rate after them.
+   */
+  index_rate?: number | null;
+  /**
    * Inflation index ratio (populated for `InflationLinkedBond`).
    */
   inflation_index_ratio?: number | null;
@@ -17666,11 +17685,23 @@ export interface CashflowRow {
    */
   kind: CFKind;
   /**
+   * Present value in row currency, before FX conversion and before any
+   * scenario price shock.
+   */
+  native_pv: number;
+  /**
    * Single Monthly Mortality for the period (populated for agency MBS).
    */
   prepayment_smm?: number | null;
   /**
-   * Per-flow present value in the envelope reporting currency. Sums to `total_pv`.
+   * Change in outstanding principal carried by this flow, in row currency
+   * (positive increases the balance). Absent when the flow kind and amount
+   * alone determine the balance movement.
+   */
+  principal_delta?: number | null;
+  /**
+   * Per-flow present value in the envelope reporting currency, after FX
+   * conversion and any scenario price shock. Sums to `total_pv`.
    */
   pv: number;
   /**
@@ -18000,8 +18031,10 @@ export interface ValuationResult {
   /**
    * Optional computation explanation trace.
    *
-   * Enabled via `ExplainOpts` in configuration. Provides step-by-step
-   * trace of calculations for debugging and auditability.
+   * Requested with `PricingOptions::with_explain`. For discounting and
+   * hazard-rate valuations it holds one `cashflow_pv` entry per projected
+   * cashflow, reconciled to `value`; for other models it holds a single
+   * `computation_step` entry saying no per-flow decomposition exists.
    */
   explanation?: ExplanationTrace | null;
   /**
@@ -18041,6 +18074,13 @@ export interface ValuationResult {
    * - Calculation timing information
    */
   meta: ResultsMeta;
+  /**
+   * How the result was produced: model, requested date, declared market
+   * dependencies, scenario adjustment and sensitivity bump sizes.
+   *
+   * Stamped by the pricer registry. Absent on results constructed directly.
+   */
+  provenance?: ValuationProvenance | null;
   /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */
@@ -18518,6 +18558,174 @@ export interface ExplanationTrace {
    */
   type: string;
   [k: string]: unknown;
+}
+/**
+ * How a valuation result was produced.
+ *
+ * Stamped by [`crate::pricer::PricerRegistry::price_with_metrics`] on every
+ * result so the number can be reproduced from the result plus the archived
+ * market: the model that priced it, the date the caller asked for, the market
+ * data the instrument declares, any scenario adjustment applied to the value,
+ * and the bump sizes behind its sensitivities.
+ */
+export interface ValuationProvenance {
+  /**
+   * Curves, surfaces, scalars, FX pairs and series the instrument declares
+   * it reads. Identifiers refer to the `MarketContext` the result was
+   * priced against.
+   */
+  market_dependencies: MarketDependencies;
+  /**
+   * Registered pricing model that produced `value`.
+   */
+  model: ModelKey;
+  /**
+   * Valuation date the caller requested.
+   *
+   * The result's `as_of` is the effective date after the instrument resolved
+   * it (for example to the market's spot date); the two differ only when
+   * the instrument moved it.
+   */
+  requested_as_of: DateWire;
+  /**
+   * Scenario price shock already applied to `value`, as a decimal
+   * (`-0.10` = the model value was multiplied by 0.90). Absent when the
+   * value is the unadjusted model value.
+   */
+  scenario_price_shock_decimal?: number | null;
+  /**
+   * Bump sizes in force for the requested metrics. Absent when no metric
+   * was requested.
+   */
+  sensitivity_bumps?: SensitivityBumps | null;
+}
+/**
+ * Market data an instrument needs to price: curves, spots, surfaces, FX pairs and fixings.
+ */
+export interface MarketDependencies {
+  /**
+   * Credit-index aggregates resolved through `MarketContext::get_credit_index`.
+   *
+   * These identifiers are distinct from direct hazard-curve IDs because a
+   * credit index also carries base correlation and optional issuer curves.
+   */
+  credit_index_ids?: Id[];
+  /**
+   * Curve dependencies grouped by type.
+   */
+  curves: InstrumentCurves;
+  /**
+   * FX pairs required for pricing (spot matrices).
+   */
+  fx_pairs: FxPair[];
+  /**
+   * Scalar market-value identifiers resolved through `MarketContext::get_price`.
+   *
+   * This includes tradable spots and non-price unitless scalars such as
+   * continuous dividend yields. [`Self::series_ids`] is reserved for
+   * `MarketContext::get_series` dependencies.
+   */
+  market_scalar_ids: string[];
+  /**
+   * Scalar time series identifiers (e.g., OHLC price series for realized variance).
+   */
+  series_ids: string[];
+  /**
+   * Typed volatility dependencies in deterministic insertion order.
+   */
+  volatility_dependencies: VolatilityDependency[];
+}
+/**
+ * Collection of curves used by an instrument, categorized by market role.
+ */
+export interface InstrumentCurves {
+  /**
+   * Credit/hazard curves used by the instrument.
+   */
+  credit_curves: Id[];
+  /**
+   * Discount curves used by the instrument (including primary and foreign).
+   */
+  discount_curves: Id[];
+  /**
+   * Forward/projection curves used by the instrument.
+   */
+  forward_curves: Id[];
+  /**
+   * Inflation curves or published inflation indices used by the instrument.
+   */
+  inflation_curves: Id[];
+}
+/**
+ * FX pair identifier using base/quote currency ordering.
+ */
+export interface FxPair {
+  /**
+   * Base currency (numerator).
+   */
+  base: Currency;
+  /**
+   * Quote currency (denominator).
+   */
+  quote: Currency;
+}
+/**
+ * A volatility-surface dependency with the context needed for diagnostics.
+ */
+export interface VolatilityDependency {
+  /**
+   * Optional contractual strike used by local volatility diagnostics.
+   */
+  reference_strike?: number | null;
+  /**
+   * Optional market-scalar id of the underlying spot paired with the surface.
+   */
+  spot_id?: Id | null;
+  /**
+   * Volatility surface identifier.
+   */
+  vol_surface_id: Id;
+}
+/**
+ * Finite-difference bump sizes in force for a metric request.
+ *
+ * These are the values after layering the `valuations.sensitivities.v1`
+ * configuration extension and the instrument's
+ * `metric_pricing_overrides.bump_config` over the library defaults. Bumped
+ * sensitivities are reported per unit bump (per 1bp, per 1 vol point), so
+ * these sizes describe how the difference was taken, not the reporting unit.
+ *
+ * A calculator with a fixed, documented shock of its own (for example an
+ * analytic greek, or a metric whose rustdoc names its shock) does not read
+ * these values.
+ */
+export interface SensitivityBumps {
+  /**
+   * Whether spot and volatility bumps are rescaled by volatility, time to
+   * expiry and moneyness instead of applied at the fixed sizes above.
+   */
+  adaptive_bumps?: boolean;
+  /**
+   * Credit-spread bump in basis points (1.0 = 1bp).
+   */
+  credit_spread_bump_bp: number;
+  /**
+   * Parallel interest-rate bump in basis points (1.0 = 1bp).
+   */
+  rate_bump_bp: number;
+  /**
+   * Spot bump as a decimal fraction of spot (0.01 = 1%).
+   */
+  spot_bump_decimal: number;
+  /**
+   * Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
+   */
+  vol_bump_decimal: number;
+  /**
+   * Yield bump in basis points for numerical yield duration and convexity.
+   * Absent when each calculator keeps its own default shock.
+   */
+  ytm_bump_bp?: number | null;
 }
 /**
  * Result of resolving a new composite holdings state.
@@ -19299,19 +19507,6 @@ export interface TrancheAccrualPeriod {
   start: DateWire;
 }
 /**
- * FX pair identifier using base/quote currency ordering.
- */
-export interface FxPair {
-  /**
-   * Base currency (numerator).
-   */
-  base: Currency;
-  /**
-   * Quote currency (denominator).
-   */
-  quote: Currency;
-}
-/**
  * Market conventions of one inflation-swap market.
  */
 export interface InflationSwapConventions {
@@ -19385,31 +19580,15 @@ export interface InstrumentCashflowEnvelope {
    */
   recovery_rate?: number | null;
   /**
+   * Scenario price shock applied to every row `pv` and to `total_pv`, as a
+   * decimal (`-0.10` = multiplied by 0.90). Absent when rows are unshocked.
+   */
+  scenario_price_shock_decimal?: number | null;
+  /**
    * Sum of `flows[i].pv`. Matches `base_value` for supported products.
    */
   total_pv: number;
   [k: string]: unknown;
-}
-/**
- * Collection of curves used by an instrument, categorized by market role.
- */
-export interface InstrumentCurves {
-  /**
-   * Credit/hazard curves used by the instrument.
-   */
-  credit_curves: Id[];
-  /**
-   * Discount curves used by the instrument (including primary and foreign).
-   */
-  discount_curves: Id[];
-  /**
-   * Forward/projection curves used by the instrument.
-   */
-  forward_curves: Id[];
-  /**
-   * Inflation curves or published inflation indices used by the instrument.
-   */
-  inflation_curves: Id[];
 }
 /**
  * Contract conventions of one interest-rate future.
@@ -19503,59 +19682,6 @@ export interface ListedProductCoverage {
    * Exchange root symbols, comma-separated where one row covers a close family.
    */
   symbols: string;
-}
-/**
- * Market data an instrument needs to price: curves, spots, surfaces, FX pairs and fixings.
- */
-export interface MarketDependencies {
-  /**
-   * Credit-index aggregates resolved through `MarketContext::get_credit_index`.
-   *
-   * These identifiers are distinct from direct hazard-curve IDs because a
-   * credit index also carries base correlation and optional issuer curves.
-   */
-  credit_index_ids?: Id[];
-  /**
-   * Curve dependencies grouped by type.
-   */
-  curves: InstrumentCurves;
-  /**
-   * FX pairs required for pricing (spot matrices).
-   */
-  fx_pairs: FxPair[];
-  /**
-   * Scalar market-value identifiers resolved through `MarketContext::get_price`.
-   *
-   * This includes tradable spots and non-price unitless scalars such as
-   * continuous dividend yields. [`Self::series_ids`] is reserved for
-   * `MarketContext::get_series` dependencies.
-   */
-  market_scalar_ids: string[];
-  /**
-   * Scalar time series identifiers (e.g., OHLC price series for realized variance).
-   */
-  series_ids: string[];
-  /**
-   * Typed volatility dependencies in deterministic insertion order.
-   */
-  volatility_dependencies: VolatilityDependency[];
-}
-/**
- * A volatility-surface dependency with the context needed for diagnostics.
- */
-export interface VolatilityDependency {
-  /**
-   * Optional contractual strike used by local volatility diagnostics.
-   */
-  reference_strike?: number | null;
-  /**
-   * Optional market-scalar id of the underlying spot paired with the surface.
-   */
-  spot_id?: Id | null;
-  /**
-   * Volatility surface identifier.
-   */
-  vol_surface_id: Id;
 }
 /**
  * Historical market scenarios for historical VaR and expected shortfall.

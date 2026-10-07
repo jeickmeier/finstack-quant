@@ -6,19 +6,22 @@ export function Example({ density = "compact" }: ExampleProps) {
   return (
     <>
       <p>
-        Supplied canonical Rust trace example; pricing has no trace request
-        input.
+        Supplied canonical Rust trace example; request one from pricing with
+        the <code>explain</code> argument.
       </p>
       <ExplanationTrace
         value={{
-          type: "calibration",
+          type: "pricing",
           entries: [
             {
-              kind: "calibration_iteration",
-              iteration: 0,
-              residual: 0.005,
-              knots_updated: ["2025-01-15"],
-              converged: false,
+              kind: "cashflow_pv",
+              date: "2025-01-15",
+              cashflow_amount: 50000,
+              cashflow_currency: "USD",
+              discount_factor: 0.95,
+              pv_amount: 47500,
+              pv_currency: "USD",
+              curve_id: "USD_GOVT",
             },
           ],
         }}

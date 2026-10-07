@@ -740,6 +740,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
             registry,
             metric_registry,
             recalibration_provider,
+            explain,
             instrument_validated: _,
         } = options;
         let model = model.unwrap_or_else(|| self.default_model());
@@ -752,6 +753,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
             registry: None,
             metric_registry,
             recalibration_provider,
+            explain,
             instrument_validated: false,
         };
 

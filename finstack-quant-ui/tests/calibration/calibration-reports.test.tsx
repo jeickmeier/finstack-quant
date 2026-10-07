@@ -144,18 +144,15 @@ it("renders exact plan and step reports, unavailable diagnostics and native zero
         );
         expect(rows).toEqual(
           report.diagnostics.per_quote.map((q) =>
-            [
-              q.quote_label,
-              q.target_value,
-              q.fitted_value,
-              q.residual,
-              q.sensitivity,
-            ].map(String),
+            [q.quote_label, q.quote_value, q.residual, q.sensitivity].map(
+              String,
+            ),
           ),
         );
+        // Each row carries the market quote it was calibrated to.
         expect(
-          report.diagnostics.per_quote.every(
-            (q) => q.target_value === 0 && q.fitted_value === q.residual,
+          report.diagnostics.per_quote.every((q) =>
+            Number.isFinite(q.quote_value),
           ),
         ).toBe(true);
       } else expect(screen.getByText("Diagnostics unavailable")).toBeTruthy();

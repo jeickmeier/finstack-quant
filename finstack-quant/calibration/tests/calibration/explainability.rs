@@ -13,7 +13,7 @@ use finstack_quant_calibration::quotes::rates::RateQuote;
 use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::create_date;
-use finstack_quant_core::explain::ExplainOpts;
+use finstack_quant_core::explain::TraceEntry;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
@@ -116,10 +116,13 @@ fn explanation_is_present_when_enabled() {
     let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
     quote_sets.insert("fwd".to_string(), cal_utils::quote_set_ids(&fwd_quotes));
 
-    let settings = CalibrationConfig {
-        explain: ExplainOpts::enabled(),
-        ..Default::default()
-    };
+    // The wire form is how hosts enable tracing: a JSON plan setting.
+    let settings: CalibrationConfig = serde_json::from_value(serde_json::json!({
+        "explain": {"enabled": true},
+        "compute_diagnostics": true,
+    }))
+    .expect("explain is a wire setting");
+    assert!(settings.explain.enabled && settings.explain.max_entries.is_none());
 
     let plan = CalibrationPlan {
         id: "plan".to_string(),
@@ -157,10 +160,36 @@ fn explanation_is_present_when_enabled() {
     let step = result.result.step_reports.get("fwd").expect("step report");
 
     assert!(step.success);
-    if let Some(trace) = step.explanation.as_ref() {
-        assert!(
-            !trace.entries.is_empty(),
-            "when explanation is present, it should contain entries"
-        );
-    }
+    let trace = step.explanation.as_ref().expect("step trace");
+    let TraceEntry::ComputationStep { name, metadata, .. } = &trace.entries[0] else {
+        panic!("unexpected entry {:?}", trace.entries[0]);
+    };
+    assert_eq!(name, "global_solve");
+    let metadata = metadata.as_ref().expect("solve metadata");
+    assert_eq!(
+        metadata["solved_params"].as_array().map(Vec::len),
+        metadata["times"].as_array().map(Vec::len)
+    );
+
+    // The plan-level trace nests every step trace under its step marker.
+    let plan_trace = result
+        .result
+        .report
+        .explanation
+        .as_ref()
+        .expect("plan trace");
+    assert!(plan_trace.entries.iter().any(
+        |entry| matches!(entry, TraceEntry::ComputationStep { name, .. } if name == "global_solve")
+    ));
+
+    // Per-quote rows carry the market quote next to the residual.
+    let rows = step.quote_rows();
+    let quoted: Vec<_> = rows.iter().map(|row| row.quote_value).collect();
+    assert_eq!(quoted, [Some(0.045), Some(0.046)]);
+}
+
+#[test]
+fn disabled_explain_is_omitted_from_the_wire_form() {
+    let json = serde_json::to_value(CalibrationConfig::default()).expect("serialize");
+    assert!(json.get("explain").is_none());
 }

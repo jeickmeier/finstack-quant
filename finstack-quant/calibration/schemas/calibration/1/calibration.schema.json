@@ -26,6 +26,10 @@
           },
           "description": "Discount-curve specific solver configuration."
         },
+        "explain": {
+          "$ref": "#/$defs/ExplainOpts",
+          "description": "Explanation options (opt-in step trace on each step report and on the\nplan report). `{\"enabled\": true}` records every bootstrap knot and\nglobal solve; add `max_entries` to cap the trace. Omitted from the wire\nform when disabled."
+        },
         "fail_on_bad_fit": {
           "default": true,
           "description": "When `true`, a calibration step whose solver reports\n`report.success == false` is propagated as a\n`finstack_quant_core::Error::Calibration` and its output is **not**\ninstalled into the market context.\n\nDefaults to `true` — this is the safe production choice because\na non-converged solver would otherwise silently poison downstream\npricing. Diagnostic workflows that want to inspect the\nreport without aborting can set this to `false`.",
@@ -1668,6 +1672,27 @@
         "id",
         "events"
       ],
+      "type": "object"
+    },
+    "ExplainOpts": {
+      "additionalProperties": false,
+      "description": "Opt-in configuration for generating explanation traces.\n\nControls whether detailed execution traces are captured during computation.\nWhen disabled, there is zero runtime overhead.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "Whether explanation tracing is enabled",
+          "type": "boolean"
+        },
+        "max_entries": {
+          "description": "Maximum number of trace entries (caps memory usage). `None` records\nevery entry.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
       "type": "object"
     },
     "ExtrapolationPolicy": {

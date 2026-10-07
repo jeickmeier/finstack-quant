@@ -9,25 +9,29 @@ use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-/// Fitted-versus-target quality record for one calibration quote.
+/// Fit quality record for one calibration quote.
 ///
 /// Attributes
 /// ----------
 /// quote_label : str
 ///     Quote identifier as supplied in the envelope (``QuoteId``).
-/// target_value : float
-///     Market target the solver tried to reprice.
-/// fitted_value : float
-///     Value implied by the calibrated object.
+/// quote_value : float | None
+///     Market quote the calibration instrument was built from, in the quote's
+///     native units: decimal rate for deposits, FRAs, swaps and inflation
+///     swaps; price for rate futures; basis points for CDS par spreads and
+///     cross-currency basis; percent for CDS and tranche upfronts. ``None``
+///     when diagnostics were not computed or the target has no scalar quote.
 /// residual : float
-///     ``fitted_value - target_value`` in the calibrator's residual units.
+///     Value of the instrument built at ``quote_value``, priced on the
+///     calibrated curve and divided by the target's residual notional. The
+///     calibration target is zero.
 /// sensitivity : float
 ///     Absolute local sensitivity of the residual to the solved knot.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.calibration import QuoteQuality
-/// >>> q = QuoteQuality.from_json('{"quote_label": "USD-OIS-SWAP-5Y", "target_value": 0.045, "fitted_value": 0.045, "residual": 0.0, "sensitivity": 1.0}')
+/// >>> q = QuoteQuality.from_json('{"quote_label": "USD-OIS-SWAP-5Y", "quote_value": 0.045, "residual": 0.0, "sensitivity": 1.0}')
 /// >>> q.quote_label
 /// 'USD-OIS-SWAP-5Y'
 #[pyclass(
@@ -55,19 +59,14 @@ impl PyQuoteQuality {
         self.inner.quote_label.clone()
     }
 
-    /// Market target the solver tried to reprice.
+    /// Market quote in its native units, or ``None`` when not recorded.
     #[getter]
-    fn target_value(&self) -> f64 {
-        self.inner.target_value
+    fn quote_value(&self) -> Option<f64> {
+        self.inner.quote_value
     }
 
-    /// Value implied by the calibrated object.
-    #[getter]
-    fn fitted_value(&self) -> f64 {
-        self.inner.fitted_value
-    }
-
-    /// Signed residual (fitted minus target).
+    /// Signed residual: normalized value of the quote instrument on the
+    /// calibrated curve (target zero).
     #[getter]
     fn residual(&self) -> f64 {
         self.inner.residual
@@ -186,7 +185,7 @@ impl PyCalibrationDiagnostics {
 
     /// Per-quote diagnostics as a pandas ``DataFrame``.
     ///
-    /// Columns: ``quote_id``, ``target``, ``fitted``, ``residual``,
+    /// Columns: ``quote_id``, ``quote_value``, ``residual``,
     /// ``sensitivity`` (one row per quote, solve order).
     ///
     /// Raises
@@ -245,21 +244,21 @@ pub(crate) fn quote_quality_dataframe<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let n = rows.len();
     let mut ids = Vec::with_capacity(n);
-    let mut targets = Vec::with_capacity(n);
-    let mut fitted = Vec::with_capacity(n);
+    let mut quote_values = Vec::with_capacity(n);
     let mut residuals = Vec::with_capacity(n);
     let mut sensitivities = Vec::with_capacity(n);
     for row in rows {
         ids.push(row.quote_label.clone());
-        targets.push(row.target_value);
-        fitted.push(row.fitted_value);
+        quote_values.push(row.quote_value.unwrap_or(f64::NAN));
         residuals.push(row.residual);
         sensitivities.push(row.sensitivity);
     }
     let data = PyDict::new(py);
     data.set_item("quote_id", ids)?;
-    data.set_item("target", PyArray1::from_vec(py, targets).into_any())?;
-    data.set_item("fitted", PyArray1::from_vec(py, fitted).into_any())?;
+    data.set_item(
+        "quote_value",
+        PyArray1::from_vec(py, quote_values).into_any(),
+    )?;
     data.set_item("residual", PyArray1::from_vec(py, residuals).into_any())?;
     data.set_item(
         "sensitivity",
@@ -428,8 +427,8 @@ impl PyCalibrationReport {
 
     /// Residuals per quote as a pandas ``DataFrame``.
     ///
-    /// Columns: ``quote_id``, ``target``, ``fitted``, ``residual``,
-    /// ``sensitivity``. ``target`` / ``fitted`` / ``sensitivity`` come from
+    /// Columns: ``quote_id``, ``quote_value``, ``residual``,
+    /// ``sensitivity``. ``quote_value`` / ``sensitivity`` come from
     /// ``diagnostics`` and are ``NaN`` when diagnostics were not computed.
     ///
     /// Raises

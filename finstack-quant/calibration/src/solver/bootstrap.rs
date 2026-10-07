@@ -6,6 +6,7 @@ use super::{bracket_solve_1d_nearest_first_with_diagnostics, bracket_solve_1d_wi
 use crate::constants::{OBJECTIVE_VALID_ABS_MAX, RESIDUAL_PENALTY_ABS_MIN};
 use crate::report::{CalibrationDiagnostics, QuoteQuality};
 use crate::{CalibrationConfig, CalibrationReport};
+use finstack_quant_core::explain::{ExplanationTrace, TraceEntry};
 use finstack_quant_core::Result;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -272,6 +273,8 @@ fn validate_residual(time: f64, residual: f64, tolerance: f64) -> Result<()> {
 }
 
 /// Validate the solved value and commit its knot, rolling back on failure.
+///
+/// Returns the quote's residual on the curve built from the committed knots.
 fn validate_and_commit_knot<T: BootstrapTarget>(
     target: &T,
     knots: &mut Vec<(f64, f64)>,
@@ -279,7 +282,7 @@ fn validate_and_commit_knot<T: BootstrapTarget>(
     solved_value: f64,
     quote: &T::Quote,
     validation_tolerance: f64,
-) -> Result<()> {
+) -> Result<f64> {
     target.validate_knot(time, solved_value)?;
 
     // PERF: avoid `knots.clone()` by temporarily pushing the candidate knot and popping
@@ -289,7 +292,7 @@ fn validate_and_commit_knot<T: BootstrapTarget>(
         let curve = target.build_curve_for_solver(knots)?;
         let residual = target.calculate_residual(&curve, quote)?;
         validate_residual(time, residual, validation_tolerance)?;
-        Ok(())
+        Ok(residual)
     })();
 
     if result.is_err() {
@@ -360,8 +363,12 @@ impl SequentialBootstrapper {
         // report can flag them as approximate rather than silently treating them
         // as true bracketed roots.
         let mut approximate_knot_times: Vec<f64> = Vec::new();
+        let mut trace = config
+            .explain
+            .enabled
+            .then(|| ExplanationTrace::new("bootstrap"));
 
-        for sq in &sorted_quotes {
+        for (index, sq) in sorted_quotes.iter().enumerate() {
             validate_time_ordering(sq.time, last_time, sq.original_idx)?;
             let quote = &quotes[sq.original_idx];
             let time = sq.time;
@@ -373,7 +380,7 @@ impl SequentialBootstrapper {
                 approximate_knot_times.push(time);
             }
 
-            validate_and_commit_knot(
+            let residual = validate_and_commit_knot(
                 target,
                 &mut knots,
                 time,
@@ -381,6 +388,25 @@ impl SequentialBootstrapper {
                 quote,
                 validation_tolerance,
             )?;
+            if let Some(trace) = trace.as_mut() {
+                // Residual on the curve as it stood when this knot was
+                // committed; the report carries the final-curve residual.
+                trace.push(
+                    TraceEntry::ComputationStep {
+                        name: "knot_solved".to_string(),
+                        description: target.residual_key(quote, index),
+                        metadata: Some(serde_json::json!({
+                            "time": time,
+                            "value": solved_value,
+                            "residual": residual,
+                            "quote_value": target.quote_value(quote),
+                            "evaluations": eval_count,
+                            "approximate": is_approximate,
+                        })),
+                    },
+                    config.explain.max_entries,
+                );
+            }
 
             total_iterations += eval_count;
             last_time = time;
@@ -427,6 +453,9 @@ impl SequentialBootstrapper {
             let diagnostics =
                 compute_bootstrap_diagnostics(target, quotes, &knots, &report.residuals, config)?;
             report = report.with_diagnostics(diagnostics);
+        }
+        if let Some(trace) = trace {
+            report = report.with_explanation(trace);
         }
 
         Ok((final_curve, report))
@@ -638,8 +667,7 @@ where
 
         per_quote.push(QuoteQuality {
             quote_label,
-            target_value: 0.0,
-            fitted_value: resid,
+            quote_value: target.quote_value(quote),
             residual: resid,
             sensitivity: sensitivity.abs(),
         });
@@ -819,7 +847,7 @@ mod tests {
             for (quality, quote) in diagnostics.per_quote.iter().zip([&short, &long]) {
                 assert_eq!(quality.quote_label, quote.label);
                 assert_eq!(quality.residual, quote.residual);
-                assert_eq!(quality.fitted_value, quote.residual);
+                assert_eq!(quality.quote_value, None);
                 assert_eq!(report.residuals[&quality.quote_label], quality.residual);
                 assert!(
                     (quality.sensitivity - quote.slope.abs()).abs() < 1e-10,

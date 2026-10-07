@@ -2363,30 +2363,11 @@ export type CalibrationSchema = "finstack_quant.calibration/1";
  * Domain-specific trace entry types.
  *
  * Each variant captures relevant details for different types of computations:
- * - Calibration: iteration details, convergence status
+ * - Calibration: solver steps as generic computation steps
  * - Pricing: cashflow-level PV breakdowns
  * - Waterfall: step-by-step payment allocations
  */
 export type TraceEntry =
-  | {
-      /**
-       * Whether convergence was achieved
-       */
-      converged: boolean;
-      /**
-       * Iteration number (0-based)
-       */
-      iteration: number;
-      kind: "calibration_iteration";
-      /**
-       * Knot points that were updated
-       */
-      knots_updated: string[];
-      /**
-       * Objective function residual
-       */
-      residual: number;
-    }
   | {
       /**
        * Cashflow amount (stored as f64 for JSON simplicity)
@@ -2417,6 +2398,14 @@ export type TraceEntry =
        * PV currency
        */
       pv_currency: string;
+      /**
+       * Conditional survival probability to the payment date, `S(date) / S(as_of)`.
+       *
+       * Present only for credit-risky valuations. `pv_amount` then also
+       * includes the recovery leg, so it is not `cashflow_amount ×
+       * discount_factor × survival_probability`.
+       */
+      survival_probability?: number | null;
     }
   | {
       /**
@@ -4428,6 +4417,13 @@ export interface CalibrationConfig {
    */
   discount_curve?: DiscountCurveSolveConfig;
   /**
+   * Explanation options (opt-in step trace on each step report and on the
+   * plan report). `{"enabled": true}` records every bootstrap knot and
+   * global solve; add `max_entries` to cap the trace. Omitted from the wire
+   * form when disabled.
+   */
+  explain?: ExplainOpts;
+  /**
    * When `true`, a calibration step whose solver reports
    * `report.success == false` is propagated as a
    * `finstack_quant_core::Error::Calibration` and its output is **not**
@@ -4562,6 +4558,23 @@ export interface DiscountCurveSolveConfig {
    * Weighting scheme for global solve residuals.
    */
   weighting_scheme?: ResidualWeightingScheme;
+}
+/**
+ * Opt-in configuration for generating explanation traces.
+ *
+ * Controls whether detailed execution traces are captured during computation.
+ * When disabled, there is zero runtime overhead.
+ */
+export interface ExplainOpts {
+  /**
+   * Whether explanation tracing is enabled
+   */
+  enabled?: boolean;
+  /**
+   * Maximum number of trace entries (caps memory usage). `None` records
+   * every entry.
+   */
+  max_entries?: number | null;
 }
 /**
  * Forward-curve specific numerical solver configuration.
@@ -4951,30 +4964,34 @@ export interface CalibrationDiagnostics {
 /**
  * Per-quote quality metrics from a calibration run.
  *
- * Captures the fitted vs target values for a single market quote,
- * along with the residual and a local sensitivity measure.
+ * Captures the market quote, the residual left after calibration and a local
+ * sensitivity measure for a single calibration instrument.
  */
 export interface QuoteQuality {
-  /**
-   * Model-implied fitted value after calibration.
-   */
-  fitted_value: number;
   /**
    * Human-readable label identifying this quote (e.g., "USD-1Y-SWAP").
    */
   quote_label: string;
   /**
-   * Residual (fitted - target) for this quote.
+   * Market quote the calibration instrument was built from, in the quote's
+   * native units: decimal rate for deposits, FRAs, swaps and inflation
+   * swaps; price for rate futures; basis points for CDS par spreads and
+   * cross-currency basis; percent for CDS and tranche upfronts.
+   *
+   * Absent when the target's quotes carry no single scalar value or
+   * diagnostics were not computed.
+   */
+  quote_value?: number | null;
+  /**
+   * Signed calibration residual: the value of the instrument built at
+   * `quote_value`, priced on the calibrated curve and divided by the
+   * target's residual notional. The calibration target is zero.
    */
   residual: number;
   /**
    * Local sensitivity: dOutput/dParam (via finite difference or Jacobian diagonal).
    */
   sensitivity: number;
-  /**
-   * Market-observed target value for this quote.
-   */
-  target_value: number;
 }
 /**
  * Canonical typed calibration request and result envelope.

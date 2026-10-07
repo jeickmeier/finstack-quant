@@ -541,6 +541,10 @@ impl BootstrapTarget for DiscountCurveTarget {
     type Quote = CalibrationQuote;
     type Curve = DiscountCurve;
 
+    fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
+        Some(quote.quote_value())
+    }
+
     fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
         quote.quote_id().to_string()
     }
@@ -826,6 +830,10 @@ impl GlobalSolveTarget for DiscountCurveTarget {
             }
             Ok(())
         })
+    }
+
+    fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
+        Some(quote.quote_value())
     }
 
     fn residual_key(&self, quote: &Self::Quote, idx: usize) -> String {

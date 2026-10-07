@@ -2490,6 +2490,24 @@ export default [
     "description": "Six-parameter Nelson-Siegel-Svensson model."
   },
   {
+    "path": "#/$defs/d_6f5e88682ce9f1cd3a3c",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ExplainOpts",
+    "description": "Opt-in configuration for generating explanation traces.\n\nControls whether detailed execution traces are captured during computation.\nWhen disabled, there is zero runtime overhead."
+  },
+  {
+    "path": "#/$defs/d_6f5e88682ce9f1cd3a3c/properties/enabled",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ExplainOpts/properties/enabled",
+    "default": false,
+    "description": "Whether explanation tracing is enabled"
+  },
+  {
+    "path": "#/$defs/d_6f5e88682ce9f1cd3a3c/properties/max_entries",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ExplainOpts/properties/max_entries",
+    "description": "Maximum number of trace entries (caps memory usage). `None` records\nevery entry.",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
     "path": "#/$defs/d_749ad577a783a3d90610",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/HierarchyNode",
     "description": "A single node in the market data hierarchy tree.\n\nNodes form a tree: each has a name, optional key-value tags for cross-cutting\nqueries, ordered children, and leaf `CurveId` references."
@@ -6355,6 +6373,13 @@ export default [
     "description": "Discount-curve specific solver configuration.",
     "ref": "#/$defs/DiscountCurveSolveConfig",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig"
+  },
+  {
+    "path": "#/$defs/d_e1605cebc97720bf2277/properties/explain",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationConfig/properties/explain",
+    "description": "Explanation options (opt-in step trace on each step report and on the\nplan report). `{\"enabled\": true}` records every bootstrap knot and\nglobal solve; add `max_entries` to cap the trace. Omitted from the wire\nform when disabled.",
+    "ref": "#/$defs/ExplainOpts",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ExplainOpts"
   },
   {
     "path": "#/$defs/d_e1605cebc97720bf2277/properties/fail_on_bad_fit",

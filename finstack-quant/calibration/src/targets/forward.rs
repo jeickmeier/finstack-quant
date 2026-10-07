@@ -667,6 +667,10 @@ impl GlobalSolveTarget for ForwardCurveTarget {
         })
     }
 
+    fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
+        Some(quote.quote_value())
+    }
+
     fn residual_key(&self, quote: &Self::Quote, idx: usize) -> String {
         match quote {
             crate::prepared::CalibrationQuote::Rates(pq) => pq.quote.id().as_str().to_string(),

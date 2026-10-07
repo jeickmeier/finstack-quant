@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Export auditability
+
+#### Added
+
+- Every priced `ValuationResult` carries `provenance` (`ValuationProvenance`): the `model` that produced the value, the `requested_as_of` date (the result's `as_of` is the effective date after the instrument resolved it), the instrument's declared `market_dependencies`, the `scenario_price_shock_decimal` already applied to the value, and, when metrics are requested, `sensitivity_bumps` (`SensitivityBumps`: `rate_bump_bp`, `credit_spread_bump_bp`, `spot_bump_decimal`, `vol_bump_decimal`, optional `ytm_bump_bp`, `adaptive_bumps`) after layering the `valuations.sensitivities.v1` extension and the instrument's `bump_config`. Python `ValuationResult.provenance` returns the dict; WASM results carry the field.
+- `PricingOptions::with_explain(ExplainOpts)` attaches a step trace to `ValuationResult.explanation`. Under `discounting` and `hazard_rate` it holds one `cashflow_pv` entry per projected cashflow, built from the same rows as `instrument_cashflows` and reconciled to the value; under any other model it holds one `computation_step` entry named `cashflow_trace_unavailable` with the reason. Python `price_instrument(..., explain=True)`; WASM `priceInstrument` and `priceInstrumentWithMarket` take a trailing `explain` boolean. The typed instrument `price` methods do not take it; pass the instrument to `price_instrument`.
+- `TraceEntry::CashflowPV.survival_probability` (conditional survival to the payment date, hazard-rate valuations only).
+- `CashflowRow` carries the inputs of each coupon and the pre-conversion value: `accrual_start`, `accrual_end`, `accrual_day_count`, `accrual_notional` (outstanding principal at accrual start), `index_rate` (floating index before spread, gearing, caps and floors), `principal_delta`, `native_pv` (row currency, before FX and scenario shock) and `fx_rate` (reporting currency per unit of row currency). `InstrumentCashflowEnvelope.scenario_price_shock_decimal` records the shock applied to every row `pv`. Python `InstrumentCashflowEnvelope.to_dataframe()` has the new columns; `accrual_start` and `accrual_end` are `datetime64`.
+- `CalibrationConfig.explain` is a wire setting (`{"explain": {"enabled": true}}` in plan settings, Python `CalibrationConfig(explain={"enabled": True})`); it was `#[serde(skip)]` and reachable from Rust only. Bootstrap steps record one `knot_solved` computation step per quote (time, solved value, residual at commit, quote value, evaluations, approximate flag) and global fits record one `global_solve` step (times, solved parameters, iteration and evaluation counts, residual norms). `ExplainOpts` derives `JsonSchema` and deserializes with defaults; a disabled setting is omitted from the wire form.
+
+#### Changed (breaking)
+
+- `QuoteQuality.target_value` and `fitted_value` are replaced by `quote_value: Option<f64>`, the market quote in its native units (decimal rate for deposits, FRAs, swaps and inflation swaps; price for rate futures; basis points for CDS par spreads and cross-currency basis; percent for CDS and tranche upfronts). Both solvers wrote `0.0` and the residual into the old fields. `residual` is documented as what it is: the quote instrument's value on the calibrated curve per unit of residual notional, target zero. Python `QuoteQuality.quote_value` replaces the two getters, and the per-quote DataFrames (`CalibrationDiagnostics.to_dataframe`, `CalibrationReport.to_dataframe`, `CalibrationResult.residuals`) have a `quote_value` column in place of `target` and `fitted`.
+- `CashflowRow.native_pv` is required on input, so a cashflow envelope serialized before this change no longer deserializes.
+- `TraceEntry::CalibrationIteration` (wire kind `calibration_iteration`) is removed; nothing produced it.
+- Rust `BondEngine::price_with_explanation` is removed; it had no production caller. The registry trace above replaces it.
+
 ### Models API simplification
 
 #### Added

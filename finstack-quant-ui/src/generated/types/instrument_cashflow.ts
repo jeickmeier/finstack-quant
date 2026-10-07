@@ -177,6 +177,27 @@ export type Currency =
  */
 export type Id1 = string;
 /**
+ * Day-count convention.
+ */
+export type DayCount =
+  | "one_one"
+  | "act_360"
+  | "act_365f"
+  | "act_365l"
+  | "30_360"
+  | "30e_360"
+  | "30e_360_isda"
+  | "30_360_it"
+  | "nl_365"
+  | "act_act"
+  | "act_act_isma"
+  | "act_act_afb"
+  | "bus_252";
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date1 = string;
+/**
  * Row currency (matters for `XccySwap` / `FxSwap`).
  */
 export type Currency1 =
@@ -340,17 +361,13 @@ export type Currency1 =
   | "ZMW"
   | "ZWL";
 /**
- * Payment date.
+ * ISO 8601 calendar date string.
  */
-export type Date1 = string;
+export type Date2 = string;
 /**
  * Opaque string identifier.
  */
 export type Id2 = string;
-/**
- * ISO 8601 calendar date string.
- */
-export type Date2 = string;
 
 /**
  * Native cashflow rows, reporting-currency PV and reconciliation status.
@@ -387,6 +404,11 @@ export interface InstrumentCashflowWire {
    */
   recovery_rate?: number | null;
   /**
+   * Scenario price shock applied to every row `pv` and to `total_pv`, as a
+   * decimal (`-0.10` = multiplied by 0.90). Absent when rows are unshocked.
+   */
+  scenario_price_shock_decimal?: number | null;
+  /**
    * Sum of `flows[i].pv`. Matches `base_value` for supported products.
    */
   total_pv: number;
@@ -397,9 +419,29 @@ export interface InstrumentCashflowWire {
  */
 export interface D_674830A94Dacf97E7Ac8 {
   /**
+   * Day-count convention that turns the accrual period into `accrual_factor`.
+   */
+  accrual_day_count?: DayCount | null;
+  /**
+   * Contractual accrual-period end behind `accrual_factor`.
+   */
+  accrual_end?: Date1 | null;
+  /**
    * Accrual factor stored on the `CashFlow`.
    */
   accrual_factor: number;
+  /**
+   * Outstanding principal at `accrual_start`, in row currency: the balance
+   * the coupon accrues on when it is constant over the period. Absent when
+   * the flow has no accrual period or the schedule has no issue date to
+   * replay balances from.
+   */
+  accrual_notional?: number | null;
+  /**
+   * Contractual accrual-period start behind `accrual_factor`. Absent for
+   * flows that carry no accrual metadata (principal, fees, exchanges).
+   */
+  accrual_start?: Date1 | null;
   /**
    * Signed cashflow amount in row currency.
    */
@@ -413,7 +455,7 @@ export interface D_674830A94Dacf97E7Ac8 {
    */
   conditional_default_prob?: number | null;
   currency: Currency1;
-  date: Date1;
+  date: Date2;
   discount_curve_id: Id2;
   /**
    * `df(as_of, date)`.
@@ -423,6 +465,16 @@ export interface D_674830A94Dacf97E7Ac8 {
    * Ending pool balance for the period (agency MBS only).
    */
   ending_balance?: number | null;
+  /**
+   * FX rate (reporting currency per unit of row currency) applied to
+   * `native_pv`. Absent when the row is already in the reporting currency.
+   */
+  fx_rate?: number | null;
+  /**
+   * Index rate (annualized decimal) before spread, gearing, caps and
+   * floors, for floating coupons. `rate` is the all-in rate after them.
+   */
+  index_rate?: number | null;
   /**
    * Inflation index ratio (populated for `InflationLinkedBond`).
    */
@@ -458,11 +510,23 @@ export interface D_674830A94Dacf97E7Ac8 {
     | "collateral_substitution_in"
     | "collateral_substitution_out";
   /**
+   * Present value in row currency, before FX conversion and before any
+   * scenario price shock.
+   */
+  native_pv: number;
+  /**
    * Single Monthly Mortality for the period (populated for agency MBS).
    */
   prepayment_smm?: number | null;
   /**
-   * Per-flow present value in the envelope reporting currency. Sums to `total_pv`.
+   * Change in outstanding principal carried by this flow, in row currency
+   * (positive increases the balance). Absent when the flow kind and amount
+   * alone determine the balance movement.
+   */
+  principal_delta?: number | null;
+  /**
+   * Per-flow present value in the envelope reporting currency, after FX
+   * conversion and any scenario price shock. Sums to `total_pv`.
    */
   pv: number;
   /**
@@ -472,7 +536,7 @@ export interface D_674830A94Dacf97E7Ac8 {
   /**
    * Reset date when the flow is a floating-rate fixing.
    */
-  reset_date?: Date2 | null;
+  reset_date?: Date1 | null;
   /**
    * Cumulative survival probability (hazard mode only).
    */

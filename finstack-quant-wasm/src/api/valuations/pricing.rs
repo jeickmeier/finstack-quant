@@ -27,8 +27,8 @@
 
 use crate::api::core::market_context::JsMarketContext;
 use crate::utils::input::{
-    from_js_json, js_opt_f64, js_opt_string, js_opt_string_seq, js_string, js_string_seq,
-    json_text, opt_json_text,
+    from_js_json, js_opt_bool, js_opt_f64, js_opt_string, js_opt_string_seq, js_string,
+    js_string_seq, json_text, opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value, to_js_value_with_bigints};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -73,7 +73,14 @@ pub(super) fn price_result_with_context(
     model: &str,
     metrics: Vec<String>,
     market_history_json: Option<&str>,
+    explain: bool,
 ) -> Result<ValuationResult, JsValue> {
+    let options = finstack_quant_calibration::recalibration::pricing_options();
+    let options = if explain {
+        options.with_explain(finstack_quant_core::explain::ExplainOpts::enabled())
+    } else {
+        options
+    };
     finstack_quant_valuations::pricer::price_instrument(
         instrument,
         market,
@@ -81,7 +88,7 @@ pub(super) fn price_result_with_context(
         model,
         &metrics,
         market_history_json,
-        finstack_quant_calibration::recalibration::pricing_options(),
+        options,
     )
     .map_err(to_js_err)
 }
@@ -104,6 +111,7 @@ fn price_instrument_with_context(
         model,
         metrics,
         market_history_json,
+        false,
     )?)
 }
 
@@ -128,6 +136,7 @@ fn price_instrument_result(
         model.unwrap_or("default"),
         Vec::new(),
         None,
+        false,
     )
 }
 
@@ -315,8 +324,16 @@ pub fn bond_from_cashflows_json(
 /// `null`/`undefined` to retain the envelope configuration.
 /// @param market_history - Optional serialized market-history JSON required by
 /// historical risk metrics such as historical VaR.
+/// @param explain - Optional boolean; `true` attaches a step trace as
+/// `result.explanation`. Under `"discounting"` and `"hazard_rate"` it holds one
+/// `cashflow_pv` entry per projected cashflow (date, amount, discount factor,
+/// curve, survival probability, present value) summing to the price, capped at
+/// 1000 entries; other models get one `computation_step` entry stating that no
+/// per-flow decomposition exists. Omit or pass `false` for no trace.
 /// @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`,
-/// `value`, `measures`, `meta`, …).
+/// `value`, `measures`, `meta`, `provenance`, …). `provenance` records the
+/// model, requested date, declared market dependencies, scenario adjustment and,
+/// when metrics are requested, the finite-difference bump sizes.
 ///
 /// # Errors
 ///
@@ -326,6 +343,7 @@ pub fn bond_from_cashflows_json(
 /// pricing or a metric calculation fails; or the valuation cannot be converted
 /// to a JavaScript value.
 #[wasm_bindgen(js_name = priceInstrument)]
+#[allow(clippy::too_many_arguments)]
 pub fn price_instrument(
     instrument_json: JsValue,
     market_json: JsValue,
@@ -334,17 +352,19 @@ pub fn price_instrument(
     metrics: Option<JsValue>,
     metric_pricing_overrides: Option<JsValue>,
     market_history: Option<JsValue>,
+    explain: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let instrument_json = json_text(&instrument_json, "instrumentJson")?;
-    PriceRequest::from_js(
+    let mut request = PriceRequest::from_js(
         &market_json,
         &as_of,
         model.as_ref(),
         metrics.as_ref(),
         metric_pricing_overrides.as_ref(),
         market_history.as_ref(),
-    )?
-    .price(&instrument_json)
+    )?;
+    request.explain = js_opt_bool(explain.as_ref(), "explain")?.unwrap_or(false);
+    request.price(&instrument_json)
 }
 
 /// The converted arguments shared by `priceInstrument` and the typed
@@ -362,6 +382,8 @@ pub(super) struct PriceRequest {
     pub(super) metric_pricing_overrides: Option<String>,
     /// Market-history JSON for historical risk metrics.
     pub(super) market_history: Option<String>,
+    /// Whether to attach the per-flow step trace as `result.explanation`.
+    pub(super) explain: bool,
 }
 
 impl PriceRequest {
@@ -384,6 +406,7 @@ impl PriceRequest {
                 "metricPricingOverrides",
             )?,
             market_history: opt_json_text(market_history, "marketHistory")?,
+            explain: false,
         })
     }
 
@@ -421,6 +444,7 @@ impl PriceRequest {
             self.model.as_deref().unwrap_or("default"),
             self.metrics,
             self.market_history.as_deref(),
+            self.explain,
         )?;
         valuation_result_value(&result)
     }
@@ -621,8 +645,16 @@ pub fn listed_product_catalog(exchange: Option<JsValue>) -> Result<JsValue, JsVa
 /// `null`/`undefined` to retain the envelope configuration.
 /// @param market_history - Optional serialized market-history JSON required by
 /// historical risk metrics such as historical VaR.
+/// @param explain - Optional boolean; `true` attaches a step trace as
+/// `result.explanation`. Under `"discounting"` and `"hazard_rate"` it holds one
+/// `cashflow_pv` entry per projected cashflow (date, amount, discount factor,
+/// curve, survival probability, present value) summing to the price, capped at
+/// 1000 entries; other models get one `computation_step` entry stating that no
+/// per-flow decomposition exists. Omit or pass `false` for no trace.
 /// @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`,
-/// `value`, `measures`, `meta`, …).
+/// `value`, `measures`, `meta`, `provenance`, …). `provenance` records the
+/// model, requested date, declared market dependencies, scenario adjustment and,
+/// when metrics are requested, the finite-difference bump sizes.
 ///
 /// # Errors
 ///
@@ -632,6 +664,7 @@ pub fn listed_product_catalog(exchange: Option<JsValue>) -> Result<JsValue, JsVa
 /// or a metric calculation fails; or the valuation cannot be converted to a
 /// JavaScript value.
 #[wasm_bindgen(js_name = priceInstrumentWithMarket)]
+#[allow(clippy::too_many_arguments)]
 pub fn price_instrument_with_market(
     instrument_json: JsValue,
     market: &JsMarketContext,
@@ -640,6 +673,7 @@ pub fn price_instrument_with_market(
     metrics: Option<JsValue>,
     metric_pricing_overrides: Option<JsValue>,
     market_history: Option<JsValue>,
+    explain: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
@@ -657,6 +691,7 @@ pub fn price_instrument_with_market(
         model.as_deref().unwrap_or("default"),
         metric_strs,
         market_history.as_deref(),
+        js_opt_bool(explain.as_ref(), "explain")?.unwrap_or(false),
     )?;
     valuation_result_value(&result)
 }
@@ -712,6 +747,7 @@ pub(super) mod tests {
             metrics: Vec::new(),
             metric_pricing_overrides: None,
             market_history: None,
+            explain: false,
         }
     }
 
@@ -1268,6 +1304,7 @@ pub(super) mod tests {
             "discounting",
             Vec::new(),
             None,
+            false,
         )
         .expect("price");
         let parsed = serde_json::to_value(&priced).expect("price json");

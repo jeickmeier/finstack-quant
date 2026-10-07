@@ -66,6 +66,13 @@ pub(crate) trait BootstrapTarget {
         Ok(Vec::new())
     }
 
+    /// Market quote value reported next to the residual in per-quote
+    /// diagnostics, in the quote's native units. Defaults to `None` for
+    /// targets whose quotes carry no single scalar value.
+    fn quote_value(&self, _quote: &Self::Quote) -> Option<f64> {
+        None
+    }
+
     /// Stable residual / diagnostics label for a quote in the report.
     ///
     /// Production targets return the quote's `QuoteId` so report residuals
@@ -149,6 +156,13 @@ pub(crate) trait GlobalSolveTarget {
     /// Default implementation delegates to `build_curve_from_params`.
     fn build_curve_final_from_params(&self, times: &[f64], params: &[f64]) -> Result<Self::Curve> {
         self.build_curve_from_params(times, params)
+    }
+
+    /// Market quote value reported next to the residual in per-quote
+    /// diagnostics, in the quote's native units. Defaults to `None` for
+    /// targets whose quotes carry no single scalar value.
+    fn quote_value(&self, _quote: &Self::Quote) -> Option<f64> {
+        None
     }
 
     /// Provide a stable residual key for reporting.

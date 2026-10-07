@@ -387,6 +387,10 @@ impl BootstrapTarget for InflationCurveTarget {
     type Quote = CalibrationQuote;
     type Curve = InflationCurve;
 
+    fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
+        Some(quote.quote_value())
+    }
+
     fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
         quote.quote_id().to_string()
     }
@@ -548,6 +552,10 @@ Global solve requires strictly increasing times.",
             }
             Ok(())
         })
+    }
+
+    fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
+        Some(quote.quote_value())
     }
 
     fn residual_key(&self, quote: &Self::Quote, idx: usize) -> String {

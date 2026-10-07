@@ -544,14 +544,48 @@ class ValuationResult:
         ...
 
     @property
-    def explanation(self) -> dict[str, Any] | None:
+    def provenance(self) -> dict[str, Any] | None:
         """
-        Computation explanation trace, or ``None`` when tracing was not enabled.
+        How the result was produced, or ``None`` for a result built directly.
 
         Returns
         -------
         dict[str, Any] or None
-            Decoded Rust ``ExplanationTrace`` document.
+            Decoded Rust ``ValuationProvenance`` document: ``model`` (the
+            registered model key that priced the instrument),
+            ``requested_as_of`` (the ISO date the caller asked for; ``as_of``
+            is the effective date after the instrument resolved it),
+            ``market_dependencies`` (curve, surface, scalar, FX and series
+            identifiers the instrument declares it reads) and, when present,
+            ``scenario_price_shock_decimal`` (shock already applied to the
+            value, ``-0.10`` = multiplied by 0.90) and ``sensitivity_bumps``
+            (``rate_bump_bp``, ``credit_spread_bump_bp``, ``spot_bump_decimal``,
+            ``vol_bump_decimal`` and optional ``ytm_bump_bp`` in force for the
+            requested metrics).
+
+        Raises
+        ------
+        ValueError
+            If the provenance cannot be serialized to a Python object.
+        """
+        ...
+
+    @property
+    def explanation(self) -> dict[str, Any] | None:
+        """
+        Computation explanation trace, or ``None`` when tracing was not enabled.
+
+        Request it with ``price_instrument(..., explain=True)``. Tabulate the
+        entries with ``pandas.DataFrame(result.explanation["entries"])``.
+
+        Returns
+        -------
+        dict[str, Any] or None
+            Decoded Rust ``ExplanationTrace`` document: ``type``, ``entries``
+            (each tagged by ``kind``: ``cashflow_pv`` rows carry ``date``,
+            ``cashflow_amount``, ``discount_factor``, ``curve_id``,
+            ``pv_amount`` and optional ``survival_probability``) and
+            ``truncated`` when the entry cap was reached.
 
         Raises
         ------

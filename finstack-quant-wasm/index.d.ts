@@ -607,13 +607,18 @@ type HostValuationResult = import('./types/valuation-result.js').ValuationResult
  * seeds, path counts) are lossless `bigint`s, so serialize stochastic results
  * with `valuations.valuationResultToJson` rather than `JSON.stringify`. The
  * emitted-field presence is stricter than the schema's input view: `covenants`
- * is always present (`null` when the instrument has none), while `details` and
- * `explanation` are omitted rather than `null` when absent.
+ * is always present (`null` when the instrument has none), while `details`,
+ * `explanation` and `provenance` are omitted rather than `null` when absent.
+ * `provenance` is stamped on every priced result.
  */
-export type ValuationResult = Omit<HostValuationResult, 'covenants' | 'details' | 'explanation'> & {
+export type ValuationResult = Omit<
+  HostValuationResult,
+  'covenants' | 'details' | 'explanation' | 'provenance'
+> & {
   covenants: NonNullable<HostValuationResult['covenants']> | null;
   details?: NonNullable<HostValuationResult['details']>;
   explanation?: NonNullable<HostValuationResult['explanation']>;
+  provenance?: NonNullable<HostValuationResult['provenance']>;
 };
 
 /**
@@ -24158,7 +24163,8 @@ export interface ValuationInstrumentsNamespace {
    * @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a discount curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.
    * @param metricPricingOverrides - Optional JSON object patch applied before validation. Only supplied fields replace stored overrides; `{}` preserves them. Supplied `bump_config` fields merge into the stored object. Explicit `null` clears nullable fields to their Rust fallback. Omit the argument or pass JavaScript `null`/`undefined` to retain the envelope configuration.
    * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.
-   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Under `"discounting"` and `"hazard_rate"` it holds one `cashflow_pv` entry per projected cashflow (date, amount, discount factor, curve, survival probability, present value) summing to the price, capped at 1000 entries; other models get one `computation_step` entry stating that no per-flow decomposition exists. Omit or pass `false` for no trace.
+   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, `provenance`, …). `provenance` records the model, requested date, declared market dependencies, scenario adjustment and, when metrics are requested, the finite-difference bump sizes.
    * @throws Error - Throws a JavaScript exception if an instrument, market, metric-pricing-override, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.
    */
   priceInstrument(
@@ -24168,7 +24174,8 @@ export interface ValuationInstrumentsNamespace {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Price an instrument using a pre-parsed `core.MarketContext` handle.
@@ -24188,7 +24195,8 @@ export interface ValuationInstrumentsNamespace {
    * @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional JSON object patch applied before validation. Only supplied fields replace stored overrides; `{}` preserves them. Supplied `bump_config` fields merge into the stored object. Explicit `null` clears nullable fields to their Rust fallback. Omit the argument or pass JavaScript `null`/`undefined` to retain the envelope configuration.
    * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.
-   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Under `"discounting"` and `"hazard_rate"` it holds one `cashflow_pv` entry per projected cashflow (date, amount, discount factor, curve, survival probability, present value) summing to the price, capped at 1000 entries; other models get one `computation_step` entry stating that no per-flow decomposition exists. Omit or pass `false` for no trace.
+   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, `provenance`, …). `provenance` records the model, requested date, declared market dependencies, scenario adjustment and, when metrics are requested, the finite-difference bump sizes.
    * @throws Error - Throws a JavaScript exception if an instrument, metric-pricing-override, or market- history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.
    */
   priceInstrumentWithMarket(
@@ -24198,7 +24206,8 @@ export interface ValuationInstrumentsNamespace {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Per-flow cashflow envelope for an instrument, as a plain object.
@@ -31019,7 +31028,7 @@ export interface CalibrationNamespace {
    * unless `CalibrationConfig.compute_diagnostics` was enabled.
    * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
    * @param stepId - Identifier of the calibration step, as given in the plan.
-   * @returns One `QuoteQuality` row per quote: `quote_label`, `target_value`, `fitted_value`, `residual` (fitted minus target, in the quote's native units) and `sensitivity`.
+   * @returns One `QuoteQuality` row per quote: `quote_label`, `quote_value` (the market quote in its native units, when recorded), `residual` (normalized value of the quote instrument on the calibrated curve; the target is zero) and `sensitivity`.
    * @throws Error - Throws a `CalibrationEnvelopeError` if the result is malformed or exceeds the default load limits, and a `FinstackError` with `kind: "not_found"` naming the available step ids if no step has the given `stepId`.
    */
   calibrationResultResiduals(

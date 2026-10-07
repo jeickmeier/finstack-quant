@@ -2099,19 +2099,22 @@
     },
     "QuoteQuality": {
       "additionalProperties": false,
-      "description": "Per-quote quality metrics from a calibration run.\n\nCaptures the fitted vs target values for a single market quote,\nalong with the residual and a local sensitivity measure.",
+      "description": "Per-quote quality metrics from a calibration run.\n\nCaptures the market quote, the residual left after calibration and a local\nsensitivity measure for a single calibration instrument.",
       "properties": {
-        "fitted_value": {
-          "description": "Model-implied fitted value after calibration.",
-          "format": "double",
-          "type": "number"
-        },
         "quote_label": {
           "description": "Human-readable label identifying this quote (e.g., \"USD-1Y-SWAP\").",
           "type": "string"
         },
+        "quote_value": {
+          "description": "Market quote the calibration instrument was built from, in the quote's\nnative units: decimal rate for deposits, FRAs, swaps and inflation\nswaps; price for rate futures; basis points for CDS par spreads and\ncross-currency basis; percent for CDS and tranche upfronts.\n\nAbsent when the target's quotes carry no single scalar value or\ndiagnostics were not computed.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "residual": {
-          "description": "Residual (fitted - target) for this quote.",
+          "description": "Signed calibration residual: the value of the instrument built at\n`quote_value`, priced on the calibrated curve and divided by the\ntarget's residual notional. The calibration target is zero.",
           "format": "double",
           "type": "number"
         },
@@ -2119,17 +2122,10 @@
           "description": "Local sensitivity: dOutput/dParam (via finite difference or Jacobian diagonal).",
           "format": "double",
           "type": "number"
-        },
-        "target_value": {
-          "description": "Market-observed target value for this quote.",
-          "format": "double",
-          "type": "number"
         }
       },
       "required": [
         "quote_label",
-        "target_value",
-        "fitted_value",
         "residual",
         "sensitivity"
       ],
@@ -2871,48 +2867,8 @@
       "type": "object"
     },
     "TraceEntry": {
-      "description": "Domain-specific trace entry types.\n\nEach variant captures relevant details for different types of computations:\n- Calibration: iteration details, convergence status\n- Pricing: cashflow-level PV breakdowns\n- Waterfall: step-by-step payment allocations",
+      "description": "Domain-specific trace entry types.\n\nEach variant captures relevant details for different types of computations:\n- Calibration: solver steps as generic computation steps\n- Pricing: cashflow-level PV breakdowns\n- Waterfall: step-by-step payment allocations",
       "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Calibration solver iteration details",
-          "properties": {
-            "converged": {
-              "description": "Whether convergence was achieved",
-              "type": "boolean"
-            },
-            "iteration": {
-              "description": "Iteration number (0-based)",
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "kind": {
-              "const": "calibration_iteration",
-              "type": "string"
-            },
-            "knots_updated": {
-              "description": "Knot points that were updated",
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "residual": {
-              "description": "Objective function residual",
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "kind",
-            "iteration",
-            "residual",
-            "knots_updated",
-            "converged"
-          ],
-          "type": "object"
-        },
         {
           "additionalProperties": false,
           "description": "Cashflow present value breakdown",
@@ -2951,6 +2907,14 @@
             "pv_currency": {
               "description": "PV currency",
               "type": "string"
+            },
+            "survival_probability": {
+              "description": "Conditional survival probability to the payment date, `S(date) / S(as_of)`.\n\nPresent only for credit-risky valuations. `pv_amount` then also\nincludes the recovery leg, so it is not `cashflow_amount ×\ndiscount_factor × survival_probability`.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
             }
           },
           "required": [

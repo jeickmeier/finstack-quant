@@ -820,14 +820,14 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 213721
+            "bytes": 214807
           },
           {
             "path": "schemas/calibration/1/calibration_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
             "type_name": "CalibrationResultEnvelope",
             "kind": "output",
-            "bytes": 124122
+            "bytes": 123716
           },
           {
             "path": "schemas/calibration/1/calibration_validation_report.schema.json",
@@ -952,6 +952,7 @@
           "DividendEvent",
           "DividendKind",
           "DividendSchedule",
+          "ExplainOpts",
           "ExtrapolationPolicy",
           "FloatingLegCompounding",
           "ForwardCurveSolveConfig",
@@ -1037,6 +1038,7 @@
           "DayCount",
           "DiscountCurveSolveConfig",
           "DiscountCurveTransform",
+          "ExplainOpts",
           "ExtrapolationPolicy",
           "ForwardCurveSolveConfig",
           "ForwardCurveTransform",
@@ -3357,7 +3359,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
             "type_name": "InstrumentCashflowEnvelope",
             "kind": "output",
-            "bytes": 16748
+            "bytes": 19964
           },
           {
             "path": "schemas/results/1/listed_product_coverage.schema.json",
@@ -3434,7 +3436,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
             "type_name": "ValuationResult",
             "kind": "output",
-            "bytes": 60306
+            "bytes": 69439
           },
           {
             "path": "schemas/results/1/var_result.schema.json",
@@ -3606,7 +3608,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 213721
+            "bytes": 214807
           },
           {
             "domain": "calibration",
@@ -3614,7 +3616,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
             "type_name": "CalibrationResultEnvelope",
             "kind": "output",
-            "bytes": 124122
+            "bytes": 123716
           },
           {
             "domain": "calibration",
@@ -5470,7 +5472,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
             "type_name": "InstrumentCashflowEnvelope",
             "kind": "output",
-            "bytes": 16748
+            "bytes": 19964
           },
           {
             "domain": "valuations",
@@ -5558,7 +5560,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
             "type_name": "ValuationResult",
             "kind": "output",
-            "bytes": 60306
+            "bytes": 69439
           },
           {
             "domain": "valuations",

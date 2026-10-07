@@ -216,30 +216,11 @@ export type Id2 = string;
  * Domain-specific trace entry types.
  *
  * Each variant captures relevant details for different types of computations:
- * - Calibration: iteration details, convergence status
+ * - Calibration: solver steps as generic computation steps
  * - Pricing: cashflow-level PV breakdowns
  * - Waterfall: step-by-step payment allocations
  */
 export type D_35C446142142801Cbb82 =
-  | {
-      /**
-       * Whether convergence was achieved
-       */
-      converged: boolean;
-      /**
-       * Iteration number (0-based)
-       */
-      iteration: number;
-      kind: "calibration_iteration";
-      /**
-       * Knot points that were updated
-       */
-      knots_updated: string[];
-      /**
-       * Objective function residual
-       */
-      residual: number;
-    }
   | {
       /**
        * Cashflow amount (stored as f64 for JSON simplicity)
@@ -267,6 +248,14 @@ export type D_35C446142142801Cbb82 =
        * PV currency
        */
       pv_currency: string;
+      /**
+       * Conditional survival probability to the payment date, `S(date) / S(as_of)`.
+       *
+       * Present only for credit-risky valuations. `pv_amount` then also
+       * includes the recovery leg, so it is not `cashflow_amount ×
+       * discount_factor × survival_probability`.
+       */
+      survival_probability?: number | null;
     }
   | {
       /**
@@ -325,7 +314,11 @@ export type D_35C446142142801Cbb82 =
  */
 export type Date1 = string;
 /**
- * Currency of all reported values and additive risk measures.
+ * Opaque string identifier.
+ */
+export type Id3 = string;
+/**
+ * Base currency (numerator).
  */
 export type Currency1 =
   | "AED"
@@ -488,13 +481,351 @@ export type Currency1 =
   | "ZMW"
   | "ZWL";
 /**
+ * Quote currency (denominator).
+ */
+export type Currency2 =
+  | "AED"
+  | "AFN"
+  | "ALL"
+  | "AMD"
+  | "ANG"
+  | "AOA"
+  | "ARS"
+  | "AUD"
+  | "AWG"
+  | "AZN"
+  | "BAM"
+  | "BBD"
+  | "BDT"
+  | "BGN"
+  | "BHD"
+  | "BIF"
+  | "BMD"
+  | "BND"
+  | "BOB"
+  | "BRL"
+  | "BSD"
+  | "BTN"
+  | "BWP"
+  | "BYN"
+  | "BZD"
+  | "CAD"
+  | "CDF"
+  | "CHF"
+  | "CLF"
+  | "CLP"
+  | "CNY"
+  | "COP"
+  | "CRC"
+  | "CUC"
+  | "CUP"
+  | "CVE"
+  | "CZK"
+  | "DJF"
+  | "DKK"
+  | "DOP"
+  | "DZD"
+  | "EGP"
+  | "ERN"
+  | "ETB"
+  | "EUR"
+  | "FJD"
+  | "FKP"
+  | "GBP"
+  | "GEL"
+  | "GHS"
+  | "GIP"
+  | "GMD"
+  | "GNF"
+  | "GTQ"
+  | "GYD"
+  | "HKD"
+  | "HNL"
+  | "HRK"
+  | "HTG"
+  | "HUF"
+  | "IDR"
+  | "ILS"
+  | "INR"
+  | "IQD"
+  | "IRR"
+  | "ISK"
+  | "JMD"
+  | "JOD"
+  | "JPY"
+  | "KES"
+  | "KGS"
+  | "KHR"
+  | "KMF"
+  | "KPW"
+  | "KRW"
+  | "KWD"
+  | "KYD"
+  | "KZT"
+  | "LAK"
+  | "LBP"
+  | "LKR"
+  | "LRD"
+  | "LSL"
+  | "LYD"
+  | "MAD"
+  | "MDL"
+  | "MGA"
+  | "MKD"
+  | "MMK"
+  | "MNT"
+  | "MOP"
+  | "MRU"
+  | "MUR"
+  | "MVR"
+  | "MWK"
+  | "MXN"
+  | "MYR"
+  | "MZN"
+  | "NAD"
+  | "NGN"
+  | "NIO"
+  | "NOK"
+  | "NPR"
+  | "NZD"
+  | "OMR"
+  | "PAB"
+  | "PEN"
+  | "PGK"
+  | "PHP"
+  | "PKR"
+  | "PLN"
+  | "PYG"
+  | "QAR"
+  | "RON"
+  | "RSD"
+  | "RUB"
+  | "RWF"
+  | "SAR"
+  | "SBD"
+  | "SCR"
+  | "SDG"
+  | "SEK"
+  | "SGD"
+  | "SHP"
+  | "SLE"
+  | "SLL"
+  | "SOS"
+  | "SRD"
+  | "SSP"
+  | "STN"
+  | "SYP"
+  | "SZL"
+  | "THB"
+  | "TJS"
+  | "TMT"
+  | "TND"
+  | "TOP"
+  | "TRY"
+  | "TTD"
+  | "TWD"
+  | "TZS"
+  | "UAH"
+  | "UGX"
+  | "USD"
+  | "UYU"
+  | "UZS"
+  | "VED"
+  | "VES"
+  | "VND"
+  | "VUV"
+  | "WST"
+  | "XAF"
+  | "XCD"
+  | "XOF"
+  | "XPF"
+  | "YER"
+  | "ZAR"
+  | "ZMW"
+  | "ZWL";
+/**
+ * Opaque string identifier.
+ */
+export type Id4 = string;
+/**
+ * Valuation date the caller requested.
+ *
+ * The result's `as_of` is the effective date after the instrument resolved
+ * it (for example to the market's spot date); the two differ only when
+ * the instrument moved it.
+ */
+export type Date2 = string;
+/**
+ * Currency of all reported values and additive risk measures.
+ */
+export type Currency3 =
+  | "AED"
+  | "AFN"
+  | "ALL"
+  | "AMD"
+  | "ANG"
+  | "AOA"
+  | "ARS"
+  | "AUD"
+  | "AWG"
+  | "AZN"
+  | "BAM"
+  | "BBD"
+  | "BDT"
+  | "BGN"
+  | "BHD"
+  | "BIF"
+  | "BMD"
+  | "BND"
+  | "BOB"
+  | "BRL"
+  | "BSD"
+  | "BTN"
+  | "BWP"
+  | "BYN"
+  | "BZD"
+  | "CAD"
+  | "CDF"
+  | "CHF"
+  | "CLF"
+  | "CLP"
+  | "CNY"
+  | "COP"
+  | "CRC"
+  | "CUC"
+  | "CUP"
+  | "CVE"
+  | "CZK"
+  | "DJF"
+  | "DKK"
+  | "DOP"
+  | "DZD"
+  | "EGP"
+  | "ERN"
+  | "ETB"
+  | "EUR"
+  | "FJD"
+  | "FKP"
+  | "GBP"
+  | "GEL"
+  | "GHS"
+  | "GIP"
+  | "GMD"
+  | "GNF"
+  | "GTQ"
+  | "GYD"
+  | "HKD"
+  | "HNL"
+  | "HRK"
+  | "HTG"
+  | "HUF"
+  | "IDR"
+  | "ILS"
+  | "INR"
+  | "IQD"
+  | "IRR"
+  | "ISK"
+  | "JMD"
+  | "JOD"
+  | "JPY"
+  | "KES"
+  | "KGS"
+  | "KHR"
+  | "KMF"
+  | "KPW"
+  | "KRW"
+  | "KWD"
+  | "KYD"
+  | "KZT"
+  | "LAK"
+  | "LBP"
+  | "LKR"
+  | "LRD"
+  | "LSL"
+  | "LYD"
+  | "MAD"
+  | "MDL"
+  | "MGA"
+  | "MKD"
+  | "MMK"
+  | "MNT"
+  | "MOP"
+  | "MRU"
+  | "MUR"
+  | "MVR"
+  | "MWK"
+  | "MXN"
+  | "MYR"
+  | "MZN"
+  | "NAD"
+  | "NGN"
+  | "NIO"
+  | "NOK"
+  | "NPR"
+  | "NZD"
+  | "OMR"
+  | "PAB"
+  | "PEN"
+  | "PGK"
+  | "PHP"
+  | "PKR"
+  | "PLN"
+  | "PYG"
+  | "QAR"
+  | "RON"
+  | "RSD"
+  | "RUB"
+  | "RWF"
+  | "SAR"
+  | "SBD"
+  | "SCR"
+  | "SDG"
+  | "SEK"
+  | "SGD"
+  | "SHP"
+  | "SLE"
+  | "SLL"
+  | "SOS"
+  | "SRD"
+  | "SSP"
+  | "STN"
+  | "SYP"
+  | "SZL"
+  | "THB"
+  | "TJS"
+  | "TMT"
+  | "TND"
+  | "TOP"
+  | "TRY"
+  | "TTD"
+  | "TWD"
+  | "TZS"
+  | "UAH"
+  | "UGX"
+  | "USD"
+  | "UYU"
+  | "UZS"
+  | "VED"
+  | "VES"
+  | "VND"
+  | "VUV"
+  | "WST"
+  | "XAF"
+  | "XCD"
+  | "XOF"
+  | "XPF"
+  | "YER"
+  | "ZAR"
+  | "ZMW"
+  | "ZWL";
+/**
  * Identifier of the corresponding leg specification.
  */
-export type Id3 = string;
+export type Id5 = string;
 /**
  * Effective date of the frozen holdings state used for pricing.
  */
-export type Date2 = string;
+export type Date3 = string;
 
 /**
  * Canonical valuation result containing PV and typed metrics.
@@ -517,8 +848,10 @@ export interface ValuationResultWire {
   /**
    * Optional computation explanation trace.
    *
-   * Enabled via `ExplainOpts` in configuration. Provides step-by-step
-   * trace of calculations for debugging and auditability.
+   * Requested with `PricingOptions::with_explain`. For discounting and
+   * hazard-rate valuations it holds one `cashflow_pv` entry per projected
+   * cashflow, reconciled to `value`; for other models it holds a single
+   * `computation_step` entry saying no per-flow decomposition exists.
    */
   explanation?: D_20E530Ddb3C6B466Caf1 | null;
   /**
@@ -549,6 +882,13 @@ export interface ValuationResultWire {
     [k: string]: number;
   };
   meta: DBbbaabd9311C14F65E9B1;
+  /**
+   * How the result was produced: model, requested date, declared market
+   * dependencies, scenario adjustment and sensitivity bump sizes.
+   *
+   * Stamped by the pricer registry. Absent on results constructed directly.
+   */
+  provenance?: D_9Ac3B1Be80F4Eff446Fb | null;
   /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */
@@ -676,12 +1016,12 @@ export interface D_11C88C8641Cb7Ae81898 {
    * Native and reporting-currency results for every top-level leg.
    */
   leg_results: D_9Dbe9A40Fccc63C10676[];
-  reporting_currency: Currency1;
+  reporting_currency: Currency3;
   /**
    * Frozen top-level quantities used for this valuation.
    */
   resolved_legs: DB38440A627738E14B971[];
-  state_effective_date: Date2;
+  state_effective_date: Date3;
   /**
    * Scalar inputs retained when the state was resolved.
    */
@@ -1669,8 +2009,10 @@ export interface ValuationResultWire1 {
   /**
    * Optional computation explanation trace.
    *
-   * Enabled via `ExplainOpts` in configuration. Provides step-by-step
-   * trace of calculations for debugging and auditability.
+   * Requested with `PricingOptions::with_explain`. For discounting and
+   * hazard-rate valuations it holds one `cashflow_pv` entry per projected
+   * cashflow, reconciled to `value`; for other models it holds a single
+   * `computation_step` entry saying no per-flow decomposition exists.
    */
   explanation?: D_20E530Ddb3C6B466Caf1 | null;
   /**
@@ -1701,6 +2043,13 @@ export interface ValuationResultWire1 {
     [k: string]: number;
   };
   meta: DBbbaabd9311C14F65E9B1;
+  /**
+   * How the result was produced: model, requested date, declared market
+   * dependencies, scenario adjustment and sensitivity bump sizes.
+   *
+   * Stamped by the pricer registry. Absent on results constructed directly.
+   */
+  provenance?: D_9Ac3B1Be80F4Eff446Fb | null;
   /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */
@@ -1772,6 +2121,182 @@ export interface DBbbaabd9311C14F65E9B1 {
    */
   version?: string | null;
   [k: string]: unknown;
+}
+/**
+ * How a valuation result was produced.
+ *
+ * Stamped by [`crate::pricer::PricerRegistry::price_with_metrics`] on every
+ * result so the number can be reproduced from the result plus the archived
+ * market: the model that priced it, the date the caller asked for, the market
+ * data the instrument declares, any scenario adjustment applied to the value,
+ * and the bump sizes behind its sensitivities.
+ */
+export interface D_9Ac3B1Be80F4Eff446Fb {
+  market_dependencies: D_6F90163Da686371Ca49E;
+  /**
+   * Registered pricing model that produced `value`.
+   */
+  model:
+    | "discounting"
+    | "tree"
+    | "black76"
+    | "hull_white_1f"
+    | "hazard_rate"
+    | "rates_credit"
+    | "normal"
+    | "monte_carlo_gbm"
+    | "monte_carlo_heston"
+    | "monte_carlo_hull_white_1f"
+    | "monte_carlo_three_factor"
+    | "barrier_bs_continuous"
+    | "asian_geometric_bs"
+    | "asian_turnbull_wakeman"
+    | "lookback_bs_continuous"
+    | "quanto_bs"
+    | "fx_barrier_bs_continuous"
+    | "heston_fourier"
+    | "merton_mc"
+    | "monte_carlo_schwartz_smith"
+    | "static_replication"
+    | "lmm_monte_carlo"
+    | "structured_credit_stochastic"
+    | "bond_future_clean_price_proxy"
+    | "monte_carlo_rough_bergomi"
+    | "monte_carlo_rough_heston"
+    | "rough_heston_fourier"
+    | "pde_crank_nicolson_1d"
+    | "pde_adi_2d"
+    | "bloomberg_cdso";
+  requested_as_of: Date2;
+  /**
+   * Scenario price shock already applied to `value`, as a decimal
+   * (`-0.10` = the model value was multiplied by 0.90). Absent when the
+   * value is the unadjusted model value.
+   */
+  scenario_price_shock_decimal?: number | null;
+  /**
+   * Bump sizes in force for the requested metrics. Absent when no metric
+   * was requested.
+   */
+  sensitivity_bumps?: D_1A872A78F6334F77801F | null;
+}
+/**
+ * Curves, surfaces, scalars, FX pairs and series the instrument declares
+ * it reads. Identifiers refer to the `MarketContext` the result was
+ * priced against.
+ */
+export interface D_6F90163Da686371Ca49E {
+  /**
+   * Credit-index aggregates resolved through `MarketContext::get_credit_index`.
+   *
+   * These identifiers are distinct from direct hazard-curve IDs because a
+   * credit index also carries base correlation and optional issuer curves.
+   */
+  credit_index_ids?: Id3[];
+  curves: DE567683D30A4C26C8269;
+  /**
+   * FX pairs required for pricing (spot matrices).
+   */
+  fx_pairs: DB2B64Fea7715Cf5D4700[];
+  /**
+   * Scalar market-value identifiers resolved through `MarketContext::get_price`.
+   *
+   * This includes tradable spots and non-price unitless scalars such as
+   * continuous dividend yields. [`Self::series_ids`] is reserved for
+   * `MarketContext::get_series` dependencies.
+   */
+  market_scalar_ids: string[];
+  /**
+   * Scalar time series identifiers (e.g., OHLC price series for realized variance).
+   */
+  series_ids: string[];
+  /**
+   * Typed volatility dependencies in deterministic insertion order.
+   */
+  volatility_dependencies: D_3B714C6F9450267930Ea[];
+}
+/**
+ * Curve dependencies grouped by type.
+ */
+export interface DE567683D30A4C26C8269 {
+  /**
+   * Credit/hazard curves used by the instrument.
+   */
+  credit_curves: Id3[];
+  /**
+   * Discount curves used by the instrument (including primary and foreign).
+   */
+  discount_curves: Id3[];
+  /**
+   * Forward/projection curves used by the instrument.
+   */
+  forward_curves: Id3[];
+  /**
+   * Inflation curves or published inflation indices used by the instrument.
+   */
+  inflation_curves: Id3[];
+}
+/**
+ * FX pair identifier using base/quote currency ordering.
+ */
+export interface DB2B64Fea7715Cf5D4700 {
+  base: Currency1;
+  quote: Currency2;
+}
+/**
+ * A volatility-surface dependency with the context needed for diagnostics.
+ */
+export interface D_3B714C6F9450267930Ea {
+  /**
+   * Optional contractual strike used by local volatility diagnostics.
+   */
+  reference_strike?: number | null;
+  /**
+   * Optional market-scalar id of the underlying spot paired with the surface.
+   */
+  spot_id?: Id3 | null;
+  vol_surface_id: Id4;
+}
+/**
+ * Finite-difference bump sizes in force for a metric request.
+ *
+ * These are the values after layering the `valuations.sensitivities.v1`
+ * configuration extension and the instrument's
+ * `metric_pricing_overrides.bump_config` over the library defaults. Bumped
+ * sensitivities are reported per unit bump (per 1bp, per 1 vol point), so
+ * these sizes describe how the difference was taken, not the reporting unit.
+ *
+ * A calculator with a fixed, documented shock of its own (for example an
+ * analytic greek, or a metric whose rustdoc names its shock) does not read
+ * these values.
+ */
+export interface D_1A872A78F6334F77801F {
+  /**
+   * Whether spot and volatility bumps are rescaled by volatility, time to
+   * expiry and moneyness instead of applied at the fixed sizes above.
+   */
+  adaptive_bumps?: boolean;
+  /**
+   * Credit-spread bump in basis points (1.0 = 1bp).
+   */
+  credit_spread_bump_bp: number;
+  /**
+   * Parallel interest-rate bump in basis points (1.0 = 1bp).
+   */
+  rate_bump_bp: number;
+  /**
+   * Spot bump as a decimal fraction of spot (0.01 = 1%).
+   */
+  spot_bump_decimal: number;
+  /**
+   * Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
+   */
+  vol_bump_decimal: number;
+  /**
+   * Yield bump in basis points for numerical yield duration and convexity.
+   * Absent when each calculator keeps its own default shock.
+   */
+  ytm_bump_bp?: number | null;
 }
 /**
  * Present value in the instrument's native currency.
@@ -1978,7 +2503,7 @@ export interface Money5 {
  * Immutable resolved quantity for one top-level composite leg.
  */
 export interface DB38440A627738E14B971 {
-  instrument_id: Id3;
+  instrument_id: Id5;
   /**
    * Signed quantity held from the state's effective date until the next rebalance.
    */

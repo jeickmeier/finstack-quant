@@ -369,6 +369,20 @@ impl PyValuationResult {
             .transpose()
     }
 
+    /// How the result was produced, or ``None`` for a result built directly.
+    ///
+    /// Same serde shape as the Rust ``ValuationProvenance``: ``model``,
+    /// ``requested_as_of``, ``market_dependencies``, and, when present,
+    /// ``scenario_price_shock_decimal`` and ``sensitivity_bumps``.
+    #[getter]
+    fn provenance<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .provenance
+            .as_ref()
+            .map(|provenance| serde_to_py(py, provenance))
+            .transpose()
+    }
+
     /// Computation explanation trace as a dict, or ``None`` when not enabled.
     #[getter]
     fn explanation<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {

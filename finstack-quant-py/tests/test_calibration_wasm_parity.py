@@ -166,7 +166,7 @@ def test_result_step_report_and_residuals_match_the_shared_golden() -> None:
     frame = result.residuals("USD-OIS")
     assert list(frame["quote_id"]) == expected["residual_ids"]
     assert all(abs(value) < 1e-8 for value in frame["residual"])
-    assert all(math.isnan(value) for value in frame["target"])
+    assert all(math.isnan(value) for value in frame["quote_value"])
     with pytest.raises(KeyError) as missing:
         result.step_report("nope")
     assert "calibration step 'nope'; available steps: [\"USD-OIS\"]" in missing.value.args[0]

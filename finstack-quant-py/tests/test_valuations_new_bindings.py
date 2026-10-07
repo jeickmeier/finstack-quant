@@ -84,6 +84,45 @@ def test_instrument_cashflows_deposit_reconciles_with_price() -> None:
     assert abs(pv_sum - envelope.total_pv) < 1e-6
 
 
+def test_explained_price_carries_trace_and_provenance() -> None:
+    inst_json, market = _build_deposit_market()
+
+    plain = price_instrument(inst_json, market, "2025-01-15", model="discounting")
+    assert plain.explanation is None
+    provenance = plain.provenance
+    assert provenance is not None
+    assert provenance["model"] == "discounting"
+    assert provenance["requested_as_of"] == "2025-01-15"
+    assert provenance["market_dependencies"]["curves"]["discount_curves"] == ["USD-OIS"]
+    assert "sensitivity_bumps" not in provenance
+
+    explained = price_instrument(
+        inst_json,
+        market,
+        "2025-01-15",
+        model="discounting",
+        metrics=["dv01"],
+        metric_pricing_overrides={"bump_config": {"rate_bump_bp": 5.0}},
+        explain=True,
+    )
+    bumps = explained.provenance["sensitivity_bumps"]
+    assert bumps["rate_bump_bp"] == 5.0
+    assert bumps["vol_bump_decimal"] == 0.01
+
+    trace = explained.explanation
+    assert trace["type"] == "pricing"
+    entries = trace["entries"]
+    assert entries
+    assert all(entry["kind"] == "cashflow_pv" for entry in entries)
+    assert all(entry["curve_id"] == "USD-OIS" for entry in entries)
+    assert abs(sum(entry["pv_amount"] for entry in entries) - float(explained.price)) < 0.01
+
+    # The stamps survive the wire format.
+    restored = type(explained).from_json(explained.to_json())
+    assert restored.provenance == explained.provenance
+    assert restored.explanation == explained.explanation
+
+
 def test_instrument_cashflows_serialization_and_dataframe() -> None:
     """PYPY-010: the envelope is compiled Rust and supports serialization and tabular views."""
     from finstack_quant import valuations

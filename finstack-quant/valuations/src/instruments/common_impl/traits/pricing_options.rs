@@ -6,6 +6,7 @@ use crate::metrics::risk::MarketHistory;
 use crate::metrics::MetricRegistry;
 use crate::pricer::{ModelKey, PricerRegistry};
 use finstack_quant_core::config::FinstackConfig;
+use finstack_quant_core::explain::ExplainOpts;
 use std::sync::Arc;
 
 /// Optional overrides for a pricing-and-metrics request.
@@ -36,6 +37,9 @@ pub struct PricingOptions {
     pub metric_registry: Option<Arc<MetricRegistry>>,
     /// Quote-recalibration service shared by one immutable pricing batch.
     pub recalibration_provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
+    /// Whether to attach a step trace to the result's `explanation` field.
+    /// Disabled by default.
+    pub explain: ExplainOpts,
     /// Whether a trusted parsed-instrument boundary already performed validation.
     pub(crate) instrument_validated: bool,
 }
@@ -118,6 +122,21 @@ impl PricingOptions {
     ///   metrics. This selection is independent of the pricer registry.
     pub fn with_metric_registry(mut self, metric_registry: Arc<MetricRegistry>) -> Self {
         self.metric_registry = Some(metric_registry);
+        self
+    }
+
+    /// Request a step trace on the result's `explanation` field.
+    ///
+    /// # Arguments
+    ///
+    /// * `explain` - Trace options. `ExplainOpts::enabled()` attaches one
+    ///   `cashflow_pv` entry per projected cashflow (date, amount, discount
+    ///   factor, curve, survival probability, present value) for discounting
+    ///   and hazard-rate valuations, capped at `max_entries`. Other models get
+    ///   a single entry stating that no per-flow decomposition exists.
+    ///   `ExplainOpts::disabled()` (the default) attaches nothing.
+    pub fn with_explain(mut self, explain: ExplainOpts) -> Self {
+        self.explain = explain;
         self
     }
 
