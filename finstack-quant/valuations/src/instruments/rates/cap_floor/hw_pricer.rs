@@ -198,9 +198,7 @@ impl CapFloorHullWhitePricer {
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
         let ctx = DayCountContext::default();
-        cap_floor.validate_for_pricing().map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        cap_floor.validate_for_pricing()?;
 
         // Standard term caplets require an explicit forward curve. Compounded
         // overnight coupons resolve through the shared projection path, which
@@ -220,9 +218,7 @@ impl CapFloorHullWhitePricer {
             None
         };
 
-        let periods = cap_floor.pricing_periods().map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let periods = cap_floor.pricing_periods()?;
 
         if periods.is_empty() {
             return Ok(ValuationResult::stamped(
@@ -232,16 +228,8 @@ impl CapFloorHullWhitePricer {
             ));
         }
 
-        let strike = cap_floor.strike_f64().map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
-        let term_strike = strike
-            - cap_floor.spread_rate().map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        let strike = cap_floor.strike_f64()?;
+        let term_strike = strike - cap_floor.spread_rate()?;
         let notional = cap_floor.notional.amount();
 
         let is_cap = matches!(
@@ -251,9 +239,7 @@ impl CapFloorHullWhitePricer {
 
         // Resolve a complete HW1F input from either explicit overrides or
         // pre-fitted MarketContext parameters. Missing/partial inputs fail.
-        let hw_model = resolve_capfloor_hw1f_model_params(cap_floor, market).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let hw_model = resolve_capfloor_hw1f_model_params(cap_floor, market)?;
 
         // Price each caplet/floorlet in closed form (Bachelier with the
         // HW1F-implied normal vol); no tree is built.
@@ -263,13 +249,7 @@ impl CapFloorHullWhitePricer {
             if period.payment_date <= as_of {
                 continue;
             }
-            let resolved_inputs = resolve_optioned_caplet_inputs(cap_floor, period, market, as_of)
-                .map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::default(),
-                    )
-                })?;
+            let resolved_inputs = resolve_optioned_caplet_inputs(cap_floor, period, market, as_of)?;
             let projection = &resolved_inputs.coupon;
             if projection.payment_date <= as_of {
                 continue;
@@ -293,13 +273,7 @@ impl CapFloorHullWhitePricer {
             let t_fix = resolved_inputs.time_to_fixing;
 
             let caplet_pv = if projection.is_compounded_overnight {
-                let moment_match = hw1f_compounded_rfr_moment_match(as_of, &hw_model, projection)
-                    .map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::default(),
-                    )
-                })?;
+                let moment_match = hw1f_compounded_rfr_moment_match(as_of, &hw_model, projection)?;
                 crate::instruments::rates::cap_floor::pricing::normal::price_caplet_floorlet(
                     CapletFloorletInputs {
                         is_cap,
@@ -312,13 +286,7 @@ impl CapFloorHullWhitePricer {
                         accrual_year_fraction: tau,
                         currency: cap_floor.notional.currency(),
                     },
-                )
-                .map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::default(),
-                    )
-                })?
+                )?
                 .amount()
             } else {
                 let fwd = fwd.as_ref().ok_or_else(|| {
@@ -330,48 +298,24 @@ impl CapFloorHullWhitePricer {
                         PricingErrorContext::default(),
                     )
                 })?;
-                let projection_df_as_of = fwd.df_on_date_curve(as_of).map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::default(),
-                    )
-                })?;
-                let pf_start = fwd.df_on_date_curve(period.accrual_start).map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::default(),
-                    )
-                })? / projection_df_as_of;
-                let pf_end = fwd.df_on_date_curve(period.accrual_end).map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::default(),
-                    )
-                })? / projection_df_as_of;
-                let t_end = finstack_quant_core::dates::DayCount::Act365F
-                    .year_fraction(as_of, period.accrual_end, ctx)
-                    .map_err(|e| {
-                        PricingError::model_failure_with_context(
-                            e.to_string(),
-                            PricingErrorContext::default(),
-                        )
-                    })?;
-                let t_pay = finstack_quant_core::dates::DayCount::Act365F
-                    .year_fraction(as_of, period.payment_date, ctx)
-                    .map_err(|e| {
-                        PricingError::model_failure_with_context(
-                            e.to_string(),
-                            PricingErrorContext::default(),
-                        )
-                    })?;
-                let t_start = finstack_quant_core::dates::DayCount::Act365F
-                    .year_fraction(as_of, period.accrual_start, ctx)
-                    .map_err(|e| {
-                        PricingError::model_failure_with_context(
-                            e.to_string(),
-                            PricingErrorContext::default(),
-                        )
-                    })?;
+                let projection_df_as_of = fwd.df_on_date_curve(as_of)?;
+                let pf_start = fwd.df_on_date_curve(period.accrual_start)? / projection_df_as_of;
+                let pf_end = fwd.df_on_date_curve(period.accrual_end)? / projection_df_as_of;
+                let t_end = finstack_quant_core::dates::DayCount::Act365F.year_fraction(
+                    as_of,
+                    period.accrual_end,
+                    ctx,
+                )?;
+                let t_pay = finstack_quant_core::dates::DayCount::Act365F.year_fraction(
+                    as_of,
+                    period.payment_date,
+                    ctx,
+                )?;
+                let t_start = finstack_quant_core::dates::DayCount::Act365F.year_fraction(
+                    as_of,
+                    period.accrual_start,
+                    ctx,
+                )?;
                 notional
                     * hw1f_term_caplet_price_from_dfs_with_model(
                         &hw_model,
@@ -385,13 +329,7 @@ impl CapFloorHullWhitePricer {
                         tau,
                         term_strike,
                         is_cap,
-                    )
-                    .map_err(|e| {
-                        PricingError::model_failure_with_context(
-                            e.to_string(),
-                            PricingErrorContext::default(),
-                        )
-                    })?
+                    )?
             };
 
             total_pv += caplet_pv;

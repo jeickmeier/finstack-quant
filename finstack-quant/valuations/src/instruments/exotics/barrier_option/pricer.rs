@@ -177,13 +177,7 @@ impl BarrierOptionMcPricer {
             let unit = finstack_quant_models::closed_form::checked_closed_form_value(
                 unit,
                 "barrier knocked-in vanilla price",
-            )
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+            )?;
             return Money::new(unit * inst.quantity, inst.currency);
         }
 
@@ -266,9 +260,7 @@ impl Pricer for BarrierOptionMcPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let barrier = expect_inst::<BarrierOption>(instrument, InstrumentType::BarrierOption)?;
 
-        let pv = self.price_internal(barrier, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let pv = self.price_internal(barrier, market, as_of)?;
 
         Ok(ValuationResult::stamped(barrier.id(), as_of, pv))
     }
@@ -442,13 +434,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
             let unit = finstack_quant_models::closed_form::checked_closed_form_value(
                 unit,
                 "barrier observed-breach vanilla price",
-            )
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+            )?;
             let pv =
                 Money::new(unit * barrier_opt.quantity, barrier_opt.currency).map_err(|error| {
                     crate::pricer::PricingError::from_core(
@@ -464,13 +450,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
         let effective_barrier = barrier_opt.barrier;
 
         let params =
-            BarrierParams::with_df(spot, barrier_opt.strike, effective_barrier, t, df, q, sigma)
-                .map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::default(),
-                    )
-                })?;
+            BarrierParams::with_df(spot, barrier_opt.strike, effective_barrier, t, df, q, sigma)?;
         let price = match barrier_opt.option_type {
             crate::instruments::OptionType::Call => {
                 barrier_call_continuous(&params, analytical_barrier_type)
@@ -495,10 +475,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
         let price = finstack_quant_models::closed_form::checked_closed_form_value(
             price * barrier_opt.quantity + rebate_val,
             "barrier closed-form price",
-        )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        )?;
 
         let pv = Money::new(price, barrier_opt.currency).map_err(|error| {
             crate::pricer::PricingError::from_core(

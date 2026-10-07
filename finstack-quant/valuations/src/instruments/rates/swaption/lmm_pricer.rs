@@ -183,13 +183,7 @@ impl BermudanSwaptionLmmPricer {
         let tenors: Vec<f64> = tenor_dates
             .iter()
             .map(|&date| year_fraction(DayCount::Act365F, as_of, date))
-            .collect::<finstack_quant_core::Result<Vec<_>>>()
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
         let num_forwards = tenors.len() - 1;
         if num_forwards == 0 {
@@ -217,20 +211,8 @@ impl BermudanSwaptionLmmPricer {
                 ));
             }
             let fwd = {
-                let df_start = disc.df_between_dates(as_of, tenor_dates[i]).map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::default(),
-                    )
-                })?;
-                let df_end = disc
-                    .df_between_dates(as_of, tenor_dates[i + 1])
-                    .map_err(|e| {
-                        PricingError::model_failure_with_context(
-                            e.to_string(),
-                            PricingErrorContext::default(),
-                        )
-                    })?;
+                let df_start = disc.df_between_dates(as_of, tenor_dates[i])?;
+                let df_end = disc.df_between_dates(as_of, tenor_dates[i + 1])?;
                 if !df_start.is_finite() || !df_end.is_finite() || df_start <= 0.0 || df_end <= 0.0
                 {
                     return Err(PricingError::model_failure_with_context(
@@ -303,9 +285,7 @@ impl BermudanSwaptionLmmPricer {
             initial_forwards,
         }
         .validate()
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })
+        .map_err(PricingError::from)
     }
 }
 
@@ -334,9 +314,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
                 )
             })?;
 
-        let ttm = swaption.time_to_maturity(as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let ttm = swaption.time_to_maturity(as_of)?;
         if ttm <= 0.0 {
             return Ok(ValuationResult::stamped(
                 swaption.id.as_str(),
@@ -347,13 +325,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
 
         let exercise_times = swaption
             .exercise_schedule
-            .exercise_times(as_of, DayCount::Act365F)
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+            .exercise_times(as_of, DayCount::Act365F)?;
         if exercise_times.is_empty() {
             let mut result = ValuationResult::stamped(
                 swaption.id.as_str(),
@@ -382,23 +354,14 @@ impl Pricer for BermudanSwaptionLmmPricer {
         let lmm_params = Self::build_lmm_params(swaption, disc.as_ref(), as_of, base_vol)?;
 
         // Strike and payer/receiver flag
-        let strike = swaption.strike_f64().map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let strike = swaption.strike_f64()?;
         let is_payer =
             swaption.option_type == crate::instruments::common_impl::parameters::OptionType::Call;
         let notional = swaption.notional.amount();
         let currency = swaption.notional.currency();
 
         // Terminal discount factor P(0, T_N) for the last tenor
-        let df_terminal = disc
-            .df_between_dates(as_of, swaption.get_underlying_maturity())
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        let df_terminal = disc.df_between_dates(as_of, swaption.get_underlying_maturity())?;
 
         // Price via LSMC with LMM dynamics
         let estimate = price_bermudan_lmm(
@@ -410,10 +373,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
             df_terminal,
             currency,
             &self.config,
-        )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        )?;
 
         let mut result = ValuationResult::stamped(swaption.id.as_str(), as_of, estimate.mean);
         if estimate.stderr > 0.0 {

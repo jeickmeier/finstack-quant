@@ -6,9 +6,7 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::asian_option::types::AsianOption;
-use crate::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
+use crate::pricer::{expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError};
 use crate::results::ValuationResult;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -246,9 +244,7 @@ impl Pricer for AsianOptionHestonMcPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let asian = expect_inst::<AsianOption>(instrument, InstrumentType::AsianOption)?;
 
-        let (pv, stderr) = self.price_internal(asian, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let (pv, stderr) = self.price_internal(asian, market, as_of)?;
 
         let mut result = ValuationResult::stamped(asian.id(), as_of, pv);
         if stderr > 0.0 {

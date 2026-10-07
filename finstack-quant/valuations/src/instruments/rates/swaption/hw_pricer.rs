@@ -134,10 +134,7 @@ impl SwaptionHullWhitePricer {
             None,
             &format!("Swaption {}", swaption.id),
             market,
-        )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        )?;
 
         // Build and calibrate HW tree with the expiry threaded as a
         // mandatory grid date so the exercise decision lands exactly on a
@@ -156,22 +153,15 @@ impl SwaptionHullWhitePricer {
             &discount,
             swap_end_time,
             &[time_to_expiry],
-        )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        )?;
 
-        let strike = swaption.strike_f64().map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let strike = swaption.strike_f64()?;
 
         let notional = swaption.notional.amount();
 
         // Map expiry to its exact tree step (guaranteed by the mandatory
         // date threaded into calibration above).
-        let exercise_step = tree.step_at_time(time_to_expiry).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let exercise_step = tree.step_at_time(time_to_expiry)?;
 
         let n = tree.num_steps();
 
@@ -179,35 +169,28 @@ impl SwaptionHullWhitePricer {
         let terminal: Vec<f64> = vec![0.0; tree.num_nodes(n)];
 
         // Backward induction with exercise at expiry step only
-        let pv = tree
-            .backward_induction(&terminal, |step, node_idx, continuation| {
-                if step == exercise_step {
-                    let exercise_value = cashflows.value(
-                        super::pricing::hw_cashflows::HwExerciseNode {
-                            tree: &tree,
-                            step,
-                            index: node_idx,
-                            discount: &discount,
-                        },
-                        super::pricing::hw_cashflows::HwExerciseTerms {
-                            strike,
-                            notional,
-                            option_type: swaption.option_type,
-                            settlement: swaption.settlement,
-                            cash_method: swaption.cash_settlement_method,
-                        },
-                    );
-                    continuation.max(exercise_value)
-                } else {
-                    continuation
-                }
-            })
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        let pv = tree.backward_induction(&terminal, |step, node_idx, continuation| {
+            if step == exercise_step {
+                let exercise_value = cashflows.value(
+                    super::pricing::hw_cashflows::HwExerciseNode {
+                        tree: &tree,
+                        step,
+                        index: node_idx,
+                        discount: &discount,
+                    },
+                    super::pricing::hw_cashflows::HwExerciseTerms {
+                        strike,
+                        notional,
+                        option_type: swaption.option_type,
+                        settlement: swaption.settlement,
+                        cash_method: swaption.cash_settlement_method,
+                    },
+                );
+                continuation.max(exercise_value)
+            } else {
+                continuation
+            }
+        })?;
 
         Ok(ValuationResult::stamped(
             swaption.id.as_str(),

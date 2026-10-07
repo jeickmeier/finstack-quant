@@ -635,9 +635,7 @@ impl Pricer for AsianOptionMcPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let asian = expect_inst::<AsianOption>(instrument, InstrumentType::AsianOption)?;
 
-        let pv = self.price_internal(asian, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let pv = self.price_internal(asian, market, as_of)?;
 
         Ok(ValuationResult::stamped(asian.id(), as_of, pv))
     }
@@ -696,14 +694,9 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
             asian.day_count,
             market,
             as_of,
-        )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        )?;
 
-        asian.validate_past_fixings(as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        asian.validate_past_fixings(as_of)?;
         let (sum, log_prod, count) = asian.accumulated_state(as_of);
         let total_fixings = asian.fixing_dates.len();
 
@@ -758,9 +751,7 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
         // equal-spacing formula would misprice contracts whose fixings are
         // not uniformly spaced over [as_of, expiry] (e.g. averaging windows
         // concentrated near expiry).
-        let fixing_times = fixing_year_fractions(asian, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let fixing_times = fixing_year_fractions(asian, as_of)?;
         let df = (-r * t).exp();
         let is_call = matches!(asian.option_type, crate::instruments::OptionType::Call);
         let (drift, multipliers) = asian_drift_and_fixing_multipliers(asian, market, as_of, q)
@@ -853,10 +844,7 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
             asian.day_count,
             market,
             as_of,
-        )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        )?;
 
         let spot = bs_inputs.spot;
         let df_expiry = bs_inputs.df;
@@ -864,9 +852,7 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
         let sigma = bs_inputs.sigma;
         let t = bs_inputs.t;
 
-        asian.validate_past_fixings(as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        asian.validate_past_fixings(as_of)?;
         let (sum, _, count) = asian.accumulated_state(as_of);
         let total_fixings = asian.fixing_dates.len();
 
@@ -928,34 +914,18 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
                     //     = S * exp(-q*t_i) / df_i  (GK forward formula)
                     //
                     // We compute each forward using date-based DFs for consistency.
-                    let disc_curve = market
-                        .get_discount(asian.discount_curve_id.as_str())
-                        .map_err(|e| {
-                            PricingError::model_failure_with_context(
-                                e.to_string(),
-                                PricingErrorContext::default(),
-                            )
-                        })?;
+                    let disc_curve = market.get_discount(asian.discount_curve_id.as_str())?;
 
                     let mut sum_fwd = 0.0;
                     for date in &asian.fixing_dates {
                         if *date > as_of {
-                            let t_i = asian
-                                .day_count
-                                .year_fraction(as_of, *date, DayCountContext::default())
-                                .map_err(|e| {
-                                    PricingError::model_failure_with_context(
-                                        e.to_string(),
-                                        PricingErrorContext::default(),
-                                    )
-                                })?;
+                            let t_i = asian.day_count.year_fraction(
+                                as_of,
+                                *date,
+                                DayCountContext::default(),
+                            )?;
                             // Get date-based DF for this fixing
-                            let df_i = disc_curve.df_between_dates(as_of, *date).map_err(|e| {
-                                PricingError::model_failure_with_context(
-                                    e.to_string(),
-                                    PricingErrorContext::default(),
-                                )
-                            })?;
+                            let df_i = disc_curve.df_between_dates(as_of, *date)?;
                             // GK forward: F_i = S * exp(-q*t_i) / df_i
                             let forward_i = spot * (-q * t_i).exp() / df_i;
                             sum_fwd += forward_i;
@@ -969,33 +939,17 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
                     // Deep ITM put (k_eff < 0): past fixings already push average above K.
                     // Compute expected average using forwards and return discounted payoff.
                     // PV = DF_T * max(K - Expected_Avg, 0)
-                    let disc_curve = market
-                        .get_discount(asian.discount_curve_id.as_str())
-                        .map_err(|e| {
-                            PricingError::model_failure_with_context(
-                                e.to_string(),
-                                PricingErrorContext::default(),
-                            )
-                        })?;
+                    let disc_curve = market.get_discount(asian.discount_curve_id.as_str())?;
 
                     let mut sum_fwd = 0.0;
                     for date in &asian.fixing_dates {
                         if *date > as_of {
-                            let t_i = asian
-                                .day_count
-                                .year_fraction(as_of, *date, DayCountContext::default())
-                                .map_err(|e| {
-                                    PricingError::model_failure_with_context(
-                                        e.to_string(),
-                                        PricingErrorContext::default(),
-                                    )
-                                })?;
-                            let df_i = disc_curve.df_between_dates(as_of, *date).map_err(|e| {
-                                PricingError::model_failure_with_context(
-                                    e.to_string(),
-                                    PricingErrorContext::default(),
-                                )
-                            })?;
+                            let t_i = asian.day_count.year_fraction(
+                                as_of,
+                                *date,
+                                DayCountContext::default(),
+                            )?;
+                            let df_i = disc_curve.df_between_dates(as_of, *date)?;
                             let forward_i = spot * (-q * t_i).exp() / df_i;
                             sum_fwd += forward_i;
                         }
@@ -1009,12 +963,7 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
             // times: seasoned schedules are concentrated near expiry, so the
             // equal-spacing-over-[0, t] assumption misstates the average's
             // variance.
-            let future_times = fixing_year_fractions(asian, as_of).map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+            let future_times = fixing_year_fractions(asian, as_of)?;
             let is_call = matches!(asian.option_type, crate::instruments::OptionType::Call);
             let unscaled = arithmetic_asian_tw_price_times(
                 spot,
@@ -1025,13 +974,7 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
                 sigma,
                 &future_times,
                 is_call,
-            )
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+            )?;
             unscaled * scale
         };
 
