@@ -927,20 +927,6 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         None
     }
 
-    /// Get the instrument's effective start/value date, if applicable.
-    ///
-    /// Returns the date at which the instrument's economics begin (e.g., accrual start,
-    /// effective date, or issue date). This is used by shared metrics such as DfStart
-    /// and year-fraction calculations.
-    ///
-    /// # Returns
-    ///
-    /// - `Some(Date)` for instruments with a defined effective start/value date
-    /// - `None` for instruments without a clear start (e.g., equity spot positions)
-    fn effective_start_date(&self) -> Option<Date> {
-        None
-    }
-
     /// Rebuild the instrument for a rate scenario when its projected
     /// cashflows respond to rates.
     ///

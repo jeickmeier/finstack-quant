@@ -591,10 +591,6 @@ impl crate::instruments::common_impl::traits::Instrument for FxBarrierOption {
         Some(self.expiry)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        None
-    }
-
     /// Roll the observed barrier state with spot held at its `as_of` level.
     ///
     /// When the roll enters the monitoring window (continuous monitoring from

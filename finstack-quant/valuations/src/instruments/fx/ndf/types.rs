@@ -944,10 +944,6 @@ impl crate::instruments::common_impl::traits::Instrument for Ndf {
         Money::new(pv, self.settlement_currency)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        None
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

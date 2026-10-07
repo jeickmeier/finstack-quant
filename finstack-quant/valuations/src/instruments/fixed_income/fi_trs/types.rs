@@ -390,10 +390,6 @@ impl crate::instruments::common_impl::traits::Instrument for FiIndexTotalReturnS
         Some(self.schedule.end)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.schedule.start)
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

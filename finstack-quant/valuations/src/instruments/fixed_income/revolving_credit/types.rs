@@ -1266,10 +1266,6 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
         )
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        Some(self.issue_date)
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

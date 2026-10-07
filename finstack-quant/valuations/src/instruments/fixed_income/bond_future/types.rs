@@ -2064,10 +2064,6 @@ impl crate::instruments::common_impl::traits::Instrument for BondFuture {
         )
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.delivery_start)
-    }
-
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.terms.settlement_date)
     }

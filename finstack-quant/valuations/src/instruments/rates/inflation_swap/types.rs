@@ -526,10 +526,6 @@ impl crate::instruments::common_impl::traits::Instrument for InflationSwap {
         Some(self.maturity)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.start_date)
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
@@ -1064,10 +1060,6 @@ impl crate::instruments::common_impl::traits::Instrument for YoYInflationSwap {
 
     fn expiry(&self) -> Option<Date> {
         Some(self.maturity)
-    }
-
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.start_date)
     }
 
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();

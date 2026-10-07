@@ -901,10 +901,6 @@ impl crate::instruments::common_impl::traits::Instrument for InflationLinkedBond
         false
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.issue_date)
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

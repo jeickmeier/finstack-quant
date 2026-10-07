@@ -537,10 +537,6 @@ impl Instrument for CdsTranche {
         Some(self.maturity)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        self.start_date
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

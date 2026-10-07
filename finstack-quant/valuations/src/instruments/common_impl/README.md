@@ -146,7 +146,7 @@ Optional hooks with defaults worth knowing about:
 | `as_marginable()` | `None` | The type implements `finstack_quant_margin::Marginable` (impls live in `../marginable.rs`) |
 | `model_params_snapshot()` / `with_model_params()` | `ModelParamsSnapshot::None` (the variant, not `Option::None`) / clone-or-error | Attribution must revalue the instrument with isolated model parameters |
 | `scenario_spread_shock_supported()` | `false` | The pricer consumes `scenario_spread_shock_bp` exactly, with no silent no-op |
-| `fx_exposure()`, `expiry()`, `effective_start_date()`, `dividend_schedule_id()`, `repo_curve_id()`, `to_instrument_json()` | `None` | The instrument has the corresponding concept |
+| `fx_exposure()`, `expiry()`, `dividend_schedule_id()`, `repo_curve_id()`, `to_instrument_json()` | `None` | The instrument has the corresponding concept |
 
 `Instrument` sits behind `Arc<dyn Instrument>` across portfolio, scenario and
 binding code, so it is a stability surface. New optional capabilities go in

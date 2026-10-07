@@ -1137,10 +1137,6 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
         )
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        Some(self.issue_date)
-    }
-
     fn model_params_snapshot(&self) -> ModelParamsSnapshot {
         ModelParamsSnapshot::Convertible {
             conversion_spec: self.conversion.clone(),

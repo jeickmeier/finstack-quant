@@ -530,10 +530,6 @@ impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
         crate::instruments::exotics::range_accrual::pricer::compute_pv(self, market, as_of)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        self.terms.observation_dates.first().copied()
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

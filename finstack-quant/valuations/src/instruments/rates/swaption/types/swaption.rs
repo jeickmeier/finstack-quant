@@ -1156,10 +1156,6 @@ impl crate::instruments::common_impl::traits::Instrument for Swaption {
         Some(self.expiry)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.get_underlying_start_date())
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

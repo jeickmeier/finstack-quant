@@ -4,7 +4,7 @@ use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::exotics::range_accrual::{BoundsType, RangeAccrualTerms};
 use crate::instruments::rates::hw1f::bermudan_call::BermudanCallProvision;
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
@@ -175,10 +175,6 @@ impl crate::instruments::common_impl::traits::Instrument for CallableRangeAccrua
              Use price_with_metrics with a MC pricer."
                 .to_string(),
         ))
-    }
-
-    fn effective_start_date(&self) -> Option<Date> {
-        self.range_accrual.observation_dates.first().copied()
     }
 
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
