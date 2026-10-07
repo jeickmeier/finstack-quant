@@ -327,15 +327,6 @@ impl FactorAccumulator {
     }
 }
 
-struct MethodOwnedAttributionRequest<'a> {
-    market_t0: &'a MarketContext,
-    market_t1: &'a MarketContext,
-    as_of_t0: Date,
-    as_of_t1: Date,
-    config: &'a FinstackConfig,
-    method: &'a AttributionMethod,
-}
-
 fn attribute_composite_primitives(
     composite: &CompositeInstrument,
     market_t0: &MarketContext,
@@ -566,85 +557,6 @@ pub(crate) fn attribution_endpoint_profile(method: &AttributionMethod) -> Evalua
     }
 }
 
-/// Attribute one position through a method that owns its repricing workflow.
-///
-/// Metrics-based attribution is deliberately excluded: it consumes the
-/// portfolio-level prepared endpoint valuations in
-/// [`reduce_prepared`] so a portfolio call does not perform two
-/// additional metric valuations per position.
-fn attribute_single_position_method_owned(
-    position: &crate::position::Position,
-    request: &MethodOwnedAttributionRequest<'_>,
-    val_t0_native: Money,
-    val_t0: Money,
-    val_t1: Money,
-) -> Result<PositionAttributionData> {
-    if let Some(composite) = position
-        .instrument
-        .as_any()
-        .downcast_ref::<CompositeInstrument>()
-    {
-        let mut pos_attr = attribute_composite_primitives(
-            composite,
-            request.market_t0,
-            request.market_t1,
-            request.as_of_t0,
-            request.as_of_t1,
-            request.config,
-            request.method,
-        )?;
-        pos_attr
-            .scale(position.scale_factor())
-            .map_err(|error| Error::ValuationError {
-                position_id: position.position_id.clone(),
-                message: format!("Attribution scaling failed: {error}"),
-                kind: error.kind(),
-            })?;
-        return Ok(PositionAttributionData {
-            position_id: position.position_id.clone(),
-            pos_attr,
-            val_t0_native,
-            inst_currency: composite.spec.reporting_currency,
-        });
-    }
-    let mut pos_attr = finstack_quant_attribution::attribute_pnl(
-        request.method,
-        &AttributionRequest {
-            strict_validation: false,
-            prepared_endpoints: Some((val_t0, val_t1)),
-            ..AttributionRequest::new(
-                &position.instrument,
-                request.market_t0,
-                request.market_t1,
-                request.as_of_t0,
-                request.as_of_t1,
-                request.config,
-            )
-        },
-    )
-    .map_err(|error| Error::ValuationError {
-        position_id: position.position_id.clone(),
-        message: format!("Attribution failed: {error}"),
-        kind: error.kind(),
-    })?;
-
-    pos_attr
-        .scale(position.scale_factor())
-        .map_err(|error| Error::ValuationError {
-            position_id: position.position_id.clone(),
-            message: format!("Attribution scaling failed: {error}"),
-            kind: error.kind(),
-        })?;
-    let inst_currency = pos_attr.total_pnl.currency();
-
-    Ok(PositionAttributionData {
-        position_id: position.position_id.clone(),
-        pos_attr,
-        val_t0_native,
-        inst_currency,
-    })
-}
-
 /// Prepare the exact ordinary endpoint values consumed by repricing methods.
 ///
 /// Both endpoints enter through the canonical portfolio executor once. The
@@ -775,15 +687,6 @@ pub(crate) fn reduce_prepared(
         )));
     }
 
-    let request = MethodOwnedAttributionRequest {
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-        config,
-        method,
-    };
-
     let reduce_position =
         |position: &crate::position::Position| -> Result<PositionAttributionData> {
             let position_t0 = prepared_t0
@@ -818,61 +721,65 @@ pub(crate) fn reduce_prepared(
                 "T1",
                 require_complete_metrics,
             )?;
-            if require_complete_metrics {
-                let mut pos_attr = if let Some(composite) = position
-                    .instrument
-                    .as_any()
-                    .downcast_ref::<CompositeInstrument>()
-                {
-                    attribute_composite_primitives(
-                        composite,
-                        market_t0,
-                        market_t1,
-                        as_of_t0,
-                        as_of_t1,
-                        config,
-                        &AttributionMethod::MetricsBased,
-                    )?
-                } else {
-                    attribute_pnl_metrics_based(
-                        &position.instrument,
-                        market_t0,
-                        market_t1,
-                        val_t0,
-                        val_t1,
-                        as_of_t0,
-                        as_of_t1,
-                    )
-                    .map_err(|error| Error::ValuationError {
-                        position_id: position.position_id.clone(),
-                        message: format!("Attribution failed: {error}"),
-                        kind: error.kind(),
-                    })?
-                };
-
-                pos_attr
-                    .scale(position.scale_factor())
-                    .map_err(|error| Error::ValuationError {
-                        position_id: position.position_id.clone(),
-                        message: format!("Attribution scaling failed: {error}"),
-                        kind: error.kind(),
-                    })?;
-                let inst_currency = pos_attr.total_pnl.currency();
-                Ok(PositionAttributionData {
-                    position_id: position.position_id.clone(),
-                    pos_attr,
-                    val_t0_native: position_t0.value_native,
-                    inst_currency,
-                })
-            } else {
-                attribute_single_position_method_owned(
-                    position,
-                    &request,
-                    position_t0.value_native,
-                    val_t0.value,
-                    val_t1.value,
+            let attribution_failed = |error: finstack_quant_core::Error| Error::ValuationError {
+                position_id: position.position_id.clone(),
+                message: format!("Attribution failed: {error}"),
+                kind: error.kind(),
+            };
+            let mut pos_attr = if let Some(composite) = position
+                .instrument
+                .as_any()
+                .downcast_ref::<CompositeInstrument>()
+            {
+                attribute_composite_primitives(
+                    composite, market_t0, market_t1, as_of_t0, as_of_t1, config, method,
+                )?
+            } else if require_complete_metrics {
+                attribute_pnl_metrics_based(
+                    &position.instrument,
+                    market_t0,
+                    market_t1,
+                    val_t0,
+                    val_t1,
+                    as_of_t0,
+                    as_of_t1,
                 )
-            }
+                .map_err(attribution_failed)?
+            } else {
+                finstack_quant_attribution::attribute_pnl(
+                    method,
+                    &AttributionRequest {
+                        strict_validation: false,
+                        prepared_endpoints: Some((val_t0.value, val_t1.value)),
+                        ..AttributionRequest::new(
+                            &position.instrument,
+                            market_t0,
+                            market_t1,
+                            as_of_t0,
+                            as_of_t1,
+                            config,
+                        )
+                    },
+                )
+                .map_err(attribution_failed)?
+            };
+
+            pos_attr
+                .scale(position.scale_factor())
+                .map_err(|error| Error::ValuationError {
+                    position_id: position.position_id.clone(),
+                    message: format!("Attribution scaling failed: {error}"),
+                    kind: error.kind(),
+                })?;
+            // A composite aggregates in its reporting currency, so the total's
+            // currency is the instrument currency for every branch.
+            let inst_currency = pos_attr.total_pnl.currency();
+            Ok(PositionAttributionData {
+                position_id: position.position_id.clone(),
+                pos_attr,
+                val_t0_native: position_t0.value_native,
+                inst_currency,
+            })
         };
 
     #[cfg(not(target_arch = "wasm32"))]
