@@ -10602,9 +10602,9 @@ export interface CmsOption {
  * - `calendar_id`: Holiday calendar identifier for business day logic (e.g., "nyse", "target")
  *
  * `start_date` is always the accrual start (spot) date. Callers holding a
- * trade date compute the spot date before building (see
- * [`Deposit::from_conventions`]). When `calendar_id` is set, `start_date` and
- * `maturity` are adjusted by the business day convention.
+ * trade date compute the spot date before building. When `calendar_id` is
+ * set, `start_date` and `maturity` are adjusted by the business day
+ * convention.
  */
 export interface Deposit {
   /**
@@ -16234,11 +16234,9 @@ export interface RangeAccrualTerms {
  * - **Conversion factors**: Supplied per deliverable, preferably from the exchange.
  * - **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,
  *   then the sole basket member. A larger basket requires an explicit or embedded CTD.
- * - **CTD analysis**: The `determine_ctd*` helpers return ranked candidates but
- *   do not mutate the selected CTD. [`crate::instruments::Instrument::value`]
- *   marks the caller-supplied CTD only; refresh it daily with
- *   [`Self::determine_ctd_by_implied_repo`] when the basket can switch.
- * - **Invoice price**: `(Futures Price × Conversion Factor) + Accrued Interest`.
+ * - **CTD analysis**: [`crate::instruments::Instrument::value`] marks the
+ *   caller-supplied CTD only; it does not rank the basket. Refresh the CTD
+ *   selection daily when the basket can switch.
  */
 export interface BondFuture {
   /**
@@ -16264,11 +16262,6 @@ export interface BondFuture {
    * followed by `ctd_bond.id`, then the sole basket member. A larger basket
    * with neither form of selection fails validation. The resolved identifier
    * must be in `deliverable_basket`; an embedded bond must have the same ID.
-   *
-   * [`Self::determine_ctd`] ranks clean prices by gross basis;
-   * [`Self::determine_ctd_by_implied_repo`] ranks by highest implied
-   * repo after coupon income and time to delivery. These helpers return a
-   * candidate and do not update this field.
    */
   ctd_bond_id?: Id | null;
   /**
@@ -16334,8 +16327,8 @@ export interface BondFuture {
  * $100,000 UST 10Y contract).
  *
  * Delivery timing is carried by the future's explicit `delivery_start` /
- * `terms.settlement_date` and the caller-supplied invoice settlement date, so
- * the spec holds no settlement lag or holiday calendar.
+ * `terms.settlement_date`, so the spec holds no settlement lag or holiday
+ * calendar.
  */
 export interface BondFutureSpecs {
   /**
@@ -16368,7 +16361,7 @@ export interface DeliverableBond {
    */
   bond_id: Id;
   /**
-   * Positive conversion factor consumed by invoice, basis, and pricing calculations.
+   * Positive conversion factor consumed by the model-price calculation.
    */
   conversion_factor: PositiveF64Wire;
 }

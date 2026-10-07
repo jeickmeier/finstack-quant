@@ -882,11 +882,9 @@ export interface DA3D5F3B41D0C911162Ff {
  * - **Conversion factors**: Supplied per deliverable, preferably from the exchange.
  * - **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,
  *   then the sole basket member. A larger basket requires an explicit or embedded CTD.
- * - **CTD analysis**: The `determine_ctd*` helpers return ranked candidates but
- *   do not mutate the selected CTD. [`crate::instruments::Instrument::value`]
- *   marks the caller-supplied CTD only; refresh it daily with
- *   [`Self::determine_ctd_by_implied_repo`] when the basket can switch.
- * - **Invoice price**: `(Futures Price × Conversion Factor) + Accrued Interest`.
+ * - **CTD analysis**: [`crate::instruments::Instrument::value`] marks the
+ *   caller-supplied CTD only; it does not rank the basket. Refresh the CTD
+ *   selection daily when the basket can switch.
  *
  * # Examples
  *
@@ -944,11 +942,6 @@ export interface DD7F0Aa83744A0794Bfe5 {
    * followed by `ctd_bond.id`, then the sole basket member. A larger basket
    * with neither form of selection fails validation. The resolved identifier
    * must be in `deliverable_basket`; an embedded bond must have the same ID.
-   *
-   * [`Self::determine_ctd`] ranks clean prices by gross basis;
-   * [`Self::determine_ctd_by_implied_repo`] ranks by highest implied
-   * repo after coupon income and time to delivery. These helpers return a
-   * candidate and do not update this field.
    */
   ctd_bond_id?: Id3 | null;
   /**
@@ -3937,7 +3930,7 @@ export interface ScenarioPricingOverrides {
 export interface D_83D45912Dd5Fd6Adb40F {
   bond_id: Id8;
   /**
-   * Positive conversion factor consumed by invoice, basis, and pricing calculations.
+   * Positive conversion factor consumed by the model-price calculation.
    */
   conversion_factor: number;
 }

@@ -25,7 +25,7 @@
         },
         {
           "const": "percent",
-          "description": "Percent or percentage-point value (`5.0` = 5%), including prices quoted\nas a percentage of par and speeds quoted as `% PSA`/`% SDA`.",
+          "description": "Percent or percentage-point value (`5.0` = 5%), such as a price quoted\nas a percentage of par.",
           "type": "string"
         },
         {
