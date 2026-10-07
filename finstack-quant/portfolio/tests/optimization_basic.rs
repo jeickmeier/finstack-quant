@@ -7,7 +7,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::optimization::{
-    CandidatePosition, Constraint, DefaultLpOptimizer, MetricExpr, Objective, PerPositionMetric,
+    optimize, CandidatePosition, Constraint, MetricExpr, Objective, PerPositionMetric,
     PortfolioOptimizationProblem, PositionFilter, TradeUniverse, WeightingScheme,
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
@@ -179,10 +179,7 @@ fn optimize_simple_value_weighted_portfolio() {
         }),
     );
 
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer
-        .optimize(&problem, &market, &config)
-        .expect("optimization should succeed");
+    let result = optimize(&problem, &market, &config).expect("optimization should succeed");
 
     assert!(result.status.is_feasible(), "solution should be feasible");
 
@@ -316,10 +313,7 @@ fn optimize_max_yield_with_ccc_limit() {
             .with_label("ccc_limit"),
     );
 
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer
-        .optimize(&problem, &market, &config)
-        .expect("optimization should succeed");
+    let result = optimize(&problem, &market, &config).expect("optimization should succeed");
 
     assert!(
         result.status.is_feasible(),
@@ -427,9 +421,7 @@ fn optimize_partial_trade_universe_keeps_excluded_positions_fixed() {
             .with_candidate(candidate),
     );
 
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer
-        .optimize(&problem, &market, &config)
+    let result = optimize(&problem, &market, &config)
         .expect("partial universe with fixed sleeves should succeed");
 
     let fixed_weight = result
@@ -525,9 +517,7 @@ fn value_weighted_average_bound_with_negative_filtered_weight_sum_errors() {
         },
     ];
 
-    let optimizer = DefaultLpOptimizer;
-    let error = optimizer
-        .optimize(&problem, &market_with_usd(), &FinstackConfig::default())
+    let error = optimize(&problem, &market_with_usd(), &FinstackConfig::default())
         .expect_err("negative filtered weight sum must fail loudly");
     let message = error.to_string();
     assert!(
@@ -583,9 +573,7 @@ fn pv_base_objective_with_candidate_in_scope_is_rejected() {
     )
     .with_trade_universe(TradeUniverse::default().with_candidate(candidate));
 
-    let optimizer = DefaultLpOptimizer;
-    let error = optimizer
-        .optimize(&problem, &market_with_usd(), &FinstackConfig::default())
+    let error = optimize(&problem, &market_with_usd(), &FinstackConfig::default())
         .expect_err("PvBase objective with a candidate in scope must error, not ignore it");
     let message = error.to_string();
     assert!(

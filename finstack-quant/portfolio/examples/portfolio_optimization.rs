@@ -19,7 +19,7 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::metrics::aggregate_metrics;
 use finstack_quant_portfolio::optimization::{
-    Constraint, DefaultLpOptimizer, MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric,
+    optimize, Constraint, MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric,
     PortfolioOptimizationProblem, WeightingScheme,
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
@@ -170,8 +170,7 @@ fn main() -> finstack_quant_portfolio::Result<()> {
             .with_label("ccc_limit"),
     );
 
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer.optimize(&problem, &market, &config)?;
+    let result = optimize(&problem, &market, &config)?;
 
     println!("=== Portfolio Optimization Example ===");
     println!("Label: {:?}", result.problem.label);

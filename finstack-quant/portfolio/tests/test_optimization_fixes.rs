@@ -8,7 +8,7 @@ use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::builder::PortfolioBuilder;
 use finstack_quant_portfolio::optimization::{
-    CandidatePosition, Constraint, DefaultLpOptimizer, Inequality, MetricExpr, MissingMetricPolicy,
+    optimize, CandidatePosition, Constraint, Inequality, MetricExpr, MissingMetricPolicy,
     Objective, PerPositionMetric, PortfolioOptimizationProblem, PositionFilter, TradeDirection,
     TradeUniverse, WeightingScheme,
 };
@@ -234,8 +234,7 @@ fn candidate_position_id_must_not_collide_with_existing_holdings() {
         }),
     )
     .with_trade_universe(TradeUniverse::default().with_candidate(candidate));
-    let error = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let error = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect_err("candidate ID collision must fail before solving");
     assert!(error.to_string().contains("COLLISION"));
     assert!(error.to_string().contains("already exists"));
@@ -262,9 +261,7 @@ fn held_zero_and_tiny_pv_positions_retain_exact_quantities() {
         .with_trade_universe(TradeUniverse::filtered(PositionFilter::ByPositionIds(
             vec!["TRADEABLE".into()],
         )));
-        let result = DefaultLpOptimizer
-            .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
-            .unwrap();
+        let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default()).unwrap();
         assert!(result.status.is_feasible());
         assert_eq!(result.implied_quantities["HELD"], quantity);
         assert!(result.to_trade_list().is_empty());
@@ -300,9 +297,7 @@ fn trade_direction_follows_quantity_changes_for_shorts_and_negative_pv() {
         );
         problem.weighting = WeightingScheme::UnitScaling;
         problem.constraints = vec![Constraint::Budget { rhs: multiplier }];
-        let result = DefaultLpOptimizer
-            .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
-            .unwrap();
+        let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default()).unwrap();
         let trades = result.to_trade_list();
         assert_eq!(trades.len(), 1);
         assert_eq!(trades[0].direction, expected_direction);
@@ -320,9 +315,7 @@ fn trade_direction_follows_quantity_changes_for_shorts_and_negative_pv() {
             filter: None,
         }),
     );
-    let result = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
-        .unwrap();
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default()).unwrap();
     let trades = result.to_trade_list();
     let liability_trade = trades
         .iter()
@@ -380,9 +373,8 @@ fn exclude_freezes_missing_attributes_and_custom_keys_in_objectives_and_bounds()
                     rhs: 0.5,
                 });
             }
-            let result = DefaultLpOptimizer
-                .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
-                .unwrap();
+            let result =
+                optimize(&problem, &MarketContext::new(), &FinstackConfig::default()).unwrap();
             assert!(result.status.is_feasible());
             assert_eq!(result.optimal_weights["MISSING"], 0.5);
             assert_eq!(result.implied_quantities["MISSING"], 1.0);
@@ -431,9 +423,7 @@ fn exclude_missing_inputs_only_freeze_positions_matching_expression_filters() {
         op: Inequality::Ge,
         rhs: 0.0,
     });
-    let result = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
-        .unwrap();
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default()).unwrap();
     assert!(result.status.is_feasible());
     assert!((result.optimal_weights["MISSING"] - 1.0 / 3.0).abs() < 1e-12);
     assert_eq!(result.implied_quantities["MISSING"], 1.0);
@@ -510,9 +500,8 @@ fn test_notional_weighting() -> Result<(), Box<dyn std::error::Error>> {
 
     let market = build_mock_market();
     let config = FinstackConfig::default();
-    let optimizer = DefaultLpOptimizer;
 
-    let result = optimizer.optimize(&problem, &market, &config)?;
+    let result = optimize(&problem, &market, &config)?;
 
     println!("Status: {:?}", result.status);
     println!("Current Weights: {:?}", result.current_weights);
@@ -577,9 +566,8 @@ fn test_candidate_batching() -> Result<(), Box<dyn std::error::Error>> {
 
     let market = build_mock_market();
     let config = FinstackConfig::default();
-    let optimizer = DefaultLpOptimizer;
 
-    let result = optimizer.optimize(&problem, &market, &config)?;
+    let result = optimize(&problem, &market, &config)?;
 
     assert!(result.status.is_feasible());
     assert_eq!(result.optimal_weights.len(), 10);
@@ -640,9 +628,7 @@ fn test_missing_metric_exclude_freezes_position_at_current_weight() {
 
     let market = build_mock_market();
     let config = FinstackConfig::default();
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer
-        .optimize(&problem, &market, &config)
+    let result = optimize(&problem, &market, &config)
         .expect("Exclude policy should freeze missing-metric positions");
 
     assert_eq!(result.current_weights.get("POS_MISSING"), Some(&0.5));
@@ -700,8 +686,7 @@ fn test_short_candidates_can_take_negative_weights() {
 
     let market = build_mock_market();
     let config = FinstackConfig::default();
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer.optimize(&problem, &market, &config).unwrap();
+    let result = optimize(&problem, &market, &config).unwrap();
 
     assert_eq!(result.optimal_weights.get("SHORT_CANDIDATE"), Some(&-0.4));
     assert_eq!(result.optimal_weights.get("LONG_CANDIDATE"), Some(&0.6));
@@ -802,8 +787,7 @@ fn m7_existing_short_accepts_negative_weight_bounds() -> Result<(), Box<dyn std:
         finstack_quant_portfolio::optimization::Constraint::Budget { rhs: 0.5 },
     ];
 
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
 
     assert!(
         result.status.is_feasible(),
@@ -874,8 +858,7 @@ fn m8_candidate_entity_filters_apply_to_metric_constraints(
         },
     );
 
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
 
     assert!(
         result.status.is_feasible(),
@@ -940,8 +923,7 @@ fn m9_turnover_slack_uses_actual_turnover() -> Result<(), Box<dyn std::error::Er
         },
     ];
 
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
 
     assert!(
         result.status.is_feasible(),
@@ -1017,9 +999,7 @@ fn m9_duplicate_turnover_constraints_are_rejected() -> Result<(), Box<dyn std::e
         },
     ];
 
-    let optimizer = DefaultLpOptimizer;
-    let err = optimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let err = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect_err("M-9: duplicate turnover constraints must fail fast");
     assert!(
         err.to_string().contains("M-9") && err.to_string().contains("MaxTurnover"),
@@ -1091,8 +1071,7 @@ fn mo6_filtered_value_weighted_average_metric_bound_uses_filtered_denominator(
         },
     ];
 
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
 
     assert!(
         result.status.is_feasible(),
@@ -1149,9 +1128,7 @@ fn mo8_value_weight_existing_zero_pv_position_errors() -> Result<(), Box<dyn std
         }),
     );
 
-    let optimizer = DefaultLpOptimizer;
-    let err = optimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let err = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect_err("MO-8: zero-PV existing ValueWeight positions must fail fast");
     assert!(err.to_string().contains("MO-8"), "unexpected error: {err}");
     Ok(())
@@ -1200,8 +1177,7 @@ fn notional_weight_rejects_missing_instrument_notional() -> Result<(), Box<dyn s
     );
     problem.weighting = WeightingScheme::NotionalWeight;
 
-    let err = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let err = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect_err("NotionalWeight must fail when instrument.notional() is None");
     assert!(
         err.to_string().contains("NotionalWeight"),
@@ -1274,8 +1250,7 @@ fn test_notional_weighting_implied_quantities_use_notional_denominator() {
 
     let market = build_mock_market();
     let config = FinstackConfig::default();
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer.optimize(&problem, &market, &config).unwrap();
+    let result = optimize(&problem, &market, &config).unwrap();
 
     assert_eq!(result.implied_quantities.get("POS_1"), Some(&1.0));
     assert_eq!(result.implied_quantities.get("POS_2"), Some(&3.0));
@@ -1341,8 +1316,7 @@ fn mo19_unfiltered_vwa_objective_with_non_unit_budget_is_rejected() {
     problem.constraints =
         vec![finstack_quant_portfolio::optimization::Constraint::Budget { rhs: -1.0 }];
 
-    let err = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let err = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect_err("MO-19: VWA objective with Σw = -1 budget must fail, not sign-flip");
     let msg = err.to_string();
     assert!(
@@ -1408,8 +1382,7 @@ fn mo19_unfiltered_vwa_objective_with_unit_budget_picks_high_yield() {
     problem.constraints =
         vec![finstack_quant_portfolio::optimization::Constraint::Budget { rhs: 1.0 }];
 
-    let result = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect("MO-19: unit budget keeps the VWA objective well-posed");
     assert!(
         result.status.is_feasible(),
@@ -1470,8 +1443,7 @@ fn infeasible_result_turnover_is_nan() {
         finstack_quant_portfolio::optimization::Constraint::Budget { rhs: 0.5 },
     ];
 
-    let result = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect("infeasible problems return a status-carrying result, not Err");
     assert!(
         !result.status.is_feasible(),
@@ -1553,8 +1525,7 @@ fn exclude_policy_removes_missing_metric_positions_from_vwa_bound_denominator() 
         },
     );
 
-    let result = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect("Exclude policy problem should solve");
     assert!(
         result.status.is_feasible(),
@@ -1644,8 +1615,7 @@ fn vwa_bound_slack_is_reported_in_metric_units() {
         },
     ];
 
-    let result = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect("VWA slack problem should solve");
     assert!(result.status.is_feasible(), "got {:?}", result.status);
 
@@ -1700,8 +1670,7 @@ fn mo21_duplicate_budget_constraints_are_rejected() {
         finstack_quant_portfolio::optimization::Constraint::Budget { rhs: 0.4 },
     ];
 
-    let err = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let err = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect_err("MO-21: duplicate Budget constraints must fail fast");
     let msg = err.to_string();
     assert!(
@@ -1745,8 +1714,7 @@ fn mo9_unit_scaling_without_budget_does_not_synthesize_sum_multiplier_budget() {
     problem.weighting = WeightingScheme::UnitScaling;
     problem.constraints.clear();
 
-    let err = DefaultLpOptimizer
-        .optimize(&problem, &build_mock_market(), &FinstackConfig::default())
+    let err = optimize(&problem, &build_mock_market(), &FinstackConfig::default())
         .expect_err("MO-9: UnitScaling must not get a synthetic budget");
     assert!(err.to_string().contains("MO-9"), "unexpected error: {err}");
 }
@@ -1807,8 +1775,7 @@ fn notional_weight_uses_instrument_deal_notional() -> Result<(), Box<dyn std::er
             },
         );
 
-    let result =
-        DefaultLpOptimizer.optimize(&problem, &build_mock_market(), &FinstackConfig::default())?;
+    let result = optimize(&problem, &build_mock_market(), &FinstackConfig::default())?;
     assert!(
         (result.current_weights["POS_1M"] - (1.0 / 3.0)).abs() < 1e-9,
         "1M deal should be one-third of 3M gross, got {}",
@@ -1896,8 +1863,7 @@ fn value_weight_percentage_reconstructs_via_scale_factor() -> Result<(), Box<dyn
             },
         );
 
-    let result =
-        DefaultLpOptimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
     assert!(
         (result.implied_quantities["POS_PERCENT"] - 25.0).abs() < 1e-9,
         "Percentage 50 at half the current PV share must reconstruct 25 points, not scale 0.25; got {}",
@@ -1980,8 +1946,7 @@ fn exclude_policy_skips_missing_metric_in_weighted_sum() {
     );
     problem.missing_metric_policy = MissingMetricPolicy::Exclude;
 
-    let result = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect("Exclude WeightedSum should solve");
     assert!(result.status.is_feasible(), "got {:?}", result.status);
     assert!(
@@ -2038,9 +2003,7 @@ fn unit_scaling_zero_turnover_preserves_long_and_short_quantities() {
     let market = build_mock_market();
     for held in [None, Some(PositionFilter::All)] {
         problem.trade_universe.held_filter = held;
-        let result = DefaultLpOptimizer
-            .optimize(&problem, &market, &FinstackConfig::default())
-            .unwrap();
+        let result = optimize(&problem, &market, &FinstackConfig::default()).unwrap();
         assert_eq!(result.current_weights["LONG"], 1.0);
         assert_eq!(result.current_weights["SHORT"], 1.0);
         assert!((result.implied_quantities["LONG"] - 10.0).abs() < 1e-9);
@@ -2048,9 +2011,7 @@ fn unit_scaling_zero_turnover_preserves_long_and_short_quantities() {
     }
     problem.trade_universe.held_filter = None;
     problem.constraints = vec![Constraint::Budget { rhs: 4.0 }];
-    let expanded = DefaultLpOptimizer
-        .optimize(&problem, &market, &FinstackConfig::default())
-        .unwrap();
+    let expanded = optimize(&problem, &market, &FinstackConfig::default()).unwrap();
     assert!(
         (expanded.implied_quantities["LONG"] / 10.0 + expanded.implied_quantities["SHORT"] / -10.0
             - 4.0)
@@ -2107,13 +2068,12 @@ fn notional_weights_convert_native_currencies_before_normalizing() {
         label: None,
         max_turnover: 0.0,
     });
-    let result = DefaultLpOptimizer
-        .optimize(
-            &problem,
-            &build_multi_currency_market(),
-            &FinstackConfig::default(),
-        )
-        .unwrap();
+    let result = optimize(
+        &problem,
+        &build_multi_currency_market(),
+        &FinstackConfig::default(),
+    )
+    .unwrap();
     assert!((result.current_weights["USD"] - 1.0 / 2.2).abs() < 1e-9);
     assert!((result.current_weights["EUR"] - 1.2 / 2.2).abs() < 1e-9);
     assert!((result.implied_quantities["EUR"] - 1.0).abs() < 1e-9);

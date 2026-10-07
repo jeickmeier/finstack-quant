@@ -81,13 +81,13 @@ pub(crate) fn evaluate_portfolio(input: EvaluationInput<'_>) -> Result<Portfolio
         .map(|seed| (seed.reprice_indices.len(), seed.refresh_base_currency));
     let execution = resolve_execution(input.execution, position_count, selective_work);
 
-    let results = match execution {
-        PositionExecution::Auto | PositionExecution::Serial => evaluate_serial(&input),
-        #[cfg(not(target_arch = "wasm32"))]
-        PositionExecution::Parallel => evaluate_parallel(&input),
-        #[cfg(target_arch = "wasm32")]
-        PositionExecution::Parallel => evaluate_serial(&input),
-    };
+    let results = map_positions(
+        &input.portfolio.positions,
+        input.seed.map(|seed| seed.reprice_indices),
+        execution,
+        |position| value_position(&input, position),
+        |index, position| reuse_position(&input, index, position),
+    );
     let position_values = collect_in_logical_order(results)?;
     assemble_valuation(position_values, input.portfolio, input.profile, input.as_of)
 }
@@ -108,19 +108,13 @@ pub(crate) fn evaluate_raw_portfolio(
     let selective_work = input.seed.map(|seed| (seed.reprice_indices.len(), false));
     let execution = resolve_execution(input.execution, position_count, selective_work);
 
-    #[cfg(target_arch = "wasm32")]
-    let _ = execution;
-
-    #[cfg(not(target_arch = "wasm32"))]
-    let results = match execution {
-        PositionExecution::Auto | PositionExecution::Serial => {
-            evaluate_raw_serial(&input, position_count)
-        }
-        PositionExecution::Parallel => evaluate_raw_parallel(&input, position_count),
-    };
-
-    #[cfg(target_arch = "wasm32")]
-    let results = evaluate_raw_serial(&input, position_count);
+    let results = map_positions(
+        &input.portfolio.positions,
+        input.seed.map(|seed| seed.reprice_indices),
+        execution,
+        |position| raw_position_endpoint(&input, position),
+        |index, position| reuse_raw_position(&input, index, position),
+    );
 
     Ok(RawPortfolioEvaluation {
         endpoints: collect_in_logical_order(results)?,
@@ -156,117 +150,47 @@ fn resolve_execution(
     }
 }
 
-fn evaluate_raw_serial(
-    input: &RawEvaluationInput<'_>,
-    position_count: usize,
-) -> Vec<Result<RawPositionEndpoint>> {
-    let mut next_reprice = input
-        .seed
-        .map(|seed| seed.reprice_indices.iter().copied().peekable());
-    let mut endpoints = Vec::with_capacity(position_count);
-    for (index, position) in input.portfolio.positions.iter().enumerate() {
-        let should_reprice = next_reprice
-            .as_mut()
-            .is_none_or(|indices| matches!(indices.peek(), Some(&dirty) if dirty == index));
-        if should_reprice {
-            if let Some(indices) = next_reprice.as_mut() {
-                indices.next();
-            }
-            endpoints.push(raw_position_endpoint(input, position));
-        } else {
-            endpoints.push(reuse_raw_position(input, index, position));
-        }
-    }
-    endpoints
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn evaluate_raw_parallel(
-    input: &RawEvaluationInput<'_>,
-    position_count: usize,
-) -> Vec<Result<RawPositionEndpoint>> {
-    use rayon::prelude::*;
-
-    let dirty_mask = input.seed.map(|seed| {
-        let mut mask = vec![false; position_count];
-        for index in seed.reprice_indices {
+/// Evaluate every position in portfolio order: `price` the positions listed in
+/// `reprice_indices` (all of them when `None`) and `reuse` the rest.
+///
+/// Serial and parallel execution run the same per-position closure, so the
+/// result vector is identical for both.
+fn map_positions<T: Send>(
+    positions: &[Position],
+    reprice_indices: Option<&[usize]>,
+    execution: PositionExecution,
+    price: impl Fn(&Position) -> Result<T> + Sync,
+    reuse: impl Fn(usize, &Position) -> Result<T> + Sync,
+) -> Vec<Result<T>> {
+    let dirty_mask = reprice_indices.map(|indices| {
+        let mut mask = vec![false; positions.len()];
+        for index in indices {
             if let Some(entry) = mask.get_mut(*index) {
                 *entry = true;
             }
         }
         mask
     });
-    input
-        .portfolio
-        .positions
-        .par_iter()
-        .enumerate()
-        .map(|(index, position)| {
-            if dirty_mask
-                .as_ref()
-                .is_none_or(|mask| mask.get(index).copied().unwrap_or(true))
-            {
-                raw_position_endpoint(input, position)
-            } else {
-                reuse_raw_position(input, index, position)
-            }
-        })
-        .collect()
-}
-
-fn evaluate_serial(input: &EvaluationInput<'_>) -> Vec<Result<PositionValue>> {
-    let mut next_reprice = input
-        .seed
-        .map(|seed| seed.reprice_indices.iter().copied().peekable());
-    let mut values = Vec::with_capacity(input.portfolio.positions.len());
-
-    for (index, position) in input.portfolio.positions.iter().enumerate() {
-        let should_reprice = next_reprice
-            .as_mut()
-            .is_none_or(|indices| matches!(indices.peek(), Some(&dirty) if dirty == index));
-        if should_reprice {
-            if let Some(indices) = next_reprice.as_mut() {
-                indices.next();
-            }
-            values.push(value_position(input, position));
+    let evaluate = |(index, position): (usize, &Position)| {
+        if dirty_mask
+            .as_ref()
+            .is_none_or(|mask| mask.get(index).copied().unwrap_or(true))
+        {
+            price(position)
         } else {
-            values.push(reuse_position(input, index, position));
+            reuse(index, position)
         }
+    };
+
+    #[cfg(not(target_arch = "wasm32"))]
+    if execution == PositionExecution::Parallel {
+        use rayon::prelude::*;
+        return positions.par_iter().enumerate().map(evaluate).collect();
     }
+    #[cfg(target_arch = "wasm32")]
+    let _ = execution;
 
-    values
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn evaluate_parallel(input: &EvaluationInput<'_>) -> Vec<Result<PositionValue>> {
-    use rayon::prelude::*;
-
-    let dirty_mask = input.seed.map(|seed| {
-        let mut mask = vec![false; input.portfolio.positions.len()];
-        for index in seed.reprice_indices {
-            if let Some(entry) = mask.get_mut(*index) {
-                *entry = true;
-            }
-        }
-        mask
-    });
-
-    input
-        .portfolio
-        .positions
-        .par_iter()
-        .enumerate()
-        .map(|(index, position)| {
-            if dirty_mask
-                .as_ref()
-                .is_none_or(|mask| mask.get(index).copied().unwrap_or(true))
-            {
-                value_position(input, position)
-            } else {
-                reuse_position(input, index, position)
-            }
-        })
-        .collect()
+    positions.iter().enumerate().map(evaluate).collect()
 }
 
 fn collect_in_logical_order<T>(results: Vec<Result<T>>) -> Result<Vec<T>> {
