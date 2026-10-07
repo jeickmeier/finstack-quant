@@ -42,7 +42,7 @@ use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CdsTranche, CdsTranchePricer, CdsTranchePricerConfig,
+    CdsTranche, CdsTranchePricer, CopulaSpec,
 };
 use std::collections::BTreeMap;
 
@@ -237,15 +237,14 @@ impl StudentTTarget {
         const STUDENT_T_UPFRONT_TOLERANCE: f64 = 1e-3;
         let acceptance_tolerance = STUDENT_T_UPFRONT_TOLERANCE;
 
-        let template = CdsTranchePricerConfig::default();
         let price_residual = |df: f64| -> f64 {
             if !df.is_finite() || !(df_lo..=df_hi).contains(&df) {
                 return f64::INFINITY;
             }
-            let Ok(config) = template.clone().with_student_t_copula(df) else {
+            let Ok(copula) = CopulaSpec::student_t(df) else {
                 return f64::INFINITY;
             };
-            let Ok(pricer) = CdsTranchePricer::with_config(config) else {
+            let Ok(pricer) = CdsTranchePricer::with_copula(copula) else {
                 return f64::INFINITY;
             };
             match pricer.price_tranche(tranche, &self.base_context, as_of) {
@@ -458,12 +457,8 @@ mod tests {
     }
 
     fn pricer(df: f64) -> CdsTranchePricer {
-        CdsTranchePricer::with_config(
-            CdsTranchePricerConfig::default()
-                .with_student_t_copula(df)
-                .expect("Student-t configuration"),
-        )
-        .expect("tranche pricer")
+        CdsTranchePricer::with_copula(CopulaSpec::student_t(df).expect("Student-t copula"))
+            .expect("tranche pricer")
     }
 
     fn settled_quote(market: &MarketContext, base_date: Date, df: f64) -> CdsTrancheQuote {

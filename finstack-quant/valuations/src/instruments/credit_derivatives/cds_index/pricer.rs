@@ -1332,4 +1332,144 @@ mod tests {
             "T+0 settlement is a pass-through of the default date"
         );
     }
+
+    /// Market with one flat hazard curve per `(id, hazard_rate)` pair on top
+    /// of [`sample_market`].
+    fn constituents_market(as_of: Date, hazards: &[(&str, f64)]) -> MarketContext {
+        let mut market = sample_market(as_of);
+        for (id, rate) in hazards {
+            market = market.insert(
+                HazardCurve::builder(*id)
+                    .base_date(as_of)
+                    .currency(Currency::USD)
+                    .recovery_rate(0.40)
+                    .knots([(0.0, *rate), (5.0, *rate)])
+                    .build()
+                    .expect("hazard curve"),
+            );
+        }
+        market
+    }
+
+    /// Constituents-mode index over `(entity, hazard_id, weight)` triples.
+    fn constituents_index(constituents: &[(&str, &str, f64)]) -> CdsIndex {
+        let mut index = CdsIndex::example().expect("example");
+        index.pricing = IndexPricing::Constituents;
+        index.upfront = None;
+        index.constituents = constituents
+            .iter()
+            .map(|&(entity, hazard_id, weight)| CdsIndexConstituent {
+                credit: CreditParams::corporate_standard(entity, hazard_id),
+                weight,
+                defaulted: false,
+            })
+            .collect();
+        index
+    }
+
+    #[test]
+    fn detailed_results_sum_to_totals_across_constituents() {
+        let as_of = date(2024, 1, 1);
+        let market = constituents_market(as_of, &[("HZ-A", 0.02), ("HZ-B", 0.03), ("HZ-C", 0.01)]);
+        let index =
+            constituents_index(&[("A", "HZ-A", 0.5), ("B", "HZ-B", 0.3), ("C", "HZ-C", 0.2)]);
+        let pricer = CdsIndexPricer::new();
+
+        let npv = pricer.npv_detailed(&index, &market, as_of).expect("npv");
+        let npv_sum: f64 = npv.constituents.iter().map(|c| c.value.amount()).sum();
+        assert_eq!(npv.constituents.len(), 3);
+        assert!(
+            (npv.total.amount() - npv_sum).abs() < 1e-6,
+            "NPV total {} must equal the constituent sum {npv_sum}",
+            npv.total.amount()
+        );
+
+        let pv_prot = pricer
+            .pv_protection_leg_detailed(&index, &market, as_of)
+            .expect("protection leg");
+        let pv_prot_sum: f64 = pv_prot.constituents.iter().map(|c| c.value.amount()).sum();
+        assert!((pv_prot.total.amount() - pv_prot_sum).abs() < 1e-6);
+
+        let pv_prem = pricer
+            .pv_premium_leg_detailed(&index, &market, as_of)
+            .expect("premium leg");
+        let pv_prem_sum: f64 = pv_prem.constituents.iter().map(|c| c.value.amount()).sum();
+        assert!((pv_prem.total.amount() - pv_prem_sum).abs() < 1e-6);
+
+        let rpv01 = pricer
+            .risky_pv01_detailed(&index, &market, as_of)
+            .expect("risky pv01");
+        let rpv01_sum: f64 = rpv01.constituents.iter().map(|c| c.value).sum();
+        assert!((rpv01.total - rpv01_sum).abs() < 1e-10 * rpv01.total.abs().max(1.0));
+    }
+
+    #[test]
+    fn detailed_results_report_constituent_weights_and_curve_ids() {
+        let as_of = date(2024, 1, 1);
+        let market = constituents_market(as_of, &[("HZ-A", 0.02), ("HZ-B", 0.02), ("HZ-C", 0.02)]);
+        let third = 1.0 / 3.0;
+        let index = constituents_index(&[
+            ("A", "HZ-A", third),
+            ("B", "HZ-B", third),
+            ("C", "HZ-C", third),
+        ]);
+
+        let detailed = CdsIndexPricer::new()
+            .risky_pv01_detailed(&index, &market, as_of)
+            .expect("risky pv01");
+        let weight_sum: f64 = detailed
+            .constituents
+            .iter()
+            .map(|c| c.weight_effective)
+            .sum();
+        assert!(
+            (weight_sum - 1.0).abs() < 1e-12,
+            "effective weights sum to 1"
+        );
+        for (constituent, expected_id) in detailed.constituents.iter().zip(["HZ-A", "HZ-B", "HZ-C"])
+        {
+            assert_eq!(constituent.credit_curve_id.as_str(), expected_id);
+            assert!((constituent.weight_raw - third).abs() < 1e-12);
+            assert!((constituent.weight_effective - third).abs() < 1e-12);
+            assert!(constituent.recovery_rate > 0.0 && constituent.recovery_rate < 1.0);
+        }
+    }
+
+    #[test]
+    fn par_spread_detailed_constituent_spreads_are_informational() {
+        let as_of = date(2024, 1, 1);
+        let market = constituents_market(as_of, &[("HZ-A", 0.02), ("HZ-B", 0.02), ("HZ-C", 0.02)]);
+        let third = 1.0 / 3.0;
+        let index = constituents_index(&[
+            ("A", "HZ-A", third),
+            ("B", "HZ-B", third),
+            ("C", "HZ-C", third),
+        ]);
+
+        let detailed = CdsIndexPricer::new()
+            .par_spread_detailed(&index, &market, as_of)
+            .expect("detailed par spread");
+        assert_eq!(detailed.constituents_spread_bp.len(), 3);
+
+        // Identical constituents: each informational spread equals the total,
+        // so the (non-additive) sum is N times the total.
+        let sum_spreads: f64 = detailed
+            .constituents_spread_bp
+            .iter()
+            .map(|c| c.value)
+            .sum();
+        assert!(
+            (sum_spreads - detailed.total_spread_bp * 3.0).abs()
+                < 1e-10 * detailed.total_spread_bp.abs().max(1.0),
+            "sum of constituent par spreads {sum_spreads} vs 3 x total {}",
+            detailed.total_spread_bp
+        );
+
+        let implied = detailed.numerator_protection_pv.amount() / detailed.denominator
+            * BASIS_POINTS_PER_UNIT;
+        assert!(
+            (implied - detailed.total_spread_bp).abs() < 1e-6,
+            "par spread total must be consistent with numerator/denominator"
+        );
+    }
 }

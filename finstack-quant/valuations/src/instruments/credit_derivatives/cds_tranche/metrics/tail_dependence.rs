@@ -28,8 +28,8 @@
 //!
 //! # Implementation
 //!
-//! Delegates to the copula built from the same pricer configuration used by
-//! the tranche pricing path (`CdsTranchePricer::config().copula_spec`), so the
+//! Delegates to the copula built from the same specification used by the
+//! tranche pricing path (`CdsTranchePricer::get_copula_spec()`), so the
 //! reported λ_L is always computed by the exact model implementation rather
 //! than a re-derived local formula that could drift from it.
 
@@ -73,14 +73,13 @@ impl MetricCalculator for TailDependenceCalculator {
             .base_correlation_curve
             .correlation(tranche.detach_pct);
 
-        // Build the copula from the same configuration the pricing path uses
+        // Build the copula from the same specification the pricing path uses
         // and delegate to its canonical tail-dependence implementation.
         // Models without a closed-form λ_L (e.g. Random Factor Loading)
         // return NaN per the trait contract.
         let pricer = CdsTranchePricer::new();
         let copula = pricer
-            .get_config()
-            .copula_spec
+            .get_copula_spec()
             .build()
             .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
 

@@ -1,7 +1,9 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
-use super::config::{CdsTranchePricer, NUMERICAL_TOLERANCE, PAR_SPREAD_TOLERANCE};
-use super::registry::JumpToDefaultResult;
+use super::config::{
+    CdsTranchePricer, CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORRELATION, NUMERICAL_TOLERANCE,
+    PAR_SPREAD_TOLERANCE,
+};
 use crate::cashflow::builder::specs::RollRule;
 use crate::cashflow::primitives::CFKind;
 use crate::constants::BASIS_POINTS_PER_UNIT;
@@ -28,9 +30,9 @@ impl CdsTranchePricer {
     /// spurious jump (the previous tanh patches were discontinuous at both
     /// seams by ≈ 0.12·w).
     pub(super) fn smooth_correlation_boundary(&self, correlation: f64) -> f64 {
-        let min_corr = self.config.min_correlation;
-        let max_corr = self.config.max_correlation;
-        let width = self.config.corr_boundary_width;
+        let min_corr = MIN_CORRELATION;
+        let max_corr = MAX_CORRELATION;
+        let width = CORR_BOUNDARY_WIDTH;
 
         if correlation < min_corr + width {
             // Lower wing: u = (ρ − min)/w ≤ 1; g = min + w·e^{u−1}.
@@ -182,7 +184,7 @@ impl CdsTranchePricer {
     /// every point by the same `h` preserves the ordering exactly. The
     /// previous implementation ran a monotonicity-repair loop *after*
     /// bumping; that loop only ever fired because of the additional
-    /// `[min_correlation, max_correlation]` clamp, and when it did fire it
+    /// `[MIN_CORRELATION, MAX_CORRELATION]` clamp, and when it did fire it
     /// adjusted the up- and down-bumped curves *differently* — destroying the
     /// symmetry of the central difference and biasing Correlation01 near
     /// base-correlation-curve kinks. The repair loop has therefore been
@@ -195,7 +197,7 @@ impl CdsTranchePricer {
     /// domain (a `BaseCorrelationCurve` cannot hold values outside it). For
     /// realistic curves (`ρ ≈ 0.2–0.9`) and realistic bumps (`h ≈ 0.01`)
     /// this clamp never fires, so symmetry is preserved. The
-    /// numerical-stability band `[min_correlation, max_correlation]` is *not*
+    /// numerical-stability band `[MIN_CORRELATION, MAX_CORRELATION]` is *not*
     /// applied here — it is enforced downstream by
     /// [`Self::smooth_correlation_boundary`] inside the EL evaluation;
     /// re-applying it here would double-clamp and re-introduce the
@@ -540,68 +542,6 @@ impl CdsTranchePricer {
         self.calculate_expected_tranche_loss(tranche, index_data_arc.as_ref(), tranche.maturity)
     }
 
-    /// Calculate CS01 (sensitivity to a 1bp parallel shift in credit *par
-    /// spreads*) using a central difference.
-    ///
-    /// Every issuer curve consumed by heterogeneous pricing (or the index
-    /// curve for homogeneous pricing) is re-bootstrapped after a simultaneous
-    /// ±`credit_spread_bump_bp` parallel quote shock — the same
-    /// market convention as the registered tranche CS01 metric calculator.
-    /// Bumping the hazard intensity λ directly instead would overstate the
-    /// spread sensitivity by ≈ `1/(1−R)` (≈1.67x at R=40%).
-    ///
-    /// # Errors
-    ///
-    /// Returns a calibration error when the hazard curve has no replayable
-    /// par-spread calibration recipe; a direct hazard-rate bump would silently
-    /// change the metric's market-risk units.
-    ///
-    /// # Arguments
-    ///
-    /// * `tranche` - Contractual tranche, notional currency and credit-index identifier.
-    /// * `market` - Base market containing the index, its complete issuer pool
-    ///   when configured, discount curve and hazard calibration dependencies.
-    /// * `as_of` - Valuation date used identically for both bumped prices.
-    /// * `provider` - Exact quote-rebootstrap service; every active hazard curve
-    ///   must carry its original calibration recipe.
-    /// * `credit_spread_bump_bp` - Parallel par-spread quote shock in basis
-    ///   points (1.0 = 1bp); must be finite and positive. The result is
-    ///   normalised to one basis point whatever the shock size. The registered
-    ///   CS01 metric passes the resolved
-    ///   `metric_pricing_overrides.bump_config.credit_spread_bump_bp`.
-    #[must_use = "CS01 result should be used for hedging"]
-    pub fn calculate_cs01(
-        &self,
-        tranche: &CdsTranche,
-        market: &MarketContext,
-        as_of: Date,
-        provider: &dyn crate::recalibration::RecalibrationProvider,
-        credit_spread_bump_bp: f64,
-    ) -> Result<f64> {
-        tranche.validate()?;
-        if !credit_spread_bump_bp.is_finite() || credit_spread_bump_bp <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "CS01 credit_spread_bump_bp must be finite and positive, got {credit_spread_bump_bp}"
-            )));
-        }
-
-        let index = market.get_credit_index(&tranche.credit_index_id)?;
-        let hazards =
-            super::super::credit_risk::active_hazards(&index, self.config.use_issuer_curves);
-        super::super::credit_risk::parallel_cs01(
-            provider,
-            market,
-            tranche.credit_index_id.as_str(),
-            &tranche.discount_curve_id,
-            &hazards,
-            credit_spread_bump_bp,
-            |market| {
-                self.price_tranche(tranche, market, as_of)
-                    .map(|pv| pv.amount())
-            },
-        )
-    }
-
     /// Calculate correlation delta (Correlation01) using a central difference.
     ///
     /// # Units
@@ -665,11 +605,11 @@ impl CdsTranchePricer {
 
     /// Calculate jump-to-default (immediate loss from specific entity default).
     ///
-    /// For a homogeneous portfolio, estimates the immediate impact if one average
-    /// entity defaults instantly. This is distinct from correlation sensitivity.
-    ///
-    /// Returns the average JTD across all constituents. For detailed min/max/avg,
-    /// use `calculate_jump_to_default_detail`.
+    /// Each constituent's instantaneous default erodes the tranche by its
+    /// weighted loss given default (per-issuer weight and recovery when
+    /// issuer curves are present, otherwise the equal index weight and
+    /// index recovery). Returns the average tranche-notional impact across
+    /// all constituents. This is distinct from correlation sensitivity.
     #[must_use = "JTD result should be used for risk management"]
     pub fn calculate_jump_to_default(
         &self,
@@ -677,230 +617,59 @@ impl CdsTranchePricer {
         market: &MarketContext,
         _as_of: Date,
     ) -> Result<f64> {
-        let detail = self.calculate_jump_to_default_detail(tranche, market)?;
-        Ok(detail.average)
-    }
-
-    /// Calculate detailed jump-to-default metrics including min, max, and average.
-    ///
-    /// For heterogeneous portfolios with issuer-specific recovery rates or weights,
-    /// this provides the full distribution of JTD impacts.
-    ///
-    /// # Returns
-    ///
-    /// `JumpToDefaultResult` containing:
-    /// - `min`: JTD for the smallest impact name
-    /// - `max`: JTD for the largest impact name (worst case for risk)
-    /// - `average`: Average JTD across all names
-    /// - `count`: Number of names that would impact this tranche
-    pub fn calculate_jump_to_default_detail(
-        &self,
-        tranche: &CdsTranche,
-        market: &MarketContext,
-    ) -> Result<JumpToDefaultResult> {
         tranche.validate()?;
         let index_data = market.get_credit_index(&tranche.credit_index_id)?;
 
         let attach_frac = tranche.attach_pct / 100.0;
         let detach_frac = tranche.detach_pct / 100.0;
-        let tranche_width = detach_frac - attach_frac;
+        let width = detach_frac - attach_frac;
         let tranche_notional = tranche.notional.amount();
 
         // Handle zero-width tranche edge case
-        if tranche_width <= NUMERICAL_TOLERANCE {
-            return Ok(JumpToDefaultResult {
-                min: 0.0,
-                max: 0.0,
-                average: 0.0,
-                count: 0,
-            });
+        if width <= NUMERICAL_TOLERANCE {
+            return Ok(0.0);
         }
 
         let num_constituents = index_data.num_constituents as usize;
         let base_weight = 1.0 / (num_constituents as f64);
         let base_recovery = index_data.recovery_rate;
-        let width = detach_frac - attach_frac;
         let current_loss = tranche.realized_loss;
+        let loss_in_tranche_before = (current_loss - attach_frac).clamp(0.0, width);
+        let impact_of = |individual_loss: f64| {
+            let loss_in_tranche_after =
+                (current_loss + individual_loss - attach_frac).clamp(0.0, width);
+            let incremental = (loss_in_tranche_after - loss_in_tranche_before).max(0.0);
+            if incremental > 0.0 {
+                tranche_notional * (incremental / width)
+            } else {
+                0.0
+            }
+        };
 
         // Collect JTD impacts for all names
         let mut impacts: Vec<f64> = Vec::with_capacity(num_constituents);
-        let mut impacting_count = 0;
-
-        let loss_in_tranche_before = (current_loss - attach_frac).clamp(0.0, width);
-
-        if index_data.has_issuer_curves() {
-            if let Some(curves) = &index_data.issuer_credit_curves {
-                let mut sorted_ids: Vec<&str> = curves.keys().map(String::as_str).collect();
-                sorted_ids.sort();
-                for id in sorted_ids {
-                    let individual_weight = index_data.get_issuer_weight(id);
-                    let recovery = index_data.get_issuer_recovery(id);
-                    let individual_loss = individual_weight * (1.0 - recovery);
-
-                    let loss_in_tranche_after =
-                        (current_loss + individual_loss - attach_frac).clamp(0.0, width);
-                    let incremental = (loss_in_tranche_after - loss_in_tranche_before).max(0.0);
-                    let impact_amount = if incremental > 0.0 {
-                        impacting_count += 1;
-                        tranche_notional * (incremental / width)
-                    } else {
-                        0.0
-                    };
-                    impacts.push(impact_amount);
-                }
+        if let Some(curves) = index_data
+            .issuer_credit_curves
+            .as_ref()
+            .filter(|curves| !curves.is_empty())
+        {
+            let mut sorted_ids: Vec<&str> = curves.keys().map(String::as_str).collect();
+            sorted_ids.sort();
+            for id in sorted_ids {
+                let individual_weight = index_data.get_issuer_weight(id);
+                let recovery = index_data.get_issuer_recovery(id);
+                impacts.push(impact_of(individual_weight * (1.0 - recovery)));
             }
         } else {
-            for _i in 0..num_constituents {
-                let individual_loss = base_weight * (1.0 - base_recovery);
-
-                let loss_in_tranche_after =
-                    (current_loss + individual_loss - attach_frac).clamp(0.0, width);
-                let incremental = (loss_in_tranche_after - loss_in_tranche_before).max(0.0);
-                let impact_amount = if incremental > 0.0 {
-                    impacting_count += 1;
-                    tranche_notional * (incremental / width)
-                } else {
-                    0.0
-                };
-                impacts.push(impact_amount);
+            for _ in 0..num_constituents {
+                impacts.push(impact_of(base_weight * (1.0 - base_recovery)));
             }
         }
 
-        let (min, max, sum) = if impacts.is_empty() {
-            (0.0, 0.0, 0.0)
-        } else {
-            impacts.iter().fold(
-                (f64::INFINITY, f64::NEG_INFINITY, 0.0),
-                |(min, max, sum), &impact| (min.min(impact), max.max(impact), sum + impact),
-            )
-        };
-
-        let average = if !impacts.is_empty() {
-            sum / (impacts.len() as f64)
-        } else {
-            0.0
-        };
-
-        Ok(JumpToDefaultResult {
-            min,
-            max,
-            average,
-            count: impacting_count,
-        })
-    }
-
-    /// Calculate accrued premium on the tranche.
-    ///
-    /// Returns the premium accrued since the last payment date, calculated on
-    /// the outstanding notional (after accounting for any realized losses).
-    ///
-    /// # Calculation
-    ///
-    /// ```text
-    /// Accrued = Coupon × Accrual_Fraction × Outstanding_Notional
-    /// ```
-    ///
-    /// Where:
-    /// - Coupon is the running coupon rate (coupon_bp / 10000)
-    /// - Accrual_Fraction is the day count fraction from last payment to as_of
-    /// - Outstanding_Notional accounts for any realized losses
-    ///
-    /// # Use Cases
-    ///
-    /// - Dirty vs clean price: `dirty_price = clean_price + accrued`
-    /// - Settlement amount calculation
-    /// - Mark-to-market accounting
-    #[must_use = "accrued premium result should be used"]
-    pub fn calculate_accrued_premium(
-        &self,
-        tranche: &CdsTranche,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Result<f64> {
-        tranche.validate()?;
-        let start_date = tranche.contractual_start_date(as_of).ok_or_else(|| {
-            Error::Validation(
-                "CDS tranche accrued premium requires an explicit start_date for non-standard schedules"
-                    .to_string(),
-            )
-        })?;
-
-        // Get credit index data for loss calculations
-        let index_data = market
-            .get_credit_index(&tranche.credit_index_id)
-            .map_err(|_| {
-                finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
-                    id: format!(
-                        "Credit index '{}' required for tranche '{}' accrued premium",
-                        tranche.credit_index_id, tranche.id
-                    ),
-                })
-            })?;
-
-        // Generate the payment schedule
-        let payment_dates = self.generate_payment_schedule(tranche, start_date)?;
-
-        // Find the last payment date on or before as_of
-        let last_payment = payment_dates
-            .iter()
-            .filter(|&&d| d <= as_of)
-            .max()
-            .copied()
-            .unwrap_or(start_date);
-
-        // Find the next payment date after as_of
-        let next_payment = payment_dates.iter().filter(|&&d| d > as_of).min().copied();
-
-        // If no next payment, we're past maturity
-        let Some(_next_payment) = next_payment else {
-            return Ok(0.0);
-        };
-
-        // Calculate the accrual fraction from last payment to as_of
-        let accrual_fraction = tranche.day_count.year_fraction(
-            last_payment,
-            as_of,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-
-        if accrual_fraction <= 0.0 {
+        if impacts.is_empty() {
             return Ok(0.0);
         }
-
-        // Calculate outstanding notional after both bottom-up realized loss
-        // and top-down recovery writedown.
-        let prior_loss = self.calculate_prior_tranche_loss(tranche);
-        let prior_writedown =
-            self.calculate_prior_tranche_writedown(tranche, index_data.recovery_rate);
-        let outstanding_notional =
-            tranche.notional.amount() * (1.0 - prior_loss - prior_writedown).max(0.0);
-
-        // Calculate accrued premium
-        let coupon = tranche.coupon_bp / BASIS_POINTS_PER_UNIT;
-        let accrued = coupon * accrual_fraction * outstanding_notional;
-
-        Ok(accrued)
-    }
-
-    /// Expose the expected loss curve for diagnostic and debugging purposes.
-    ///
-    /// Returns a vector of (Date, EL_fraction) pairs where EL_fraction
-    /// is the cumulative expected loss as a fraction of tranche notional [0, 1].
-    ///
-    /// This is useful for:
-    /// - Visualizing the expected loss profile over time
-    /// - Debugging pricing discrepancies
-    /// - Validating model behavior
-    pub fn get_expected_loss_curve(
-        &self,
-        tranche: &CdsTranche,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Result<Vec<(Date, f64)>> {
-        tranche.validate()?;
-        let index_data = market.get_credit_index(&tranche.credit_index_id)?;
-        let payment_dates = self.generate_payment_schedule(tranche, as_of)?;
-        self.build_el_curve(tranche, index_data.as_ref(), &payment_dates)
+        Ok(impacts.iter().sum::<f64>() / (impacts.len() as f64))
     }
 }
 
@@ -967,7 +736,7 @@ mod tests {
 
     /// Index-sized homogeneous pools keep the exact conditional binomial.
     ///
-    /// Routing pools above the heterogeneous `SMALL_POOL_THRESHOLD` (64) to
+    /// Routing pools above a size threshold (previously 64 names) to
     /// the large-homogeneous-pool limit `min(p·e, cap)` collapses the
     /// conditional loss variance to zero and mis-priced the Hull-White (2004)
     /// Table 7 benchmark spreads by up to 30% on thin tranches. The finite-n

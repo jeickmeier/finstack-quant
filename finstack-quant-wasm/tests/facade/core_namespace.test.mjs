@@ -276,15 +276,6 @@ test('ForwardCurve options accept typed arrays', () => {
   );
 });
 
-test('coupon profile variants use separate explicit entrypoints', () => {
-  const snowball = valuations.snowballCouponProfile(0.02, 0.05, [0.01, 0.04], 0, 0.1);
-  const inverse = valuations.inverseFloaterCouponProfile(0.05, [0.01, 0.02], 0, 0.1, 2);
-  assert.ok(Math.abs(snowball[0] - 0.06) < 1e-12);
-  assert.ok(Math.abs(snowball[1] - 0.07) < 1e-12);
-  assert.ok(Math.abs(inverse[0] - 0.03) < 1e-12);
-  assert.ok(Math.abs(inverse[1] - 0.01) < 1e-12);
-});
-
 test('core VolCube is a data-only artifact', () => {
   const cube = new core.VolCube('NORMAL', [1], [2], [0.01, 0, -0.2, 0.4, Number.NaN], [0.02]);
   assert.equal(cube.id, 'NORMAL');

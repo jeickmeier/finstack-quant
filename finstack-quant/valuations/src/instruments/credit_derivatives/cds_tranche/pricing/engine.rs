@@ -1,8 +1,8 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
 use super::config::{
-    CdsTranchePricer, CdsTranchePricerConfig, DiscountAt, EffectiveStructure,
-    ProjectedDiscountedRow, ProjectionInputs, PROBABILITY_CLIP,
+    validate_copula_spec, CdsTranchePricer, DiscountAt, EffectiveStructure, ProjectedDiscountedRow,
+    ProjectionInputs, BESPOKE_SETTLEMENT_DAYS, INDEX_SETTLEMENT_DAYS, PROBABILITY_CLIP,
 };
 use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule};
 use crate::cashflow::primitives::{CFKind, CashFlow};
@@ -23,12 +23,12 @@ use finstack_quant_models::correlation::copula::{
 impl CdsTranchePricer {
     /// Return the cached copula instance, building it on first call.
     ///
-    /// The copula is determined entirely by `self.config.copula_spec` at
+    /// The copula is determined entirely by `self.copula_spec` at
     /// pricer-construction time, so a single instance can be reused across
     /// every EL/integrand evaluation for the lifetime of this pricer.
     pub(super) fn copula(&self) -> &dyn Copula {
         self.copula_cache
-            .get_or_init(|| match &self.config.copula_spec {
+            .get_or_init(|| match &self.copula_spec {
                 CopulaSpec::Gaussian => Box::new(GaussianCopula::new()),
                 CopulaSpec::StudentT { degrees_of_freedom } => {
                     Box::new(StudentTCopula::new(*degrees_of_freedom))
@@ -44,33 +44,11 @@ impl CdsTranchePricer {
     pub(super) fn default_threshold_for_copula(&self, default_prob: f64) -> f64 {
         let eps = PROBABILITY_CLIP;
         let p = default_prob.max(eps).min(1.0 - eps);
-        match &self.config.copula_spec {
+        match &self.copula_spec {
             CopulaSpec::StudentT { degrees_of_freedom } => {
                 student_t_inv_cdf(p, *degrees_of_freedom).unwrap_or(f64::NAN)
             }
             _ => standard_normal_inv_cdf(p),
-        }
-    }
-
-    /// Factor supplied to the stochastic recovery model.
-    ///
-    /// Gaussian-family recovery models are calibrated to the same systematic
-    /// market factor that drives conditional default probabilities. For the
-    /// Student-t copula, `factors[0]` is the normal numerator and `factors[1]`
-    /// is the chi-square scale mixture, so the actual market factor is
-    /// `Z / sqrt(W)`.
-    pub(super) fn recovery_driver_for_factors(&self, factors: &[f64]) -> f64 {
-        match self.config.copula_spec {
-            CopulaSpec::StudentT { .. } if factors.len() >= 2 => {
-                let z = factors[0];
-                let w = factors[1];
-                if z.is_finite() && w.is_finite() && w > 0.0 {
-                    z / w.sqrt()
-                } else {
-                    z
-                }
-            }
-            _ => factors.first().copied().unwrap_or(0.0),
         }
     }
 
@@ -85,33 +63,36 @@ impl CdsTranchePricer {
             .conditional_default_prob(default_threshold, factor_realization, correlation)
             .clamp(0.0, 1.0)
     }
-    /// Create a new Gaussian Copula model with default parameters.
+    /// Create a new one-factor Gaussian copula pricer.
     pub fn new() -> Self {
         Self {
-            config: CdsTranchePricerConfig::default(),
+            copula_spec: CopulaSpec::Gaussian,
             copula_cache: std::sync::OnceLock::new(),
         }
     }
 
-    /// Create a new model with validated custom parameters.
+    /// Create a pricer with a validated copula specification.
     ///
     /// # Arguments
     ///
-    /// * `config` - Copula, recovery, numerical integration, sensitivity, and
-    ///   settlement settings for every valuation performed by the pricer.
+    /// * `copula_spec` - Copula model used for every valuation performed by
+    ///   the pricer: Gaussian, Student-t (degrees of freedom above 2; typical
+    ///   4-10 for CDX), random factor loading (loading volatility in
+    ///   `[0, 0.5]`) or the global-plus-sector multi-factor copula.
     ///
     /// # Returns
     ///
-    /// A pricer with immutable validated configuration and empty numerical caches.
+    /// A pricer with an immutable validated copula and an empty copula cache.
     ///
     /// # Errors
     ///
-    /// Returns an error when the copula, recovery, quadrature, bump, correlation,
-    /// settlement, or convolution settings violate their documented ranges.
-    pub fn with_config(config: CdsTranchePricerConfig) -> Result<Self> {
-        config.validate()?;
+    /// Returns [`finstack_quant_core::Error::Validation`] when the Student-t
+    /// degrees of freedom or the loading volatility are outside their
+    /// documented ranges.
+    pub fn with_copula(copula_spec: CopulaSpec) -> Result<Self> {
+        validate_copula_spec(&copula_spec)?;
         Ok(Self {
-            config,
+            copula_spec,
             copula_cache: std::sync::OnceLock::new(),
         })
     }
@@ -342,18 +323,12 @@ impl CdsTranchePricer {
             //
             // A name defaulting at the survival-weighted fraction `f` of the
             // period pays accrued premium over `f·Δ` only, so the premium
-            // notional lost on the defaulted slice is `(1−f)·Δerosion`. With
-            // accrual-on-default disabled, a defaulted name pays nothing for
-            // the period — the full erosion drops out of the premium
-            // notional. Both the loss increment (bottom-up) and the recovery
-            // writedown increment (top-down) occur at default time, so they
-            // receive the same treatment.
+            // notional lost on the defaulted slice is `(1−f)·Δerosion`
+            // (ISDA accrual-on-default). Both the loss increment (bottom-up)
+            // and the recovery writedown increment (top-down) occur at
+            // default time, so they receive the same treatment.
             let delta_erosion = delta_el_fraction + delta_wd_fraction;
-            let aod_adjustment = if self.config.include_accrual_on_default {
-                (1.0 - default_fraction) * tranche_notional * delta_erosion
-            } else {
-                tranche_notional * delta_erosion
-            };
+            let aod_adjustment = (1.0 - default_fraction) * tranche_notional * delta_erosion;
             let premium_amount =
                 coupon * accrual_period * (outstanding_notional - aod_adjustment).max(0.0);
 
@@ -386,11 +361,11 @@ impl CdsTranchePricer {
                         None,
                     ),
                     // Discount the loss increment at the time the underlying
-                    // defaults actually occur, not the period end. With
-                    // `mid_period_protection`, the within-period loss is
-                    // discounted at the SURVIVAL-WEIGHTED mean default time
-                    // (Item 6) — `fraction` of the way through the period —
-                    // rather than the flat period midpoint, which
+                    // defaults actually occur, not the period end (ISDA
+                    // mid-period protection timing): the within-period loss
+                    // is discounted at the SURVIVAL-WEIGHTED mean default
+                    // time (Item 6) — `fraction` of the way through the
+                    // period — rather than the flat period midpoint, which
                     // over-discounted the increment by assuming all loss
                     // lands at the midpoint. The default fraction is < 0.5
                     // for a positive hazard, so the loss is correctly
@@ -398,13 +373,9 @@ impl CdsTranchePricer {
                     // fraction is measured on the hazard axis (a survival
                     // quantity); the DF lookup itself happens on the
                     // discount curve's axis in `discount_projected_rows`.
-                    discount_at: if self.config.mid_period_protection {
-                        DiscountAt::WithinPeriod {
-                            start: period_start,
-                            fraction: default_fraction,
-                        }
-                    } else {
-                        DiscountAt::PaymentDate
+                    discount_at: DiscountAt::WithinPeriod {
+                        start: period_start,
+                        fraction: default_fraction,
                     },
                 });
             }
@@ -528,9 +499,9 @@ impl CdsTranchePricer {
             || tranche.index_name.starts_with("iTraxx")
             || tranche.index_name.starts_with("ITRAXX");
         let settlement_lag = if is_standard_index {
-            self.config.index_settlement_days
+            INDEX_SETTLEMENT_DAYS
         } else {
-            self.config.bespoke_settlement_days
+            BESPOKE_SETTLEMENT_DAYS
         };
 
         // Use calendar if available, otherwise fall back to weekday-only adjustment

@@ -1,40 +1,9 @@
-//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
+//! Registry pricer adapter for CDS tranches.
 //!
 use super::config::CdsTranchePricer;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::pricer::expect_inst;
 use finstack_quant_core::market_data::context::MarketContext;
-
-/// Result of detailed jump-to-default calculation.
-///
-/// Provides the distribution of JTD impacts across all portfolio constituents,
-/// which is essential for worst-case risk management scenarios.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct JumpToDefaultResult {
-    /// Minimum JTD impact across all names (best case)
-    pub min: f64,
-    /// Maximum JTD impact across all names (worst case for risk)
-    pub max: f64,
-    /// Average JTD impact across all names
-    pub average: f64,
-    /// Number of names that would impact this tranche
-    pub count: usize,
-}
-
-impl JumpToDefaultResult {
-    /// Check if any names would impact this tranche
-    #[inline]
-    pub fn has_impact(&self) -> bool {
-        self.count > 0
-    }
-
-    /// Get the range of impacts (max - min)
-    #[inline]
-    pub fn impact_range(&self) -> f64 {
-        self.max - self.min
-    }
-}
 
 /// Registry pricer for CDS Tranche using Gaussian Copula model
 pub(crate) struct SimpleCdsTrancheHazardPricer;

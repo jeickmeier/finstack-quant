@@ -543,67 +543,6 @@ impl CdsIndex {
         let pricer = CdsIndexPricer::new();
         pricer.cs01(self, market, as_of, provider)
     }
-
-    /// Calculate NPV with per-constituent breakdown (if applicable).
-    pub fn npv_detailed(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<IndexResult<Money>> {
-        let pricer = CdsIndexPricer::new();
-        pricer.npv_detailed(self, market, as_of)
-    }
-
-    /// Calculate protection leg PV with per-constituent breakdown.
-    pub fn pv_protection_leg_detailed(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<IndexResult<Money>> {
-        let pricer = CdsIndexPricer::new();
-        pricer.pv_protection_leg_detailed(self, market, as_of)
-    }
-
-    /// Calculate premium leg PV with per-constituent breakdown.
-    pub fn pv_premium_leg_detailed(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<IndexResult<Money>> {
-        let pricer = CdsIndexPricer::new();
-        pricer.pv_premium_leg_detailed(self, market, as_of)
-    }
-
-    /// Calculate par spread with per-constituent breakdown.
-    pub fn par_spread_detailed(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<IndexParSpreadResult> {
-        let pricer = CdsIndexPricer::new();
-        pricer.par_spread_detailed(self, market, as_of)
-    }
-
-    /// Calculate risky PV01 with per-constituent breakdown.
-    pub fn risky_pv01_detailed(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<IndexResult<f64>> {
-        let pricer = CdsIndexPricer::new();
-        pricer.risky_pv01_detailed(self, market, as_of)
-    }
-
-    /// Calculate CS01 with per-constituent breakdown.
-    pub fn cs01_detailed(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        provider: &dyn crate::recalibration::RecalibrationProvider,
-    ) -> finstack_quant_core::Result<IndexResult<f64>> {
-        let pricer = CdsIndexPricer::new();
-        pricer.cs01_detailed(self, market, as_of, provider)
-    }
 }
 
 impl crate::instruments::common_impl::traits::Instrument for CdsIndex {

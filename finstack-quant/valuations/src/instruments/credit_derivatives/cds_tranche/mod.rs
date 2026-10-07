@@ -3,7 +3,7 @@
 //! CDS tranches (synthetic CDO tranches) provide leveraged credit exposure
 //! to specific slices of the default distribution. Pricing supports multiple
 //! copula models including Gaussian, Student-t, Random Factor Loading, and
-//! Multi-factor, with optional stochastic recovery.
+//! Multi-factor, selected through [`CdsTranchePricer::with_copula`].
 //!
 //! # Tranche Structure
 //!
@@ -46,12 +46,6 @@
 //! Sector-specific correlation structure for bespoke portfolios
 //! with industry concentration.
 //!
-//! # Stochastic Recovery
-//!
-//! Optional recovery model where recovery negatively correlates with
-//! the systematic factor (lower recovery in stress). This captures
-//! the "double hit" effect seen empirically.
-//!
 //! # Arbitrage-Free Base Correlation
 //!
 //! Base correlation curves are validated for arbitrage-free conditions:
@@ -80,7 +74,6 @@
 //! - [`CdsTranche`] for instrument struct
 //! - [`crate::instruments::PayReceive`] for buyer (`Pay`) vs seller (`Receive`)
 //! - [`finstack_quant_models::correlation::copula`] for copula model implementations
-//! - [`finstack_quant_models::correlation::recovery`] for stochastic recovery models
 //! - Base correlation calibration via plan-driven `calibration::api`
 
 mod credit_risk;
@@ -90,8 +83,7 @@ pub(crate) mod pricing;
 mod types;
 
 pub use finstack_quant_models::correlation::copula::CopulaSpec;
-pub use finstack_quant_models::correlation::recovery::RecoverySpec;
 pub use parameters::CdsTrancheParams;
 pub use types::{CdsTranche, CdsTrancheBuilder};
 
-pub use pricing::{CdsTranchePricer, CdsTranchePricerConfig, HeteroMethod};
+pub use pricing::CdsTranchePricer;

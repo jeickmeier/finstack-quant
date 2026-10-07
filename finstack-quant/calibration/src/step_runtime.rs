@@ -758,7 +758,7 @@ mod tests {
     };
     use finstack_quant_core::types::{CurveId, UnderlyingId};
     use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-        CdsTranchePricer, CdsTranchePricerConfig,
+        CdsTranchePricer, CopulaSpec,
     };
     use finstack_quant_valuations::instruments::OptionType;
     use finstack_quant_valuations::market::conventions::ids::{
@@ -958,12 +958,9 @@ mod tests {
             .expect("cash settlement discount factor");
         let mut without_upfront = tranche.clone();
         without_upfront.upfront = None;
-        let pricer = CdsTranchePricer::with_config(
-            CdsTranchePricerConfig::default()
-                .with_student_t_copula(6.0)
-                .expect("valid fixture df"),
-        )
-        .expect("valid pricer");
+        let pricer =
+            CdsTranchePricer::with_copula(CopulaSpec::student_t(6.0).expect("valid fixture df"))
+                .expect("valid pricer");
         let live = pricer
             .price_tranche(&without_upfront, &market, base_date)
             .expect("premium/protection leg PV")
