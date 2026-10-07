@@ -131,81 +131,14 @@
 //!   Performance Measurement*, 3(4), 5–14 — multi-period smoothing applied by
 //!   [`campisi_carino_link`]. `docs/REFERENCES.md#carino-1999`
 
-use crate::brinson::{carino_link_effects, CarinoPeriod};
+use crate::brinson::{
+    carino_link_effects, check_active_return_identity, check_net_weight, check_weights_sum,
+    CarinoPeriod, ScaledL1Norm,
+};
 use crate::error::{Error, Result};
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-
-/// Tolerance for the requirement that weights sum to 1.0 on each side.
-const WEIGHT_TOLERANCE: f64 = 1e-6;
-
-/// Relative tolerance on the ratio `|net weight| / gross weight` below which a
-/// sector's per-unit rate is treated as too poorly conditioned to attribute,
-/// in [`check_net_weight`].
-///
-/// A sector's rate is `contribution / weight` (see [`SideAgg::rate`]). At exact
-/// cancellation (`weight == 0.0` with `abs_weight > 0.0`) that rate is
-/// undefined; arbitrarily close to exact cancellation it is *defined* but
-/// numerically explosive — as `weight -> 0` for a roughly fixed contribution,
-/// the rate grows without bound, and with it the Brinson-Fachler allocation
-/// `(w_p,i − w_b,i)(r_b,i − r_b)`, whose weight difference does not shrink
-/// alongside the exploding rate. An exact-equality-only guard misses this: a
-/// benchmark sector of `+0.40 @ 3%` and `-(0.40 - 1e-8) @ 0.5%` nets to
-/// `1e-8`, not `0.0`, yet produces an allocation on the order of `3e5` against
-/// an active return of `-81 bp`, and drives the telescoping identity's residual
-/// to `-3.8e-11` — outside the `1e-12` tolerance this module's own tests
-/// assert. Reusing [`WEIGHT_TOLERANCE`]'s existing 1e-6 precision floor for
-/// this ratio keeps a single, already-load-bearing precision assumption for the
-/// whole module: a net weight smaller than a millionth of its own gross weight
-/// is, for the purposes of this module, indistinguishable from exact
-/// cancellation.
-const NET_WEIGHT_RELATIVE_TOLERANCE: f64 = 1e-6;
-
-/// Relative reconciliation tolerance for inbound linked-period effects.
-///
-/// The floor is `1e-10` in ordinary return space. For near-cancelling,
-/// long/short-generated effects whose gross magnitude is much larger than
-/// their net active return, it scales with an overflow-safe L1 sector-effect
-/// norm so valid outputs from [`campisi_attribution`] are not rejected solely
-/// because cancellation amplified floating-point noise.
-const LINK_RECONCILIATION_RELATIVE_TOLERANCE: f64 = 1e-10;
-
-/// Streaming L1 scale that avoids summing absolute values at their original
-/// magnitude.
-#[derive(Default)]
-struct ScaledL1Norm {
-    scale: f64,
-    normalized_sum: f64,
-}
-
-impl ScaledL1Norm {
-    fn add(&mut self, value: f64) {
-        let magnitude = value.abs();
-        if magnitude > self.scale {
-            self.normalized_sum = if self.scale == 0.0 {
-                1.0
-            } else {
-                self.normalized_sum * (self.scale / magnitude) + 1.0
-            };
-            self.scale = magnitude;
-        } else if self.scale > 0.0 {
-            self.normalized_sum += magnitude / self.scale;
-        }
-    }
-
-    fn tolerance(&self) -> f64 {
-        if self.scale == 0.0 {
-            return LINK_RECONCILIATION_RELATIVE_TOLERANCE;
-        }
-        let scaled_relative = LINK_RECONCILIATION_RELATIVE_TOLERANCE * self.scale;
-        if self.normalized_sum > f64::MAX / scaled_relative {
-            f64::MAX
-        } else {
-            (scaled_relative * self.normalized_sum).max(LINK_RECONCILIATION_RELATIVE_TOLERANCE)
-        }
-    }
-}
 
 /// Configuration for [`campisi_attribution`].
 ///
@@ -491,7 +424,7 @@ fn validate_snapshot(s: &FiPositionSnapshot, side: &str) -> Result<()> {
 /// `weight` is the *net* sector weight (long minus short) and `abs_weight` the
 /// gross weight; the pair distinguishes "sector absent from this side"
 /// (`abs_weight == 0`) from "sector present with offsetting positions"
-/// (`abs_weight > 0`, `weight` zero or, per [`NET_WEIGHT_RELATIVE_TOLERANCE`],
+/// (`abs_weight > 0`, `weight` zero or, per `NET_WEIGHT_RELATIVE_TOLERANCE`,
 /// numerically near zero relative to `abs_weight`), which [`check_net_weight`]
 /// rejects.
 #[derive(Clone, Copy, Default)]
@@ -523,40 +456,6 @@ impl SideAgg {
             0.0
         }
     }
-}
-
-/// Fail closed on a sector that is present on a side but nets to zero, or to a
-/// weight that is numerically near zero *relative to its own gross weight* (a
-/// long/short pair, a CDS hedge against a cash bond in the same bucket, a
-/// fully- or nearly-fully-hedged sector).
-///
-/// Such a sector still contributes `Σ_j w_j r_j ≠ 0` to the side total. At
-/// exact cancellation its per-unit rate `contribution / weight` is undefined
-/// (`0 / 0`), so every per-sector effect would be forced to zero while the
-/// contribution stayed in the side return. At near-cancellation the rate is
-/// *defined* but grows without bound as the net weight shrinks, so the
-/// allocation effect built from it can blow up to a numerically meaningless
-/// magnitude — and the telescoping identity's residual with it — while
-/// `active_return` still ties out against performance data and no `NaN` or
-/// infinity ever appears for a finiteness check to catch. An exact-equality
-/// check (`agg.weight == 0.0`) misses that regime entirely, so this compares
-/// the ratio `|weight| / abs_weight` against [`NET_WEIGHT_RELATIVE_TOLERANCE`]
-/// instead — a relative bound, so rescaling all weights uniformly (percent vs.
-/// decimal) does not change whether it fires.
-fn check_net_weight(sector: &str, agg: &SideAgg, side_name: &str) -> Result<()> {
-    if agg.abs_weight > 0.0 && agg.weight.abs() <= NET_WEIGHT_RELATIVE_TOLERANCE * agg.abs_weight {
-        return Err(Error::invalid_input(format!(
-            "{side_name} sector '{sector}' has offsetting positions netting to a weight \
-             ({}) that is zero, or numerically near zero, relative to its gross weight \
-             ({}): a sector whose |net weight| does not exceed \
-             {NET_WEIGHT_RELATIVE_TOLERANCE} times its gross weight cannot be attributed \
-             because its per-unit rate contribution / weight is undefined or numerically \
-             explosive. Split the offsetting positions into distinct sectors, or net them \
-             into a single snapshot with a net weight well clear of that relative bound.",
-            agg.weight, agg.abs_weight
-        )));
-    }
-    Ok(())
 }
 
 /// Accumulate one side into per-sector aggregates and side totals.
@@ -609,11 +508,7 @@ fn aggregate_side(
     }
 
     let total_w = sum_w.total();
-    if (total_w - 1.0).abs() > WEIGHT_TOLERANCE {
-        return Err(Error::invalid_input(format!(
-            "{side_name} weights must sum to 1.0 (got {total_w})"
-        )));
-    }
+    check_weights_sum(side_name, total_w)?;
 
     let ret = sum_r.total();
     let carry = sum_carry.total();
@@ -731,8 +626,8 @@ pub fn campisi_attribution(
     // effects while its contribution stayed in the side return, or blow those
     // effects up past any meaningful magnitude. Fail closed instead.
     for (sector, (p, b)) in &sectors {
-        check_net_weight(sector, p, "Portfolio")?;
-        check_net_weight(sector, b, "Benchmark")?;
+        check_net_weight("sector", sector, p.weight, p.abs_weight, "Portfolio")?;
+        check_net_weight("sector", sector, b.weight, b.abs_weight, "Benchmark")?;
     }
 
     let mut total_allocation = NeumaierAccumulator::new();
@@ -896,33 +791,13 @@ fn validate_campisi_link_period(period: &FiAttributionResult, index: usize) -> R
         }
     }
 
-    let expected_active = period.portfolio_return - period.benchmark_return;
-    if !expected_active.is_finite() {
-        return Err(Error::invalid_input(format!(
-            "Campisi Carino period[{index}] portfolio_return - benchmark_return must be finite"
-        )));
-    }
-    let return_scale = period
-        .portfolio_return
-        .abs()
-        .max(period.benchmark_return.abs())
-        .max(period.active_return.abs())
-        .max(1.0);
-    let return_tolerance = 1e-12 * return_scale;
-    let active_residual = period.active_return - expected_active;
-    if !active_residual.is_finite() {
-        return Err(Error::invalid_input(format!(
-            "Campisi Carino period[{index}] active-return residual must be finite"
-        )));
-    }
-    if active_residual.abs() > return_tolerance {
-        return Err(Error::invalid_input(format!(
-            "Campisi Carino period[{index}].active_return ({}) does not agree with \
-             portfolio_return - benchmark_return ({expected_active}) within return-scale \
-             tolerance {return_tolerance}",
-            period.active_return
-        )));
-    }
+    check_active_return_identity(
+        "Campisi",
+        index,
+        period.portfolio_return,
+        period.benchmark_return,
+        period.active_return,
+    )?;
 
     const N_EFFECTS: usize = 5;
     let mut sector_totals = [NeumaierAccumulator::new(); N_EFFECTS];
@@ -1614,7 +1489,7 @@ mod tests {
         assert!(err.to_string().contains("Portfolio weights"), "{err}");
     }
 
-    /// Pins [`WEIGHT_TOLERANCE`] itself. The test above misses by 0.20, which
+    /// Pins `WEIGHT_TOLERANCE` itself. The test above misses by 0.20, which
     /// still trips under an absurdly loose tolerance; these two cases bracket
     /// the documented ±1e-6 boundary so loosening or tightening it fails here.
     #[test]

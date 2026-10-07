@@ -948,37 +948,6 @@ fn aggregate_position_attributions(
     Ok(acc.into_portfolio_attribution(base_currency, by_position)?)
 }
 
-/// Compile and reduce strict T0/T1 metric endpoint valuations for the public
-/// metrics-based attribution entry point.
-fn attribute_portfolio_pnl_metrics_prepared(
-    portfolio: &Portfolio,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    as_of_t0: Date,
-    as_of_t1: Date,
-    config: &FinstackConfig,
-) -> Result<PortfolioAttribution> {
-    let (prepared_t0, prepared_t1) = prepare_endpoints(
-        portfolio,
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-        config,
-        &AttributionMethod::MetricsBased,
-    )?;
-
-    reduce_prepared(
-        portfolio,
-        (market_t0, market_t1),
-        (as_of_t0, as_of_t1),
-        config,
-        &AttributionMethod::MetricsBased,
-        &prepared_t0,
-        &prepared_t1,
-    )
-}
-
 fn attribution_endpoint_error(error: Error, endpoint: &str) -> Error {
     match error {
         Error::ValuationError {
@@ -1075,12 +1044,6 @@ pub fn attribute_portfolio_pnl(
     config: &FinstackConfig,
     method: AttributionMethod,
 ) -> Result<PortfolioAttribution> {
-    if matches!(method, AttributionMethod::MetricsBased) {
-        return attribute_portfolio_pnl_metrics_prepared(
-            portfolio, market_t0, market_t1, as_of_t0, as_of_t1, config,
-        );
-    }
-
     let (prepared_t0, prepared_t1) = prepare_endpoints(
         portfolio, market_t0, market_t1, as_of_t0, as_of_t1, config, &method,
     )?;

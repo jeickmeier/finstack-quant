@@ -175,8 +175,6 @@ pub struct BrinsonPeriodResult {
 /// * `sectors` - Sector-level portfolio and benchmark weights and returns;
 ///   weights on each side must sum to one, including zero-weight sectors.
 pub fn brinson_fachler(sectors: &[SectorPeriod]) -> Result<BrinsonPeriodResult> {
-    const WEIGHT_TOLERANCE: f64 = 1e-6;
-
     if sectors.is_empty() {
         return Err(Error::invalid_input(
             "Brinson-Fachler attribution requires at least one sector",
@@ -209,16 +207,8 @@ pub fn brinson_fachler(sectors: &[SectorPeriod]) -> Result<BrinsonPeriodResult> 
 
     let total_wp = sum_wp.total();
     let total_wb = sum_wb.total();
-    if (total_wp - 1.0).abs() > WEIGHT_TOLERANCE {
-        return Err(Error::invalid_input(format!(
-            "Portfolio weights must sum to 1.0 (got {total_wp})"
-        )));
-    }
-    if (total_wb - 1.0).abs() > WEIGHT_TOLERANCE {
-        return Err(Error::invalid_input(format!(
-            "Benchmark weights must sum to 1.0 (got {total_wb})"
-        )));
-    }
+    check_weights_sum("Portfolio", total_wp)?;
+    check_weights_sum("Benchmark", total_wb)?;
 
     let portfolio_return = sum_rp.total();
     let benchmark_return = sum_rb.total();
@@ -591,6 +581,192 @@ pub(crate) fn carino_coefficient(r_p: f64, r_b: f64) -> Result<f64> {
     } else {
         Ok((diff / one_plus_rb).ln_1p() / diff)
     }
+}
+
+/// Tolerance for the requirement that weights sum to 1.0 on each side.
+pub(crate) const WEIGHT_TOLERANCE: f64 = 1e-6;
+
+/// Require one side's weights to sum to 1.0 within [`WEIGHT_TOLERANCE`].
+///
+/// Shared by every attribution module in this crate so the fully-invested
+/// requirement has one tolerance and one error message.
+pub(crate) fn check_weights_sum(side_name: &str, total: f64) -> Result<()> {
+    if (total - 1.0).abs() > WEIGHT_TOLERANCE {
+        return Err(Error::invalid_input(format!(
+            "{side_name} weights must sum to 1.0 (got {total})"
+        )));
+    }
+    Ok(())
+}
+
+/// Relative tolerance on the ratio `|net weight| / gross weight` below which a
+/// bucket's per-unit rate is treated as too poorly conditioned to attribute,
+/// in [`check_net_weight`].
+///
+/// A bucket's rate is `weighted contribution / weight`. At exact cancellation
+/// (`weight == 0.0` with `abs_weight > 0.0`) that rate is undefined;
+/// arbitrarily close to exact cancellation it is *defined* but numerically
+/// explosive — as `weight -> 0` for a roughly fixed contribution, the rate,
+/// and every allocation/curve/sector/selection effect derived from it, grows
+/// without bound. An exact-equality-only guard misses this: a benchmark bucket
+/// of `+0.40 @ 3%` and `-(0.40 - 1e-8) @ 0.5%` nets to `1e-8`, not `0.0`, yet
+/// produces an allocation on the order of `3e5` against an active return of
+/// `-81 bp`.
+///
+/// # What this bound does, and does not, guarantee
+///
+/// It caps how *explosive* an accepted bucket's rate can become; it is not a
+/// promise that the reconstructed effects reconcile to `active_return` within
+/// any particular tolerance — see the "Telescoping identity" section of
+/// [`crate::grid_attribution`] for measured residuals as large as `~5.7e-8`
+/// (on a ~1% return spread) for an accepted bucket sitting right at this
+/// tolerance. Reaching a `1e-12`-tight reconciliation guarantee across
+/// realistic return spreads would require a bound near `1e-3`, which would
+/// reject a bucket netting to 0.1% of its own gross weight — a plausible
+/// near-hedge in a long/short credit portfolio. `1e-6` is therefore a
+/// deliberate trade-off that reuses [`WEIGHT_TOLERANCE`]'s precision floor: a
+/// net weight smaller than a millionth of its own gross weight is treated as
+/// indistinguishable from exact cancellation.
+pub(crate) const NET_WEIGHT_RELATIVE_TOLERANCE: f64 = 1e-6;
+
+/// Fail closed on a bucket that is present on a side but nets to zero, or to a
+/// weight that is numerically near zero *relative to its own gross weight* (a
+/// long/short pair, a CDS hedge against a cash bond in the same bucket, a
+/// fully- or nearly-fully-hedged sector).
+///
+/// Such a bucket still contributes `Σ_j w_j r_j ≠ 0` to the side total. At
+/// exact cancellation its per-unit rate is undefined (`0 / 0`); at
+/// near-cancellation the rate is defined but grows without bound as the net
+/// weight shrinks, so every effect built from it can blow up to a numerically
+/// meaningless magnitude while `active_return` still ties out and no `NaN` or
+/// infinity appears for a finiteness check to catch. The comparison is the
+/// ratio `|weight| / abs_weight` against [`NET_WEIGHT_RELATIVE_TOLERANCE`] — a
+/// relative bound, so rescaling all weights uniformly (percent vs. decimal)
+/// does not change whether it fires.
+///
+/// # Arguments
+///
+/// * `kind` - Noun for the bucket in the error message (`"sector"`, `"bucket"`).
+/// * `name` - Bucket label reported to the caller.
+/// * `weight` - Net (signed) weight of the bucket on this side.
+/// * `abs_weight` - Gross weight: the sum of absolute position weights.
+/// * `side_name` - `"Portfolio"` or `"Benchmark"`.
+pub(crate) fn check_net_weight(
+    kind: &str,
+    name: &str,
+    weight: f64,
+    abs_weight: f64,
+    side_name: &str,
+) -> Result<()> {
+    if abs_weight > 0.0 && weight.abs() <= NET_WEIGHT_RELATIVE_TOLERANCE * abs_weight {
+        return Err(Error::invalid_input(format!(
+            "{side_name} {kind} '{name}' has offsetting positions netting to a weight \
+             ({weight}) that is zero, or numerically near zero, relative to its gross weight \
+             ({abs_weight}): a {kind} whose |net weight| does not exceed \
+             {NET_WEIGHT_RELATIVE_TOLERANCE} times its gross weight cannot be attributed \
+             because its per-unit rate (weighted contribution / weight) is undefined or \
+             numerically explosive. Split the offsetting positions into distinct {kind}s, or \
+             net them into a single position with a net weight well clear of that relative \
+             bound."
+        )));
+    }
+    Ok(())
+}
+
+/// Relative reconciliation tolerance for inbound linked-period effects.
+///
+/// The floor is `1e-10` in ordinary return space. For near-cancelling,
+/// long/short-generated effects whose gross magnitude is much larger than
+/// their net active return, [`ScaledL1Norm`] scales it with an overflow-safe
+/// L1 effect norm so valid single-period outputs are not rejected solely
+/// because cancellation amplified floating-point noise.
+const LINK_RECONCILIATION_RELATIVE_TOLERANCE: f64 = 1e-10;
+
+/// Streaming L1 scale that avoids summing absolute values at their original
+/// magnitude.
+#[derive(Default)]
+pub(crate) struct ScaledL1Norm {
+    /// Largest absolute value seen so far.
+    pub(crate) scale: f64,
+    /// Sum of absolute values divided by `scale`.
+    pub(crate) normalized_sum: f64,
+}
+
+impl ScaledL1Norm {
+    /// Fold one effect value into the norm.
+    pub(crate) fn add(&mut self, value: f64) {
+        let magnitude = value.abs();
+        if magnitude > self.scale {
+            self.normalized_sum = if self.scale == 0.0 {
+                1.0
+            } else {
+                self.normalized_sum * (self.scale / magnitude) + 1.0
+            };
+            self.scale = magnitude;
+        } else if self.scale > 0.0 {
+            self.normalized_sum += magnitude / self.scale;
+        }
+    }
+
+    /// Reconciliation tolerance: the relative tolerance times the L1 norm,
+    /// floored at the relative tolerance and saturating at `f64::MAX`.
+    pub(crate) fn tolerance(&self) -> f64 {
+        if self.scale == 0.0 {
+            return LINK_RECONCILIATION_RELATIVE_TOLERANCE;
+        }
+        let scaled_relative = LINK_RECONCILIATION_RELATIVE_TOLERANCE * self.scale;
+        if self.normalized_sum > f64::MAX / scaled_relative {
+            f64::MAX
+        } else {
+            (scaled_relative * self.normalized_sum).max(LINK_RECONCILIATION_RELATIVE_TOLERANCE)
+        }
+    }
+}
+
+/// Require a period's declared `active_return` to equal
+/// `portfolio_return - benchmark_return` within a `1e-12` return-scale
+/// tolerance before it is Carino-linked.
+///
+/// # Arguments
+///
+/// * `label` - Attribution family named in the error (`"Campisi"`, `"Grid"`).
+/// * `index` - Zero-based period index reported in the error.
+/// * `portfolio_return` - Finite period portfolio return, decimal.
+/// * `benchmark_return` - Finite period benchmark return, decimal.
+/// * `active_return` - Declared active return to reconcile, decimal.
+pub(crate) fn check_active_return_identity(
+    label: &str,
+    index: usize,
+    portfolio_return: f64,
+    benchmark_return: f64,
+    active_return: f64,
+) -> Result<()> {
+    let expected_active = portfolio_return - benchmark_return;
+    if !expected_active.is_finite() {
+        return Err(Error::invalid_input(format!(
+            "{label} Carino period[{index}] portfolio_return - benchmark_return must be finite"
+        )));
+    }
+    let return_scale = portfolio_return
+        .abs()
+        .max(benchmark_return.abs())
+        .max(active_return.abs())
+        .max(1.0);
+    let return_tolerance = 1e-12 * return_scale;
+    let active_residual = active_return - expected_active;
+    if !active_residual.is_finite() {
+        return Err(Error::invalid_input(format!(
+            "{label} Carino period[{index}] active-return residual must be finite"
+        )));
+    }
+    if active_residual.abs() > return_tolerance {
+        return Err(Error::invalid_input(format!(
+            "{label} Carino period[{index}].active_return ({active_return}) does not agree with \
+             portfolio_return - benchmark_return ({expected_active}) within return-scale \
+             tolerance {return_tolerance}"
+        )));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

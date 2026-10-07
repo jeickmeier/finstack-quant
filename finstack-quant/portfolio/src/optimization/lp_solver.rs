@@ -38,8 +38,6 @@ struct LpConstraint {
     rhs: f64,
     /// Optional name (constraint label) for diagnostics.
     name: Option<String>,
-    /// Whether this is a turnover placeholder to be expanded with auxiliary variables.
-    is_turnover_placeholder: bool,
     /// For `ValueWeightedAverage` bounds: which decision items matched the
     /// filter. The `Σ_F wᵢ(mᵢ − rhs) OP 0` linearization is only equivalent
     /// to `average OP rhs` when `Σ_F wᵢ > 0`, so the solution is checked
@@ -352,28 +350,14 @@ impl DefaultLpOptimizer {
                         relation: *op,
                         rhs: lowered_rhs,
                         name: label.clone(),
-                        is_turnover_placeholder: false,
                         vwa_filter_mask,
                         vwa_rhs,
                     });
                 }
-                Constraint::WeightBounds { .. } => {
-                    // Already applied to `DecisionFeatures::min_weight/max_weight`.
-                }
-                Constraint::MaxTurnover {
-                    label,
-                    max_turnover,
-                } => {
-                    lp_constraints.push(LpConstraint {
-                        coefficients: vec![0.0; n_vars],
-                        relation: Inequality::Le,
-                        rhs: *max_turnover,
-                        name: label.clone().or_else(|| Some("turnover".to_string())),
-                        is_turnover_placeholder: true,
-                        vwa_filter_mask: None,
-                        vwa_rhs: None,
-                    });
-                }
+                // Weight bounds are already applied to
+                // `DecisionFeatures::min_weight/max_weight`; turnover is lowered
+                // with auxiliary variables in `assemble_and_solve`.
+                Constraint::WeightBounds { .. } | Constraint::MaxTurnover { .. } => {}
                 Constraint::Budget { rhs } => {
                     let coefficients = vec![1.0; n_vars];
                     lp_constraints.push(LpConstraint {
@@ -381,7 +365,6 @@ impl DefaultLpOptimizer {
                         relation: Inequality::Eq,
                         rhs: *rhs,
                         name: Some("budget".to_string()),
-                        is_turnover_placeholder: false,
                         vwa_filter_mask: None,
                         vwa_rhs: None,
                     });
@@ -401,7 +384,6 @@ impl DefaultLpOptimizer {
                 relation: Inequality::Eq,
                 rhs: 1.0,
                 name: Some("budget".to_string()),
-                is_turnover_placeholder: false,
                 vwa_filter_mask: None,
                 vwa_rhs: None,
             });
@@ -480,10 +462,6 @@ impl DefaultLpOptimizer {
         .using(default_solver);
 
         for lc in &rows.lp_constraints {
-            if lc.is_turnover_placeholder {
-                continue;
-            }
-
             let mut lhs: Expression = 0.0.into();
             for (var, coef) in w_vars.iter().zip(&lc.coefficients) {
                 lhs += (*coef) * *var;
@@ -636,9 +614,6 @@ impl DefaultLpOptimizer {
 
         let mut constraint_slacks: IndexMap<String, f64> = IndexMap::new();
         for lc in &rows.lp_constraints {
-            if lc.is_turnover_placeholder {
-                continue;
-            }
             if let Some(name) = &lc.name {
                 let slack = if let (Some(mask), Some(bound_rhs)) = (&lc.vwa_filter_mask, lc.vwa_rhs)
                 {

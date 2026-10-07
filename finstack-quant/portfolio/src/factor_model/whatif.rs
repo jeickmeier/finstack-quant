@@ -5,7 +5,6 @@ use crate::error::{Error, Result};
 use crate::evaluation::{
     evaluate_raw_portfolio, PositionExecution, RawEvaluationInput, RawSelectiveSeed,
 };
-use crate::sensitivity::SensitivityMatrix;
 use crate::types::PositionId;
 use crate::Portfolio;
 use finstack_quant_core::dates::Date;
@@ -65,7 +64,7 @@ pub struct StressResult {
     pub stressed_decomposition: RiskDecomposition,
 }
 
-/// Position edits supported by `WhatIfEngine::position_what_if`.
+/// Position edits supported by `FactorModel::position_what_if`.
 ///
 /// Serialized as an internally tagged object: `{"kind": "remove",
 /// "position_id": ...}`, `{"kind": "resize", "position_id": ...,
@@ -89,153 +88,110 @@ pub enum PositionChange {
     },
 }
 
-/// Scenario engine built from a baseline factor-model analysis.
-pub struct WhatIfEngine<'a> {
-    model: &'a FactorModel,
-    base_decomposition: &'a RiskDecomposition,
-    base_sensitivities: &'a SensitivityMatrix,
-    portfolio: &'a Portfolio,
-    market: &'a MarketContext,
+/// Decompose baseline risk, then reallocate sensitivity rows to simulate
+/// remove or resize scenarios.
+///
+/// A removal zeroes that position's sensitivity row; a resize scales it in
+/// proportion to the original nonzero quantity. Risk decomposition and credit
+/// residual risk are then recomputed for the edited portfolio.
+pub(super) fn position_what_if(
+    model: &FactorModel,
+    portfolio: &Portfolio,
+    market: &MarketContext,
     as_of: Date,
-}
+    changes: &[PositionChange],
+) -> Result<WhatIfResult> {
+    let (before, mut sensitivities) = model.analyze_with_sensitivities(portfolio, market, as_of)?;
+    let position_ids = sensitivities.position_ids().to_vec();
+    let position_index = |position_id: &PositionId| {
+        position_ids
+            .iter()
+            .position(|current| current == position_id.as_str())
+    };
+    let mut scenario_positions = portfolio.positions().to_vec();
 
-impl<'a> WhatIfEngine<'a> {
-    /// Create a what-if engine from a previously computed baseline.
-    #[must_use]
-    pub fn new(
-        model: &'a FactorModel,
-        base_decomposition: &'a RiskDecomposition,
-        base_sensitivities: &'a SensitivityMatrix,
-        portfolio: &'a Portfolio,
-        market: &'a MarketContext,
-        as_of: Date,
-    ) -> Self {
-        Self {
-            model,
-            base_decomposition,
-            base_sensitivities,
-            portfolio,
-            market,
-            as_of,
-        }
-    }
-
-    /// Reallocate existing sensitivity rows to simulate remove or resize scenarios.
-    ///
-    /// A removal zeroes that position's sensitivity row; a resize scales it in
-    /// proportion to the original nonzero quantity. The method then recomputes
-    /// risk decomposition and credit residual risk.
-    ///
-    /// # Arguments
-    ///
-    /// * `changes` - One final remove or resize operation per existing position.
-    ///   Resize quantities use the original position unit; removals zero its risk.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an unknown position, non-finite
-    /// replacement quantity, a proportional resize of a zero quantity, or
-    /// multiple changes to one position. Propagates decomposition,
-    /// portfolio-update, and credit-risk calculation errors.
-    pub fn position_what_if(&self, changes: &[PositionChange]) -> Result<WhatIfResult> {
-        let mut sensitivities = self.base_sensitivities.clone();
-        let mut scenario_positions = self.portfolio.positions().to_vec();
-
-        let mut changed = HashSet::default();
-        for change in changes {
-            match change {
-                PositionChange::Remove { position_id } => {
-                    if !changed.insert(position_id) {
-                        return Err(Error::invalid_input(format!(
-                            "Multiple what-if changes for position '{position_id}'; supply one final change per position"
-                        )));
-                    }
-                    let Some(position_idx) = self.position_index(position_id) else {
-                        return Err(Error::invalid_input(format!(
-                            "Unknown position '{}'",
-                            position_id
-                        )));
-                    };
-                    for factor_idx in 0..sensitivities.n_factors() {
-                        sensitivities.set_delta(position_idx, factor_idx, 0.0);
-                    }
-                    scenario_positions.retain(|position| position.position_id != *position_id);
+    let mut changed = HashSet::default();
+    for change in changes {
+        match change {
+            PositionChange::Remove { position_id } => {
+                if !changed.insert(position_id) {
+                    return Err(Error::invalid_input(format!(
+                        "Multiple what-if changes for position '{position_id}'; supply one final change per position"
+                    )));
                 }
-                PositionChange::Resize {
-                    position_id,
-                    new_quantity,
-                } => {
-                    if !changed.insert(position_id) {
-                        return Err(Error::invalid_input(format!(
-                            "Multiple what-if changes for position '{position_id}'; supply one final change per position"
-                        )));
-                    }
-                    if !new_quantity.is_finite() {
-                        return Err(Error::invalid_input(format!(
-                            "PositionChange::Resize new_quantity must be finite for position '{}', got {}",
-                            position_id, new_quantity
-                        )));
-                    }
-                    let Some(position_idx) = self.position_index(position_id) else {
-                        return Err(Error::invalid_input(format!(
-                            "Unknown position '{}'",
-                            position_id
-                        )));
-                    };
-                    let Some(position) = self.portfolio.get_position(position_id.as_str()) else {
-                        return Err(Error::invalid_input(format!(
-                            "Unknown position '{}'",
-                            position_id
-                        )));
-                    };
-                    if position.quantity.abs() < f64::EPSILON {
-                        return Err(Error::invalid_input(format!(
-                            "Position '{}' has zero quantity and cannot be resized proportionally",
-                            position_id
-                        )));
-                    }
-                    let scale = *new_quantity / position.quantity;
-                    let row = sensitivities.position_deltas(position_idx)?.to_vec();
-                    for (factor_idx, delta) in row.into_iter().enumerate() {
-                        sensitivities.set_delta(position_idx, factor_idx, delta * scale);
-                    }
-                    if let Some(scenario_position) = scenario_positions
-                        .iter_mut()
-                        .find(|current| current.position_id == *position_id)
-                    {
-                        scenario_position.quantity = *new_quantity;
-                    }
+                let Some(position_idx) = position_index(position_id) else {
+                    return Err(Error::invalid_input(format!(
+                        "Unknown position '{}'",
+                        position_id
+                    )));
+                };
+                for factor_idx in 0..sensitivities.n_factors() {
+                    sensitivities.set_delta(position_idx, factor_idx, 0.0);
+                }
+                scenario_positions.retain(|position| position.position_id != *position_id);
+            }
+            PositionChange::Resize {
+                position_id,
+                new_quantity,
+            } => {
+                if !changed.insert(position_id) {
+                    return Err(Error::invalid_input(format!(
+                        "Multiple what-if changes for position '{position_id}'; supply one final change per position"
+                    )));
+                }
+                if !new_quantity.is_finite() {
+                    return Err(Error::invalid_input(format!(
+                        "PositionChange::Resize new_quantity must be finite for position '{}', got {}",
+                        position_id, new_quantity
+                    )));
+                }
+                let Some(position_idx) = position_index(position_id) else {
+                    return Err(Error::invalid_input(format!(
+                        "Unknown position '{}'",
+                        position_id
+                    )));
+                };
+                let Some(position) = portfolio.get_position(position_id.as_str()) else {
+                    return Err(Error::invalid_input(format!(
+                        "Unknown position '{}'",
+                        position_id
+                    )));
+                };
+                if position.quantity.abs() < f64::EPSILON {
+                    return Err(Error::invalid_input(format!(
+                        "Position '{}' has zero quantity and cannot be resized proportionally",
+                        position_id
+                    )));
+                }
+                let scale = *new_quantity / position.quantity;
+                let row = sensitivities.position_deltas(position_idx)?.to_vec();
+                for (factor_idx, delta) in row.into_iter().enumerate() {
+                    sensitivities.set_delta(position_idx, factor_idx, delta * scale);
+                }
+                if let Some(scenario_position) = scenario_positions
+                    .iter_mut()
+                    .find(|current| current.position_id == *position_id)
+                {
+                    scenario_position.quantity = *new_quantity;
                 }
             }
         }
-
-        let mut after = finstack_quant_models::factor::risk::decompose_factors(
-            &sensitivities,
-            self.model.covariance(),
-            self.model.risk_measure(),
-        )?;
-        let mut scenario_portfolio = self.portfolio.clone();
-        scenario_portfolio.set_positions(scenario_positions)?;
-        self.model.add_credit_residual_risk(
-            &mut after,
-            &scenario_portfolio,
-            self.market,
-            self.as_of,
-        )?;
-
-        Ok(WhatIfResult {
-            before: self.base_decomposition.clone(),
-            delta: factor_deltas(self.base_decomposition, &after),
-            after,
-        })
     }
 
-    fn position_index(&self, position_id: &PositionId) -> Option<usize> {
-        self.base_sensitivities
-            .position_ids()
-            .iter()
-            .position(|current| current == position_id.as_str())
-    }
+    let mut after = finstack_quant_models::factor::risk::decompose_factors(
+        &sensitivities,
+        model.covariance(),
+        model.risk_measure(),
+    )?;
+    let mut scenario_portfolio = portfolio.clone();
+    scenario_portfolio.set_positions(scenario_positions)?;
+    model.add_credit_residual_risk(&mut after, &scenario_portfolio, market, as_of)?;
+
+    Ok(WhatIfResult {
+        delta: factor_deltas(&before, &after),
+        before,
+        after,
+    })
 }
 
 pub(super) fn factor_stress_pnl(
@@ -415,30 +371,15 @@ mod tests {
         let Some((model, portfolio, market)) = setup else {
             return;
         };
-        let base_result = model.analyze(&portfolio, &market, date!(2024 - 01 - 01));
-        assert!(base_result.is_ok());
-        let Ok(base) = base_result else {
-            return;
-        };
-        let sensitivities_result =
-            model.compute_sensitivities(&portfolio, &market, date!(2024 - 01 - 01));
-        assert!(sensitivities_result.is_ok());
-        let Ok(sensitivities) = sensitivities_result else {
-            return;
-        };
-
-        let result = model
-            .what_if(
-                &base,
-                &sensitivities,
-                &portfolio,
-                &market,
-                date!(2024 - 01 - 01),
-            )
-            .position_what_if(&[PositionChange::Resize {
+        let result = model.position_what_if(
+            &portfolio,
+            &market,
+            date!(2024 - 01 - 01),
+            &[PositionChange::Resize {
                 position_id: PositionId::new("pos-1"),
                 new_quantity: 4.0,
-            }]);
+            }],
+        );
         assert!(result.is_ok());
         let Ok(result) = result else {
             return;
@@ -454,29 +395,14 @@ mod tests {
         let Some((model, portfolio, market)) = setup else {
             return;
         };
-        let base_result = model.analyze(&portfolio, &market, date!(2024 - 01 - 01));
-        assert!(base_result.is_ok());
-        let Ok(base) = base_result else {
-            return;
-        };
-        let sensitivities_result =
-            model.compute_sensitivities(&portfolio, &market, date!(2024 - 01 - 01));
-        assert!(sensitivities_result.is_ok());
-        let Ok(sensitivities) = sensitivities_result else {
-            return;
-        };
-
-        let result = model
-            .what_if(
-                &base,
-                &sensitivities,
-                &portfolio,
-                &market,
-                date!(2024 - 01 - 01),
-            )
-            .position_what_if(&[PositionChange::Remove {
+        let result = model.position_what_if(
+            &portfolio,
+            &market,
+            date!(2024 - 01 - 01),
+            &[PositionChange::Remove {
                 position_id: PositionId::new("pos-1"),
-            }]);
+            }],
+        );
         assert!(result.is_ok());
         let Ok(result) = result else {
             return;
@@ -486,35 +412,19 @@ mod tests {
     }
 
     #[test]
-    fn model_position_what_if_matches_the_engine_on_its_own_baseline() {
+    fn position_what_if_rejects_unknown_position() {
         let (model, portfolio, market) = build_test_model().expect("setup");
-        let as_of = date!(2024 - 01 - 01);
-        let changes = [PositionChange::Remove {
-            position_id: PositionId::new("pos-1"),
-        }];
-        let (base, sensitivities) = model
-            .analyze_with_sensitivities(&portfolio, &market, as_of)
-            .expect("baseline");
-        let expected = model
-            .what_if(&base, &sensitivities, &portfolio, &market, as_of)
-            .position_what_if(&changes)
-            .expect("engine what-if");
-
-        let actual = model
-            .position_what_if(&portfolio, &market, as_of, &changes)
-            .expect("model what-if");
-
-        assert_eq!(actual, expected);
-        assert!(model
+        let error = model
             .position_what_if(
                 &portfolio,
                 &market,
-                as_of,
+                date!(2024 - 01 - 01),
                 &[PositionChange::Remove {
                     position_id: PositionId::new("missing"),
                 }],
             )
-            .is_err());
+            .expect_err("unknown position");
+        assert!(error.to_string().contains("Unknown position"));
     }
 
     #[test]
@@ -530,16 +440,12 @@ mod tests {
     fn repeated_position_changes_are_rejected() {
         let (model, portfolio, market) = build_test_model().expect("setup");
         let as_of = date!(2024 - 01 - 01);
-        let (base, sensitivities) = model
-            .analyze_with_sensitivities(&portfolio, &market, as_of)
-            .expect("analysis");
         let changes = [20.0, 30.0].map(|new_quantity| PositionChange::Resize {
             position_id: PositionId::new("pos-1"),
             new_quantity,
         });
         let error = model
-            .what_if(&base, &sensitivities, &portfolio, &market, as_of)
-            .position_what_if(&changes)
+            .position_what_if(&portfolio, &market, as_of, &changes)
             .expect_err("duplicate changes");
         assert!(error.to_string().contains("Multiple what-if changes"));
     }
@@ -549,25 +455,15 @@ mod tests {
         let Some((model, portfolio, market)) = build_test_model() else {
             panic!("setup");
         };
-        let base = model
-            .analyze(&portfolio, &market, date!(2024 - 01 - 01))
-            .expect("analysis");
-        let sensitivities = model
-            .compute_sensitivities(&portfolio, &market, date!(2024 - 01 - 01))
-            .expect("sensitivities");
-
-        let result = model
-            .what_if(
-                &base,
-                &sensitivities,
-                &portfolio,
-                &market,
-                date!(2024 - 01 - 01),
-            )
-            .position_what_if(&[PositionChange::Resize {
+        let result = model.position_what_if(
+            &portfolio,
+            &market,
+            date!(2024 - 01 - 01),
+            &[PositionChange::Resize {
                 position_id: PositionId::new("pos-1"),
                 new_quantity: f64::NAN,
-            }]);
+            }],
+        );
 
         let err = result.expect_err("M-1 non-finite resize quantity must fail at input boundary");
         assert!(
