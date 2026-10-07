@@ -254,10 +254,10 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/position_change.schema.json",
-      "bytes": 1625,
+      "bytes": 1624,
       "kind": "output",
       "path": "schemas/portfolio/1/position_change.schema.json",
-      "summary": "Position edits supported by `WhatIfEngine::position_what_if`.",
+      "summary": "Position edits supported by `FactorModel::position_what_if`.",
       "title": "PositionChange",
       "type_name": "PositionChange"
     },

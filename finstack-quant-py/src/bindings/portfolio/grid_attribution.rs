@@ -11,7 +11,7 @@ use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
     serde_to_py, ColumnSchema,
 };
-use crate::errors::{display_to_py, portfolio_to_py, serde_json_to_py};
+use crate::errors::{portfolio_to_py, serde_json_to_py};
 
 /// Column schema for [`PyGridAttributionResult::to_dataframe`] (per-cell
 /// curve effects).
@@ -44,6 +44,12 @@ const GRID_SECTOR_COLUMNS: &[ColumnSchema<'static>] = &[
 pub struct PyGridAttributionResult {
     pub(crate) inner: finstack_quant_portfolio::GridAttributionResult,
 }
+
+crate::bindings::macros::wire_methods!(
+    PyGridAttributionResult,
+    finstack_quant_portfolio::GridAttributionResult,
+    "GridAttributionResult"
+);
 
 #[pymethods]
 impl PyGridAttributionResult {
@@ -111,19 +117,6 @@ impl PyGridAttributionResult {
     fn to_sector_effects_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_rows_to_dataframe_with_schema(py, &self.inner.sector_effects, GRID_SECTOR_COLUMNS)
     }
-    /// Serialize to a compact JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Deserialize from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::GridAttributionResult =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
 
     fn __repr__(&self) -> String {
         format!(
@@ -131,12 +124,6 @@ impl PyGridAttributionResult {
             self.inner.curve_effects.len(),
             self.inner.active_return,
         )
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 
@@ -154,6 +141,12 @@ impl PyGridAttributionResult {
 pub struct PyGridCarinoLinkedResult {
     pub(crate) inner: finstack_quant_portfolio::GridCarinoLinkedResult,
 }
+
+crate::bindings::macros::wire_methods!(
+    PyGridCarinoLinkedResult,
+    finstack_quant_portfolio::GridCarinoLinkedResult,
+    "GridCarinoLinkedResult"
+);
 
 #[pymethods]
 impl PyGridCarinoLinkedResult {
@@ -221,32 +214,12 @@ impl PyGridCarinoLinkedResult {
         )
     }
 
-    /// Serialize to a compact JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Deserialize from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::GridCarinoLinkedResult =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "GridCarinoLinkedResult(periods={}, linked_selection={})",
             self.inner.periods.len(),
             self.inner.linked_selection,
         )
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 

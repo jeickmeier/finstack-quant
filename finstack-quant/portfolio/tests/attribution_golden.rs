@@ -8,7 +8,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::attribution::attribute_portfolio_pnl;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::PortfolioBuilder;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use std::sync::Arc;
 use time::Duration;
@@ -43,7 +43,7 @@ fn test_attribution_parallel_rates_shift() {
     )
     .expect("Position::new should succeed with valid parameters");
 
-    let portfolio = PortfolioBuilder::new("TEST")
+    let portfolio = Portfolio::builder("TEST")
         .base_currency(Currency::USD)
         .as_of(as_of_t0)
         .entity(Entity::new("ENTITY_A"))
@@ -112,7 +112,7 @@ fn test_attribution_metrics_based_rates_shift() {
         PositionUnit::FaceValue,
     )
     .expect("position");
-    let portfolio = PortfolioBuilder::new("TEST_METRICS_ATTR")
+    let portfolio = Portfolio::builder("TEST_METRICS_ATTR")
         .base_currency(Currency::USD)
         .as_of(as_of_t0)
         .entity(Entity::new("ENTITY_A"))
@@ -160,7 +160,7 @@ fn test_attribution_metrics_based_fx_translation() {
         PositionUnit::FaceValue,
     )
     .expect("position");
-    let portfolio = PortfolioBuilder::new("TEST_METRICS_FX_ATTR")
+    let portfolio = Portfolio::builder("TEST_METRICS_FX_ATTR")
         .base_currency(Currency::USD)
         .as_of(as_of_t0)
         .entity(Entity::new("ENTITY_A"))
@@ -214,7 +214,7 @@ fn test_attribution_fx_translation() {
     )
     .expect("Position::new should succeed with valid parameters");
 
-    let portfolio = PortfolioBuilder::new("TEST")
+    let portfolio = Portfolio::builder("TEST")
         .base_currency(Currency::USD)
         .as_of(as_of_t0)
         .entity(Entity::new("ENTITY_A"))
@@ -301,7 +301,7 @@ fn test_attribution_carry_theta() {
     )
     .expect("Position::new should succeed with valid parameters");
 
-    let portfolio = PortfolioBuilder::new("TEST")
+    let portfolio = Portfolio::builder("TEST")
         .base_currency(Currency::USD)
         .as_of(as_of_t0)
         .entity(Entity::new("ENTITY_A"))
@@ -382,7 +382,7 @@ fn test_parallel_portfolio_attribution_closes_with_serial_inner_policy() {
         })
         .collect::<Vec<_>>();
 
-    let portfolio = PortfolioBuilder::new("TEST_PARALLEL_ATTR")
+    let portfolio = Portfolio::builder("TEST_PARALLEL_ATTR")
         .base_currency(Currency::USD)
         .as_of(as_of_t0)
         .entity(Entity::new("ENTITY_A"))

@@ -51,6 +51,12 @@ pub struct PyReplayResult {
     pub(crate) inner: finstack_quant_portfolio::replay::ReplayResult,
 }
 
+crate::bindings::macros::wire_methods!(
+    PyReplayResult,
+    finstack_quant_portfolio::replay::ReplayResult,
+    "ReplayResult"
+);
+
 impl PyReplayResult {
     fn rows(&self) -> Vec<ReplayStepRow> {
         self.inner
@@ -97,24 +103,6 @@ impl PyReplayResult {
         serde_rows_to_dataframe_with_schema(py, &self.rows(), REPLAY_STEP_COLUMNS)
     }
 
-    /// Serialize to a compact JSON string.
-    fn to_json(&self, py: Python<'_>) -> PyResult<String> {
-        let inner = &self.inner;
-        py.detach(|| serde_json::to_string(inner))
-            .map_err(display_to_py)
-    }
-
-    /// Deserialize from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(py: Python<'_>, json: &str) -> PyResult<Self> {
-        let json = json.to_owned();
-        let inner: finstack_quant_portfolio::replay::ReplayResult = py
-            .detach(move || serde_json::from_str(&json))
-            .map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "ReplayResult(steps={}, start={}, end={})",
@@ -122,12 +110,6 @@ impl PyReplayResult {
             self.inner.summary.start_date,
             self.inner.summary.end_date,
         )
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json(py)?)
     }
 }
 

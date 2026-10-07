@@ -24,7 +24,7 @@ use finstack_quant_portfolio::optimization::{
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::PortfolioBuilder;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
@@ -130,7 +130,7 @@ fn build_bond_portfolio(as_of: Date) -> finstack_quant_portfolio::Portfolio {
     .expect("CCC position should build")
     .with_text_attribute("rating", "CCC");
 
-    PortfolioBuilder::new("BOND_FUND")
+    Portfolio::builder("BOND_FUND")
         .name("Credit Portfolio – Optimization Example")
         .base_currency(Currency::USD)
         .as_of(as_of)

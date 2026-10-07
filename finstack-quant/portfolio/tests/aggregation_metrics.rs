@@ -8,7 +8,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::PortfolioBuilder;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::metrics::MetricId;
@@ -208,7 +208,7 @@ fn degraded_positions_are_reported_on_portfolio_metrics() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("P")
+    let portfolio = Portfolio::builder("P")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E1"))
@@ -275,7 +275,7 @@ fn additive_currency_metrics_aggregate_and_omissions_are_reported() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("P")
+    let portfolio = Portfolio::builder("P")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E1"))
@@ -335,7 +335,7 @@ fn m17_aggregate_metrics_rejects_mismatched_base_currency() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("P")
+    let portfolio = Portfolio::builder("P")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E1"))
@@ -394,7 +394,7 @@ fn m17_aggregate_metrics_rejects_mismatched_as_of() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("P")
+    let portfolio = Portfolio::builder("P")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E1"))
@@ -454,7 +454,7 @@ fn summable_metrics_scale_with_quantity_and_short_sign() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("P")
+    let portfolio = Portfolio::builder("P")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E1"))

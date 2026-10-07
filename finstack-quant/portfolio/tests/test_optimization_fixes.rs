@@ -6,7 +6,6 @@ use finstack_quant_core::dates::{create_date, Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
-use finstack_quant_portfolio::builder::PortfolioBuilder;
 use finstack_quant_portfolio::optimization::{
     optimize, CandidatePosition, Constraint, Inequality, MetricExpr, MissingMetricPolicy,
     Objective, PerPositionMetric, PortfolioOptimizationProblem, PositionFilter, TradeDirection,
@@ -14,6 +13,7 @@ use finstack_quant_portfolio::optimization::{
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::metrics::MetricId;
@@ -198,7 +198,7 @@ fn regression_position(id: &str, value: f64, quantity: f64, unit: PositionUnit) 
 }
 
 fn regression_portfolio(positions: Vec<Position>) -> finstack_quant_portfolio::Portfolio {
-    let mut builder = PortfolioBuilder::new("REGRESSION")
+    let mut builder = Portfolio::builder("REGRESSION")
         .base_currency(Currency::USD)
         .as_of(create_date(2024, Month::January, 1).unwrap())
         .entity(Entity::new("ENT_A"));
@@ -478,7 +478,7 @@ fn test_notional_weighting() -> Result<(), Box<dyn std::error::Error>> {
         PositionUnit::Notional(Some(Currency::USD)),
     )?;
 
-    let portfolio = PortfolioBuilder::new("HEDGED_PORTFOLIO")
+    let portfolio = Portfolio::builder("HEDGED_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -522,7 +522,7 @@ fn test_notional_weighting() -> Result<(), Box<dyn std::error::Error>> {
 fn test_candidate_batching() -> Result<(), Box<dyn std::error::Error>> {
     let as_of = create_date(2024, Month::January, 1)?;
 
-    let portfolio = PortfolioBuilder::new("EMPTY_PORTFOLIO")
+    let portfolio = Portfolio::builder("EMPTY_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .build()?;
@@ -608,7 +608,7 @@ fn test_missing_metric_exclude_freezes_position_at_current_weight() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("PORTFOLIO")
+    let portfolio = Portfolio::builder("PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -637,7 +637,7 @@ fn test_missing_metric_exclude_freezes_position_at_current_weight() {
 }
 #[test]
 fn test_short_candidates_can_take_negative_weights() {
-    let portfolio = PortfolioBuilder::new("EMPTY_PORTFOLIO")
+    let portfolio = Portfolio::builder("EMPTY_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(create_date(2024, Month::January, 1).unwrap())
         .build()
@@ -753,7 +753,7 @@ fn m7_existing_short_accepts_negative_weight_bounds() -> Result<(), Box<dyn std:
         -1.0,
         PositionUnit::Units,
     )?;
-    let portfolio = PortfolioBuilder::new("SHORT_BOOK")
+    let portfolio = Portfolio::builder("SHORT_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -806,7 +806,7 @@ fn m7_existing_short_accepts_negative_weight_bounds() -> Result<(), Box<dyn std:
 fn m8_candidate_entity_filters_apply_to_metric_constraints(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let as_of = create_date(2024, Month::January, 1)?;
-    let portfolio = PortfolioBuilder::new("EMPTY")
+    let portfolio = Portfolio::builder("EMPTY")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .build()?;
@@ -901,7 +901,7 @@ fn m9_turnover_slack_uses_actual_turnover() -> Result<(), Box<dyn std::error::Er
         1.0,
         PositionUnit::Units,
     )?;
-    let portfolio = PortfolioBuilder::new("TURNOVER_BOOK")
+    let portfolio = Portfolio::builder("TURNOVER_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -973,7 +973,7 @@ fn m9_duplicate_turnover_constraints_are_rejected() -> Result<(), Box<dyn std::e
         1.0,
         PositionUnit::Units,
     )?;
-    let portfolio = PortfolioBuilder::new("DUPLICATE_TURNOVER_BOOK")
+    let portfolio = Portfolio::builder("DUPLICATE_TURNOVER_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1040,7 +1040,7 @@ fn mo6_filtered_value_weighted_average_metric_bound_uses_filtered_denominator(
         1.0,
         PositionUnit::Units,
     )?;
-    let portfolio = PortfolioBuilder::new("FILTERED_AVG")
+    let portfolio = Portfolio::builder("FILTERED_AVG")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1114,7 +1114,7 @@ fn mo8_value_weight_existing_zero_pv_position_errors() -> Result<(), Box<dyn std
         1.0,
         PositionUnit::Units,
     )?;
-    let portfolio = PortfolioBuilder::new("ZERO_PV")
+    let portfolio = Portfolio::builder("ZERO_PV")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1161,7 +1161,7 @@ fn notional_weight_rejects_missing_instrument_notional() -> Result<(), Box<dyn s
         1.0,
         PositionUnit::Units,
     )?;
-    let portfolio = PortfolioBuilder::new("NOTIONAL_SCALE")
+    let portfolio = Portfolio::builder("NOTIONAL_SCALE")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1209,7 +1209,7 @@ fn test_notional_weighting_implied_quantities_use_notional_denominator() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("NOTIONAL_PORTFOLIO")
+    let portfolio = Portfolio::builder("NOTIONAL_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1297,7 +1297,7 @@ fn mo19_unfiltered_vwa_objective_with_non_unit_budget_is_rejected() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("NET_SHORT_BOOK")
+    let portfolio = Portfolio::builder("NET_SHORT_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1363,7 +1363,7 @@ fn mo19_unfiltered_vwa_objective_with_unit_budget_picks_high_yield() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("LONG_BOOK")
+    let portfolio = Portfolio::builder("LONG_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1415,7 +1415,7 @@ fn infeasible_result_turnover_is_nan() {
         PositionUnit::Units,
     )
     .unwrap();
-    let portfolio = PortfolioBuilder::new("INFEASIBLE_BOOK")
+    let portfolio = Portfolio::builder("INFEASIBLE_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1496,7 +1496,7 @@ fn exclude_policy_removes_missing_metric_positions_from_vwa_bound_denominator() 
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("SCORED_BOOK")
+    let portfolio = Portfolio::builder("SCORED_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1575,7 +1575,7 @@ fn vwa_bound_slack_is_reported_in_metric_units() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("SLACK_BOOK")
+    let portfolio = Portfolio::builder("SLACK_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1650,7 +1650,7 @@ fn mo21_duplicate_budget_constraints_are_rejected() {
         PositionUnit::Units,
     )
     .unwrap();
-    let portfolio = PortfolioBuilder::new("DUPLICATE_BUDGET_BOOK")
+    let portfolio = Portfolio::builder("DUPLICATE_BUDGET_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1696,7 +1696,7 @@ fn mo9_unit_scaling_without_budget_does_not_synthesize_sum_multiplier_budget() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("UNIT_SCALING_PORTFOLIO")
+    let portfolio = Portfolio::builder("UNIT_SCALING_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1738,7 +1738,7 @@ fn notional_weight_uses_instrument_deal_notional() -> Result<(), Box<dyn std::er
         1.0,
         PositionUnit::Notional(Some(Currency::USD)),
     )?;
-    let portfolio = PortfolioBuilder::new("DEAL_NOTIONAL")
+    let portfolio = Portfolio::builder("DEAL_NOTIONAL")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1827,7 +1827,7 @@ fn value_weight_percentage_reconstructs_via_scale_factor() -> Result<(), Box<dyn
         1.0,
         PositionUnit::Units,
     )?;
-    let portfolio = PortfolioBuilder::new("PCT_SCALE")
+    let portfolio = Portfolio::builder("PCT_SCALE")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1927,7 +1927,7 @@ fn exclude_policy_skips_missing_metric_in_weighted_sum() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("EXCLUDE_WS")
+    let portfolio = Portfolio::builder("EXCLUDE_WS")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1964,7 +1964,7 @@ fn exclude_policy_skips_missing_metric_in_weighted_sum() {
 fn unit_scaling_zero_turnover_preserves_long_and_short_quantities() {
     use finstack_quant_portfolio::optimization::{Constraint, PositionFilter};
     let as_of = create_date(2024, Month::January, 1).unwrap();
-    let mut builder = PortfolioBuilder::new("UNIT_BASELINE")
+    let mut builder = Portfolio::builder("UNIT_BASELINE")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"));
@@ -2028,7 +2028,7 @@ fn notional_weights_convert_native_currencies_before_normalizing() {
     let mut eur = test_deposit("EUR", 1_000_000.0, as_of).unwrap();
     eur.notional = Money::from((1_000_000_i64, Currency::EUR));
     eur.discount_curve_id = "EUR-OIS".into();
-    let portfolio = PortfolioBuilder::new("FX_NOTIONAL")
+    let portfolio = Portfolio::builder("FX_NOTIONAL")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -2103,7 +2103,7 @@ fn rebalance_from_spec_matches_the_live_result_and_rejects_foreign_results() {
     let as_of = create_date(2024, Month::January, 1).unwrap();
     let usd = test_deposit("USD", 1_000_000.0, as_of).unwrap();
     let other = test_deposit("USD", 500_000.0, as_of).unwrap();
-    let portfolio = PortfolioBuilder::new("REBALANCE")
+    let portfolio = Portfolio::builder("REBALANCE")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))

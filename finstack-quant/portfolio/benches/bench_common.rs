@@ -25,7 +25,7 @@ use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::{Portfolio, PortfolioBuilder};
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::{
     CdsConvention, CdsValuationConvention, CreditDefaultSwap, PayReceive, PremiumLegSpec,
     ProtectionLegSpec,
@@ -441,7 +441,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
 /// Remaining slots are filled with deposits.
 pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     let base = base_date();
-    let mut builder = PortfolioBuilder::new("INSTITUTIONAL_PORTFOLIO")
+    let mut builder = Portfolio::builder("INSTITUTIONAL_PORTFOLIO")
         .name("Large Investment Organization")
         .base_currency(Currency::USD)
         .as_of(base);
@@ -1179,7 +1179,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
 /// complete benchmark market data.
 pub fn create_attribution_portfolio(num_positions: usize) -> Portfolio {
     let portfolio = create_institutional_portfolio(num_positions);
-    let mut builder = PortfolioBuilder::new(format!("ATTRIBUTION_{}", num_positions))
+    let mut builder = Portfolio::builder(format!("ATTRIBUTION_{}", num_positions))
         .name("Attribution Benchmark Portfolio")
         .base_currency(portfolio.base_currency)
         .as_of(portfolio.as_of);

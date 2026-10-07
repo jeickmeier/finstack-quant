@@ -1341,7 +1341,7 @@ export type RequestedMetrics =
       [k: string]: unknown;
     };
 /**
- * Position edits supported by `WhatIfEngine::position_what_if`.
+ * Position edits supported by `FactorModel::position_what_if`.
  */
 export type PositionChange =
   | {

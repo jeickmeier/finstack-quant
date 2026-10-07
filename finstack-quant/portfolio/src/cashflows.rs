@@ -558,7 +558,7 @@ fn convert_money_to_base_on_date(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::PortfolioBuilder;
+
     use crate::position::{Position, PositionUnit};
     use crate::test_utils::build_test_market_at;
     use crate::types::Entity;
@@ -742,7 +742,7 @@ mod tests {
         )
         .expect("test should succeed");
 
-        let portfolio = PortfolioBuilder::new("TEST")
+        let portfolio = Portfolio::builder("TEST")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))
@@ -784,7 +784,7 @@ mod tests {
             PositionUnit::Units,
         )
         .expect("test should succeed");
-        let portfolio = PortfolioBuilder::new("WARNINGS")
+        let portfolio = Portfolio::builder("WARNINGS")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))
@@ -832,7 +832,7 @@ mod tests {
             PositionUnit::Units,
         )
         .expect("test should succeed");
-        let portfolio = PortfolioBuilder::new("PLACEHOLDER")
+        let portfolio = Portfolio::builder("PLACEHOLDER")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))
@@ -869,7 +869,7 @@ mod tests {
             PositionUnit::Units,
         )
         .expect("test should succeed");
-        let portfolio = PortfolioBuilder::new("AGENCY")
+        let portfolio = Portfolio::builder("AGENCY")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))
@@ -904,7 +904,7 @@ mod tests {
             PositionUnit::Units,
         )
         .expect("test should succeed");
-        let portfolio = PortfolioBuilder::new("CDX")
+        let portfolio = Portfolio::builder("CDX")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))
@@ -958,7 +958,7 @@ mod tests {
             PositionUnit::FaceValue,
         )
         .expect("test should succeed");
-        let portfolio = PortfolioBuilder::new("FULL")
+        let portfolio = Portfolio::builder("FULL")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))
@@ -1010,7 +1010,7 @@ mod tests {
             PositionUnit::Units,
         )
         .expect("test should succeed");
-        let portfolio = PortfolioBuilder::new("UNSUPPORTED")
+        let portfolio = Portfolio::builder("UNSUPPORTED")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))

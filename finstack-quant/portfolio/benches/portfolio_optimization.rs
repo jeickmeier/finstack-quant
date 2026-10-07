@@ -19,7 +19,7 @@ use finstack_quant_portfolio::optimization::{
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::PortfolioBuilder;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
@@ -45,7 +45,7 @@ fn bond_book(n_positions: usize, as_of: Date) -> finstack_quant_portfolio::Portf
     let issue = as_of;
     let maturity =
         Date::from_calendar_date(as_of.year() + 5, Month::January, 1).expect("valid maturity");
-    let mut builder = PortfolioBuilder::new("OPT_BENCH")
+    let mut builder = Portfolio::builder("OPT_BENCH")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("FUND_A"));
