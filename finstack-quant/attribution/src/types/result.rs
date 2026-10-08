@@ -617,8 +617,10 @@ impl PnlAttribution {
     ///
     /// * `total_pnl` - Total P&L (val_t1 - val_t0)
     /// * `instrument_id` - Instrument identifier
-    /// * `t0` - Start date
-    /// * `t1` - End date
+    /// * `t0` - Valuation date opening the attribution window; the T₀ market
+    ///   and instrument state are observed on it.
+    /// * `t1` - Valuation date closing the window (`t1 >= t0`); the T₁ market
+    ///   and instrument state are observed on it.
     /// * `method` - Attribution methodology
     ///
     /// # Returns

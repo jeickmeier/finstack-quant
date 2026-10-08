@@ -874,6 +874,11 @@ impl DiscountedCashFlow {
     /// always discounts at the full `t_n` regardless of the mid-year
     /// convention.
     ///
+    /// # Arguments
+    ///
+    /// * `terminal_value` - Undiscounted terminal value at the end of the
+    ///   explicit horizon, in the instrument's currency units.
+    ///
     /// Returns `Err` if flows are empty.
     pub fn discount_terminal_value(&self, terminal_value: f64) -> finstack_quant_core::Result<f64> {
         let years = self.terminal_discount_years()?;
