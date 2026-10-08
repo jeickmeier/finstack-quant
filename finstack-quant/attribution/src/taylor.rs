@@ -137,41 +137,46 @@ impl TaylorAttributionConfig {
     }
 }
 
-/// Record a Taylor factor result and its attempted pricing calls, including
-/// calls that returned an error before the factor completed.
-///
-/// On failure the factor is recorded in `notes` and `result_invalid` is set:
-/// every factor routed through here is backed by a curve/surface that appears
-/// in the instrument's market dependencies, so a failure means part of the
-/// declared risk decomposition is silently missing and the result cannot be
-/// trusted.
-#[allow(clippy::too_many_arguments)]
-fn record_taylor_factor_result(
-    factor_kind: &str,
-    factor_id: &CurveId,
-    result: Result<TaylorFactorResult>,
-    factors: &mut Vec<TaylorFactorResult>,
-    num_repricings: &mut usize,
-    repricings: usize,
-    notes: &mut Vec<String>,
-    result_invalid: &mut bool,
-) {
-    *num_repricings += repricings;
-    match result {
-        Ok(result) => {
-            factors.push(result);
-        }
-        Err(e) => {
-            tracing::warn!(
-                factor_kind = factor_kind,
-                curve_id = %factor_id,
-                error = %e,
-                "Taylor attribution: factor computation failed"
-            );
-            notes.push(format!(
-                "Taylor {factor_kind} factor '{factor_id}' failed: {e}"
-            ));
-            *result_invalid = true;
+/// Factors, repricing count and diagnostics accumulated across a Taylor run.
+#[derive(Default)]
+struct TaylorAccumulator {
+    factors: Vec<TaylorFactorResult>,
+    num_repricings: usize,
+    notes: Vec<String>,
+    result_invalid: bool,
+}
+
+impl TaylorAccumulator {
+    /// Record a Taylor factor result and its attempted pricing calls, including
+    /// calls that returned an error before the factor completed.
+    ///
+    /// On failure the factor is recorded in `notes` and `result_invalid` is set:
+    /// every factor routed through here is backed by a curve/surface that appears
+    /// in the instrument's market dependencies, so a failure means part of the
+    /// declared risk decomposition is silently missing and the result cannot be
+    /// trusted.
+    fn record(
+        &mut self,
+        factor_kind: &str,
+        factor_id: &CurveId,
+        result: Result<TaylorFactorResult>,
+        repricings: usize,
+    ) {
+        self.num_repricings += repricings;
+        match result {
+            Ok(result) => self.factors.push(result),
+            Err(e) => {
+                tracing::warn!(
+                    factor_kind = factor_kind,
+                    curve_id = %factor_id,
+                    error = %e,
+                    "Taylor attribution: factor computation failed"
+                );
+                self.notes.push(format!(
+                    "Taylor {factor_kind} factor '{factor_id}' failed: {e}"
+                ));
+                self.result_invalid = true;
+            }
         }
     }
 }
@@ -179,6 +184,8 @@ fn record_taylor_factor_result(
 /// One Taylor factor's first-order and optional second-order P&L.
 #[derive(Debug, Clone)]
 pub(crate) struct TaylorFactorResult {
+    /// Attribution bucket the factor's P&L lands in (`Carry` for theta).
+    pub factor: AttributionFactor,
     /// Diagnostic factor label, including its curve or volatility input ID.
     pub factor_name: String,
     /// First-order explained P&L. For key-rate factors this is the per-bucket
@@ -219,12 +226,6 @@ pub(crate) struct TaylorAttributionResult {
     pub result_invalid: bool,
 }
 
-#[derive(Clone, Copy)]
-struct TaylorExecution {
-    policy: ExecutionPolicy,
-    prepared_endpoints: Option<(Money, Money)>,
-}
-
 /// Compute the detailed Taylor factor decomposition.
 ///
 /// Uses bump-and-reprice at T0 to compute first-order sensitivities, then
@@ -233,52 +234,39 @@ struct TaylorExecution {
 ///
 /// # Arguments
 ///
-/// * `instrument` - Instrument to attribute
-/// * `market_t0` - Market context at T0
-/// * `market_t1` - Market context at T1
-/// * `as_of_t0` - Valuation date T0
-/// * `as_of_t1` - Valuation date T1
-/// * `config` - Taylor attribution configuration
+/// * `request` - Instrument, markets, dates, execution policy, optional
+///   opening model parameters and prepared endpoint values.
+/// * `config` - Taylor bump sizes and gamma treatment.
 ///
 /// # Returns
 ///
 /// `TaylorAttributionResult` with factors, endpoints and pricing diagnostics.
-#[allow(clippy::too_many_arguments)]
 fn compute_taylor_result(
-    instrument: &Arc<dyn Instrument>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    as_of_t0: Date,
-    as_of_t1: Date,
+    request: &AttributionRequest<'_>,
     config: &TaylorAttributionConfig,
-    execution: TaylorExecution,
-    model_params_t0: Option<&ModelParamsSnapshot>,
 ) -> Result<TaylorAttributionResult> {
     config.validate()?;
+    let AttributionRequest {
+        instrument,
+        market_t0,
+        market_t1,
+        as_of_t0,
+        as_of_t1,
+        execution_policy,
+        model_params_t0,
+        ..
+    } = *request;
     validate_attribution_period(as_of_t0, as_of_t1)?;
-    let execution_policy = execution.policy;
-    let instrument_t0 = if let Some(params) = model_params_t0 {
-        model_params::with_model_params(instrument, params)?
-    } else {
-        Arc::clone(instrument)
-    };
-    let (pv_t0, pv_t1) = if let Some(endpoints) = execution.prepared_endpoints {
-        endpoints
-    } else {
-        (
-            instrument_t0.value(market_t0, as_of_t0)?,
-            instrument.value(market_t1, as_of_t1)?,
-        )
-    };
+    let (instrument_t0, pv_t0, pv_t1) = endpoint_values(request)?;
     // Decimal-exact difference: subtracting two large `.amount()` f64s loses
     // precision at high notionals, and `checked_sub` also rejects a currency
     // mismatch instead of silently differencing across currencies.
     pv_t1.checked_sub(pv_t0)?;
 
-    let mut factors = Vec::new();
-    let mut num_repricings: usize = 2;
-    let mut notes: Vec<String> = Vec::new();
-    let mut result_invalid = false;
+    let mut acc = TaylorAccumulator {
+        num_repricings: 2,
+        ..TaylorAccumulator::default()
+    };
 
     // Rate sensitivities (key-rate DV01 per discount curve)
     let market_deps = instrument_t0.market_dependencies()?;
@@ -292,67 +280,33 @@ fn compute_taylor_result(
         .cloned()
         .collect();
     let recalibration_provider = CachedRecalibrationProvider::new();
-    let compute_rate = |curve_id: &CurveId| {
-        let mut repricings = 0;
-        let result = compute_curve_factor(
-            CurveKind::Discount,
-            &instrument_t0,
-            market_t0,
-            market_t1,
-            as_of_t0,
-            pv_t0,
-            curve_id,
-            config,
-            &mut repricings,
-        );
-        (curve_id.clone(), result, repricings)
-    };
-    let rate_results = map_policy(execution_policy, &rate_curve_ids, compute_rate);
-    for (curve_id, result, repricings) in rate_results {
-        record_taylor_factor_result(
-            "rate",
-            &curve_id,
-            result,
-            &mut factors,
-            &mut num_repricings,
-            repricings,
-            &mut notes,
-            &mut result_invalid,
-        );
-    }
-
-    // Forward curve sensitivities (key-rate DV01 per projection curve)
-    let compute_forward = |curve_id: &CurveId| {
-        let mut repricings = 0;
-        let result = compute_curve_factor(
+    // Key-rate DV01 per discount curve, then per projection curve.
+    for (kind, factor_kind, curve_ids) in [
+        (CurveKind::Discount, "rate", rate_curve_ids.as_slice()),
+        (
             CurveKind::Forward,
-            &instrument_t0,
-            market_t0,
-            market_t1,
-            as_of_t0,
-            pv_t0,
-            curve_id,
-            config,
-            &mut repricings,
-        );
-        (curve_id.clone(), result, repricings)
-    };
-    let forward_results = map_policy(
-        execution_policy,
-        &market_deps.curves.forward_curves,
-        compute_forward,
-    );
-    for (curve_id, result, repricings) in forward_results {
-        record_taylor_factor_result(
             "forward",
-            &curve_id,
-            result,
-            &mut factors,
-            &mut num_repricings,
-            repricings,
-            &mut notes,
-            &mut result_invalid,
-        );
+            market_deps.curves.forward_curves.as_slice(),
+        ),
+    ] {
+        let compute = |curve_id: &CurveId| {
+            let mut repricings = 0;
+            let result = compute_curve_factor(
+                kind,
+                &instrument_t0,
+                market_t0,
+                market_t1,
+                as_of_t0,
+                pv_t0,
+                curve_id,
+                config,
+                &mut repricings,
+            );
+            (curve_id.clone(), result, repricings)
+        };
+        for (curve_id, result, repricings) in map_policy(execution_policy, curve_ids, compute) {
+            acc.record(factor_kind, &curve_id, result, repricings);
+        }
     }
 
     // Credit sensitivities — credit-curve move, key-rate aware.
@@ -365,7 +319,7 @@ fn compute_taylor_result(
     let credit_keyrate = if credit_curves.is_empty() {
         None
     } else {
-        num_repricings += 1;
+        acc.num_repricings += 1;
         instrument_t0
             .price_with_metrics(
                 market_t0,
@@ -384,8 +338,8 @@ fn compute_taylor_result(
                 .map_err(Into::into)
             })
             .map_err(|error| {
-                result_invalid = true;
-                notes.push(format!(
+                acc.result_invalid = true;
+                acc.notes.push(format!(
                     "Taylor bucketed credit sensitivities failed: {error}"
                 ));
                 error
@@ -423,16 +377,7 @@ fn compute_taylor_result(
     };
     let credit_results = map_policy(execution_policy, credit_curves, compute_credit);
     for (curve_id, result, repricings) in credit_results {
-        record_taylor_factor_result(
-            "credit",
-            &curve_id,
-            result,
-            &mut factors,
-            &mut num_repricings,
-            repricings,
-            &mut notes,
-            &mut result_invalid,
-        );
+        acc.record("credit", &curve_id, result, repricings);
     }
 
     // Volatility sensitivities (vega) — one factor per vol-surface dependency.
@@ -456,7 +401,7 @@ fn compute_taylor_result(
         .collect();
     for dependency in &surface_dependencies {
         if reference_expiry_years.is_none() || dependency.reference_strike.is_none() {
-            notes.push(format!(
+            acc.notes.push(format!(
                 "Taylor vol factor '{}': no reference expiry/strike available; \
                  vol move is surface-averaged",
                 dependency.vol_surface_id
@@ -481,16 +426,7 @@ fn compute_taylor_result(
         };
     let vol_results = map_policy(execution_policy, &surface_dependencies, compute_vol);
     for (vol_surface_id, result, repricings) in vol_results {
-        record_taylor_factor_result(
-            "vol",
-            &vol_surface_id,
-            result,
-            &mut factors,
-            &mut num_repricings,
-            repricings,
-            &mut notes,
-            &mut result_invalid,
-        );
+        acc.record("vol", &vol_surface_id, result, repricings);
     }
 
     let scalar_vol_t0 =
@@ -503,25 +439,16 @@ fn compute_taylor_result(
         // T1 surfaces/cubes remain in the snapshot; only scalar vol quotes move.
         scalar_vol_restore.volatility_scalars = scalar_vol_t0.volatility_scalars;
         let mut repricings = 0;
-        let result = compute_restored_family_factor(
-            instrument,
+        let result = restored_family_factor(
+            request,
             &scalar_vol_restore,
-            market_t1,
-            as_of_t1,
             pv_t1,
-            (MarketRestoreFlags::VOL, "Vol:scalars"),
+            AttributionFactor::Volatility,
+            MarketRestoreFlags::VOL,
+            "Vol:scalars",
             &mut repricings,
         );
-        record_taylor_factor_result(
-            "vol",
-            &CurveId::new("Vol:scalars"),
-            result,
-            &mut factors,
-            &mut num_repricings,
-            repricings,
-            &mut notes,
-            &mut result_invalid,
-        );
+        acc.record("vol", &CurveId::new("Vol:scalars"), result, repricings);
     }
 
     // FX-exposure factor: pricing impact of FX-rate changes on cross-currency
@@ -532,29 +459,34 @@ fn compute_taylor_result(
     // factor is omitted (single-currency instruments stay at zero FX P&L).
     if market_t0.fx().is_some() || market_t1.fx().is_some() {
         if market_t0.fx().is_none() {
-            notes.push(
+            acc.notes.push(
                 "Taylor FX factor: T0 market has no FX matrix; FX-exposure P&L is measured \
                  against an FX-less T0 restore"
                     .to_string(),
             );
         }
-        match compute_fx_factor(
-            instrument,
-            market_t0,
-            market_t1,
-            as_of_t1,
+        // Both values are in the instrument's native currency. A
+        // single-currency instrument that does not read the FX matrix
+        // produces exactly zero.
+        let fx_snapshot = MarketSnapshot::extract(market_t0, MarketRestoreFlags::FX);
+        match restored_family_factor(
+            request,
+            &fx_snapshot,
             pv_t1,
-            &mut num_repricings,
+            AttributionFactor::Fx,
+            MarketRestoreFlags::FX,
+            "Fx",
+            &mut acc.num_repricings,
         ) {
             Ok(result) => {
-                factors.push(result);
+                acc.factors.push(result);
             }
             Err(e) => {
                 tracing::warn!(
                     error = %e,
                     "Taylor attribution: FX factor computation failed"
                 );
-                notes.push(format!("Taylor FX factor failed: {e}"));
+                acc.notes.push(format!("Taylor FX factor failed: {e}"));
             }
         }
     }
@@ -562,51 +494,31 @@ fn compute_taylor_result(
     // Restore-and-reprice families (same isolation as FX / parallel):
     // inflation curves, base correlations, and market scalars. The isolated
     // P&L already includes that family's higher-order effects.
-    record_restored_family_factor(
-        "inflation",
-        "Inflation",
-        MarketRestoreFlags::INFLATION,
-        instrument,
-        market_t0,
-        market_t1,
-        &market_deps,
-        as_of_t1,
-        pv_t1,
-        &mut factors,
-        &mut num_repricings,
-        &mut notes,
-        &mut result_invalid,
-    );
-    record_restored_family_factor(
-        "correlations",
-        "Correlations",
-        MarketRestoreFlags::CORRELATION,
-        instrument,
-        market_t0,
-        market_t1,
-        &market_deps,
-        as_of_t1,
-        pv_t1,
-        &mut factors,
-        &mut num_repricings,
-        &mut notes,
-        &mut result_invalid,
-    );
-    record_restored_family_factor(
-        "market-scalar",
-        "MarketScalars",
-        MarketRestoreFlags::SCALARS,
-        instrument,
-        market_t0,
-        market_t1,
-        &market_deps,
-        as_of_t1,
-        pv_t1,
-        &mut factors,
-        &mut num_repricings,
-        &mut notes,
-        &mut result_invalid,
-    );
+    for (factor, factor_kind, factor_name) in [
+        (AttributionFactor::InflationCurves, "inflation", "Inflation"),
+        (
+            AttributionFactor::Correlations,
+            "correlations",
+            "Correlations",
+        ),
+        (
+            AttributionFactor::MarketScalars,
+            "market-scalar",
+            "MarketScalars",
+        ),
+    ] {
+        if let Some(flags) = MarketRestoreFlags::for_factor(&factor) {
+            record_restored_family_factor(
+                &mut acc,
+                request,
+                &market_deps,
+                pv_t1,
+                (factor, flags),
+                factor_kind,
+                factor_name,
+            );
+        }
+    }
 
     // Model-parameter snapshot: reprice T1 market with T0 params restored.
     let params_t0 = model_params_t0
@@ -619,17 +531,13 @@ fn compute_taylor_result(
             as_of_t1,
             pv_t1,
             &params_t0,
-            &mut num_repricings,
+            &mut acc.num_repricings,
         );
-        record_taylor_factor_result(
+        acc.record(
             "model-parameter",
             &CurveId::new("ModelParameters"),
             result,
-            &mut factors,
-            &mut num_repricings,
             0,
-            &mut notes,
-            &mut result_invalid,
         );
     }
 
@@ -644,7 +552,7 @@ fn compute_taylor_result(
         as_of_t0,
         as_of_t1,
         pv_t0,
-        &mut num_repricings,
+        &mut acc.num_repricings,
     ) {
         Ok(outcome) => {
             let ThetaFactorOutcome {
@@ -655,29 +563,29 @@ fn compute_taylor_result(
 
             theta_coupon_income = Some(coupon_income);
             theta_cash_paid = Some(cash_paid);
-            factors.push(result);
+            acc.factors.push(result);
         }
         Err(e) => {
             tracing::warn!(
                 error = %e,
                 "Taylor attribution: theta factor computation failed"
             );
-            notes.push(format!(
+            acc.notes.push(format!(
                 "Taylor theta factor failed: {e}; total P&L excludes period cash receipts"
             ));
-            result_invalid = true;
+            acc.result_invalid = true;
         }
     }
 
     Ok(TaylorAttributionResult {
-        factors,
-        num_repricings,
+        factors: acc.factors,
+        num_repricings: acc.num_repricings,
         pv_t0,
         pv_t1,
         theta_coupon_income,
         theta_cash_paid,
-        notes,
-        result_invalid,
+        notes: acc.notes,
+        result_invalid: acc.result_invalid,
     })
 }
 
@@ -729,54 +637,16 @@ pub(crate) fn attribute_pnl_taylor(
     request: &AttributionRequest<'_>,
     config: &TaylorAttributionConfig,
 ) -> Result<PnlAttribution> {
-    let AttributionRequest {
-        instrument,
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-        execution_policy,
-        model_params_t0,
-        prepared_endpoints,
-        ..
-    } = *request;
-    let execution = TaylorExecution {
-        policy: execution_policy,
-        prepared_endpoints,
-    };
-    let taylor = compute_taylor_result(
-        instrument,
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-        config,
-        execution,
-        model_params_t0,
-    )?;
-
-    let total_pnl = compute_pnl_with_fx(
+    let instrument = request.instrument;
+    let taylor = compute_taylor_result(request, config)?;
+    let mut attribution = seed_attribution(
+        request,
         taylor.pv_t0,
         taylor.pv_t1,
-        taylor.pv_t1.currency(),
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-    )?;
-
-    let ccy = total_pnl.currency();
-    let mut attribution = init_attribution(
-        total_pnl,
-        instrument.id(),
-        as_of_t0,
-        as_of_t1,
         AttributionMethod::Taylor(config.clone()),
-        Some(request.config),
-    );
-    // Policy-visibility invariant: stamp the execution policy the
-    // attribution ran under (workspace rule: results carry the parallel flag).
-    attribution.meta.execution_policy = Some(execution.policy);
+        request.execution_policy,
+    )?;
+    let ccy = attribution.total_pnl.currency();
 
     // Surface the factor-level diagnostics collected during computation
     // (failed factors, surface-averaged vol moves, missing T0 FX) and
@@ -804,59 +674,48 @@ pub(crate) fn attribute_pnl_taylor(
 
         // Route accumulation through Money::checked_add so a currency
         // mismatch surfaces as an error instead of being silently coerced into
-        // `ccy`. Taylor factors are all produced in the instrument's native
-        // currency in practice, but the safety net matches the rest of the
-        // attribution code.
-        if factor.factor_name.starts_with("Rates:") || factor.factor_name.starts_with("Forward:") {
-            attribution.rates_curves_pnl =
-                attribution.rates_curves_pnl.checked_add(factor_money)?;
-        } else if factor.factor_name.starts_with("Credit:") {
-            attribution.credit_curves_pnl =
-                attribution.credit_curves_pnl.checked_add(factor_money)?;
-        } else if factor.factor_name.starts_with("Vol:") {
-            attribution.vol_pnl = attribution.vol_pnl.checked_add(factor_money)?;
-        } else if factor.factor_name == "Fx" {
-            attribution.fx_pnl = attribution.fx_pnl.checked_add(factor_money)?;
+        // `ccy`.
+        let bucket = match factor.factor {
+            AttributionFactor::RatesCurves => &mut attribution.rates_curves_pnl,
+            AttributionFactor::CreditCurves => &mut attribution.credit_curves_pnl,
+            AttributionFactor::InflationCurves => &mut attribution.inflation_curves_pnl,
+            AttributionFactor::Correlations => &mut attribution.correlations_pnl,
+            AttributionFactor::Fx => &mut attribution.fx_pnl,
+            AttributionFactor::Volatility => &mut attribution.vol_pnl,
+            AttributionFactor::MarketScalars => &mut attribution.market_scalars_pnl,
+            AttributionFactor::ModelParameters => &mut attribution.model_params_pnl,
+            AttributionFactor::Carry => {
+                // Taylor theta already includes cashflows from compute_theta_factor.
+                let ci = factor_money_or_invalid(
+                    taylor.theta_coupon_income.unwrap_or(0.0),
+                    ccy,
+                    "Theta coupon income",
+                    &mut attribution.meta.notes,
+                    &mut non_finite_detected,
+                );
+                let cash_paid = Money::new(taylor.theta_cash_paid.unwrap_or(0.0), ccy)?;
+                let theta_only = Money::new(factor_money.amount() - cash_paid.amount(), ccy)?;
+                // Taylor path: delta_accrued and flat_window_diff are unavailable (no repricing).
+                let carry_inputs = TotalReturnCarryInputs {
+                    cash_paid,
+                    income_cash_paid: ci,
+                    delta_accrued: None,
+                    flat_window_diff: None,
+                    funding_cost: None,
+                    num_repricings: 0,
+                    warnings: Vec::new(),
+                };
+                apply_total_return_carry(&mut attribution, theta_only, carry_inputs)?;
+                continue;
+            }
+        };
+        *bucket = bucket.checked_add(factor_money)?;
+        if factor.factor == AttributionFactor::Fx {
             stamp_fx_policy(
                 &mut attribution,
                 ccy,
                 "Taylor FX-exposure P&L (T0 FX matrix restored vs T1)",
             );
-        } else if factor.factor_name == "Inflation" {
-            attribution.inflation_curves_pnl =
-                attribution.inflation_curves_pnl.checked_add(factor_money)?;
-        } else if factor.factor_name == "Correlations" {
-            attribution.correlations_pnl =
-                attribution.correlations_pnl.checked_add(factor_money)?;
-        } else if factor.factor_name == "MarketScalars" {
-            attribution.market_scalars_pnl =
-                attribution.market_scalars_pnl.checked_add(factor_money)?;
-        } else if factor.factor_name == "ModelParameters" {
-            attribution.model_params_pnl =
-                attribution.model_params_pnl.checked_add(factor_money)?;
-        } else if factor.factor_name == "Theta" {
-            // Taylor theta already includes cashflows from compute_theta_factor.
-            let ci_val = taylor.theta_coupon_income.unwrap_or(0.0);
-            let ci = factor_money_or_invalid(
-                ci_val,
-                ccy,
-                "Theta coupon income",
-                &mut attribution.meta.notes,
-                &mut non_finite_detected,
-            );
-            let cash_paid = Money::new(taylor.theta_cash_paid.unwrap_or(0.0), ccy)?;
-            let theta_only = Money::new(factor_money.amount() - cash_paid.amount(), ccy)?;
-            // Taylor path: delta_accrued and flat_window_diff are unavailable (no repricing).
-            let carry_inputs = TotalReturnCarryInputs {
-                cash_paid,
-                income_cash_paid: ci,
-                delta_accrued: None,
-                flat_window_diff: None,
-                funding_cost: None,
-                num_repricings: 0,
-                warnings: Vec::new(),
-            };
-            apply_total_return_carry(&mut attribution, theta_only, carry_inputs)?;
         }
     }
 
@@ -997,9 +856,6 @@ enum CurveKind {
 /// curve, forward rate for a forward curve):
 ///
 ///   explained = Σ_bucket  DV01_bucket × Δr_bucket
-///
-/// The reported `sensitivity` is the parallel-equivalent DV01 (Σ bucket DV01s)
-/// and `market_move` the average shift used by the internal factor result.
 #[allow(clippy::too_many_arguments)]
 fn compute_curve_factor(
     kind: CurveKind,
@@ -1087,8 +943,8 @@ fn compute_curve_factor(
         CurveKind::Forward => "Forward",
     };
     Ok(TaylorFactorResult {
+        factor: AttributionFactor::RatesCurves,
         factor_name: format!("{prefix}:{curve_id}"),
-
         explained_pnl: explained,
         gamma_pnl,
     })
@@ -1246,6 +1102,7 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
             None
         };
         return Ok(TaylorFactorResult {
+            factor: AttributionFactor::CreditCurves,
             factor_name: format!("Credit:{}", curve_id),
 
             explained_pnl: explained,
@@ -1293,8 +1150,8 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
     };
 
     Ok(TaylorFactorResult {
+        factor: AttributionFactor::CreditCurves,
         factor_name: format!("Credit:{}", curve_id),
-
         explained_pnl: explained,
         gamma_pnl,
     })
@@ -1368,132 +1225,65 @@ fn compute_vol_factor(
     };
 
     Ok(TaylorFactorResult {
+        factor: AttributionFactor::Volatility,
         factor_name: format!("Vol:{}", vol_surface_id),
-
         explained_pnl: explained,
         gamma_pnl,
     })
 }
 
-/// Compute FX-exposure attribution by restoring the T0 FX matrix.
-///
-/// Unlike the curve/vol factors this is *not* a symmetric bump-and-reprice:
-/// FX exposure is isolated the same way the parallel methodology does it
-/// (see `attribution/parallel.rs`, Step 7) — reprice with the T1 market but the
-/// T0 FX matrix restored, and take the differential against the T1 value. This
-/// captures the pricing impact of FX-rate changes on cross-currency
-/// instruments. For a single-currency instrument whose pricing does not read
-/// the FX matrix this produces exactly zero.
-///
-/// `market_t1` is the full T1 market and `pv_t1` its repriced value.
-fn compute_fx_factor(
-    instrument: &Arc<dyn Instrument>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    as_of_t1: Date,
-    pv_t1: Money,
-    repricings: &mut usize,
-) -> Result<TaylorFactorResult> {
-    let fx_snapshot = MarketSnapshot::extract(market_t0, MarketRestoreFlags::FX);
-    let market_with_t0_fx =
-        MarketSnapshot::restore_market(market_t1, &fx_snapshot, MarketRestoreFlags::FX);
-    *repricings += 1;
-    let pv_with_t0_fx = instrument.value(&market_with_t0_fx, as_of_t1)?;
-
-    // FX-exposure P&L: value with the actual T1 FX minus value with T0 FX
-    // restored — i.e. the pricing impact attributable to the FX-rate move.
-    let explained = pv_t1.amount() - pv_with_t0_fx.amount();
-
-    Ok(TaylorFactorResult {
-        factor_name: "Fx".to_string(),
-
-        explained_pnl: explained,
-        gamma_pnl: None,
-    })
-}
-
-/// True when a snapshot extracted with `flags` actually holds that family.
-fn snapshot_has_family(snapshot: &MarketSnapshot, flags: MarketRestoreFlags) -> bool {
-    if flags.contains(MarketRestoreFlags::INFLATION) {
-        return !snapshot.inflation_curves.is_empty() || !snapshot.inflation_indices.is_empty();
-    }
-    if flags.contains(MarketRestoreFlags::CORRELATION) {
-        return !snapshot.base_correlation_curves.is_empty();
-    }
-    if flags.contains(MarketRestoreFlags::SCALARS) {
-        return !snapshot.prices.is_empty()
-            || !snapshot.series.is_empty()
-            || !snapshot.dividends.is_empty()
-            || !snapshot.price_curves.is_empty();
-    }
-    false
-}
-
-/// Isolate one restore-flag family by splicing the T₀ snapshot into the T₁
-/// market, matching [`compute_fx_factor`] and the parallel methodology.
-fn compute_restored_family_factor(
-    instrument: &Arc<dyn Instrument>,
+/// Isolate one restore-flag family by splicing `snapshot` into the T₁ market,
+/// matching the parallel methodology. The P&L is the T₁ value minus the value
+/// with the family restored; an instrument that does not read the family
+/// produces exactly zero.
+fn restored_family_factor(
+    request: &AttributionRequest<'_>,
     snapshot: &MarketSnapshot,
-    market_t1: &MarketContext,
-    as_of_t1: Date,
     pv_t1: Money,
-    family: (MarketRestoreFlags, &str),
+    factor: AttributionFactor,
+    flags: MarketRestoreFlags,
+    factor_name: &str,
     repricings: &mut usize,
 ) -> Result<TaylorFactorResult> {
-    let (flags, factor_name) = family;
-    let market_with_t0 = MarketSnapshot::restore_market(market_t1, snapshot, flags);
+    let market_with_t0 = MarketSnapshot::restore_market(request.market_t1, snapshot, flags);
     *repricings += 1;
-    let pv_with_t0 = instrument.value(&market_with_t0, as_of_t1)?;
-    let explained = pv_t1.amount() - pv_with_t0.amount();
+    let pv_with_t0 = request
+        .instrument
+        .value(&market_with_t0, request.as_of_t1)?;
     Ok(TaylorFactorResult {
+        factor,
         factor_name: factor_name.to_string(),
-        explained_pnl: explained,
+        explained_pnl: pv_t1.amount() - pv_with_t0.amount(),
         gamma_pnl: None,
     })
 }
 
 /// Run a restore-and-reprice family when either market carries that family.
-#[allow(clippy::too_many_arguments)]
 fn record_restored_family_factor(
+    acc: &mut TaylorAccumulator,
+    request: &AttributionRequest<'_>,
+    dependencies: &finstack_quant_valuations::instruments::MarketDependencies,
+    pv_t1: Money,
+    (factor, flags): (AttributionFactor, MarketRestoreFlags),
     factor_kind: &str,
     factor_name: &str,
-    flags: MarketRestoreFlags,
-    instrument: &Arc<dyn Instrument>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    dependencies: &finstack_quant_valuations::instruments::MarketDependencies,
-    as_of_t1: Date,
-    pv_t1: Money,
-    factors: &mut Vec<TaylorFactorResult>,
-    num_repricings: &mut usize,
-    notes: &mut Vec<String>,
-    result_invalid: &mut bool,
 ) {
-    let t0_snap = MarketSnapshot::extract_with_dependencies(market_t0, flags, dependencies);
-    let t1_snap = MarketSnapshot::extract_with_dependencies(market_t1, flags, dependencies);
-    if !snapshot_has_family(&t0_snap, flags) && !snapshot_has_family(&t1_snap, flags) {
+    let t0_snap = MarketSnapshot::extract_with_dependencies(request.market_t0, flags, dependencies);
+    let t1_snap = MarketSnapshot::extract_with_dependencies(request.market_t1, flags, dependencies);
+    if !t0_snap.has_data(flags) && !t1_snap.has_data(flags) {
         return;
     }
     let mut repricings = 0;
-    let result = compute_restored_family_factor(
-        instrument,
+    let result = restored_family_factor(
+        request,
         &t0_snap,
-        market_t1,
-        as_of_t1,
         pv_t1,
-        (flags, factor_name),
+        factor,
+        flags,
+        factor_name,
         &mut repricings,
     );
-    record_taylor_factor_result(
-        factor_kind,
-        &CurveId::new(factor_name),
-        result,
-        factors,
-        num_repricings,
-        repricings,
-        notes,
-        result_invalid,
-    );
+    acc.record(factor_kind, &CurveId::new(factor_name), result, repricings);
 }
 
 /// Isolate T₀ vs T₁ model-parameter P&L by repricing the T₁ market with the
@@ -1511,6 +1301,7 @@ fn compute_model_params_factor(
     let pv_with_t0 = instrument_t0.value(market_t1, as_of_t1)?;
     let explained = pv_t1.amount() - pv_with_t0.amount();
     Ok(TaylorFactorResult {
+        factor: AttributionFactor::ModelParameters,
         factor_name: "ModelParameters".to_string(),
         explained_pnl: explained,
         gamma_pnl: None,
@@ -1558,6 +1349,7 @@ fn compute_theta_factor(
     let theta_pnl = pv_diff + cash_paid;
     Ok(ThetaFactorOutcome {
         factor: TaylorFactorResult {
+            factor: AttributionFactor::Carry,
             factor_name: "Theta".to_string(),
             explained_pnl: theta_pnl,
             gamma_pnl: None,
@@ -1768,17 +1560,18 @@ mod tests {
 
         let config = TaylorAttributionConfig::default();
         let result = compute_taylor_result(
-            &instrument,
-            &market_t0,
-            &market_t1,
-            as_of_t0,
-            as_of_t1,
-            &config,
-            TaylorExecution {
-                policy: ExecutionPolicy::Parallel,
-                prepared_endpoints: None,
+            &AttributionRequest {
+                execution_policy: ExecutionPolicy::Parallel,
+                ..AttributionRequest::new(
+                    &instrument,
+                    &market_t0,
+                    &market_t1,
+                    as_of_t0,
+                    as_of_t1,
+                    &finstack_quant_core::config::FinstackConfig::default(),
+                )
             },
-            None,
+            &config,
         )
         .expect("taylor attribution should succeed");
 
@@ -1955,17 +1748,18 @@ mod tests {
 
         // The internal Taylor factor decomposition should also expose an "Fx" factor.
         let taylor = compute_taylor_result(
-            &instrument,
-            &market_t0,
-            &market_t1,
-            as_of_t0,
-            as_of_t1,
-            &config,
-            TaylorExecution {
-                policy: ExecutionPolicy::Parallel,
-                prepared_endpoints: None,
+            &AttributionRequest {
+                execution_policy: ExecutionPolicy::Parallel,
+                ..AttributionRequest::new(
+                    &instrument,
+                    &market_t0,
+                    &market_t1,
+                    as_of_t0,
+                    as_of_t1,
+                    &finstack_quant_core::config::FinstackConfig::default(),
+                )
             },
-            None,
+            &config,
         )
         .expect("taylor attribution should succeed");
         assert!(
@@ -2449,17 +2243,18 @@ mod tests {
             ..TaylorAttributionConfig::default()
         };
         let result = compute_taylor_result(
-            &instrument,
-            &market_t0,
-            &market_t1,
-            as_of_t0,
-            as_of_t1,
-            &config,
-            TaylorExecution {
-                policy: ExecutionPolicy::Serial,
-                prepared_endpoints: None,
+            &AttributionRequest {
+                execution_policy: ExecutionPolicy::Serial,
+                ..AttributionRequest::new(
+                    &instrument,
+                    &market_t0,
+                    &market_t1,
+                    as_of_t0,
+                    as_of_t1,
+                    &finstack_quant_core::config::FinstackConfig::default(),
+                )
             },
-            None,
+            &config,
         )
         .expect("taylor attribution should succeed");
 
@@ -2600,17 +2395,18 @@ mod tests {
             ..TaylorAttributionConfig::default()
         };
         let result = compute_taylor_result(
-            &instrument,
-            &market_t0,
-            &market_t1,
-            as_of_t0,
-            as_of_t1,
-            &config,
-            TaylorExecution {
-                policy: ExecutionPolicy::Serial,
-                prepared_endpoints: None,
+            &AttributionRequest {
+                execution_policy: ExecutionPolicy::Serial,
+                ..AttributionRequest::new(
+                    &instrument,
+                    &market_t0,
+                    &market_t1,
+                    as_of_t0,
+                    as_of_t1,
+                    &finstack_quant_core::config::FinstackConfig::default(),
+                )
             },
-            None,
+            &config,
         )
         .expect("taylor attribution should succeed");
 
@@ -2722,17 +2518,18 @@ mod tests {
             ..TaylorAttributionConfig::default()
         };
         let result = compute_taylor_result(
-            &instrument,
-            &market_t0,
-            &market_t1,
-            as_of_t0,
-            as_of_t1,
-            &config,
-            TaylorExecution {
-                policy: ExecutionPolicy::Serial,
-                prepared_endpoints: None,
+            &AttributionRequest {
+                execution_policy: ExecutionPolicy::Serial,
+                ..AttributionRequest::new(
+                    &instrument,
+                    &market_t0,
+                    &market_t1,
+                    as_of_t0,
+                    as_of_t1,
+                    &finstack_quant_core::config::FinstackConfig::default(),
+                )
             },
-            None,
+            &config,
         )
         .expect("taylor attribution should succeed");
 
@@ -2791,17 +2588,18 @@ mod tests {
 
         let config = TaylorAttributionConfig::default();
         let result = compute_taylor_result(
-            &instrument,
-            &market_t0,
-            &market_t1,
-            as_of_t0,
-            as_of_t1,
-            &config,
-            TaylorExecution {
-                policy: ExecutionPolicy::Serial,
-                prepared_endpoints: None,
+            &AttributionRequest {
+                execution_policy: ExecutionPolicy::Serial,
+                ..AttributionRequest::new(
+                    &instrument,
+                    &market_t0,
+                    &market_t1,
+                    as_of_t0,
+                    as_of_t1,
+                    &finstack_quant_core::config::FinstackConfig::default(),
+                )
             },
-            None,
+            &config,
         )
         .expect("taylor attribution should succeed");
 
@@ -2858,17 +2656,18 @@ mod tests {
 
         let config = TaylorAttributionConfig::default();
         let result = compute_taylor_result(
-            &instrument,
-            &market_t0,
-            &market_t1,
-            as_of_t0,
-            as_of_t1,
-            &config,
-            TaylorExecution {
-                policy: ExecutionPolicy::Serial,
-                prepared_endpoints: None,
+            &AttributionRequest {
+                execution_policy: ExecutionPolicy::Serial,
+                ..AttributionRequest::new(
+                    &instrument,
+                    &market_t0,
+                    &market_t1,
+                    as_of_t0,
+                    as_of_t1,
+                    &finstack_quant_core::config::FinstackConfig::default(),
+                )
             },
-            None,
+            &config,
         )
         .expect("taylor attribution should succeed");
 
@@ -3082,17 +2881,18 @@ mod tests {
             let instrument: Arc<dyn Instrument> = Arc::new(mock);
 
             let result = compute_taylor_result(
-                &instrument,
-                &market,
-                &market,
-                as_of_t0,
-                as_of_t1,
-                &config,
-                TaylorExecution {
-                    policy: ExecutionPolicy::Serial,
-                    prepared_endpoints: None,
+                &AttributionRequest {
+                    execution_policy: ExecutionPolicy::Serial,
+                    ..AttributionRequest::new(
+                        &instrument,
+                        &market,
+                        &market,
+                        as_of_t0,
+                        as_of_t1,
+                        &finstack_quant_core::config::FinstackConfig::default(),
+                    )
                 },
-                None,
+                &config,
             )
             .expect("failed period cashflow collection should retain diagnostic attribution");
 
@@ -3176,17 +2976,18 @@ mod tests {
         let market_t1 = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(FixedFx(1.20))));
 
         let result = compute_taylor_result(
-            &instrument,
-            &market_t0,
-            &market_t1,
-            as_of_t0,
-            as_of_t1,
-            &TaylorAttributionConfig::default(),
-            TaylorExecution {
-                policy: ExecutionPolicy::Serial,
-                prepared_endpoints: None,
+            &AttributionRequest {
+                execution_policy: ExecutionPolicy::Serial,
+                ..AttributionRequest::new(
+                    &instrument,
+                    &market_t0,
+                    &market_t1,
+                    as_of_t0,
+                    as_of_t1,
+                    &finstack_quant_core::config::FinstackConfig::default(),
+                )
             },
-            None,
+            &TaylorAttributionConfig::default(),
         )
         .expect("taylor attribution should succeed");
 

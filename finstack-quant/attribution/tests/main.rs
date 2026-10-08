@@ -3,7 +3,6 @@
 //! Former top-level `tests/*.rs` binaries are modules of this one target
 //! so the crate links once instead of once per file.
 
-#[path = "attribution.rs"]
 mod attribution;
 #[path = "credit_carry_split.rs"]
 mod credit_carry_split;

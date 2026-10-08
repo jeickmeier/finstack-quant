@@ -27,14 +27,15 @@
 //! | Entry point | Use when |
 //! |---|---|
 //! | [`pnl_bridge`] | Only raw endpoint P&L in an explicit currency is required |
-//! | [`attribute_pnl_metrics_based`] | Precomputed first- and optional second-order sensitivities provide a fast approximation |
+//! | [`attribute_pnl_metrics_based`] | Already-priced first- and optional second-order sensitivities provide a fast approximation |
 //! | [`attribute_pnl`] with [`AttributionMethod::Parallel`] | Independent factor effects and an interaction residual are required |
 //! | [`attribute_pnl`] with [`AttributionMethod::Waterfall`] | An ordered full-revaluation decomposition is required |
 //! | [`attribute_pnl`] with [`AttributionMethod::Taylor`] | A bump-and-reprice first- or second-order decomposition is required |
 //! | [`attribute_pnl_many`] | Shared [`AttributionInputs`] applied to an ordered instrument batch |
 //!
-//! Repricing methods take one [`AttributionRequest`] carrying the instrument,
-//! both market states and dates, the Finstack configuration, and the optional
+//! [`attribute_pnl`] runs any method, metrics-based included, from one
+//! [`AttributionRequest`] carrying the instrument, both market states and
+//! dates, the Finstack configuration, and the optional
 //! credit-factor model, model-parameter snapshot, execution policy and
 //! prepared endpoint values.
 //!
@@ -139,7 +140,6 @@ pub(crate) mod policy_map;
 pub(crate) mod return_contribution;
 #[cfg(feature = "json-schema")]
 pub mod schema;
-/// JSON Schema generation helpers for attribution contracts.
 pub(crate) mod spec;
 pub(crate) mod target_currency;
 pub(crate) mod taylor;
@@ -160,10 +160,6 @@ pub use types::result::{
 /// Snapshot/restore primitives used by benches and integration tests.
 #[doc(hidden)]
 pub use factors::{MarketRestoreFlags, MarketSnapshot};
-pub use long_rows::{
-    pnl_attribution_carry_rows, pnl_attribution_credit_factor_rows, pnl_attribution_long_rows,
-    pnl_attribution_wide_row,
-};
 pub use metrics_based::attribute_pnl_metrics_based;
 pub use return_contribution::{
     attribute_return_contribution, attribute_return_contribution_json,
@@ -175,7 +171,7 @@ pub use return_contribution::{
 pub use spec::{
     attribute_pnl_many, default_attribution_metrics, validate_attribution_json, AttributionConfig,
     AttributionEnvelope, AttributionInputs, AttributionResult, AttributionResultEnvelope,
-    AttributionSchema, AttributionSpec, ATTRIBUTION_SCHEMA,
+    AttributionSchema, AttributionSpec,
 };
 pub use target_currency::translate_to_target_currency;
 pub use taylor::TaylorAttributionConfig;
@@ -287,21 +283,21 @@ impl<'a> AttributionRequest<'a> {
     }
 }
 
-/// Run one repricing-based attribution method on a request.
+/// Run one attribution method on a request.
 ///
 /// # Arguments
 ///
-/// * `method` - Attribution methodology. `Parallel`, `Waterfall(order)` and
-///   `Taylor(config)` are executed here; `MetricsBased` needs priced
-///   [`finstack_quant_valuations::results::ValuationResult`]s and must go
-///   through [`attribute_pnl_metrics_based`].
+/// * `method` - Attribution methodology. `MetricsBased` prices both endpoints
+///   with the default metric menu the instrument supports; call
+///   [`attribute_pnl_metrics_based`] directly when the
+///   [`finstack_quant_valuations::results::ValuationResult`]s are already priced.
 /// * `request` - Instrument, market states, dates, configuration and the
 ///   optional overrides described on [`AttributionRequest`].
 ///
 /// # Errors
 ///
 /// Returns method-specific validation, market-data, repricing, and currency
-/// errors, and a validation error for [`AttributionMethod::MetricsBased`].
+/// errors.
 pub fn attribute_pnl(
     method: &AttributionMethod,
     request: &AttributionRequest<'_>,
@@ -314,10 +310,7 @@ pub fn attribute_pnl(
         AttributionMethod::Taylor(taylor_config) => {
             taylor::attribute_pnl_taylor(request, taylor_config)
         }
-        AttributionMethod::MetricsBased => Err(finstack_quant_core::Error::Validation(
-            "metrics-based attribution requires priced valuation results; call attribute_pnl_metrics_based"
-                .to_string(),
-        )),
+        AttributionMethod::MetricsBased => metrics_based::attribute_request(request, None),
     }
 }
 

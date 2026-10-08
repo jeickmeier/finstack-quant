@@ -1,22 +1,14 @@
 use super::super::helpers::*;
 use super::super::types::*;
-use super::context::AttributionInputs;
+use super::context::MetricsContext;
 use finstack_quant_valuations::metrics::MetricId;
-
-// Large Move Warning Thresholds
-//
-// These thresholds define when market moves are large enough that second-order
-// Taylor expansion may produce significant approximation errors (>5% relative).
-//
-// Beyond these thresholds, consider using parallel or waterfall attribution
-// for more accurate results.
 
 /// Maximum volatility shift (in percentage points) before warning.
 /// Vol-of-vol effects become significant beyond ~5% absolute vol change.
 const LARGE_VOL_MOVE_THRESHOLD_PCT: f64 = 5.0;
 
 pub(super) fn apply(
-    inputs: &AttributionInputs<'_>,
+    inputs: &MetricsContext<'_>,
     attribution: &mut PnlAttribution,
     non_finite_detected: &mut bool,
 ) {
@@ -33,24 +25,18 @@ pub(super) fn apply(
         if let Some(vol_shift) = inputs.shifts.avg_vol_shift_abs {
             // vol_shift is already in percentage points
             let vol_amount = vega * vol_shift;
-            attribution.vol_pnl = factor_money_or_invalid(
-                vol_amount,
-                inputs.val_t1.value.currency(),
-                "vol P&L",
-                &mut attribution.meta.notes,
-                non_finite_detected,
-            );
+            attribution.vol_pnl =
+                inputs.money(vol_amount, "vol P&L", attribution, non_finite_detected);
 
             // 5b. Volatility convexity (Volga - second-order)
             if let Some(volga) = inputs.val_t0.measures.get(MetricId::Volga.as_str()) {
                 // Volga term: ½ × Volga × (Δσ)²
                 let volga_pnl = 0.5 * volga * vol_shift * vol_shift;
 
-                attribution.vol_pnl = factor_money_or_invalid(
+                attribution.vol_pnl = inputs.money(
                     attribution.vol_pnl.amount() + volga_pnl,
-                    inputs.val_t1.value.currency(),
                     "volga P&L",
-                    &mut attribution.meta.notes,
+                    attribution,
                     non_finite_detected,
                 );
             }

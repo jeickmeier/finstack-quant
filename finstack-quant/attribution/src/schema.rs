@@ -11,9 +11,6 @@ use finstack_quant_core::schema::{SchemaArtifact, SchemaKind};
 
 use crate::{AttributionEnvelope, AttributionResultEnvelope};
 
-/// Stable base URI shared by every attribution artifact.
-pub const ATTRIBUTION_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/attribution/1/";
-
 /// A canonical attribution result: a small carry-only P&L decomposition.
 ///
 /// Effects that did not contribute are explicit zeros rather than omitted, which

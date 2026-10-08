@@ -18,9 +18,6 @@ use finstack_quant_valuations::metrics::MetricId;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-/// Schema marker for attribution serialization.
-pub const ATTRIBUTION_SCHEMA: &str = "finstack_quant.attribution/1";
-
 /// Exact schema marker accepted by attribution envelopes.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -28,11 +25,6 @@ pub enum AttributionSchema {
     /// The sole supported attribution contract.
     #[serde(rename = "finstack_quant.attribution/1")]
     Attribution,
-}
-
-impl AttributionSchema {
-    /// The exact marker required by every persisted attribution envelope.
-    pub const CURRENT: Self = Self::Attribution;
 }
 
 /// Top-level envelope for attribution specifications.
@@ -58,7 +50,7 @@ impl AttributionEnvelope {
     ///   in the current persistence envelope.
     pub fn new(attribution: AttributionSpec) -> Self {
         Self {
-            schema: AttributionSchema::CURRENT,
+            schema: AttributionSchema::Attribution,
             attribution,
         }
     }
@@ -86,22 +78,10 @@ impl AttributionEnvelope {
     ///
     /// # Errors
     ///
-    /// Propagates all instrument, market-data, pricing, and method-specific
-    /// errors from [`AttributionSpec::execute`]. Unsupported schema markers
-    /// are rejected during deserialization.
+    /// Everything [`AttributionSpec::execute`] returns. Unsupported schema
+    /// markers are rejected during deserialization.
     pub fn execute(&self) -> Result<AttributionResultEnvelope> {
         let result = self.attribution.execute()?;
-        Ok(AttributionResultEnvelope::new(result))
-    }
-
-    /// Execute with panic containment; see [`AttributionSpec::execute_contained`].
-    ///
-    /// # Errors
-    ///
-    /// Everything [`Self::execute`] returns, plus
-    /// [`finstack_quant_core::Error::Internal`] for a contained panic.
-    pub fn execute_contained(&self) -> Result<AttributionResultEnvelope> {
-        let result = self.attribution.execute_contained()?;
         Ok(AttributionResultEnvelope::new(result))
     }
 }
@@ -625,7 +605,7 @@ mod tests {
         assert!(!canonical.contains('\n'), "canonical form is compact");
         let reparsed: AttributionEnvelope =
             serde_json::from_str(&canonical).expect("canonical output must re-parse");
-        assert_eq!(reparsed.schema, AttributionSchema::CURRENT);
+        assert_eq!(reparsed.schema, AttributionSchema::Attribution);
 
         // Malformed and empty payloads are rejected as validation errors.
         for bad in ["not json", "{}"] {

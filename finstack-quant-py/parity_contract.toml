@@ -1241,10 +1241,10 @@ schema = { python = "finstack_quant.attribution.schema", status = "exists", note
 #     with AttributionRequest, attribute_pnl_metrics_based,
 #     translate_to_target_currency and CreditFactorDetailOptions (the host
 #     `attribute_pnl` shares only the name: both hosts run
-#     AttributionSpec::execute_contained); the per-method implementations are
-#     pub(crate). attribute_return_contribution_json, pnl_bridge and
-#     attribute_pnl_many ARE bound in Python (pnl_bridge returns Money;
-#     attribute_pnl_many returns a DataFrame of wide rows)
+#     AttributionSpec::execute); the per-method implementations are
+#     pub(crate). pnl_bridge and attribute_pnl_many ARE bound in Python
+#     (pnl_bridge returns Money; attribute_pnl_many returns a DataFrame of
+#     wide rows); attribute_return_contribution_json is bound in WASM only
 #   - per-factor detail structs (CarryDetail, RatesCurvesAttribution,
 #     CreditFactorAttribution, and the rest of types::detail) — reachable
 #     from hosts as serde payloads on PnlAttribution detail getters
