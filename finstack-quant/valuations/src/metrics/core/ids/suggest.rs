@@ -1,6 +1,6 @@
 //! Closest-match suggestions for unknown metric names.
 //!
-//! An unknown-metric error that lists all ~220 standard identifiers is not
+//! An unknown-metric error that lists every standard identifier is not
 //! actionable. [`closest_metric_names`] ranks candidates by a case-folded
 //! similarity so the error can carry only the handful the caller most likely
 //! meant (`DV01` → `dv01`, `modified_duration` → `duration_mod`,

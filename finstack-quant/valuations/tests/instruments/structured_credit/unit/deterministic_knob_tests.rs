@@ -9,7 +9,7 @@
 //!   by `funding_tests`), `waterfall_rules` (each spec has its own suite in
 //!   `production_waterfall_audit`), `hedge_swaps` beyond one entry
 //!   (`hedge_swap_tests`).
-//! - `market_conditions.refi_rate` only feeds the stochastic prepayment tree.
+//! - `market_conditions.refi_rate` only feeds the stochastic prepayment paths.
 //! - `pool.reserve_target` governs replenishment from revolver repayments, so
 //!   it only acts on instrument collateral (`instrument_pool_tests`).
 //! - `deal_metadata`, `attributes`, pricing overrides,

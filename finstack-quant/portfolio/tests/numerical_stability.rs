@@ -7,7 +7,7 @@ use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::{Error, PortfolioBuilder};
+use finstack_quant_portfolio::{Error, Portfolio};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use std::sync::Arc;
 use time::Duration;
@@ -19,7 +19,7 @@ fn test_compensated_summation_large_portfolio() {
     let as_of = base_date();
     let end_date = as_of + Duration::days(30);
 
-    let mut builder = PortfolioBuilder::new("LARGE_PORTFOLIO")
+    let mut builder = Portfolio::builder("LARGE_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENTITY_A"));
@@ -122,7 +122,7 @@ fn test_aggregated_metrics_are_finite() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("TEST")
+    let portfolio = Portfolio::builder("TEST")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENTITY_A"))

@@ -50,9 +50,7 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::term_loan::types::RateSpec;
-use crate::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
+use crate::pricer::{expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError};
 use crate::results::ValuationResult;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -517,9 +515,7 @@ impl Pricer for TermLoanDiscountingPricer {
         let loan = expect_inst::<TermLoan>(instrument, InstrumentType::TermLoan)?;
 
         // Use the provided as_of date for valuation
-        let pv = Self::price(loan, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let pv = Self::price(loan, market, as_of)?;
 
         Ok(ValuationResult::stamped(loan.id(), as_of, pv))
     }

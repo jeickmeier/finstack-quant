@@ -274,10 +274,6 @@ impl crate::instruments::common_impl::traits::Instrument for VolatilityIndexFutu
         ))
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        None
-    }
-
     fn expiry(&self) -> Option<Date> {
         Some(self.terms.settlement_date)
     }

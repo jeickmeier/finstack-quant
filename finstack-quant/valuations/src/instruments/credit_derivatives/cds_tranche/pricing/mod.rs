@@ -35,17 +35,13 @@
 //! ## Adaptive Integration
 //!
 //! Gaussian, RFL, and multi-factor conditioning use partitioned adaptive
-//! Simpson. Normal tails outside [-10,10] have probability below 1.524e-23.
-//! Student-t uses the copula's product Gauss–Laguerre × Gauss–Hermite rule
-//! by default; nested adaptive Simpson over the mixing variable is opt-in
-//! via `CdsTranchePricerConfig::with_adaptive_student_t_integration`.
-//! When adaptive Student-t is enabled, mixing tails use explicit quantile
-//! bounds and the configured absolute integration tolerance is allocated
-//! across intervals, factors and tails; exhausted refinement produces an
-//! error. Conditional convolution grid error and the heterogeneous
-//! large-pool normal approximation remain separate approximation boundaries.
-//! Base-correlation differences may clamp only noise inside the combined
-//! integration budget; materially negative tranche losses return an error.
+//! Simpson with a fixed absolute budget allocated across intervals, factors
+//! and tails; exhausted refinement produces an error. Normal tails outside
+//! [-10,10] have probability below 1.524e-23. Student-t uses the copula's
+//! product Gauss–Laguerre × Gauss–Hermite rule. Conditional convolution grid
+//! error is a separate approximation boundary. Base-correlation differences
+//! may clamp only noise inside the integration budget; materially negative
+//! tranche losses return an error.
 //!
 //! ## Portfolio Support
 //!
@@ -53,9 +49,8 @@
 //!   curves, recovery rates, and weights via `CreditIndexData::issuer_credit_curves`
 //! * Automatically detects uniform portfolios and uses the exact conditional
 //!   binomial path at every pool size
-//! * Uses bounded conditional convolution by default for heterogeneous pools;
-//!   a moment-matched normal approximation is available by explicit opt-in,
-//!   with no general concentration error guarantee
+//! * Uses bounded exact conditional convolution for heterogeneous pools;
+//!   exceeding the grid or work limits fails instead of approximating
 //!
 //! ## Limitations
 //!
@@ -67,12 +62,10 @@ mod expected_loss;
 mod heterogeneous;
 mod integration;
 mod registry;
-mod saddlepoint;
 mod sensitivities;
 
 #[cfg(test)]
 mod tests;
 
-pub use config::{CdsTranchePricer, CdsTranchePricerConfig, HeteroMethod};
-pub use registry::JumpToDefaultResult;
+pub use config::CdsTranchePricer;
 pub(crate) use registry::SimpleCdsTrancheHazardPricer;

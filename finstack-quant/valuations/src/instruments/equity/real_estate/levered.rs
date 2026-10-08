@@ -207,10 +207,6 @@ impl Instrument for LeveredRealEstateEquity {
         levered_pricer::compute_pv(self, market, as_of)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        None
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

@@ -857,11 +857,6 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture 
         Some(self.terms.last_trading_date)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        self.period_start
-            .or_else(|| self.fixing_date.map(|d| d + time::Duration::days(2)))
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

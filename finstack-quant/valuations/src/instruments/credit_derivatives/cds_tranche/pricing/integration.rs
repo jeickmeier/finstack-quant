@@ -1,8 +1,8 @@
 //! Adaptive conditioning-factor integration for bounded pool expectations.
 
-use super::config::CdsTranchePricer;
+use super::config::{CdsTranchePricer, INTEGRATION_MAX_DEPTH, INTEGRATION_TOLERANCE};
 use finstack_quant_core::math::integration::adaptive_simpson;
-use finstack_quant_core::math::{chi_squared_quantile, ln_gamma, norm_pdf};
+use finstack_quant_core::math::norm_pdf;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::correlation::copula::{CopulaSpec, FactorPairIntegrand};
 use std::cell::RefCell;
@@ -19,7 +19,6 @@ fn integrate_interval(
     lower: f64,
     upper: f64,
     tolerance: f64,
-    max_depth: usize,
 ) -> Result<f64> {
     let failure = RefCell::new(None);
     let checked = |x| {
@@ -51,7 +50,7 @@ fn integrate_interval(
             left,
             right,
             tolerance / intervals as f64,
-            max_depth,
+            INTEGRATION_MAX_DEPTH,
         );
         if let Some(error) = failure.borrow_mut().take() {
             return Err(error);
@@ -61,66 +60,28 @@ fn integrate_interval(
     Ok(result)
 }
 
-fn integrate_normal(
-    f: &dyn Fn(f64) -> Result<f64>,
-    tolerance: f64,
-    max_depth: usize,
-) -> Result<f64> {
+fn integrate_normal(f: &dyn Fn(f64) -> Result<f64>, tolerance: f64) -> Result<f64> {
     integrate_interval(
         &|z| Ok(f(z)? * norm_pdf(z)),
         -NORMAL_LIMIT,
         NORMAL_LIMIT,
         tolerance,
-        max_depth,
     )
 }
 
 impl CdsTranchePricer {
     /// Integrate a bounded expectation over every copula conditioning factor.
     /// Nested quadrature and omitted factor tails consume separate shares of
-    /// `integration_tolerance`. Conditional-name approximation or convolution
-    /// discretization error is separate from this quadrature budget.
+    /// `INTEGRATION_TOLERANCE`. Conditional convolution discretization error
+    /// is separate from this quadrature budget.
     pub(super) fn integrate_factors(&self, f: &dyn Fn(&[f64]) -> Result<f64>) -> Result<f64> {
-        let tolerance = self.config.integration_tolerance;
-        let depth = self.config.integration_max_depth;
-        match self.config.copula_spec {
-            CopulaSpec::Gaussian => integrate_normal(&|z| f(&[z]), tolerance * 0.5, depth),
-            CopulaSpec::StudentT { .. } if !self.config.adaptive_student_t_integration => {
-                self.copula().try_integrate_fn(f)
-            }
-            CopulaSpec::StudentT { degrees_of_freedom } => {
-                // Shared W ~ Gamma(nu/2, nu/2). Integrate log(W), preserving
-                // conditional independence given both Z and W. Explicit
-                // quantiles bound omitted Gamma mass by tolerance/8.
-                let tail = tolerance / 16.0;
-                let lower =
-                    (chi_squared_quantile(tail, degrees_of_freedom)? / degrees_of_freedom).ln();
-                let upper = (chi_squared_quantile(1.0 - tail, degrees_of_freedom)?
-                    / degrees_of_freedom)
-                    .ln();
-                if !lower.is_finite() || !upper.is_finite() || lower >= upper {
-                    return Err(Error::Validation(
-                        "could not resolve finite Student-t mixing integration bounds".to_owned(),
-                    ));
-                }
-                let shape = degrees_of_freedom / 2.0;
-                let log_normalization = shape * shape.ln() - ln_gamma(shape);
-                integrate_interval(
-                    &|log_w| {
-                        let w = log_w.exp();
-                        let density = (log_normalization + shape * log_w - shape * w).exp();
-                        Ok(density * integrate_normal(&|z| f(&[z, w]), tolerance / 8.0, depth)?)
-                    },
-                    lower,
-                    upper,
-                    tolerance / 8.0,
-                    depth,
-                )
-            }
+        let tolerance = INTEGRATION_TOLERANCE;
+        match self.copula_spec {
+            CopulaSpec::Gaussian => integrate_normal(&|z| f(&[z]), tolerance * 0.5),
+            CopulaSpec::StudentT { .. } => self.copula().try_integrate_fn(f),
             CopulaSpec::RandomFactorLoading { .. } | CopulaSpec::MultiFactor => integrate_normal(
-                &|second| integrate_normal(&|z| f(&[z, second]), tolerance / 8.0, depth),
+                &|second| integrate_normal(&|z| f(&[z, second]), tolerance / 8.0),
                 tolerance / 8.0,
-                depth,
             ),
         }
     }
@@ -128,13 +89,10 @@ impl CdsTranchePricer {
     /// Integrate a two-valued bounded expectation over the copula factors.
     ///
     /// Student-t product-Gauss pricing accumulates both components in one
-    /// node sweep. Adaptive and Gaussian paths evaluate each component
-    /// separately.
+    /// node sweep. Gaussian-family paths evaluate each component separately.
     pub(super) fn integrate_factors_pair(&self, f: &FactorPairIntegrand<'_>) -> Result<(f64, f64)> {
-        match self.config.copula_spec {
-            CopulaSpec::StudentT { .. } if !self.config.adaptive_student_t_integration => {
-                self.copula().try_integrate_pair(f)
-            }
+        match self.copula_spec {
+            CopulaSpec::StudentT { .. } => self.copula().try_integrate_pair(f),
             _ => Ok((
                 self.integrate_factors(&|factors| f(factors).map(|pair| pair.0))?,
                 self.integrate_factors(&|factors| f(factors).map(|pair| pair.1))?,
@@ -146,16 +104,9 @@ impl CdsTranchePricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::credit_derivatives::cds_tranche::CdsTranchePricerConfig;
 
     #[test]
-    fn production_credit_audit_unconverged_integrals_fail() {
-        let pricer = CdsTranchePricer::with_config(CdsTranchePricerConfig {
-            integration_max_depth: 0,
-            ..Default::default()
-        })
-        .expect("config");
-        assert!(pricer.integrate_factors(&|_| Ok(1.0)).is_err());
+    fn production_credit_audit_non_finite_integrands_fail() {
         assert!(CdsTranchePricer::new()
             .integrate_factors(&|_| Ok(f64::NAN))
             .is_err());
@@ -173,25 +124,16 @@ mod tests {
             },
             CopulaSpec::MultiFactor,
         ] {
-            let pricer = CdsTranchePricer::with_config(CdsTranchePricerConfig {
-                copula_spec: spec.clone(),
-                integration_tolerance: 1e-8,
-                ..Default::default()
-            })
-            .expect("config");
+            let pricer = CdsTranchePricer::with_copula(spec.clone()).expect("copula");
             let mass = pricer.integrate_factors(&|_| Ok(1.0)).expect("mass");
             assert!((mass - 1.0).abs() < 1e-8, "{spec:?}: mass={mass}");
         }
     }
 
     #[test]
-    fn student_t_default_uses_product_gauss_node_count() {
-        let pricer = CdsTranchePricer::with_config(
-            CdsTranchePricerConfig::default()
-                .with_student_t_copula(6.0)
-                .expect("valid df"),
-        )
-        .expect("config");
+    fn student_t_uses_product_gauss_node_count() {
+        let pricer = CdsTranchePricer::with_copula(CopulaSpec::student_t(6.0).expect("valid df"))
+            .expect("copula");
         let evals = std::cell::Cell::new(0usize);
         let mass = pricer
             .integrate_factors(&|_| {
@@ -208,25 +150,9 @@ mod tests {
     }
 
     #[test]
-    fn student_t_product_gauss_ignores_adaptive_depth() {
-        let pricer = CdsTranchePricer::with_config(CdsTranchePricerConfig {
-            copula_spec: CopulaSpec::student_t(6.0).expect("valid df"),
-            integration_max_depth: 0,
-            ..Default::default()
-        })
-        .expect("config");
-        let mass = pricer.integrate_factors(&|_| Ok(1.0)).expect("mass");
-        assert!((mass - 1.0).abs() < 1e-8, "mass={mass}");
-    }
-
-    #[test]
     fn student_t_pair_matches_two_scalar_integrals() {
-        let pricer = CdsTranchePricer::with_config(
-            CdsTranchePricerConfig::default()
-                .with_student_t_copula(6.0)
-                .expect("valid df"),
-        )
-        .expect("config");
+        let pricer = CdsTranchePricer::with_copula(CopulaSpec::student_t(6.0).expect("valid df"))
+            .expect("copula");
         let (first, second) = pricer
             .integrate_factors_pair(&|factors| {
                 let z = factors[0];

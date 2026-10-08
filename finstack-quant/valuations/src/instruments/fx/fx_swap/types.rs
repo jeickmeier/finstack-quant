@@ -405,10 +405,6 @@ impl crate::instruments::common_impl::traits::Instrument for FxSwap {
         Some(self.far_date)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.near_date)
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

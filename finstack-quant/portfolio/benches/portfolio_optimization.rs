@@ -1,4 +1,4 @@
-//! End-to-end `DefaultLpOptimizer::optimize` on a bond book.
+//! End-to-end `optimization::optimize` on a bond book.
 //!
 //! Valuation plus metric discovery dominate; the LP itself is secondary.
 //! The fixture is a uniform fixed-coupon book so the timed path is the
@@ -15,11 +15,11 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::optimization::{
-    DefaultLpOptimizer, MetricExpr, Objective, PerPositionMetric, PortfolioOptimizationProblem,
+    optimize, MetricExpr, Objective, PerPositionMetric, PortfolioOptimizationProblem,
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::PortfolioBuilder;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
@@ -45,7 +45,7 @@ fn bond_book(n_positions: usize, as_of: Date) -> finstack_quant_portfolio::Portf
     let issue = as_of;
     let maturity =
         Date::from_calendar_date(as_of.year() + 5, Month::January, 1).expect("valid maturity");
-    let mut builder = PortfolioBuilder::new("OPT_BENCH")
+    let mut builder = Portfolio::builder("OPT_BENCH")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("FUND_A"));
@@ -90,7 +90,6 @@ fn bench_optimize(c: &mut Criterion) {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("as_of");
     let market = opt_market(as_of);
     let config = FinstackConfig::default();
-    let optimizer = DefaultLpOptimizer;
     let objective = Objective::Maximize(MetricExpr::ValueWeightedAverage {
         metric: PerPositionMetric::Metric(MetricId::Ytm),
         filter: None,
@@ -104,13 +103,12 @@ fn bench_optimize(c: &mut Criterion) {
             &n_positions,
             |b, _| {
                 b.iter(|| {
-                    optimizer
-                        .optimize(
-                            std::hint::black_box(&problem),
-                            std::hint::black_box(&market),
-                            std::hint::black_box(&config),
-                        )
-                        .expect("bench: optimize")
+                    optimize(
+                        std::hint::black_box(&problem),
+                        std::hint::black_box(&market),
+                        std::hint::black_box(&config),
+                    )
+                    .expect("bench: optimize")
                 });
             },
         );

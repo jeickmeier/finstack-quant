@@ -578,45 +578,6 @@ impl ForwardCdsContext {
     pub fn forward_value(&self) -> f64 {
         (self.forward_par_spread - self.coupon) * self.bootstrapped_l_at_expiry
     }
-
-    /// Native ATM-forward clean-price coordinate in percentage points, for
-    /// moneyness and volatility-surface selection on price-struck index
-    /// options.
-    ///
-    /// Derived from payer/receiver parity under the exact price-strike
-    /// payoff used by the quadrature — not from a separate price
-    /// approximation. With `F0 = E[V_te]` from the lognormal-mean
-    /// calibration anchor, payer − receiver telescopes to
-    /// `df · (f·F0 + (K − 1)·f0 + L)`, so the parity strike is
-    ///
-    /// ```text
-    /// K_ATM = 1 − (f·F0 + L) / f0
-    /// ```
-    ///
-    /// returned as `100 · K_ATM`. In the limiting case `f = f0 = 1`,
-    /// `L = 0`, `FEP = 0` this reduces to `K_ATM = 1 − F0`.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error for spread-struck contexts: the
-    /// coordinate needs the strike's original factor `f0`.
-    pub fn native_atm_forward_clean_price_pct(&self) -> Result<f64> {
-        let QuadratureStrike::CleanPrice {
-            strike_index_factor,
-            ..
-        } = self.strike
-        else {
-            return Err(finstack_quant_core::Error::Validation(
-                "the native ATM clean-price coordinate requires a clean-price strike \
-                 (it scales by the strike's original index factor f0)"
-                    .to_string(),
-            ));
-        };
-        let f = self.scale.max(numerical::ZERO_TOLERANCE);
-        let f0 = strike_index_factor.max(numerical::ZERO_TOLERANCE);
-        let k_atm = 1.0 - (f * self.forward_value() + self.realized_loss) / f0;
-        Ok(100.0 * k_atm)
-    }
 }
 
 // Calibration of the lognormal mean `m` (DOCS 2055833 Eq. 2.3)
@@ -1643,82 +1604,6 @@ mod tests {
         assert!(
             (lhs - parity_rhs).abs() < 1e-9,
             "parity violated: payer − receiver = {lhs}, expected {parity_rhs}"
-        );
-    }
-
-    /// The native ATM-forward clean-price coordinate is the parity strike:
-    /// payer and receiver struck there have equal value.
-    #[test]
-    fn native_atm_forward_clean_price_is_the_parity_strike() {
-        let as_of = date!(2025 - 01 - 01);
-        let mkt = market(as_of);
-        let (f0, f, loss) = (1.0, 0.99, 0.004);
-        let vol = 0.40;
-
-        let seed = price_strike_option(
-            as_of,
-            OptionType::Call,
-            105.0,
-            500.0,
-            vol,
-            f0,
-            f,
-            Some(loss),
-        );
-        let ctx = context_for(&seed, &mkt, as_of, vol);
-        let k_atm_pct = ctx
-            .native_atm_forward_clean_price_pct()
-            .expect("ATM coordinate");
-
-        let payer = price_strike_option(
-            as_of,
-            OptionType::Call,
-            k_atm_pct,
-            500.0,
-            vol,
-            f0,
-            f,
-            Some(loss),
-        );
-        let receiver = price_strike_option(
-            as_of,
-            OptionType::Put,
-            k_atm_pct,
-            500.0,
-            vol,
-            f0,
-            f,
-            Some(loss),
-        );
-        let diff =
-            npv_per_unit(&payer, &mkt, as_of, vol) - npv_per_unit(&receiver, &mkt, as_of, vol);
-        assert!(
-            diff.abs() < 1e-8,
-            "payer/receiver parity must be zero at K_ATM = {k_atm_pct}: diff = {diff}"
-        );
-    }
-
-    /// Limiting identity: `f = f0 = 1`, `L = 0`, `FEP = 0` reduces the ATM
-    /// coordinate to `K_ATM = 1 − F0` when valued at legal expiry.
-    #[test]
-    fn native_atm_forward_limit_reduces_to_one_minus_f0() {
-        let as_of = date!(2025 - 01 - 01);
-        let mkt = market(as_of);
-        let option =
-            price_strike_option(as_of, OptionType::Call, 107.0, 500.0, 0.35, 1.0, 1.0, None);
-        let ctx = context_for(&option, &mkt, option.expiry, 0.35);
-        assert!(
-            ctx.front_end_protection == 0.0,
-            "FEP must be zero at legal expiry"
-        );
-        let k_atm = ctx
-            .native_atm_forward_clean_price_pct()
-            .expect("ATM coordinate")
-            / 100.0;
-        let expected = 1.0 - ctx.forward_value();
-        assert!(
-            (k_atm - expected).abs() < 1e-12,
-            "limiting K_ATM mismatch: got {k_atm}, expected {expected}"
         );
     }
 

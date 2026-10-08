@@ -337,11 +337,6 @@ fn test_ledger_export_formats() {
     let engine = EquityWaterfallEngine::new(&spec);
     let ledger = engine.run(&events).unwrap();
 
-    // Test tabular export
-    let (columns, rows) = ledger.to_tabular_data();
-    assert_eq!(columns.len(), 10); // Expected number of columns
-    assert!(!rows.is_empty(), "Should have data rows");
-
     // Test JSON export
     let json = ledger.to_json().unwrap();
     assert!(json.contains("rows"), "JSON should contain rows");

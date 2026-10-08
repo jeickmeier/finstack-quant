@@ -28,7 +28,6 @@ use crate::metrics::MetricRegistry;
 pub(crate) fn register_cap_floor_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), crate::metrics::MetricRegistryError> {
-    use crate::instruments::rates::cap_floor::CapFloor;
     use crate::metrics::{Dv01CalculatorConfig, UnifiedDv01Calculator};
     use crate::pricer::InstrumentType;
     crate::register_metrics! {
@@ -44,12 +43,12 @@ pub(crate) fn register_cap_floor_metrics(
             // Rho = parallel bump of the discount curve only. Routing through
             // the unified DV01 calculator keeps Rho aligned with the workspace
             // bump-size config and central-difference convention.
-            (Rho, UnifiedDv01Calculator::<CapFloor>::new(
+            (Rho, UnifiedDv01Calculator::new(
                 Dv01CalculatorConfig::parallel_discount_only(),
             )),
             (ImpliedVol, implied_vol::ImpliedVolCalculator),
             (ForwardPv01, forward_pv01::ForwardPv01Calculator),
-            (BucketedDv01, UnifiedDv01Calculator::<CapFloor>::new(
+            (BucketedDv01, UnifiedDv01Calculator::new(
                 Dv01CalculatorConfig::triangular_key_rate(),
             )),
         ]

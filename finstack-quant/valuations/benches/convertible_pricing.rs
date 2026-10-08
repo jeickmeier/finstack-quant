@@ -1,7 +1,7 @@
 //! Convertible bond pricing benchmarks.
 //!
 //! Measures performance of hybrid debt-equity valuation:
-//! - NPV calculation with binomial and trinomial trees
+//! - NPV calculation with the binomial tree
 //! - Tree convergence (different step counts)
 //! - Greeks calculation (delta, gamma, vega, rho, theta)
 //! - Parity and conversion premium
@@ -22,7 +22,7 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    calculate_convertible_greeks, price_convertible_bond, ConvertibleTreeType,
+    calculate_convertible_greeks, price_convertible_bond,
 };
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
@@ -206,38 +206,7 @@ fn bench_npv_binomial(c: &mut Criterion) {
             |b, &s| {
                 let bond = with_tree_steps(bond.clone(), s);
                 b.iter(|| {
-                    price_convertible_bond(
-                        black_box(&bond),
-                        black_box(&market),
-                        black_box(ConvertibleTreeType::Binomial),
-                        base_date(),
-                    )
-                });
-            },
-        );
-    }
-    group.finish();
-}
-
-fn bench_npv_trinomial(c: &mut Criterion) {
-    let mut group = c.benchmark_group("convertible_npv_trinomial");
-    let bond = create_standard_convertible();
-    let market = create_market_context(SPOT_PRICE, VOL_STANDARD, DIV_YIELD);
-
-    {
-        let steps = &100;
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}steps", steps)),
-            steps,
-            |b, &s| {
-                let bond = with_tree_steps(bond.clone(), s);
-                b.iter(|| {
-                    price_convertible_bond(
-                        black_box(&bond),
-                        black_box(&market),
-                        black_box(ConvertibleTreeType::Trinomial),
-                        base_date(),
-                    )
+                    price_convertible_bond(black_box(&bond), black_box(&market), base_date())
                 });
             },
         );
@@ -255,14 +224,7 @@ fn bench_npv_by_moneyness(c: &mut Criterion) {
         let (label, spot) = &("ATM", SPOT_ATM);
         let market = create_market_context(*spot, VOL_STANDARD, DIV_YIELD);
         group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
-            b.iter(|| {
-                price_convertible_bond(
-                    black_box(&bond),
-                    black_box(&market),
-                    black_box(ConvertibleTreeType::Binomial),
-                    base_date(),
-                )
-            });
+            b.iter(|| price_convertible_bond(black_box(&bond), black_box(&market), base_date()));
         });
     }
     group.finish();
@@ -277,40 +239,19 @@ fn bench_npv_features(c: &mut Criterion) {
     // Standard convertible
     let standard = with_tree_steps(create_standard_convertible(), 50);
     group.bench_function("standard", |b| {
-        b.iter(|| {
-            price_convertible_bond(
-                black_box(&standard),
-                black_box(&market),
-                black_box(ConvertibleTreeType::Binomial),
-                base_date(),
-            )
-        });
+        b.iter(|| price_convertible_bond(black_box(&standard), black_box(&market), base_date()));
     });
 
     // Callable convertible
     let callable = with_tree_steps(create_callable_convertible(), 50);
     group.bench_function("callable", |b| {
-        b.iter(|| {
-            price_convertible_bond(
-                black_box(&callable),
-                black_box(&market),
-                black_box(ConvertibleTreeType::Binomial),
-                base_date(),
-            )
-        });
+        b.iter(|| price_convertible_bond(black_box(&callable), black_box(&market), base_date()));
     });
 
     // Zero coupon
     let zero_coupon = with_tree_steps(create_zero_coupon_convertible(), 50);
     group.bench_function("zero_coupon", |b| {
-        b.iter(|| {
-            price_convertible_bond(
-                black_box(&zero_coupon),
-                black_box(&market),
-                black_box(ConvertibleTreeType::Binomial),
-                base_date(),
-            )
-        });
+        b.iter(|| price_convertible_bond(black_box(&zero_coupon), black_box(&market), base_date()));
     });
 
     group.finish();
@@ -326,14 +267,7 @@ fn bench_npv_volatility(c: &mut Criterion) {
         let (label, vol) = &("std", VOL_STANDARD);
         let market = create_market_context(SPOT_PRICE, *vol, DIV_YIELD);
         group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
-            b.iter(|| {
-                price_convertible_bond(
-                    black_box(&bond),
-                    black_box(&market),
-                    black_box(ConvertibleTreeType::Binomial),
-                    base_date(),
-                )
-            });
+            b.iter(|| price_convertible_bond(black_box(&bond), black_box(&market), base_date()));
         });
     }
     group.finish();
@@ -357,7 +291,6 @@ fn bench_greeks_calculation(c: &mut Criterion) {
                     calculate_convertible_greeks(
                         black_box(&bond),
                         black_box(&market),
-                        black_box(ConvertibleTreeType::Binomial),
                         black_box(GreekBumps::default()),
                         base_date(),
                     )
@@ -380,7 +313,6 @@ fn bench_greeks_by_moneyness(c: &mut Criterion) {
                 calculate_convertible_greeks(
                     black_box(&bond),
                     black_box(&market),
-                    black_box(ConvertibleTreeType::Binomial),
                     black_box(GreekBumps::default()),
                     base_date(),
                 )
@@ -451,12 +383,7 @@ fn bench_tree_convergence(c: &mut Criterion) {
             |b, &s| {
                 let bond = with_tree_steps(bond.clone(), s);
                 b.iter(|| {
-                    price_convertible_bond(
-                        black_box(&bond),
-                        black_box(&market),
-                        black_box(ConvertibleTreeType::Binomial),
-                        base_date(),
-                    )
+                    price_convertible_bond(black_box(&bond), black_box(&market), base_date())
                 });
             },
         );
@@ -467,7 +394,6 @@ fn bench_tree_convergence(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_npv_binomial,
-    bench_npv_trinomial,
     bench_npv_by_moneyness,
     bench_npv_features,
     bench_npv_volatility,

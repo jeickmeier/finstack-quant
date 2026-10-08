@@ -6,9 +6,7 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::barrier_option::types::BarrierOption;
-use crate::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
+use crate::pricer::{expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError};
 use crate::results::ValuationResult;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -20,7 +18,6 @@ use finstack_quant_models::monte_carlo::payoff::barrier::{BarrierOptionPayoff, O
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
 use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-use finstack_quant_models::monte_carlo::seed;
 
 /// Barrier option Heston Monte Carlo pricer.
 ///
@@ -142,15 +139,10 @@ impl BarrierOptionHestonMcPricer {
         )?;
 
         // Derive deterministic seed
-        let seed_val = if let Some(ref scenario) = inst
+        let seed_val = inst
             .instrument_pricing_overrides
             .model_config
-            .mc_seed_scenario
-        {
-            seed::derive_seed(&inst.id, scenario)
-        } else {
-            seed::derive_seed(&inst.id, "base")
-        };
+            .mc_seed(&inst.id);
 
         let engine = McEngine::new(McEngineConfig::new(num_paths, time_grid));
 
@@ -192,9 +184,7 @@ impl Pricer for BarrierOptionHestonMcPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let barrier = expect_inst::<BarrierOption>(instrument, InstrumentType::BarrierOption)?;
 
-        let (pv, stderr) = self.price_internal(barrier, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let (pv, stderr) = self.price_internal(barrier, market, as_of)?;
 
         let mut result = ValuationResult::stamped(barrier.id(), as_of, pv);
         if stderr > 0.0 {

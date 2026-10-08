@@ -309,10 +309,6 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSpreadOption {
             .price_internal(self, market, as_of)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        Some(self.expiry)
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

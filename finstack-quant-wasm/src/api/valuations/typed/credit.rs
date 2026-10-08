@@ -1030,6 +1030,6 @@ impl JsConvertibleBond {
     pub fn greeks(&self, market_json: JsValue, as_of: JsValue) -> Result<JsValue, JsValue> {
         let market = super::market(&market_json)?;
         let as_of = super::as_of(&as_of)?;
-        to_js_value(&self.inner.greeks(&market, None, as_of).map_err(to_js_err)?)
+        to_js_value(&self.inner.greeks(&market, as_of).map_err(to_js_err)?)
     }
 }

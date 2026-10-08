@@ -1,6 +1,6 @@
 //! Portfolio historical VaR / expected shortfall by full revaluation.
 //!
-//! Binds `finstack_quant_valuations::metrics::risk::calculate_var_with_pricing`
+//! Binds `finstack_quant_valuations::metrics::risk::calculate_var`
 //! and its typed `VarResult`. The per-instrument `hvar` metric reprices one
 //! instrument; this entry point reprices a whole list under every scenario and
 //! takes the quantile of the summed P&L, so diversification is preserved.
@@ -11,8 +11,7 @@ use crate::bindings::extract::{extract_instrument_json, extract_market};
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_valuations::metrics::risk::{
-    calculate_var_with_pricing as rust_calculate_var_with_pricing, MarketHistory, VarConfig,
-    VarResult,
+    calculate_var as rust_calculate_var, MarketHistory, VarConfig, VarResult,
 };
 use finstack_quant_valuations::pricer::PricingDispatch;
 use pyo3::prelude::*;
@@ -37,7 +36,7 @@ fn extract_config(py: Python<'_>, obj: Option<&Bound<'_, PyAny>>) -> PyResult<Va
 
 /// Historical VaR and expected shortfall of a list of instruments.
 ///
-/// Mirrors Rust ``metrics::risk::calculate_var_with_pricing``: every
+/// Mirrors Rust ``metrics::risk::calculate_var``: every
 /// instrument is repriced under every ``history`` scenario, the per-scenario
 /// P&Ls are summed across instruments, and VaR / ES are read off that single
 /// portfolio distribution (R type-7 linear-interpolated quantile). Unlike
@@ -93,7 +92,7 @@ fn extract_config(py: Python<'_>, obj: Option<&Bound<'_, PyAny>>) -> PyResult<Va
 /// >>> from finstack_quant.core.money import Money
 /// >>> from finstack_quant.core.types import Rate
 /// >>> from finstack_quant.valuations.instruments import (
-/// ...     Bond, MarketHistory, calculate_var_with_pricing)
+/// ...     Bond, MarketHistory, calculate_var)
 /// >>> as_of = datetime.date(2024, 1, 2)
 /// >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
 /// >>> def bond(id):
@@ -104,14 +103,14 @@ fn extract_config(py: Python<'_>, obj: Option<&Bound<'_, PyAny>>) -> PyResult<Va
 /// >>> history = MarketHistory(as_of, 2, [
 /// ...     {"date": "2023-12-29", "shifts": shift(0.0010)},
 /// ...     {"date": "2023-12-28", "shifts": shift(-0.0005)}])
-/// >>> one = calculate_var_with_pricing([bond("A")], market, history, as_of)
-/// >>> two = calculate_var_with_pricing([bond("A"), bond("B")], market, history, as_of)
+/// >>> one = calculate_var([bond("A")], market, history, as_of)
+/// >>> two = calculate_var([bond("A"), bond("B")], market, history, as_of)
 /// >>> (two.num_scenarios, one.var < 0, abs(two.var - 2 * one.var) < 1e-6)
 /// (2, True, True)
 #[pyfunction]
 #[pyo3(signature = (instruments, market, history, as_of, config=None, model="default"))]
 #[pyo3(text_signature = "(instruments, market, history, as_of, config=None, model='default')")]
-fn calculate_var_with_pricing(
+fn calculate_var(
     py: Python<'_>,
     instruments: Vec<Bound<'_, PyAny>>,
     market: &Bound<'_, PyAny>,
@@ -137,7 +136,7 @@ fn calculate_var_with_pricing(
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
         let refs: Vec<_> = parsed.iter().map(|p| p.as_instrument()).collect();
-        rust_calculate_var_with_pricing(
+        rust_calculate_var(
             &refs,
             &market,
             &history,
@@ -154,7 +153,7 @@ fn calculate_var_with_pricing(
 /// Historical VaR / expected shortfall with its P&L distribution.
 ///
 /// Typed wrapper of the Rust ``VarResult`` returned by
-/// :func:`calculate_var_with_pricing`. VaR and ES follow the P&L sign: losses
+/// :func:`calculate_var`. VaR and ES follow the P&L sign: losses
 /// are negative, and ``expected_shortfall <= var``.
 ///
 /// Examples
@@ -272,7 +271,7 @@ impl PyVarResult {
     /// Returns
     /// -------
     /// str
-    ///     The result JSON (the WASM ``calculateVarWithPricing`` object).
+    ///     The result JSON (the WASM ``calculateVar`` object).
     ///
     /// Raises
     /// ------
@@ -303,9 +302,9 @@ impl PyVarResult {
 /// Register the VaR entry point and result type on the instruments submodule.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyVarResult>()?;
-    m.add_function(pyo3::wrap_pyfunction!(calculate_var_with_pricing, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(calculate_var, m)?)?;
     Ok(())
 }
 
 /// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
-pub(crate) const EXPORTS: &[&str] = &["VarResult", "calculate_var_with_pricing"];
+pub(crate) const EXPORTS: &[&str] = &["VarResult", "calculate_var"];

@@ -196,26 +196,21 @@ impl BondFuturePricer {
     /// Model_Price       = Forward_Clean_CTD_percent / CF
     /// ```
     ///
-    /// This standalone helper uses the CTD bond's discount curve both to value
-    /// interim cashflows and to carry the remaining dirty value to delivery.
-    ///
-    /// # Financing curve
-    ///
-    /// Instrument valuation uses the future's `repo_curve_id` when configured
-    /// and otherwise uses the future's `discount_curve_id`; it does not call
-    /// this standalone helper's CTD-curve default.
+    /// Interim cashflows are valued and the remaining dirty value is carried to
+    /// delivery on `financing_curve_id`.
     ///
     /// # Arguments
     ///
     /// - `ctd_bond`: Cheapest-to-deliver bond whose dirty value, cashflows,
-    ///   accrued interest, notional, and discount curve determine the forward
-    ///   clean price.
+    ///   accrued interest and notional determine the forward clean price.
     /// - `conversion_factor`: Positive, finite, unitless conversion factor for
     ///   `ctd_bond`.
     /// - `market`: Market context containing the CTD bond's required pricing
-    ///   inputs and discount curve.
+    ///   inputs and the financing curve.
     /// - `as_of`: Valuation date used for the spot bond value and cashflow cutoff.
     /// - `delivery_date`: Date to which the CTD position is carried.
+    /// - `financing_curve_id`: Discount curve used to value interim cashflows
+    ///   and carry the CTD to delivery.
     ///
     /// # Returns
     ///
@@ -226,30 +221,13 @@ impl BondFuturePricer {
     /// Returns an error if `conversion_factor` is not positive and finite, the
     /// discount factor to delivery is not positive and finite, or CTD pricing,
     /// schedule, accrual, or curve lookup fails.
-    pub fn fair_price(
+    fn fair_price(
         ctd_bond: &Bond,
         conversion_factor: f64,
         market: &MarketContext,
         as_of: Date,
         delivery_date: Date,
-    ) -> Result<f64> {
-        Self::fair_price_with_financing_curve(
-            ctd_bond,
-            conversion_factor,
-            market,
-            as_of,
-            delivery_date,
-            None,
-        )
-    }
-
-    fn fair_price_with_financing_curve(
-        ctd_bond: &Bond,
-        conversion_factor: f64,
-        market: &MarketContext,
-        as_of: Date,
-        delivery_date: Date,
-        repo_curve_id: Option<&finstack_quant_core::types::CurveId>,
+        financing_curve_id: &finstack_quant_core::types::CurveId,
     ) -> Result<f64> {
         use crate::cashflow::accrual::accrued_interest_amount;
         use finstack_quant_core::math::summation::NeumaierAccumulator;
@@ -264,7 +242,6 @@ impl BondFuturePricer {
         // Spot dirty price of the CTD (PV in currency at the valuation date).
         let spot_dirty = ctd_bond.value(market, as_of)?.amount();
 
-        let financing_curve_id = repo_curve_id.unwrap_or(&ctd_bond.discount_curve_id);
         let disc = market.get_discount(financing_curve_id)?;
 
         // One CTD schedule feeds both the interim flows and the accrued at
@@ -326,13 +303,13 @@ impl BondFuturePricer {
             .repo_curve_id
             .as_ref()
             .unwrap_or(&future.discount_curve_id);
-        Self::fair_price_with_financing_curve(
+        Self::fair_price(
             ctd_bond,
             conversion_factor,
             market,
             as_of,
             delivery_date,
-            Some(financing_curve_id),
+            financing_curve_id,
         )
     }
 
@@ -804,6 +781,7 @@ mod tests {
             &market,
             as_of,
             as_of + time::Duration::days(90),
+            &bond.discount_curve_id,
         )
         .expect("Failed to calculate model futures price for par bond");
 
@@ -837,6 +815,7 @@ mod tests {
             &market,
             as_of,
             as_of + time::Duration::days(90),
+            &bond.discount_curve_id,
         )
         .expect("Failed to calculate model futures price for discount bond");
 
@@ -867,6 +846,7 @@ mod tests {
             &market,
             as_of,
             as_of + time::Duration::days(90),
+            &bond.discount_curve_id,
         )
         .expect("Failed to calculate model futures price for premium bond");
 
@@ -899,6 +879,7 @@ mod tests {
             &market,
             as_of,
             as_of + time::Duration::days(90),
+            &bond.discount_curve_id,
         )
         .expect("Failed to calculate model futures price for manual verification");
 
@@ -945,8 +926,15 @@ mod tests {
         let delivery_date = date!(2025 - 07 - 15);
         let cf = 0.8234_f64;
 
-        let model_price = BondFuturePricer::fair_price(&bond, cf, &market, as_of, delivery_date)
-            .expect("carry-adjusted model price should compute");
+        let model_price = BondFuturePricer::fair_price(
+            &bond,
+            cf,
+            &market,
+            as_of,
+            delivery_date,
+            &bond.discount_curve_id,
+        )
+        .expect("carry-adjusted model price should compute");
 
         // --- Independent carry-adjusted forward reconstruction ---
         let disc = market
@@ -1116,9 +1104,15 @@ mod tests {
 
         let model = BondFuturePricer::fair_price_for_future(&future, &bond, cf, &market, as_of)
             .expect("future-aware model price");
-        let fallback =
-            BondFuturePricer::fair_price(&bond, cf, &market, as_of, future.delivery_start)
-                .expect("discount-curve fallback");
+        let fallback = BondFuturePricer::fair_price(
+            &bond,
+            cf,
+            &market,
+            as_of,
+            future.delivery_start,
+            &bond.discount_curve_id,
+        )
+        .expect("discount-curve fallback");
         let npv = BondFuturePricer::calculate_npv(&future, &bond, cf, &market, as_of).expect("npv");
         let implied_model = future.terms.entry_price
             + npv.amount() / (future.terms.contracts * future.terms.multiplier);
@@ -1206,9 +1200,15 @@ mod tests {
 
         // Use the contract's delivery date so the model price matches the one
         // `calculate_npv` derives internally (it carries the CTD to delivery).
-        let model_price =
-            BondFuturePricer::fair_price(&ctd_bond, cf, &market, as_of, future.delivery_start)
-                .expect("Failed to calculate model price");
+        let model_price = BondFuturePricer::fair_price(
+            &ctd_bond,
+            cf,
+            &market,
+            as_of,
+            future.delivery_start,
+            &ctd_bond.discount_curve_id,
+        )
+        .expect("Failed to calculate model price");
 
         let npv = BondFuturePricer::calculate_npv(&future, &ctd_bond, cf, &market, as_of)
             .expect("Failed to calculate NPV");

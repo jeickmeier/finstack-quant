@@ -10,7 +10,7 @@ use pyo3::types::{PyAny, PyModule};
 use crate::bindings::pandas_utils::{
     serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
 };
-use crate::errors::{display_to_py, portfolio_to_py, serde_json_to_py};
+use crate::errors::{portfolio_to_py, serde_json_to_py};
 
 /// Column schema shared by [`PyBrinsonPeriodResult::to_dataframe`] and
 /// [`PyCarinoLinkedAttribution::to_dataframe`] (both frames are sector-effect
@@ -36,6 +36,12 @@ const SECTOR_EFFECT_COLUMNS: &[ColumnSchema<'static>] = &[
 pub struct PyBrinsonPeriodResult {
     pub(crate) inner: finstack_quant_portfolio::BrinsonPeriodResult,
 }
+
+crate::bindings::macros::wire_methods!(
+    PyBrinsonPeriodResult,
+    finstack_quant_portfolio::BrinsonPeriodResult,
+    "BrinsonPeriodResult"
+);
 
 #[pymethods]
 impl PyBrinsonPeriodResult {
@@ -89,32 +95,12 @@ impl PyBrinsonPeriodResult {
         serde_rows_to_dataframe_with_schema(py, &self.inner.sectors, SECTOR_EFFECT_COLUMNS)
     }
 
-    /// Serialize to a compact JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Deserialize from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::BrinsonPeriodResult =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "BrinsonPeriodResult(sectors={}, total_excess_return={})",
             self.inner.sectors.len(),
             self.inner.total_excess_return,
         )
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 
@@ -131,6 +117,12 @@ impl PyBrinsonPeriodResult {
 pub struct PyCarinoLinkedAttribution {
     pub(crate) inner: finstack_quant_portfolio::CarinoLinkedAttribution,
 }
+
+crate::bindings::macros::wire_methods!(
+    PyCarinoLinkedAttribution,
+    finstack_quant_portfolio::CarinoLinkedAttribution,
+    "CarinoLinkedAttribution"
+);
 
 #[pymethods]
 impl PyCarinoLinkedAttribution {
@@ -184,32 +176,12 @@ impl PyCarinoLinkedAttribution {
         serde_rows_to_dataframe_with_schema(py, &self.inner.linked_sectors, SECTOR_EFFECT_COLUMNS)
     }
 
-    /// Serialize to a compact JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Deserialize from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::CarinoLinkedAttribution =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CarinoLinkedAttribution(periods={}, sectors={})",
             self.inner.periods.len(),
             self.inner.linked_sectors.len(),
         )
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 

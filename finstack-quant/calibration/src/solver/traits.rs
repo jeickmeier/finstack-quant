@@ -24,26 +24,19 @@ pub(crate) trait BootstrapTarget {
     /// automatically.
     fn quote_time(&self, quote: &Self::Quote) -> Result<f64>;
 
-    /// Build a temporary curve from a set of knots.
+    /// Build a temporary curve from a set of knots (lenient validation allowed).
     ///
-    /// This is called repeatedly during the solver loop.
-    fn build_curve(&self, knots: &[(f64, f64)]) -> Result<Self::Curve>;
-
-    /// Build a temporary curve for the solver (fast path, lenient validation).
-    ///
-    /// Overriding this can improve performance by skipping expensive checks
-    /// (e.g. strict monotonicity) during optimization if they are enforced
-    /// by the solver bounds or the final build step.
-    fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
-        self.build_curve(knots)
-    }
+    /// This is called repeatedly during the solver loop, so implementations may
+    /// skip expensive checks (e.g. strict monotonicity) that the solver bounds or
+    /// [`build_curve_final`](Self::build_curve_final) enforce.
+    fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve>;
 
     /// Build the final curve (strict validation).
     ///
-    /// Called once after a knot is successfully solved to ensure the final
-    /// term structure meets all requirements.
+    /// Called once after the last knot is solved to ensure the final term
+    /// structure meets all requirements. Defaults to the solver build.
     fn build_curve_final(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
-        self.build_curve(knots)
+        self.build_curve_for_solver(knots)
     }
 
     /// Calculate the pricing residual for a quote given the curve.
@@ -131,18 +124,9 @@ pub(crate) trait GlobalSolveTarget {
     ) -> Result<TimeGridAndGuesses<Self::Quote>>;
 
     /// Build a curve from parameters (e.g., zero rates).
-    fn build_curve_from_params(&self, times: &[f64], params: &[f64]) -> Result<Self::Curve>;
-
-    /// Build a curve for solver iterations (lenient validation allowed).
     ///
-    /// Default implementation delegates to `build_curve_from_params`.
-    fn build_curve_for_solver_from_params(
-        &self,
-        times: &[f64],
-        params: &[f64],
-    ) -> Result<Self::Curve> {
-        self.build_curve_from_params(times, params)
-    }
+    /// Called on every solver iteration, so lenient validation is allowed.
+    fn build_curve_from_params(&self, times: &[f64], params: &[f64]) -> Result<Self::Curve>;
 
     /// Build the final curve returned to callers (strict validation).
     ///
@@ -162,20 +146,8 @@ pub(crate) trait GlobalSolveTarget {
     ///
     /// Higher weights increase the penalty for residuals on specific quotes.
     /// Default implementation fills weights with 1.0.
-    fn residual_weights(&self, quotes: &[Self::Quote], weights_out: &mut [f64]) -> Result<()> {
-        if quotes.len() != weights_out.len() {
-            return Err(finstack_quant_core::Error::Calibration {
-                message: format!(
-                    "Global solve requires weights.len() == quotes.len(); got {} vs {}.",
-                    weights_out.len(),
-                    quotes.len()
-                ),
-                category: "global_solve".to_string(),
-            });
-        }
-        for weight in weights_out.iter_mut() {
-            *weight = 1.0;
-        }
+    fn residual_weights(&self, _quotes: &[Self::Quote], weights_out: &mut [f64]) -> Result<()> {
+        weights_out.fill(1.0);
         Ok(())
     }
 

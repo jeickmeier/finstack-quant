@@ -89,7 +89,7 @@
               },
               "version": 1
             },
-            "version": "0.9.0"
+            "version": "0.10.0"
           },
           "description": "Audit stamp: numeric mode, rounding context, and FX policy in force."
         },
@@ -135,7 +135,7 @@
               },
               "version": 1
             },
-            "version": "0.9.0"
+            "version": "0.10.0"
           },
           "description": "Audit stamp: numeric mode, rounding context, and FX policy in force."
         },
@@ -580,7 +580,7 @@
               },
               "version": 1
             },
-            "version": "0.9.0"
+            "version": "0.10.0"
           },
           "description": "Audit stamp: numeric mode, rounding context, and FX policy in force."
         },

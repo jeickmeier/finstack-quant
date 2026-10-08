@@ -18,9 +18,7 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::common_impl::vol_resolution::resolve_sigma_at;
 use crate::instruments::exotics::range_accrual::monte_carlo::RangeAccrualPayoff;
 use crate::instruments::exotics::range_accrual::types::RangeAccrual;
-use crate::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
+use crate::pricer::{expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError};
 use crate::results::ValuationResult;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -312,17 +310,11 @@ impl RangeAccrualMcPricer {
         .with_observation_multipliers(&observation_multipliers)?;
 
         // Derive deterministic seed from instrument ID and scenario
-        use finstack_quant_models::monte_carlo::seed;
 
-        let seed = if let Some(ref scenario) = inst
+        let seed = inst
             .instrument_pricing_overrides
             .model_config
-            .mc_seed_scenario
-        {
-            seed::derive_seed(&inst.id, scenario)
-        } else {
-            seed::derive_seed(&inst.id, "base")
-        };
+            .mc_seed(&inst.id);
 
         config.seed = seed;
         let pricer = PathDependentPricer::new(config);
@@ -384,14 +376,7 @@ impl Pricer for RangeAccrualMcPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let range_accrual = expect_inst::<RangeAccrual>(instrument, InstrumentType::RangeAccrual)?;
 
-        let pv = self
-            .price_internal(range_accrual, market, as_of)
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        let pv = self.price_internal(range_accrual, market, as_of)?;
 
         Ok(ValuationResult::stamped(range_accrual.id(), as_of, pv))
     }
@@ -413,9 +398,7 @@ impl Pricer for RangeAccrualStaticReplicationPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let range_accrual = expect_inst::<RangeAccrual>(instrument, InstrumentType::RangeAccrual)?;
 
-        let pv = compute_pv(range_accrual, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let pv = compute_pv(range_accrual, market, as_of)?;
 
         Ok(ValuationResult::stamped(range_accrual.id(), as_of, pv))
     }

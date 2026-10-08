@@ -294,7 +294,7 @@ pub(crate) fn build_decision_space(
     }
 
     let candidate_valuation = if !problem.trade_universe.candidates.is_empty() {
-        let mut builder = crate::builder::PortfolioBuilder::new("CANDIDATES")
+        let mut builder = crate::Portfolio::builder("CANDIDATES")
             .base_currency(problem.portfolio.base_currency)
             .as_of(problem.portfolio.as_of);
 

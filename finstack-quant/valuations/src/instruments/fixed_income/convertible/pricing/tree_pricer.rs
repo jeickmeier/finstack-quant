@@ -5,7 +5,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 
 use crate::instruments::common_impl::traits::Instrument;
 
-use super::engine::{price_convertible_bond, ConvertibleTreeType};
+use super::engine::price_convertible_bond;
 
 /// Registry pricer for Convertible Bond using Tsiveriotis-Zhang tree-based pricing.
 pub(crate) struct ConvertibleTreePricer;
@@ -41,13 +41,12 @@ impl crate::pricer::Pricer for ConvertibleTreePricer {
             crate::instruments::fixed_income::convertible::ConvertibleBond,
         >(instrument, crate::pricer::InstrumentType::Convertible)?;
 
-        let pv = price_convertible_bond(convertible, market, ConvertibleTreeType::default(), as_of)
-            .map_err(|e| {
-                crate::pricer::PricingError::model_failure_with_context(
-                    e.to_string(),
-                    crate::pricer::PricingErrorContext::default(),
-                )
-            })?;
+        let pv = price_convertible_bond(convertible, market, as_of).map_err(|e| {
+            crate::pricer::PricingError::model_failure_with_context(
+                e.to_string(),
+                crate::pricer::PricingErrorContext::default(),
+            )
+        })?;
 
         Ok(crate::results::ValuationResult::stamped(
             convertible.id(),

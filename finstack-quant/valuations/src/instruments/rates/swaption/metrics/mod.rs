@@ -33,22 +33,16 @@ pub(crate) fn register_swaption_metrics(
             (Delta, DeltaCalculator),
             (Gamma, GammaCalculator),
             (Vega, VegaCalculator),
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::Swaption,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
             // Theta is now registered universally in metrics::standard_registry()
             // Rho bumps ONLY the discount/funding curve (holding the forward swap
             // rate fixed) — this is the correct option rho definition.  Using
             // `parallel_combined()` would also move the forward curve, conflating
             // discounting sensitivity with delta and producing the wrong sign for
             // receiver swaptions and wrong magnitude for payers.
-            (Rho, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::Swaption,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_discount_only())),
+            (Rho, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_discount_only())),
             (ImpliedVol, ImpliedVolCalculator),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::Swaption,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
     Ok(())

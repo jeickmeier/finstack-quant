@@ -4,7 +4,6 @@
 //! - [`pricing`] — instrument JSON validation, pricing, metric introspection.
 //! - [`composite`] — composite-instrument initialization, rebalancing,
 //!   decomposition and history.
-//! - [`exotic_rates`] — deterministic TARN / snowball / range-accrual helpers.
 //! - [`fixed_income`] — typed `Bond` / `TermLoan` / `RevolvingCredit` /
 //!   `AssetBackedFacility` instrument classes.
 //! - [`fx`] — typed FX instrument classes.
@@ -18,7 +17,6 @@
 //!   builders, and the instrument data-type constructors.
 
 pub mod composite;
-pub mod exotic_rates;
 pub mod fixed_income;
 pub mod fx;
 pub mod market;

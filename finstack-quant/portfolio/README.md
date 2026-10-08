@@ -64,7 +64,7 @@ through its module path. See the rustdoc for detail
 | `performance` | `twrr_modified_dietz`, `twrr_linked`, `mwr_xirr` |
 | `factor_model` | `FactorModel` (`assign_factors` / `compute_sensitivities` / `analyze`), `decompose_factors`, `allocate_weights` |
 | `sensitivity` | `DeltaBasedEngine`, `FullRepricingEngine` + `ScenarioGrid`, `FactorSensitivityEngine` |
-| `optimization` | `PortfolioOptimizationProblem`, `DefaultLpOptimizer`, `optimize_from_spec`, `PortfolioOptimizationResult` |
+| `optimization` | `PortfolioOptimizationProblem`, `optimize`, `optimize_from_spec`, `PortfolioOptimizationResult` |
 | `margin` (re-exported at root) | `PortfolioMarginAggregator`, `PortfolioMarginResult` — see [`src/margin/README.md`](src/margin/README.md) |
 | `scenarios` | `apply_and_revalue`, `scenario_pnl`, `scenario_pnl_batch` |
 | `replay` | `replay_portfolio` over a `ReplayTimeline` of dated market snapshots |

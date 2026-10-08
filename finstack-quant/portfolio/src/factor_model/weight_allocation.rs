@@ -139,7 +139,7 @@ pub fn allocate_weights(spec: &WeightAllocationSpec) -> Result<WeightAllocationR
 /// * `spec_json` - UTF-8 JSON [`WeightAllocationSpec`] selecting the
 ///   allocation scheme, strategy inputs, and any required covariance data.
 pub fn allocate_weights_json(spec_json: &str) -> Result<String> {
-    let spec = parse_allocation_spec(spec_json)?;
+    let spec = WeightAllocationSpec::from_json(spec_json)?;
     let result = allocate_weights(&spec)?;
     serde_json::to_string(&result)
         .map_err(|err| Error::InvalidInput(format!("failed to serialize allocation result: {err}")))
@@ -161,7 +161,7 @@ pub fn allocate_weights_json(spec_json: &str) -> Result<String> {
 ///
 /// The canonical compact JSON re-serialization of the accepted spec.
 pub fn validate_allocation_json(spec_json: &str) -> Result<String> {
-    let spec = parse_allocation_spec(spec_json)?;
+    let spec = WeightAllocationSpec::from_json(spec_json)?;
     spec.execute()?;
     serde_json::to_string(&spec).map_err(|err| {
         Error::InvalidInput(format!("failed to canonicalize allocation spec: {err}"))
@@ -172,12 +172,23 @@ fn default_money_decimal_places() -> u32 {
     10
 }
 
-fn parse_allocation_spec(spec_json: &str) -> Result<WeightAllocationSpec> {
-    serde_json::from_str(spec_json)
-        .map_err(|err| Error::validation(format!("invalid allocation JSON: {err}")))
-}
-
 impl WeightAllocationSpec {
+    /// Parse an allocation specification from its JSON wire form.
+    ///
+    /// # Arguments
+    ///
+    /// * `spec_json` - UTF-8 JSON object with the [`WeightAllocationSpec`]
+    ///   fields; unknown fields are rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::ValidationFailed`] when the text is not valid JSON or
+    /// does not match the specification shape.
+    pub fn from_json(spec_json: &str) -> Result<Self> {
+        serde_json::from_str(spec_json)
+            .map_err(|err| Error::validation(format!("invalid allocation JSON: {err}")))
+    }
+
     fn execute(&self) -> Result<WeightAllocationResult> {
         self.validate_common()?;
         let covariance = if self.scheme == AllocationScheme::RiskBudget {

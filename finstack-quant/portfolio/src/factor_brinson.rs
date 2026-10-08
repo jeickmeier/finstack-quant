@@ -93,12 +93,10 @@
 //!   Quantitative Special Issue 2023, 216-223. `docs/REFERENCES.md#jeet-partani-2023`
 //!
 
+use crate::brinson::check_weights_sum;
 use crate::error::{Error, Result};
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use serde::{Deserialize, Serialize};
-
-/// Tolerance for the requirement that each side's weights sum to `1.0`.
-const WEIGHT_TOLERANCE: f64 = 1e-6;
 
 /// Tolerance on the Jeet-Partani completeness residual `h_b'ε_b`, scaled by
 /// `max(1, |r_b|)`. See the module-level "Completeness tolerance" note for
@@ -256,65 +254,29 @@ pub fn factor_brinson_attribution(
         )));
     }
 
-    for (i, &v) in input.asset_returns.iter().enumerate() {
-        if !v.is_finite() {
+    for (name, values) in [
+        ("asset_returns", input.asset_returns.as_slice()),
+        ("portfolio_weights", input.portfolio_weights.as_slice()),
+        ("benchmark_weights", input.benchmark_weights.as_slice()),
+        ("exposures", input.exposures.as_slice()),
+        ("factor_returns", factor_returns),
+    ] {
+        if let Some((i, v)) = values.iter().enumerate().find(|(_, v)| !v.is_finite()) {
             return Err(Error::invalid_input(format!(
-                "'asset_returns[{i}]' must be finite (got {v})"
-            )));
-        }
-    }
-    for (i, &v) in input.portfolio_weights.iter().enumerate() {
-        if !v.is_finite() {
-            return Err(Error::invalid_input(format!(
-                "'portfolio_weights[{i}]' must be finite (got {v})"
-            )));
-        }
-    }
-    for (i, &v) in input.benchmark_weights.iter().enumerate() {
-        if !v.is_finite() {
-            return Err(Error::invalid_input(format!(
-                "'benchmark_weights[{i}]' must be finite (got {v})"
-            )));
-        }
-    }
-    for (i, &v) in input.exposures.iter().enumerate() {
-        if !v.is_finite() {
-            return Err(Error::invalid_input(format!(
-                "'exposures[{i}]' must be finite (got {v})"
-            )));
-        }
-    }
-    for (j, &v) in factor_returns.iter().enumerate() {
-        if !v.is_finite() {
-            return Err(Error::invalid_input(format!(
-                "'factor_returns[{j}]' must be finite (got {v})"
+                "'{name}[{i}]' must be finite (got {v})"
             )));
         }
     }
 
-    let sum_wp: f64 = {
+    for (side_name, weights) in [
+        ("Portfolio", &input.portfolio_weights),
+        ("Benchmark", &input.benchmark_weights),
+    ] {
         let mut acc = NeumaierAccumulator::new();
-        for &w in &input.portfolio_weights {
+        for &w in weights {
             acc.add(w);
         }
-        acc.total()
-    };
-    if (sum_wp - 1.0).abs() > WEIGHT_TOLERANCE {
-        return Err(Error::invalid_input(format!(
-            "Portfolio weights must sum to 1.0 (got {sum_wp})"
-        )));
-    }
-    let sum_wb: f64 = {
-        let mut acc = NeumaierAccumulator::new();
-        for &w in &input.benchmark_weights {
-            acc.add(w);
-        }
-        acc.total()
-    };
-    if (sum_wb - 1.0).abs() > WEIGHT_TOLERANCE {
-        return Err(Error::invalid_input(format!(
-            "Benchmark weights must sum to 1.0 (got {sum_wb})"
-        )));
+        check_weights_sum(side_name, acc.total())?;
     }
 
     // Portfolio / benchmark total returns: r_p = h_p'r, r_b = h_b'r.

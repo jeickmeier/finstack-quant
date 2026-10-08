@@ -5,7 +5,6 @@
 
 pub(crate) mod composite;
 pub(crate) mod convert;
-mod exotic_rates;
 pub(crate) mod instruments;
 pub(crate) mod market;
 mod merton_mc;
@@ -16,6 +15,7 @@ pub(crate) mod typed_credit;
 pub(crate) mod typed_equity;
 pub(crate) mod typed_fx;
 mod typed_legs;
+pub(crate) mod typed_macros;
 pub(crate) mod typed_rates;
 pub(crate) mod typed_revolving_credit;
 mod var;
@@ -666,15 +666,12 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "- instruments, builders and ``price_instrument``: ``finstack_quant.valuations.instruments``\n",
             "- results: ``ValuationResult`` here; per-flow tables via ``instruments.instrument_cashflows``\n",
             "- composites, listed-market catalog, JSON schemas:\n",
-            "  ``.composite``, ``.market``, ``.schema``\n\n",
-            "The module-level ``*_coupon_profile`` / ``cms_spread_option_intrinsic`` / \n",
-            "``callable_range_accrual_accrued`` functions are deterministic exotic-rates helpers.",
+            "  ``.composite``, ``.market``, ``.schema``",
         ),
     )?;
 
     m.add_class::<PyValuationResult>()?;
     composite::register(py, &m)?;
-    exotic_rates::register(py, &m)?;
     schema::register(py, &m)?;
     register_instruments(py, &m)?;
     register_market(py, &m)?;
@@ -683,11 +680,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         py,
         [
             "ValuationResult",
-            "tarn_coupon_profile",
-            "snowball_coupon_profile",
-            "inverse_floater_coupon_profile",
-            "cms_spread_option_intrinsic",
-            "callable_range_accrual_accrued",
             "composite",
             "instruments",
             "market",

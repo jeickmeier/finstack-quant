@@ -106,15 +106,8 @@ impl PreparedHullWhiteModel {
             ));
         }
         let config = HullWhiteTreeConfig::new(params.kappa, params.sigma, steps);
-        let discount = ModelDiscountCurve::new(disc, as_of)
-            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
-        let tree =
-            HullWhiteTree::calibrate(config, &discount, ttm, mandatory_times).map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        let discount = ModelDiscountCurve::new(disc, as_of)?;
+        let tree = HullWhiteTree::calibrate(config, &discount, ttm, mandatory_times)?;
         Ok(Self {
             tree: Arc::new(tree),
             as_of,
@@ -324,9 +317,7 @@ impl BermudanSwaptionPricer {
             &format!("BermudanSwaption {}", swaption.id),
             market,
         )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })
+        .map_err(PricingError::from)
     }
 
     /// Price using Hull-White tree.
@@ -348,9 +339,7 @@ impl BermudanSwaptionPricer {
             ));
         }
 
-        let ttm = swaption.time_to_maturity(as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let ttm = swaption.time_to_maturity(as_of)?;
 
         if ttm <= 0.0 {
             // Expired - return zero
@@ -366,9 +355,7 @@ impl BermudanSwaptionPricer {
         // calibrating a tree with an empty exercise grid (which previously
         // produced a misleading model failure and required market data for a
         // position that had already expired).
-        let exercise_times = swaption.exercise_times(as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let exercise_times = swaption.exercise_times(as_of)?;
         if exercise_times.is_empty() {
             return Ok(ValuationResult::stamped(
                 swaption.id.as_str(),
@@ -395,14 +382,13 @@ impl BermudanSwaptionPricer {
                 Hw1fParamFamily::Swaption,
                 swaption.get_discount_curve_id().as_str(),
                 &swaption.instrument_pricing_overrides.model_config,
-                Some(
-                    HullWhiteCalibrationParams::new(cached_config.kappa, cached_config.sigma)
-                        .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?,
-                ),
+                Some(HullWhiteCalibrationParams::new(
+                    cached_config.kappa,
+                    cached_config.sigma,
+                )?),
                 &format!("BermudanSwaption {}", swaption.id),
                 market,
-            )
-            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
+            )?;
             if resolved.kappa.to_bits() != cached_config.kappa.to_bits()
                 || resolved.sigma.to_bits() != cached_config.sigma.to_bits()
                 || swaption
@@ -418,19 +404,8 @@ impl BermudanSwaptionPricer {
             }
             // Validate and reuse the prepared model.
             let valuator =
-                BermudanSwaptionTreeValuator::new(swaption, cached_tree, disc.as_ref(), as_of)
-                    .map_err(|e| {
-                        PricingError::model_failure_with_context(
-                            e.to_string(),
-                            PricingErrorContext::default(),
-                        )
-                    })?;
-            let pv = valuator.price().map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+                BermudanSwaptionTreeValuator::new(swaption, cached_tree, disc.as_ref(), as_of)?;
+            let pv = valuator.price()?;
             (pv, true)
         } else {
             // Prepare a request-local tree (O(Steps × Time) per instrument).
@@ -472,12 +447,7 @@ impl BermudanSwaptionPricer {
                         )
                     },
                 )?;
-            let pv = valuator.price().map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+            let pv = valuator.price()?;
             (pv, false)
         };
 
@@ -528,9 +498,7 @@ impl BermudanSwaptionPricer {
             ));
         }
 
-        let ttm = swaption.time_to_maturity(as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let ttm = swaption.time_to_maturity(as_of)?;
 
         if ttm <= 0.0 {
             // Expired - return zero
@@ -541,9 +509,7 @@ impl BermudanSwaptionPricer {
             ));
         }
 
-        let exercise_times = swaption.exercise_times(as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let exercise_times = swaption.exercise_times(as_of)?;
         if exercise_times.is_empty() {
             return Ok(ValuationResult::stamped(
                 swaption.id.as_str(),
@@ -590,12 +556,9 @@ impl BermudanSwaptionPricer {
                     as_of,
                 )
             })
-            .collect::<finstack_quant_core::Result<Vec<_>>>()
-            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
         let terms = HwExerciseTerms {
-            strike: swaption
-                .strike_f64()
-                .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?,
+            strike: swaption.strike_f64()?,
             notional: swaption.notional.amount(),
             option_type: swaption.option_type,
             settlement: swaption.settlement,
@@ -607,10 +570,7 @@ impl BermudanSwaptionPricer {
             &valid_exercise_times,
             ttm,
             self.config.mc.min_steps_between_events,
-        )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        )?;
 
         // Build θ(t) times for calibration (use grid times)
         let theta_times: Vec<f64> = time_grid
@@ -620,8 +580,7 @@ impl BermudanSwaptionPricer {
             .filter(|&t| t <= ttm)
             .collect();
 
-        let model_curve = ModelDiscountCurve::new(disc.as_ref(), as_of)
-            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
+        let model_curve = ModelDiscountCurve::new(disc.as_ref(), as_of)?;
         let discount_fn = |t| model_curve.get_df(t).unwrap_or(f64::NAN);
 
         // Calibrate Hull-White parameters from discount curve
@@ -678,21 +637,14 @@ impl BermudanSwaptionPricer {
             )
         })?;
 
-        let estimate = lsmc_pricer
-            .price_bermudan_with_grid(
-                exercise_value,
-                initial_rate,
-                &time_grid,
-                &exercise_indices,
-                &basis,
-                swaption.notional.currency(),
-            )
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        let estimate = lsmc_pricer.price_bermudan_with_grid(
+            exercise_value,
+            initial_rate,
+            &time_grid,
+            &exercise_indices,
+            &basis,
+            swaption.notional.currency(),
+        )?;
 
         let mut result = ValuationResult::stamped(swaption.id.as_str(), as_of, estimate.mean);
 
@@ -882,10 +834,8 @@ pub(crate) fn apply_exercise_today(
             )
         })?;
     let value =
-        value_with_exercise_today(swaption, discount.as_ref(), as_of, result.value.amount())
-            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
-    result.value = Money::new(value, swaption.notional.currency())
-        .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
+        value_with_exercise_today(swaption, discount.as_ref(), as_of, result.value.amount())?;
+    result.value = Money::new(value, swaption.notional.currency())?;
     Ok(())
 }
 

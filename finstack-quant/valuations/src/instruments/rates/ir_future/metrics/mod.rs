@@ -27,13 +27,9 @@ pub(crate) fn register_ir_future_metrics(
             (FuturesPrice, pricing::FuturesPriceCalculator),
             (ImpliedForward, pricing::ImpliedForwardCalculator),
             (ConvexityAdjustment, pricing::ConvexityAdjustmentCalculator),
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::InterestRateFuture,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
             // Theta is now registered universally in metrics::standard_registry()
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::InterestRateFuture,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
     Ok(())

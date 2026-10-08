@@ -2072,43 +2072,11 @@ export interface D_482Fa346C77E25F26A51 {
   expected_shortfall: Money9;
   npv: Money10;
   /**
-   * Number of simulated scenario paths (`2 × pricing_mode.num_paths` for
-   * antithetic Monte Carlo, prefixes × suffixes for Hybrid).
+   * Number of simulated scenario paths (`2 × pricing_mode.num_paths` with
+   * antithetic pairing, `pricing_mode.num_paths` without).
    */
   num_paths: number;
-  /**
-   * Pricing mode used.
-   */
-  pricing_mode:
-    | "tree"
-    | {
-        monte_carlo: {
-          /**
-           * Pair each estimator's path with its sign-flipped mirror.
-           */
-          antithetic: boolean;
-          /**
-           * Number of independent estimators; must be at least two to estimate
-           * sampling uncertainty. With `antithetic` each estimator averages a
-           * `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
-           * Sample standard error and the Student-t interval use this estimator
-           * count, with `num_paths - 1` degrees of freedom.
-           */
-          num_paths: number;
-        };
-      }
-    | {
-        hybrid: {
-          /**
-           * Monte Carlo continuation paths per tree prefix
-           */
-          num_paths: number;
-          /**
-           * Tree periods before switching to MC
-           */
-          tree_periods: number;
-        };
-      };
+  pricing_mode: DFcd765F028A63B1F206F;
   /**
    * Two-sided 95% Student-t confidence interval for the mean PV, in the
    * NPV currency, using one fewer degree of freedom than the independent
@@ -3019,6 +2987,25 @@ export interface Money10 {
     | "ZAR"
     | "ZMW"
     | "ZWL";
+}
+/**
+ * Pricing mode used.
+ */
+export interface DFcd765F028A63B1F206F {
+  monte_carlo: {
+    /**
+     * Pair each estimator's path with its sign-flipped mirror.
+     */
+    antithetic: boolean;
+    /**
+     * Number of independent estimators; must be at least two to estimate
+     * sampling uncertainty. With `antithetic` each estimator averages a
+     * `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
+     * Sample standard error and the Student-t interval use this estimator
+     * count, with `num_paths - 1` degrees of freedom.
+     */
+    num_paths: number;
+  };
 }
 /**
  * Tranche-level pricing result.

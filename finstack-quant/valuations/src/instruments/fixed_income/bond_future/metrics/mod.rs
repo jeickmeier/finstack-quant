@@ -37,12 +37,8 @@ pub(crate) fn register_bond_future_metrics(
         metrics: [
             (FuturesPrice, pricing::FuturesPriceCalculator),
             (ConversionFactor, pricing::ConversionFactorCalculator),
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::fixed_income::bond_future::BondFuture,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::fixed_income::bond_future::BondFuture,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     };
     Ok(())

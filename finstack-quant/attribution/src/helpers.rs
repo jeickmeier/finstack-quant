@@ -66,8 +66,7 @@ impl InstrumentFactorUse {
         let inflation = !deps.curves.inflation_curves.is_empty();
         let fx = !deps.fx_pairs.is_empty() || instrument.fx_exposure().is_some();
         let volatility = !deps.volatility_dependencies.is_empty();
-        let scalars =
-            !deps.market_scalar_ids.is_empty() || instrument.dividend_schedule_id().is_some();
+        let scalars = !deps.market_scalar_ids.is_empty();
         // An empty dependency set is "undeclared", not "uses nothing". Test
         // stubs and some custom instruments omit the declaration; fail open
         // so a live FX/scalar/credit factor is not dropped into residual.

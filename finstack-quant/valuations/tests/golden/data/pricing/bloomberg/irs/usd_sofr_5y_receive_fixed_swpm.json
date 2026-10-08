@@ -527,15 +527,7 @@
   "expected": {
     "npv": -91334.81,
     "par_rate": 0.0370075,
-    "dv01": -4523.48,
-    "fixed_leg_payment_count": 5.0,
-    "floating_leg_payment_count": 5.0,
-    "fixed_first_payment_date": 20944.0,
-    "fixed_last_payment_date": 22406.0,
-    "floating_first_payment_date": 20944.0,
-    "floating_last_payment_date": 22406.0,
-    "fixed_first_accrual_factor": 1.013888888889,
-    "floating_first_accrual_factor": 1.013888888889
+    "dv01": -4523.48
   },
   "tolerances": {
     "npv": {
@@ -549,30 +541,6 @@
     "dv01": {
       "abs": 0.65,
       "tolerance_reason": "Executable DV01 from Finstack Quant's signed receive-fixed convention against the calibrated curve. The OIS compounding override slightly shifts the bootstrap-implied curve, producing a small (~0.6) DV01 delta vs Bloomberg's screen value. Bloomberg's screen-positive 4523.48 is retained in inputs.source_reference.screen_outputs for provenance."
-    },
-    "fixed_leg_payment_count": {
-      "abs": 1e-12
-    },
-    "floating_leg_payment_count": {
-      "abs": 1e-12
-    },
-    "fixed_first_payment_date": {
-      "abs": 1e-12
-    },
-    "fixed_last_payment_date": {
-      "abs": 1e-12
-    },
-    "floating_first_payment_date": {
-      "abs": 1e-12
-    },
-    "floating_last_payment_date": {
-      "abs": 1e-12
-    },
-    "fixed_first_accrual_factor": {
-      "abs": 1e-12
-    },
-    "floating_first_accrual_factor": {
-      "abs": 1e-12
     }
   }
 }

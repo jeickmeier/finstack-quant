@@ -20,6 +20,14 @@
 - Python `ApplicationReport.warnings_json` and `HorizonResult.warnings_json`; `warnings` is the same list.
 - Rust `apply_time_roll_forward` (apply a `TimeRollForward` operation through `ScenarioEngine::apply`), the crate-root `ArbitrageViolation` re-export, `ApplicationEnvelope::into_parts`, `HazardBumpMode::is_solve_to_par`, `TemplateRegistry::get` and `RegisteredTemplate` (use `build`, `build_component`, `component_ids`, `list`), `schema::SCENARIO_SCHEMA_BASE` / `SCENARIO_SCHEMA_FILENAME`, and the unused `Error` constructors `market_data_not_found`, `node_not_found`, `invalid_tenor`, `tenor_not_found`, `invalid_period`.
 
+## [0.10.0] - 2026-10-06
+
+### Dependencies
+
+#### Removed
+
+- Unused `indexmap` dependency from `finstack-quant-models`.
+
 ### Models API simplification
 
 #### Added

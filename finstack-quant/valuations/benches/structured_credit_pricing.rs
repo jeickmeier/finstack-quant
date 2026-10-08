@@ -254,7 +254,7 @@ fn bench_pool_metrics(c: &mut Criterion) {
     let market = create_market();
     let as_of = test_date();
 
-    let pool_metrics = vec![MetricId::CloWas, MetricId::WAM, MetricId::CloDiversity];
+    let pool_metrics = vec![MetricId::CloWas, MetricId::WAM];
 
     {
         let num_assets = &100;
@@ -349,7 +349,6 @@ fn bench_full_metrics_suite(c: &mut Criterion) {
         MetricId::CloWas,
         MetricId::WAM,
         MetricId::CloWarf,
-        MetricId::CloDiversity,
     ];
 
     group.bench_function("all_metrics", |b| {

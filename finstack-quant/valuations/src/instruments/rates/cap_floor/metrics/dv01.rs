@@ -30,10 +30,8 @@ impl MetricCalculator for Dv01Calculator {
                 .is_err();
         if single_curve_ois {
             if !discount_has_replay {
-                return UnifiedDv01Calculator::<CapFloor>::new(
-                    Dv01CalculatorConfig::parallel_discount_only(),
-                )
-                .calculate(context);
+                return UnifiedDv01Calculator::new(Dv01CalculatorConfig::parallel_discount_only())
+                    .calculate(context);
             }
             let bump_bp = sens_config::from_context_or_default(
                 context.get_config(),
@@ -52,10 +50,8 @@ impl MetricCalculator for Dv01Calculator {
         let forward = market.get_forward(cap_floor.forward_curve_id.as_str())?;
         let forward_has_replay = forward.rate_calibration().is_some();
         if !discount_has_replay || !forward_has_replay {
-            return UnifiedDv01Calculator::<CapFloor>::new(
-                Dv01CalculatorConfig::parallel_combined(),
-            )
-            .calculate(context);
+            return UnifiedDv01Calculator::new(Dv01CalculatorConfig::parallel_combined())
+                .calculate(context);
         }
 
         let bump_bp = sens_config::from_context_or_default(

@@ -48,10 +48,8 @@ impl MetricCalculator for IrsDv01Calculator {
                     .is_some()
         };
         if !has_replay {
-            return UnifiedDv01Calculator::<InterestRateSwap>::new(
-                Dv01CalculatorConfig::parallel_combined(),
-            )
-            .calculate(context);
+            return UnifiedDv01Calculator::new(Dv01CalculatorConfig::parallel_combined())
+                .calculate(context);
         }
 
         let bump_bp = sens_config::from_context_or_default(

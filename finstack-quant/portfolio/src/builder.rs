@@ -73,7 +73,7 @@ impl PortfolioBuilder {
     /// # Returns
     ///
     /// A builder with no configured currency, valuation date, entities, or positions.
-    pub fn new(id: impl Into<String>) -> Self {
+    pub(crate) fn new(id: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             name: None,

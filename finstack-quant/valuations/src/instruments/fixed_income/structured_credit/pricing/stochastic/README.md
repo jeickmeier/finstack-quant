@@ -1,8 +1,8 @@
 # Structured Credit — Stochastic Pricing
 
-Valuations owns structured-credit calibration presets and the scenario-tree /
-Monte Carlo orchestration that runs each simulated collateral path through the
-deal waterfall. Product-independent default, prepayment, correlation, and
+Valuations owns structured-credit calibration presets and the Monte Carlo
+orchestration that runs each simulated collateral path through the deal
+waterfall. Product-independent default, prepayment, correlation, and
 finite-pool copula engines live in
 `finstack_quant_models::credit::pool`.
 
@@ -11,7 +11,7 @@ finite-pool copula engines live in
 ```text
 stochastic/
 ├── calibrations.rs  # registry-backed RMBS/CLO/CMBS/ABS presets
-├── tree/config.rs   # valuation-owned scenario-tree configuration
+├── tree/config.rs   # valuation-owned scenario configuration (horizon, specs, seed)
 └── pricer/
     ├── config.rs    # StructuredCreditPricingMode and internal pricer configuration
     ├── engine.rs    # path generation plus waterfall orchestration
@@ -61,16 +61,15 @@ let result = clo.price_stochastic_with_mode(
 ```
 
 `StructuredCreditPricingMode::default()` uses 5,000 antithetic estimators (10,000 simulated
-paths); `num_paths` always counts independent estimators. Tree mode is
-bounded by its non-recombining node count and is intended only for short
-horizons. `StochasticPricingResult` and `TranchePricingResult` remain
-valuation-owned outputs.
+paths); `num_paths` always counts independent estimators.
+`StochasticPricingResult` and `TranchePricingResult` remain valuation-owned
+outputs.
 
 The path seed is fixed by the internal scenario configuration, so repeated
 runs and bump-and-reprice sensitivities reuse common random numbers.
 
 Pools of real instruments (`AssetPool::instruments`) price through the same
-modes. Each path resolves every name's default from its own hazard curve or
+engine. Each path resolves every name's default from its own hazard curve or
 the deal model — through the per-name copula when the default model is a
 copula — and advances each stochastic revolver's spread (CIR, market-anchored
 on its hazard curve) and utilization (exact OU toward the spread-linked

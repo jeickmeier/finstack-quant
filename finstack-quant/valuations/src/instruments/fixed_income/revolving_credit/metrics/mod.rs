@@ -49,9 +49,7 @@ pub(crate) fn register_revolving_credit_metrics(
         registry: registry,
         instrument: InstrumentType::RevolvingCredit,
         metrics: [
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::RevolvingCredit,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
             // CS01: with a replayable credit curve, rebootstrap it after
             // bumping its par spreads; with an analyst-built (knot) curve,
             // bump the hazard rates directly. With no credit curve, survival
@@ -64,9 +62,7 @@ pub(crate) fn register_revolving_credit_metrics(
                 crate::instruments::RevolvingCredit,
             >::hazard_when_credit_curve()),
             // Theta is now registered universally in metrics::standard_registry()
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::RevolvingCredit,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
             // Quote metrics on the settlement schedule (LSTA convention: a
             // quote applies to the drawn balance plus accrued).
             (DiscountMargin, quotes::DiscountMarginCalculator),

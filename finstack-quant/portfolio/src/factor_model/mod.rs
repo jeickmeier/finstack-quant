@@ -50,6 +50,4 @@ pub use weight_allocation::{
     AllocationScheme, StrategyAllocation, StrategyAllocationInput, WeightAllocationResult,
     WeightAllocationSpec,
 };
-pub use whatif::{
-    FactorContributionDelta, PositionChange, StressPnl, StressResult, WhatIfEngine, WhatIfResult,
-};
+pub use whatif::{FactorContributionDelta, PositionChange, StressPnl, StressResult, WhatIfResult};

@@ -13,8 +13,8 @@ use finstack_quant_core::{Error, Result};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-pub(super) fn active_hazards(index: &CreditIndexData, use_issuers: bool) -> Vec<Arc<HazardCurve>> {
-    if let Some(issuers) = index.issuer_credit_curves.as_ref().filter(|_| use_issuers) {
+pub(super) fn active_hazards(index: &CreditIndexData) -> Vec<Arc<HazardCurve>> {
+    if let Some(issuers) = index.issuer_credit_curves.as_ref() {
         // One quote shock per curve, even if several names share its recipe.
         issuers
             .values()

@@ -46,12 +46,8 @@ pub(crate) fn register_cliquet_option_metrics(
             metrics: [
                 (Vega, crate::metrics::GenericFdVega::<crate::instruments::CliquetOption>::default()),
                 (Rho, rho::RhoCalculator),
-                (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                    crate::instruments::CliquetOption,
-                >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-                (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                    crate::instruments::CliquetOption,
-                >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+                (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+                (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
             ]
         }
     }

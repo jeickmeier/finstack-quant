@@ -57,10 +57,9 @@ actually reach for: the builders (`CapFloorBuilder`,
 `OvernightCouponConvention`, `OvernightSpreadCompounding`,
 `irs::FloatingLegCompounding`, `swaption::{SABRParameters, BermudanSchedule, BermudanType,
 CashSettlementMethod, BermudanPricingMethod, BermudanSwaptionPricer,
-BermudanSwaptionTreeValuator, SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer, SwaptionParams}`,
+BermudanSwaptionTreeValuator, SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer}`,
 `xccy_swap::{NotionalExchange, ResettingSide,
 XccySwapLeg}`, `cms_swap::{FundingLeg, FundingLegSpec}`,
-`deposit::ConventionDepositParams`, `fra::ConventionFraParams`,
 `ir_future::FutureContractSpecs`, and `hw1f`.
 Reusable `HullWhiteParams` and Hull-White equations live at
 `finstack_quant_models::rates::hull_white`.

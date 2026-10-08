@@ -45,10 +45,10 @@ const PER_NAME_SEED_SALT: u64 = 0x5350_4552_4E41_4D45; // "SPERNAME"
 
 /// Salt for the INDEPENDENT component of the prepayment factor.
 ///
-/// XOR-salting keeps this stream disjoint from the credit-factor,
-/// per-name and tree-tail streams, so adding it leaves every existing draw
-/// sequence bit-identical — the credit factors, and therefore all existing
-/// default results, are unchanged.
+/// XOR-salting keeps this stream disjoint from the credit-factor and
+/// per-name streams, so adding it leaves every existing draw sequence
+/// bit-identical — the credit factors, and therefore all existing default
+/// results, are unchanged.
 const PREPAY_FACTOR_SEED_SALT: u64 = 0x5052_4550_4159_5A32; // "PREPAYZ2"
 
 /// Independent stream for initial prepayment regimes and monthly transitions.
@@ -58,20 +58,9 @@ const PREPAY_REGIME_SEED_SALT: u64 = 0x5052_4550_4159_5247; // "PREPAYRG"
 ///
 /// Revolver spread and utilization shocks of instrument pools are drawn from
 /// a Philox stream seeded with `config.seed ^ INSTRUMENT_PATH_SEED_SALT`,
-/// disjoint from the systematic-factor, per-name and tree-tail stream
-/// spaces, so adding instrument collateral never perturbs the draws of the
-/// other channels.
+/// disjoint from the systematic-factor and per-name stream spaces, so adding
+/// instrument collateral never perturbs the draws of the other channels.
 const INSTRUMENT_PATH_SEED_SALT: u64 = 0x494E_5354_5255_4D50; // "INSTRUMP"
-
-/// Seed salt for the tree-mode tail-month RNG.
-///
-/// Tree-mode paths enumerate base-`branch_count` digits of the path index for
-/// the leading months; months beyond `log_branch(path_count)` carry no digit
-/// information and are drawn from a Philox substream seeded with
-/// `config.seed ^ TREE_TAIL_SEED_SALT` instead (see `StochasticPricer::tree_path_factors`).
-/// The salt keeps these tail streams disjoint from the systematic-factor and
-/// per-name stream spaces.
-const TREE_TAIL_SEED_SALT: u64 = 0x5452_4545_5441_494C; // "TREETAIL"
 
 /// Stochastic pricing engine for structured credit.
 ///
@@ -212,70 +201,16 @@ impl StochasticPricer {
         context: &MarketContext,
     ) -> Result<StochasticPricingResult> {
         let prepared = self.prepare_run(instrument, context)?;
-        match &self.config.pricing_mode {
-            StructuredCreditPricingMode::Tree => self.price_tree(instrument, context, &prepared),
-            StructuredCreditPricingMode::MonteCarlo {
-                num_paths,
-                antithetic,
-            } => self.price_monte_carlo(instrument, context, *num_paths, *antithetic, &prepared),
-            StructuredCreditPricingMode::Hybrid {
-                tree_periods,
-                num_paths,
-            } => self.price_hybrid(instrument, context, *tree_periods, *num_paths, &prepared),
-        }
+        let StructuredCreditPricingMode::MonteCarlo {
+            num_paths,
+            antithetic,
+        } = &self.config.pricing_mode;
+        self.price_monte_carlo(instrument, context, *num_paths, *antithetic, &prepared)
     }
 
-    fn price_tree(
-        &self,
-        instrument: &StructuredCredit,
-        context: &MarketContext,
-        prepared: &PreparedRun,
-    ) -> Result<StochasticPricingResult> {
-        let terminal_paths = self
-            .config
-            .tree_config
-            .terminal_path_count(self.config.tree_config.num_periods);
-        if terminal_paths > self.config.max_tree_paths {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "structured_credit_stochastic tree requires {terminal_paths} terminal paths, \
-                 above max_tree_paths={}",
-                self.config.max_tree_paths
-            )));
-        }
-
-        let branch_count = self.config.tree_config.branch_count.max(1);
-        let path_count = terminal_paths.max(1);
-        let per_name_simulator = self.per_name_simulator()?;
-        // Tree mode draws no antithetic pairs: every path is an independent
-        // stratified node, so the std-error is the plain i.i.d. estimator.
-        let mut collector = ScenarioCollector::new(
-            instrument,
-            path_count,
-            false,
-            self.tracks_option_cost(prepared),
-        )?;
-        for path_index in 0..path_count {
-            let shocks =
-                self.tree_path_shocks(instrument, path_index, path_count, branch_count, prepared)?;
-            // Tree mode draws no antithetic pairs — each path is an
-            // independent stratified node, so the per-name substream is
-            // per-path and never negated.
-            let per_name_engine = per_name_simulator
-                .as_ref()
-                .map(|sim| self.per_name_engine(sim, path_index, false));
-            let output = self.price_path(
-                instrument,
-                context,
-                prepared,
-                shocks,
-                per_name_engine,
-                (path_index, false),
-            )?;
-            collector.record_output(output);
-        }
-        collector.finalize(self, StructuredCreditPricingMode::Tree)
-    }
-
+    /// Price `num_paths` independent estimators, each path drawing its monthly
+    /// factors from its own Philox substream inside the (parallel) path loop
+    /// so no path's factors outlive its pricing.
     fn price_monte_carlo(
         &self,
         instrument: &StructuredCredit,
@@ -293,126 +228,15 @@ impl StochasticPricer {
         }
 
         // `num_paths` counts independent estimators; antithetic pairing
-        // simulates each estimator as a `(Z, -Z)` pair of paths.
-        let simulated_paths = num_paths
+        // simulates each estimator as a `(Z, -Z)` pair of adjacent
+        // `(2k, 2k+1)` paths.
+        let total_paths = num_paths
             .checked_mul(if antithetic { 2 } else { 1 })
             .ok_or_else(|| {
                 finstack_quant_core::Error::Validation(
                     "Monte Carlo pricing path count overflow".to_string(),
                 )
             })?;
-        self.price_factor_sets(
-            instrument,
-            context,
-            |path_index| self.monte_carlo_path_factors(instrument, path_index, antithetic),
-            simulated_paths,
-            StructuredCreditPricingMode::MonteCarlo {
-                num_paths,
-                antithetic,
-            },
-            prepared,
-        )
-    }
-
-    fn price_hybrid(
-        &self,
-        instrument: &StructuredCredit,
-        context: &MarketContext,
-        tree_periods: usize,
-        num_paths: usize,
-        prepared: &PreparedRun,
-    ) -> Result<StochasticPricingResult> {
-        if tree_periods == 0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "Hybrid pricing requires at least one tree prefix period".to_string(),
-            ));
-        }
-        if num_paths == 0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "Hybrid pricing requires at least one Monte Carlo suffix path".to_string(),
-            ));
-        }
-
-        let branch_count = self.config.tree_config.branch_count.max(1);
-        let prefix_count = self
-            .config
-            .tree_config
-            .terminal_path_count(tree_periods)
-            .max(1);
-        let total_paths = prefix_count.checked_mul(num_paths).ok_or_else(|| {
-            finstack_quant_core::Error::Validation("Hybrid pricing path count overflow".to_string())
-        })?;
-        if total_paths > self.config.max_tree_paths {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Hybrid pricing requires {total_paths} paths, above max_tree_paths={}",
-                self.config.max_tree_paths
-            )));
-        }
-
-        let months_per_period = instrument.frequency.months().unwrap_or(1).max(1) as usize;
-        let month_count = self.month_count(instrument);
-        let prefix_months = tree_periods
-            .saturating_mul(months_per_period)
-            .min(month_count);
-        let suffix_months = month_count.saturating_sub(prefix_months);
-        let has_stochastic_rates = self.has_stochastic_rates();
-
-        // Path `prefix_index * num_paths + suffix_index` continues tree prefix
-        // `prefix_index` with Monte Carlo suffix draws from its own Philox
-        // substream: `Philox(seed).substream(path_id)` is statistically
-        // independent for any pair of distinct path ids, so the hybrid suffix
-        // factors carry no inter-path correlation.
-        let hybrid_factors = |path_index: usize| {
-            let prefix_index = path_index / num_paths;
-            let prefix =
-                self.tree_path_factors(prefix_index, prefix_count, branch_count, prefix_months);
-            let mut rng = PhiloxRng::new(self.config.tree_config.seed).substream(path_index as u64);
-            let mut factors = Vec::with_capacity(prefix.len() + suffix_months);
-            factors.extend_from_slice(&prefix);
-            for _ in 0..suffix_months {
-                factors.push(if has_stochastic_rates {
-                    rng.next_std_normal()
-                } else {
-                    0.0
-                });
-            }
-            factors
-        };
-
-        self.price_factor_sets(
-            instrument,
-            context,
-            hybrid_factors,
-            total_paths,
-            StructuredCreditPricingMode::Hybrid {
-                tree_periods,
-                num_paths,
-            },
-            prepared,
-        )
-    }
-
-    /// Price `total_paths` scenario paths, drawing each path's monthly
-    /// factors from `path_factors(path_index)` inside the (parallel) path
-    /// loop so no path's factors outlive its pricing.
-    fn price_factor_sets(
-        &self,
-        instrument: &StructuredCredit,
-        context: &MarketContext,
-        path_factors: impl Fn(usize) -> Vec<f64> + Sync,
-        total_paths: usize,
-        pricing_mode: StructuredCreditPricingMode,
-        prepared: &PreparedRun,
-    ) -> Result<StochasticPricingResult> {
-        // Monte Carlo antithetic runs simulate `total_paths = 2 × num_paths`
-        // paths as adjacent `(2k, 2k+1)` pairs. Hybrid mode draws no pairs.
-        let antithetic = matches!(
-            pricing_mode,
-            StructuredCreditPricingMode::MonteCarlo {
-                antithetic: true,
-                ..
-            }
-        );
         let per_name_simulator = self.per_name_simulator()?;
         // `try_map_ordered` over `0..n` returns outputs in path order
         // regardless of rayon scheduling, and each path keeps a stable
@@ -420,7 +244,7 @@ impl StochasticPricer {
         // properties are required for bit-identical serial/parallel results
         // (the downstream Welford accumulation is order-sensitive).
         let price_factors = |path_index: usize| {
-            let factors = path_factors(path_index);
+            let factors = self.monte_carlo_path_factors(instrument, path_index, antithetic);
             let shocks = self.path_shocks_from_factors(
                 instrument,
                 &factors,
@@ -454,7 +278,13 @@ impl StochasticPricer {
             collector.record_output(output);
         }
 
-        collector.finalize(self, pricing_mode)
+        collector.finalize(
+            self,
+            StructuredCreditPricingMode::MonteCarlo {
+                num_paths,
+                antithetic,
+            },
+        )
     }
 
     /// Monthly systematic factors of Monte Carlo path `path_index`.
@@ -716,70 +546,6 @@ impl StochasticPricer {
         (0..month_count).map(|_| rng.next_std_normal()).collect()
     }
 
-    fn tree_path_shocks(
-        &self,
-        instrument: &StructuredCredit,
-        path_index: usize,
-        path_count: usize,
-        branch_count: usize,
-        prepared: &PreparedRun,
-    ) -> Result<Vec<PeriodPoolShock>> {
-        let month_count = self.month_count(instrument);
-        let factors = self.tree_path_factors(path_index, path_count, branch_count, month_count);
-        self.path_shocks_from_factors(instrument, &factors, (path_index, false), prepared)
-    }
-
-    fn tree_path_factors(
-        &self,
-        mut path_index: usize,
-        path_count: usize,
-        branch_count: usize,
-        month_count: usize,
-    ) -> Vec<f64> {
-        let path_count = path_count.max(1);
-        let branch_count = branch_count.max(1);
-        let original_path_index = path_index;
-        let mut factors = Vec::with_capacity(month_count);
-
-        // Number of leading months the base-`branch_count` digits of the path
-        // index can actually resolve: the largest `m` with
-        // `branch_count^m <= path_count`. Trailing months beyond that are drawn
-        // from a per-path Philox substream so the tail continues to diffuse.
-        let mut resolved_months = 0usize;
-        let mut capacity = 1usize;
-        while resolved_months < month_count {
-            match capacity.checked_mul(branch_count) {
-                Some(next) if next <= path_count => {
-                    capacity = next;
-                    resolved_months += 1;
-                }
-                _ => break,
-            }
-        }
-        let mut tail_rng =
-            (resolved_months < month_count && self.has_stochastic_rates()).then(|| {
-                PhiloxRng::new(self.config.tree_config.seed ^ TREE_TAIL_SEED_SALT)
-                    .substream(original_path_index as u64)
-            });
-
-        for month in 0..month_count {
-            let z = if !self.has_stochastic_rates() {
-                0.0
-            } else if month < resolved_months {
-                let branch = path_index % branch_count;
-                path_index /= branch_count;
-                let p = (branch as f64 + 0.5) / branch_count as f64;
-                finstack_quant_core::math::standard_normal_inv_cdf(p)
-            } else if let Some(rng) = tail_rng.as_mut() {
-                rng.next_std_normal()
-            } else {
-                0.0
-            };
-            factors.push(z);
-        }
-        factors
-    }
-
     /// Configured systematic-factor mean-reversion speed κ (per year).
     ///
     /// For [`LatentFactorSpec::SingleFactor`], κ is taken from the factor spec
@@ -965,9 +731,9 @@ impl StochasticPricer {
         path: (usize, bool),
         prepared: &PreparedRun,
     ) -> Result<Vec<PeriodPoolShock>> {
-        // AR(1)/OU persistence for MC, tree, and hybrid paths: monthly draws
-        // are innovations. Applied unconditionally — persistence is a property
-        // of the factor, not of which channels are simulated.
+        // AR(1)/OU persistence: monthly draws are innovations. Applied
+        // unconditionally — persistence is a property of the factor, not of
+        // which channels are simulated.
         let evolved_storage = Self::evolved_factors(factors, prepared.factor_kappa);
         let factor_path: &[f64] = &evolved_storage;
         let prepay_storage = self.prepay_factors(factor_path, path, prepared);
@@ -1480,7 +1246,7 @@ struct ScenarioCollector {
     /// Per-path deal PVs, recorded in path order. Retained so sampling
     /// statistics can use independent antithetic pair means; the order matches
     /// the antithetic pairing `(2k, 2k+1)` because `record_output` is fed in
-    /// path order (see `price_factor_sets`).
+    /// path order (see `price_monte_carlo`).
     deal_pvs: Vec<f64>,
     tranche_stats: Vec<TrancheScenarioStats>,
     /// Paths on which a collateral draw could not be funded.
@@ -1789,7 +1555,7 @@ mod tests {
         let config = StochasticPricerConfig::new(
             test_date(),
             test_discount_curve(),
-            ScenarioTreeConfig::new(test_date().months_until(instrument.maturity) as usize, 2),
+            ScenarioTreeConfig::new(test_date().months_until(instrument.maturity) as usize),
         )
         .with_pricing_mode(StructuredCreditPricingMode::MonteCarlo {
             num_paths: 2,
@@ -1810,7 +1576,7 @@ mod tests {
         let config = StochasticPricerConfig::new(
             test_date(),
             test_discount_curve(),
-            ScenarioTreeConfig::new(12, 2),
+            ScenarioTreeConfig::new(12),
         );
         let pricer = StochasticPricer::new(config);
         for antithetic in [false, true] {
@@ -1849,35 +1615,6 @@ mod tests {
         assert!(independent_estimator_stats(&[1.0], false).is_err());
         assert!(independent_estimator_stats(&[1.0, 3.0], true).is_err());
         assert!(independent_estimator_stats(&[1.0, 3.0, 2.0], true).is_err());
-    }
-
-    #[test]
-    fn hybrid_mode_prices_tree_prefix_and_mc_suffix_paths() {
-        let instrument = test_instrument();
-        let market = MarketContext::new().insert((*test_discount_curve()).clone());
-        let config = StochasticPricerConfig::new(
-            test_date(),
-            test_discount_curve(),
-            ScenarioTreeConfig::new(test_date().months_until(instrument.maturity) as usize, 2),
-        )
-        .with_pricing_mode(StructuredCreditPricingMode::Hybrid {
-            tree_periods: 3,
-            num_paths: 100,
-        });
-        let pricer = StochasticPricer::new(config);
-
-        let result = pricer.price(&instrument, &market).expect("hybrid price");
-
-        assert_eq!(result.num_paths, 800);
-        assert_eq!(result.tranche_results.len(), 1);
-        assert!(result.npv.amount().is_finite());
-        assert_eq!(
-            result.pricing_mode,
-            StructuredCreditPricingMode::Hybrid {
-                tree_periods: 3,
-                num_paths: 100,
-            }
-        );
     }
 
     /// Regression test: catastrophic cancellation in MC variance accumulation.
@@ -1930,11 +1667,17 @@ mod tests {
         let config = StochasticPricerConfig::new(
             test_date(),
             test_discount_curve(),
-            ScenarioTreeConfig::new(12, 2),
+            ScenarioTreeConfig::new(12),
         );
         let pricer = StochasticPricer::new(config);
         let result = collector
-            .finalize(&pricer, StructuredCreditPricingMode::Tree)
+            .finalize(
+                &pricer,
+                StructuredCreditPricingMode::MonteCarlo {
+                    num_paths: n,
+                    antithetic: false,
+                },
+            )
             .expect("valid pricing result");
 
         // True population variance = delta² = 0.0025
@@ -2088,7 +1831,7 @@ mod tests {
         let instrument = test_instrument();
         let market = MarketContext::new().insert((*test_discount_curve()).clone());
         let price_with_kappa = |kappa: f64| {
-            let mut tree_config = ScenarioTreeConfig::new(24, 2);
+            let mut tree_config = ScenarioTreeConfig::new(24);
             tree_config.factor_spec = LatentFactorSpec::single_factor(1.0, kappa);
             tree_config.default_spec =
                 StochasticDefaultSpec::intensity_process(0.10, 1.0, 0.5, 0.8);
@@ -2124,11 +1867,11 @@ mod tests {
     /// factor ⇒ high MDR and low recovery).
     #[test]
     fn mc_engine_defaults_and_recoveries_co_move_negatively() {
-        let mut rmbs = ScenarioTreeConfig::new(24, 3);
+        let mut rmbs = ScenarioTreeConfig::new(24);
         rmbs.default_spec = rmbs_default_spec();
         rmbs.recovery_spec = RecoverySpec::market_standard_stochastic();
 
-        let mut clo = ScenarioTreeConfig::new(24, 3);
+        let mut clo = ScenarioTreeConfig::new(24);
         clo.default_spec = clo_default_spec();
         clo.recovery_spec = RecoverySpec::MarketCorrelated {
             mean_recovery: 0.40,
@@ -2351,7 +2094,7 @@ mod per_name_copula_tests {
         granularity: PoolGranularity,
         num_paths: usize,
     ) -> StochasticPricerConfig {
-        let mut tree_config = ScenarioTreeConfig::new(num_periods, 2);
+        let mut tree_config = ScenarioTreeConfig::new(num_periods);
         tree_config.default_spec = StochasticDefaultSpec::gaussian_copula(base_cdr, correlation);
         StochasticPricerConfig::new(close(), discount_curve(), tree_config)
             .with_pricing_mode(StructuredCreditPricingMode::MonteCarlo {
@@ -2385,7 +2128,7 @@ mod per_name_copula_tests {
         granularity: PoolGranularity,
         num_paths: usize,
     ) -> StochasticPricerConfig {
-        let mut tree_config = ScenarioTreeConfig::new(num_periods, 2);
+        let mut tree_config = ScenarioTreeConfig::new(num_periods);
         tree_config.default_spec = default_spec;
         StochasticPricerConfig::new(close(), discount_curve(), tree_config)
             .with_pricing_mode(StructuredCreditPricingMode::MonteCarlo {
@@ -2554,7 +2297,7 @@ mod per_name_copula_tests {
         let mut cfg = copula_config(
             0.05,
             0.30,
-            12, // 12 monthly tree periods
+            12, // 12 monthly periods
             PoolGranularity::PerName,
             16,
         );
@@ -2732,7 +2475,7 @@ mod per_name_copula_tests {
         let as_of = deal.closing_date;
         let tree_config = deal
             .build_scenario_tree_config(as_of)
-            .expect("scenario tree config");
+            .expect("scenario config");
 
         match tree_config.factor_spec {
             LatentFactorSpec::SingleFactor { mean_reversion, .. } => assert!(

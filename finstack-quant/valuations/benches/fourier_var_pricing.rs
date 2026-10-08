@@ -11,10 +11,12 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::risk::{
     calculate_var, MarketHistory, MarketScenario, RiskFactorShift, RiskFactorType, VarConfig,
     VarMethod,
 };
+use finstack_quant_valuations::pricer::PricingDispatch;
 use std::hint::black_box;
 use time::Month;
 
@@ -84,8 +86,16 @@ fn bench_taylor_var(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(n), &history, |b, history| {
             b.iter(|| {
                 black_box(
-                    calculate_var(black_box(&[&bond]), &market, history, base, &config, None)
-                        .unwrap(),
+                    calculate_var(
+                        black_box(&[&bond as &dyn Instrument]),
+                        &market,
+                        history,
+                        base,
+                        &config,
+                        PricingDispatch::InstrumentDefault,
+                        None,
+                    )
+                    .unwrap(),
                 )
             });
         });

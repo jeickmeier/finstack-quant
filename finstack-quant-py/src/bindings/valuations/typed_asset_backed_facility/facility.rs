@@ -8,22 +8,19 @@ use crate::bindings::cashflows::builder::specs::{
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::core::types::PyAttributes;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{
-    attributes_from_py, attributes_to_py, bool_repr, day_count_from_py, money_from_py, money_to_py,
-    tenor_from_py,
+    attributes_from_py, bool_repr, day_count_from_py, money_from_py, money_to_py, tenor_from_py,
 };
-use crate::bindings::valuations::instruments::{
-    instrument_default_model, instrument_market_dependencies, metric_typed,
-    parse_typed_instrument_json, price_typed, serialize_typed_instrument_json,
+use crate::bindings::valuations::instruments::serialize_typed_instrument_json;
+use crate::bindings::valuations::typed_macros::{
+    builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
 use crate::bindings::valuations::typed_structured_credit::{
     PyAssetPool, PySimulationDiagnostics, PyStructuredCredit, PyTrancheCashflows,
 };
-use crate::bindings::valuations::PyValuationResult;
 use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -77,29 +74,18 @@ impl PyAssetBackedFacility {
     }
 }
 
+instrument_envelope_methods!(
+    PyAssetBackedFacility,
+    AssetBackedFacility,
+    "asset_backed_facility",
+    PyAssetBackedFacilityBuilder,
+    AssetBackedFacility::builder(),
+    no_fields
+);
+instrument_pricing_methods!(PyAssetBackedFacility);
+
 #[pymethods]
 impl PyAssetBackedFacility {
-    /// Create a fluent builder (mirrors Rust ``AssetBackedFacility::builder()``).
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     A builder with fluent, consuming setter methods.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import AssetBackedFacility
-    /// >>> builder = AssetBackedFacility.builder()
-    /// >>> builder.id("WH-1") is builder
-    /// True
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn builder() -> PyAssetBackedFacilityBuilder {
-        PyAssetBackedFacilityBuilder {
-            inner: Some(AssetBackedFacility::builder()),
-        }
-    }
-
     /// The canonical example: the example CLO pool financed by a USD 80M
     /// commitment drawn USD 70M at a fixed 6%, 80% advance rate, 20% obligor
     /// limit, two-year revolving period and a 24-month term-out.
@@ -125,179 +111,6 @@ impl PyAssetBackedFacility {
         AssetBackedFacility::example()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
-    }
-
-    /// Deserialize from a canonical ``finstack_quant.instrument/1`` envelope.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     Envelope JSON whose instrument type is ``asset_backed_facility``.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacility
-    ///     The decoded facility.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed, carries another instrument type or
-    ///     fails validation.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import AssetBackedFacility
-    /// >>> facility = AssetBackedFacility.example()
-    /// >>> AssetBackedFacility.from_json(facility.to_json()).id
-    /// 'ABF-EXAMPLE'
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        parse_typed_instrument_json(json).map(|inner| Self { inner })
-    }
-
-    /// Serialize to the canonical instrument envelope.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     Envelope accepted by ``price_instrument`` and ``from_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        self.envelope_json()
-    }
-
-    /// Return the facility as a plain ``dict`` (canonical serde shape).
-    ///
-    /// Returns
-    /// -------
-    /// dict[str, Any]
-    ///     Serde form of the Rust facility.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the value cannot be serialized.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner)
-    }
-
-    /// Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Price the lender's projected flows (interest, principal and commitment
-    /// fees) through the shared pricing pipeline.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext
-    ///     Discount and index curves plus fixings for the note and the
-    ///     collateral.
-    /// as_of : datetime.date
-    ///     Valuation date.
-    /// model : str, optional
-    ///     Pricing model key; ``"default"`` selects discounting.
-    /// metrics : list[str], optional
-    ///     Metric identifiers to compute alongside the value (for example
-    ///     ``"abf_borrowing_base_cushion"``, ``"abf_facility_irr"``,
-    ///     ``"dv01"``).
-    /// metric_pricing_overrides : MetricPricingOverrides | dict | str, optional
-    ///     Metric-time overrides merged into
-    ///     ``instrument.spec.metric_pricing_overrides`` before pricing.
-    /// market_history : MarketHistory | dict | str, optional
-    ///     ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
-    ///
-    /// Returns
-    /// -------
-    /// ValuationResult
-    ///     Value plus the requested metrics.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the facility fails validation, a curve is missing, or a metric
-    ///     cannot be computed.
-    #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
-    #[pyo3(
-        text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn price(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        model: &str,
-        metrics: Option<Vec<String>>,
-        metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
-        market_history: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyValuationResult> {
-        price_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            model,
-            metrics,
-            metric_pricing_overrides,
-            market_history,
-        )
-    }
-
-    /// Compute one metric through the shared pricing pipeline.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext
-    ///     Curves and fixings for the projection.
-    /// as_of : datetime.date
-    ///     Valuation date.
-    /// metric_id : str
-    ///     Metric identifier (``"abf_borrowing_base"``,
-    ///     ``"abf_borrowing_base_cushion"``, ``"abf_advance_rate_utilization"``,
-    ///     ``"abf_facility_irr"``, ``"abf_residual_irr"``, ``"dv01"``,
-    ///     ``"cs01"`` ...).
-    /// model : str, optional
-    ///     Pricing model key; ``"default"`` selects discounting.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     The metric value.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the metric is unknown for this instrument or cannot be computed.
-    #[pyo3(signature = (market, as_of, metric_id, model="default"))]
-    #[pyo3(text_signature = "($self, market, as_of, metric_id, model='default')")]
-    fn metric(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        metric_id: &str,
-        model: &str,
-    ) -> PyResult<f64> {
-        metric_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            metric_id,
-            model,
-        )
     }
 
     /// Borrowing base on the closing collateral.
@@ -401,12 +214,6 @@ impl PyAssetBackedFacility {
         let market = extract_market(py, market)?;
         let as_of = py_to_date(as_of)?;
         self.inner.facility_irr(&market, as_of).map_err(core_to_py)
-    }
-
-    /// Instrument identifier.
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.id.to_string()
     }
 
     /// Collateral pool the facility lends against.
@@ -595,34 +402,6 @@ impl PyAssetBackedFacility {
         PyRecoveryModelSpec {
             inner: self.inner.credit_model.recovery_spec.clone(),
         }
-    }
-
-    /// Free-form attributes (tags and metadata).
-    #[getter]
-    fn attributes(&self) -> PyAttributes {
-        attributes_to_py(&self.inner.attributes)
-    }
-
-    /// Default pricing model key (``"discounting"``).
-    #[getter]
-    fn default_model(&self) -> String {
-        instrument_default_model(&self.inner)
-    }
-
-    /// Curves, fixings and series the facility needs from the market.
-    ///
-    /// Returns
-    /// -------
-    /// dict[str, Any]
-    ///     ``MarketDependencies`` serde dict.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the collateral cannot be normalized.
-    #[pyo3(text_signature = "($self)")]
-    fn market_dependencies<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        instrument_market_dependencies(py, &self.inner)
     }
 
     /// Return ``repr(self)``.
@@ -876,9 +655,7 @@ impl PyAssetBackedFacilityBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let converted = InstrumentId::new(value.to_string());
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.id(converted));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.id(converted))
     }
 
     /// Set the collateral pool.
@@ -902,9 +679,8 @@ impl PyAssetBackedFacilityBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyAssetPool>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.collateral(value.inner.clone()));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b
+            .collateral(value.inner.clone()))
     }
 
     /// Set the advance rates, eligibility and concentration limits.
@@ -935,9 +711,7 @@ impl PyAssetBackedFacilityBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let rules: BorrowingBaseRules =
             crate::bindings::module_utils::py_to_serde(py, value, "borrowing_base_rules")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.borrowing_base_rules(rules));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.borrowing_base_rules(rules))
     }
 
     /// Set the total commitment.
@@ -969,9 +743,7 @@ impl PyAssetBackedFacilityBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "commitment")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.commitment(money));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.commitment(money))
     }
 
     /// Set the amount drawn at closing.
@@ -1004,9 +776,7 @@ impl PyAssetBackedFacilityBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "drawn")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.drawn(money));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.drawn(money))
     }
 
     /// Set the facility coupon.
@@ -1040,9 +810,7 @@ impl PyAssetBackedFacilityBuilder {
         } else {
             crate::bindings::module_utils::py_to_serde(py, value, "rate")?
         };
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.rate(spec));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.rate(spec))
     }
 
     /// Set the commitment fee on the undrawn commitment.
@@ -1069,9 +837,8 @@ impl PyAssetBackedFacilityBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted =
             crate::bindings::valuations::instruments::decimal_from_f64(value, "commitment_fee_bp")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.commitment_fee_bp(converted));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b
+            .commitment_fee_bp(converted))
     }
 
     /// Set the closing date.
@@ -1096,9 +863,7 @@ impl PyAssetBackedFacilityBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.closing_date(date));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.closing_date(date))
     }
 
     /// Set the scheduled end of the revolving period.
@@ -1123,9 +888,7 @@ impl PyAssetBackedFacilityBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.revolving_end(date));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.revolving_end(date))
     }
 
     /// Set the legal final maturity.
@@ -1150,9 +913,7 @@ impl PyAssetBackedFacilityBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.maturity(date));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.maturity(date))
     }
 
     /// Set the payment frequency.
@@ -1179,9 +940,7 @@ impl PyAssetBackedFacilityBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let tenor = tenor_from_py(value, "frequency")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.frequency(tenor));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.frequency(tenor))
     }
 
     /// Set the accrual day count.
@@ -1208,9 +967,7 @@ impl PyAssetBackedFacilityBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let day_count = day_count_from_py(value, "day_count")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.day_count(day_count));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.day_count(day_count))
     }
 
     /// Set the payment calendar.
@@ -1236,9 +993,8 @@ impl PyAssetBackedFacilityBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted = value.to_string();
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.calendar_id(converted.into()));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b
+            .calendar_id(converted.into()))
     }
 
     /// Set the events that end revolving early.
@@ -1268,9 +1024,7 @@ impl PyAssetBackedFacilityBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let events: Vec<AmortizationEvent> =
             crate::bindings::module_utils::py_to_serde(py, value, "amortization_events")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.amortization_events(events));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.amortization_events(events))
     }
 
     /// Set the term-out window after revolving.
@@ -1293,9 +1047,7 @@ impl PyAssetBackedFacilityBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn term_out<'py>(mut slf: PyRefMut<'py, Self>, value: u32) -> PyResult<PyRefMut<'py, Self>> {
         let converted = TermOutSpec { months: value };
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.term_out(converted));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.term_out(converted))
     }
 
     /// Set the transaction fees paid through the waterfall ahead of the
@@ -1326,9 +1078,7 @@ impl PyAssetBackedFacilityBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let fees: DealFees = crate::bindings::module_utils::py_to_serde(py, value, "fees")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.fees(fees));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.fees(fees))
     }
 
     /// Set the scheduled draws after closing.
@@ -1357,9 +1107,7 @@ impl PyAssetBackedFacilityBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let draws: Vec<DrawEvent> = crate::bindings::module_utils::py_to_serde(py, value, "draws")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.draws(draws));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.draws(draws))
     }
 
     /// Set whether the line is re-advanced up to the borrowing base each
@@ -1385,9 +1133,8 @@ impl PyAssetBackedFacilityBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: bool,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.readvance_to_borrowing_base(value));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b
+            .readvance_to_borrowing_base(value))
     }
 
     /// Set the collateral liquidation price at the term-out end.
@@ -1412,9 +1159,8 @@ impl PyAssetBackedFacilityBuilder {
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted = value;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.liquidation_price_pct(converted));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b
+            .liquidation_price_pct(converted))
     }
 
     /// Set the discount curve.
@@ -1439,9 +1185,8 @@ impl PyAssetBackedFacilityBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted = CurveId::new(value.to_string());
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.discount_curve_id(converted));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b
+            .discount_curve_id(converted))
     }
 
     /// Replace the whole collateral behavior model.
@@ -1470,9 +1215,7 @@ impl PyAssetBackedFacilityBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let model: CreditModelConfig =
             crate::bindings::module_utils::py_to_serde(py, value, "credit_model")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.credit_model(model));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.credit_model(model))
     }
 
     /// Set the deterministic prepayment model of the collateral.
@@ -1503,9 +1246,7 @@ impl PyAssetBackedFacilityBuilder {
         } else {
             crate::bindings::module_utils::py_to_serde(py, value, "prepayment_spec")?
         };
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.prepayment_spec(spec));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.prepayment_spec(spec))
     }
 
     /// Set the deterministic default model of the collateral.
@@ -1536,9 +1277,7 @@ impl PyAssetBackedFacilityBuilder {
         } else {
             crate::bindings::module_utils::py_to_serde(py, value, "default_spec")?
         };
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.default_spec(spec));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.default_spec(spec))
     }
 
     /// Set the recovery model of the collateral.
@@ -1569,9 +1308,7 @@ impl PyAssetBackedFacilityBuilder {
         } else {
             crate::bindings::module_utils::py_to_serde(py, value, "recovery_spec")?
         };
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.recovery_spec(spec));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.recovery_spec(spec))
     }
 
     /// Set free-form attributes (tags and metadata).
@@ -1601,9 +1338,7 @@ impl PyAssetBackedFacilityBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attributes = attributes_from_py(value)?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.attributes(attributes));
-        Ok(slf)
+        builder_set!(slf, |b: FacilityBuilderInner| b.attributes(attributes))
     }
 
     /// Build the validated facility.

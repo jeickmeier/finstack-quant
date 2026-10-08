@@ -621,10 +621,6 @@ impl crate::instruments::common_impl::traits::Instrument for Autocallable {
         pricer::compute_pv(self, market, as_of)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        self.observation_dates.first().copied()
-    }
-
     fn expiry(&self) -> Option<Date> {
         Some(self.expiry)
     }

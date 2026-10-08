@@ -81,14 +81,14 @@ def test_quanto_asset_financing_and_required_market_inputs() -> None:
     )
     assert overridden.value.amount == pytest.approx(expected_override, abs=0.02)
     del f["market"]["prices"]["EURUSD"]
-    with pytest.raises(RuntimeError, match="EURUSD"):
+    with pytest.raises(KeyError, match="EURUSD"):
         price_instrument(json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "static_replication", [])
 
 
 def test_quanto_rejects_asset_spot_currency_mismatch() -> None:
     f = quanto_fixture()
     f["market"]["prices"]["SPX-SPOT"]["price"]["currency"] = "USD"
-    with pytest.raises(RuntimeError, match=r"(?i)currency"):
+    with pytest.raises(ValueError, match=r"(?i)currency"):
         price_instrument(json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "static_replication", [])
 
 

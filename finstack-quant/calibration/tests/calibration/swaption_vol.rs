@@ -15,16 +15,22 @@ use finstack_quant_calibration::quotes::ids::QuoteId;
 use finstack_quant_calibration::quotes::market_quote::MarketQuote;
 use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+use finstack_quant_core::dates::{
+    BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
+};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::CurveId;
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::instruments::rates::swaption::{Swaption, SwaptionParams};
-use finstack_quant_valuations::instruments::VolatilityModel;
+use finstack_quant_valuations::instruments::rates::irs::{
+    FixedLegSpec, FloatLegSpec, FloatingLegCompounding,
+};
+use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
+use finstack_quant_valuations::instruments::{OptionType, SettlementType, VolatilityModel};
 use finstack_quant_valuations::market::conventions::ids::SwaptionConventionId;
+use rust_decimal::Decimal;
 
 use crate::calibration::calibration_support as cal_utils;
 use finstack_quant_calibration::quotes::vol::VolQuote;
@@ -291,20 +297,51 @@ fn calibrated_swaption_surface_is_not_silently_reused_as_strike_surface() {
     let ctx = MarketContext::try_from(result.result.final_market).expect("restore context");
 
     let expiry = Date::from_calendar_date(2026, Month::January, 1).unwrap();
-    let params = SwaptionParams::payer(
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.045,
-        expiry,
-        expiry,
-        Date::from_calendar_date(2031, Month::January, 1).unwrap(),
-    )
-    .unwrap()
-    .with_fixed_frequency(Tenor::semi_annual())
-    .with_float_frequency(Tenor::quarterly())
-    .with_fixed_day_count(DayCount::Thirty360)
-    .with_float_day_count(DayCount::Act360)
-    .with_vol_model(VolatilityModel::Normal);
-    let swaption = Swaption::new("SWPT-1Yx5Y", &params, "USD-OIS", "USD-SOFR-3M", "USD-SWPT");
+    let swap_end = Date::from_calendar_date(2031, Month::January, 1).unwrap();
+    let fixed = FixedLegSpec {
+        discount_curve_id: CurveId::new("USD-OIS"),
+        rate: Decimal::try_from(0.045).expect("valid strike"),
+        frequency: Tenor::semi_annual(),
+        day_count: DayCount::Thirty360,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: None,
+        stub: StubKind::None,
+        start: expiry,
+        end: swap_end,
+        par_method: None,
+        payment_lag_days: 0,
+        end_of_month: false,
+    };
+    let float = FloatLegSpec {
+        discount_curve_id: CurveId::new("USD-OIS"),
+        forward_curve_id: CurveId::new("USD-SOFR-3M"),
+        spread_bp: Decimal::ZERO,
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act360,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: None,
+        stub: StubKind::None,
+        reset_lag_days: 0,
+        fixing_calendar_id: None,
+        start: expiry,
+        end: swap_end,
+        compounding: FloatingLegCompounding::Simple,
+        payment_lag_days: 0,
+        end_of_month: false,
+    };
+    let swaption = Swaption::builder()
+        .id(InstrumentId::new("SWPT-1Yx5Y"))
+        .option_type(OptionType::Call)
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
+        .expiry(expiry)
+        .settlement(SettlementType::Physical)
+        .cash_settlement_method(CashSettlementMethod::default())
+        .vol_model(VolatilityModel::Normal)
+        .vol_surface_id(CurveId::new("USD-SWPT"))
+        .underlying_fixed_leg(fixed)
+        .underlying_float_leg(float)
+        .build()
+        .expect("valid swaption");
 
     // Normal calibration preserves its quote convention on the expiry/tenor
     // cube. It cannot be read as a Black strike surface.

@@ -7,7 +7,7 @@ use finstack_quant_portfolio::book::{Book, BookId};
 use finstack_quant_portfolio::portfolio::PortfolioSpec;
 use finstack_quant_portfolio::position::{Position, PositionSpec, PositionUnit};
 use finstack_quant_portfolio::types::{AttributeValue, Entity};
-use finstack_quant_portfolio::{Portfolio, PortfolioBuilder};
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::InstrumentJson;
@@ -112,7 +112,7 @@ fn test_portfolio_spec_serialization() {
     .unwrap()
     .with_text_attribute("rating", "AA");
 
-    let portfolio = PortfolioBuilder::new("TEST_PORTFOLIO")
+    let portfolio = Portfolio::builder("TEST_PORTFOLIO")
         .name("Test Portfolio")
         .base_currency(Currency::USD)
         .as_of(as_of)
@@ -166,7 +166,7 @@ fn test_portfolio_spec_json_roundtrip() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("TEST")
+    let portfolio = Portfolio::builder("TEST")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENTITY_A"))

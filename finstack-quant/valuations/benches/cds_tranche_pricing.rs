@@ -21,7 +21,7 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CdsTranche, CdsTranchePricer, CdsTranchePricerConfig,
+    CdsTranche, CdsTranchePricer, CopulaSpec,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
@@ -334,12 +334,7 @@ fn bench_cds_tranche_student_t_npv(c: &mut Criterion) {
     let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let tranche = create_tranche(3.0, 7.0, 5);
-    let pricer = CdsTranchePricer::with_config(
-        CdsTranchePricerConfig::default()
-            .with_student_t_copula(6.0)
-            .unwrap(),
-    )
-    .unwrap();
+    let pricer = CdsTranchePricer::with_copula(CopulaSpec::student_t(6.0).unwrap()).unwrap();
 
     group.bench_function("junior_mezz_3_7_df6", |b| {
         b.iter(|| {

@@ -580,10 +580,6 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyMbsPassthroug
         crate::instruments::fixed_income::mbs_passthrough::pricer::price_mbs(self, market, as_of)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        Some(self.issue_date)
-    }
-
     fn rate_risk_rebuild(
         &self,
         base: &finstack_quant_core::market_data::context::MarketContext,

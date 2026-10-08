@@ -1,8 +1,9 @@
-//! JSON-serializable helpers for portfolio optimization bindings.
+//! JSON-serializable optimization spec and the spec-driven entry points the
+//! bindings call.
 
 use super::result::rebalance_portfolio;
 use super::{
-    CandidatePosition, Constraint, DefaultLpOptimizer, MissingMetricPolicy, Objective,
+    optimize, CandidatePosition, Constraint, MissingMetricPolicy, Objective,
     PortfolioOptimizationProblem, PortfolioOptimizationResult, PortfolioOptimizationResultWire,
     TradeUniverse, WeightingScheme,
 };
@@ -125,8 +126,7 @@ pub fn optimize_from_spec(
         problem = problem.with_trade_universe(universe.clone());
     }
 
-    let optimizer = DefaultLpOptimizer;
-    optimizer.optimize(&problem, market, config)
+    optimize(&problem, market, config)
 }
 
 /// Rebalance a spec's portfolio to a serialized optimization solution.

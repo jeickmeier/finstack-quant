@@ -45,6 +45,8 @@ CONTRACT_EXCLUDED_PARTS = {
 EXCLUDED_PREFIXES = (
     Path("docs/superpowers/plans"),
     Path("docs/superpowers/mockups"),
+    # Audit evidence quotes the retired payloads it proved were rejected.
+    Path("docs/audits"),
     Path("scripts/tests/fixtures"),
     Path("scripts/check_schema_residue.py"),
 )
