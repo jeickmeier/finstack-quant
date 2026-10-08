@@ -11,9 +11,6 @@ impl MetricId {
     /// Base amount
     pub const BaseAmount: Self = Self(Cow::Borrowed("base_amount"));
 
-    /// Quote amount
-    pub const QuoteAmount: Self = Self(Cow::Borrowed("quote_amount"));
-
     /// Inverse rate
     pub const InverseRate: Self = Self(Cow::Borrowed("inverse_rate"));
 
@@ -177,9 +174,6 @@ impl MetricId {
     ///
     /// Units: currency per vol-point squared.
     pub const Volga: Self = Self(Cow::Borrowed("volga"));
-
-    /// Veta (theta sensitivity to volatility)
-    pub const Veta: Self = Self(Cow::Borrowed("veta"));
 
     /// Interest-rate convexity for swap/rates contexts.
     ///

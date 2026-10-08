@@ -547,10 +547,6 @@ impl crate::instruments::common_impl::traits::Instrument for VarianceSwap {
         self.effective_settlement_date().ok()
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.start_date)
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {

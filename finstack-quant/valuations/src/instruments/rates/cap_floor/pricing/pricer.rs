@@ -4,9 +4,7 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cap_floor::pricing::payoff::CapletFloorletInputs;
 use crate::instruments::rates::cap_floor::pricing::projection::resolve_optioned_caplet_inputs;
 use crate::instruments::rates::cap_floor::{CapFloor, CapFloorVolType, RateOptionType};
-use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
+use crate::pricer::{InstrumentType, ModelKey, Pricer, PricerKey, PricingError};
 use crate::results::ValuationResult;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -164,9 +162,7 @@ impl Pricer for SimpleCapFloorBlackPricer {
         let cap_floor =
             crate::pricer::expect_inst::<CapFloor>(instrument, InstrumentType::CapFloor)?;
 
-        let pv = price_cap_floor(cap_floor, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let pv = price_cap_floor(cap_floor, market, as_of)?;
 
         Ok(ValuationResult::stamped(cap_floor.id(), as_of, pv))
     }

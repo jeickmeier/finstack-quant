@@ -293,10 +293,6 @@ impl crate::instruments::common_impl::traits::Instrument for BarrierOption {
         Some(self.expiry)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        None
-    }
-
     /// Roll the observed barrier state with spot held at its `as_of` level.
     ///
     /// State is recorded when the rolled pricing needs it: a discrete

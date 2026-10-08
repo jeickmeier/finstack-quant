@@ -420,10 +420,6 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwap {
         finstack_quant_core::money::Money::new(npv, self.underlying.currency)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        Some(self.start_date)
-    }
-
     fn last_payment_date(&self, _curves: &MarketContext, _as_of: Date) -> Result<Option<Date>> {
         Ok(self.periods()?.last().map(|period| period.payment_date))
     }

@@ -741,10 +741,6 @@ impl Instrument for CommodityOption {
         )
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        None
-    }
-
     fn expiry(&self) -> Option<Date> {
         Some(self.expiry)
     }

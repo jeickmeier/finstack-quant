@@ -19,12 +19,12 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::metrics::aggregate_metrics;
 use finstack_quant_portfolio::optimization::{
-    Constraint, DefaultLpOptimizer, MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric,
+    optimize, Constraint, MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric,
     PortfolioOptimizationProblem, WeightingScheme,
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::PortfolioBuilder;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
@@ -130,7 +130,7 @@ fn build_bond_portfolio(as_of: Date) -> finstack_quant_portfolio::Portfolio {
     .expect("CCC position should build")
     .with_text_attribute("rating", "CCC");
 
-    PortfolioBuilder::new("BOND_FUND")
+    Portfolio::builder("BOND_FUND")
         .name("Credit Portfolio – Optimization Example")
         .base_currency(Currency::USD)
         .as_of(as_of)
@@ -170,8 +170,7 @@ fn main() -> finstack_quant_portfolio::Result<()> {
             .with_label("ccc_limit"),
     );
 
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer.optimize(&problem, &market, &config)?;
+    let result = optimize(&problem, &market, &config)?;
 
     println!("=== Portfolio Optimization Example ===");
     println!("Label: {:?}", result.problem.label);

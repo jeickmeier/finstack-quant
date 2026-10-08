@@ -44,13 +44,13 @@ There is **no `prelude` module** — import the names you need directly.
 | `CallAssumption`, `CallScope` | Deal or tranche call for price-to-call analytics (`TrancheMetrics.wal_to_call`, `z_spread_to_call_bp`, `dm_to_call_bp`) — see [Calls and clean-up calls](#calls-and-clean-up-calls). |
 | `run_simulation_with_diagnostics`, `SimulationRun`, `SimulationDiagnostics`, `PeriodDiagnostics`, `CoverageTestDiagnostic`, `calculate_equity_metrics`, `EquityMetrics` | Period-by-period deal record and equity analytics — see [Deal diagnostics and equity analytics](#deal-diagnostics-and-equity-analytics). |
 | `run_simulation`, `generate_cashflows` | Deterministic projection entry points. |
-| `execute_waterfall`, `execute_waterfall_with_explanation`, `WaterfallContext`, `WaterfallDistribution` | Waterfall execution. |
+| `execute_waterfall`, `WaterfallContext`, `WaterfallDistribution` | Waterfall execution. |
 | `CoverageTest`, `TestContext`, `TestResult` | Coverage-test evaluation. |
 | `calculate_tranche_metrics`, `TrancheMetrics`, `scenario_table`, `ScenarioTable`/`ScenarioGrid`/`ScenarioCell` | Tranche summary (price, WAL, z-spread, CS01, spread duration and convexity, effective duration and convexity from ±1 bp re-projection, discount margin for floaters) and scenario grids (one projection per cell, clean settlement price per current face). |
 | `calculate_tranche_wal`, `_duration`, `_convexity`, `_spread_convexity`, `_z_spread`, `_discount_margin`, `_oas` (+ `OasConfig`, `OasResult`), `_cs01`, `_breakeven_cdr` | Individual tranche analytics, the same functions the Python/WASM `structured_credit_tranche_*` entry points wrap. |
 | `clamped_cpr_to_smm`, `clamped_smm_to_cpr`, `clamped_cdr_to_mdr`, `clamped_mdr_to_cdr`, `psa_to_cpr` | Rate conversions. |
 | `validate_tiers`, `ValidationError` | Waterfall validation. |
-| Deal-type constants | Standard speeds, fees and concentration limits, re-exported at the module root: `clo_standard_cdr`, `rmbs_standard_psa`, `sda_peak_cdr`, … (the `types` submodule itself is `pub(crate)`). |
+| Constants | Unit conversions and simulation thresholds re-exported at the module root: `MONTHS_PER_YEAR`, `BASIS_POINTS_DIVISOR`, `PERCENTAGE_MULTIPLIER`, `MIN_PREPAYMENT_RATE`, `QUARTERLY_PERIODS_PER_YEAR`, `AVERAGE_DAYS_PER_YEAR`, `pool_balance_cleanup_threshold` (the `types` submodule itself is `pub(crate)`). |
 
 ## Module layout
 
@@ -71,7 +71,7 @@ structured_credit/
 │   ├── waterfall.rs       # execute_waterfall(_with_explanation), WaterfallContext
 │   ├── resolve.rs         # layer WaterfallRules onto the period waterfall in place
 │   ├── coverage_tests.rs  # OC/IC test evaluation
-│   └── stochastic/        # calibration presets, tree and Monte Carlo orchestration
+│   └── stochastic/        # calibration presets and Monte Carlo orchestration
 ├── metrics/
 │   ├── pricing/       # clean/dirty price, accrued, WAL
 │   ├── risk/          # duration, convexity, YTM, z-spread, OAS, CS01, breakeven CDR, *01 sensitivities
@@ -94,7 +94,7 @@ structured_credit/
 `new_*` constructors pull their frequency, prepayment, default and recovery defaults from the
 embedded registry in
 [`data/assumptions/structured_credit_assumptions.v1.json`](../../../../data/assumptions/structured_credit_assumptions.v1.json)
-(fee defaults, PSA/SDA parameters, concentration limits, standard speeds).
+(fee defaults, constructor defaults, SDA parameters, stochastic calibrations).
 They return `Result<StructuredCredit>` and reject closing dates whose first
 registry payment period exceeds the supported calendar range.
 
@@ -238,8 +238,7 @@ carries the full period state: `available_cash`, `interest_collections`,
 `principal_collections`, `payment_date`, `period_start`, `valuation_date`,
 `pool_balance`, the `MarketContext`, plus optional current tranche/asset
 balances, deferred interest, reserve and restricted cash, recovery proceeds and
-an OAS floating-rate shift. `execute_waterfall_with_explanation` returns the
-same distribution with a trace.
+an OAS floating-rate shift.
 
 `Waterfall::standard_sequential` gives every note its own interest tier, in
 seniority order, so a coverage-test position can sit between any two coupons;

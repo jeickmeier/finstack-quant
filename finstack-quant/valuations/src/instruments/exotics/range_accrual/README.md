@@ -225,10 +225,6 @@ Reachable from Python and WASM through the JSON envelope
 - **Python**: `finstack_quant.valuations.instruments.price_instrument(...)`.
 - **WASM**: `valuations.instruments.priceInstrument`.
 
-A related standalone helper for the callable variant is exposed as
-`finstack_quant.valuations.callable_range_accrual_accrued` (Python) and
-`valuations.callableRangeAccrualAccrued` (WASM).
-
 ## Limitations
 
 - GBM dynamics only: no stochastic volatility, no jumps.

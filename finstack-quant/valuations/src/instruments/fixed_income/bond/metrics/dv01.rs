@@ -56,7 +56,7 @@ impl MetricCalculator for BondDv01Calculator {
                 .has_price_driver()
                 && !has_options
             {
-                return crate::metrics::UnifiedDv01Calculator::<Bond>::new(
+                return crate::metrics::UnifiedDv01Calculator::new(
                     crate::metrics::Dv01CalculatorConfig::parallel_combined(),
                 )
                 .calculate(context);
@@ -91,7 +91,7 @@ impl MetricCalculator for BondDv01Calculator {
             .market_quotes
             .has_price_driver();
         if !has_price_driver {
-            return crate::metrics::UnifiedDv01Calculator::<Bond>::new(
+            return crate::metrics::UnifiedDv01Calculator::new(
                 crate::metrics::Dv01CalculatorConfig::parallel_combined(),
             )
             .calculate(context);
@@ -99,7 +99,7 @@ impl MetricCalculator for BondDv01Calculator {
 
         if !has_options {
             return super::risk_view::with_bond_risk_view(context, |ctx| {
-                crate::metrics::UnifiedDv01Calculator::<Bond>::new(
+                crate::metrics::UnifiedDv01Calculator::new(
                     crate::metrics::Dv01CalculatorConfig::parallel_combined(),
                 )
                 .calculate(ctx)
@@ -171,7 +171,7 @@ impl MetricCalculator for BondBucketedDv01Calculator {
 
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         super::risk_view::with_bond_risk_view(context, |ctx| {
-            crate::metrics::UnifiedDv01Calculator::<Bond>::new(
+            crate::metrics::UnifiedDv01Calculator::new(
                 crate::metrics::Dv01CalculatorConfig::triangular_key_rate(),
             )
             .calculate(ctx)

@@ -153,51 +153,6 @@ impl CdsQuote {
         }
     }
 
-    /// Create a new quote with the spread bumped.
-    ///
-    /// For par spread quotes, bumps `spread_bp`. For upfront quotes, bumps `coupon_bp`.
-    /// The upfront percentage remains unchanged.
-    ///
-    /// # Arguments
-    ///
-    /// * `bump_decimal` - The bump amount in decimal terms (e.g., `0.0001` for 1 basis point).
-    ///   This is converted to basis points internally (multiplied by 10,000).
-    ///
-    /// # Returns
-    ///
-    /// A new `CdsQuote` with the bumped spread.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_calibration::quotes::cds::CdsQuote;
-    /// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-    /// use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
-    /// use finstack_quant_core::currency::Currency;
-    ///
-    /// # fn example() -> finstack_quant_core::Result<()> {
-    /// let quote = CdsQuote::CdsParSpread {
-    ///     id: QuoteId::new("CDS-ABC-CORP-5Y"),
-    ///     entity: "ABC Corp".to_string(),
-    ///     convention: CdsConventionKey {
-    ///         currency: Currency::USD,
-    ///         doc_clause: CdsDocClause::Cr14,
-    ///     },
-    ///     pillar: Pillar::Tenor("5Y".parse()?),
-    ///     spread_bp: 150.0,
-    ///     recovery_rate: 0.40,
-    /// };
-    ///
-    /// // Bump by 1 basis point (0.0001 decimal)
-    /// let bumped = quote.bump_spread_decimal(0.0001);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn bump_spread_decimal(&self, bump_decimal: f64) -> Self {
-        let bump_bp = bump_decimal * 10_000.0;
-        self.bump_spread_bp(bump_bp)
-    }
-
     /// Bump by spread in basis points (e.g., `1.0` = 1bp).
     pub fn bump_spread_bp(&self, bump_bp: f64) -> Self {
         let mut quote = self.clone();

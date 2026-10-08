@@ -200,7 +200,7 @@ impl MetricCalculator for BondCs01Calculator {
 
         if uses_credit {
             return with_bond_risk_view(context, |ctx| {
-                crate::metrics::GenericParallelCs01::<Bond>::default().calculate(ctx)
+                crate::metrics::GenericParallelCs01.calculate(ctx)
             });
         }
 
@@ -269,7 +269,7 @@ impl MetricCalculator for BondBucketedCs01Calculator {
 
         if uses_credit {
             return with_bond_risk_view(context, |ctx| {
-                crate::metrics::GenericBucketedCs01::<Bond>::default().calculate(ctx)
+                crate::metrics::GenericBucketedCs01.calculate(ctx)
             });
         }
 

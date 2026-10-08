@@ -417,10 +417,6 @@ impl crate::instruments::common_impl::traits::Instrument for Equity {
         )
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        None
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

@@ -135,6 +135,8 @@ pub(super) struct PyCreditVolReport {
     pub(crate) inner: CreditVolReport,
 }
 
+crate::bindings::macros::wire_methods!(PyCreditVolReport, CreditVolReport, "CreditVolReport");
+
 impl PyCreditVolReport {
     fn from_inner(inner: CreditVolReport) -> Self {
         Self { inner }
@@ -143,28 +145,6 @@ impl PyCreditVolReport {
 
 #[pymethods]
 impl PyCreditVolReport {
-    /// Deserialize from the canonical ``CreditVolReport`` JSON emitted by
-    /// :meth:`to_json` (and returned by the WASM ``buildCreditVolReport``).
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: CreditVolReport =
-            serde_json::from_str(json).map_err(crate::errors::display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to canonical ``CreditVolReport`` JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Total annualized risk under the chosen measure; matches the source
     /// decomposition's ``total_risk``.
     #[getter]

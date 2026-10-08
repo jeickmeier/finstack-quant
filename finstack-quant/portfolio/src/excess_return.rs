@@ -35,14 +35,11 @@
 //!   Research, March 1998, Appendix B. `docs/REFERENCES.md#dynkin-hyman-vankudre-1998`
 //!
 
+use crate::brinson::check_weights_sum;
 use crate::error::{Error, Result};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use serde::{Deserialize, Serialize};
-
-/// Absolute tolerance for the position-weight-sums-to-one check in
-/// [`excess_returns`], matching [`crate::fi_attribution`]'s convention.
-const WEIGHT_TOLERANCE: f64 = 1e-6;
 
 /// Configuration for [`cell_returns_from_reference`].
 ///
@@ -948,11 +945,7 @@ pub fn excess_returns(
     }
 
     let total_weight = weight_sum.total();
-    if (total_weight - 1.0).abs() > WEIGHT_TOLERANCE {
-        return Err(Error::invalid_input(format!(
-            "position weights must sum to 1.0 (got {total_weight})"
-        )));
-    }
+    check_weights_sum("position", total_weight)?;
 
     Ok(ExcessReturnResult {
         base_label: table.base_label.clone(),

@@ -7,8 +7,6 @@
 //! - Accrual-on-default conventions
 //! - Risk metric calculation standards
 
-#![allow(clippy::field_reassign_with_default)]
-
 use super::helpers::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::{binomial_probability, log_factorial};
@@ -245,21 +243,6 @@ fn test_log_factorial_accuracy() {
     );
 }
 
-// ==================== Accrual-on-Default Methodology Tests ====================
-
-#[test]
-fn test_aod_enabled_by_default() {
-    // Market Standard: Modern CDS pricing includes accrual-on-default
-    // Reference: Post-2009 ISDA CDS standard model (ISDA CDS Standard Model)
-
-    let config =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricerConfig::default();
-    assert!(
-        config.include_accrual_on_default,
-        "Accrual-on-default should be enabled by default per ISDA standards"
-    );
-}
-
 // ==================== Day Count Convention Tests ====================
 
 #[test]
@@ -330,23 +313,6 @@ fn test_mezzanine_tranche_parameters() {
 
     approx_eq(params.attach_pct, 3.0, 0.01, "Mezzanine attachment");
     approx_eq(params.detach_pct, 7.0, 0.01, "Mezzanine detachment");
-}
-
-// ==================== Gaussian Copula Methodology Tests ====================
-
-#[test]
-fn test_adaptive_integration_config() {
-    use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-        CdsTranchePricer, CdsTranchePricerConfig,
-    };
-    for tolerance in [1e-6, 1e-8, 1e-10, 1e-12] {
-        let config = CdsTranchePricerConfig::default().with_integration_tolerance(tolerance);
-        CdsTranchePricer::with_config(config).expect("supported global integration budget");
-    }
-    assert_eq!(
-        CdsTranchePricerConfig::default().integration_tolerance,
-        1e-10
-    );
 }
 
 // Note: Portfolio loss distribution testing is done indirectly through
@@ -430,15 +396,7 @@ fn test_homogeneous_pool_assumption() {
     // - Identical notionals
     // Reference: Li (2000)
 
-    let mut config =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricerConfig::default();
-    config.use_issuer_curves = false;
-
-    let pricer =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer::with_config(
-            config,
-        )
-        .expect("valid tranche pricer config");
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = standard_market_context();
 
@@ -451,15 +409,7 @@ fn test_heterogeneous_pool_extension() {
     // Market Standard: Extended model with issuer-specific curves
     // Reference: Hull & White (2004), "Valuation of a CDO and an n-th to Default CDS"
 
-    let mut config =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricerConfig::default();
-    config.use_issuer_curves = true;
-
-    let pricer =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer::with_config(
-            config,
-        )
-        .expect("valid tranche pricer config");
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = market_context_with_issuers(50);
 

@@ -295,10 +295,6 @@ impl crate::instruments::Instrument for EquityTotalReturnFuture {
         Money::new(self.npv_raw(market, as_of)?, self.terms.currency)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        None
-    }
-
     fn expiry(&self) -> Option<Date> {
         Some(self.terms.settlement_date)
     }

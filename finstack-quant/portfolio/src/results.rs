@@ -112,12 +112,12 @@ impl PortfolioResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::PortfolioBuilder;
     use crate::metrics::aggregate_metrics;
     use crate::position::{Position, PositionUnit};
     use crate::test_utils::build_test_market;
     use crate::types::Entity;
     use crate::valuation::value_portfolio;
+    use crate::Portfolio;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
     use std::sync::Arc;
@@ -150,7 +150,7 @@ mod tests {
         )
         .expect("test should succeed");
 
-        let portfolio = PortfolioBuilder::new("TEST")
+        let portfolio = Portfolio::builder("TEST")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))

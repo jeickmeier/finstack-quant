@@ -451,7 +451,7 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "portfolio",
         "position_change",
         Output,
-        "Position edits supported by `WhatIfEngine::position_what_if`."
+        "Position edits supported by `FactorModel::position_what_if`."
     )
     .with_packager(package_materialization_schema)
     .with_examples(examples::position_change),

@@ -18,8 +18,10 @@ use super::super::convert::{
     money_repr, money_to_py, opt_repr,
 };
 use super::super::instruments::{enum_from_str, serialize_typed_instrument_json};
-use super::super::typed_fx::{instrument_envelope_methods, instrument_pricing_methods};
 use super::super::typed_legs::{PyPremiumLegSpec, PyProtectionLegSpec};
+use super::super::typed_macros::{
+    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+};
 use crate::bindings::valuations::convert::take_builder;
 
 type CdsBuilderInner =
@@ -294,16 +296,6 @@ crate::bindings::valuations::pricing::pricing_override_methods!(
     fields
 );
 
-/// Apply one consuming Rust setter and record the field for ``__repr__``.
-macro_rules! cds_set {
-    ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{
-        let b = take_builder(&mut $slf.inner)?;
-        $slf.inner = Some($apply(b));
-        $slf.fields.push((stringify!($field), $repr));
-        Ok($slf)
-    }};
-}
-
 #[pymethods]
 impl PyCreditDefaultSwapBuilder {
     /// Set the instrument identifier.
@@ -319,7 +311,7 @@ impl PyCreditDefaultSwapBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        cds_set!(slf, id, format!("{value:?}"), |b: CdsBuilderInner| b
+        builder_set!(slf, id, format!("{value:?}"), |b: CdsBuilderInner| b
             .id(InstrumentId::new(value.to_string())))
     }
 
@@ -340,7 +332,7 @@ impl PyCreditDefaultSwapBuilder {
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = value.inner;
-        cds_set!(slf, notional, money_repr(money), |b: CdsBuilderInner| b
+        builder_set!(slf, notional, money_repr(money), |b: CdsBuilderInner| b
             .notional(money))
     }
 
@@ -364,7 +356,7 @@ impl PyCreditDefaultSwapBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side = enum_from_str(value, "side")?;
-        cds_set!(slf, side, format!("{value:?}"), |b: CdsBuilderInner| b
+        builder_set!(slf, side, format!("{value:?}"), |b: CdsBuilderInner| b
             .side(side))
     }
 
@@ -390,7 +382,7 @@ impl PyCreditDefaultSwapBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn convention<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let convention = cds_convention_from_str(value)?;
-        cds_set!(
+        builder_set!(
             slf,
             convention,
             format!("{value:?}"),
@@ -421,7 +413,7 @@ impl PyCreditDefaultSwapBuilder {
             date_repr(leg.start),
             date_repr(leg.end)
         );
-        cds_set!(slf, premium_leg, shown, |b: CdsBuilderInner| b
+        builder_set!(slf, premium_leg, shown, |b: CdsBuilderInner| b
             .premium_leg(leg))
     }
 
@@ -447,7 +439,7 @@ impl PyCreditDefaultSwapBuilder {
             leg.credit_curve_id.as_str(),
             leg.recovery_rate
         );
-        cds_set!(slf, protection_leg, shown, |b: CdsBuilderInner| b
+        builder_set!(slf, protection_leg, shown, |b: CdsBuilderInner| b
             .protection_leg(leg))
     }
 
@@ -475,7 +467,7 @@ impl PyCreditDefaultSwapBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let convention: CdsValuationConvention = enum_from_str(value, "valuation_convention")?;
-        cds_set!(
+        builder_set!(
             slf,
             valuation_convention,
             format!("{value:?}"),
@@ -508,7 +500,7 @@ impl PyCreditDefaultSwapBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let (date, money) = dated_money_from_py(value, None, "upfront")?;
         let shown = format!("({}, {})", date_repr(date), money_repr(money));
-        cds_set!(slf, upfront, shown, |b: CdsBuilderInner| b
+        builder_set!(slf, upfront, shown, |b: CdsBuilderInner| b
             .upfront((date, money)))
     }
 
@@ -536,7 +528,7 @@ impl PyCreditDefaultSwapBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn doc_clause<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let clause: CdsDocClause = enum_from_str(value, "doc_clause")?;
-        cds_set!(
+        builder_set!(
             slf,
             doc_clause,
             format!("{value:?}"),
@@ -563,7 +555,7 @@ impl PyCreditDefaultSwapBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        cds_set!(
+        builder_set!(
             slf,
             protection_effective_date,
             date_repr(date),
@@ -597,7 +589,7 @@ impl PyCreditDefaultSwapBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec = crate::bindings::module_utils::py_to_serde(py, value, "margin_spec")?;
         let shown = value.repr()?.to_string();
-        cds_set!(slf, margin_spec, shown, |b: CdsBuilderInner| b
+        builder_set!(slf, margin_spec, shown, |b: CdsBuilderInner| b
             .margin_spec(spec))
     }
 
@@ -628,7 +620,7 @@ impl PyCreditDefaultSwapBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        cds_set!(slf, attributes, shown, |b: CdsBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: CdsBuilderInner| b
             .attributes(attrs))
     }
 

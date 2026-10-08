@@ -26,7 +26,7 @@ use finstack_quant_portfolio::primitive_exposures;
 use finstack_quant_portfolio::valuation::{
     value_portfolio, PortfolioValuationOptions, RequestedMetrics,
 };
-use finstack_quant_portfolio::PortfolioBuilder;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::metrics::MetricId;
 use std::hint::black_box;
 
@@ -36,7 +36,7 @@ fn booked_institutional_portfolio(num_positions: usize) -> finstack_quant_portfo
     let n_desks = 8_usize;
     let desks_per_region = n_desks / n_regions;
 
-    let mut builder = PortfolioBuilder::new(format!("{}_BOOKS", source.id))
+    let mut builder = Portfolio::builder(format!("{}_BOOKS", source.id))
         .base_currency(source.base_currency)
         .as_of(source.as_of)
         .entities(source.entities.values().cloned())

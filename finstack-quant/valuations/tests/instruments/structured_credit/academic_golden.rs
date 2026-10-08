@@ -482,14 +482,49 @@ fn test_was_golden_calculation() {
 
 #[test]
 fn test_recovery_rate_golden_industry_standards() {
-    // Industry standard recovery rates by asset class
+    // Industry standard recovery rates by asset class, as applied by the
+    // deal-type constructors from the embedded assumptions registry.
     // Reference: Moody's Default Study, S&P Recovery Studies
-    //
-    // These are the standard assumptions used in modeling:
-
+    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-        abs_auto_standard_recovery, clo_standard_recovery, cmbs_standard_recovery,
-        rmbs_standard_recovery,
+        StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
+    };
+
+    let closing = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let maturity = Date::from_calendar_date(2030, Month::December, 31).unwrap();
+    let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
+    pool.assets.push(PoolAsset::fixed_rate_bond(
+        "A1",
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        0.06,
+        Date::from_calendar_date(2029, Month::January, 1).unwrap(),
+        finstack_quant_core::dates::DayCount::Thirty360,
+    ));
+    let tranche = Tranche::new(
+        "SENIOR",
+        0.0,
+        100.0,
+        TrancheSeniority::Senior,
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        RateSpec::Fixed { rate: 0.05 },
+        Date::from_calendar_date(2030, Month::January, 1).unwrap(),
+    )
+    .unwrap();
+    let tranches = TrancheStructure::new(vec![tranche]).unwrap();
+    let registry_recovery = |deal_type: DealType| {
+        StructuredCredit::apply_deal_defaults(
+            format!("TEST-{deal_type:?}"),
+            deal_type,
+            pool.clone(),
+            tranches.clone(),
+            closing,
+            maturity,
+            "USD-OIS",
+        )
+        .expect("valid structured-credit dates")
+        .credit_model
+        .recovery_spec
+        .rate
     };
 
     // CLO (Senior Secured Loans): 60% recovery — the rating-agency and
@@ -497,7 +532,7 @@ fn test_recovery_rate_golden_industry_standards() {
     // recovery data for senior secured loans averages 60-70%; the CLO
     // registry used 40% until 2026-09-17, the senior unsecured bond figure).
     assert_eq!(
-        clo_standard_recovery(),
+        registry_recovery(DealType::Clo),
         0.60,
         "CLO standard recovery should be 60%"
     );
@@ -505,7 +540,7 @@ fn test_recovery_rate_golden_industry_standards() {
     // RMBS (Residential Mortgages): ~60% recovery
     // Source: S&P RMBS methodology
     assert_eq!(
-        rmbs_standard_recovery(),
+        registry_recovery(DealType::Rmbs),
         0.60,
         "RMBS standard recovery should be 60%"
     );
@@ -513,7 +548,7 @@ fn test_recovery_rate_golden_industry_standards() {
     // Auto ABS: ~45% recovery
     // Source: S&P Auto ABS methodology
     assert_eq!(
-        abs_auto_standard_recovery(),
+        registry_recovery(DealType::Abs),
         0.45,
         "Auto ABS standard recovery should be 45%"
     );
@@ -521,7 +556,7 @@ fn test_recovery_rate_golden_industry_standards() {
     // CMBS (Commercial Mortgages): ~65% recovery
     // Source: Moody's CMBS methodology
     assert_eq!(
-        cmbs_standard_recovery(),
+        registry_recovery(DealType::Cmbs),
         0.65,
         "CMBS standard recovery should be 65%"
     );

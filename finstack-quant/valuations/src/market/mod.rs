@@ -31,7 +31,6 @@
 
 /// Market conventions and registries.
 pub mod conventions;
-pub mod credit_option_vol;
 /// Exchange-listed product-family coverage and valuation routes.
 pub mod listed;
 pub mod volatility;

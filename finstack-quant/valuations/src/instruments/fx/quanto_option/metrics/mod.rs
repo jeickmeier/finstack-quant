@@ -26,12 +26,8 @@ pub(crate) fn register_quanto_option_metrics(
             (Vega, crate::metrics::OptionGreekCalculator::<crate::instruments::fx::quanto_option::QuantoOption>::vega()),
             (Rho, crate::metrics::OptionGreekCalculator::<crate::instruments::fx::quanto_option::QuantoOption>::rho()),
             (ForeignRho, crate::metrics::OptionGreekCalculator::<crate::instruments::fx::quanto_option::QuantoOption>::foreign_rho()),
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::fx::quanto_option::QuantoOption,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::fx::quanto_option::QuantoOption,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
             (Vanna, crate::metrics::OptionGreekCalculator::<crate::instruments::fx::quanto_option::QuantoOption>::vanna()),
             (Volga, crate::metrics::OptionGreekCalculator::<crate::instruments::fx::quanto_option::QuantoOption>::volga()),
         ]

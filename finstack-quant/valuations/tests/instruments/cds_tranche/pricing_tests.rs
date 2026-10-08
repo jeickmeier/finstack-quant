@@ -12,15 +12,11 @@
 //! through these end-to-end pricing tests and through public metric APIs.
 
 use super::helpers::*;
-use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer;
 use finstack_quant_valuations::instruments::PayReceive;
-use time::macros::date;
 
 // ==================== Basic Pricing Tests ====================
 
@@ -86,50 +82,6 @@ fn test_senior_tranche_pricing() {
     assert!(result.is_ok());
     let pv = result.unwrap();
     assert!(pv.amount().is_finite());
-}
-
-#[test]
-fn test_bespoke_seasoned_tranche_requires_effective_date_for_accrued_premium() {
-    let market = standard_market_context();
-    let as_of = date!(2025 - 02 - 01);
-
-    let tranche_params = CdsTrancheParams::new(
-        "CDX.NA.IG.42",
-        42,
-        3.0,
-        7.0,
-        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        date!(2030 - 01 - 01),
-        500.0,
-    );
-    let schedule_params = ScheduleParams::quarterly_act360();
-
-    let mut explicit = CdsTranche::new(
-        "BESPOKE-SEASONED-EXPLICIT",
-        &tranche_params,
-        &schedule_params,
-        "USD-OIS",
-        "CDX.NA.IG.42",
-        PayReceive::Receive,
-    )
-    .expect("bespoke tranche");
-    explicit.start_date = Some(date!(2024 - 11 - 15));
-
-    let accrued_explicit = explicit
-        .accrued_premium(&market, as_of)
-        .expect("explicit accrued premium");
-    assert!(accrued_explicit > 0.0);
-
-    let mut missing_effective = explicit;
-    missing_effective.start_date = None;
-
-    let err = missing_effective
-        .accrued_premium(&market, as_of)
-        .expect_err("bespoke seasoned tranche without effective_date should be rejected");
-    assert!(matches!(
-        err,
-        finstack_quant_core::Error::Validation(_) | finstack_quant_core::Error::Input(_)
-    ));
 }
 
 // ==================== Buy vs Sell Protection Tests ====================

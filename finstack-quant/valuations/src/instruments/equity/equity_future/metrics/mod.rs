@@ -48,8 +48,8 @@ pub(crate) fn register_equity_future_metrics(
             (FuturesPrice, FuturesPrice),
             (Basis, Basis),
             (Delta, Delta),
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<crate::instruments::EquityFuture>::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<crate::instruments::EquityFuture>::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
     Ok(())

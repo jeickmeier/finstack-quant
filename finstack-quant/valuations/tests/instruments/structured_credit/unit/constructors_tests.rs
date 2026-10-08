@@ -6,13 +6,11 @@ use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    abs_auto_standard_cdr, clo_standard_cdr, clo_standard_recovery, cmbs_standard_cdr,
-    psa_ramp_months, psa_terminal_cpr, rmbs_standard_cdr, sda_peak_cdr, sda_peak_month,
-    sda_terminal_cdr, AssetPool, CreditModelConfig, DealFees, DealType, PoolAsset,
-    StructuredCredit, Tranche, TrancheStructure,
+    clamped_cdr_to_mdr, clamped_cpr_to_smm,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    clamped_cdr_to_mdr, clamped_cpr_to_smm,
+    AssetPool, CreditModelConfig, DealFees, DealType, PoolAsset, StructuredCredit, Tranche,
+    TrancheStructure,
 };
 use time::Month;
 
@@ -61,11 +59,14 @@ fn test_apply_deal_defaults_sets_expected_assumptions() {
     let closing = Date::from_calendar_date(2024, Month::January, 1).unwrap();
     let legal = maturity_date();
 
+    // Expected annual CDRs are the `constructor.default_cdr` values of the
+    // embedded registry's deal profiles
+    // (`data/assumptions/structured_credit_assumptions.v1.json`).
     let cases = [
-        (DealType::Abs, Tenor::monthly(), abs_auto_standard_cdr()),
-        (DealType::Clo, Tenor::quarterly(), clo_standard_cdr()),
-        (DealType::Cmbs, Tenor::monthly(), cmbs_standard_cdr()),
-        (DealType::Rmbs, Tenor::monthly(), rmbs_standard_cdr()),
+        (DealType::Abs, Tenor::monthly(), 0.02),
+        (DealType::Clo, Tenor::quarterly(), 0.02),
+        (DealType::Cmbs, Tenor::monthly(), 0.005),
+        (DealType::Rmbs, Tenor::monthly(), 0.006),
     ];
 
     for (deal_type, expected_frequency, expected_cdr) in cases {
@@ -103,11 +104,6 @@ fn clo_registry_profile_is_the_single_source_of_clo_defaults() {
         fees.senior_mgmt_fee_bp,
         fees.subordinated_mgmt_fee_bp
     );
-    assert!(
-        clo_standard_recovery() >= 0.55,
-        "senior secured loans recover at least 55%: {}",
-        clo_standard_recovery()
-    );
     let clo = StructuredCredit::new_clo(
         "CLO",
         create_pool_with_balance(100_000_000.0),
@@ -117,6 +113,11 @@ fn clo_registry_profile_is_the_single_source_of_clo_defaults() {
         "USD-OIS",
     )
     .expect("valid structured-credit dates");
+    assert!(
+        clo.credit_model.recovery_spec.rate >= 0.55,
+        "senior secured loans recover at least 55%: {}",
+        clo.credit_model.recovery_spec.rate
+    );
     let defaults = CreditModelConfig::default();
     assert_eq!(
         format!("{:?}", clo.credit_model.prepayment_spec),
@@ -167,8 +168,9 @@ fn test_prepayment_spec_shapes_drive_monthly_rates() {
     assert!((cpr_rate - clamped_cpr_to_smm(0.12)).abs() < 1e-12);
 
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::psa(2.0);
+    // PSA standard: CPR ramps linearly to 6% over the first 30 months.
     let seasoning = 3;
-    let base_cpr = (seasoning as f64 / psa_ramp_months() as f64) * psa_terminal_cpr();
+    let base_cpr = (seasoning as f64 / 30.0) * 0.06;
     let expected = clamped_cpr_to_smm(base_cpr * 2.0);
     let psa_rate = sc.calculate_smm(seasoning).unwrap();
     assert!((psa_rate - expected).abs() < 1e-12);
@@ -194,9 +196,13 @@ fn test_default_spec_shapes_drive_monthly_rates() {
 
     sc.credit_model.default_spec = DefaultModelSpec::sda(1.5);
 
-    // Canonical PSA SDA shape: months 30-60 sit on the peak plateau.
-    let plateau_seasoning = sda_peak_month() + 1;
-    let plateau_cdr = sda_peak_cdr() * 1.5;
+    // Canonical PSA SDA shape (registry `default_models.sda`): CDR peaks at
+    // 0.6% in month 30, plateaus through month 60 and declines to 0.03%.
+    let sda_peak_month: u32 = 30;
+    let sda_peak_cdr: f64 = 0.006;
+    let sda_terminal_cdr: f64 = 0.0003;
+    let plateau_seasoning = sda_peak_month + 1;
+    let plateau_cdr = sda_peak_cdr * 1.5;
     let expected_plateau = 1.0 - (1.0 - plateau_cdr).powf(1.0 / 12.0);
     let plateau_rate = sc.calculate_default_rate(plateau_seasoning).unwrap();
     assert!((plateau_rate - expected_plateau).abs() < 1e-12);
@@ -205,7 +211,7 @@ fn test_default_spec_shapes_drive_monthly_rates() {
     // month 90 sits halfway through the decline.
     let decline_seasoning = 90;
     let frac = f64::from(decline_seasoning - 60) / 60.0;
-    let decline_cdr = (sda_peak_cdr() - frac * (sda_peak_cdr() - sda_terminal_cdr())) * 1.5;
+    let decline_cdr = (sda_peak_cdr - frac * (sda_peak_cdr - sda_terminal_cdr)) * 1.5;
     let expected_decline = 1.0 - (1.0 - decline_cdr).powf(1.0 / 12.0);
     let decline_rate = sc.calculate_default_rate(decline_seasoning).unwrap();
     assert!((decline_rate - expected_decline).abs() < 1e-12);

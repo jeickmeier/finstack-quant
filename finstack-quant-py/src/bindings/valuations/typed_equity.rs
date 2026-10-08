@@ -18,9 +18,8 @@ use super::convert::{
     enum_to_py_string, float_repr,
 };
 use super::instruments::{enum_from_str, serialize_typed_instrument_json};
-use super::typed_fx::{
-    instrument_envelope_methods, instrument_pricing_methods, typed_option_greeks,
-};
+use super::typed_fx::typed_option_greeks;
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
 use crate::bindings::valuations::convert::take_builder;
 
 type EquityOptionBuilderInner =
@@ -560,16 +559,6 @@ crate::bindings::valuations::pricing::pricing_override_methods!(
     fields
 );
 
-/// Apply one consuming Rust setter and record the field for ``__repr__``.
-macro_rules! eq_set {
-    ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{
-        let b = take_builder(&mut $slf.inner)?;
-        $slf.inner = Some($apply(b));
-        $slf.fields.push((stringify!($field), $repr));
-        Ok($slf)
-    }};
-}
-
 #[pymethods]
 impl PyEquityOptionBuilder {
     /// Set the instrument identifier.
@@ -585,7 +574,7 @@ impl PyEquityOptionBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        eq_set!(
+        builder_set!(
             slf,
             id,
             format!("{value:?}"),
@@ -609,7 +598,7 @@ impl PyEquityOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        eq_set!(
+        builder_set!(
             slf,
             underlying_ticker,
             format!("{value:?}"),
@@ -630,7 +619,7 @@ impl PyEquityOptionBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn strike<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        eq_set!(
+        builder_set!(
             slf,
             strike,
             float_repr(value),
@@ -660,7 +649,7 @@ impl PyEquityOptionBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let option_type = enum_from_str(value, "option_type")?;
-        eq_set!(
+        builder_set!(
             slf,
             option_type,
             format!("{value:?}"),
@@ -691,7 +680,7 @@ impl PyEquityOptionBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let exercise_style = enum_from_str(value, "exercise_style")?;
-        eq_set!(
+        builder_set!(
             slf,
             exercise_style,
             format!("{value:?}"),
@@ -716,7 +705,7 @@ impl PyEquityOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let expiry = py_to_date(value)?;
-        eq_set!(
+        builder_set!(
             slf,
             expiry,
             date_repr(expiry),
@@ -746,7 +735,7 @@ impl PyEquityOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let day_count = day_count_from_py(value, "day_count")?;
-        eq_set!(
+        builder_set!(
             slf,
             day_count,
             format!("DayCount('{day_count}')"),
@@ -773,7 +762,7 @@ impl PyEquityOptionBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn settlement<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let settlement = enum_from_str(value, "settlement")?;
-        eq_set!(
+        builder_set!(
             slf,
             settlement,
             format!("{value:?}"),
@@ -819,7 +808,7 @@ impl PyEquityOptionBuilder {
             date_repr(exercise.settlement_date),
             bool_repr(exercise.exercised)
         );
-        eq_set!(slf, exercise, shown, |b: EquityOptionBuilderInner| b
+        builder_set!(slf, exercise, shown, |b: EquityOptionBuilderInner| b
             .exercise(exercise))
     }
 
@@ -836,7 +825,7 @@ impl PyEquityOptionBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn quantity<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        eq_set!(
+        builder_set!(
             slf,
             quantity,
             float_repr(value),
@@ -866,7 +855,7 @@ impl PyEquityOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let ccy = currency_from_py(value, "currency")?;
-        eq_set!(
+        builder_set!(
             slf,
             currency,
             format!("{:?}", ccy.to_string()),
@@ -890,7 +879,7 @@ impl PyEquityOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        eq_set!(
+        builder_set!(
             slf,
             discount_curve_id,
             format!("{value:?}"),
@@ -911,7 +900,7 @@ impl PyEquityOptionBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn spot_id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        eq_set!(
+        builder_set!(
             slf,
             spot_id,
             format!("{value:?}"),
@@ -935,7 +924,7 @@ impl PyEquityOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        eq_set!(
+        builder_set!(
             slf,
             vol_surface_id,
             format!("{value:?}"),
@@ -960,7 +949,7 @@ impl PyEquityOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        eq_set!(
+        builder_set!(
             slf,
             div_yield_id,
             format!("{value:?}"),
@@ -999,7 +988,7 @@ impl PyEquityOptionBuilder {
                 .collect::<Vec<_>>()
                 .join(", ")
         );
-        eq_set!(
+        builder_set!(
             slf,
             discrete_dividends,
             shown,
@@ -1033,7 +1022,7 @@ impl PyEquityOptionBuilder {
                 .collect::<Vec<_>>()
                 .join(", ")
         );
-        eq_set!(slf, exercise_dates, shown, |b: EquityOptionBuilderInner| b
+        builder_set!(slf, exercise_dates, shown, |b: EquityOptionBuilderInner| b
             .exercise_dates(dates))
     }
 
@@ -1064,7 +1053,7 @@ impl PyEquityOptionBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        eq_set!(slf, attributes, shown, |b: EquityOptionBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: EquityOptionBuilderInner| b
             .attributes(attrs))
     }
 

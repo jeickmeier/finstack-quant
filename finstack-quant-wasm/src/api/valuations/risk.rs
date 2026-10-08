@@ -1,7 +1,7 @@
 //! Portfolio historical VaR / expected shortfall by full revaluation.
 //!
 //! Mirrors `finstack-quant-py/src/bindings/valuations/var.rs`: binds
-//! `finstack_quant_valuations::metrics::risk::calculate_var_with_pricing`,
+//! `finstack_quant_valuations::metrics::risk::calculate_var`,
 //! returning the `VarResult` plain object.
 
 use super::pricing::parse_market_json;
@@ -13,7 +13,7 @@ use wasm_bindgen::prelude::*;
 
 /// Historical VaR and expected shortfall of a list of instruments.
 ///
-/// Mirrors Rust `metrics::risk::calculate_var_with_pricing`: every instrument
+/// Mirrors Rust `metrics::risk::calculate_var`: every instrument
 /// is repriced under every `historyJson` scenario, the per-scenario P&Ls are
 /// summed across instruments, and VaR / ES are read off that single portfolio
 /// distribution (R type-7 linear-interpolated quantile), so offsetting
@@ -27,8 +27,8 @@ use wasm_bindgen::prelude::*;
 /// @param model - Optional model key applied to every instrument; omit or `"default"` for each instrument's canonical pricing path.
 /// @returns `VarResult` plain object: `var`, `expected_shortfall` (losses negative), the worst-first `pnl_distribution`, `num_scenarios`, `confidence_level`, `skipped_fx` and `skipped_vol`.
 /// @throws Error - Throws with kind `validation` if an envelope, the market, history, config, `asOf` or `model` is invalid, the confidence level is outside `(0, 1)`, a non-empty portfolio has no scenarios, or a mixed-currency portfolio has no reporting currency; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if a scenario revaluation fails.
-#[wasm_bindgen(js_name = calculateVarWithPricing)]
-pub fn calculate_var_with_pricing(
+#[wasm_bindgen(js_name = calculateVar)]
+pub fn calculate_var(
     instruments_json: JsValue,
     market_json: JsValue,
     history_json: JsValue,
@@ -51,7 +51,7 @@ pub fn calculate_var_with_pricing(
     let dispatch =
         PricingDispatch::from_model(model.as_deref().unwrap_or("default")).map_err(to_js_err)?;
     let refs: Vec<_> = parsed.iter().map(|p| p.as_ref()).collect();
-    let result = finstack_quant_valuations::metrics::risk::calculate_var_with_pricing(
+    let result = finstack_quant_valuations::metrics::risk::calculate_var(
         &refs,
         &market,
         &history,

@@ -217,13 +217,7 @@ impl BarrierOptionPdePricer {
         {
             return Ok(value);
         }
-        let bs_inputs =
-            super::pricer::collect_barrier_inputs(inst, market, as_of).map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        let bs_inputs = super::pricer::collect_barrier_inputs(inst, market, as_of)?;
 
         let spot = bs_inputs.spot;
         let q = bs_inputs.q;

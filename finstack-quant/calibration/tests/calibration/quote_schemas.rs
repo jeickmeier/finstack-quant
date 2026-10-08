@@ -42,8 +42,7 @@ fn cds_quote_id_and_bump_semantics() {
     };
     assert_eq!(q.id().as_str(), "CDS-ACME-5Y");
 
-    // bump_decimal 0.0001 -> +1bp
-    let bumped = q.bump_spread_decimal(0.0001);
+    let bumped = q.bump_spread_bp(1.0);
     match bumped {
         CdsQuote::CdsParSpread { spread_bp, .. } => {
             assert!(
@@ -66,7 +65,7 @@ fn cds_quote_id_and_bump_semantics() {
         upfront_pct: 0.02,
         recovery_rate: 0.40,
     };
-    let bumped2 = q2.bump_spread_decimal(0.0002); // +2bp
+    let bumped2 = q2.bump_spread_bp(2.0);
     match bumped2 {
         CdsQuote::CdsUpfront {
             coupon_bp,
@@ -87,7 +86,7 @@ fn cds_quote_id_and_bump_semantics() {
 }
 
 #[test]
-fn cds_tranche_quote_id_and_bump_semantics() {
+fn cds_tranche_quote_id() {
     let q = CdsTrancheQuote {
         id: QuoteId::new("CDX-IG-3-7"),
         index: "CDX.NA.IG".to_string(),
@@ -103,74 +102,10 @@ fn cds_tranche_quote_id_and_bump_semantics() {
         },
     };
     assert_eq!(q.id().as_str(), "CDX-IG-3-7");
-
-    let bumped = q.bump_spread_decimal(0.0001);
-    assert!(
-        (bumped.coupon_bp - 501.0).abs() < tolerances::TIGHT,
-        "running spread mismatch: expected 501.0, got {}",
-        bumped.coupon_bp
-    );
-    assert!(
-        (bumped.upfront_pct + 2.5).abs() < tolerances::TIGHT,
-        "upfront pct should be unchanged: expected -2.5, got {}",
-        bumped.upfront_pct
-    );
 }
 
 #[test]
-fn spread_bump_bp_decimal_parity_for_cds_and_tranche() {
-    let cds = CdsQuote::CdsParSpread {
-        id: QuoteId::new("CDS-ACME-3Y"),
-        entity: "ACME".to_string(),
-        convention: CdsConventionKey {
-            currency: Currency::USD,
-            doc_clause: CdsDocClause::Cr14,
-        },
-        pillar: Pillar::Tenor("3Y".parse().unwrap()),
-        spread_bp: 80.0,
-        recovery_rate: 0.4,
-    };
-    let bumped_decimal = cds.bump_spread_decimal(0.0001);
-    let bumped_bp = cds.bump_spread_bp(1.0);
-    match (bumped_decimal, bumped_bp) {
-        (
-            CdsQuote::CdsParSpread { spread_bp: dec, .. },
-            CdsQuote::CdsParSpread { spread_bp: bp, .. },
-        ) => {
-            assert!(
-                (dec - bp).abs() < tolerances::TIGHT,
-                "cds decimal/bp bump mismatch: decimal {dec}, bp {bp}"
-            );
-        }
-        other => panic!("expected CdsParSpread bumps, got {:?}", other),
-    }
-
-    let tranche = CdsTrancheQuote {
-        id: QuoteId::new("CDX-IG-7-10"),
-        index: "CDX.NA.IG".to_string(),
-        series: 1,
-        attachment: 0.07,
-        detachment: 0.10,
-        maturity: d(2030, time::Month::June, 20),
-        upfront_pct: -1.25,
-        coupon_bp: 400.0,
-        convention: CdsConventionKey {
-            currency: Currency::USD,
-            doc_clause: CdsDocClause::Cr14,
-        },
-    };
-    let tranche_decimal = tranche.bump_spread_decimal(0.0001);
-    let tranche_bp = tranche.bump_spread_bp(1.0);
-    let (CdsTrancheQuote { coupon_bp: dec, .. }, CdsTrancheQuote { coupon_bp: bp, .. }) =
-        (tranche_decimal, tranche_bp);
-    assert!(
-        (dec - bp).abs() < tolerances::TIGHT,
-        "tranche decimal/bp bump mismatch: decimal {dec}, bp {bp}"
-    );
-}
-
-#[test]
-fn inflation_quote_maturity_and_bump() {
+fn inflation_quote_maturity() {
     let zcis = InflationQuote::InflationSwap {
         id: QuoteId::new("USA-CPI-U-ZCIS-5Y"),
         maturity: d(2029, time::Month::June, 20),
@@ -179,19 +114,6 @@ fn inflation_quote_maturity_and_bump() {
         convention: InflationSwapConventionId::new("USD-CPI"),
     };
     assert_eq!(zcis.maturity_date(), Some(d(2029, time::Month::June, 20)));
-
-    let bumped = zcis.bump_rate_decimal(0.0001);
-    match bumped {
-        InflationQuote::InflationSwap { rate, .. } => {
-            assert!(
-                (rate - 0.0251).abs() < tolerances::TIGHT,
-                "inflation rate bump mismatch: expected 0.0251, got {rate}"
-            );
-        }
-        other @ InflationQuote::YoYInflationSwap { .. } => {
-            panic!("expected InflationSwap, got {:?}", other)
-        }
-    }
 
     let yoy = InflationQuote::YoYInflationSwap {
         id: QuoteId::new("USA-CPI-U-YOY-5Y"),
@@ -203,48 +125,10 @@ fn inflation_quote_maturity_and_bump() {
         convention: InflationSwapConventionId::new("USD-CPI"),
     };
     assert_eq!(yoy.maturity_date(), Some(d(2029, time::Month::June, 20)));
-    let bumped2 = yoy.bump_rate_decimal(-0.0005);
-    match bumped2 {
-        InflationQuote::YoYInflationSwap {
-            rate, frequency, ..
-        } => {
-            assert!(
-                (rate - 0.0295).abs() < tolerances::TIGHT,
-                "yoy rate bump mismatch: expected 0.0295, got {rate}"
-            );
-            assert_eq!(
-                frequency,
-                Tenor::new(1, finstack_quant_core::dates::TenorUnit::Years)
-                    .expect("valid tenor fixture")
-            );
-        }
-        other @ InflationQuote::InflationSwap { .. } => {
-            panic!("expected YoYInflationSwap, got {:?}", other)
-        }
-    }
 }
 
 #[test]
-fn vol_quote_bump_and_swaption_maturity_contract() {
-    let opt = VolQuote::OptionVol {
-        id: QuoteId::new("SPX-VOL-20241220-4500"),
-        underlying: UnderlyingId::new("SPX"),
-        expiry: d(2024, time::Month::December, 20),
-        strike: 4500.0,
-        vol: 0.20,
-        option_type: OptionType::Call,
-    };
-    let bumped = opt.bump_vol_absolute(0.01).expect("valid volatility bump");
-    match bumped {
-        VolQuote::OptionVol { vol, .. } => {
-            assert!(
-                (vol - 0.21).abs() < tolerances::TIGHT,
-                "vol bump mismatch: expected 0.21, got {vol}"
-            );
-        }
-        other => panic!("expected OptionVol, got {:?}", other),
-    }
-
+fn swaption_vol_quote_maturity_contract() {
     // Swaption maturity must use "maturity" (legacy "tenor" is rejected).
     let json_with_tenor = r#"
     {
@@ -489,7 +373,7 @@ fn quote_denies_unknown_fields() {
 }
 
 #[test]
-fn xccy_quote_helpers_preserve_ids_and_bumps() {
+fn xccy_quote_helpers_preserve_ids() {
     let xccy = XccyQuote {
         id: QuoteId::new("EURUSD-XCCY-5Y"),
         convention: XccyConventionId::new("EUR/USD-XCCY"),
@@ -499,9 +383,6 @@ fn xccy_quote_helpers_preserve_ids_and_bumps() {
     };
     assert_eq!(xccy.id().as_str(), "EURUSD-XCCY-5Y");
     assert!((xccy.value() - 12.5).abs() < tolerances::TIGHT);
-    let bumped = xccy.bump_spread_decimal(0.0002);
-    assert!((bumped.basis_spread_bp - 14.5).abs() < tolerances::TIGHT);
-    assert_eq!(bumped.spot_fx, Some(1.08));
 }
 
 #[test]

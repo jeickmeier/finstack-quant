@@ -62,16 +62,12 @@ pub(crate) fn register_repo_metrics(
             (RequiredCollateral, required_collateral::RequiredCollateralCalculator),
             (CollateralCoverage, collateral_coverage::CollateralCoverageCalculator),
             (RepoInterest, repo_interest::RepoInterestCalculator),
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::Repo,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
             (FundingRisk, funding_risk::FundingRiskCalculator),
             (EffectiveRate, effective_rate::EffectiveRateCalculator),
             (TimeToMaturity, time_to_maturity::TimeToMaturityCalculator),
             (ImpliedCollateralReturn, implied_collateral_return::ImpliedCollateralReturnCalculator),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::Repo,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     };
     Ok(())

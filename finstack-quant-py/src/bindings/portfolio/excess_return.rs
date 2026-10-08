@@ -16,7 +16,7 @@ use crate::bindings::core::market_data::curves::PyDiscountCurve;
 use crate::bindings::pandas_utils::{
     serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
 };
-use crate::errors::{display_to_py, portfolio_to_py, serde_json_to_py};
+use crate::errors::{portfolio_to_py, serde_json_to_py};
 
 /// Column schema for [`PyDurationCellTable::to_dataframe`].
 const CELL_COLUMNS: &[ColumnSchema<'static>] = &[
@@ -51,6 +51,12 @@ pub struct PyDurationCellTable {
     pub(crate) inner: finstack_quant_portfolio::DurationCellTable,
 }
 
+crate::bindings::macros::wire_methods!(
+    PyDurationCellTable,
+    finstack_quant_portfolio::DurationCellTable,
+    "DurationCellTable"
+);
+
 #[pymethods]
 impl PyDurationCellTable {
     /// Label identifying the reference universe (e.g. ``"UST"``).
@@ -73,32 +79,12 @@ impl PyDurationCellTable {
         serde_rows_to_dataframe_with_schema(py, &self.inner.cells, CELL_COLUMNS)
     }
 
-    /// Serialize to a compact JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Deserialize from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::DurationCellTable =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "DurationCellTable(base_label={:?}, cells={})",
             self.inner.base_label,
             self.inner.cells.len(),
         )
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 
@@ -115,6 +101,12 @@ impl PyDurationCellTable {
 pub struct PyExcessReturnResult {
     pub(crate) inner: finstack_quant_portfolio::ExcessReturnResult,
 }
+
+crate::bindings::macros::wire_methods!(
+    PyExcessReturnResult,
+    finstack_quant_portfolio::ExcessReturnResult,
+    "ExcessReturnResult"
+);
 
 #[pymethods]
 impl PyExcessReturnResult {
@@ -155,32 +147,12 @@ impl PyExcessReturnResult {
         serde_rows_to_dataframe_with_schema(py, &self.inner.positions, POSITION_EXCESS_COLUMNS)
     }
 
-    /// Serialize to a compact JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Deserialize from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::ExcessReturnResult =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "ExcessReturnResult(positions={}, portfolio_excess_return={})",
             self.inner.positions.len(),
             self.inner.portfolio_excess_return,
         )
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 

@@ -354,7 +354,7 @@ impl BootstrapTarget for BaseCorrelationTarget {
         }
     }
 
-    fn build_curve(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
+    fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
         let mut sorted_knots = knots.to_vec();
         if sorted_knots.iter().any(|(d, _)| !d.is_finite()) {
             return Err(finstack_quant_core::Error::Input(
@@ -394,7 +394,7 @@ impl BootstrapTarget for BaseCorrelationTarget {
     }
 
     fn build_curve_final(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
-        let curve = self.build_curve(knots)?;
+        let curve = self.build_curve_for_solver(knots)?;
         let validation = curve.validate_shape();
         if !validation.is_monotonic {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -622,13 +622,13 @@ mod tests {
         let target = test_target();
 
         let single = target
-            .build_curve(&[(7.0, 0.25)])
+            .build_curve_for_solver(&[(7.0, 0.25)])
             .expect("single knot should be expanded");
         assert_eq!(single.detachment_points(), &[7.0, 17.0]);
         assert_eq!(single.correlations(), &[0.25, 0.25]);
 
         let unsorted = target
-            .build_curve(&[(10.0, 0.4), (3.0, 0.2), (10.0 + 1e-13, 0.4)])
+            .build_curve_for_solver(&[(10.0, 0.4), (3.0, 0.2), (10.0 + 1e-13, 0.4)])
             .expect("unsorted near-duplicate knots should normalize");
         assert_eq!(unsorted.detachment_points(), &[3.0, 10.0]);
         assert_eq!(unsorted.correlations(), &[0.2, 0.4]);

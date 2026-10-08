@@ -163,9 +163,6 @@ macro_rules! impl_future_option_instrument {
                 Some(self.terms.settlement.terminal_date())
             }
 
-            fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-                None
-            }
 
             crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
         }

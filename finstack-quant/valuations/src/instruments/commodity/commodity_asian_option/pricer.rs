@@ -22,9 +22,7 @@ use crate::instruments::commodity::commodity_asian_option::types::CommodityAsian
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::asian_option::AveragingMethod;
 use crate::instruments::OptionType;
-use crate::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
+use crate::pricer::{expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError};
 use crate::results::ValuationResult;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -418,9 +416,7 @@ impl Pricer for CommodityAsianOptionAnalyticalPricer {
         let asian =
             expect_inst::<CommodityAsianOption>(instrument, InstrumentType::CommodityAsianOption)?;
 
-        let pv = compute_pv(asian, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let pv = compute_pv(asian, market, as_of)?;
 
         Ok(ValuationResult::stamped(asian.id(), as_of, pv))
     }

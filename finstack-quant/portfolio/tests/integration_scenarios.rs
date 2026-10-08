@@ -9,7 +9,7 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::PortfolioBuilder;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_scenarios::spec::{CurveKind, OperationSpec, ScenarioSpec};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::{
@@ -41,7 +41,7 @@ fn apply_and_revalue_succeeds() {
         .unwrap();
 
     let pos = Position::new("P", "E", "D", Arc::new(dep), 1.0, PositionUnit::Units).unwrap();
-    let portfolio = PortfolioBuilder::new("PF")
+    let portfolio = Portfolio::builder("PF")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E"))
@@ -141,7 +141,7 @@ fn scenario_pnl_reconciles_end_to_end() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("PF")
+    let portfolio = Portfolio::builder("PF")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E_A"))
@@ -231,7 +231,7 @@ fn scenario_pnl_no_op_scenario_is_flat() {
         .unwrap();
 
     let pos = Position::new("P", "E", "D", Arc::new(dep), 1.0, PositionUnit::Units).unwrap();
-    let portfolio = PortfolioBuilder::new("PF")
+    let portfolio = Portfolio::builder("PF")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E"))
@@ -399,7 +399,7 @@ impl Instrument for ScenarioFailureInstrument {
 
 #[test]
 fn scenario_batch_reports_earliest_error_across_application_and_valuation_phases() {
-    let portfolio = PortfolioBuilder::new("ERROR_ORDER_PORTFOLIO")
+    let portfolio = Portfolio::builder("ERROR_ORDER_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(base_date())
         .entity(Entity::new("ENTITY"))

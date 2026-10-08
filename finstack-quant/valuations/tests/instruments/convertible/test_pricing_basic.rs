@@ -9,22 +9,15 @@
 
 use super::fixtures::*;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    price_convertible_bond, ConvertibleTreeType,
-};
+use finstack_quant_valuations::instruments::fixed_income::convertible::price_convertible_bond;
 
 #[test]
 fn test_conversion_value_itm() {
     let bond = create_standard_convertible();
     let market = create_market_context();
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
 
     let conversion_value =
         theoretical_conversion_value(market_params::SPOT_PRICE, bond_params::CONVERSION_RATIO);
@@ -43,13 +36,8 @@ fn test_pricing_exceeds_bond_floor() {
     let bond = create_standard_convertible();
     let market = create_market_context();
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
 
     // Bond floor approximation (straight bond value)
     // With 5% coupon and 3% risk-free rate, bond trades above par
@@ -73,13 +61,8 @@ fn test_pricing_respects_max_value() {
     let bond = create_standard_convertible();
     let market = create_market_context();
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
 
     // For ITM convertible, value should be close to max(bond_floor, conversion_value)
     let conversion_value =
@@ -103,7 +86,6 @@ fn test_conversion_ratio_vs_price_equivalence() {
     let price_ratio = price_convertible_bond(
         &with_tree_steps(&bond_ratio, 50),
         &market,
-        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -111,7 +93,6 @@ fn test_conversion_ratio_vs_price_equivalence() {
     let price_price = price_convertible_bond(
         &with_tree_steps(&bond_price, 50),
         &market,
-        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -132,13 +113,8 @@ fn test_zero_coupon_convertible_pricing() {
     let bond = create_zero_coupon_convertible();
     let market = create_market_context();
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
 
     let conversion_value =
         theoretical_conversion_value(market_params::SPOT_PRICE, bond_params::CONVERSION_RATIO);
@@ -156,7 +132,6 @@ fn test_zero_coupon_convertible_pricing() {
     let coupon_price = price_convertible_bond(
         &with_tree_steps(&coupon_bond, 50),
         &market,
-        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -178,13 +153,8 @@ fn test_deep_itm_convertible() {
         market_params::DIV_YIELD,
     );
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
 
     let conversion_value =
         theoretical_conversion_value(market_params::SPOT_HIGH, bond_params::CONVERSION_RATIO);
@@ -207,13 +177,8 @@ fn test_deep_otm_convertible() {
         market_params::DIV_YIELD,
     );
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
 
     // Deep OTM convertible should trade closer to bond floor
     // Bond floor with 5% coupon and 3% rate trades above par
@@ -239,13 +204,8 @@ fn test_currency_consistency() {
     let bond = create_standard_convertible();
     let market = create_market_context();
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
 
     assert_eq!(
         price.currency(),
@@ -259,13 +219,8 @@ fn test_reasonable_price_range() {
     let bond = create_standard_convertible();
     let market = create_market_context();
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
 
     // Price should be in a reasonable range
     // Min: ~bond floor or conversion value

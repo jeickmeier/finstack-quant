@@ -191,7 +191,6 @@ pub fn attribute_pnl_metrics_based(
     super::volatility::apply(&inputs, &mut attribution, &mut non_finite_detected);
     super::equity::apply_spot(&inputs, &mut attribution, &mut non_finite_detected);
     super::cross_factor::apply(&inputs, &mut attribution, &mut non_finite_detected);
-    super::equity::apply_dividend(&inputs, &mut attribution, &mut non_finite_detected);
     super::equity::apply_inflation(&inputs, &mut attribution, &mut non_finite_detected);
 
     if non_finite_detected {

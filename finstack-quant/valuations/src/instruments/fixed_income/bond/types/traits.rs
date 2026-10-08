@@ -147,10 +147,6 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
         Some(self.maturity)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.issue_date)
-    }
-
     fn repo_curve_id(&self) -> Option<CurveId> {
         self.repo_curve_id.clone()
     }

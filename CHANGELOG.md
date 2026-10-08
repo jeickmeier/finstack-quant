@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-06
+
+### Dependencies
+
+#### Removed
+
+- Unused `indexmap` dependency from `finstack-quant-models`.
+
 ### Models API simplification
 
 #### Added

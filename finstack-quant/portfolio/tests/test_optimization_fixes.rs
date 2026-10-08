@@ -6,14 +6,14 @@ use finstack_quant_core::dates::{create_date, Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
-use finstack_quant_portfolio::builder::PortfolioBuilder;
 use finstack_quant_portfolio::optimization::{
-    CandidatePosition, Constraint, DefaultLpOptimizer, Inequality, MetricExpr, MissingMetricPolicy,
+    optimize, CandidatePosition, Constraint, Inequality, MetricExpr, MissingMetricPolicy,
     Objective, PerPositionMetric, PortfolioOptimizationProblem, PositionFilter, TradeDirection,
     TradeUniverse, WeightingScheme,
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::metrics::MetricId;
@@ -198,7 +198,7 @@ fn regression_position(id: &str, value: f64, quantity: f64, unit: PositionUnit) 
 }
 
 fn regression_portfolio(positions: Vec<Position>) -> finstack_quant_portfolio::Portfolio {
-    let mut builder = PortfolioBuilder::new("REGRESSION")
+    let mut builder = Portfolio::builder("REGRESSION")
         .base_currency(Currency::USD)
         .as_of(create_date(2024, Month::January, 1).unwrap())
         .entity(Entity::new("ENT_A"));
@@ -234,8 +234,7 @@ fn candidate_position_id_must_not_collide_with_existing_holdings() {
         }),
     )
     .with_trade_universe(TradeUniverse::default().with_candidate(candidate));
-    let error = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let error = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect_err("candidate ID collision must fail before solving");
     assert!(error.to_string().contains("COLLISION"));
     assert!(error.to_string().contains("already exists"));
@@ -262,9 +261,7 @@ fn held_zero_and_tiny_pv_positions_retain_exact_quantities() {
         .with_trade_universe(TradeUniverse::filtered(PositionFilter::ByPositionIds(
             vec!["TRADEABLE".into()],
         )));
-        let result = DefaultLpOptimizer
-            .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
-            .unwrap();
+        let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default()).unwrap();
         assert!(result.status.is_feasible());
         assert_eq!(result.implied_quantities["HELD"], quantity);
         assert!(result.to_trade_list().is_empty());
@@ -300,9 +297,7 @@ fn trade_direction_follows_quantity_changes_for_shorts_and_negative_pv() {
         );
         problem.weighting = WeightingScheme::UnitScaling;
         problem.constraints = vec![Constraint::Budget { rhs: multiplier }];
-        let result = DefaultLpOptimizer
-            .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
-            .unwrap();
+        let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default()).unwrap();
         let trades = result.to_trade_list();
         assert_eq!(trades.len(), 1);
         assert_eq!(trades[0].direction, expected_direction);
@@ -320,9 +315,7 @@ fn trade_direction_follows_quantity_changes_for_shorts_and_negative_pv() {
             filter: None,
         }),
     );
-    let result = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
-        .unwrap();
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default()).unwrap();
     let trades = result.to_trade_list();
     let liability_trade = trades
         .iter()
@@ -380,9 +373,8 @@ fn exclude_freezes_missing_attributes_and_custom_keys_in_objectives_and_bounds()
                     rhs: 0.5,
                 });
             }
-            let result = DefaultLpOptimizer
-                .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
-                .unwrap();
+            let result =
+                optimize(&problem, &MarketContext::new(), &FinstackConfig::default()).unwrap();
             assert!(result.status.is_feasible());
             assert_eq!(result.optimal_weights["MISSING"], 0.5);
             assert_eq!(result.implied_quantities["MISSING"], 1.0);
@@ -431,9 +423,7 @@ fn exclude_missing_inputs_only_freeze_positions_matching_expression_filters() {
         op: Inequality::Ge,
         rhs: 0.0,
     });
-    let result = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
-        .unwrap();
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default()).unwrap();
     assert!(result.status.is_feasible());
     assert!((result.optimal_weights["MISSING"] - 1.0 / 3.0).abs() < 1e-12);
     assert_eq!(result.implied_quantities["MISSING"], 1.0);
@@ -488,7 +478,7 @@ fn test_notional_weighting() -> Result<(), Box<dyn std::error::Error>> {
         PositionUnit::Notional(Some(Currency::USD)),
     )?;
 
-    let portfolio = PortfolioBuilder::new("HEDGED_PORTFOLIO")
+    let portfolio = Portfolio::builder("HEDGED_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -510,9 +500,8 @@ fn test_notional_weighting() -> Result<(), Box<dyn std::error::Error>> {
 
     let market = build_mock_market();
     let config = FinstackConfig::default();
-    let optimizer = DefaultLpOptimizer;
 
-    let result = optimizer.optimize(&problem, &market, &config)?;
+    let result = optimize(&problem, &market, &config)?;
 
     println!("Status: {:?}", result.status);
     println!("Current Weights: {:?}", result.current_weights);
@@ -533,7 +522,7 @@ fn test_notional_weighting() -> Result<(), Box<dyn std::error::Error>> {
 fn test_candidate_batching() -> Result<(), Box<dyn std::error::Error>> {
     let as_of = create_date(2024, Month::January, 1)?;
 
-    let portfolio = PortfolioBuilder::new("EMPTY_PORTFOLIO")
+    let portfolio = Portfolio::builder("EMPTY_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .build()?;
@@ -577,9 +566,8 @@ fn test_candidate_batching() -> Result<(), Box<dyn std::error::Error>> {
 
     let market = build_mock_market();
     let config = FinstackConfig::default();
-    let optimizer = DefaultLpOptimizer;
 
-    let result = optimizer.optimize(&problem, &market, &config)?;
+    let result = optimize(&problem, &market, &config)?;
 
     assert!(result.status.is_feasible());
     assert_eq!(result.optimal_weights.len(), 10);
@@ -620,7 +608,7 @@ fn test_missing_metric_exclude_freezes_position_at_current_weight() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("PORTFOLIO")
+    let portfolio = Portfolio::builder("PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -640,9 +628,7 @@ fn test_missing_metric_exclude_freezes_position_at_current_weight() {
 
     let market = build_mock_market();
     let config = FinstackConfig::default();
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer
-        .optimize(&problem, &market, &config)
+    let result = optimize(&problem, &market, &config)
         .expect("Exclude policy should freeze missing-metric positions");
 
     assert_eq!(result.current_weights.get("POS_MISSING"), Some(&0.5));
@@ -651,7 +637,7 @@ fn test_missing_metric_exclude_freezes_position_at_current_weight() {
 }
 #[test]
 fn test_short_candidates_can_take_negative_weights() {
-    let portfolio = PortfolioBuilder::new("EMPTY_PORTFOLIO")
+    let portfolio = Portfolio::builder("EMPTY_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(create_date(2024, Month::January, 1).unwrap())
         .build()
@@ -700,8 +686,7 @@ fn test_short_candidates_can_take_negative_weights() {
 
     let market = build_mock_market();
     let config = FinstackConfig::default();
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer.optimize(&problem, &market, &config).unwrap();
+    let result = optimize(&problem, &market, &config).unwrap();
 
     assert_eq!(result.optimal_weights.get("SHORT_CANDIDATE"), Some(&-0.4));
     assert_eq!(result.optimal_weights.get("LONG_CANDIDATE"), Some(&0.6));
@@ -768,7 +753,7 @@ fn m7_existing_short_accepts_negative_weight_bounds() -> Result<(), Box<dyn std:
         -1.0,
         PositionUnit::Units,
     )?;
-    let portfolio = PortfolioBuilder::new("SHORT_BOOK")
+    let portfolio = Portfolio::builder("SHORT_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -802,8 +787,7 @@ fn m7_existing_short_accepts_negative_weight_bounds() -> Result<(), Box<dyn std:
         finstack_quant_portfolio::optimization::Constraint::Budget { rhs: 0.5 },
     ];
 
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
 
     assert!(
         result.status.is_feasible(),
@@ -822,7 +806,7 @@ fn m7_existing_short_accepts_negative_weight_bounds() -> Result<(), Box<dyn std:
 fn m8_candidate_entity_filters_apply_to_metric_constraints(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let as_of = create_date(2024, Month::January, 1)?;
-    let portfolio = PortfolioBuilder::new("EMPTY")
+    let portfolio = Portfolio::builder("EMPTY")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .build()?;
@@ -874,8 +858,7 @@ fn m8_candidate_entity_filters_apply_to_metric_constraints(
         },
     );
 
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
 
     assert!(
         result.status.is_feasible(),
@@ -918,7 +901,7 @@ fn m9_turnover_slack_uses_actual_turnover() -> Result<(), Box<dyn std::error::Er
         1.0,
         PositionUnit::Units,
     )?;
-    let portfolio = PortfolioBuilder::new("TURNOVER_BOOK")
+    let portfolio = Portfolio::builder("TURNOVER_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -940,8 +923,7 @@ fn m9_turnover_slack_uses_actual_turnover() -> Result<(), Box<dyn std::error::Er
         },
     ];
 
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
 
     assert!(
         result.status.is_feasible(),
@@ -991,7 +973,7 @@ fn m9_duplicate_turnover_constraints_are_rejected() -> Result<(), Box<dyn std::e
         1.0,
         PositionUnit::Units,
     )?;
-    let portfolio = PortfolioBuilder::new("DUPLICATE_TURNOVER_BOOK")
+    let portfolio = Portfolio::builder("DUPLICATE_TURNOVER_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1017,9 +999,7 @@ fn m9_duplicate_turnover_constraints_are_rejected() -> Result<(), Box<dyn std::e
         },
     ];
 
-    let optimizer = DefaultLpOptimizer;
-    let err = optimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let err = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect_err("M-9: duplicate turnover constraints must fail fast");
     assert!(
         err.to_string().contains("M-9") && err.to_string().contains("MaxTurnover"),
@@ -1060,7 +1040,7 @@ fn mo6_filtered_value_weighted_average_metric_bound_uses_filtered_denominator(
         1.0,
         PositionUnit::Units,
     )?;
-    let portfolio = PortfolioBuilder::new("FILTERED_AVG")
+    let portfolio = Portfolio::builder("FILTERED_AVG")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1091,8 +1071,7 @@ fn mo6_filtered_value_weighted_average_metric_bound_uses_filtered_denominator(
         },
     ];
 
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
 
     assert!(
         result.status.is_feasible(),
@@ -1135,7 +1114,7 @@ fn mo8_value_weight_existing_zero_pv_position_errors() -> Result<(), Box<dyn std
         1.0,
         PositionUnit::Units,
     )?;
-    let portfolio = PortfolioBuilder::new("ZERO_PV")
+    let portfolio = Portfolio::builder("ZERO_PV")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1149,9 +1128,7 @@ fn mo8_value_weight_existing_zero_pv_position_errors() -> Result<(), Box<dyn std
         }),
     );
 
-    let optimizer = DefaultLpOptimizer;
-    let err = optimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let err = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect_err("MO-8: zero-PV existing ValueWeight positions must fail fast");
     assert!(err.to_string().contains("MO-8"), "unexpected error: {err}");
     Ok(())
@@ -1184,7 +1161,7 @@ fn notional_weight_rejects_missing_instrument_notional() -> Result<(), Box<dyn s
         1.0,
         PositionUnit::Units,
     )?;
-    let portfolio = PortfolioBuilder::new("NOTIONAL_SCALE")
+    let portfolio = Portfolio::builder("NOTIONAL_SCALE")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1200,8 +1177,7 @@ fn notional_weight_rejects_missing_instrument_notional() -> Result<(), Box<dyn s
     );
     problem.weighting = WeightingScheme::NotionalWeight;
 
-    let err = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let err = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect_err("NotionalWeight must fail when instrument.notional() is None");
     assert!(
         err.to_string().contains("NotionalWeight"),
@@ -1233,7 +1209,7 @@ fn test_notional_weighting_implied_quantities_use_notional_denominator() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("NOTIONAL_PORTFOLIO")
+    let portfolio = Portfolio::builder("NOTIONAL_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1274,8 +1250,7 @@ fn test_notional_weighting_implied_quantities_use_notional_denominator() {
 
     let market = build_mock_market();
     let config = FinstackConfig::default();
-    let optimizer = DefaultLpOptimizer;
-    let result = optimizer.optimize(&problem, &market, &config).unwrap();
+    let result = optimize(&problem, &market, &config).unwrap();
 
     assert_eq!(result.implied_quantities.get("POS_1"), Some(&1.0));
     assert_eq!(result.implied_quantities.get("POS_2"), Some(&3.0));
@@ -1322,7 +1297,7 @@ fn mo19_unfiltered_vwa_objective_with_non_unit_budget_is_rejected() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("NET_SHORT_BOOK")
+    let portfolio = Portfolio::builder("NET_SHORT_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1341,8 +1316,7 @@ fn mo19_unfiltered_vwa_objective_with_non_unit_budget_is_rejected() {
     problem.constraints =
         vec![finstack_quant_portfolio::optimization::Constraint::Budget { rhs: -1.0 }];
 
-    let err = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let err = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect_err("MO-19: VWA objective with Σw = -1 budget must fail, not sign-flip");
     let msg = err.to_string();
     assert!(
@@ -1389,7 +1363,7 @@ fn mo19_unfiltered_vwa_objective_with_unit_budget_picks_high_yield() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("LONG_BOOK")
+    let portfolio = Portfolio::builder("LONG_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1408,8 +1382,7 @@ fn mo19_unfiltered_vwa_objective_with_unit_budget_picks_high_yield() {
     problem.constraints =
         vec![finstack_quant_portfolio::optimization::Constraint::Budget { rhs: 1.0 }];
 
-    let result = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect("MO-19: unit budget keeps the VWA objective well-posed");
     assert!(
         result.status.is_feasible(),
@@ -1442,7 +1415,7 @@ fn infeasible_result_turnover_is_nan() {
         PositionUnit::Units,
     )
     .unwrap();
-    let portfolio = PortfolioBuilder::new("INFEASIBLE_BOOK")
+    let portfolio = Portfolio::builder("INFEASIBLE_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1470,8 +1443,7 @@ fn infeasible_result_turnover_is_nan() {
         finstack_quant_portfolio::optimization::Constraint::Budget { rhs: 0.5 },
     ];
 
-    let result = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect("infeasible problems return a status-carrying result, not Err");
     assert!(
         !result.status.is_feasible(),
@@ -1524,7 +1496,7 @@ fn exclude_policy_removes_missing_metric_positions_from_vwa_bound_denominator() 
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("SCORED_BOOK")
+    let portfolio = Portfolio::builder("SCORED_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1553,8 +1525,7 @@ fn exclude_policy_removes_missing_metric_positions_from_vwa_bound_denominator() 
         },
     );
 
-    let result = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect("Exclude policy problem should solve");
     assert!(
         result.status.is_feasible(),
@@ -1604,7 +1575,7 @@ fn vwa_bound_slack_is_reported_in_metric_units() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("SLACK_BOOK")
+    let portfolio = Portfolio::builder("SLACK_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1644,8 +1615,7 @@ fn vwa_bound_slack_is_reported_in_metric_units() {
         },
     ];
 
-    let result = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect("VWA slack problem should solve");
     assert!(result.status.is_feasible(), "got {:?}", result.status);
 
@@ -1680,7 +1650,7 @@ fn mo21_duplicate_budget_constraints_are_rejected() {
         PositionUnit::Units,
     )
     .unwrap();
-    let portfolio = PortfolioBuilder::new("DUPLICATE_BUDGET_BOOK")
+    let portfolio = Portfolio::builder("DUPLICATE_BUDGET_BOOK")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1700,8 +1670,7 @@ fn mo21_duplicate_budget_constraints_are_rejected() {
         finstack_quant_portfolio::optimization::Constraint::Budget { rhs: 0.4 },
     ];
 
-    let err = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let err = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect_err("MO-21: duplicate Budget constraints must fail fast");
     let msg = err.to_string();
     assert!(
@@ -1727,7 +1696,7 @@ fn mo9_unit_scaling_without_budget_does_not_synthesize_sum_multiplier_budget() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("UNIT_SCALING_PORTFOLIO")
+    let portfolio = Portfolio::builder("UNIT_SCALING_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1745,8 +1714,7 @@ fn mo9_unit_scaling_without_budget_does_not_synthesize_sum_multiplier_budget() {
     problem.weighting = WeightingScheme::UnitScaling;
     problem.constraints.clear();
 
-    let err = DefaultLpOptimizer
-        .optimize(&problem, &build_mock_market(), &FinstackConfig::default())
+    let err = optimize(&problem, &build_mock_market(), &FinstackConfig::default())
         .expect_err("MO-9: UnitScaling must not get a synthetic budget");
     assert!(err.to_string().contains("MO-9"), "unexpected error: {err}");
 }
@@ -1770,7 +1738,7 @@ fn notional_weight_uses_instrument_deal_notional() -> Result<(), Box<dyn std::er
         1.0,
         PositionUnit::Notional(Some(Currency::USD)),
     )?;
-    let portfolio = PortfolioBuilder::new("DEAL_NOTIONAL")
+    let portfolio = Portfolio::builder("DEAL_NOTIONAL")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1807,8 +1775,7 @@ fn notional_weight_uses_instrument_deal_notional() -> Result<(), Box<dyn std::er
             },
         );
 
-    let result =
-        DefaultLpOptimizer.optimize(&problem, &build_mock_market(), &FinstackConfig::default())?;
+    let result = optimize(&problem, &build_mock_market(), &FinstackConfig::default())?;
     assert!(
         (result.current_weights["POS_1M"] - (1.0 / 3.0)).abs() < 1e-9,
         "1M deal should be one-third of 3M gross, got {}",
@@ -1860,7 +1827,7 @@ fn value_weight_percentage_reconstructs_via_scale_factor() -> Result<(), Box<dyn
         1.0,
         PositionUnit::Units,
     )?;
-    let portfolio = PortfolioBuilder::new("PCT_SCALE")
+    let portfolio = Portfolio::builder("PCT_SCALE")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1896,8 +1863,7 @@ fn value_weight_percentage_reconstructs_via_scale_factor() -> Result<(), Box<dyn
             },
         );
 
-    let result =
-        DefaultLpOptimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
     assert!(
         (result.implied_quantities["POS_PERCENT"] - 25.0).abs() < 1e-9,
         "Percentage 50 at half the current PV share must reconstruct 25 points, not scale 0.25; got {}",
@@ -1961,7 +1927,7 @@ fn exclude_policy_skips_missing_metric_in_weighted_sum() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("EXCLUDE_WS")
+    let portfolio = Portfolio::builder("EXCLUDE_WS")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -1980,8 +1946,7 @@ fn exclude_policy_skips_missing_metric_in_weighted_sum() {
     );
     problem.missing_metric_policy = MissingMetricPolicy::Exclude;
 
-    let result = DefaultLpOptimizer
-        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+    let result = optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
         .expect("Exclude WeightedSum should solve");
     assert!(result.status.is_feasible(), "got {:?}", result.status);
     assert!(
@@ -1999,7 +1964,7 @@ fn exclude_policy_skips_missing_metric_in_weighted_sum() {
 fn unit_scaling_zero_turnover_preserves_long_and_short_quantities() {
     use finstack_quant_portfolio::optimization::{Constraint, PositionFilter};
     let as_of = create_date(2024, Month::January, 1).unwrap();
-    let mut builder = PortfolioBuilder::new("UNIT_BASELINE")
+    let mut builder = Portfolio::builder("UNIT_BASELINE")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"));
@@ -2038,9 +2003,7 @@ fn unit_scaling_zero_turnover_preserves_long_and_short_quantities() {
     let market = build_mock_market();
     for held in [None, Some(PositionFilter::All)] {
         problem.trade_universe.held_filter = held;
-        let result = DefaultLpOptimizer
-            .optimize(&problem, &market, &FinstackConfig::default())
-            .unwrap();
+        let result = optimize(&problem, &market, &FinstackConfig::default()).unwrap();
         assert_eq!(result.current_weights["LONG"], 1.0);
         assert_eq!(result.current_weights["SHORT"], 1.0);
         assert!((result.implied_quantities["LONG"] - 10.0).abs() < 1e-9);
@@ -2048,9 +2011,7 @@ fn unit_scaling_zero_turnover_preserves_long_and_short_quantities() {
     }
     problem.trade_universe.held_filter = None;
     problem.constraints = vec![Constraint::Budget { rhs: 4.0 }];
-    let expanded = DefaultLpOptimizer
-        .optimize(&problem, &market, &FinstackConfig::default())
-        .unwrap();
+    let expanded = optimize(&problem, &market, &FinstackConfig::default()).unwrap();
     assert!(
         (expanded.implied_quantities["LONG"] / 10.0 + expanded.implied_quantities["SHORT"] / -10.0
             - 4.0)
@@ -2067,7 +2028,7 @@ fn notional_weights_convert_native_currencies_before_normalizing() {
     let mut eur = test_deposit("EUR", 1_000_000.0, as_of).unwrap();
     eur.notional = Money::from((1_000_000_i64, Currency::EUR));
     eur.discount_curve_id = "EUR-OIS".into();
-    let portfolio = PortfolioBuilder::new("FX_NOTIONAL")
+    let portfolio = Portfolio::builder("FX_NOTIONAL")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))
@@ -2107,13 +2068,12 @@ fn notional_weights_convert_native_currencies_before_normalizing() {
         label: None,
         max_turnover: 0.0,
     });
-    let result = DefaultLpOptimizer
-        .optimize(
-            &problem,
-            &build_multi_currency_market(),
-            &FinstackConfig::default(),
-        )
-        .unwrap();
+    let result = optimize(
+        &problem,
+        &build_multi_currency_market(),
+        &FinstackConfig::default(),
+    )
+    .unwrap();
     assert!((result.current_weights["USD"] - 1.0 / 2.2).abs() < 1e-9);
     assert!((result.current_weights["EUR"] - 1.2 / 2.2).abs() < 1e-9);
     assert!((result.implied_quantities["EUR"] - 1.0).abs() < 1e-9);
@@ -2143,7 +2103,7 @@ fn rebalance_from_spec_matches_the_live_result_and_rejects_foreign_results() {
     let as_of = create_date(2024, Month::January, 1).unwrap();
     let usd = test_deposit("USD", 1_000_000.0, as_of).unwrap();
     let other = test_deposit("USD", 500_000.0, as_of).unwrap();
-    let portfolio = PortfolioBuilder::new("REBALANCE")
+    let portfolio = Portfolio::builder("REBALANCE")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENT_A"))

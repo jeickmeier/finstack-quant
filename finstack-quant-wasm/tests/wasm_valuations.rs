@@ -5,7 +5,6 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use finstack_quant_wasm::api::valuations::exotic_rates::*;
 use finstack_quant_wasm::api::valuations::pricing::{
     instrument_cashflows, list_standard_metrics, price_instrument,
 };
@@ -539,19 +538,6 @@ fn price_instrument_structured_credit_stochastic_missing_market_data_errors() {
 }
 
 #[wasm_bindgen_test]
-fn cms_spread_option_intrinsic_call_works() {
-    let p = cms_spread_option_intrinsic(
-        JsValue::from(0.04),
-        JsValue::from(0.02),
-        JsValue::from(0.01),
-        JsValue::from(true),
-        JsValue::from(1_000_000.0),
-    )
-    .expect("cms");
-    assert!((p - 10_000.0).abs() < 1e-9);
-}
-
-#[wasm_bindgen_test]
 fn public_json_routes_validate_instrument_before_market_json_binding() {
     assert!(structured_credit_tranche_discount_margin(
         JsValue::from("{}"),
@@ -593,34 +579,4 @@ fn public_json_routes_validate_instrument_before_market_json_binding() {
         Some(JsValue::from(f64::NAN)),
     )
     .is_err());
-}
-
-#[wasm_bindgen_test]
-fn snowball_honors_cap_and_floor() {
-    let coupons = snowball_coupon_profile(
-        JsValue::from(0.02),
-        JsValue::from(0.05),
-        JsValue::from(vec![0.01_f64, 0.04, 0.03]),
-        JsValue::from(0.0),
-        Some(JsValue::from(0.10)),
-    )
-    .expect("snowball");
-    assert_eq!(coupons.len(), 3);
-    for c in coupons {
-        assert!((0.0..=0.10).contains(&c));
-    }
-}
-
-#[wasm_bindgen_test]
-fn inverse_floater_uses_explicit_gearing() {
-    let coupons = inverse_floater_coupon_profile(
-        JsValue::from(0.05),
-        JsValue::from(vec![0.01_f64, 0.02]),
-        JsValue::from(0.0),
-        Some(JsValue::from(0.10)),
-        JsValue::from(2.0),
-    )
-    .expect("inverse floater");
-    assert!((coupons[0] - 0.03).abs() < 1e-12);
-    assert!((coupons[1] - 0.01).abs() < 1e-12);
 }

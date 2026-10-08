@@ -5,7 +5,7 @@
 //! risk metrics like DV01, Theta, etc.
 
 use crate::metrics::core::traits::{MetricCalculator, MetricContext};
-use crate::metrics::risk::{calculate_var_with_pricing, VarConfig, VarResult};
+use crate::metrics::risk::{calculate_var, VarConfig, VarResult};
 use crate::metrics::MetricId;
 use finstack_quant_core::Result;
 
@@ -21,7 +21,7 @@ fn calculate_var_result(
         .and_then(|overrides| overrides.var_config.clone())
         .unwrap_or_else(VarConfig::var_95);
     let dispatch = context.clone_pricer_dispatch();
-    calculate_var_with_pricing(
+    calculate_var(
         &[context.instrument.as_ref()],
         &context.curves,
         history,
@@ -141,7 +141,7 @@ mod tests {
 
     use super::*;
     use crate::instruments::common_impl::traits::Instrument;
-    use crate::metrics::risk::calculate_var;
+    use crate::pricer::PricingDispatch;
     use std::sync::Arc;
     use test_utils::{history_from_rate_shifts, sample_as_of, standard_bond, usd_ois_market};
     use time::Duration;
@@ -170,11 +170,12 @@ mod tests {
 
         // Compute a reference result directly from the VaR engine.
         let expected = calculate_var(
-            &[&bond],
+            &[&bond as &dyn Instrument],
             market.as_ref(),
             history.as_ref(),
             as_of,
             &VarConfig::var_95(),
+            PricingDispatch::InstrumentDefault,
             None,
         )?;
 
@@ -251,13 +252,22 @@ mod tests {
             .collect();
         let history = Arc::new(history_from_rate_shifts(as_of, &shifts));
         let market = usd_ois_market(as_of)?;
-        let expected = calculate_var(&[&bond], &market, &history, as_of, &config, None)?;
+        let expected = calculate_var(
+            &[&bond as &dyn Instrument],
+            &market,
+            &history,
+            as_of,
+            &config,
+            PricingDispatch::InstrumentDefault,
+            None,
+        )?;
         let default = calculate_var(
-            &[&bond],
+            &[&bond as &dyn Instrument],
             &market,
             &history,
             as_of,
             &VarConfig::var_95(),
+            PricingDispatch::InstrumentDefault,
             None,
         )?;
         assert_ne!(expected.var, default.var);

@@ -370,8 +370,6 @@ fn numeric_vector_exports_declare_float64array() {
         ("CorrelationNamespace", "jointProbabilities"),
         ("CorrelationNamespace", "nearestCorrelation"),
         ("SabrSmile", "generateSmile"),
-        ("ValuationsNamespace", "snowballCouponProfile"),
-        ("ValuationsNamespace", "inverseFloaterCouponProfile"),
     ] {
         let ret = declared(&dts, owner, export);
         assert!(

@@ -7,19 +7,19 @@ use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::core::types::PyAttributes;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{
-    attributes_from_py, attributes_to_py, bdc_from_py, builder_repr, day_count_from_py,
-    enum_to_py_string, money_from_py, money_repr, money_to_py, tenor_from_py,
+    attributes_from_py, bdc_from_py, builder_repr, day_count_from_py, enum_to_py_string,
+    money_from_py, money_repr, money_to_py, tenor_from_py,
 };
 use crate::bindings::valuations::instruments::{
-    instrument_default_model, instrument_expiry, instrument_market_dependencies, metric_typed,
-    parse_typed_instrument_json, price_typed, serialize_typed_instrument_json, stub_kind_from_py,
+    instrument_expiry, serialize_typed_instrument_json, stub_kind_from_py,
 };
-use crate::bindings::valuations::PyValuationResult;
+use crate::bindings::valuations::typed_macros::{
+    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+};
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_cashflows::traits::CashflowScheduleSource;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -77,30 +77,17 @@ impl PyRevolvingCredit {
     }
 }
 
+instrument_envelope_methods!(
+    PyRevolvingCredit,
+    RevolvingCredit,
+    "revolving_credit",
+    PyRevolvingCreditBuilder,
+    RevolvingCredit::builder()
+);
+instrument_pricing_methods!(PyRevolvingCredit);
+
 #[pymethods]
 impl PyRevolvingCredit {
-    /// Create a fluent builder (mirrors Rust ``RevolvingCredit::builder()``).
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     A builder with fluent, consuming setter methods.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import RevolvingCredit
-    /// >>> builder = RevolvingCredit.builder()
-    /// >>> builder.id("RCF-1") is builder
-    /// True
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn builder() -> PyRevolvingCreditBuilder {
-        PyRevolvingCreditBuilder {
-            inner: Some(RevolvingCredit::builder()),
-            fields: Vec::new(),
-        }
-    }
-
     /// Canonical example: USD 50M three-year SOFR + 250bp facility, USD 10M
     /// drawn, with a scheduled draw and repayment (mirrors Rust
     /// ``RevolvingCredit::example``).
@@ -126,191 +113,6 @@ impl PyRevolvingCredit {
         RevolvingCredit::example()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
-    }
-
-    /// Support ``pickle`` (and therefore ``multiprocessing``, ``joblib``, ``dask``).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// ``to_json`` / ``from_json``, so an unpickled value is exactly what the
-    /// wire format defines.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a validated facility from its canonical v1 envelope.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     A ``finstack_quant.instrument/1`` envelope containing an exact
-    ///     ``"revolving_credit"`` payload. The UTF-8 input must not exceed
-    ///     16 MiB. Bare payloads and cross-type coercion are rejected.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCredit
-    ///     The validated facility represented by the payload.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the input exceeds 16 MiB, is malformed, has an unsupported
-    ///     envelope schema, carries a type other than ``"revolving_credit"``,
-    ///     or fails facility validation.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import RevolvingCredit
-    /// >>> facility = RevolvingCredit.example()
-    /// >>> RevolvingCredit.from_json(facility.to_json()).id == facility.id
-    /// True
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        parse_typed_instrument_json(json).map(|inner| Self { inner })
-    }
-
-    /// Serialize to a canonical ``finstack_quant.instrument/1`` envelope.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     Envelope accepted by ``price_instrument`` and ``from_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        self.envelope_json()
-    }
-
-    /// Serde form of the facility as a Python ``dict``.
-    ///
-    /// Returns
-    /// -------
-    /// dict
-    ///     Canonical serde shape of the Rust ``RevolvingCredit``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the value cannot be serialized.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner)
-    }
-
-    /// Price the facility and return a ``ValuationResult``.
-    ///
-    /// Same pipeline and keyword surface as ``price_instrument``; a
-    /// stochastic ``draw_repay_spec`` prices by Monte Carlo, a deterministic
-    /// one on its contractual schedule.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market context object or JSON string.
-    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation date.
-    /// model : str, default "default"
-    ///     Model key.
-    /// metrics : list[str], optional
-    ///     Metric identifiers to compute (for example ``"dv01"`` or
-    ///     ``"draw_option_cost"``).
-    /// metric_pricing_overrides : MetricPricingOverrides | dict | str, optional
-    ///     Metric-time overrides merged into
-    ///     ``instrument.spec.metric_pricing_overrides`` before pricing.
-    /// market_history : MarketHistory | dict | str, optional
-    ///     ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
-    ///
-    /// Returns
-    /// -------
-    /// ValuationResult
-    ///     Typed valuation envelope.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input cannot be interpreted or the instrument fails validation.
-    /// KeyError
-    ///     If a required curve or metric is missing.
-    /// RuntimeError
-    ///     If pricing or a metric computation fails.
-    #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
-    #[pyo3(
-        text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn price(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        model: &str,
-        metrics: Option<Vec<String>>,
-        metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
-        market_history: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyValuationResult> {
-        price_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            model,
-            metrics,
-            metric_pricing_overrides,
-            market_history,
-        )
-    }
-
-    /// Compute one scalar metric (e.g. ``"dv01"`` or ``"draw_option_cost"``).
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market context object or JSON string.
-    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation date.
-    /// metric_id : str
-    ///     Registered metric identifier.
-    /// model : str, default "default"
-    ///     Model key.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     The metric value.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``metric_id`` is unknown or an input cannot be interpreted.
-    /// KeyError
-    ///     If a required curve is missing.
-    /// RuntimeError
-    ///     If the metric computation fails.
-    #[pyo3(signature = (market, as_of, metric_id, model="default"))]
-    #[pyo3(text_signature = "($self, market, as_of, metric_id, model='default')")]
-    fn metric(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        metric_id: &str,
-        model: &str,
-    ) -> PyResult<f64> {
-        metric_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            metric_id,
-            model,
-        )
     }
 
     /// Run the stochastic Monte Carlo valuation and keep every path.
@@ -392,12 +194,6 @@ impl PyRevolvingCredit {
             .detach(move || facility.raw_cashflow_schedule(&market, as_of))
             .map_err(core_to_py)?;
         Ok(PyCashFlowSchedule::from_inner(schedule))
-    }
-
-    /// Instrument identifier.
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.id.to_string()
     }
 
     /// Total committed amount.
@@ -567,38 +363,10 @@ impl PyRevolvingCredit {
         self.inner.settlement_days
     }
 
-    /// Scenario-selection attributes.
-    #[getter]
-    fn attributes(&self) -> PyAttributes {
-        attributes_to_py(&self.inner.attributes)
-    }
-
-    /// Default pricing model key from the ``Instrument`` trait.
-    #[getter]
-    fn default_model(&self) -> String {
-        instrument_default_model(&self.inner)
-    }
-
     /// Expiry date exposed by the ``Instrument`` trait, or ``None``.
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
-    }
-
-    /// Market-data dependencies (curves, fixings) as a dict.
-    ///
-    /// Returns
-    /// -------
-    /// dict
-    ///     Serde form of the Rust ``MarketDependencies``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the instrument cannot enumerate its dependencies.
-    #[pyo3(text_signature = "($self)")]
-    fn market_dependencies<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        instrument_market_dependencies(py, &self.inner)
     }
 
     /// Return ``repr(self)``.
@@ -685,10 +453,12 @@ impl PyRevolvingCreditBuilder {
     ///     If the builder was already consumed by ``build()``.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.id(InstrumentId::new(value.to_string())));
-        slf.fields.push(("id", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            id,
+            format!("{value:?}"),
+            |b: RevolvingCreditBuilderInner| b.id(InstrumentId::new(value.to_string()))
+        )
     }
 
     /// Set the total commitment.
@@ -720,10 +490,12 @@ impl PyRevolvingCreditBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "commitment")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.commitment(money));
-        slf.fields.push(("commitment", money_repr(money)));
-        Ok(slf)
+        builder_set!(
+            slf,
+            commitment,
+            money_repr(money),
+            |b: RevolvingCreditBuilderInner| b.commitment(money)
+        )
     }
 
     /// Set the drawn balance at the simulation anchor, the later of the
@@ -757,10 +529,12 @@ impl PyRevolvingCreditBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "drawn")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.drawn(money));
-        slf.fields.push(("drawn", money_repr(money)));
-        Ok(slf)
+        builder_set!(
+            slf,
+            drawn,
+            money_repr(money),
+            |b: RevolvingCreditBuilderInner| b.drawn(money)
+        )
     }
 
     /// Set the date the facility becomes available.
@@ -785,10 +559,12 @@ impl PyRevolvingCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.issue_date(date));
-        slf.fields.push(("issue_date", date.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            issue_date,
+            date.to_string(),
+            |b: RevolvingCreditBuilderInner| b.issue_date(date)
+        )
     }
 
     /// Set the expiry of the commitment.
@@ -813,10 +589,12 @@ impl PyRevolvingCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.maturity(date));
-        slf.fields.push(("maturity", date.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            maturity,
+            date.to_string(),
+            |b: RevolvingCreditBuilderInner| b.maturity(date)
+        )
     }
 
     /// Set the facility coupon.
@@ -851,10 +629,8 @@ impl PyRevolvingCreditBuilder {
             spec_from_py(py, value, "rate")?
         };
         let repr = serde_json::to_string(&spec).unwrap_or_default();
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.rate(spec));
-        slf.fields.push(("rate", repr));
-        Ok(slf)
+        builder_set!(slf, rate, repr, |b: RevolvingCreditBuilderInner| b
+            .rate(spec))
     }
 
     /// Set the interest accrual day count.
@@ -881,10 +657,12 @@ impl PyRevolvingCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let day_count = day_count_from_py(value, "day_count")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.day_count(day_count));
-        slf.fields.push(("day_count", format!("{day_count:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            day_count,
+            format!("{day_count:?}"),
+            |b: RevolvingCreditBuilderInner| b.day_count(day_count)
+        )
     }
 
     /// Set the payment frequency for interest and fees.
@@ -911,10 +689,12 @@ impl PyRevolvingCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let tenor = tenor_from_py(value, "frequency")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.frequency(tenor));
-        slf.fields.push(("frequency", format!("{tenor:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            frequency,
+            format!("{tenor:?}"),
+            |b: RevolvingCreditBuilderInner| b.frequency(tenor)
+        )
     }
 
     /// Set the fee structure from its serde shape.
@@ -946,10 +726,12 @@ impl PyRevolvingCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let fees: RevolvingCreditFees = spec_from_py(py, value, "fees")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.fees(fees));
-        slf.fields.push(("fees", "{..}".to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            fees,
+            "{..}".to_string(),
+            |b: RevolvingCreditBuilderInner| b.fees(fees)
+        )
     }
 
     /// Set the scheduled commitment changes.
@@ -984,10 +766,12 @@ impl PyRevolvingCreditBuilder {
         let steps: Vec<
             finstack_quant_valuations::instruments::fixed_income::loan_terms::CommitmentStep,
         > = spec_from_py(py, value, "commitment_steps")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.commitment_steps(steps));
-        slf.fields.push(("commitment_steps", "[..]".to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            commitment_steps,
+            "[..]".to_string(),
+            |b: RevolvingCreditBuilderInner| b.commitment_steps(steps)
+        )
     }
 
     /// Set the dated fixed fees (amendment, waiver, extension, consent).
@@ -1018,10 +802,12 @@ impl PyRevolvingCreditBuilder {
         let fees: Vec<
             finstack_quant_valuations::instruments::fixed_income::loan_terms::ScheduledFee,
         > = spec_from_py(py, value, "scheduled_fees")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.scheduled_fees(fees));
-        slf.fields.push(("scheduled_fees", "[..]".to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            scheduled_fees,
+            "[..]".to_string(),
+            |b: RevolvingCreditBuilderInner| b.scheduled_fees(fees)
+        )
     }
 
     /// Set the effective-interest-rate reporting switch.
@@ -1053,10 +839,12 @@ impl PyRevolvingCreditBuilder {
             finstack_quant_valuations::instruments::fixed_income::loan_terms::OidEirSpec,
         > = value.map(|v| spec_from_py(py, v, "oid_eir")).transpose()?;
         let repr = if spec.is_some() { "{..}" } else { "None" };
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.oid_eir_opt(spec));
-        slf.fields.push(("oid_eir", repr.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            oid_eir,
+            repr.to_string(),
+            |b: RevolvingCreditBuilderInner| b.oid_eir_opt(spec)
+        )
     }
 
     /// Set the letter-of-credit sub-facility.
@@ -1092,10 +880,12 @@ impl PyRevolvingCreditBuilder {
             finstack_quant_valuations::instruments::fixed_income::loan_terms::LetterOfCreditSpec,
         > = value.map(|v| spec_from_py(py, v, "lc")).transpose()?;
         let repr = if lc.is_some() { "{..}" } else { "None" };
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.lc_opt(lc));
-        slf.fields.push(("lc", repr.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            lc,
+            repr.to_string(),
+            |b: RevolvingCreditBuilderInner| b.lc_opt(lc)
+        )
     }
 
     /// Set the dated margin steps.
@@ -1128,10 +918,12 @@ impl PyRevolvingCreditBuilder {
         let steps: Vec<
             finstack_quant_valuations::instruments::fixed_income::loan_terms::MarginStep,
         > = spec_from_py(py, value, "margin_steps")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.margin_steps(steps));
-        slf.fields.push(("margin_steps", "[..]".to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            margin_steps,
+            "[..]".to_string(),
+            |b: RevolvingCreditBuilderInner| b.margin_steps(steps)
+        )
     }
 
     /// Set the draw/repay specification from its serde shape.
@@ -1167,10 +959,12 @@ impl PyRevolvingCreditBuilder {
             DrawRepaySpec::Deterministic(_) => "deterministic",
             DrawRepaySpec::Stochastic(_) => "stochastic",
         };
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.draw_repay_spec(spec));
-        slf.fields.push(("draw_repay_spec", kind.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            draw_repay_spec,
+            kind.to_string(),
+            |b: RevolvingCreditBuilderInner| b.draw_repay_spec(spec)
+        )
     }
 
     /// Set the discount curve identifier.
@@ -1194,10 +988,12 @@ impl PyRevolvingCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.discount_curve_id(CurveId::new(value.to_string())));
-        slf.fields.push(("discount_curve_id", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            discount_curve_id,
+            format!("{value:?}"),
+            |b: RevolvingCreditBuilderInner| b.discount_curve_id(CurveId::new(value.to_string()))
+        )
     }
 
     /// Set (or clear) the credit curve identifier.
@@ -1224,10 +1020,13 @@ impl PyRevolvingCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.credit_curve_id_opt(value.map(|v| CurveId::new(v.to_string()))));
-        slf.fields.push(("credit_curve_id", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            credit_curve_id,
+            format!("{value:?}"),
+            |b: RevolvingCreditBuilderInner| b
+                .credit_curve_id_opt(value.map(|v| CurveId::new(v.to_string())))
+        )
     }
 
     /// Set the recovery rate on default.
@@ -1251,10 +1050,12 @@ impl PyRevolvingCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.recovery_rate(value));
-        slf.fields.push(("recovery_rate", value.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            recovery_rate,
+            value.to_string(),
+            |b: RevolvingCreditBuilderInner| b.recovery_rate(value)
+        )
     }
 
     /// Set the loan-equivalent exposure drawn at default.
@@ -1276,10 +1077,12 @@ impl PyRevolvingCreditBuilder {
     ///     If the builder was already consumed.
     #[pyo3(text_signature = "($self, value)")]
     fn leq<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.leq(value));
-        slf.fields.push(("leq", value.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            leq,
+            value.to_string(),
+            |b: RevolvingCreditBuilderInner| b.leq(value)
+        )
     }
 
     /// Set the stub rule for schedule generation.
@@ -1308,10 +1111,12 @@ impl PyRevolvingCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let stub = stub_kind_from_py(Some(value), "stub")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.stub(stub));
-        slf.fields.push(("stub", format!("{stub:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            stub,
+            format!("{stub:?}"),
+            |b: RevolvingCreditBuilderInner| b.stub(stub)
+        )
     }
 
     /// Set the business-day convention for payment dates.
@@ -1340,11 +1145,12 @@ impl PyRevolvingCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let convention = bdc_from_py(value, "business_day_convention")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.business_day_convention(convention));
-        slf.fields
-            .push(("business_day_convention", format!("{convention:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            business_day_convention,
+            format!("{convention:?}"),
+            |b: RevolvingCreditBuilderInner| b.business_day_convention(convention)
+        )
     }
 
     /// Set the holiday calendar used for payment, fixing and settlement rolls.
@@ -1371,10 +1177,12 @@ impl PyRevolvingCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: Option<String>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.calendar_id_opt(value.clone().map(Into::into)));
-        slf.fields.push(("calendar_id", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            calendar_id,
+            format!("{value:?}"),
+            |b: RevolvingCreditBuilderInner| b.calendar_id_opt(value.clone().map(Into::into))
+        )
     }
 
     /// Set the payment lag in business days after each accrual end.
@@ -1399,10 +1207,12 @@ impl PyRevolvingCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: u32,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.payment_lag_days(value));
-        slf.fields.push(("payment_lag_days", value.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            payment_lag_days,
+            value.to_string(),
+            |b: RevolvingCreditBuilderInner| b.payment_lag_days(value)
+        )
     }
 
     /// Set the settlement lag used by quote metrics.
@@ -1428,10 +1238,12 @@ impl PyRevolvingCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: u32,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.settlement_days(value));
-        slf.fields.push(("settlement_days", value.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            settlement_days,
+            value.to_string(),
+            |b: RevolvingCreditBuilderInner| b.settlement_days(value)
+        )
     }
 
     /// Set scenario-selection attributes.
@@ -1462,10 +1274,12 @@ impl PyRevolvingCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attributes = attributes_from_py(value)?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.attributes(attributes));
-        slf.fields.push(("attributes", "{..}".to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            attributes,
+            "{..}".to_string(),
+            |b: RevolvingCreditBuilderInner| b.attributes(attributes)
+        )
     }
 
     /// Consume the builder and validate the facility.

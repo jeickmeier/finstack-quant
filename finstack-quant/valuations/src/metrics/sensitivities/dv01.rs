@@ -36,7 +36,6 @@ use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::neumaier_sum;
 use finstack_quant_core::types::CurveId;
-use std::marker::PhantomData;
 
 /// Reprice for a rate scenario. Instruments whose projected cashflows respond
 /// to rates (agency mortgages) rebuild themselves through
@@ -190,28 +189,19 @@ impl Dv01CalculatorConfig {
 ///
 /// 2. **Par-Rate Bumping** (`KeyRateParRate`): Bumps par rates of calibration
 ///    instruments and re-bootstraps, ensuring exact sum = parallel.
-pub(crate) struct UnifiedDv01Calculator<I> {
+pub(crate) struct UnifiedDv01Calculator {
     config: Dv01CalculatorConfig,
-    _phantom: PhantomData<I>,
 }
 
-impl<I> UnifiedDv01Calculator<I> {
+impl UnifiedDv01Calculator {
     /// Create a new calculator with the given configuration.
     pub(crate) fn new(config: Dv01CalculatorConfig) -> Self {
-        Self {
-            config,
-            _phantom: PhantomData,
-        }
+        Self { config }
     }
 }
 
-impl<I> MetricCalculator for UnifiedDv01Calculator<I>
-where
-    I: Instrument + 'static,
-{
+impl MetricCalculator for UnifiedDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let instrument: &I = context.instrument_as()?;
-
         // Resolve bump size from config, then layer instrument overrides.
         let defaults = sens_config::from_context_or_default(
             context.get_config(),
@@ -219,7 +209,7 @@ where
         )?;
         let bump_bp = defaults.rate_bump_bp;
 
-        let curves = self.collect_curves(instrument, context.curves.as_ref())?;
+        let curves = self.collect_curves(context.instrument.as_ref(), context.curves.as_ref())?;
 
         match self.config.mode {
             Dv01ComputationMode::ParallelCombined => {
@@ -236,10 +226,7 @@ where
     }
 }
 
-impl<I> UnifiedDv01Calculator<I>
-where
-    I: Instrument + 'static,
-{
+impl UnifiedDv01Calculator {
     /// Collect curves based on configuration and what exists in the market.
     ///
     /// # Errors
@@ -249,7 +236,7 @@ where
     /// market data is surfaced explicitly rather than silently returning 0.0.
     fn collect_curves(
         &self,
-        instrument: &I,
+        instrument: &dyn Instrument,
         market: &MarketContext,
     ) -> finstack_quant_core::Result<Vec<(CurveId, RatesCurveKind)>> {
         let deps = instrument.market_dependencies()?.curves;
@@ -540,9 +527,7 @@ mod tests {
             .expect("valid discount curve");
         let market = MarketContext::new().insert(curve);
 
-        let calc = UnifiedDv01Calculator::<InterestRateSwap>::new(
-            Dv01CalculatorConfig::parallel_combined(),
-        );
+        let calc = UnifiedDv01Calculator::new(Dv01CalculatorConfig::parallel_combined());
         let curves = calc
             .collect_curves(&swap, &market)
             .expect("dual-role curve must still resolve for DV01");

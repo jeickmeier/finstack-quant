@@ -22,9 +22,7 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cms_swap::types::CmsSwap;
 #[cfg(test)]
 use crate::instruments::rates::cms_swap::types::FundingLeg;
-use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
+use crate::pricer::{InstrumentType, ModelKey, Pricer, PricerKey, PricingError};
 use crate::results::ValuationResult;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -156,9 +154,7 @@ impl Pricer for CmsSwapPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let cms = crate::pricer::expect_inst::<CmsSwap>(instrument, InstrumentType::CmsSwap)?;
 
-        let pv = self
-            .price_internal(cms, market, as_of)
-            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
+        let pv = self.price_internal(cms, market, as_of)?;
 
         Ok(ValuationResult::stamped(cms.id(), as_of, pv))
     }
@@ -336,9 +332,7 @@ impl Pricer for CmsSwapReplicationPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let cms = crate::pricer::expect_inst::<CmsSwap>(instrument, InstrumentType::CmsSwap)?;
 
-        let pv = self
-            .price_internal(cms, market, as_of)
-            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
+        let pv = self.price_internal(cms, market, as_of)?;
 
         Ok(ValuationResult::stamped(cms.id(), as_of, pv))
     }

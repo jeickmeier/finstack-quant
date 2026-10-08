@@ -248,6 +248,51 @@ mod tests {
         .expect("parse structured-credit golden fixture")
     }
 
+    /// The Bloomberg SWPM screenshots behind this fixture show five annual
+    /// payments per leg, both legs paying on the same lagged dates and a first
+    /// ACT/360 accrual of 365 days. Assert that schedule shape from the
+    /// instrument's own cashflow schedule rather than through metric keys.
+    #[test]
+    fn usd_sofr_swpm_schedule_matches_bloomberg_leg_layout() {
+        use finstack_quant_core::cashflow::CFKind;
+        use time::macros::date;
+
+        let fixture: GoldenFixture = serde_json::from_str(include_str!(
+            "data/pricing/bloomberg/irs/usd_sofr_5y_receive_fixed_swpm.json"
+        ))
+        .expect("parse SWPM golden fixture");
+        let pricing = fixture.pricing().expect("pricing body");
+        let market = resolve_market(&pricing.market).expect("resolve fixture market");
+        let instrument_json =
+            serde_json::to_string(&pricing.instrument).expect("serialize instrument");
+        let instrument =
+            parse_boxed_instrument_from_json(&instrument_json, None).expect("parse swap");
+        let as_of = finstack_quant_core::dates::parse_iso_date(&fixture.metadata.valuation_date)
+            .expect("fixture valuation date");
+
+        let schedule = instrument
+            .as_instrument()
+            .cashflow_schedule(&market, as_of)
+            .expect("swap cashflow schedule");
+        let (mut floating, mut fixed): (Vec<_>, Vec<_>) = schedule
+            .get_flows()
+            .iter()
+            .partition(|flow| matches!(flow.kind, CFKind::FloatReset));
+        fixed.sort_by_key(|flow| flow.date);
+        floating.sort_by_key(|flow| flow.date);
+
+        for (leg, flows) in [("fixed", &fixed), ("floating", &floating)] {
+            assert_eq!(flows.len(), 5, "{leg} leg payment count");
+            assert_eq!(flows[0].date, date!(2027 - 05 - 06), "{leg} first payment");
+            assert_eq!(flows[4].date, date!(2031 - 05 - 07), "{leg} last payment");
+            assert!(
+                (flows[0].accrual_factor - 365.0 / 360.0).abs() < 1e-12,
+                "{leg} first accrual factor {}",
+                flows[0].accrual_factor
+            );
+        }
+    }
+
     fn price_fixture_npv(
         fixture: &GoldenFixture,
         market: &MarketContext,

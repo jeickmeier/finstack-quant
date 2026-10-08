@@ -8,7 +8,7 @@ use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve, HazardCurve};
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    price_convertible_bond, ConversionPolicy, ConvertibleTreeType,
+    price_convertible_bond, ConversionPolicy,
 };
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
@@ -50,18 +50,10 @@ fn production_convertible_clean_call_includes_accrued() {
     });
     bond.instrument_pricing_overrides.model_config.tree_steps = Some(100);
     let expected = 1000.0 + 50.0 * 90.0 / 365.0;
-    for tree in [
-        ConvertibleTreeType::Binomial,
-        ConvertibleTreeType::Trinomial,
-    ] {
-        let actual = price_convertible_bond(&bond, &market(as_of, 0.0, 1.0, 0.2), tree, as_of)
-            .expect("callable value")
-            .amount();
-        assert!(
-            (actual - expected).abs() < 1e-8,
-            "{tree:?}: {actual} vs {expected}"
-        );
-    }
+    let actual = price_convertible_bond(&bond, &market(as_of, 0.0, 1.0, 0.2), as_of)
+        .expect("callable value")
+        .amount();
+    assert!((actual - expected).abs() < 1e-8, "{actual} vs {expected}");
 }
 
 #[test]
@@ -81,18 +73,10 @@ fn production_convertible_clean_put_includes_accrued() {
     });
     bond.instrument_pricing_overrides.model_config.tree_steps = Some(100);
     let expected = 1200.0 + 50.0 * 90.0 / 365.0;
-    for tree in [
-        ConvertibleTreeType::Binomial,
-        ConvertibleTreeType::Trinomial,
-    ] {
-        let actual = price_convertible_bond(&bond, &market(as_of, 0.0, 1.0, 0.2), tree, as_of)
-            .expect("puttable value")
-            .amount();
-        assert!(
-            (actual - expected).abs() < 1e-8,
-            "{tree:?}: {actual} vs {expected}"
-        );
-    }
+    let actual = price_convertible_bond(&bond, &market(as_of, 0.0, 1.0, 0.2), as_of)
+        .expect("puttable value")
+        .amount();
+    assert!((actual - expected).abs() < 1e-8, "{actual} vs {expected}");
 }
 
 #[test]
@@ -145,7 +129,6 @@ fn production_convertible_coupon_date_call_does_not_duplicate_coupon() {
         let actual = price_convertible_bond(
             &with_tree_steps(&bond, 365),
             &market(as_of, 0.0, 1.0, 0.2),
-            ConvertibleTreeType::Binomial,
             as_of,
         )
         .expect("coupon-date exercise")
@@ -204,10 +187,10 @@ fn production_convertible_volatility_override_drives_price_and_greeks() {
     let reference_market = market(as_of, 0.03, 90.0, 0.4);
     let inactive_market = market(as_of, 0.03, 90.0, 0.1);
     let reference = bond
-        .greeks(&reference_market, None, as_of)
+        .greeks(&reference_market, as_of)
         .expect("reference Greeks");
     let actual = overridden
-        .greeks(&inactive_market, None, as_of)
+        .greeks(&inactive_market, as_of)
         .expect("override Greeks");
     assert!((actual.price - reference.price).abs() < 1e-9);
     assert!((actual.vega - reference.vega).abs() < 1e-9);
@@ -512,18 +495,14 @@ fn production_convertible_implied_vol_preserves_selected_engine() {
                 instrument,
                 InstrumentType::Convertible,
             )?;
-            let value = price_convertible_bond(
-                &with_tree_steps(bond, 17),
-                market,
-                ConvertibleTreeType::Trinomial,
-                as_of,
-            )
-            .map_err(|error| {
-                PricingError::model_failure_with_context(
-                    error.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+            let value = price_convertible_bond(&with_tree_steps(bond, 17), market, as_of).map_err(
+                |error| {
+                    PricingError::model_failure_with_context(
+                        error.to_string(),
+                        PricingErrorContext::default(),
+                    )
+                },
+            )?;
             Ok(ValuationResult::stamped(bond.id(), as_of, value))
         }
     }
@@ -532,14 +511,9 @@ fn production_convertible_implied_vol_preserves_selected_engine() {
     bond.cashflow_spec =
         finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::default();
     let ctx = market(as_of, 0.0, 90.0, 0.4);
-    let target = price_convertible_bond(
-        &with_tree_steps(&bond, 17),
-        &ctx,
-        ConvertibleTreeType::Trinomial,
-        as_of,
-    )
-    .expect("selected target")
-    .amount();
+    let target = price_convertible_bond(&with_tree_steps(&bond, 17), &ctx, as_of)
+        .expect("selected target")
+        .amount();
     bond.instrument_pricing_overrides
         .market_quotes
         .quoted_clean_price_pct = Some(target / 10.0);

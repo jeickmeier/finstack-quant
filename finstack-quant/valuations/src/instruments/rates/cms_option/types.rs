@@ -263,10 +263,6 @@ impl crate::instruments::common_impl::traits::Instrument for CmsOption {
         crate::instruments::rates::cms_option::pricer::compute_pv(self, market, as_of)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        self.fixing_dates.first().copied()
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

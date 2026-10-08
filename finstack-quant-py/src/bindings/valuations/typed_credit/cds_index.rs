@@ -20,8 +20,10 @@ use super::super::convert::{
     enum_to_py_string, float_repr, money_from_py, money_repr, money_to_py, opt_repr,
 };
 use super::super::instruments::{enum_from_str, serialize_typed_instrument_json};
-use super::super::typed_fx::{instrument_envelope_methods, instrument_pricing_methods};
 use super::super::typed_legs::{PyPremiumLegSpec, PyProtectionLegSpec};
+use super::super::typed_macros::{
+    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+};
 use super::cds::cds_convention_from_str;
 use crate::bindings::valuations::convert::take_builder;
 
@@ -872,16 +874,6 @@ crate::bindings::valuations::pricing::pricing_override_methods!(
     fields
 );
 
-/// Apply one consuming Rust setter and record the field for ``__repr__``.
-macro_rules! cds_index_set {
-    ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{
-        let b = take_builder(&mut $slf.inner)?;
-        $slf.inner = Some($apply(b));
-        $slf.fields.push((stringify!($field), $repr));
-        Ok($slf)
-    }};
-}
-
 #[pymethods]
 impl PyCdsIndexBuilder {
     /// Set the instrument identifier.
@@ -897,7 +889,7 @@ impl PyCdsIndexBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        cds_index_set!(slf, id, format!("{value:?}"), |b: CdsIndexBuilderInner| b
+        builder_set!(slf, id, format!("{value:?}"), |b: CdsIndexBuilderInner| b
             .id(InstrumentId::new(value.to_string())))
     }
 
@@ -914,7 +906,7 @@ impl PyCdsIndexBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn index_name<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        cds_index_set!(
+        builder_set!(
             slf,
             index_name,
             format!("{value:?}"),
@@ -935,7 +927,7 @@ impl PyCdsIndexBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn series<'py>(mut slf: PyRefMut<'py, Self>, value: u16) -> PyResult<PyRefMut<'py, Self>> {
-        cds_index_set!(slf, series, value.to_string(), |b: CdsIndexBuilderInner| b
+        builder_set!(slf, series, value.to_string(), |b: CdsIndexBuilderInner| b
             .series(value))
     }
 
@@ -952,7 +944,7 @@ impl PyCdsIndexBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn version<'py>(mut slf: PyRefMut<'py, Self>, value: u16) -> PyResult<PyRefMut<'py, Self>> {
-        cds_index_set!(
+        builder_set!(
             slf,
             version,
             value.to_string(),
@@ -977,7 +969,7 @@ impl PyCdsIndexBuilder {
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = value.inner;
-        cds_index_set!(
+        builder_set!(
             slf,
             notional,
             money_repr(money),
@@ -1002,7 +994,7 @@ impl PyCdsIndexBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cds_index_set!(
+        builder_set!(
             slf,
             index_factor,
             float_repr(value),
@@ -1030,7 +1022,7 @@ impl PyCdsIndexBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side = enum_from_str(value, "side")?;
-        cds_index_set!(
+        builder_set!(
             slf,
             side,
             format!("{value:?}"),
@@ -1059,7 +1051,7 @@ impl PyCdsIndexBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn convention<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let convention = cds_convention_from_str(value)?;
-        cds_index_set!(
+        builder_set!(
             slf,
             convention,
             format!("{value:?}"),
@@ -1090,7 +1082,7 @@ impl PyCdsIndexBuilder {
             date_repr(leg.start),
             date_repr(leg.end)
         );
-        cds_index_set!(slf, premium_leg, shown, |b: CdsIndexBuilderInner| b
+        builder_set!(slf, premium_leg, shown, |b: CdsIndexBuilderInner| b
             .premium_leg(leg))
     }
 
@@ -1116,7 +1108,7 @@ impl PyCdsIndexBuilder {
             leg.credit_curve_id.as_str(),
             leg.recovery_rate
         );
-        cds_index_set!(slf, protection_leg, shown, |b: CdsIndexBuilderInner| b
+        builder_set!(slf, protection_leg, shown, |b: CdsIndexBuilderInner| b
             .protection_leg(leg))
     }
 
@@ -1142,7 +1134,7 @@ impl PyCdsIndexBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn pricing<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let pricing: IndexPricing = enum_from_str(value, "pricing")?;
-        cds_index_set!(
+        builder_set!(
             slf,
             pricing,
             format!("{value:?}"),
@@ -1179,7 +1171,7 @@ impl PyCdsIndexBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let constituents = constituents_from_py(py, value)?;
         let shown = format!("<{} constituents>", constituents.len());
-        cds_index_set!(slf, constituents, shown, |b: CdsIndexBuilderInner| b
+        builder_set!(slf, constituents, shown, |b: CdsIndexBuilderInner| b
             .constituents(constituents))
     }
 
@@ -1201,7 +1193,7 @@ impl PyCdsIndexBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: u32,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cds_index_set!(
+        builder_set!(
             slf,
             num_constituents,
             value.to_string(),
@@ -1235,7 +1227,7 @@ impl PyCdsIndexBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let (date, money) = dated_money_from_py(value, None, "upfront")?;
         let shown = format!("({}, {})", date_repr(date), money_repr(money));
-        cds_index_set!(slf, upfront, shown, |b: CdsIndexBuilderInner| b
+        builder_set!(slf, upfront, shown, |b: CdsIndexBuilderInner| b
             .upfront((date, money)))
     }
 
@@ -1264,7 +1256,7 @@ impl PyCdsIndexBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec = crate::bindings::module_utils::py_to_serde(py, value, "margin_spec")?;
         let shown = value.repr()?.to_string();
-        cds_index_set!(slf, margin_spec, shown, |b: CdsIndexBuilderInner| b
+        builder_set!(slf, margin_spec, shown, |b: CdsIndexBuilderInner| b
             .margin_spec(spec))
     }
 
@@ -1295,7 +1287,7 @@ impl PyCdsIndexBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        cds_index_set!(slf, attributes, shown, |b: CdsIndexBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: CdsIndexBuilderInner| b
             .attributes(attrs))
     }
 

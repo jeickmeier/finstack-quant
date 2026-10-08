@@ -10,17 +10,15 @@ use finstack_quant_core::contract::{
 };
 use finstack_quant_core::Result;
 use serde::{Deserialize, Serialize};
-use std::io::Read;
-use std::sync::Arc;
 
 /// Maximum permitted size of a JSON instrument definition, in bytes.
 ///
 /// 16 MiB is far larger than any realistic single-instrument JSON payload
 /// (the largest observed real-world instruments are well under 1 MiB), but
 /// small enough to prevent unbounded allocations from malicious or
-/// accidentally huge inputs.  Reader-based entry points (`from_reader`,
-/// `from_path`) enforce this limit before handing bytes to the JSON parser,
-/// so a multi-gigabyte file can never cause an OOM allocation.
+/// accidentally huge inputs.  The capped loaders enforce this limit before
+/// handing bytes to the JSON parser, so a multi-gigabyte input can never
+/// cause an OOM allocation.
 pub const MAX_JSON_BYTES: usize = 16 * 1024 * 1024; // 16 MiB
 
 /// Map bounded loading diagnostics into the ordinary pricing error surface.
@@ -42,20 +40,12 @@ pub(crate) fn instrument_load_error(error: ContractError) -> finstack_quant_core
     finstack_quant_core::Error::Validation(format!("invalid instrument envelope JSON: {message}"))
 }
 
-// Strict callers retain their supplied limits; capped adapters retain the
-// 16 MiB instrument policy and serde_json's 128-level recursion backstop.
+// Strict callers retain their supplied limits.
 fn decode_json<T: serde::de::DeserializeOwned>(
     bytes: &[u8],
     limits: &LoadLimits,
 ) -> std::result::Result<T, ContractError> {
     deserialize_json_value(parse_json_value(bytes, limits)?, limits)
-}
-
-pub(crate) fn decode_capped_json<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T> {
-    let limits = LoadLimits::default()
-        .with_max_bytes(MAX_JSON_BYTES)
-        .with_max_depth(128);
-    decode_json(bytes, &limits).map_err(instrument_load_error)
 }
 
 /// Persistence contract for [`InstrumentEnvelope`].
@@ -710,21 +700,6 @@ impl InstrumentJson {
     pub(crate) fn into_boxed_unchecked(self) -> Result<Box<dyn Instrument>> {
         with_instrument_json_registry!(instrument_json_into_boxed_match, self)
     }
-
-    /// Convert this JSON representation into a shared cashflow provider.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the instrument fails construction or pricing
-    /// validation.
-    pub fn into_cashflow_provider(
-        self,
-    ) -> Result<Arc<dyn finstack_quant_cashflows::CashflowProvider + Send + Sync>> {
-        let instrument = self.into_boxed()?;
-        let provider: Box<dyn finstack_quant_cashflows::CashflowProvider + Send + Sync> =
-            instrument;
-        Ok(Arc::from(provider))
-    }
 }
 
 impl InstrumentEnvelope {
@@ -802,158 +777,6 @@ impl InstrumentEnvelope {
         let instrument = envelope.into_boxed()?;
         Ok((instrument, ValidationReport::default()))
     }
-
-    /// Load an instrument from a JSON value.
-    ///
-    /// Requires the canonical v1 envelope form:
-    ///
-    /// ```json
-    /// { "schema": "finstack_quant.instrument/1", "instrument": { ... } }
-    /// ```
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - Parsed canonical instrument envelope JSON.
-    pub fn from_value(value: serde_json::Value) -> Result<Box<dyn Instrument>> {
-        let limits = LoadLimits::default().with_max_bytes(MAX_JSON_BYTES);
-        let bytes = serde_json::to_vec(&value)
-            .map_err(|error| finstack_quant_core::Error::Validation(error.to_string()))?;
-        let envelope = Self::decode_bytes(&bytes, &limits).map_err(instrument_load_error)?;
-        envelope.into_boxed()
-    }
-
-    /// Load an instrument from a JSON reader.
-    ///
-    /// Reads up to [`MAX_JSON_BYTES`] from the reader.  If the input exceeds
-    /// that limit the call returns a clear validation error rather than
-    /// attempting an unbounded allocation.
-    ///
-    /// # Arguments
-    ///
-    /// * `reader` - Any reader providing JSON bytes
-    ///
-    /// # Returns
-    ///
-    /// A boxed instrument trait object ready for pricing.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - Input exceeds [`MAX_JSON_BYTES`]
-    /// - JSON is malformed
-    /// - Schema version is unsupported
-    /// - Required fields are missing
-    /// - Unknown fields are present (strict mode)
-    /// - Spec validation fails
-    pub fn from_reader<R: Read>(reader: R) -> Result<Box<dyn Instrument>> {
-        // Read up to MAX_JSON_BYTES + 1 bytes so we can distinguish "exactly
-        // at limit" from "over limit" without reading the whole stream first.
-        let mut buf = Vec::with_capacity(4096.min(MAX_JSON_BYTES));
-        reader
-            .take((MAX_JSON_BYTES as u64) + 1)
-            .read_to_end(&mut buf)
-            .map_err(|e| {
-                finstack_quant_core::Error::Validation(format!("Failed to read JSON: {e}"))
-            })?;
-
-        if buf.len() > MAX_JSON_BYTES {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Instrument JSON input exceeds the {} MiB size limit ({} bytes read before limit)",
-                MAX_JSON_BYTES / (1024 * 1024),
-                buf.len(),
-            )));
-        }
-
-        let envelope: Self = decode_capped_json(&buf)?;
-        envelope.into_boxed()
-    }
-
-    /// Load an instrument from a JSON string.
-    ///
-    /// Convenience wrapper around `from_reader`.  The same [`MAX_JSON_BYTES`]
-    /// cap applies.
-    ///
-    /// # Arguments
-    ///
-    /// * `s` - Complete UTF-8 canonical instrument envelope.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error before parsing when `s` exceeds [`MAX_JSON_BYTES`], or
-    /// when JSON, schema, instrument construction, or instrument validation
-    /// fails.
-    #[allow(clippy::should_implement_trait)]
-    pub fn from_str(s: &str) -> Result<Box<dyn Instrument>> {
-        if s.len() > MAX_JSON_BYTES {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Instrument JSON input is {} bytes, which exceeds the {} MiB size limit",
-                s.len(),
-                MAX_JSON_BYTES / (1024 * 1024),
-            )));
-        }
-        let envelope: Self = decode_capped_json(s.as_bytes())?;
-        envelope.into_boxed()
-    }
-
-    /// Load an instrument from a JSON file path.
-    ///
-    /// Checks the file's reported byte length up front (defence in depth) and
-    /// also enforces the [`MAX_JSON_BYTES`] cap while reading, so the limit
-    /// is respected even on file-systems that misreport metadata.
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - Path to the JSON file
-    ///
-    /// # Returns
-    ///
-    /// A boxed instrument trait object ready for pricing.
-    pub fn from_path(path: impl AsRef<std::path::Path>) -> Result<Box<dyn Instrument>> {
-        let path = path.as_ref();
-        let file = std::fs::File::open(path).map_err(|e| {
-            finstack_quant_core::Error::Validation(format!(
-                "Failed to open instrument JSON file '{}': {e}",
-                path.display()
-            ))
-        })?;
-
-        // Defence-in-depth: reject obviously oversized files before reading.
-        if let Ok(meta) = file.metadata() {
-            if meta.len() > MAX_JSON_BYTES as u64 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Instrument JSON file '{}' is {} bytes, which exceeds the {} MiB size limit",
-                    path.display(),
-                    meta.len(),
-                    MAX_JSON_BYTES / (1024 * 1024),
-                )));
-            }
-        }
-
-        Self::from_reader(file)
-    }
-}
-
-/// Construct a runtime cashflow-providing instrument from a canonical tagged
-/// JSON payload, dispatched through the instrument registry.
-///
-/// Every instrument type registered in the crate's instrument registry is
-/// reachable through the required v1 envelope.
-///
-/// # Errors
-///
-/// Returns an error when the payload does not match a registered instrument
-/// type or fails spec validation.
-///
-/// # Arguments
-///
-/// * `value` - Parsed canonical v1 instrument envelope to construct as a
-///   runtime cashflow provider.
-pub fn cashflow_provider_from_value(
-    value: serde_json::Value,
-) -> Result<Arc<dyn finstack_quant_cashflows::CashflowProvider + Send + Sync>> {
-    let instrument: Box<dyn Instrument> = InstrumentEnvelope::from_value(value)?;
-    let provider: Box<dyn finstack_quant_cashflows::CashflowProvider + Send + Sync> = instrument;
-    Ok(Arc::from(provider))
 }
 
 #[cfg(test)]
@@ -961,6 +784,13 @@ mod tests {
     use rust_decimal::Decimal;
 
     use super::*;
+
+    fn load(json: &str) -> Result<Box<dyn Instrument>> {
+        let limits = LoadLimits::default().with_max_bytes(MAX_JSON_BYTES);
+        InstrumentEnvelope::from_slice_strict(json.as_bytes(), &limits)
+            .map(|(instrument, _)| instrument)
+            .map_err(instrument_load_error)
+    }
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::money::Money;
@@ -1092,8 +922,7 @@ mod tests {
             }
         }"#;
 
-        let instrument = InstrumentEnvelope::from_str(json)
-            .expect("Instrument envelope parsing should succeed in test");
+        let instrument = load(json).expect("Instrument envelope parsing should succeed in test");
         assert_eq!(instrument.id(), "BOND-FROM-STR");
     }
 
@@ -1112,7 +941,7 @@ mod tests {
 
         let value =
             serde_json::to_value(InstrumentJson::Bond(bond)).expect("serialize tagged instrument");
-        let error = InstrumentEnvelope::from_value(value)
+        let error = load(&value.to_string())
             .err()
             .expect("tagged instrument payload must include the v1 envelope");
         assert!(error.to_string().contains("envelope"), "{error}");
@@ -1207,7 +1036,7 @@ mod tests {
             }
         }"#;
 
-        let result = InstrumentEnvelope::from_str(json);
+        let result = load(json);
         assert!(result.is_err());
     }
 
@@ -1245,7 +1074,7 @@ mod tests {
             }
         }"#;
 
-        let result = InstrumentEnvelope::from_str(json);
+        let result = load(json);
         assert!(result.is_err());
     }
 
@@ -1259,7 +1088,7 @@ mod tests {
             }
         }"#;
 
-        let result = InstrumentEnvelope::from_str(json);
+        let result = load(json);
         assert!(result.is_err());
     }
 
@@ -1765,7 +1594,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cashflow_provider_from_value_non_legacy_type() {
+    fn test_loader_builds_non_legacy_type() {
         // RevolvingCredit is in the registry but was absent from the old statements
         // `Generic` brute-force list (Bond/IRS/TermLoan/Deposit/FRA/Repo). It must
         // build through the canonical registry.
@@ -1776,7 +1605,7 @@ mod tests {
         ))
         .expect("InstrumentJson serialization should succeed in test");
 
-        let provider = cashflow_provider_from_value(tagged);
+        let provider = load(&tagged.to_string());
         assert!(
             provider.is_ok(),
             "revolving_credit must build via the canonical registry"
@@ -1784,33 +1613,34 @@ mod tests {
     }
 
     #[test]
-    fn test_cashflow_provider_from_value_rejects_unknown_type() {
-        let provider = cashflow_provider_from_value(serde_json::json!({
-            "schema": "finstack_quant.instrument/1",
-            "instrument": {"type": "not_a_real_instrument", "spec": {}}
-        }));
+    fn test_loader_rejects_unknown_type() {
+        let provider = load(
+            &serde_json::json!({
+                "schema": "finstack_quant.instrument/1",
+                "instrument": {"type": "not_a_real_instrument", "spec": {}}
+            })
+            .to_string(),
+        );
         assert!(provider.is_err(), "unknown type tag must error");
     }
 
     // ── W48: input-size cap regression tests ────────────────────────────────
 
-    /// `from_reader` must return a clear `Err` (not panic / OOM) when the
+    /// The strict loader must return a clear `Err` (not panic / OOM) when the
     /// input stream exceeds `MAX_JSON_BYTES`.
     #[test]
-    fn test_from_reader_rejects_oversized_input() {
-        // Build a reader that is exactly MAX_JSON_BYTES + 1 bytes of spaces.
-        // `std::io::repeat` produces infinite bytes; `take` bounds it.
-        let oversized = std::io::repeat(b' ').take((MAX_JSON_BYTES as u64) + 1);
+    fn test_loader_rejects_oversized_input() {
+        let oversized = " ".repeat(MAX_JSON_BYTES + 1);
 
-        let result = InstrumentEnvelope::from_reader(oversized);
+        let result = load(&oversized);
         assert!(
             result.is_err(),
-            "from_reader must reject input larger than MAX_JSON_BYTES"
+            "the loader must reject input larger than MAX_JSON_BYTES"
         );
 
         let err_msg = result.err().unwrap().to_string();
         assert!(
-            err_msg.contains("size limit") || err_msg.contains("MiB"),
+            err_msg.contains("exceeds limit"),
             "error message should name the size limit, got: {err_msg}"
         );
     }
@@ -1818,7 +1648,7 @@ mod tests {
     /// A valid, normal-sized instrument JSON must still load successfully after
     /// the byte-cap guard is in place.
     #[test]
-    fn test_from_reader_accepts_normal_sized_input() {
+    fn test_loader_accepts_normal_sized_input() {
         let json = r#"{
             "schema": "finstack_quant.instrument/1",
             "instrument": {
@@ -1852,28 +1682,28 @@ mod tests {
             }
         }"#;
 
-        let result = InstrumentEnvelope::from_reader(json.as_bytes());
+        let result = load(json);
         assert!(
             result.is_ok(),
-            "from_reader must accept valid normal-sized input"
+            "the loader must accept valid normal-sized input"
         );
         assert_eq!(result.unwrap().id(), "BOND-SIZE-OK");
     }
 
-    /// `from_reader` at exactly `MAX_JSON_BYTES` of whitespace (invalid JSON
+    /// Loading exactly `MAX_JSON_BYTES` of whitespace (invalid JSON
     /// but within the size limit) must fail with a parse error, not a size
     /// error.  This confirms the boundary condition is `> MAX_JSON_BYTES`,
     /// not `>= MAX_JSON_BYTES`.
     #[test]
-    fn test_from_reader_at_exact_limit_gives_parse_error_not_size_error() {
-        let exactly_at_limit = std::io::repeat(b' ').take(MAX_JSON_BYTES as u64);
-        let result = InstrumentEnvelope::from_reader(exactly_at_limit);
+    fn test_loader_at_exact_limit_gives_parse_error_not_size_error() {
+        let exactly_at_limit = " ".repeat(MAX_JSON_BYTES);
+        let result = load(&exactly_at_limit);
         // Must fail (all spaces is not valid JSON), but the error must NOT
         // mention the size limit — it should be a JSON parse error.
         assert!(result.is_err());
         let err_msg = result.err().unwrap().to_string();
         assert!(
-            !err_msg.contains("size limit"),
+            !err_msg.contains("exceeds limit"),
             "at exact limit the error should be a parse error, not a size-limit error, got: {err_msg}"
         );
     }

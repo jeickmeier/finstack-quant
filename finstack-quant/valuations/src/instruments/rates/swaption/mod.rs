@@ -112,8 +112,6 @@ pub(crate) mod hw_pricer;
 pub mod lmm_pricer;
 /// Swaption risk metrics (delta, vega, theta, rho)
 pub(crate) mod metrics;
-/// Swaption parameters and market data extraction
-pub(crate) mod parameters;
 /// European swaption pricers for Black-76 and Bachelier normal models.
 pub(crate) mod pricer;
 /// Bermudan swaption pricing engines (tree, LSMC, LMM).
@@ -130,7 +128,6 @@ pub use bermudan::{
     BermudanPricingMethod, BermudanSwaptionPricer, BermudanSwaptionPricerConfig,
     PreparedHullWhiteModel,
 };
-pub use parameters::SwaptionParams;
 pub use pricer::{SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer};
 pub use pricing::BermudanSwaptionTreeValuator;
 pub use types::{

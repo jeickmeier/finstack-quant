@@ -1034,10 +1034,6 @@ impl crate::instruments::common_impl::traits::Instrument for XccySwap {
         pv1_rep.checked_add(pv2_rep)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.leg1.leg.start)
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

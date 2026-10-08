@@ -8,10 +8,7 @@ use finstack_quant_calibration::api::schema::{DiscountCurveParams, StepParams};
 use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
 use finstack_quant_calibration::quotes::market_quote::MarketQuote;
 use finstack_quant_calibration::quotes::rates::RateQuote;
-use finstack_quant_calibration::{
-    CalibrationConfig, CalibrationMethod, ResidualWeightingScheme, CALIBRATION_CONFIG_KEY,
-};
-use finstack_quant_core::config::FinstackConfig;
+use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod, ResidualWeightingScheme};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -345,20 +342,11 @@ fn test_bloomberg_usd_ois_calibration_accuracy() {
         ), // 30Y
     ];
 
-    let mut cfg = FinstackConfig::default();
-    cfg.extensions
-        .insert(
-            CALIBRATION_CONFIG_KEY,
-            serde_json::json!({
-                "solver": {
-                    "tolerance": 1e-12,
-                    "max_iterations": 200
-                }
-            }),
-        )
-        .expect("valid extension key");
-    let mut settings =
-        CalibrationConfig::from_finstack_config_or_default(&cfg).expect("valid config");
+    let mut settings = CalibrationConfig::default();
+    settings.solver = settings
+        .solver
+        .with_tolerance(1e-12)
+        .with_max_iterations(200);
     settings.discount_curve.weighting_scheme = ResidualWeightingScheme::Equal;
 
     let params = DiscountCurveParams {

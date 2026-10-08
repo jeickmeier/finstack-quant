@@ -186,10 +186,6 @@ impl Instrument for StructuredCredit {
         }
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        None
-    }
-
     fn model_params_snapshot(&self) -> ModelParamsSnapshot {
         ModelParamsSnapshot::StructuredCredit {
             prepayment_spec: self.credit_model.prepayment_spec.clone(),

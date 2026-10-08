@@ -19,13 +19,9 @@ impl DfDateSelector {
 
     fn resolve(self, context: &MetricContext) -> finstack_quant_core::Result<Date> {
         match self {
-            Self::Start => context.instrument.effective_start_date().ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Instrument {} has no value date for {}",
-                    context.instrument.id(),
-                    self.metric_name()
-                ))
-            }),
+            Self::Start => context
+                .instrument_as::<crate::instruments::Deposit>()?
+                .effective_start_date(),
             Self::End => context.instrument.expiry().ok_or_else(|| {
                 finstack_quant_core::Error::Validation(format!(
                     "Instrument {} has no expiry date for {}",

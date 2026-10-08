@@ -1,21 +1,17 @@
-//! Heterogeneous capped loss with common recovery and integration contracts.
+//! Heterogeneous capped loss by conditional convolution on a fixed loss grid.
 use super::config::{
-    CdsTranchePricer, HeteroMethod, PoolExposure, CDF_CLIP, GRID_STEP_MIN, HOMOGENEITY_TOLERANCE,
+    CdsTranchePricer, PoolExposure, CDF_CLIP, GRID_STEP, HOMOGENEITY_TOLERANCE,
     MAX_CONVOLUTION_WORK, MAX_GRID_POINTS, NUMERICAL_TOLERANCE,
 };
-use super::expected_loss::stochastic_recovery_exposure_scale;
-use super::saddlepoint::conditional_min_loss_normal;
-use crate::constants::credit;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::math::norm_cdf;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_models::correlation::recovery::RecoveryModel;
 use std::cell::RefCell;
 
 impl CdsTranchePricer {
-    /// Integrate a complete constituent pool, applying the configured recovery
-    /// model at every factor node in both convolution and normal-approximation paths.
+    /// Integrate a complete constituent pool with per-issuer recovery rates
+    /// by exact conditional convolution at every factor node.
     pub(super) fn calculate_equity_tranche_capped_hetero(
         &self,
         cap_pct: f64,
@@ -87,7 +83,7 @@ impl CdsTranchePricer {
             .map(|p| self.default_threshold_for_copula(*p))
             .collect();
         let conditional_p = |i: usize, factors: &[f64]| {
-            if self.config.copula_spec.is_gaussian() {
+            if self.copula_spec.is_gaussian() {
                 self.conditional_default_probability_enhanced(
                     thresholds[i],
                     correlation,
@@ -102,107 +98,28 @@ impl CdsTranchePricer {
                 )
             }
         };
-        let exposure_of = |recovery: f64| match exposure {
-            PoolExposure::Loss => 1.0 - recovery,
-            PoolExposure::Recovery => recovery,
-        };
-        let recovery_model: Option<Box<dyn RecoveryModel>> = self
-            .config
-            .stochastic_recovery_spec
-            .as_ref()
-            .map(|spec| spec.build());
-        let exposure_at = |i: usize, factors: &[f64]| {
-            exposure_of(recovery_model.as_ref().map_or(recoveries[i], |model| {
-                model.conditional_recovery(self.recovery_driver_for_factors(factors))
-            }))
-        };
-        let stochastic = recovery_model
-            .as_ref()
-            .is_some_and(|model| model.is_stochastic());
-        let grid_step = self.config.grid_step.max(GRID_STEP_MIN);
-        let exact = count <= credit::SMALL_POOL_THRESHOLD
-            || self.config.hetero_method == HeteroMethod::ExactConvolution;
-        if exact {
-            // Check resource requirements before any recovery normalization
-            // integral. Stochastic recovery first uses unscaled unit exposure
-            // as a conservative preflight. This may reject a request whose
-            // eventual scales shrink its support. Conversely, normalization
-            // can enlarge support, so actual scales are checked again below.
-            let preflight_grid_index = (0..count)
-                .map(|i| {
-                    let amount = if stochastic {
-                        1.0
-                    } else {
-                        exposure_at(i, &[0.0, 1.0])
-                    };
-                    (weights[i] * amount / grid_step).ceil()
-                })
-                .sum();
-            checked_convolution_grid(count, preflight_grid_index)?;
-        }
-        let mut scales = vec![1.0; count];
-        if stochastic {
-            for i in 0..count {
-                if probabilities[i] * exposure_of(recoveries[i]) == 0.0 {
-                    // The scale helper returns one regardless of its second
-                    // argument when the target exposure is zero.
-                    continue;
-                }
-                let model_exposure = self.integrate_factors(&|factors| {
-                    Ok(conditional_p(i, factors) * exposure_at(i, factors))
-                })?;
-                scales[i] = stochastic_recovery_exposure_scale(
-                    probabilities[i] * exposure_of(recoveries[i]),
-                    model_exposure,
-                );
-            }
-        }
-        // Stochastic recovery is in [0,1], so each scale bounds its exposure.
+        let exposures: Vec<f64> = recoveries
+            .iter()
+            .map(|&recovery| match exposure {
+                PoolExposure::Loss => 1.0 - recovery,
+                PoolExposure::Recovery => recovery,
+            })
+            .collect();
         // The PMF spans every reachable loss, including the mass above the cap.
         // Fractional-bin interpolation can round each name upward. Bound the
         // sum of those rounded supports, not just the rounded aggregate loss,
         // so no reachable probability mass falls off the convolution grid.
         let max_grid_index: f64 = (0..count)
-            .map(|i| {
-                (weights[i]
-                    * if stochastic {
-                        scales[i]
-                    } else {
-                        exposure_at(i, &[0.0, 1.0])
-                    }
-                    / grid_step)
-                    .ceil()
-            })
+            .map(|i| (weights[i] * exposures[i] / GRID_STEP).ceil())
             .sum();
         if !max_grid_index.is_finite() {
             return Err(Error::Validation(
                 "non-finite heterogeneous pool exposure".to_owned(),
             ));
         }
-        let max_points = if exact {
-            checked_convolution_grid(count, max_grid_index)?
-        } else {
-            0
-        };
-        if !exact {
-            tracing::warn!(count, max_points, "CDS tranche uses moment-matched normal approximation; conditional-loss approximation error is separate from quadrature tolerance");
-        }
-        let buffers = RefCell::new((
-            vec![0.0; if exact { max_points } else { 0 }],
-            vec![0.0; if exact { max_points } else { 0 }],
-        ));
+        let max_points = checked_convolution_grid(count, max_grid_index)?;
+        let buffers = RefCell::new((vec![0.0; max_points], vec![0.0; max_points]));
         self.integrate_factors(&|factors| {
-            if !exact {
-                let mut mean = 0.0;
-                let mut variance = 0.0;
-                for i in 0..count {
-                    let p = conditional_p(i, factors);
-                    let amount = weights[i] * scales[i] * exposure_at(i, factors);
-                    mean += amount * p;
-                    variance += amount * amount * p * (1.0 - p);
-                }
-                return Ok(conditional_min_loss_normal(cap, mean, variance));
-            }
             let mut buffers = buffers.borrow_mut();
             let (first, second) = &mut *buffers;
             first[0] = 1.0;
@@ -210,14 +127,25 @@ impl CdsTranchePricer {
             let mut in_first = true;
             for i in 0..count {
                 let p = conditional_p(i, factors);
-                let amount = scales[i] * exposure_at(i, factors);
                 len = if in_first {
                     accumulate_issuer_pmf(
-                        first, len, second, max_points, weights[i], amount, grid_step, p,
+                        first,
+                        len,
+                        second,
+                        max_points,
+                        weights[i],
+                        exposures[i],
+                        p,
                     )
                 } else {
                     accumulate_issuer_pmf(
-                        second, len, first, max_points, weights[i], amount, grid_step, p,
+                        second,
+                        len,
+                        first,
+                        max_points,
+                        weights[i],
+                        exposures[i],
+                        p,
                     )
                 };
                 in_first = !in_first;
@@ -228,7 +156,6 @@ impl CdsTranchePricer {
                 } else {
                     &second[..len]
                 },
-                grid_step,
                 cap,
             ))
         })
@@ -284,7 +211,7 @@ impl CdsTranchePricer {
             // limit (it dropped the 1/√(1−ρ) divisor).
             //
             // Reachability: `smooth_correlation_boundary` caps ρ at
-            // DEFAULT_MAX_CORRELATION (0.99), so this branch is currently
+            // MAX_CORRELATION (0.99), so this branch is currently
             // unreachable; the exact limit is kept for correctness should the cap
             // ever be relaxed. The 0.99 cap is a deliberate numerical-stability
             // choice and means the exact ρ = 1 comonotonic limit is not priced.
@@ -327,7 +254,7 @@ fn checked_convolution_grid(count: usize, max_grid_index: f64) -> Result<usize> 
     }
     if max_grid_index.ceil() >= MAX_GRID_POINTS as f64 {
         return Err(Error::Validation(format!(
-            "heterogeneous exact convolution grid is exceeding the limit of {MAX_GRID_POINTS} points; increase grid_step"
+            "heterogeneous exact convolution grid is exceeding the limit of {MAX_GRID_POINTS} points"
         )));
     }
     let points = (max_grid_index.ceil() as usize)
@@ -338,7 +265,7 @@ fn checked_convolution_grid(count: usize, max_grid_index: f64) -> Result<usize> 
     })?;
     if work > MAX_CONVOLUTION_WORK {
         return Err(Error::Validation(format!(
-            "heterogeneous exact convolution requires up to {work} issuer-grid visits per factor evaluation, exceeding the limit of {MAX_CONVOLUTION_WORK}; increase grid_step or reduce positive-weight constituent count"
+            "heterogeneous exact convolution requires up to {work} issuer-grid visits per factor evaluation, exceeding the limit of {MAX_CONVOLUTION_WORK}; reduce the positive-weight constituent count"
         )));
     }
     Ok(points)
@@ -350,13 +277,12 @@ fn checked_convolution_grid(count: usize, max_grid_index: f64) -> Result<usize> 
 /// `dst[..returned_len]`, and zeros only what it touches in `dst` so the buffer
 /// can be reused without reallocating between issuers.
 ///
-/// `loss_exact = weight * lgd / grid_step` is split into floor + frac bins to
+/// `loss_exact = weight * lgd / GRID_STEP` is split into floor + frac bins to
 /// preserve fractional loss contributions when the issuer's loss does not align
 /// with the grid. Mass conservation: each input mass `m` is distributed as
 /// `m*(1-p)` to no-default bin, `m*p*(1-frac)` to floor bin, `m*p*frac` to ceil
 /// bin (or floor if ceil is past the grid).
 #[inline]
-#[allow(clippy::too_many_arguments)] // hot-path numerical helper; grouping into a struct would add allocation
 fn accumulate_issuer_pmf(
     src: &[f64],
     src_len: usize,
@@ -364,10 +290,9 @@ fn accumulate_issuer_pmf(
     max_points: usize,
     weight: f64,
     lgd: f64,
-    grid_step: f64,
     p: f64,
 ) -> usize {
-    let loss_exact = weight * lgd / grid_step;
+    let loss_exact = weight * lgd / GRID_STEP;
     let loss_floor = loss_exact.floor() as usize;
     let frac = loss_exact - loss_floor as f64;
 
@@ -406,16 +331,16 @@ fn accumulate_issuer_pmf(
     new_len
 }
 
-/// Compute `E[min(L, k)]` from a PMF where bin `i` represents loss `i * grid_step`.
+/// Compute `E[min(L, k)]` from a PMF where bin `i` represents loss `i * GRID_STEP`.
 ///
 /// Uses Neumaier compensated summation to maintain accuracy when the PMF has
-/// many bins (up to `max_grid_points`, which can be 200K).
+/// many bins (up to `MAX_GRID_POINTS`).
 #[inline]
-fn expected_loss_capped(pmf: &[f64], grid_step: f64, k: f64) -> f64 {
+fn expected_loss_capped(pmf: &[f64], k: f64) -> f64 {
     finstack_quant_core::math::neumaier_sum(
         pmf.iter()
             .enumerate()
-            .map(|(i, &mass)| mass * ((i as f64) * grid_step).min(k)),
+            .map(|(i, &mass)| mass * ((i as f64) * GRID_STEP).min(k)),
     )
 }
 

@@ -640,10 +640,7 @@ impl RevolvingCreditMcRun {
                 model_config.mc_paths,
                 defaults.num_paths,
             )?,
-            seed: finstack_quant_models::monte_carlo::seed::derive_seed(
-                facility_id,
-                model_config.mc_seed_scenario.as_deref().unwrap_or("base"),
-            ),
+            seed: model_config.mc_seed(facility_id),
             antithetic: model_config.mc_antithetic.unwrap_or(defaults.antithetic),
         })
     }
@@ -1264,10 +1261,6 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
         crate::instruments::fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer::price(
             self, curves, as_of,
         )
-    }
-
-    fn effective_start_date(&self) -> Option<Date> {
-        Some(self.issue_date)
     }
 
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();

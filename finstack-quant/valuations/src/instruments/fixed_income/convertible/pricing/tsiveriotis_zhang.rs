@@ -4,7 +4,6 @@ use finstack_quant_core::{Error, Result};
 
 use finstack_quant_models::EvolutionParams;
 
-use super::engine::ConvertibleTreeType;
 use super::valuator::ConvertibleBondValuator;
 
 /// Resolve the terminal exercise choice and its cash component.
@@ -94,11 +93,7 @@ pub(super) struct TsiveriotisZhangEngine<'a> {
 }
 
 impl<'a> TsiveriotisZhangEngine<'a> {
-    pub(super) fn price(
-        &self,
-        market: TzMarketInputs,
-        tree_type: ConvertibleTreeType,
-    ) -> Result<(f64, f64)> {
+    pub(super) fn price(&self, market: TzMarketInputs) -> Result<(f64, f64)> {
         let TzMarketInputs {
             spot,
             volatility,
@@ -124,10 +119,10 @@ impl<'a> TsiveriotisZhangEngine<'a> {
         };
         let ratio_accretion_at = |step: usize| (protected_dividend_rate * step as f64 * dt).exp();
 
-        // Evolution parameters for the recombining tree.
+        // Evolution parameters for the recombining binomial tree.
         //
-        // Drift-discount consistency: the up/down (and middle) factors depend
-        // only on volatility and dt, so they are constant across steps and the
+        // Drift-discount consistency: the up/down factors depend only on
+        // volatility and dt, so they are constant across steps and the
         // lattice recombines. The branch probabilities, however, are recomputed
         // per step from the SAME per-step risk-free forward rate used for
         // discounting in backward induction (`rf_step_dfs`):
@@ -138,17 +133,10 @@ impl<'a> TsiveriotisZhangEngine<'a> {
         // (martingale property) even on non-flat curves. The base parameters
         // below (built from the t=0 short rate) only supply the constant
         // factors; their probabilities are replaced by the per-step set.
-        let params = match tree_type {
-            ConvertibleTreeType::Binomial => {
-                EvolutionParams::equity_crr(volatility, risk_free_rate, dividend_yield, dt)?
-            }
-            ConvertibleTreeType::Trinomial => {
-                EvolutionParams::equity_trinomial(volatility, risk_free_rate, dividend_yield, dt)?
-            }
-        };
+        let params = EvolutionParams::equity_crr(volatility, risk_free_rate, dividend_yield, dt)?;
 
         // Per-step probabilities driven by the per-step forward rates implied
-        // by the risk-free step discount factors (u/d/middle unchanged).
+        // by the risk-free step discount factors (u/d unchanged).
         let mut step_params = Vec::with_capacity(self.steps);
         for &df in &self.valuator.rf_step_dfs {
             if df <= 0.0 {
@@ -162,39 +150,16 @@ impl<'a> TsiveriotisZhangEngine<'a> {
         }
 
         // State tracking: (Total Value, Cash Component)
-        let mut values: Vec<(f64, f64)> = Vec::with_capacity(2 * self.steps + 1);
+        let mut values: Vec<(f64, f64)> = Vec::with_capacity(self.steps + 1);
 
-        // Trinomial node spot: for a recombining trinomial the recombination
-        // identity is `up·down = middle²`, so the spot at `net` net up-moves
-        // after `step` total moves depends only on `net` and equals
-        //   S₀ · up^net · middle^(step − net).
-        // The previous form `up^max(net,0) · down^max(-net,0)` silently
-        // assumed `up·down = 1` (it dropped the middle factor entirely) and is
-        // malformed for any trinomial whose middle factor is not 1. Using the
-        // explicit `middle_factor` is correct for any recombining trinomial.
-        let trinomial_middle = params.middle_factor.unwrap_or(1.0);
         let get_spot = |step: usize, node: usize| -> f64 {
-            match tree_type {
-                ConvertibleTreeType::Binomial => {
-                    let ups = node as i32;
-                    let downs = step as i32 - node as i32;
-                    spot * params.up_factor.powi(ups) * params.down_factor.powi(downs)
-                }
-                ConvertibleTreeType::Trinomial => {
-                    let net_moves = node as i32 - step as i32;
-                    // `powi` accepts negative exponents (u^(-k) = 1/u^k), so
-                    // this is correct for both up and down net moves.
-                    spot * params.up_factor.powi(net_moves)
-                        * trinomial_middle.powi(step as i32 - net_moves)
-                }
-            }
+            let ups = node as i32;
+            let downs = step as i32 - node as i32;
+            spot * params.up_factor.powi(ups) * params.down_factor.powi(downs)
         };
 
         // 1. Terminal Step
-        let num_nodes = match tree_type {
-            ConvertibleTreeType::Binomial => self.steps + 1,
-            ConvertibleTreeType::Trinomial => 2 * self.steps + 1,
-        };
+        let num_nodes = self.steps + 1;
 
         let mandatory = self.valuator.conversion_is_mandatory();
         let terminal_accretion = ratio_accretion_at(self.steps);
@@ -206,8 +171,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
             .unwrap_or(0.0);
         let terminal_put = self.valuator.put_price_at_step(self.steps);
 
-        // Log-spot spacing between adjacent terminal nodes (for a trinomial the
-        // adjacent ratio is `up / middle`, so read it off the lattice itself).
+        // Log-spot spacing between adjacent terminal nodes.
         let terminal_log_spacing = if num_nodes > 1 {
             (get_spot(self.steps, 1) / get_spot(self.steps, 0)).ln()
         } else {
@@ -238,10 +202,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
         // layer reuses one allocation (cleared) instead of allocating a fresh Vec.
         let mut next_values: Vec<(f64, f64)> = Vec::with_capacity(values.len());
         for step in (0..self.steps).rev() {
-            let current_num_nodes = match tree_type {
-                ConvertibleTreeType::Binomial => step + 1,
-                ConvertibleTreeType::Trinomial => 2 * step + 1,
-            };
+            let current_num_nodes = step + 1;
 
             // Per-step discount factors from full term structure, and the
             // per-step branch probabilities derived from the same forwards.
@@ -258,28 +219,10 @@ impl<'a> TsiveriotisZhangEngine<'a> {
             next_values.clear();
 
             for i in 0..current_num_nodes {
-                let (exp_total, exp_cash) = match tree_type {
-                    ConvertibleTreeType::Binomial => {
-                        let (v_up, c_up) = values[i + 1];
-                        let (v_down, c_down) = values[i];
-
-                        (
-                            sp.prob_up * v_up + sp.prob_down * v_down,
-                            sp.prob_up * c_up + sp.prob_down * c_down,
-                        )
-                    }
-                    ConvertibleTreeType::Trinomial => {
-                        let (v_up, c_up) = values[i + 2];
-                        let (v_mid, c_mid) = values[i + 1];
-                        let (v_down, c_down) = values[i];
-
-                        let pm = sp.prob_middle.unwrap_or(0.0);
-                        (
-                            sp.prob_up * v_up + pm * v_mid + sp.prob_down * v_down,
-                            sp.prob_up * c_up + pm * c_mid + sp.prob_down * c_down,
-                        )
-                    }
-                };
+                let (v_up, c_up) = values[i + 1];
+                let (v_down, c_down) = values[i];
+                let exp_total = sp.prob_up * v_up + sp.prob_down * v_down;
+                let exp_cash = sp.prob_up * c_up + sp.prob_down * c_down;
 
                 // TZ discounting: equity at risk-free, cash at risky
                 let equity_part = (exp_total - exp_cash) * df_rf;

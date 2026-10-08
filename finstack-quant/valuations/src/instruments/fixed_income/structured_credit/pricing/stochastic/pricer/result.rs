@@ -58,8 +58,8 @@ pub struct StochasticPricingResult {
     /// estimator count. Coverage is approximate for non-Gaussian payoffs.
     pub pv_confidence_interval: (f64, f64),
 
-    /// Number of simulated scenario paths (`2 × pricing_mode.num_paths` for
-    /// antithetic Monte Carlo, prefixes × suffixes for Hybrid).
+    /// Number of simulated scenario paths (`2 × pricing_mode.num_paths` with
+    /// antithetic pairing, `pricing_mode.num_paths` without).
     pub num_paths: usize,
 
     /// Pricing mode used.
@@ -100,8 +100,8 @@ impl StochasticPricingResult {
     ///
     /// * `npv` - Deal net present value and result currency.
     /// * `expected_loss` - Probability-weighted expected loss in the result currency.
-    /// * `num_paths` - Number of simulated or enumerated scenario paths.
-    /// * `pricing_mode` - Exact typed mode and mode parameters used for pricing.
+    /// * `num_paths` - Number of simulated scenario paths.
+    /// * `pricing_mode` - Estimator count and antithetic pairing used for pricing.
     pub fn new(
         npv: Money,
         expected_loss: Money,
@@ -307,7 +307,15 @@ mod tests {
         let npv = Money::from((1_000_000_i64, currency));
         let el = Money::from((50_000_i64, currency));
 
-        let result = StochasticPricingResult::new(npv, el, 1000, StructuredCreditPricingMode::Tree);
+        let result = StochasticPricingResult::new(
+            npv,
+            el,
+            1000,
+            StructuredCreditPricingMode::MonteCarlo {
+                num_paths: 1000,
+                antithetic: false,
+            },
+        );
 
         assert_eq!(result.num_paths, 1000);
         assert!(result.expected_loss.amount() > 0.0);
@@ -336,9 +344,17 @@ mod tests {
         let ul = Money::from((75_000_i64, currency));
         let es = Money::from((100_000_i64, currency));
 
-        let result = StochasticPricingResult::new(npv, el, 1000, StructuredCreditPricingMode::Tree)
-            .with_unexpected_loss(ul)
-            .with_expected_shortfall(es, 0.99);
+        let result = StochasticPricingResult::new(
+            npv,
+            el,
+            1000,
+            StructuredCreditPricingMode::MonteCarlo {
+                num_paths: 500,
+                antithetic: true,
+            },
+        )
+        .with_unexpected_loss(ul)
+        .with_expected_shortfall(es, 0.99);
 
         assert!(result.unexpected_loss.amount() > 0.0);
         assert!((result.es_confidence - 0.99).abs() < 1e-10);

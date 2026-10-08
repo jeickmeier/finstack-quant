@@ -5,12 +5,11 @@ Exchange bond future on a deliverable basket. Pricing marks the
 
 ## Conventions
 
-- Resolve the CTD with `BondFuture::determine_ctd_by_implied_repo` (or the
-  other `determine_ctd*` helpers) and write it back onto the instrument.
-  Refresh that choice when the basket can switch. `Instrument::value` will
+- Set the CTD on the instrument (`ctd_bond_id` plus the embedded `ctd_bond`)
+  and refresh that choice when the basket can switch. `Instrument::value` will
   not search.
-- Invoice price is `(futures price × conversion factor) + accrued`.
-  Variation-margin futures are not discounted further.
+- The model price is the carry-adjusted forward clean CTD price divided by the
+  conversion factor. Variation-margin futures are not discounted further.
 
 Import path:
 `finstack_quant_valuations::instruments::fixed_income::bond_future`

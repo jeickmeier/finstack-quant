@@ -30,8 +30,8 @@ pub(crate) fn register_fx_future_metrics(
         metrics: [
             (FuturesPrice, FuturesPrice),
             (Delta, Delta),
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<crate::instruments::FxFuture>::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<crate::instruments::FxFuture>::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
     Ok(())

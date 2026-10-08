@@ -164,10 +164,6 @@ impl Instrument for StructuredCreditTranche {
         }))
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        None
-    }
-
     fn get_instrument_pricing_overrides(
         &self,
     ) -> Option<&crate::instruments::InstrumentPricingOverrides> {
