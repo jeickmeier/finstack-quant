@@ -81,6 +81,7 @@
       "roll_specialness",
       "theta",
       "theta_carry",
+      "theta_period_days",
       "theta_roll_down"
     ],
     "Credit": [
