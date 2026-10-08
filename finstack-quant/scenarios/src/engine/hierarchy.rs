@@ -62,52 +62,41 @@ fn dedup_matches_keep_deepest(matches: Vec<ResolvedCurveMatch>) -> Vec<ResolvedC
     out
 }
 
-fn has_hierarchy_op(operations: &[OperationSpec]) -> bool {
-    operations.iter().any(|op| {
-        matches!(
-            op,
-            OperationSpec::HierarchyCurveParallelBp { .. }
-                | OperationSpec::HierarchyVolSurfaceParallelPct { .. }
-                | OperationSpec::HierarchyEquityPricePct { .. }
-                | OperationSpec::HierarchyBaseCorrParallelPts { .. }
-        )
-    })
-}
-
 /// Direct operations after hierarchy expansion, plus any skip/no-match warnings.
 pub(super) struct ExpansionOutcome<'a> {
     pub(super) operations: std::borrow::Cow<'a, [OperationSpec]>,
     pub(super) warnings: Vec<Warning>,
 }
 
-fn expand_matches(
-    matches: Vec<ResolvedCurveMatch>,
-    mut make: impl FnMut(CurveId) -> (HierarchyExpansionKey, OperationSpec),
-) -> Vec<HierarchyExpansion> {
-    matches
-        .into_iter()
-        .map(|m| {
-            let (key, operation) = make(m.curve_id.clone());
-            HierarchyExpansion {
-                matched_depth: m.matched_depth,
-                key,
-                operation,
-            }
-        })
-        .collect()
-}
-
-/// Skip hierarchy-resolved ids that are not in this operation's market collection.
-fn retain_existing_targets(
-    matches: Vec<ResolvedCurveMatch>,
+/// Resolve one hierarchy target into direct operations.
+///
+/// Emits [`Warning::HierarchyNoMatch`] when the target resolves to nothing and
+/// [`Warning::HierarchyResolvedIdSkipped`] for each resolved id absent from the
+/// operation's market collection.
+fn expand_target(
+    hierarchy: &MarketDataHierarchy,
+    target: &HierarchyTarget,
     op_kind: &str,
     warnings: &mut Vec<Warning>,
     exists: impl Fn(&CurveId) -> bool,
-) -> Vec<ResolvedCurveMatch> {
-    let mut kept = Vec::with_capacity(matches.len());
+    mut make: impl FnMut(CurveId) -> (HierarchyExpansionKey, OperationSpec),
+) -> Vec<HierarchyExpansion> {
+    let matches = resolve_hierarchy_matches(hierarchy, target);
+    if matches.is_empty() {
+        warnings.push(Warning::HierarchyNoMatch {
+            target_path: target.path.join("/"),
+            op_kind: op_kind.to_string(),
+        });
+    }
+    let mut expansions = Vec::with_capacity(matches.len());
     for m in matches {
         if exists(&m.curve_id) {
-            kept.push(m);
+            let (key, operation) = make(m.curve_id);
+            expansions.push(HierarchyExpansion {
+                matched_depth: m.matched_depth,
+                key,
+                operation,
+            });
         } else {
             warnings.push(Warning::HierarchyResolvedIdSkipped {
                 curve_id: m.curve_id.as_str().to_string(),
@@ -115,7 +104,7 @@ fn retain_existing_targets(
             });
         }
     }
-    kept
+    expansions
 }
 
 fn curve_kind_target_exists(
@@ -143,7 +132,7 @@ pub(super) fn expand_hierarchy_operations<'a>(
     market: &finstack_quant_core::market_data::context::MarketContext,
     mode: ResolutionMode,
 ) -> Result<ExpansionOutcome<'a>> {
-    if !has_hierarchy_op(operations) {
+    if !operations.iter().any(OperationSpec::is_hierarchy) {
         return Ok(ExpansionOutcome {
             operations: std::borrow::Cow::Borrowed(operations),
             warnings: Vec::new(),
@@ -167,30 +156,20 @@ pub(super) fn expand_hierarchy_operations<'a>(
     let mut slots: Vec<Slot> = Vec::with_capacity(operations.len());
     let mut warnings: Vec<Warning> = Vec::new();
 
-    let join_path = |target: &HierarchyTarget| target.path.join("/");
-
     for op in operations {
-        match op {
+        let expansions = match op {
             OperationSpec::HierarchyCurveParallelBp {
                 curve_kind,
                 target,
                 bp,
                 discount_curve_id,
-            } => {
-                let matches = resolve_hierarchy_matches(hierarchy, target);
-                if matches.is_empty() {
-                    warnings.push(Warning::HierarchyNoMatch {
-                        target_path: join_path(target),
-                        op_kind: "HierarchyCurveParallelBp".to_string(),
-                    });
-                }
-                let matches = retain_existing_targets(
-                    matches,
-                    "HierarchyCurveParallelBp",
-                    &mut warnings,
-                    |id| curve_kind_target_exists(market, *curve_kind, id),
-                );
-                let exps = expand_matches(matches, |curve_id| {
+            } => expand_target(
+                hierarchy,
+                target,
+                "HierarchyCurveParallelBp",
+                &mut warnings,
+                |id| curve_kind_target_exists(market, *curve_kind, id),
+                |curve_id| {
                     (
                         HierarchyExpansionKey::Curve {
                             curve_kind: *curve_kind,
@@ -203,24 +182,15 @@ pub(super) fn expand_hierarchy_operations<'a>(
                             bp: *bp,
                         },
                     )
-                });
-                slots.push(Slot::Expanded(exps));
-            }
-            OperationSpec::HierarchyVolSurfaceParallelPct { target, pct } => {
-                let matches = resolve_hierarchy_matches(hierarchy, target);
-                if matches.is_empty() {
-                    warnings.push(Warning::HierarchyNoMatch {
-                        target_path: join_path(target),
-                        op_kind: "HierarchyVolSurfaceParallelPct".to_string(),
-                    });
-                }
-                let matches = retain_existing_targets(
-                    matches,
-                    "HierarchyVolSurfaceParallelPct",
-                    &mut warnings,
-                    |id| market.get_surface(id.as_str()).is_ok(),
-                );
-                let exps = expand_matches(matches, |curve_id| {
+                },
+            ),
+            OperationSpec::HierarchyVolSurfaceParallelPct { target, pct } => expand_target(
+                hierarchy,
+                target,
+                "HierarchyVolSurfaceParallelPct",
+                &mut warnings,
+                |id| market.get_surface(id.as_str()).is_ok(),
+                |curve_id| {
                     (
                         HierarchyExpansionKey::VolSurface {
                             vol_surface_id: curve_id.clone(),
@@ -230,24 +200,15 @@ pub(super) fn expand_hierarchy_operations<'a>(
                             pct: *pct,
                         },
                     )
-                });
-                slots.push(Slot::Expanded(exps));
-            }
-            OperationSpec::HierarchyEquityPricePct { target, pct } => {
-                let matches = resolve_hierarchy_matches(hierarchy, target);
-                if matches.is_empty() {
-                    warnings.push(Warning::HierarchyNoMatch {
-                        target_path: join_path(target),
-                        op_kind: "HierarchyEquityPricePct".to_string(),
-                    });
-                }
-                let matches = retain_existing_targets(
-                    matches,
-                    "HierarchyEquityPricePct",
-                    &mut warnings,
-                    |id| market.get_price(id.as_str()).is_ok(),
-                );
-                let exps = expand_matches(matches, |curve_id| {
+                },
+            ),
+            OperationSpec::HierarchyEquityPricePct { target, pct } => expand_target(
+                hierarchy,
+                target,
+                "HierarchyEquityPricePct",
+                &mut warnings,
+                |id| market.get_price(id.as_str()).is_ok(),
+                |curve_id| {
                     (
                         HierarchyExpansionKey::EquityPrice {
                             spot_id: PriceId::new(curve_id.as_str()),
@@ -257,24 +218,15 @@ pub(super) fn expand_hierarchy_operations<'a>(
                             pct: *pct,
                         },
                     )
-                });
-                slots.push(Slot::Expanded(exps));
-            }
-            OperationSpec::HierarchyBaseCorrParallelPts { target, points } => {
-                let matches = resolve_hierarchy_matches(hierarchy, target);
-                if matches.is_empty() {
-                    warnings.push(Warning::HierarchyNoMatch {
-                        target_path: join_path(target),
-                        op_kind: "HierarchyBaseCorrParallelPts".to_string(),
-                    });
-                }
-                let matches = retain_existing_targets(
-                    matches,
-                    "HierarchyBaseCorrParallelPts",
-                    &mut warnings,
-                    |id| market.get_base_correlation(id.as_str()).is_ok(),
-                );
-                let exps = expand_matches(matches, |curve_id| {
+                },
+            ),
+            OperationSpec::HierarchyBaseCorrParallelPts { target, points } => expand_target(
+                hierarchy,
+                target,
+                "HierarchyBaseCorrParallelPts",
+                &mut warnings,
+                |id| market.get_base_correlation(id.as_str()).is_ok(),
+                |curve_id| {
                     (
                         HierarchyExpansionKey::BaseCorrelation {
                             surface_id: curve_id.clone(),
@@ -284,11 +236,14 @@ pub(super) fn expand_hierarchy_operations<'a>(
                             points: *points,
                         },
                     )
-                });
-                slots.push(Slot::Expanded(exps));
+                },
+            ),
+            other => {
+                slots.push(Slot::Direct(other.clone()));
+                continue;
             }
-            other => slots.push(Slot::Direct(other.clone())),
-        }
+        };
+        slots.push(Slot::Expanded(expansions));
     }
 
     let max_depth: HashMap<HierarchyExpansionKey, usize> =

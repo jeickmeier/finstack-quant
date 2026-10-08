@@ -10,5 +10,4 @@ pub(crate) mod fx;
 pub(crate) mod instruments;
 pub(crate) mod statements;
 pub(crate) mod time_roll;
-pub(crate) mod traits;
 pub(crate) mod vol;

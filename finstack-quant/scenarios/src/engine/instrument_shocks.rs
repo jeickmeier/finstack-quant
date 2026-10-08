@@ -1,63 +1,94 @@
 //! Instrument and structured-credit correlation shock application.
 
-use crate::adapters::instruments::InstrumentShockOutcome;
+use crate::adapters::instruments::{
+    apply_instrument_shock, InstrumentFilter, InstrumentShockOutcome, ShockKind,
+};
+use crate::error::Result;
+use crate::spec::OperationSpec;
 use crate::warning::Warning;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::pricer::InstrumentType;
 
-type TypeShockFn = fn(&mut [Box<dyn Instrument>], &[InstrumentType], f64) -> InstrumentShockOutcome;
+/// Apply an instrument-scoped operation to the inventory.
+///
+/// Returns `None` for every operation that does not mutate instruments.
+pub(super) fn apply_instrument_operation(
+    op: &OperationSpec,
+    instruments: &mut Option<&mut Vec<Box<dyn Instrument>>>,
+) -> Result<Option<InstrumentShockOutcome>> {
+    let outcome = match op {
+        OperationSpec::InstrumentPricePctByType {
+            instrument_types,
+            pct,
+        } => apply_instrument_shock(
+            inventory(instruments)?,
+            InstrumentFilter::Types(instrument_types),
+            ShockKind::Price,
+            *pct,
+        ),
+        OperationSpec::InstrumentPricePctByAttr { attrs, pct } => apply_instrument_shock(
+            inventory(instruments)?,
+            InstrumentFilter::Attrs(attrs),
+            ShockKind::Price,
+            *pct,
+        ),
+        OperationSpec::InstrumentSpreadBpByType {
+            instrument_types,
+            bp,
+        } => apply_instrument_shock(
+            inventory(instruments)?,
+            InstrumentFilter::Types(instrument_types),
+            ShockKind::Spread,
+            *bp,
+        ),
+        OperationSpec::InstrumentSpreadBpByAttr { attrs, bp } => apply_instrument_shock(
+            inventory(instruments)?,
+            InstrumentFilter::Attrs(attrs),
+            ShockKind::Spread,
+            *bp,
+        ),
+        OperationSpec::AssetCorrelationPts { delta_pts } => {
+            apply_correlation_shock(CorrelationKind::Asset, *delta_pts, inventory(instruments)?)
+        }
+        OperationSpec::PrepayDefaultCorrelationPts { delta_pts } => apply_correlation_shock(
+            CorrelationKind::PrepayDefault,
+            *delta_pts,
+            inventory(instruments)?,
+        ),
+        _ => return Ok(None),
+    };
+    Ok(Some(outcome))
+}
 
-type AttrShockFn = fn(
-    &mut [Box<dyn Instrument>],
-    &indexmap::IndexMap<String, String>,
-    f64,
-) -> InstrumentShockOutcome;
-
-pub(super) fn apply_instrument_shock(
-    types: Option<&[InstrumentType]>,
-    attrs: Option<&indexmap::IndexMap<String, String>>,
-    value: f64,
-    portfolio: &mut [Box<dyn Instrument>],
-    type_fn: TypeShockFn,
-    attr_fn: AttrShockFn,
-) -> InstrumentShockOutcome {
-    let mut applied = 0;
-    let mut changed_indices = Vec::new();
-    let mut warnings = Vec::new();
-    if let Some(ts) = types {
-        let outcome = type_fn(portfolio, ts, value);
-        applied += outcome.count;
-        changed_indices.extend(outcome.changed_indices);
-        warnings.extend(outcome.warnings);
-    }
-    if let Some(ats) = attrs {
-        let outcome = attr_fn(portfolio, ats, value);
-        applied += outcome.count;
-        changed_indices.extend(outcome.changed_indices);
-        warnings.extend(outcome.warnings);
-    }
-    InstrumentShockOutcome {
-        count: applied,
-        changed_indices,
-        warnings,
-    }
+/// The instrument inventory an instrument-scoped operation mutates.
+///
+/// [`super::ScenarioEngine::apply`] rejects instrument-scoped operations
+/// without an inventory before any operation runs, so a missing inventory here
+/// is an engine invariant violation.
+fn inventory<'a>(
+    instruments: &'a mut Option<&mut Vec<Box<dyn Instrument>>>,
+) -> Result<&'a mut Vec<Box<dyn Instrument>>> {
+    instruments.as_deref_mut().ok_or_else(|| {
+        crate::error::Error::internal(
+            "instrument-scoped operation reached the engine without an instrument inventory",
+        )
+    })
 }
 
 /// Which structured-credit correlation parameter a shock targets.
 #[derive(Debug, Clone, Copy)]
-pub(super) enum CorrelationKind {
+enum CorrelationKind {
     /// Asset correlation (clamped to `[0, 0.99]`).
     Asset,
     /// Prepay-default correlation (clamped to `[-0.99, 0.99]`).
     PrepayDefault,
 }
 
-pub(super) fn apply_correlation_effect(
+fn apply_correlation_shock(
     kind: CorrelationKind,
     delta_pts: f64,
     instruments: &mut [Box<dyn Instrument>],
-) -> (usize, Vec<usize>, Vec<Warning>) {
+) -> InstrumentShockOutcome {
     let mut changed_indices = Vec::new();
     let mut warnings = Vec::new();
 
@@ -88,5 +119,9 @@ pub(super) fn apply_correlation_effect(
         warnings.push(Warning::CorrelationShockNoMatch);
     }
 
-    (changed_indices.len(), changed_indices, warnings)
+    InstrumentShockOutcome {
+        count: changed_indices.len(),
+        changed_indices,
+        warnings,
+    }
 }

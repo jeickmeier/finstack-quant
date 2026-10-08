@@ -12,8 +12,8 @@
 //!   certificate (the exact condition is fixed moneyness).
 //! - **Positive vol**: all volatilities must be positive
 
-use crate::adapters::traits::ScenarioEffect;
 use crate::engine::ExecutionContext;
+use crate::engine::ScenarioEffect;
 use crate::error::{Error, Result};
 use crate::warning::Warning;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
@@ -28,9 +28,8 @@ use finstack_quant_core::types::CurveId;
 const LARGE_NEGATIVE_VOL_SHOCK_PCT: f64 = -50.0;
 
 /// Arbitrage violation types detected in volatility surfaces.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
-pub enum ArbitrageViolation {
+#[derive(Debug, Clone)]
+enum ArbitrageViolation {
     /// Calendar spread arbitrage: total variance decreases with expiry at given strike
     CalendarSpread {
         /// Strike level where violation was detected
@@ -89,7 +88,7 @@ impl std::fmt::Display for ArbitrageViolation {
 /// the fixed-strike check can flag a spurious violation, or miss a genuine
 /// one at constant moneyness. Treat calendar-spread results as a heuristic
 /// screen, not a proof of arbitrage.
-pub fn check_arbitrage(
+fn check_arbitrage(
     expiries: &[f64],
     strikes: &[f64],
     vols: &[Vec<f64>],

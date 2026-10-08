@@ -1,9 +1,5 @@
 //! JSON Schema generation helpers for scenario contracts.
 
-/// Stable base URI for scenario-owned schemas.
-pub const SCENARIO_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/scenarios/1/";
-/// Filename of the published scenario envelope schema.
-pub const SCENARIO_SCHEMA_FILENAME: &str = "scenario.schema.json";
 /// Canonical title of the published scenario envelope schema.
 pub const SCENARIO_SCHEMA_TITLE: &str = "Finstack Quant Scenario Specification";
 /// Canonical description of the published scenario envelope schema.
@@ -35,10 +31,16 @@ fn scenario_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
 /// The metadata of the built-in 2008 global-financial-crisis template.
 fn template_metadata_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
     let registry = crate::templates::TemplateRegistry::embedded_builtins()?;
-    let template = registry.get("gfc_2008").ok_or_else(|| {
-        finstack_quant_core::Error::Internal("built-in template gfc_2008 is missing".to_string())
-    })?;
-    finstack_quant_core::schema::example(template.metadata())
+    let metadata = registry
+        .list()
+        .into_iter()
+        .find(|metadata| metadata.id == "gfc_2008")
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Internal(
+                "built-in template gfc_2008 is missing".to_string(),
+            )
+        })?;
+    finstack_quant_core::schema::example(metadata)
 }
 
 /// One applied operation against an otherwise empty market.

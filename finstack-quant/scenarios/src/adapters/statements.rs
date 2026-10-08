@@ -63,64 +63,26 @@ pub fn apply_forecast_percent(
     })
 }
 
-/// Assign a value to explicit forecasts in a node, optionally filtering periods.
+/// Assign a value to every explicit forecast in a node.
 /// Actual periods, monetary currency, and monetary versus scalar value types are preserved.
 ///
 /// # Arguments
 /// * `model` - Statement model containing period classifications and node values.
 /// * `node_id` - Exact node identifier; missing nodes return `NodeNotFound`.
-/// * `value` - Finite numeric value replacing selected forecasts, in the node's
+/// * `value` - Finite numeric value replacing the forecasts, in the node's
 ///   existing units; monetary values retain their currency and use major units.
-/// * `period_filter` - Optional inclusive date bounds; only forecast periods
-///   wholly contained in the interval change. `None` selects all forecasts.
 pub fn apply_forecast_assign(
     model: &mut FinancialModelSpec,
     node_id: &str,
     value: f64,
-    period_filter: Option<(
-        finstack_quant_core::dates::Date,
-        finstack_quant_core::dates::Date,
-    )>,
 ) -> Result<bool> {
-    if !value.is_finite() {
-        return Err(Error::Validation(format!(
-            "Forecast assignment must be finite, got {value}"
-        )));
-    }
-
-    let allowed_period_ids: std::collections::HashSet<_> = model
-        .periods
-        .iter()
-        .filter(|period| {
-            !period.is_actual
-                && period_filter
-                    .is_none_or(|(start, end)| period.start >= start && period.end <= end)
-        })
-        .map(|period| period.id)
-        .collect();
-
-    let node = model
-        .get_node_mut(node_id)
-        .ok_or_else(|| Error::NodeNotFound {
-            node_id: node_id.to_string(),
-        })?;
-
-    match node.values.as_mut() {
-        Some(values) => {
-            for (period_id, val) in values.iter_mut() {
-                if allowed_period_ids.contains(period_id) {
-                    *val = match val {
-                        AmountOrScalar::Scalar(_) => AmountOrScalar::Scalar(value),
-                        AmountOrScalar::Amount(money) => {
-                            AmountOrScalar::amount(value, money.currency())?
-                        }
-                    };
-                }
-            }
-            Ok(true)
-        }
-        None => Ok(false),
-    }
+    with_node_values_mut(model, node_id, |val| {
+        *val = match val {
+            AmountOrScalar::Scalar(_) => AmountOrScalar::Scalar(value),
+            AmountOrScalar::Amount(money) => AmountOrScalar::amount(value, money.currency())?,
+        };
+        Ok(())
+    })
 }
 
 /// Update a statement rate node using a full [`RateBindingSpec`].
@@ -199,7 +161,7 @@ pub fn update_rate_from_binding(
             binding.compounding,
             output_years,
         )?;
-        return apply_forecast_assign(model, binding.node_id.as_str(), converted, None);
+        return apply_forecast_assign(model, binding.node_id.as_str(), converted);
     }
 
     if let Ok(curve) = market.get_forward(curve_id) {
@@ -269,7 +231,7 @@ pub fn update_rate_from_binding(
             binding.compounding,
             output_accrual,
         )?;
-        return apply_forecast_assign(model, binding.node_id.as_str(), converted, None);
+        return apply_forecast_assign(model, binding.node_id.as_str(), converted);
     }
 
     Err(Error::MarketDataNotFound {
@@ -365,7 +327,7 @@ mod tests {
         };
         apply_forecast_percent(&mut model, "rate", -10.0).expect("shock");
         assert_eq!(values(&model), [100.0, 180.0]);
-        apply_forecast_assign(&mut model, "rate", 300.0, None).expect("assign");
+        apply_forecast_assign(&mut model, "rate", 300.0).expect("assign");
         assert_eq!(values(&model), [100.0, 300.0]);
         let base = date!(2025 - 01 - 01);
         let discount = DiscountCurve::builder("DISC")
@@ -425,42 +387,5 @@ mod tests {
             assert!((values(&model)[1] - expected).abs() < 1e-12);
             assert_eq!(values(&model)[0], 100.0);
         }
-    }
-
-    #[test]
-    fn test_apply_forecast_assign_updates_only_selected_periods() {
-        let period_plan = build_periods("2025Q1..Q4", None).expect("periods should build");
-        let periods = period_plan.periods;
-        let mut model = FinancialModelSpec::new("test", periods.clone());
-
-        let mut values = IndexMap::new();
-        for (i, period) in periods.iter().enumerate() {
-            values.insert(period.id, AmountOrScalar::Scalar(100.0 * (i as f64 + 1.0)));
-        }
-
-        model.add_node(NodeSpec::new("Revenue", NodeType::Value).with_values(values));
-
-        apply_forecast_assign(
-            &mut model,
-            "Revenue",
-            500.0,
-            Some((periods[1].start, periods[1].end)),
-        )
-        .expect("filtered assign should succeed");
-
-        let shocked_values: Vec<f64> = model
-            .get_node("Revenue")
-            .expect("node should exist")
-            .values
-            .as_ref()
-            .expect("values should exist")
-            .values()
-            .map(|v| match v {
-                AmountOrScalar::Scalar(s) => *s,
-                AmountOrScalar::Amount(_) => 0.0,
-            })
-            .collect();
-
-        assert_eq!(shocked_values, vec![100.0, 500.0, 300.0, 400.0]);
     }
 }

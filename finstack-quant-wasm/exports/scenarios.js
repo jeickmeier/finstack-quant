@@ -43,7 +43,6 @@ export const scenarios = {
   rateBindingSpecValidate: wasm.rateBindingSpecValidate,
   scenarioSpecRequiresInstruments: wasm.scenarioSpecRequiresInstruments,
   scenarioSpecMutatesInstruments: wasm.scenarioSpecMutatesInstruments,
-  scenarioSpecWithHazardBumpMode: wasm.scenarioSpecWithHazardBumpMode,
   horizonResultExplainText: wasm.horizonResultExplainText,
   horizonResultFactorContribution: wasm.horizonResultFactorContribution,
   schema,

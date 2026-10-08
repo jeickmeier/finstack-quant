@@ -185,8 +185,8 @@ test('rateBindingSpecValidate matches Python RateBindingSpec.validate', () => {
   );
 });
 
-test('scenarioSpec predicates and withHazardBumpMode match Python', () => {
-  const { cases, with_hazard_bump_mode: bump, bad_mode_error } = GOLDEN.scenario_spec;
+test('scenarioSpec predicates match Python', () => {
+  const { cases } = GOLDEN.scenario_spec;
   for (const { spec, requires_instruments, mutates_instruments } of cases) {
     assert.equal(scenarios.scenarioSpecRequiresInstruments(spec), requires_instruments, spec.id);
     assert.equal(scenarios.scenarioSpecMutatesInstruments(spec), mutates_instruments, spec.id);
@@ -195,17 +195,6 @@ test('scenarioSpec predicates and withHazardBumpMode match Python', () => {
       requires_instruments
     );
   }
-  const [{ spec }] = cases;
-  // The default mode (`solve_to_par`) is omitted from the wire.
-  assert.equal(spec.hazard_bump_mode, undefined);
-  assert.deepEqual(scenarios.scenarioSpecWithHazardBumpMode(spec, bump.mode), bump.expected);
-  // The input object is not mutated.
-  assert.equal(spec.hazard_bump_mode, undefined);
-  assert.equal(bad_mode_error.exception, 'ValueError');
-  assert.throws(
-    () => scenarios.scenarioSpecWithHazardBumpMode(spec, 'nope'),
-    validation(bad_mode_error.message)
-  );
   assert.throws(
     () => scenarios.scenarioSpecRequiresInstruments({ id: '', operations: [] }),
     (error) => error.kind === 'validation' && /Scenario ID cannot be empty/.test(error.message)

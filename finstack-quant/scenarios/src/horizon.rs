@@ -227,7 +227,7 @@ impl HorizonAnalysis {
     fn pricing_options(&self) -> PricingOptions {
         PricingOptions::default()
             .with_config(self.engine.get_config())
-            .with_recalibration_provider(Arc::clone(self.engine.recalibration_provider()))
+            .with_recalibration_provider(Arc::clone(self.engine.get_recalibration_provider()))
     }
 
     /// Resolve the configured calendar identifier against core's built-in calendar registry.
@@ -309,7 +309,6 @@ impl HorizonAnalysis {
         as_of_t0: Date,
         scenario: &ScenarioSpec,
     ) -> crate::Result<HorizonResult> {
-        scenario.validate()?;
         if let Some(op_name) = horizon_unsupported_instrument_operation(scenario) {
             return Err(crate::Error::Validation(format!(
                 "{op_name} is not supported by HorizonAnalysis because attribution uses one \

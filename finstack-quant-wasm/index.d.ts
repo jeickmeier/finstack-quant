@@ -275,7 +275,6 @@ import type {
   AttributionFactor,
   Compounding,
   CurveKind,
-  HazardBumpMode,
   HierarchyTarget,
   HorizonResult,
   HorizonSummary,
@@ -36918,17 +36917,6 @@ export interface ScenariosNamespace {
    * @throws Error - Throws a `TypeError` when `spec` is not an object or JSON string, and a `validation` error when it is not a valid `ScenarioSpec`.
    */
   scenarioSpecMutatesInstruments(spec: ScenarioSpec | string): boolean;
-  /**
-   * Copy a scenario with a different ParCDS hazard delivery mode.
-   *
-   * Free-function twin of Python `ScenarioSpec.with_hazard_bump_mode` (Rust
-   * `ScenarioSpec::with_hazard_bump_mode`). The input is not modified.
-   * @param spec - `ScenarioSpec` object or JSON; it is validated first.
-   * @param mode - `"solve_to_par"` (re-bootstrap hazard from shocked par spreads) or `"first_order_shift"` (shift hazard knots in place).
-   * @returns A new `ScenarioSpec` object with `hazard_bump_mode` replaced.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments, and a `validation` error when `spec` is not a valid `ScenarioSpec` or `mode` is not an accepted label.
-   */
-  scenarioSpecWithHazardBumpMode(spec: ScenarioSpec | string, mode: HazardBumpMode): ScenarioSpec;
   /**
    * Render a horizon result as a multi-line text summary.
    *

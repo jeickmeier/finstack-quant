@@ -223,12 +223,6 @@ impl PyHorizonResult {
         serde_to_py(py, &self.inner.scenario_report.warnings)
     }
 
-    /// The structured warnings as one JSON-encoded array.
-    #[getter]
-    fn warnings_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.scenario_report.warnings).map_err(display_to_py)
-    }
-
     /// Factor contribution as decimal fraction of initial value.
     ///
     /// ``factor`` must be one of the canonical serde names from

@@ -15,84 +15,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
 use indexmap::IndexMap;
 
-/// Apply a time roll-forward operation.
-///
-/// The function advances the valuation date by the requested period and computes
-/// theta/carry for each instrument (if a portfolio is supplied). Theta is
-/// realized-forward: carry is `PV_rolled(t1) - PV(t0) + CF_(t0,t1]`, where
-/// `t1` is valued on the market after
-/// [`MarketContext::roll_forward`](finstack_quant_core::market_data::context::MarketContext::roll_forward)
-/// (curves realize their forwards). It is not a frozen-knot lookup of the
-/// unrolled market at a shifted `as_of`. Before rolling curves, raw coupon
-/// observations crossed in `[t0, t1]` on advancing rolls are materialized from the canonical
-/// pre-roll schedules. Existing exact-date observations retain priority. A
-/// missing or conflicting required projection returns an error atomically.
-/// A nonzero roll of a calibrated hazard curve replays its calibration recipe
-/// on the rolled market; this standalone helper uses a fresh
-/// `CachedRecalibrationProvider`, while
-/// [`ScenarioEngine`](crate::ScenarioEngine) uses its configured provider.
-/// A business-day adjustment that returns the starting date is a no-op.
-///
-/// # Arguments
-/// - `ctx`: Execution context providing the mutable valuation date, market data,
-///   and optional instruments.
-/// - `period_str`: Period string such as `"1D"`, `"1W"`, `"1M"`, or `"1Y"`.
-/// - `mode`: Roll interpretation (business-day aware vs approximate days).
-///
-/// # Returns
-/// [`RollForwardReport`] summarising the new date and P&L breakdown.
-///
-/// # Errors
-/// - [`Error::InvalidPeriod`](crate::error::Error::InvalidPeriod) if the period
-///   string cannot be parsed.
-/// - Propagates any errors encountered while revaluing instruments.
-/// - Returns a core validation error if the target exceeds the supported date range.
-/// - Propagates recalibration failures for a nonzero calibrated-hazard roll.
-///
-/// # References
-///
-/// - Day-count and business-day conventions: `docs/REFERENCES.md#isda-2006-definitions`
-/// - Period notation: `docs/REFERENCES.md#iso-8601`
-///
-/// # Examples
-/// ```
-/// use finstack_quant_scenarios::ExecutionContext;
-/// use finstack_quant_scenarios::apply_time_roll_forward;
-/// use finstack_quant_scenarios::TimeRollMode;
-/// use finstack_quant_core::market_data::context::MarketContext;
-/// use finstack_quant_statements::FinancialModelSpec;
-/// use time::macros::date;
-///
-/// # fn main() -> finstack_quant_scenarios::Result<()> {
-/// let mut market = MarketContext::new();
-/// let mut model = FinancialModelSpec::new("demo", vec![]);
-/// let as_of = date!(2025 - 01 - 01);
-/// let mut ctx = ExecutionContext {
-///     market: &mut market,
-///     model: Some(&mut model),
-///     instruments: None,
-///     rate_bindings: None,
-///     calendar: None,
-///     as_of,
-/// };
-/// // 2025-01-01 + 1M is Saturday 2025-02-01, so ModifiedFollowing carries the
-/// // target to Monday 2025-02-03 -> 33 calendar days.
-/// let report = apply_time_roll_forward(&mut ctx, "1M", TimeRollMode::BusinessDays)?;
-/// assert_eq!(report.new_date, date!(2025 - 02 - 03));
-/// assert_eq!(report.days, 33);
-/// # Ok(())
-/// # }
-/// ```
-pub fn apply_time_roll_forward(
-    ctx: &mut ExecutionContext,
-    period_str: &str,
-    mode: TimeRollMode,
-) -> Result<RollForwardReport> {
-    // Only calibrated hazard curves already in the market consult the provider.
-    let provider = finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
-    apply_time_roll_forward_with_credit(ctx, period_str, mode, &[], &provider)
-}
-
 /// Resolve the canonical forward-roll target before projecting fixings.
 pub(crate) fn resolve_roll_dates(
     old_date: Date,
@@ -146,7 +68,48 @@ pub(crate) fn resolve_roll_dates(
     Ok((new_date, day_shift))
 }
 
-pub(crate) fn apply_time_roll_forward_with_credit(
+/// Apply a time roll-forward operation.
+///
+/// The function advances the valuation date by the requested period and computes
+/// theta/carry for each instrument (if a portfolio is supplied). Theta is
+/// realized-forward: carry is `PV_rolled(t1) - PV(t0) + CF_(t0,t1]`, where
+/// `t1` is valued on the market after
+/// [`MarketContext::roll_forward`](finstack_quant_core::market_data::context::MarketContext::roll_forward)
+/// (curves realize their forwards). It is not a frozen-knot lookup of the
+/// unrolled market at a shifted `as_of`. Before rolling curves, raw coupon
+/// observations crossed in `[t0, t1]` on advancing rolls are materialized from the canonical
+/// pre-roll schedules. Existing exact-date observations retain priority. A
+/// missing or conflicting required projection returns an error atomically.
+/// A nonzero roll of a calibrated hazard curve replays its calibration recipe
+/// on the rolled market through `provider`.
+/// A business-day adjustment that returns the starting date is a no-op.
+///
+/// # Arguments
+/// - `ctx`: Execution context providing the mutable valuation date, market data,
+///   and optional instruments.
+/// - `period_str`: Period string such as `"1D"`, `"1W"`, `"1M"`, or `"1Y"`.
+/// - `mode`: Roll interpretation (business-day aware vs approximate days).
+/// - `hazard_rolls`: `(hazard, discount)` curve-id pairs whose hazard curve is
+///   replayed on the rolled market in addition to every calibrated hazard curve
+///   already in the market.
+/// - `provider`: Quote-recalibration service used for the hazard replay.
+///
+/// # Returns
+/// [`RollForwardReport`] summarising the new date and P&L breakdown.
+///
+/// # Errors
+/// - [`Error::InvalidPeriod`](crate::error::Error::InvalidPeriod) if the period
+///   string cannot be parsed.
+/// - Propagates any errors encountered while revaluing instruments.
+/// - Returns a core validation error if the target exceeds the supported date range.
+/// - Propagates recalibration failures for a nonzero calibrated-hazard roll.
+///
+/// # References
+///
+/// - Day-count and business-day conventions: `docs/REFERENCES.md#isda-2006-definitions`
+/// - Period notation: `docs/REFERENCES.md#iso-8601`
+///
+pub(crate) fn apply_time_roll_forward(
     ctx: &mut ExecutionContext,
     period_str: &str,
     mode: TimeRollMode,
@@ -246,7 +209,7 @@ pub(crate) fn apply_time_roll_forward_with_credit(
     // the rolled market — the same realized-forward theta as valuations.
     let (instrument_carry, total_carry, failed_instruments) =
         if let Some(instruments) = ctx.instruments.as_ref() {
-            calculate_instrument_pnl(instruments, ctx.market, &rolled_market, old_date, new_date)?
+            calculate_instrument_pnl(instruments, ctx.market, &rolled_market, old_date, new_date)
         } else {
             (Vec::new(), IndexMap::new(), Vec::new())
         };
@@ -272,62 +235,7 @@ type InstrumentPnlResult = (
     Vec<(String, String)>,
 );
 
-/// Calculate P&L breakdown for instruments.
-///
-/// Realized-forward theta (carry) is:
-///   Carry = PV_rolled(end_date) - PV(start_date) + Sum(Cashflows from start to end)
-///
-/// `start_date` is valued on the pre-roll market; `end_date` is valued on
-/// the rolled market (curves have realized their forwards). Cashflows in
-/// `(start_date, end_date]` are collected from the pre-roll market.
-///
-/// This accounts for:
-/// - Pull-to-par and realized-forward roll-down
-/// - Coupon/interest net cashflows during the period
-/// - Principal payments during the period
-///
-/// This matches the valuations theta metric (`compute_theta_breakdown`):
-/// value on the rolled market at `t1`.
-///
-/// # Failure handling
-///
-/// If either endpoint valuation or cashflow collection returns an error, the
-/// instrument is recorded in the `failed_instruments` return slot with the
-/// underlying error message and is *excluded* from `instrument_carry` /
-/// `total_carry`. This prevents partial cashflow-only carry lines from
-/// contaminating the aggregate while still surfacing the failure in the
-/// `RollForwardReport`.
-///
-/// # Cashflow window convention
-///
-/// Cashflows are included when their payment date satisfies
-/// `start_date < date <= end_date` (i.e. T+0 excluded, T+N included). A coupon
-/// paid on the roll-forward target date counts toward carry; a coupon paid on
-/// the starting valuation date does not.
-#[cfg(not(target_arch = "wasm32"))]
-fn time_roll_parallel_threshold() -> usize {
-    #[cfg(test)]
-    {
-        2
-    }
-    #[cfg(not(test))]
-    {
-        64
-    }
-}
-
-fn should_parallel_time_roll(instrument_count: usize) -> bool {
-    #[cfg(target_arch = "wasm32")]
-    {
-        let _ = instrument_count;
-        false
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        instrument_count >= time_roll_parallel_threshold()
-    }
-}
-
+/// Carry outcome for one instrument.
 enum InstrumentPnlRow {
     Carry(String, IndexMap<Currency, Money>),
     Failed(String, String),
@@ -398,39 +306,60 @@ fn fold_instrument_pnl_rows(rows: Vec<InstrumentPnlRow>) -> InstrumentPnlResult 
     (instrument_carry, total_carry, failed_instruments)
 }
 
+/// Calculate P&L breakdown for instruments.
+///
+/// Realized-forward theta (carry) is:
+///   Carry = PV_rolled(end_date) - PV(start_date) + Sum(Cashflows from start to end)
+///
+/// `start_date` is valued on the pre-roll market; `end_date` is valued on
+/// the rolled market (curves have realized their forwards). Cashflows in
+/// `(start_date, end_date]` are collected from the pre-roll market.
+///
+/// This accounts for:
+/// - Pull-to-par and realized-forward roll-down
+/// - Coupon/interest net cashflows during the period
+/// - Principal payments during the period
+///
+/// This matches the valuations theta metric (`compute_theta_breakdown`):
+/// value on the rolled market at `t1`.
+///
+/// # Failure handling
+///
+/// If either endpoint valuation or cashflow collection returns an error, the
+/// instrument is recorded in the `failed_instruments` return slot with the
+/// underlying error message and is *excluded* from `instrument_carry` /
+/// `total_carry`. This prevents partial cashflow-only carry lines from
+/// contaminating the aggregate while still surfacing the failure in the
+/// `RollForwardReport`.
+///
+/// # Cashflow window convention
+///
+/// Cashflows are included when their payment date satisfies
+/// `start_date < date <= end_date` (i.e. T+0 excluded, T+N included). A coupon
+/// paid on the roll-forward target date counts toward carry; a coupon paid on
+/// the starting valuation date does not.
 fn calculate_instrument_pnl(
     instruments: &[Box<dyn Instrument>],
     market: &finstack_quant_core::market_data::context::MarketContext,
     rolled: &finstack_quant_core::market_data::context::MarketContext,
     old_date: finstack_quant_core::dates::Date,
     new_date: finstack_quant_core::dates::Date,
-) -> Result<InstrumentPnlResult> {
-    let map_one = |instrument: &dyn Instrument| {
-        one_instrument_pnl(instrument, market, rolled, old_date, new_date)
-    };
-    let rows = if should_parallel_time_roll(instruments.len()) {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            use rayon::prelude::*;
-            instruments
-                .par_iter()
-                .map(|instrument| map_one(instrument.as_ref()))
-                .collect()
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            instruments
-                .iter()
-                .map(|instrument| map_one(instrument.as_ref()))
-                .collect()
-        }
-    } else {
-        instruments
-            .iter()
-            .map(|instrument| map_one(instrument.as_ref()))
-            .collect()
-    };
-    Ok(fold_instrument_pnl_rows(rows))
+) -> InstrumentPnlResult {
+    // Rows come back in input order on every target, so the serial fold below
+    // produces identical totals whether or not the map ran in parallel.
+    let rows = finstack_quant_core::parallel::try_map_ordered(instruments, |instrument| {
+        Ok::<_, std::convert::Infallible>(one_instrument_pnl(
+            instrument.as_ref(),
+            market,
+            rolled,
+            old_date,
+            new_date,
+        ))
+    });
+    match rows {
+        Ok(rows) => fold_instrument_pnl_rows(rows),
+        Err(never) => match never {},
+    }
 }
 
 /// Collect cashflows for an instrument during a period, grouped by currency.
@@ -439,7 +368,7 @@ fn calculate_instrument_pnl(
 /// exactly at `start_date` are excluded (they are assumed to have been
 /// captured by the previous roll's "end_date" or to have already been paid
 /// at `t = 0`) while cashflows exactly at `end_date` are included. This
-/// keeps successive [`apply_time_roll_forward`] calls conservative under
+/// keeps successive time rolls conservative under
 /// concatenation and avoids double-counting coupons landing on roll
 /// boundaries.
 fn collect_instrument_cashflows(
@@ -469,6 +398,16 @@ fn collect_instrument_cashflows(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn roll(
+        ctx: &mut ExecutionContext,
+        period: &str,
+        mode: TimeRollMode,
+    ) -> Result<RollForwardReport> {
+        let provider =
+            finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
+        apply_time_roll_forward(ctx, period, mode, &[], &provider)
+    }
     use crate::engine::ExecutionContext;
     use crate::TimeRollMode;
     use finstack_quant_core::dates::{Date, DateExt, DayCount, Tenor};
@@ -566,7 +505,7 @@ mod tests {
             calendar: None,
             as_of: origin,
         };
-        let error = apply_time_roll_forward(&mut ctx, "1M", TimeRollMode::CalendarDays)
+        let error = roll(&mut ctx, "1M", TimeRollMode::CalendarDays)
             .expect_err("fixing projection must fail before committing the roll");
         assert!(matches!(error, crate::Error::Validation(_)));
         let message = error.to_string();
@@ -598,8 +537,7 @@ mod tests {
             &market,
             date!(2025 - 01 - 01),
             date!(2025 - 02 - 01),
-        )
-        .expect("carry failures are reported per instrument");
+        );
         assert!(instrument_carry.is_empty());
         assert!(total_carry.is_empty());
         assert_eq!(failed_instruments.len(), 1);
@@ -675,8 +613,7 @@ mod tests {
             as_of: base_date,
         };
 
-        let report = apply_time_roll_forward(&mut ctx, "1M", TimeRollMode::BusinessDays)
-            .expect("time roll succeeds");
+        let report = roll(&mut ctx, "1M", TimeRollMode::BusinessDays).expect("time roll succeeds");
         assert_eq!(ctx.as_of, expected_date);
         assert_eq!(report.new_date, expected_date);
         assert_eq!(report.days, 33);
@@ -785,8 +722,7 @@ mod tests {
             as_of: base_date,
         };
 
-        let report = apply_time_roll_forward(&mut ctx, "1M", TimeRollMode::CalendarDays)
-            .expect("time roll succeeds");
+        let report = roll(&mut ctx, "1M", TimeRollMode::CalendarDays).expect("time roll succeeds");
         assert_eq!(ctx.as_of, new_date);
         assert_eq!(report.days, 31);
 
@@ -813,7 +749,7 @@ mod tests {
             calendar: None,
             as_of: base_date,
         };
-        let report = apply_time_roll_forward(&mut ctx, period, mode).expect("time roll succeeds");
+        let report = roll(&mut ctx, period, mode).expect("time roll succeeds");
         (report.new_date, report.days)
     }
 
@@ -840,8 +776,7 @@ mod tests {
                 as_of: Date::MAX,
             };
 
-            let error = apply_time_roll_forward(&mut ctx, "1D", mode)
-                .expect_err("out-of-range roll returns an error");
+            let error = roll(&mut ctx, "1D", mode).expect_err("out-of-range roll returns an error");
             assert!(matches!(error, crate::error::Error::Core(_)), "{error}");
             assert_eq!(ctx.as_of, Date::MAX);
             assert_eq!(
@@ -959,8 +894,7 @@ mod tests {
             as_of: base_date,
         };
 
-        let report = apply_time_roll_forward(&mut ctx, "1M", TimeRollMode::CalendarDays)
-            .expect("time roll succeeds");
+        let report = roll(&mut ctx, "1M", TimeRollMode::CalendarDays).expect("time roll succeeds");
 
         let rolled_curve = market.get_discount("USD-OIS").expect("rolled curve");
         let dt = old_curve

@@ -29,7 +29,7 @@ instrument effects — live in `finstack-quant-statements-analytics` instead.
 | `ApplicationEnvelope` | JSON envelope of the mutated market/model plus the report (used by bindings) |
 | `RateBindingSpec` | Links a statement `NodeId` to a curve tenor, used by `OperationSpec::RateBinding` |
 | `HorizonAnalysis` / `HorizonResult` | Scenario + attribution for one instrument's decomposed total return |
-| `templates` | `TemplateRegistry`, `RegisteredTemplate`, `TemplateMetadata` |
+| `templates` | `TemplateRegistry`, `TemplateMetadata` |
 | `envelope` | `ScenarioEnvelope`, `ScenarioSchema`, `SCENARIO_CONTRACT` for strict versioned persistence |
 | `Warning`, `Error`, `Result` | Structured non-fatal warnings and the crate error type |
 
@@ -46,8 +46,8 @@ Supporting types re-exported at the crate root: `CurveKind` (`Discount`,
 (`MostSpecificWins` by default, `Cumulative` the other variant). It is *not*
 re-exported here — import it from `finstack-quant-core`.
 
-The `adapters` and `utils` modules are `pub(crate)`; the only adapter items
-exposed are `apply_time_roll_forward` and `ArbitrageViolation` at the crate root.
+The `adapters` and `utils` modules are `pub(crate)`; scenario application goes
+through `ScenarioEngine::apply`.
 
 ## Operation families
 
@@ -158,10 +158,7 @@ fn rates_leg() -> finstack_quant_scenarios::Result<()> {
         println!("{} — {}", metadata.id, metadata.name);
     }
 
-    let gfc = registry.get("gfc_2008").expect("built-in template");
-    let rates_only = gfc
-        .component("gfc_2008_rates")
-        .expect("component id from metadata.components");
+    let rates_only = registry.build_component("gfc_2008", "gfc_2008_rates")?;
     println!("{} operations", rates_only.operations.len());
     Ok(())
 }
@@ -283,8 +280,7 @@ Integration suites live under [`tests/`](tests). `mod.rs` aggregates `engine/`,
 aggregates `templates/`. Contract tests `canonical_contract.rs` and
 `schema_contract.rs` run against [`tests/data/canonical/`](tests/data/canonical).
 Two suites stand alone: `par_cds_bump.rs` (par-CDS curve bump behaviour) and
-`report_serialization.rs` (`RollForwardReport` / `ArbitrageViolation` wire
-stability).
+`report_serialization.rs` (`RollForwardReport` wire stability).
 Benchmarks are documented in [`benches/README.md`](benches/README.md).
 
 ## References
