@@ -22,7 +22,9 @@ use super::super::convert::{
     money_to_py, opt_repr,
 };
 use super::super::instruments::serialize_typed_instrument_json;
-use super::super::typed_fx::{instrument_envelope_methods, instrument_pricing_methods};
+use super::super::typed_macros::{
+    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+};
 use crate::bindings::valuations::convert::take_builder;
 
 type ConvertibleBondBuilderInner =
@@ -775,16 +777,6 @@ crate::bindings::valuations::pricing::pricing_override_methods!(
     fields
 );
 
-/// Apply one consuming Rust setter and record the field for ``__repr__``.
-macro_rules! cb_set {
-    ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{
-        let b = take_builder(&mut $slf.inner)?;
-        $slf.inner = Some($apply(b));
-        $slf.fields.push((stringify!($field), $repr));
-        Ok($slf)
-    }};
-}
-
 #[pymethods]
 impl PyConvertibleBondBuilder {
     /// Set the instrument identifier.
@@ -800,7 +792,7 @@ impl PyConvertibleBondBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        cb_set!(
+        builder_set!(
             slf,
             id,
             format!("{value:?}"),
@@ -825,7 +817,7 @@ impl PyConvertibleBondBuilder {
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = value.inner;
-        cb_set!(
+        builder_set!(
             slf,
             notional,
             money_repr(money),
@@ -850,7 +842,7 @@ impl PyConvertibleBondBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let issue_date = py_to_date(value)?;
-        cb_set!(
+        builder_set!(
             slf,
             issue_date,
             date_repr(issue_date),
@@ -875,7 +867,7 @@ impl PyConvertibleBondBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let maturity = py_to_date(value)?;
-        cb_set!(
+        builder_set!(
             slf,
             maturity,
             date_repr(maturity),
@@ -900,7 +892,7 @@ impl PyConvertibleBondBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cb_set!(
+        builder_set!(
             slf,
             discount_curve_id,
             format!("{value:?}"),
@@ -927,7 +919,7 @@ impl PyConvertibleBondBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cb_set!(
+        builder_set!(
             slf,
             credit_curve_id,
             format!("{value:?}"),
@@ -965,7 +957,7 @@ impl PyConvertibleBondBuilder {
             inner: conversion.clone(),
         }
         .__repr__();
-        cb_set!(slf, conversion, shown, |b: ConvertibleBondBuilderInner| b
+        builder_set!(slf, conversion, shown, |b: ConvertibleBondBuilderInner| b
             .conversion(conversion))
     }
 
@@ -983,7 +975,7 @@ impl PyConvertibleBondBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn spot_id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        cb_set!(
+        builder_set!(
             slf,
             spot_id,
             format!("{value:?}"),
@@ -1008,7 +1000,7 @@ impl PyConvertibleBondBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cb_set!(
+        builder_set!(
             slf,
             vol_surface_id,
             format!("{value:?}"),
@@ -1033,7 +1025,7 @@ impl PyConvertibleBondBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cb_set!(
+        builder_set!(
             slf,
             div_yield_id,
             format!("{value:?}"),
@@ -1070,7 +1062,7 @@ impl PyConvertibleBondBuilder {
             call_put.calls.len(),
             call_put.puts.len()
         );
-        cb_set!(slf, call_put, shown, |b: ConvertibleBondBuilderInner| b
+        builder_set!(slf, call_put, shown, |b: ConvertibleBondBuilderInner| b
             .call_put(call_put))
     }
 
@@ -1105,7 +1097,7 @@ impl PyConvertibleBondBuilder {
             trigger.observation_days,
             trigger.required_days_above
         );
-        cb_set!(
+        builder_set!(
             slf,
             soft_call_trigger,
             shown,
@@ -1131,7 +1123,7 @@ impl PyConvertibleBondBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: u32,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cb_set!(
+        builder_set!(
             slf,
             settlement_days,
             value.to_string(),
@@ -1157,7 +1149,7 @@ impl PyConvertibleBondBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cb_set!(
+        builder_set!(
             slf,
             recovery_rate,
             float_repr(value),
@@ -1192,7 +1184,7 @@ impl PyConvertibleBondBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec =
             serde_from_py(py, value, "cashflow_spec")?;
-        cb_set!(
+        builder_set!(
             slf,
             cashflow_spec,
             "{...}".to_string(),
@@ -1227,7 +1219,7 @@ impl PyConvertibleBondBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        cb_set!(slf, attributes, shown, |b: ConvertibleBondBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: ConvertibleBondBuilderInner| b
             .attributes(attrs))
     }
 

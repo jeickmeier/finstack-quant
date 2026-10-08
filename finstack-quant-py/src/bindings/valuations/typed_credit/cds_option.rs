@@ -17,7 +17,9 @@ use super::super::convert::{
     money_repr, money_to_py,
 };
 use super::super::instruments::{enum_from_str, serialize_typed_instrument_json, spec_from_py};
-use super::super::typed_fx::{instrument_envelope_methods, instrument_pricing_methods};
+use super::super::typed_macros::{
+    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+};
 use super::cds::cds_convention_from_str;
 use crate::bindings::valuations::convert::take_builder;
 
@@ -289,16 +291,6 @@ pub struct PyCdsOptionBuilder {
     fields: Vec<(&'static str, String)>,
 }
 
-/// Apply one consuming Rust setter and record the field for ``__repr__``.
-macro_rules! cdso_set {
-    ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{
-        let b = take_builder(&mut $slf.inner)?;
-        $slf.inner = Some($apply(b));
-        $slf.fields.push((stringify!($field), $repr));
-        Ok($slf)
-    }};
-}
-
 /// Parse a ``decimal.Decimal | str | int | float`` exactly, via its string form.
 fn decimal_arg(value: &Bound<'_, PyAny>) -> PyResult<Decimal> {
     if is_python_decimal(value)? {
@@ -323,7 +315,7 @@ impl PyCdsOptionBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        cdso_set!(slf, id, format!("{value:?}"), |b: CdsOptionBuilderInner| b
+        builder_set!(slf, id, format!("{value:?}"), |b: CdsOptionBuilderInner| b
             .id(InstrumentId::new(value.to_string())))
     }
 
@@ -353,7 +345,7 @@ impl PyCdsOptionBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let strike: CdsOptionStrike = spec_from_py(py, value, "strike")?;
         let shown = value.repr()?.to_string();
-        cdso_set!(slf, strike, shown, |b: CdsOptionBuilderInner| b
+        builder_set!(slf, strike, shown, |b: CdsOptionBuilderInner| b
             .strike(strike))
     }
 
@@ -379,7 +371,7 @@ impl PyCdsOptionBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let parsed = enum_from_str(value, "option_type")?;
-        cdso_set!(
+        builder_set!(
             slf,
             option_type,
             format!("{value:?}"),
@@ -409,7 +401,7 @@ impl PyCdsOptionBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let parsed = enum_from_str(value, "exercise_style")?;
-        cdso_set!(
+        builder_set!(
             slf,
             exercise_style,
             format!("{value:?}"),
@@ -434,7 +426,7 @@ impl PyCdsOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        cdso_set!(slf, expiry, date_repr(date), |b: CdsOptionBuilderInner| b
+        builder_set!(slf, expiry, date_repr(date), |b: CdsOptionBuilderInner| b
             .expiry(date))
     }
 
@@ -455,7 +447,7 @@ impl PyCdsOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        cdso_set!(
+        builder_set!(
             slf,
             underlying_maturity,
             date_repr(date),
@@ -480,7 +472,7 @@ impl PyCdsOptionBuilder {
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = value.inner;
-        cdso_set!(
+        builder_set!(
             slf,
             notional,
             money_repr(money),
@@ -507,7 +499,7 @@ impl PyCdsOptionBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn settlement<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let parsed = enum_from_str(value, "settlement")?;
-        cdso_set!(
+        builder_set!(
             slf,
             settlement,
             format!("{value:?}"),
@@ -533,7 +525,7 @@ impl PyCdsOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        cdso_set!(
+        builder_set!(
             slf,
             premium_settlement_date,
             date_repr(date),
@@ -559,7 +551,7 @@ impl PyCdsOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        cdso_set!(
+        builder_set!(
             slf,
             exercise_settlement_date,
             date_repr(date),
@@ -585,7 +577,7 @@ impl PyCdsOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        cdso_set!(
+        builder_set!(
             slf,
             underlying_start_date,
             date_repr(date),
@@ -616,7 +608,7 @@ impl PyCdsOptionBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let parsed = enum_from_str(value, "protection_start_convention")?;
-        cdso_set!(
+        builder_set!(
             slf,
             protection_start_convention,
             format!("{value:?}"),
@@ -637,7 +629,7 @@ impl PyCdsOptionBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn knockout<'py>(mut slf: PyRefMut<'py, Self>, value: bool) -> PyResult<PyRefMut<'py, Self>> {
-        cdso_set!(
+        builder_set!(
             slf,
             knockout,
             bool_repr(value).to_string(),
@@ -661,7 +653,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cdso_set!(
+        builder_set!(
             slf,
             recovery_rate,
             float_repr(value),
@@ -685,7 +677,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cdso_set!(
+        builder_set!(
             slf,
             discount_curve_id,
             format!("{value:?}"),
@@ -709,7 +701,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cdso_set!(
+        builder_set!(
             slf,
             credit_curve_id,
             format!("{value:?}"),
@@ -733,7 +725,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cdso_set!(
+        builder_set!(
             slf,
             vol_surface_id,
             format!("{value:?}"),
@@ -763,7 +755,7 @@ impl PyCdsOptionBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let convention = cds_convention_from_str(value)?;
-        cdso_set!(
+        builder_set!(
             slf,
             underlying_convention,
             format!("{value:?}"),
@@ -788,7 +780,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: bool,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cdso_set!(
+        builder_set!(
             slf,
             underlying_is_index,
             bool_repr(value).to_string(),
@@ -813,7 +805,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cdso_set!(
+        builder_set!(
             slf,
             index_factor,
             float_repr(value),
@@ -838,7 +830,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cdso_set!(
+        builder_set!(
             slf,
             strike_index_factor,
             float_repr(value),
@@ -863,7 +855,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        cdso_set!(
+        builder_set!(
             slf,
             realized_loss,
             float_repr(value),
@@ -895,7 +887,7 @@ impl PyCdsOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let coupon = decimal_arg(value)?;
-        cdso_set!(
+        builder_set!(
             slf,
             coupon_bp,
             coupon.to_string(),
@@ -930,7 +922,7 @@ impl PyCdsOptionBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        cdso_set!(slf, attributes, shown, |b: CdsOptionBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: CdsOptionBuilderInner| b
             .attributes(attrs))
     }
 

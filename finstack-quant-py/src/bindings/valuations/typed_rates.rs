@@ -13,25 +13,23 @@ use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::core::types::PyAttributes;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
-use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::InstrumentJson;
 
 use super::convert::{
-    attributes_from_py, attributes_to_py, enum_to_py_string, money_from_py, money_to_py,
-    rate_decimal_from_py,
+    attributes_from_py, enum_to_py_string, money_from_py, money_to_py, rate_decimal_from_py,
 };
 use super::typed_legs::{PyFixedLegSpec, PyFloatLegSpec};
-use super::PyValuationResult;
 use crate::bindings::valuations::convert::{builder_repr, money_repr};
 use crate::bindings::valuations::instruments::{
-    decimal_from_f64, enum_from_str, instrument_default_model, instrument_expiry,
-    instrument_market_dependencies, metric_typed, opt_serde_to_py, parse_typed_instrument_json,
-    price_typed, serialize_typed_instrument_json, spec_from_py, stub_kind_from_py,
+    decimal_from_f64, enum_from_str, instrument_expiry, opt_serde_to_py,
+    serialize_typed_instrument_json, spec_from_py, stub_kind_from_py,
+};
+use crate::bindings::valuations::typed_macros::{
+    builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
 
 type IrsBuilder = finstack_quant_valuations::instruments::rates::irs::InterestRateSwapBuilder;
@@ -76,30 +74,17 @@ impl PyInterestRateSwap {
     }
 }
 
+instrument_envelope_methods!(
+    PyInterestRateSwap,
+    InterestRateSwap,
+    "interest_rate_swap",
+    PyInterestRateSwapBuilder,
+    finstack_quant_valuations::instruments::InterestRateSwap::builder()
+);
+instrument_pricing_methods!(PyInterestRateSwap);
+
 #[pymethods]
 impl PyInterestRateSwap {
-    /// Create a fluent builder (mirrors Rust ``InterestRateSwap::builder()``).
-    ///
-    /// Returns
-    /// -------
-    /// InterestRateSwapBuilder
-    ///     A builder with fluent, consuming setter methods.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import InterestRateSwap
-    /// >>> builder = InterestRateSwap.builder()
-    /// >>> builder.id("EXAMPLE") is builder
-    /// True
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn builder() -> PyInterestRateSwapBuilder {
-        PyInterestRateSwapBuilder {
-            inner: Some(finstack_quant_valuations::instruments::InterestRateSwap::builder()),
-            fields: Vec::new(),
-        }
-    }
-
     /// Create a vanilla swap from registered rate-index conventions.
     ///
     /// Mirrors Rust ``InterestRateSwap::from_conventions`` (QuantLib
@@ -217,183 +202,6 @@ impl PyInterestRateSwap {
             .map_err(core_to_py)
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a validated swap from its canonical v1 envelope.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     A ``finstack_quant.instrument/1`` envelope containing an exact
-    ///     ``"interest_rate_swap"`` payload. The UTF-8 input must not exceed
-    ///     16 MiB. Bare payloads and cross-type coercion are rejected.
-    ///
-    /// Returns
-    /// -------
-    /// InterestRateSwap
-    ///     The validated swap represented by the exact ``"interest_rate_swap"`` payload.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the input exceeds 16 MiB, is malformed, has an unsupported
-    ///     envelope schema, carries another type, or fails swap validation.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import InterestRateSwap
-    /// >>> try:
-    /// ...     InterestRateSwap.from_json("{}")
-    /// ... except ValueError as exc:
-    /// ...     print("schema" in str(exc))
-    /// True
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        parse_typed_instrument_json(json).map(|inner| Self { inner })
-    }
-
-    /// Serialize to a canonical ``finstack_quant.instrument/1`` envelope.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     Canonical instrument envelope accepted by ``price_instrument`` and
-    ///     ``InterestRateSwap.from_json``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        self.envelope_json()
-    }
-
-    /// Serde form of the swap spec as a Python ``dict``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner)
-    }
-
-    /// Price the swap and return a ``ValuationResult``.
-    ///
-    /// Same pipeline and keyword surface as ``price_instrument``.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market context object or JSON string.
-    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation date.
-    /// model : str, default "default"
-    ///     Model key.
-    /// metrics : list[str], optional
-    ///     Metric identifiers to compute (e.g. ``["dv01", "par_rate"]``).
-    /// metric_pricing_overrides : MetricPricingOverrides | dict | str, optional
-    ///     Metric-time overrides merged into
-    ///     ``instrument.spec.metric_pricing_overrides`` before pricing.
-    /// market_history : MarketHistory | dict | str, optional
-    ///     ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
-    ///
-    /// Returns
-    /// -------
-    /// ValuationResult
-    ///     Typed valuation envelope.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input cannot be interpreted, the swap fails validation, or a
-    ///     seasoned floating period needs a fixing that is absent (the message
-    ///     names the ``FIXING:<index>`` series to insert).
-    /// KeyError
-    ///     If a required curve or metric is missing.
-    /// RuntimeError
-    ///     If pricing or a metric computation fails.
-    #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
-    #[pyo3(
-        text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn price(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        model: &str,
-        metrics: Option<Vec<String>>,
-        metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
-        market_history: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyValuationResult> {
-        price_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            model,
-            metrics,
-            metric_pricing_overrides,
-            market_history,
-        )
-    }
-
-    /// Compute one scalar metric (e.g. ``"dv01"``, ``"par_rate"``).
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market context object or JSON string.
-    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation date.
-    /// metric_id : str
-    ///     Registered metric identifier.
-    /// model : str, default "default"
-    ///     Model key.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     The metric value.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``metric_id`` is unknown or an input cannot be interpreted.
-    /// KeyError
-    ///     If a required curve is missing.
-    /// RuntimeError
-    ///     If the metric computation fails.
-    #[pyo3(signature = (market, as_of, metric_id, model="default"))]
-    #[pyo3(text_signature = "($self, market, as_of, metric_id, model='default')")]
-    fn metric(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        metric_id: &str,
-        model: &str,
-    ) -> PyResult<f64> {
-        metric_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            metric_id,
-            model,
-        )
-    }
-
-    /// Instrument identifier.
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.id.to_string()
-    }
-
     /// Notional shared by both legs.
     #[getter]
     fn notional(&self) -> PyMoney {
@@ -436,38 +244,10 @@ impl PyInterestRateSwap {
         opt_serde_to_py(py, self.inner.margin_spec.as_ref())
     }
 
-    /// Instrument attributes (tags and metadata).
-    #[getter]
-    fn attributes(&self) -> PyAttributes {
-        attributes_to_py(&self.inner.attributes)
-    }
-
-    /// Canonical model key used when ``model="default"``.
-    #[getter]
-    fn default_model(&self) -> String {
-        instrument_default_model(&self.inner)
-    }
-
     /// Expiry date exposed by the ``Instrument`` trait, or ``None``.
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
-    }
-
-    /// Market-data dependencies (discount/forward curves, fixings) as a dict.
-    ///
-    /// Returns
-    /// -------
-    /// dict
-    ///     Serde form of the Rust ``MarketDependencies``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the instrument cannot enumerate its dependencies.
-    #[pyo3(text_signature = "($self)")]
-    fn market_dependencies<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        instrument_market_dependencies(py, &self.inner)
     }
 
     /// Return ``repr(self)``.
@@ -521,10 +301,8 @@ impl PyInterestRateSwapBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.id(InstrumentId::new(value.to_string())));
-        slf.fields.push(("id", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(slf, id, format!("{value:?}"), |b: IrsBuilder| b
+            .id(InstrumentId::new(value.to_string())))
     }
 
     /// Set the notional (both legs).
@@ -553,10 +331,8 @@ impl PyInterestRateSwapBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "notional")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.notional(money));
-        slf.fields.push(("notional", money_repr(money)));
-        Ok(slf)
+        builder_set!(slf, notional, money_repr(money), |b: IrsBuilder| b
+            .notional(money))
     }
 
     /// Set the swap direction: ``"pay"`` or ``"receive"`` (fixed leg).
@@ -579,10 +355,8 @@ impl PyInterestRateSwapBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side = enum_from_str(value, "side")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.side(side));
-        slf.fields.push(("side", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(slf, side, format!("{value:?}"), |b: IrsBuilder| b
+            .side(side))
     }
 
     /// Set the fixed leg specification.
@@ -601,10 +375,8 @@ impl PyInterestRateSwapBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyFixedLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.fixed_leg(value.inner.clone()));
-        slf.fields.push(("fixed_leg", value.__repr__()));
-        Ok(slf)
+        builder_set!(slf, fixed_leg, value.__repr__(), |b: IrsBuilder| b
+            .fixed_leg(value.inner.clone()))
     }
 
     /// Set the floating leg specification.
@@ -623,10 +395,8 @@ impl PyInterestRateSwapBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyFloatLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.float_leg(value.inner.clone()));
-        slf.fields.push(("float_leg", value.__repr__()));
-        Ok(slf)
+        builder_set!(slf, float_leg, value.__repr__(), |b: IrsBuilder| b
+            .float_leg(value.inner.clone()))
     }
 
     /// Select adjustment of fixed coupon accrual dates independently of payment dates.
@@ -638,11 +408,12 @@ impl PyInterestRateSwapBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: bool,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.adjust_fixed_accrual_dates(value));
-        slf.fields
-            .push(("adjust_fixed_accrual_dates", value.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            adjust_fixed_accrual_dates,
+            value.to_string(),
+            |b: IrsBuilder| b.adjust_fixed_accrual_dates(value)
+        )
     }
 
     /// Select adjustment of floating coupon accrual dates independently of payment dates.
@@ -654,11 +425,12 @@ impl PyInterestRateSwapBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: bool,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.adjust_float_accrual_dates(value));
-        slf.fields
-            .push(("adjust_float_accrual_dates", value.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            adjust_float_accrual_dates,
+            value.to_string(),
+            |b: IrsBuilder| b.adjust_float_accrual_dates(value)
+        )
     }
 
     /// Set the OTC margin (CSA / initial-margin) specification.
@@ -684,10 +456,8 @@ impl PyInterestRateSwapBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: OtcMarginSpec = spec_from_py(py, value, "margin_spec")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.margin_spec(spec));
-        slf.fields.push(("margin_spec", "{...}".to_string()));
-        Ok(slf)
+        builder_set!(slf, margin_spec, "{...}".to_string(), |b: IrsBuilder| b
+            .margin_spec(spec))
     }
 
     /// Set instrument attributes (tags and metadata).
@@ -716,11 +486,12 @@ impl PyInterestRateSwapBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.attributes(attrs));
-        slf.fields
-            .push(("attributes", "Attributes(...)".to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            attributes,
+            "Attributes(...)".to_string(),
+            |b: IrsBuilder| b.attributes(attrs)
+        )
     }
 
     /// Build the validated swap.
@@ -778,30 +549,23 @@ impl PySwaption {
     }
 }
 
+instrument_envelope_methods!(
+    PySwaption,
+    Swaption,
+    "swaption",
+    PySwaptionBuilder,
+    finstack_quant_valuations::instruments::Swaption::builder()
+);
+instrument_pricing_methods!(
+    PySwaption,
+    model_doc = [
+        "     Explicit keys include ``\"black76\"``, ``\"normal\"`` and",
+        "     ``\"hull_white_1f\"``.",
+    ]
+);
+
 #[pymethods]
 impl PySwaption {
-    /// Create a fluent builder (mirrors Rust ``Swaption::builder()``).
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     A builder with fluent, consuming setter methods.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import Swaption
-    /// >>> builder = Swaption.builder()
-    /// >>> builder.id("EXAMPLE") is builder
-    /// True
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn builder() -> PySwaptionBuilder {
-        PySwaptionBuilder {
-            inner: Some(finstack_quant_valuations::instruments::Swaption::builder()),
-            fields: Vec::new(),
-        }
-    }
-
     /// Canonical European 1Yx5Y USD payer swaption (mirrors Rust ``Swaption::example``).
     ///
     /// Returns
@@ -827,175 +591,6 @@ impl PySwaption {
             inner: finstack_quant_valuations::instruments::Swaption::example()
                 .map_err(core_to_py)?,
         })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a validated swaption from its canonical v1 envelope.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     A ``finstack_quant.instrument/1`` envelope containing an exact
-    ///     ``"swaption"`` payload. The UTF-8 input must not exceed 16 MiB.
-    ///     Bare payloads and cross-type coercion are rejected.
-    ///
-    /// Returns
-    /// -------
-    /// Swaption
-    ///     The validated swaption represented by the exact ``"swaption"`` payload.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the input exceeds 16 MiB, is malformed, has an unsupported
-    ///     envelope schema, carries another type, or fails swaption validation.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import Swaption
-    /// >>> try:
-    /// ...     Swaption.from_json("{}")
-    /// ... except ValueError as exc:
-    /// ...     print("schema" in str(exc))
-    /// True
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        parse_typed_instrument_json(json).map(|inner| Self { inner })
-    }
-
-    /// Serialize to a canonical ``finstack_quant.instrument/1`` envelope.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     Canonical instrument envelope accepted by ``price_instrument`` and
-    ///     ``Swaption.from_json``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        self.envelope_json()
-    }
-
-    /// Serde form of the swaption spec as a Python ``dict``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner)
-    }
-
-    /// Price the swaption and return a ``ValuationResult``.
-    ///
-    /// Same pipeline and keyword surface as ``price_instrument``.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market context object or JSON string.
-    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation date.
-    /// model : str, default "default"
-    ///     Model key (``"black76"``, ``"normal"``, ``"hull_white_1f"``, …).
-    /// metrics : list[str], optional
-    ///     Metric identifiers to compute.
-    /// metric_pricing_overrides : MetricPricingOverrides | dict | str, optional
-    ///     Metric-time overrides merged into
-    ///     ``instrument.spec.metric_pricing_overrides`` before pricing.
-    /// market_history : MarketHistory | dict | str, optional
-    ///     ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
-    ///
-    /// Returns
-    /// -------
-    /// ValuationResult
-    ///     Typed valuation envelope.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input cannot be interpreted or the swaption fails validation.
-    /// KeyError
-    ///     If a required curve, vol surface or metric is missing.
-    /// RuntimeError
-    ///     If pricing or a metric computation fails.
-    #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
-    #[pyo3(
-        text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn price(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        model: &str,
-        metrics: Option<Vec<String>>,
-        metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
-        market_history: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyValuationResult> {
-        price_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            model,
-            metrics,
-            metric_pricing_overrides,
-            market_history,
-        )
-    }
-
-    /// Compute one scalar metric (e.g. ``"delta"``, ``"vega"``).
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market context object or JSON string.
-    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation date.
-    /// metric_id : str
-    ///     Registered metric identifier.
-    /// model : str, default "default"
-    ///     Model key.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     The metric value.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``metric_id`` is unknown or an input cannot be interpreted.
-    /// KeyError
-    ///     If a required curve or vol surface is missing.
-    /// RuntimeError
-    ///     If the metric computation fails.
-    #[pyo3(signature = (market, as_of, metric_id, model="default"))]
-    #[pyo3(text_signature = "($self, market, as_of, metric_id, model='default')")]
-    fn metric(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        metric_id: &str,
-        model: &str,
-    ) -> PyResult<f64> {
-        metric_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            metric_id,
-            model,
-        )
     }
 
     /// Forward swap rate of the underlying (mirrors Rust ``Swaption::forward_swap_rate``).
@@ -1048,12 +643,6 @@ impl PySwaption {
     #[pyo3(text_signature = "($self)")]
     fn get_underlying_maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.get_underlying_maturity())
-    }
-
-    /// Instrument identifier.
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.id.to_string()
     }
 
     /// Option type: ``"call"`` (payer) or ``"put"`` (receiver).
@@ -1116,34 +705,6 @@ impl PySwaption {
         opt_serde_to_py(py, self.inner.sabr_params.as_ref())
     }
 
-    /// Instrument attributes (tags and metadata).
-    #[getter]
-    fn attributes(&self) -> PyAttributes {
-        attributes_to_py(&self.inner.attributes)
-    }
-
-    /// Canonical model key used when ``model="default"``.
-    #[getter]
-    fn default_model(&self) -> String {
-        instrument_default_model(&self.inner)
-    }
-
-    /// Market-data dependencies (curves, vol surface) as a dict.
-    ///
-    /// Returns
-    /// -------
-    /// dict
-    ///     Serde form of the Rust ``MarketDependencies``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the instrument cannot enumerate its dependencies.
-    #[pyo3(text_signature = "($self)")]
-    fn market_dependencies<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        instrument_market_dependencies(py, &self.inner)
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -1196,10 +757,8 @@ impl PySwaptionBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.id(InstrumentId::new(value.to_string())));
-        slf.fields.push(("id", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(slf, id, format!("{value:?}"), |b: SwaptionBuilderInner| b
+            .id(InstrumentId::new(value.to_string())))
     }
 
     /// Set the option type: ``"call"`` (payer) or ``"put"`` (receiver).
@@ -1224,10 +783,12 @@ impl PySwaptionBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let option_type = enum_from_str(value, "option_type")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.option_type(option_type));
-        slf.fields.push(("option_type", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            option_type,
+            format!("{value:?}"),
+            |b: SwaptionBuilderInner| b.option_type(option_type)
+        )
     }
 
     /// Set the notional amount of the underlying swap.
@@ -1256,10 +817,12 @@ impl PySwaptionBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "notional")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.notional(money));
-        slf.fields.push(("notional", money_repr(money)));
-        Ok(slf)
+        builder_set!(
+            slf,
+            notional,
+            money_repr(money),
+            |b: SwaptionBuilderInner| b.notional(money)
+        )
     }
 
     /// Set the option expiry date.
@@ -1279,10 +842,12 @@ impl PySwaptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let expiry = py_to_date(value)?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.expiry(expiry));
-        slf.fields.push(("expiry", expiry.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            expiry,
+            expiry.to_string(),
+            |b: SwaptionBuilderInner| b.expiry(expiry)
+        )
     }
 
     /// Set the settlement method.
@@ -1304,10 +869,12 @@ impl PySwaptionBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn settlement<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let settlement = enum_from_str(value, "settlement")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.settlement(settlement));
-        slf.fields.push(("settlement", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            settlement,
+            format!("{value:?}"),
+            |b: SwaptionBuilderInner| b.settlement(settlement)
+        )
     }
 
     /// Set the cash settlement annuity method.
@@ -1335,11 +902,12 @@ impl PySwaptionBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let method = enum_from_str(value, "cash_settlement_method")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.cash_settlement_method(method));
-        slf.fields
-            .push(("cash_settlement_method", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            cash_settlement_method,
+            format!("{value:?}"),
+            |b: SwaptionBuilderInner| b.cash_settlement_method(method)
+        )
     }
 
     /// Set the volatility model.
@@ -1361,10 +929,12 @@ impl PySwaptionBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn vol_model<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let vol_model = enum_from_str(value, "vol_model")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.vol_model(vol_model));
-        slf.fields.push(("vol_model", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            vol_model,
+            format!("{value:?}"),
+            |b: SwaptionBuilderInner| b.vol_model(vol_model)
+        )
     }
 
     /// Set the volatility surface identifier.
@@ -1383,10 +953,12 @@ impl PySwaptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.vol_surface_id(CurveId::new(value.to_string())));
-        slf.fields.push(("vol_surface_id", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            vol_surface_id,
+            format!("{value:?}"),
+            |b: SwaptionBuilderInner| b.vol_surface_id(CurveId::new(value.to_string()))
+        )
     }
 
     /// Set the complete fixed leg of the underlying swap.
@@ -1405,10 +977,12 @@ impl PySwaptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyFixedLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.underlying_fixed_leg(value.inner.clone()));
-        slf.fields.push(("underlying_fixed_leg", value.__repr__()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            underlying_fixed_leg,
+            value.__repr__(),
+            |b: SwaptionBuilderInner| b.underlying_fixed_leg(value.inner.clone())
+        )
     }
 
     /// Set the complete floating leg of the underlying swap.
@@ -1427,10 +1001,12 @@ impl PySwaptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyFloatLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.underlying_float_leg(value.inner.clone()));
-        slf.fields.push(("underlying_float_leg", value.__repr__()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            underlying_float_leg,
+            value.__repr__(),
+            |b: SwaptionBuilderInner| b.underlying_float_leg(value.inner.clone())
+        )
     }
 
     /// Set the SABR volatility model parameters.
@@ -1458,10 +1034,12 @@ impl PySwaptionBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let sabr_params: finstack_quant_models::volatility::SabrParameters =
             spec_from_py(py, value, "sabr_params")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.sabr_params(sabr_params));
-        slf.fields.push(("sabr_params", "{...}".to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            sabr_params,
+            "{...}".to_string(),
+            |b: SwaptionBuilderInner| b.sabr_params(sabr_params)
+        )
     }
 
     /// Set instrument attributes (tags and metadata).
@@ -1490,11 +1068,12 @@ impl PySwaptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.attributes(attrs));
-        slf.fields
-            .push(("attributes", "Attributes(...)".to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            attributes,
+            "Attributes(...)".to_string(),
+            |b: SwaptionBuilderInner| b.attributes(attrs)
+        )
     }
 
     /// Build the validated swaption.
@@ -1550,39 +1129,34 @@ impl PyCapFloor {
     }
 }
 
+instrument_envelope_methods!(
+    PyCapFloor,
+    CapFloor,
+    "cap_floor",
+    PyCapFloorBuilder,
+    finstack_quant_valuations::instruments::CapFloor::builder(),
+    builder_doc = [
+        " ",
+        " Notes",
+        " -----",
+        " This factory does not raise; it returns a new instance with the documented defaults.",
+        " Unset ``vol_type`` defaults to ``\"auto\"``: the surface is treated as",
+        " a lognormal quote. Each caplet uses Black-76 when forward and strike",
+        " are positive; otherwise the lognormal vol is converted to an",
+        " equivalent normal vol and priced with Bachelier. A normal-vol",
+        " surface must set ``vol_type`` to ``\"normal\"``.",
+    ]
+);
+instrument_pricing_methods!(
+    PyCapFloor,
+    model_doc = [
+        "     Explicit keys include ``\"black76\"``, ``\"normal\"`` and",
+        "     ``\"hull_white_1f\"``.",
+    ]
+);
+
 #[pymethods]
 impl PyCapFloor {
-    /// Create a fluent builder (mirrors Rust ``CapFloor::builder()``).
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     A builder with fluent, consuming setter methods.
-    ///
-    /// Notes
-    /// -----
-    /// This factory does not raise; it returns a new instance with the documented defaults.
-    /// Unset ``vol_type`` defaults to ``"auto"``: the surface is treated as
-    /// a lognormal quote. Each caplet uses Black-76 when forward and strike
-    /// are positive; otherwise the lognormal vol is converted to an
-    /// equivalent normal vol and priced with Bachelier. A normal-vol
-    /// surface must set ``vol_type`` to ``"normal"``.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import CapFloor
-    /// >>> builder = CapFloor.builder()
-    /// >>> builder.id("EXAMPLE") is builder
-    /// True
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn builder() -> PyCapFloorBuilder {
-        PyCapFloorBuilder {
-            inner: Some(finstack_quant_valuations::instruments::CapFloor::builder()),
-            fields: Vec::new(),
-        }
-    }
-
     /// Canonical 5-year USD 3% cap (mirrors Rust ``CapFloor::example``).
     ///
     /// Returns
@@ -1607,181 +1181,6 @@ impl PyCapFloor {
         finstack_quant_valuations::instruments::CapFloor::example()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a validated cap/floor from its canonical v1 envelope.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     A ``finstack_quant.instrument/1`` envelope containing an exact
-    ///     ``"cap_floor"`` payload. The UTF-8 input must not exceed 16 MiB.
-    ///     Bare payloads and cross-type coercion are rejected.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloor
-    ///     The validated cap/floor represented by the exact ``"cap_floor"`` payload.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the input exceeds 16 MiB, is malformed, has an unsupported
-    ///     envelope schema, carries another type, or fails cap/floor validation.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import CapFloor
-    /// >>> try:
-    /// ...     CapFloor.from_json("{}")
-    /// ... except ValueError as exc:
-    /// ...     print("schema" in str(exc))
-    /// True
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        parse_typed_instrument_json(json).map(|inner| Self { inner })
-    }
-
-    /// Serialize to a canonical ``finstack_quant.instrument/1`` envelope.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     Canonical instrument envelope accepted by ``price_instrument`` and
-    ///     ``CapFloor.from_json``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        self.envelope_json()
-    }
-
-    /// Serde form of the cap/floor spec as a Python ``dict``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner)
-    }
-
-    /// Price the cap/floor and return a ``ValuationResult``.
-    ///
-    /// Same pipeline and keyword surface as ``price_instrument``.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market context object or JSON string.
-    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation date.
-    /// model : str, default "default"
-    ///     Model key (``"black76"``, ``"normal"``, ``"hull_white_1f"``, …).
-    /// metrics : list[str], optional
-    ///     Metric identifiers to compute.
-    /// metric_pricing_overrides : MetricPricingOverrides | dict | str, optional
-    ///     Metric-time overrides merged into
-    ///     ``instrument.spec.metric_pricing_overrides`` before pricing.
-    /// market_history : MarketHistory | dict | str, optional
-    ///     ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
-    ///
-    /// Returns
-    /// -------
-    /// ValuationResult
-    ///     Typed valuation envelope.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input cannot be interpreted or the instrument fails validation.
-    /// KeyError
-    ///     If a required curve, vol surface or metric is missing.
-    /// RuntimeError
-    ///     If pricing or a metric computation fails.
-    #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
-    #[pyo3(
-        text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn price(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        model: &str,
-        metrics: Option<Vec<String>>,
-        metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
-        market_history: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyValuationResult> {
-        price_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            model,
-            metrics,
-            metric_pricing_overrides,
-            market_history,
-        )
-    }
-
-    /// Compute one scalar metric (e.g. ``"delta"``, ``"vega"``).
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market context object or JSON string.
-    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation date.
-    /// metric_id : str
-    ///     Registered metric identifier.
-    /// model : str, default "default"
-    ///     Model key.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     The metric value.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``metric_id`` is unknown or an input cannot be interpreted.
-    /// KeyError
-    ///     If a required curve or vol surface is missing.
-    /// RuntimeError
-    ///     If the metric computation fails.
-    #[pyo3(signature = (market, as_of, metric_id, model="default"))]
-    #[pyo3(text_signature = "($self, market, as_of, metric_id, model='default')")]
-    fn metric(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        metric_id: &str,
-        model: &str,
-    ) -> PyResult<f64> {
-        metric_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            metric_id,
-            model,
-        )
-    }
-
-    /// Instrument identifier.
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.id.to_string()
     }
 
     /// Option type: ``"cap"``, ``"floor"``, ``"caplet"`` or ``"floorlet"``.
@@ -1907,38 +1306,10 @@ impl PyCapFloor {
             .transpose()
     }
 
-    /// Instrument attributes (tags and metadata).
-    #[getter]
-    fn attributes(&self) -> PyAttributes {
-        attributes_to_py(&self.inner.attributes)
-    }
-
-    /// Canonical model key used when ``model="default"``.
-    #[getter]
-    fn default_model(&self) -> String {
-        instrument_default_model(&self.inner)
-    }
-
     /// Expiry date exposed by the ``Instrument`` trait, or ``None``.
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
-    }
-
-    /// Market-data dependencies (curves, vol surface) as a dict.
-    ///
-    /// Returns
-    /// -------
-    /// dict
-    ///     Serde form of the Rust ``MarketDependencies``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the instrument cannot enumerate its dependencies.
-    #[pyo3(text_signature = "($self)")]
-    fn market_dependencies<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        instrument_market_dependencies(py, &self.inner)
     }
 
     /// Return ``repr(self)``.
@@ -1993,10 +1364,8 @@ impl PyCapFloorBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.id(InstrumentId::new(value.to_string())));
-        slf.fields.push(("id", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(slf, id, format!("{value:?}"), |b: CapFloorBuilderInner| b
+            .id(InstrumentId::new(value.to_string())))
     }
 
     /// Set the option type.
@@ -2023,10 +1392,12 @@ impl PyCapFloorBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let rate_option_type = enum_from_str(value, "rate_option_type")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.rate_option_type(rate_option_type));
-        slf.fields.push(("rate_option_type", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            rate_option_type,
+            format!("{value:?}"),
+            |b: CapFloorBuilderInner| b.rate_option_type(rate_option_type)
+        )
     }
 
     /// Set the notional amount.
@@ -2055,10 +1426,12 @@ impl PyCapFloorBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "notional")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.notional(money));
-        slf.fields.push(("notional", money_repr(money)));
-        Ok(slf)
+        builder_set!(
+            slf,
+            notional,
+            money_repr(money),
+            |b: CapFloorBuilderInner| b.notional(money)
+        )
     }
 
     /// Set the strike.
@@ -2086,10 +1459,12 @@ impl PyCapFloorBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let strike = rate_decimal_from_py(value, "strike")?;
         let strike = decimal_from_f64(strike, "strike")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.strike(strike));
-        slf.fields.push(("strike", strike.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            strike,
+            strike.to_string(),
+            |b: CapFloorBuilderInner| b.strike(strike)
+        )
     }
 
     /// Set the contractual margin added to the referenced rate.
@@ -2118,10 +1493,12 @@ impl PyCapFloorBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spread_bp = crate::bindings::valuations::convert::bps_from_py(value, "spread_bp")?;
         let spread_bp = decimal_from_f64(spread_bp, "spread_bp")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.spread_bp(spread_bp));
-        slf.fields.push(("spread_bp", spread_bp.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            spread_bp,
+            spread_bp.to_string(),
+            |b: CapFloorBuilderInner| b.spread_bp(spread_bp)
+        )
     }
 
     /// Set the dated premium paid by the cap/floor holder.
@@ -2158,13 +1535,12 @@ impl PyCapFloorBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let payment_date = py_to_date(payment_date)?;
         let amount = money_from_py(amount, currency, "amount")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.premium((payment_date, amount)));
-        slf.fields.push((
-            "premium",
+        builder_set!(
+            slf,
+            premium,
             format!("({payment_date}, {})", money_repr(amount)),
-        ));
-        Ok(slf)
+            |b: CapFloorBuilderInner| b.premium((payment_date, amount))
+        )
     }
 
     /// Set the start date of the underlying period.
@@ -2184,10 +1560,12 @@ impl PyCapFloorBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let start_date = py_to_date(value)?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.start_date(start_date));
-        slf.fields.push(("start_date", start_date.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            start_date,
+            start_date.to_string(),
+            |b: CapFloorBuilderInner| b.start_date(start_date)
+        )
     }
 
     /// Set the end date of the underlying period.
@@ -2207,10 +1585,12 @@ impl PyCapFloorBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let maturity = py_to_date(value)?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.maturity(maturity));
-        slf.fields.push(("maturity", maturity.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            maturity,
+            maturity.to_string(),
+            |b: CapFloorBuilderInner| b.maturity(maturity)
+        )
     }
 
     /// Set the payment frequency.
@@ -2235,10 +1615,12 @@ impl PyCapFloorBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let tenor = crate::bindings::valuations::convert::tenor_from_py(value, "frequency")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.frequency(tenor));
-        slf.fields.push(("frequency", tenor.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            frequency,
+            tenor.to_string(),
+            |b: CapFloorBuilderInner| b.frequency(tenor)
+        )
     }
 
     /// Set the day count convention.
@@ -2264,10 +1646,12 @@ impl PyCapFloorBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let day_count =
             crate::bindings::valuations::convert::day_count_from_py(value, "day_count")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.day_count(day_count));
-        slf.fields.push(("day_count", day_count.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            day_count,
+            day_count.to_string(),
+            |b: CapFloorBuilderInner| b.day_count(day_count)
+        )
     }
 
     /// Set the stub rule (default ``"short_front"``).
@@ -2292,13 +1676,12 @@ impl PyCapFloorBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let stub = stub_kind_from_py(Some(value), "stub")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.stub(stub));
-        slf.fields.push((
-            "stub",
+        builder_set!(
+            slf,
+            stub,
             format!("{:?}", enum_to_py_string(&stub).unwrap_or_default()),
-        ));
-        Ok(slf)
+            |b: CapFloorBuilderInner| b.stub(stub)
+        )
     }
 
     /// Set the business day convention (default ``"modified_following"``).
@@ -2323,11 +1706,12 @@ impl PyCapFloorBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let convention = super::convert::bdc_from_str(value, "business_day_convention")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.business_day_convention(convention));
-        slf.fields
-            .push(("business_day_convention", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            business_day_convention,
+            format!("{value:?}"),
+            |b: CapFloorBuilderInner| b.business_day_convention(convention)
+        )
     }
 
     /// Set the holiday calendar identifier for schedule and roll conventions.
@@ -2346,10 +1730,12 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.calendar_id(CalendarId::new(value.to_string())));
-        slf.fields.push(("calendar_id", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            calendar_id,
+            format!("{value:?}"),
+            |b: CapFloorBuilderInner| b.calendar_id(CalendarId::new(value.to_string()))
+        )
     }
 
     /// Set the exercise style (default ``"european"``).
@@ -2374,10 +1760,12 @@ impl PyCapFloorBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let style = enum_from_str(value, "exercise_style")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.exercise_style(style));
-        slf.fields.push(("exercise_style", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            exercise_style,
+            format!("{value:?}"),
+            |b: CapFloorBuilderInner| b.exercise_style(style)
+        )
     }
 
     /// Set the settlement type (default ``"cash"``).
@@ -2399,10 +1787,12 @@ impl PyCapFloorBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn settlement<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let settlement = enum_from_str(value, "settlement")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.settlement(settlement));
-        slf.fields.push(("settlement", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            settlement,
+            format!("{value:?}"),
+            |b: CapFloorBuilderInner| b.settlement(settlement)
+        )
     }
 
     /// Set the discount curve identifier.
@@ -2421,10 +1811,12 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.discount_curve_id(CurveId::new(value.to_string())));
-        slf.fields.push(("discount_curve_id", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            discount_curve_id,
+            format!("{value:?}"),
+            |b: CapFloorBuilderInner| b.discount_curve_id(CurveId::new(value.to_string()))
+        )
     }
 
     /// Set the forward curve identifier.
@@ -2443,10 +1835,12 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.forward_curve_id(CurveId::new(value.to_string())));
-        slf.fields.push(("forward_curve_id", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            forward_curve_id,
+            format!("{value:?}"),
+            |b: CapFloorBuilderInner| b.forward_curve_id(CurveId::new(value.to_string()))
+        )
     }
 
     /// Set the volatility surface identifier.
@@ -2465,10 +1859,12 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.vol_surface_id(CurveId::new(value.to_string())));
-        slf.fields.push(("vol_surface_id", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            vol_surface_id,
+            format!("{value:?}"),
+            |b: CapFloorBuilderInner| b.vol_surface_id(CurveId::new(value.to_string()))
+        )
     }
 
     /// Set the volatility type convention.
@@ -2495,10 +1891,12 @@ impl PyCapFloorBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn vol_type<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let vol_type = enum_from_str(value, "vol_type")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.vol_type(vol_type));
-        slf.fields.push(("vol_type", format!("{value:?}")));
-        Ok(slf)
+        builder_set!(
+            slf,
+            vol_type,
+            format!("{value:?}"),
+            |b: CapFloorBuilderInner| b.vol_type(vol_type)
+        )
     }
 
     /// Set the displacement shift used for shifted-lognormal pricing.
@@ -2514,10 +1912,12 @@ impl PyCapFloorBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn vol_shift<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.vol_shift(value));
-        slf.fields.push(("vol_shift", value.to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            vol_shift,
+            value.to_string(),
+            |b: CapFloorBuilderInner| b.vol_shift(value)
+        )
     }
 
     /// Set the overnight (RFR) coupon convention for compounded caplets.
@@ -2546,10 +1946,12 @@ impl PyCapFloorBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let convention: finstack_quant_valuations::instruments::rates::cap_floor::OvernightCouponConvention =
             spec_from_py(py, value, "overnight_coupon")?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.overnight_coupon(convention));
-        slf.fields.push(("overnight_coupon", "{...}".to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            overnight_coupon,
+            "{...}".to_string(),
+            |b: CapFloorBuilderInner| b.overnight_coupon(convention)
+        )
     }
 
     /// Set instrument attributes (tags and metadata).
@@ -2578,11 +1980,12 @@ impl PyCapFloorBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
-        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-        slf.inner = Some(b.attributes(attrs));
-        slf.fields
-            .push(("attributes", "Attributes(...)".to_string()));
-        Ok(slf)
+        builder_set!(
+            slf,
+            attributes,
+            "Attributes(...)".to_string(),
+            |b: CapFloorBuilderInner| b.attributes(attrs)
+        )
     }
 
     /// Build the validated cap/floor.

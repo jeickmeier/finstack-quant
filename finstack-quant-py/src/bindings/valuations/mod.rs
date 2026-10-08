@@ -15,6 +15,7 @@ pub(crate) mod typed_credit;
 pub(crate) mod typed_equity;
 pub(crate) mod typed_fx;
 mod typed_legs;
+pub(crate) mod typed_macros;
 pub(crate) mod typed_rates;
 pub(crate) mod typed_revolving_credit;
 mod var;
