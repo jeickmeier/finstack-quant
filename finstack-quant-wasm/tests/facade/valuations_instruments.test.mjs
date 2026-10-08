@@ -411,15 +411,9 @@ test('calculateVar matches the hvar metric and aggregates positions', () => {
   assert.ok(Math.abs(doubled.var - 2 * single99.var) < 1e-6);
   assert.throws(
     () =>
-      valuations.instruments.calculateVar(
-        [long],
-        FLAT_MARKET,
-        RATE_HISTORY,
-        '2024-01-15',
-        {
-          confidence_level: 1.5,
-        }
-      ),
+      valuations.instruments.calculateVar([long], FLAT_MARKET, RATE_HISTORY, '2024-01-15', {
+        confidence_level: 1.5,
+      }),
     (error) => error.name === 'FinstackError' && error.kind === 'validation'
   );
 });

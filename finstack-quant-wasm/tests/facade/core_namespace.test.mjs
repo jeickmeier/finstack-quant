@@ -28,7 +28,7 @@ if (!existsSync(WASM_BG)) {
 
 const facade = await import('../../index.js');
 const init = facade.default;
-const { core, valuations } = facade;
+const { core } = facade;
 
 await init({ module_or_path: readFileSync(WASM_BG) });
 
