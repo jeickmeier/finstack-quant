@@ -4,7 +4,7 @@
 //! ```text
 //! PdeProblem1D (coefficients + boundary conditions + domain)
 //!   → TridiagOperator (discretizes PDE on a Grid1D)
-//!     → TimeStepper (theta scheme: explicit/implicit/CN/Rannacher)
+//!     → ThetaStepper (theta scheme: explicit/implicit/CN/Rannacher)
 //!       → PenaltyExercise (American/Bermudan constraint)
 //!         → PdeSolution (values + interpolation + Greeks)
 //! ```
@@ -70,15 +70,13 @@ mod stepper;
 
 pub use adi::CraigSneydStepper;
 pub use boundary::BoundaryCondition;
-pub use bridge::BlackScholesPde;
+pub use bridge::{BlackScholesPde, LocalVolPde};
 pub use bridge2d::HestonPde;
-pub use exercise::{ExerciseError, ExerciseType, PenaltyExercise};
+pub use exercise::ExerciseError;
 pub use grid::{Grid1D, PdeGridError};
 pub use grid2d::Grid2D;
-pub use operator::TridiagOperator;
-pub use operator2d::{apply_cross_derivative, Operators2D};
 pub use problem::PdeProblem1D;
 pub use problem2d::PdeProblem2D;
 pub use solver::{PdeSolution, PdeSolverError, Solver1D, Solver1DBuilder};
 pub use solver2d::{PdeSolution2D, PdeSolver2DError, Solver2D};
-pub use stepper::{RannacherStepper, StepperError, ThetaStepper, TimeStepper};
+pub use stepper::{StepperError, ThetaStepper};

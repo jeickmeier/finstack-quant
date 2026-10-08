@@ -36,6 +36,106 @@ const factorRisk = models.factor.risk;
 const { dtsm, hullWhite } = models.rates;
 
 const MERTON = [100.0, 0.25, 80.0, 0.05];
+const PATH_GRID = {
+  time_grid: { type: 'uniform', expiry: 1.0, num_steps: 4 },
+  num_paths: 3,
+  seed: 42,
+};
+const ROUGH_BERGOMI = {
+  type: 'rough_bergomi',
+  r: 0.03,
+  q: 0.01,
+  hurst: { h: 0.1 },
+  eta: 1.2,
+  rho: -0.7,
+  xi: { interpolation: 'linear', times: [0.0, 1.0], values: [0.04, 0.05] },
+};
+// One `PathSimulationSpec` per process family; the same objects are in
+// `test_models_wasm_parity.py`, and each case compares the whole `PathSummary`.
+const PATH_SPECS = {
+  gbm: {
+    process: { type: 'gbm', r: 0.05, q: 0.0, sigma: 0.2 },
+    initial_state: [100.0],
+    ...PATH_GRID,
+  },
+  local_vol: {
+    process: {
+      type: 'local_vol',
+      r: 0.04,
+      q: 0.01,
+      surface: {
+        expiries: [0.25, 1.0],
+        strikes: [80.0, 100.0, 120.0],
+        local_vols: [0.3, 0.22, 0.18, 0.26, 0.2, 0.17],
+      },
+    },
+    initial_state: [100.0],
+    ...PATH_GRID,
+  },
+  heston: {
+    process: {
+      type: 'heston',
+      r: 0.04,
+      q: 0.01,
+      kappa: 2.0,
+      theta: 0.05,
+      sigma_v: 0.3,
+      rho: -0.7,
+      v0: 0.03,
+    },
+    initial_state: [100.0, 0.03],
+    antithetic: true,
+    ...PATH_GRID,
+  },
+  hull_white_1f: {
+    process: {
+      type: 'hull_white_1f',
+      kappa: 0.8,
+      volatility: { times: [0.0], values: [0.01] },
+      theta_curve: [0.05],
+      theta_times: [0.0],
+    },
+    initial_state: [0.02],
+    ...PATH_GRID,
+  },
+  multi_gbm: {
+    process: {
+      type: 'multi_gbm',
+      assets: [
+        { r: 0.04, q: 0.01, sigma: 0.25 },
+        { r: 0.04, q: 0.03, sigma: 0.15 },
+      ],
+      correlation: [1.0, 0.6, 0.6, 1.0],
+    },
+    scheme: 'milstein',
+    initial_state: [100.0, 50.0],
+    ...PATH_GRID,
+  },
+  cir_plus_plus: {
+    process: {
+      type: 'cir_plus_plus',
+      params: { kappa: 0.5, theta: 0.04, sigma: 0.1 },
+      shift_curve: [0.01, 0.02],
+      shift_times: [0.0, 0.5],
+    },
+    initial_state: [0.04],
+    time_grid: { type: 'times', times: [0.0, 0.25, 0.5, 1.0] },
+    num_paths: 3,
+    seed: 42,
+  },
+  rough_bergomi: {
+    process: ROUGH_BERGOMI,
+    initial_state: [100.0],
+    antithetic: true,
+    ...PATH_GRID,
+  },
+  rough_bergomi_cholesky: {
+    process: ROUGH_BERGOMI,
+    initial_state: [100.0],
+    fbm: { type: 'cholesky' },
+    ...PATH_GRID,
+  },
+};
 const GBM = [100.0, 100.0, 0.05, 0.0, 0.2, 1.0];
 const STATE = {
   hazard_rate: 0.05,
@@ -131,6 +231,18 @@ const VOLS = [
   [0.27, 0.235, 0.21, 0.215, 0.23],
 ];
 const SVI = { a: 0.04, b: 0.4, rho: -0.4, m: 0.0, sigma: 0.2 };
+// Implied skew, flat in expiry by cash strike, and one forward per expiry.
+const LV_SMILE = [0.24, 0.22, 0.2, 0.19, 0.185];
+const LV_IMPLIED = {
+  id: 'SKEW',
+  expiries: [0.25, 0.5, 1.0, 2.0],
+  strikes: STRIKES,
+  vols_row_major: [...LV_SMILE, ...LV_SMILE, ...LV_SMILE, ...LV_SMILE],
+  secondary_axis: 'strike',
+  interpolation_mode: 'vol',
+  quote_type: 'black_lognormal',
+};
+const LV_FORWARDS = [100.5, 101.0, 102.0, 104.0];
 const CAP_PERIODS = [
   [0.25, 0.5, 0.25],
   [0.5, 0.75, 0.25],
@@ -144,6 +256,21 @@ const generator = () => new credit.GeneratorMatrix(scale(), GENERATOR);
 const masterScale = () => new credit.MasterScale(GRADES);
 const panel = () => new dtsm.YieldPanel(TENORS, YIELDS);
 const money = (estimate) => [Number(estimate.mean.amount), estimate.stderr];
+/**
+ * Parse every `Money` wire amount (a decimal string) into a number. The two
+ * hosts link different `exp`/`ln` implementations, so simulated amounts can
+ * differ in the last digit; as numbers they get the shared tolerance.
+ */
+const numericAmounts = (value) => {
+  if (Array.isArray(value)) return value.map(numericAmounts);
+  if (value === null || typeof value !== 'object') return value;
+  const keys = Object.keys(value).sort();
+  if (keys.length === 2 && keys[0] === 'amount' && keys[1] === 'currency')
+    return { amount: Number(value.amount), currency: value.currency };
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, numericAmounts(item)])
+  );
+};
 const json = (handle) => JSON.parse(handle.toJson());
 const cube = () =>
   new core.VolCube(
@@ -175,7 +302,7 @@ const CASES = {
     merton().debtSpread(5.0),
     merton().cdsParSpread(5.0, 0.4),
   ],
-  'merton.implied_equity': () => list(merton().tryImpliedEquity(1.0)),
+  'merton.implied_equity': () => list(merton().impliedEquity(1.0)),
   'merton.kmv_default_point': () => credit.MertonModel.kmvDefaultPoint(40.0, 60.0),
   'merton.hazard_curve_sp': () =>
     merton().toHazardCurve('ACME', '2025-01-15', [1.0, 3.0, 5.0], 0.4, 'act_365f').sp(5.0),
@@ -224,10 +351,10 @@ const CASES = {
     credit.EndogenousHazardSpec.powerLaw(0.1, 1.5, 2.5).hazardAfterPikAccrual(120.0, 80.0),
   ],
   'toggle.should_pik': () => [
-    credit.ToggleExerciseModel.threshold('leverage', 0.7, 'above').shouldPikWithUniform(STATE, 0.5),
-    credit.ToggleExerciseModel.stochastic('leverage', -2.0, 4.0).shouldPikWithUniform(STATE, 0.5),
-    credit.ToggleExerciseModel.stochastic('leverage', -2.0, 4.0).shouldPikWithUniform(STATE, 0.9),
-    credit.ToggleExerciseModel.optimal(100, 0.1, 0.2, 0.03, 1.0).shouldPikWithUniform(STATE, 0.5),
+    credit.ToggleExerciseModel.threshold('leverage', 0.7, 'above').shouldPik(STATE, 0.5),
+    credit.ToggleExerciseModel.stochastic('leverage', -2.0, 4.0).shouldPik(STATE, 0.5),
+    credit.ToggleExerciseModel.stochastic('leverage', -2.0, 4.0).shouldPik(STATE, 0.9),
+    credit.ToggleExerciseModel.optimal(100, 0.1, 0.2, 0.03, 1.0).shouldPik(STATE, 0.5),
   ],
   rating_factors: () => [
     credit.moodysWarfFactor('B2'),
@@ -503,6 +630,13 @@ const CASES = {
     const asian = new monteCarlo.PathDependentPricer(2000, 42, false);
     return [money(asian.priceAsianCall(...GBM, 12)), money(asian.priceAsianPut(...GBM, 12))];
   },
+  'monte_carlo.lrm_greeks': () => {
+    const asian = new monteCarlo.PathDependentPricer(2000, 42, false);
+    return [
+      numericAmounts(asian.priceWithLrmGreeks(...GBM, true, 12)),
+      numericAmounts(asian.priceWithLrmGreeks(...GBM, false, 12, 'EUR')),
+    ];
+  },
   'monte_carlo.lsmc': () => {
     const lsmc = new monteCarlo.LsmcPricer(2000, 42, false, 20);
     return [
@@ -516,12 +650,14 @@ const CASES = {
   },
   'monte_carlo.finite_diff': () => [
     monteCarlo.finiteDiffDelta(...GBM, true, 2000, 42).mean,
-    monteCarlo.finiteDiffDeltaCrn(...GBM, true, 2000, 42).mean,
     monteCarlo.finiteDiffGamma(...GBM, false, 2000, 42).mean,
-    monteCarlo.finiteDiffGammaCrn(...GBM, false, 2000, 42).mean,
   ],
-  'monte_carlo.simulate_gbm_paths': () =>
-    monteCarlo.simulateGbmPaths(100.0, 0.05, 0.0, 0.2, 1.0, 4, 3, 42).paths,
+  ...Object.fromEntries(
+    Object.entries(PATH_SPECS).map(([name, spec]) => [
+      `monte_carlo.simulate_paths.${name}`,
+      () => monteCarlo.simulatePaths(spec),
+    ])
+  ),
   'monte_carlo.heston_satisfies_feller': () => [
     monteCarlo.hestonSatisfiesFeller(2.0, 0.04, 0.3),
     monteCarlo.hestonSatisfiesFeller(0.5, 0.04, 0.5),
@@ -569,8 +705,8 @@ const CASES = {
       model.phi,
       list(model.mu),
       model.factors.r_squared_avg,
-      dtsm.dieboldLiFitFactors(TENORS, YIELDS).r_squared_avg,
-      dtsm.dieboldLiForecast(TENORS, YIELDS, 2).yields,
+      new dtsm.DieboldLi().extractFactors(panel()).factors.r_squared_avg,
+      model.forecast(2).yields,
     ];
   },
   'dtsm.yield_pca': () => {
@@ -587,6 +723,15 @@ const CASES = {
     ];
   },
 
+  'volatility.local_vol': () => {
+    const localVol = volatility.localVolFromImpliedVol(LV_IMPLIED, LV_FORWARDS);
+    return [
+      localVol,
+      volatility.localVolValue(localVol, 0.75, 95.0),
+      volatility.localVolValue(localVol, 5.0, 60.0),
+      volatility.localVolFromImpliedVolSmoothed(LV_IMPLIED, LV_FORWARDS, 10.0),
+    ];
+  },
   'volatility.svi': () => [
     volatility.sviTotalVariance(SVI, 0.1),
     volatility.sviDurrlemanG(SVI, 0.1),

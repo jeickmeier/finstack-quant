@@ -26,7 +26,7 @@
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
 use serde::{Deserialize, Serialize};
 
-use super::types::{validate_tenors, YieldPanel};
+use super::types::{rows_to_dmatrix, validate_tenors, YieldPanel};
 
 fn validate_components(
     eigenvalues: &[f64],
@@ -225,22 +225,58 @@ impl YieldPca {
     ///
     /// * `panel` - Aligned feature panel whose observations are transformed.
     pub fn fit(panel: &YieldPanel) -> finstack_quant_core::Result<Self> {
-        let n = panel.num_tenors();
-        let t = panel.num_dates();
+        Self::fit_changes(panel.yield_changes(), panel.tenors.clone())
+    }
+
+    /// Fit PCA directly from row-major yield changes.
+    ///
+    /// The changes are decomposed as supplied; no level panel is rebuilt.
+    /// Changes alone do not identify the maturities, so [`Self::tenors`]
+    /// reports the 1-based column positions `1..=N` as placeholders, not
+    /// year fractions. Use [`Self::fit`] with a [`YieldPanel`] when the
+    /// tenor grid should be carried on the result.
+    ///
+    /// # Errors
+    /// - Yield-change rows are empty or ragged, or hold a non-finite value
+    /// - Fewer than two yield-change rows or fewer than two tenors are supplied
+    /// - The covariance matrix is degenerate
+    ///
+    /// # Arguments
+    ///
+    /// * `yield_changes` - `yield_changes[date_idx][tenor_idx]` first
+    ///   differences of decimal yields, one row per observation interval and
+    ///   one column per tenor.
+    pub fn fit_yield_changes(yield_changes: Vec<Vec<f64>>) -> finstack_quant_core::Result<Self> {
+        let changes = rows_to_dmatrix(&yield_changes, "yield_changes")?;
+        for (i, row) in yield_changes.iter().enumerate() {
+            if let Some(j) = row.iter().position(|change| !change.is_finite()) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Non-finite yield change at row {i}, col {j}: {}",
+                    row[j]
+                )));
+            }
+        }
+        let tenors = (1..=changes.ncols()).map(|i| i as f64).collect();
+        Self::fit_changes(changes, tenors)
+    }
+
+    /// Eigendecomposition of the sample covariance of `changes` (one row per
+    /// observation interval, one column per entry of `tenors`).
+    fn fit_changes(changes: DMatrix<f64>, tenors: Vec<f64>) -> finstack_quant_core::Result<Self> {
+        let n = changes.ncols();
+        let m = changes.nrows();
 
         if n < 2 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Need at least 2 tenors for PCA, got {n}"
             )));
         }
-        if t < 3 {
+        if m < 2 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "Need at least 3 observations for PCA (to get 2 yield changes), got {t}"
+                "Need at least 3 observations for PCA (to get 2 yield changes), got {}",
+                m + 1
             )));
         }
-
-        let changes = panel.yield_changes();
-        let m = changes.nrows(); // T - 1
 
         let mut mean_change = DVector::zeros(n);
         for j in 0..n {
@@ -326,29 +362,11 @@ impl YieldPca {
             eigenvalues,
             loadings,
             scores,
-            tenors: panel.tenors.clone(),
+            tenors,
             variance_explained,
             cumulative_variance,
             mean_change,
         })
-    }
-
-    /// Fit PCA directly from row-major yield changes.
-    ///
-    /// This is equivalent to reconstructing a pseudo-panel with
-    /// [`YieldPanel::from_yield_changes`] and then calling [`Self::fit`].
-    ///
-    /// # Errors
-    /// - Yield-change rows are empty or ragged
-    /// - Fewer than two yield-change rows or fewer than two tenors are supplied
-    /// - The covariance matrix is degenerate
-    ///
-    /// # Arguments
-    ///
-    /// * `yield_changes` - Yield changes used by the algorithm, subject to the enclosing type invariants and documented units.
-    pub fn fit_yield_changes(yield_changes: Vec<Vec<f64>>) -> finstack_quant_core::Result<Self> {
-        let panel = YieldPanel::from_yield_changes(yield_changes)?;
-        Self::fit(&panel)
     }
 
     /// The leading `n_components` components as plain nested vectors.
@@ -649,6 +667,169 @@ mod tests {
         for i in 1..pca.cumulative_variance().len() {
             assert!(pca.cumulative_variance()[i] >= pca.cumulative_variance()[i - 1] - 1e-15);
         }
+    }
+
+    fn pinned_changes() -> Vec<Vec<f64>> {
+        (0..9)
+            .map(|t| {
+                (0..4)
+                    .map(|j| {
+                        let x = (t as f64 + 1.0) * (j as f64 + 1.0);
+                        0.001 * (x * 0.7).sin() + 0.0004 * (x * 0.31).cos() - 0.0001 * j as f64
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn assert_close(actual: f64, expected: f64) {
+        let scale = expected.abs().max(1e-300);
+        assert!(
+            ((actual - expected) / scale).abs() < 1e-12,
+            "{actual:e} vs pinned {expected:e}"
+        );
+    }
+
+    /// Pins captured when `fit_yield_changes` still integrated the changes
+    /// into a level panel and differenced them again. Fitting the changes
+    /// directly removes that round trip, so results agree to floating-point
+    /// noise (1e-12 relative) rather than bit for bit.
+    #[test]
+    fn fit_yield_changes_reproduces_the_level_round_trip_results() {
+        let pca = YieldPca::fit_yield_changes(pinned_changes()).unwrap();
+
+        let eigenvalues = [
+            1.055981924606919e-6,
+            8.442745805936783e-7,
+            6.267413491204975e-7,
+            4.68981098875056e-7,
+        ];
+        let variance_explained = [
+            0.352466402836503,
+            0.2818025739776959,
+            0.20919417623140554,
+            0.15653684695439554,
+        ];
+        let mean_change = [
+            6.849969446589403e-6,
+            -0.00014822655957679386,
+            -0.00019181831635650952,
+            -0.00034553700826074206,
+        ];
+        let loadings = [
+            vec![
+                0.9206130839661846,
+                0.017510200302497638,
+                0.18063150760068367,
+                0.3457415233632509,
+            ],
+            vec![
+                0.2724105331443984,
+                -0.6229759605048468,
+                0.0692772385215657,
+                -0.729995971418935,
+            ],
+            vec![
+                -0.2796537009744855,
+                -0.5639348207188076,
+                0.6419365983665702,
+                0.4378227143372939,
+            ],
+            vec![
+                0.007606483650721816,
+                -0.5418227233138866,
+                -0.7419503530306366,
+                0.39481635166860607,
+            ],
+        ];
+        let scores = [
+            vec![
+                0.001005625724220893,
+                -0.001722541131161227,
+                0.0006017591155451812,
+                4.0418432536739056e-5,
+            ],
+            vec![
+                0.0016114746058386953,
+                0.000751987435289683,
+                0.00030188762686492724,
+                -0.0007146706845834998,
+            ],
+            vec![
+                0.0008600643497129949,
+                0.0005038425950250538,
+                -0.0005219388114502738,
+                0.0011255885684793325,
+            ],
+            vec![
+                2.7498094595144394e-5,
+                0.0007321621109878491,
+                0.0009688013647787895,
+                0.0007084056035010233,
+            ],
+            vec![
+                2.7839410415840665e-5,
+                -0.00045908956879923474,
+                -0.0016924211767795421,
+                -0.00017701447004363766,
+            ],
+            vec![
+                -0.0008566322148343199,
+                -0.00018852371264143117,
+                0.0005776232139149116,
+                -0.0008819027620784428,
+            ],
+            vec![
+                -0.0015847187344957066,
+                -0.0006593009428068896,
+                0.0002147179248450164,
+                0.0006269882288659027,
+            ],
+            vec![
+                -0.0009047568411239273,
+                0.001298015309211864,
+                -0.00017939241234225605,
+                -0.00032138490497099243,
+            ],
+            vec![
+                -0.00018639439432961447,
+                -0.00025655209510566727,
+                -0.00027103684537675406,
+                -0.00040642801170642486,
+            ],
+        ];
+
+        assert_eq!(pca.tenors(), [1.0, 2.0, 3.0, 4.0]);
+        for (actual, expected) in pca.eigenvalues().iter().zip(eigenvalues) {
+            assert_close(*actual, expected);
+        }
+        for (actual, expected) in pca.variance_explained().iter().zip(variance_explained) {
+            assert_close(*actual, expected);
+        }
+        for (actual, expected) in pca.mean_change().iter().zip(mean_change) {
+            assert_close(*actual, expected);
+        }
+        for (actual_row, expected_row) in matrix_rows(pca.loadings()).iter().zip(&loadings) {
+            for (actual, expected) in actual_row.iter().zip(expected_row) {
+                assert_close(*actual, *expected);
+            }
+        }
+        for (actual_row, expected_row) in matrix_rows(pca.scores()).iter().zip(&scores) {
+            for (actual, expected) in actual_row.iter().zip(expected_row) {
+                assert_close(*actual, *expected);
+            }
+        }
+    }
+
+    #[test]
+    fn fit_yield_changes_rejects_non_finite_and_too_short_input() {
+        let mut changes = pinned_changes();
+        changes[2][1] = f64::NAN;
+        let err = YieldPca::fit_yield_changes(changes).expect_err("NaN change must be rejected");
+        assert!(err.to_string().contains("row 2, col 1"), "{err}");
+        assert!(YieldPca::fit_yield_changes(vec![vec![0.001, 0.002]]).is_err());
+        assert!(YieldPca::fit_yield_changes(vec![vec![0.001], vec![0.002]]).is_err());
+        assert!(YieldPca::fit_yield_changes(Vec::new()).is_err());
     }
 
     #[test]

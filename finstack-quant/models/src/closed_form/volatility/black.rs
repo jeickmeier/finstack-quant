@@ -5,15 +5,9 @@
 //! annuity or unit discount factor; callers multiply by the relevant annuity,
 //! discount factor, notional, or PV01 outside this module.
 //!
-//! Spot Black-Scholes-Merton functions take spot, continuously compounded
-//! risk-free rate, continuous dividend yield, volatility, and expiry. Those
-//! functions include the continuous discount factors in the returned spot price.
-//!
 //! Zero volatility or expiry returns intrinsic value for Black-76 prices and
 //! zero or digital-limit values for Greeks. Invalid inputs return `NaN`; use
-//! the checked price/Greeks entrypoints for validation errors. Spot Black-Scholes
-//! functions return `NaN` when any input is non-finite and otherwise return
-//! intrinsic value at zero expiry or discounted deterministic payoff at zero volatility.
+//! the checked price/Greeks entrypoints for validation errors.
 //!
 //! # References
 //!
@@ -24,8 +18,6 @@
 //! - Hull, J. C., *Options, Futures, and Other Derivatives*. `docs/REFERENCES.md#hull-options-futures`
 //!
 
-use crate::closed_form::vanilla::bs_price;
-use crate::types::OptionType;
 use finstack_quant_core::math::{norm_cdf, norm_pdf};
 
 #[derive(Clone, Copy, Debug)]
@@ -122,112 +114,6 @@ pub fn black_put(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
         Some(state) => strike * norm_cdf(-state.d2) - forward * norm_cdf(-state.d1),
         None => (strike - forward).max(0.0),
     }
-}
-
-/// Black-Scholes-Merton call price on spot with continuous carry.
-///
-/// # Arguments
-///
-/// - `spot`: Current spot price `S`.
-/// - `strike`: Exercise price `K`, expressed in the same currency and price
-///   units as `spot`.
-/// - `rate`: Continuously compounded risk-free rate.
-/// - `dividend_yield`: Continuously compounded dividend or convenience yield.
-/// - `sigma`: Lognormal volatility as an annual decimal.
-/// - `t`: Expiry in years.
-///
-/// # Returns
-///
-/// Returns `S exp(-qT) N(d1) - K exp(-rT) N(d2)`, including continuous discount
-/// factors. Returns `NaN` if any input is non-finite. For finite degenerate
-/// inputs outside the checked Black-Scholes domain, returns `NaN`. At zero
-/// expiry returns spot intrinsic; at zero volatility returns discounted
-/// deterministic payoff using `S exp(-qT)` and `K exp(-rT)`.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_models::closed_form::volatility::{
-///     black_scholes_spot_call,
-///     black_scholes_spot_put,
-/// };
-///
-/// let call = black_scholes_spot_call(100.0, 95.0, 0.04, 0.01, 0.20, 1.0);
-/// let put = black_scholes_spot_put(100.0, 95.0, 0.04, 0.01, 0.20, 1.0);
-/// let parity = 100.0 * (-0.01_f64).exp() - 95.0 * (-0.04_f64).exp();
-/// assert!((call - put - parity).abs() < 1e-10);
-/// ```
-#[must_use]
-pub fn black_scholes_spot_call(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    dividend_yield: f64,
-    sigma: f64,
-    t: f64,
-) -> f64 {
-    black_scholes_spot(
-        spot,
-        strike,
-        rate,
-        dividend_yield,
-        sigma,
-        t,
-        OptionType::Call,
-    )
-}
-
-/// Black-Scholes-Merton put price on spot with continuous carry.
-///
-/// # Arguments
-///
-/// - `spot`: Current spot price `S`.
-/// - `strike`: Exercise price `K`, expressed in the same currency and price
-///   units as `spot`.
-/// - `rate`: Continuously compounded risk-free rate.
-/// - `dividend_yield`: Continuously compounded dividend or convenience yield.
-/// - `sigma`: Lognormal volatility as an annual decimal.
-/// - `t`: Expiry in years.
-///
-/// # Returns
-///
-/// Returns `K exp(-rT) N(-d2) - S exp(-qT) N(-d1)`, including continuous
-/// discount factors. Returns `NaN` if any input is non-finite. For finite
-/// inputs outside the checked Black-Scholes domain, returns `NaN`. At zero
-/// expiry returns spot intrinsic; at zero volatility returns discounted
-/// deterministic payoff using `S exp(-qT)` and `K exp(-rT)`.
-#[must_use]
-pub fn black_scholes_spot_put(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    dividend_yield: f64,
-    sigma: f64,
-    t: f64,
-) -> f64 {
-    black_scholes_spot(
-        spot,
-        strike,
-        rate,
-        dividend_yield,
-        sigma,
-        t,
-        OptionType::Put,
-    )
-}
-
-/// Spot Black-Scholes-Merton price delegated to the canonical checked kernel.
-#[inline]
-fn black_scholes_spot(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    dividend_yield: f64,
-    sigma: f64,
-    t: f64,
-    option_type: OptionType,
-) -> f64 {
-    bs_price(spot, strike, rate, dividend_yield, sigma, t, option_type).unwrap_or(f64::NAN)
 }
 
 /// Black-76 vega with respect to lognormal volatility.
@@ -351,22 +237,4 @@ pub fn black_gamma(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 #[inline]
 pub fn black_shifted_call(forward: f64, strike: f64, sigma: f64, t: f64, shift: f64) -> f64 {
     black_call(forward + shift, strike + shift, sigma, t)
-}
-
-/// Shifted Black put price with unit annuity.
-///
-/// Applies [`black_put`] to `forward + shift` and `strike + shift` on the same
-/// undiscounted unit-annuity scale as the unshifted Black-76 functions.
-///
-/// # Arguments
-///
-/// * `forward` - Unshifted forward rate or price in the option's native units.
-/// * `strike` - Unshifted option strike in the same units as `forward`.
-/// * `sigma` - Annualized lognormal volatility as a decimal, for example `0.20`.
-/// * `t` - Time to expiry in years.
-/// * `shift` - Additive displacement applied to both forward and strike before
-///   Black-76 pricing.
-#[inline]
-pub fn black_shifted_put(forward: f64, strike: f64, sigma: f64, t: f64, shift: f64) -> f64 {
-    black_put(forward + shift, strike + shift, sigma, t)
 }

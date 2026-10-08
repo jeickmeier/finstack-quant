@@ -8,6 +8,7 @@ use super::config::extract_config;
 use super::report::PyCalibrationValidationReport;
 use crate::bindings::date_utils::extract_date_iso;
 use crate::bindings::extract::{extract_basis_points, extract_rate_decimal};
+use crate::bindings::macros::wire_methods;
 use crate::bindings::module_utils::{py_to_json_value, py_to_serde};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::pickle_support::reduce_via_json;
@@ -310,41 +311,12 @@ impl PyRateQuote {
         self.inner.implied_rate()
     }
 
-    /// Serialize to compact JSON (``{"type": ..., "id": ..., ...}``).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize RateQuote"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed, has unknown fields, or fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: RateQuote = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid RateQuote JSON"))?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("RateQuote", &self.inner)
     }
 }
+
+wire_methods!(PyRateQuote, RateQuote, "RateQuote", validate);
 
 /// Single-name CDS quote (par spread or upfront) for hazard-curve calibration.
 ///
@@ -557,41 +529,12 @@ impl PyCdsQuote {
         self.inner.coupon_bp()
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CdsQuote"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed, has unknown fields, or fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: CdsQuote =
-            serde_json::from_str(json).map_err(|e| serde_json_to_py(e, "invalid CdsQuote JSON"))?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("CdsQuote", &self.inner)
     }
 }
+
+wire_methods!(PyCdsQuote, CdsQuote, "CdsQuote", validate);
 
 /// Volatility quote (equity option, swaption, or cap/floor) for surface calibration.
 ///
@@ -798,41 +741,12 @@ impl PyVolQuote {
         self.inner.volatility()
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize VolQuote"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed, has unknown fields, or fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: VolQuote =
-            serde_json::from_str(json).map_err(|e| serde_json_to_py(e, "invalid VolQuote JSON"))?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("VolQuote", &self.inner)
     }
 }
+
+wire_methods!(PyVolQuote, VolQuote, "VolQuote", validate);
 
 /// Convert one market-data entry (typed quote or datum, or dict) into a `MarketDatum`.
 pub(crate) fn extract_market_datum(
@@ -1668,36 +1582,6 @@ impl PyCalibrationStep {
         serde_to_py(py, &self.inner.params)
     }
 
-    /// Serialize the step to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CalibrationStep"))
-    }
-
-    /// Rebuild a step from its wire JSON (``{"id", "quote_set", "kind"}``).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or has unknown fields.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|e| serde_json_to_py(e, "invalid CalibrationStep JSON"))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CalibrationStep(id={:?}, kind={:?}, quote_set={:?})",
@@ -1707,6 +1591,8 @@ impl PyCalibrationStep {
         )
     }
 }
+
+wire_methods!(PyCalibrationStep, CalibrationStep, "CalibrationStep");
 
 /// Ordered calibration plan: steps, named quote sets, and solver settings.
 ///
@@ -1846,40 +1732,6 @@ impl PyCalibrationPlan {
         super::config::PyCalibrationConfig::from_inner(self.inner.settings.clone())
     }
 
-    /// Serialize the plain plan to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CalibrationPlan"))
-    }
-
-    /// Rebuild a plan from the JSON written by ``to_json``.
-    ///
-    /// Only the shape is checked; quote-set ids that are absent from
-    /// ``market_data`` are reported when the plan is calibrated or validated.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed, lacks the schema marker or has unknown
-    ///     fields.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|e| serde_json_to_py(e, "invalid CalibrationPlan JSON"))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CalibrationPlan(id={:?}, steps={:?}, quote_sets={})",
@@ -1889,6 +1741,8 @@ impl PyCalibrationPlan {
         )
     }
 }
+
+wire_methods!(PyCalibrationPlan, CalibrationPlan, "CalibrationPlan");
 
 /// Complete calibration request: plan, flat market data, and prior calibrated objects.
 ///

@@ -1,18 +1,12 @@
 //! Shared serde default helpers for instrument structs.
 
-use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind};
+use finstack_quant_core::dates::DayCount;
 
 use crate::instruments::SettlementType;
 
-/// Default stub convention for optional schedule stub fields.
-pub(crate) fn stub_short_front() -> StubKind {
-    StubKind::ShortFront
-}
-
-/// Default business day convention for optional BDC fields.
-pub(crate) fn bdc_modified_following() -> BusinessDayConvention {
-    BusinessDayConvention::ModifiedFollowing
-}
+pub(crate) use finstack_quant_cashflows::serde_defaults::{
+    bdc_modified_following, stub_short_front,
+};
 
 /// Default day count convention for option instruments (ACT/365F).
 pub(crate) fn day_count_act365f() -> DayCount {
@@ -32,20 +26,7 @@ pub(crate) fn multiplier_one() -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind};
-
-    #[test]
-    fn stub_short_front_matches_short_front_variant() {
-        assert_eq!(stub_short_front(), StubKind::ShortFront);
-    }
-
-    #[test]
-    fn bdc_modified_following_matches_enum() {
-        assert_eq!(
-            bdc_modified_following(),
-            BusinessDayConvention::ModifiedFollowing
-        );
-    }
+    use finstack_quant_core::dates::DayCount;
 
     #[test]
     fn day_count_act365f_matches_enum() {

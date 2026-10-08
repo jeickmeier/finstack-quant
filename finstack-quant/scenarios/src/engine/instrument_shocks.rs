@@ -70,8 +70,8 @@ pub(super) fn apply_correlation_effect(
         };
 
         let (new_corr, clamp_info) = match kind {
-            CorrelationKind::Asset => corr.bump_asset_with_clamp_info(delta_pts),
-            CorrelationKind::PrepayDefault => corr.bump_prepay_default_with_clamp_info(delta_pts),
+            CorrelationKind::Asset => corr.bump_asset(delta_pts),
+            CorrelationKind::PrepayDefault => corr.bump_prepay_default(delta_pts),
         };
 
         if let Some(info) = clamp_info {

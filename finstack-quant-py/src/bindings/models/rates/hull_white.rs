@@ -6,7 +6,8 @@
 //! pricing). Quote preparation and fitting live in `finstack_quant.calibration`.
 
 use crate::bindings::core::market_data::curves::PyDiscountCurve;
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::bindings::macros::wire_methods;
+use crate::errors::core_to_py;
 use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
 use finstack_quant_models::rates::hull_white::{self, HullWhiteCalibrationParams, HullWhiteParams};
 use pyo3::prelude::*;
@@ -133,28 +134,6 @@ impl PyHullWhiteParams {
         hull_white::hw_bond_vol_with_model(&self.inner, t, expiry, maturity).map_err(core_to_py)
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "HullWhiteParams serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed or fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid HullWhiteParams JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "HullWhiteParams(kappa={:?}, times={:?}, values={:?})",
@@ -164,6 +143,8 @@ impl PyHullWhiteParams {
         )
     }
 }
+
+wire_methods!(PyHullWhiteParams, HullWhiteParams, "HullWhiteParams");
 
 /// Low-rate, small-variance Hull-White approximation to the simple-deposit
 /// futures-minus-forward rate bias over ``[t_settle, t_end]``.

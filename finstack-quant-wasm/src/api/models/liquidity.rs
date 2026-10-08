@@ -117,9 +117,8 @@ pub fn lvar_bangia(
     let spread_vol = js_f64(&spread_vol, "spreadVol")?;
     let confidence = js_f64(&confidence, "confidence")?;
     let position_value = js_f64(&position_value, "positionValue")?;
-    let result =
-        liquidity::lvar_bangia_scalar(var, spread_mean, spread_vol, confidence, position_value)
-            .map_err(to_js_err)?;
+    let result = liquidity::lvar_bangia(var, spread_mean, spread_vol, confidence, position_value)
+        .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -155,7 +154,7 @@ pub fn almgren_chriss_impact(
     let permanent_impact_coef = js_f64(&permanent_impact_coef, "permanentImpactCoef")?;
     let temporary_impact_coef = js_f64(&temporary_impact_coef, "temporaryImpactCoef")?;
     let reference_price = js_opt_f64(reference_price.as_ref(), "referencePrice")?;
-    let estimate = liquidity::almgren_chriss_uniform_impact(
+    let estimate = liquidity::almgren_chriss_impact(
         position_size,
         avg_daily_volume,
         volatility,
@@ -194,6 +193,194 @@ pub fn kyle_lambda(
         &volumes,
         reference_price,
     ))
+}
+
+/// Absolute bid-ask spread of a liquidity profile.
+///
+/// Twin of the Rust `LiquidityProfile::spread` and the Python property
+/// `LiquidityProfile.spread`.
+/// @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+/// @returns `ask - bid`, in price units.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const profile = {
+///   instrument_id: "XYZ",
+///   mid: 100,
+///   bid: 99.5,
+///   ask: 100.5,
+///   avg_daily_volume: 1_000_000,
+///   avg_trade_size: 200,
+///   spread_volatility: 0.05,
+///   spread_volatility_kind: "absolute" as const,
+///   observation_days: 20,
+/// };
+/// console.log(models.liquidity.liquidityProfileSpread(profile)); // 1
+/// ```
+///
+/// # Errors
+///
+/// Throws a `TypeError` if `profile` is neither a string nor a plain object,
+/// and a `validation` error if it is malformed or fails the profile's
+/// quote and volume checks.
+#[wasm_bindgen(js_name = liquidityProfileSpread)]
+pub fn liquidity_profile_spread(profile: JsValue) -> Result<f64, JsValue> {
+    let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
+    Ok(profile.spread())
+}
+
+/// Relative bid-ask spread of a liquidity profile, as a fraction of mid.
+///
+/// Twin of the Rust `LiquidityProfile::relative_spread` and the Python
+/// property `LiquidityProfile.relative_spread`.
+/// @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+/// @returns `(ask - bid) / mid`, as a decimal fraction of the mid price.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const profile = {
+///   instrument_id: "XYZ",
+///   mid: 100,
+///   bid: 99.5,
+///   ask: 100.5,
+///   avg_daily_volume: 1_000_000,
+///   avg_trade_size: 200,
+///   spread_volatility: 0.05,
+///   spread_volatility_kind: "absolute" as const,
+///   observation_days: 20,
+/// };
+/// console.log(models.liquidity.liquidityProfileRelativeSpread(profile)); // 0.01
+/// ```
+///
+/// # Errors
+///
+/// Throws a `TypeError` if `profile` is neither a string nor a plain object,
+/// and a `validation` error if it is malformed or fails the profile's
+/// quote and volume checks.
+#[wasm_bindgen(js_name = liquidityProfileRelativeSpread)]
+pub fn liquidity_profile_relative_spread(profile: JsValue) -> Result<f64, JsValue> {
+    let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
+    Ok(profile.relative_spread())
+}
+
+/// Half the absolute bid-ask spread of a liquidity profile: the one-way
+/// transaction cost at mid.
+///
+/// Twin of the Rust `LiquidityProfile::half_spread` and the Python property
+/// `LiquidityProfile.half_spread`.
+/// @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+/// @returns `0.5 * (ask - bid)`, in price units.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const profile = {
+///   instrument_id: "XYZ",
+///   mid: 100,
+///   bid: 99.5,
+///   ask: 100.5,
+///   avg_daily_volume: 1_000_000,
+///   avg_trade_size: 200,
+///   spread_volatility: 0.05,
+///   spread_volatility_kind: "absolute" as const,
+///   observation_days: 20,
+/// };
+/// console.log(models.liquidity.liquidityProfileHalfSpread(profile)); // 0.5
+/// ```
+///
+/// # Errors
+///
+/// Throws a `TypeError` if `profile` is neither a string nor a plain object,
+/// and a `validation` error if it is malformed or fails the profile's
+/// quote and volume checks.
+#[wasm_bindgen(js_name = liquidityProfileHalfSpread)]
+pub fn liquidity_profile_half_spread(profile: JsValue) -> Result<f64, JsValue> {
+    let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
+    Ok(profile.half_spread())
+}
+
+/// Spread volatility of a liquidity profile normalised to relative
+/// (fraction-of-mid) units.
+///
+/// A `"relative"` `spread_volatility_kind` returns the stored value; an
+/// `"absolute"` one divides it by `mid`. Twin of the Rust
+/// `LiquidityProfile::relative_spread_volatility` and the Python property
+/// `LiquidityProfile.relative_spread_volatility`.
+/// @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+/// @returns The spread standard deviation as a decimal fraction of the mid price.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const profile = {
+///   instrument_id: "XYZ",
+///   mid: 100,
+///   bid: 99.5,
+///   ask: 100.5,
+///   avg_daily_volume: 1_000_000,
+///   avg_trade_size: 200,
+///   spread_volatility: 0.05,
+///   spread_volatility_kind: "absolute" as const,
+///   observation_days: 20,
+/// };
+/// console.log(models.liquidity.liquidityProfileRelativeSpreadVolatility(profile)); // 0.0005
+/// ```
+///
+/// # Errors
+///
+/// Throws a `TypeError` if `profile` is neither a string nor a plain object,
+/// and a `validation` error if it is malformed or fails the profile's
+/// quote and volume checks.
+#[wasm_bindgen(js_name = liquidityProfileRelativeSpreadVolatility)]
+pub fn liquidity_profile_relative_spread_volatility(profile: JsValue) -> Result<f64, JsValue> {
+    let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
+    Ok(profile.relative_spread_volatility())
+}
+
+/// Reference price a trade actually uses: its explicit `reference_price`, or
+/// the profile's `mid` when that is `null`.
+///
+/// Twin of the Rust `TradeParams::effective_reference_price` and the Python
+/// property `TradeParams.effective_reference_price`.
+/// @param params - `TradeParams` object or JSON (`quantity`, `horizon_days`, `daily_volatility`, `risk_aversion`, `reference_price`, `profile`).
+/// @returns The reference price in price units.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const profile = {
+///   instrument_id: "XYZ",
+///   mid: 100,
+///   bid: 99.5,
+///   ask: 100.5,
+///   avg_daily_volume: 1_000_000,
+///   avg_trade_size: 200,
+///   spread_volatility: 0.05,
+///   spread_volatility_kind: "absolute" as const,
+///   observation_days: 20,
+/// };
+/// const params = { quantity: 10_000, horizon_days: 2, daily_volatility: 0.02, profile };
+/// console.log(models.liquidity.tradeParamsEffectiveReferencePrice(params)); // 100
+/// console.log(
+///   models.liquidity.tradeParamsEffectiveReferencePrice({ ...params, reference_price: 101 })
+/// ); // 101
+/// ```
+///
+/// # Errors
+///
+/// Throws a `TypeError` if `params` is neither a string nor a plain object,
+/// and a `validation` error if it is malformed.
+#[wasm_bindgen(js_name = tradeParamsEffectiveReferencePrice)]
+pub fn trade_params_effective_reference_price(params: JsValue) -> Result<f64, JsValue> {
+    let params: TradeParams = from_js_json(&params, "params")?;
+    Ok(params.effective_reference_price())
 }
 
 /// Almgren-Chriss market-impact model with linear permanent impact and

@@ -7,6 +7,7 @@ mod pd;
 mod recovery_waterfall;
 mod scoring;
 
+use crate::bindings::macros::wire_methods;
 use std::sync::Arc;
 
 use crate::bindings::core::dates::daycount::extract_day_count;
@@ -16,7 +17,7 @@ use crate::bindings::extract::extract_credit_rating;
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_object_to_single_row_dataframe, serde_to_py, values_to_series,
 };
-use crate::errors::{core_to_py, serde_json_to_py, value_error};
+use crate::errors::{core_to_py, value_error};
 use finstack_quant_models::credit::{
     moodys_warf_factor as rust_moodys_warf_factor, AssetDynamics, CreditState, CreditStateVariable,
     DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel, RatingFactorTable,
@@ -133,32 +134,13 @@ impl PyRatingFactorTable {
         self.inner.default_factor()
     }
 
-    /// Deserialize a rating-factor table from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid RatingFactorTable JSON"))?,
-        })
-    }
-
-    /// Serialize this table to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "RatingFactorTable serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RatingFactorTable", &self.inner)
     }
 }
+
+wire_methods!(PyRatingFactorTable, RatingFactorTable, "RatingFactorTable");
 
 /// Default-barrier monitoring convention for structural credit models.
 ///
@@ -208,34 +190,14 @@ impl PyBarrierType {
         }
     }
 
-    /// Deserialize a barrier type from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid MertonBarrierType JSON"))?,
-        })
-    }
-
-    /// Serialize this barrier type to compact JSON.
-    #[allow(clippy::wrong_self_convention)]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "MertonBarrierType serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs (``MertonBarrierType.terminal()``,
     /// ``MertonBarrierType.first_passage(barrier_growth_rate=0.02)``).
     fn __repr__(&self) -> String {
         variant_repr("MertonBarrierType", &self.inner)
     }
 }
+
+wire_methods!(PyBarrierType, MertonBarrierType, "MertonBarrierType");
 
 /// Asset-return dynamics for structural credit models.
 ///
@@ -305,28 +267,6 @@ impl PyAssetDynamics {
         }
     }
 
-    /// Deserialize asset dynamics from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid AssetDynamics JSON"))?,
-        })
-    }
-
-    /// Serialize these asset dynamics to compact JSON.
-    #[allow(clippy::wrong_self_convention)]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "AssetDynamics serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs
     /// (``AssetDynamics.geometric_brownian()``,
     /// ``AssetDynamics.jump_diffusion(jump_intensity=..., ...)``).
@@ -334,6 +274,8 @@ impl PyAssetDynamics {
         variant_repr("AssetDynamics", &self.inner)
     }
 }
+
+wire_methods!(PyAssetDynamics, AssetDynamics, "AssetDynamics");
 
 /// Merton-family structural credit model (Merton 1974, Black-Cox 1976,
 /// CreditGrades) over firm asset value, volatility, and a debt barrier.
@@ -581,31 +523,6 @@ impl PyMertonModel {
         })
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a structural credit model from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid MertonModel JSON"))?,
-        })
-    }
-
-    /// Serialize this model to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "MertonModel serialization failed"))
-    }
-
     /// Current firm asset value ``V_0``, in the issuer's reporting currency.
     #[getter]
     fn asset_value(&self) -> f64 {
@@ -774,8 +691,8 @@ impl PyMertonModel {
     ///
     /// Raises ``ValueError`` when the firm is economically in default or the
     /// inversion is numerically ill-conditioned.
-    fn try_implied_equity(&self, horizon: f64) -> PyResult<(f64, f64)> {
-        self.inner.try_implied_equity(horizon).map_err(core_to_py)
+    fn implied_equity(&self, horizon: f64) -> PyResult<(f64, f64)> {
+        self.inner.implied_equity(horizon).map_err(core_to_py)
     }
 
     /// Bootstrap a piecewise-constant hazard curve from structural default probabilities.
@@ -816,7 +733,7 @@ impl PyMertonModel {
     /// * `num_steps` - Number of time steps per path (must be >= 1)
     /// * `horizon` - Simulation horizon in years (must be > 0)
     /// * `seed` - Seed for reproducible draws; the Rust
-    ///   ``MertonModel::simulate_paths_seeded`` owns the generator (PCG64), so
+    ///   ``MertonModel::simulate_paths`` owns the generator (PCG64), so
     ///   equal seeds give equal paths in every host
     /// * `antithetic` - When ``True``, use antithetic variates for variance
     ///   reduction (required, as in Rust and WASM)
@@ -831,7 +748,7 @@ impl PyMertonModel {
     ) -> PyResult<PySimulatedPaths> {
         let paths = self
             .inner
-            .simulate_paths_seeded(num_paths, num_steps, horizon, seed, antithetic)
+            .simulate_paths(num_paths, num_steps, horizon, seed, antithetic)
             .map_err(core_to_py)?;
         Ok(PySimulatedPaths::from_inner(paths))
     }
@@ -845,6 +762,8 @@ impl PyMertonModel {
         crate::bindings::repr_support::repr_from_serde("MertonModel", &self.inner)
     }
 }
+
+wire_methods!(PyMertonModel, MertonModel, "MertonModel");
 
 /// Monte Carlo asset-value paths from ``MertonModel.simulate_paths``.
 ///
@@ -870,31 +789,6 @@ impl PySimulatedPaths {
 
 #[pymethods]
 impl PySimulatedPaths {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize simulated paths from their canonical JSON form.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: SimulatedPaths = serde_json::from_str(json)
-            .map_err(|err| serde_json_to_py(err, "invalid SimulatedPaths JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to canonical JSON (``times``, ``asset_values``, ``num_paths``,
-    /// ``num_steps``).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "SimulatedPaths serialization failed"))
-    }
-
     /// Time grid from 0 to the simulation horizon.
     #[getter]
     fn times(&self) -> Vec<f64> {
@@ -981,6 +875,8 @@ impl PySimulatedPaths {
         crate::bindings::repr_support::repr_from_serde("SimulatedPaths", &self.inner)
     }
 }
+
+wire_methods!(PySimulatedPaths, SimulatedPaths, "SimulatedPaths");
 
 /// Notional-dependent recovery curve for PIK-accreting instruments.
 ///
@@ -1117,32 +1013,7 @@ impl PyDynamicRecoverySpec {
     /// ``"floored_inverse"``, ``"linear_decline"``.
     #[getter]
     fn kind(&self) -> PyResult<String> {
-        model_tag(self.inner.model())
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a recovery specification from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid DynamicRecoverySpec JSON"))?,
-        })
-    }
-
-    /// Serialize this specification to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "DynamicRecoverySpec serialization failed"))
+        finstack_quant_core::wire::serde_tag(self.inner.model()).map_err(core_to_py)
     }
 
     /// Recovery rate (decimal) at the given current notional.
@@ -1192,6 +1063,12 @@ impl PyDynamicRecoverySpec {
         crate::bindings::repr_support::repr_from_serde("DynamicRecoverySpec", &self.inner)
     }
 }
+
+wire_methods!(
+    PyDynamicRecoverySpec,
+    DynamicRecoverySpec,
+    "DynamicRecoverySpec"
+);
 
 /// Leverage-dependent hazard-rate feedback for PIK-accreting instruments.
 ///
@@ -1282,32 +1159,7 @@ impl PyEndogenousHazardSpec {
     /// One of ``"power_law"``, ``"exponential"``, ``"tabular"``.
     #[getter]
     fn kind(&self) -> PyResult<String> {
-        model_tag(self.inner.leverage_hazard_map())
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a hazard specification from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid EndogenousHazardSpec JSON"))?,
-        })
-    }
-
-    /// Serialize this specification to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "EndogenousHazardSpec serialization failed"))
+        finstack_quant_core::wire::serde_tag(self.inner.leverage_hazard_map()).map_err(core_to_py)
     }
 
     /// Annualized hazard rate (decimal) at the given leverage ratio.
@@ -1372,9 +1224,15 @@ impl PyEndogenousHazardSpec {
     }
 }
 
+wire_methods!(
+    PyEndogenousHazardSpec,
+    EndogenousHazardSpec,
+    "EndogenousHazardSpec"
+);
+
 /// Snapshot of an obligor's credit state at a PIK toggle decision date.
 ///
-/// Feeds ``ToggleExerciseModel.should_pik_with_uniform``. Hazard rates are
+/// Feeds ``ToggleExerciseModel.should_pik``. Hazard rates are
 /// annualized decimals, leverage is a ratio, and the monetary fields share
 /// the instrument's currency.
 #[pyclass(
@@ -1433,12 +1291,6 @@ impl PyCreditState {
         .map_err(core_to_py)
     }
 
-    /// Serialize this snapshot to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "CreditState serialization failed"))
-    }
-
     /// Annualized instantaneous default intensity at this observation.
     #[getter]
     fn hazard_rate(&self) -> f64 {
@@ -1480,23 +1332,6 @@ impl PyCreditState {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
 
-    /// Deserialize from JSON produced by `to_json`.
-    ///
-    /// Completes the wire round-trip, which is also what makes this type
-    /// picklable (see `__reduce__`).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: CreditState = serde_json::from_str(json)
-            .map_err(|err| serde_json_to_py(err, "invalid CreditState JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -1506,6 +1341,8 @@ impl PyCreditState {
         crate::bindings::repr_support::repr_from_serde("CreditState", &self.inner)
     }
 }
+
+wire_methods!(PyCreditState, CreditState, "CreditState");
 
 /// PIK toggle exercise rule: threshold, stochastic (logistic) or nested
 /// Monte Carlo optimal exercise.
@@ -1595,8 +1432,8 @@ impl PyToggleExerciseModel {
     ///     simulation with a seed derived from ``u``, so equal draws give equal
     ///     decisions.
     #[pyo3(text_signature = "($self, state, u)")]
-    fn should_pik_with_uniform(&self, state: &PyCreditState, u: f64) -> bool {
-        self.inner.should_pik_with_uniform(&state.inner, u)
+    fn should_pik(&self, state: &PyCreditState, u: f64) -> bool {
+        self.inner.should_pik(&state.inner, u)
     }
 
     /// Nested-Monte-Carlo optimal exercise rule.
@@ -1639,31 +1476,6 @@ impl PyToggleExerciseModel {
         .map_err(core_to_py)
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize an exercise rule from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid ToggleExerciseModel JSON"))?,
-        })
-    }
-
-    /// Serialize this rule to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "ToggleExerciseModel serialization failed"))
-    }
-
     /// Which exercise rule this model carries.
     ///
     /// One of ``"threshold"``, ``"stochastic"`` or ``"optimal_exercise"`` —
@@ -1703,23 +1515,11 @@ impl PyToggleExerciseModel {
     }
 }
 
-/// Canonical serde tag of an externally-tagged enum value (`"constant"`,
-/// `{"inverse_power": {...}}` -> `"inverse_power"`).
-fn model_tag<T: serde::Serialize>(value: &T) -> PyResult<String> {
-    match serde_json::to_value(value)
-        .map_err(|err| serde_json_to_py(err, "model tag serialization failed"))?
-    {
-        serde_json::Value::String(tag) => Ok(tag),
-        serde_json::Value::Object(map) if map.len() == 1 => map
-            .keys()
-            .next()
-            .cloned()
-            .ok_or_else(|| value_error("model tag object is empty")),
-        other => Err(value_error(format!(
-            "expected an externally tagged enum value, got {other}"
-        ))),
-    }
-}
+wire_methods!(
+    PyToggleExerciseModel,
+    ToggleExerciseModel,
+    "ToggleExerciseModel"
+);
 
 /// Render an externally-tagged enum as its Python constructor call:
 /// `"terminal"` -> `Name.terminal()`, `{"first_passage": {"k": v}}` ->

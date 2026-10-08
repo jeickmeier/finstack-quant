@@ -495,7 +495,6 @@ mod tests {
         use super::super::super::rng::philox::PhiloxRng;
         use super::super::super::rng::volterra::RiemannLiouvilleVolterra;
         use super::super::super::traits::RandomStream;
-        use crate::closed_form::black_scholes_spot_call;
 
         let h = 0.1_f64;
         let eta = 1e-3_f64; // near-zero vol-of-vol: rBergomi → Black-Scholes
@@ -543,7 +542,16 @@ mod tests {
         let mc_price = sum_payoff / num_paths as f64;
 
         // Analytic reference: Black-Scholes ATM call at σ = √ξ₀, r = q = 0.
-        let bs_price = black_scholes_spot_call(s0, strike, 0.0, 0.0, xi0.sqrt(), t_end);
+        let bs_price = crate::closed_form::bs_price(
+            s0,
+            strike,
+            0.0,
+            0.0,
+            xi0.sqrt(),
+            t_end,
+            crate::types::OptionType::Call,
+        )
+        .expect("valid Black-Scholes inputs");
 
         // MC standard error of an ATM call over 2e5 paths is ≈ 0.03 (price
         // units); a 3% relative band comfortably covers MC noise plus the

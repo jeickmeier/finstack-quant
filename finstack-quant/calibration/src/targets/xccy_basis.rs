@@ -37,7 +37,9 @@ use crate::targets::util::{
 use crate::CalibrationReport;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{BasisSpreadCurve, DiscountCurve};
+use finstack_quant_core::market_data::term_structures::{
+    BasisSpreadCurve, DiscountCurve, DiscountCurveBuilder, ValidationMode,
+};
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
@@ -79,6 +81,16 @@ impl XccyBasisTarget {
     pub(crate) fn new(params: XccyBasisTargetParams) -> Self {
         let scratch = ContextScratch::new(params.base_context.clone());
         Self { params, scratch }
+    }
+
+    /// Curve builder shared by the solver and final builds.
+    fn curve_builder(&self, knots: &[(f64, f64)]) -> DiscountCurveBuilder {
+        DiscountCurve::builder(self.params.curve_id.clone())
+            .base_date(self.params.base_date)
+            .day_count(self.params.curve_day_count)
+            .knots(knots.to_vec())
+            .interp(self.params.solve_interp)
+            .extrapolation(self.params.extrapolation)
     }
 
     /// Execute the full calibration for a cross-currency basis step.
@@ -132,6 +144,7 @@ impl XccyBasisTarget {
                 ),
                 Some(curve_day_count),
                 XCCY_RESIDUAL_NOTIONAL,
+                None,
             )?;
             prepared_quotes.extend(prepared.quotes);
         }
@@ -258,29 +271,16 @@ impl BootstrapTarget for XccyBasisTarget {
         Ok(quote.pillar_time())
     }
 
-    fn build_curve(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
-        DiscountCurve::builder(self.params.curve_id.clone())
-            .base_date(self.params.base_date)
-            .day_count(self.params.curve_day_count)
-            .knots(knots.to_vec())
-            .interp(self.params.solve_interp)
-            .extrapolation(self.params.extrapolation)
-            .build()
+    fn build_curve_final(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
+        self.curve_builder(knots).build()
     }
 
     fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
-        DiscountCurve::builder(self.params.curve_id.clone())
-            .base_date(self.params.base_date)
-            .day_count(self.params.curve_day_count)
-            .knots(knots.to_vec())
-            .interp(self.params.solve_interp)
-            .extrapolation(self.params.extrapolation)
-            .validation(
-                finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                    allow_non_monotonic: true,
-                    forward_floor: None,
-                },
-            )
+        self.curve_builder(knots)
+            .validation(ValidationMode::Raw {
+                allow_non_monotonic: true,
+                forward_floor: None,
+            })
             .build_for_solver()
     }
 

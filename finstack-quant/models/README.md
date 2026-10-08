@@ -48,9 +48,13 @@ unconditional dependency. A few convenience entry points (`EuropeanPricer`,
 | `correlation` | Copulas, recovery models, latent-factor models, and portfolio-loss simulation |
 | `monte_carlo` | Random streams, stochastic processes, discretizations, payoffs, execution engines, pricers, Greeks, results, and embedded defaults |
 
-The Monte Carlo module also re-exports `simulate_gbm_paths`, `GbmPathConfig`,
-and `GbmPathSummary`: a compact captured-GBM-paths helper for plotting and
-diagnostics that bypasses the payoff machinery.
+`monte_carlo::simulate::simulate_paths` returns compact simulated paths for any
+built-in process and discretization scheme selected by a serializable
+`PathSimulationSpec`, bypassing the payoff machinery. That includes the
+path-dependent processes (`lmm`, `rough_bergomi`, `rough_heston`,
+`cheyette_rough`); `FbmSpec` selects the fractional-noise generator of the two
+that consume one. It is the one
+path-simulation entry point and is bound in Python and WASM.
 
 Antithetic pairing is **not** in `variance_reduction` — it is implemented inline
 in the engine loop and configured with `McEngineConfig::antithetic`.
@@ -205,7 +209,7 @@ let result = engine
 println!("estimate={}", result.estimate.mean);
 
 if let Some(paths) = result.paths.as_ref() {
-    println!("captured={} of {}", paths.num_captured(), paths.num_paths_total);
+    println!("captured={} of {}", paths.paths.len(), paths.num_paths_total);
     println!("sampling={:?}", paths.sampling_method);
     println!("state_keys={:?}", paths.state_var_keys());
 }
@@ -225,16 +229,17 @@ one path set and replays it on a second, independent set. It rejects a
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::pricer::lsmc::{
-    AmericanPut, LsmcConfig, LsmcPricer,
+    AmericanExercise, LsmcConfig, LsmcPricer,
 };
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
+use finstack_quant_models::types::OptionType;
 
 let cfg = LsmcConfig::new(50_000, vec![25, 50, 75, 100], 100)
     .expect("valid LSMC config")
     .with_seed(42);
 let pricer = LsmcPricer::new(cfg);
 let process = GbmProcess::with_params(0.05, 0.0, 0.3).expect("valid GBM parameters");
-let put = AmericanPut::new(100.0).expect("valid strike");
+let put = AmericanExercise::new(OptionType::Put, 100.0).expect("valid strike");
 let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
 let unbiased = pricer
@@ -263,20 +268,18 @@ reported price, so it cannot print below intrinsic.
 
 ### Finite-difference Greeks with common random numbers
 
-- `finite_diff_delta` / `finite_diff_gamma` honour the engine's `use_parallel`
-  flag and report a **conservative independence-bound** stderr — an upper bound,
-  since CRN correlates the legs.
-- `finite_diff_delta_crn` / `finite_diff_gamma_crn` pair the legs per path and
-  report the true paired stderr. Serial only.
-
-All four require a splittable RNG and fail closed with `SobolRng`.
+`finite_diff_delta` / `finite_diff_gamma` simulate every stencil point on the
+same per-path substream, average the per-path differences, and report their
+**paired** standard error. They run serially with a fixed path count (adaptive
+stopping and path capture are rejected), require a splittable RNG and fail
+closed with `SobolRng`.
 
 ```rust
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::discretization::ExactGbm;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::greeks::finite_diff::{
-    finite_diff_delta_crn, FiniteDiffInputs,
+    finite_diff_delta, FiniteDiffInputs,
 };
 use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
@@ -301,7 +304,7 @@ let inputs = FiniteDiffInputs {
     currency: Currency::USD,
     discount_factor: (-0.05_f64).exp(),
 };
-let (delta, paired_stderr) = finite_diff_delta_crn(
+let (delta, paired_stderr) = finite_diff_delta(
     &inputs,
     /* initial_spot   = */ 100.0,
     /* relative bump  = */ 0.01,
@@ -479,17 +482,18 @@ via `max_event_step()` so grid mismatches are caught up front.
 
 - **Python** — `finstack_quant.models.monte_carlo` exposes `McEngine`, `TimeGrid`,
   `EuropeanPricer`, `PathDependentPricer`, `LsmcPricer`, `MoneyEstimate`,
-  `Estimate`, `GbmPathSummary`, `simulate_gbm_paths`, `price_heston_call` /
+  `Estimate`, `PathSummary`, `simulate_paths`, `price_heston_call` /
   `price_heston_put`, `heston_satisfies_feller`, `black_scholes_call` /
   `black_scholes_put`, and the four finite-difference Greek functions.
 - **WASM** — the `models.monteCarlo` namespace in
   [`exports/models/monteCarlo.js`](../../finstack-quant-wasm/exports/models/monteCarlo.js)
-  exposes the convenience pricers only: `priceEuropeanCall/Put`,
+  exposes `simulatePaths` and the convenience pricers: `priceEuropeanCall/Put`,
   `priceHestonCall/Put`, `priceAsianCall/Put`, `priceAmericanCall/Put`,
-  `priceAmericanCallUnbiased` / `priceAmericanPutUnbiased`, and
+  `priceAmericanCallUnbiased` / `priceAmericanExerciseUnbiased`, and
   `blackScholesCall/Put`.
 
-Neither binding exposes the generic trait surface; custom processes, schemes, and
+Neither binding exposes the generic trait surface: `simulate_paths` selects among
+the built-in processes and schemes by spec, and custom processes, schemes, and
 payoffs are Rust-only.
 
 ## Verification

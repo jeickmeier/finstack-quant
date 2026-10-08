@@ -60,7 +60,7 @@
 //! - Correlation-dependent credit valuation: `docs/REFERENCES.md#hull-predescu-white-2005`
 //!
 
-use super::{get_cached_quadrature, Copula, DEFAULT_QUADRATURE_ORDER};
+use super::{default_quadrature, Copula, DEFAULT_QUADRATURE_ORDER};
 use finstack_quant_core::math::distributions::chi_squared_quantile;
 #[cfg(test)]
 use finstack_quant_core::math::student_t_inv_cdf;
@@ -161,47 +161,9 @@ impl StudentTCopula {
         Self {
             degrees_of_freedom: df,
             quadrature_order: order,
-            inner_quadrature: get_cached_quadrature(order),
+            inner_quadrature: default_quadrature(),
             gamma_quadrature: Self::compute_gamma_quadrature(df, order as usize),
         }
-    }
-
-    /// Create with custom quadrature order for higher precision.
-    ///
-    /// # Arguments
-    /// * `df` - Finite degrees of freedom, strictly greater than 2.
-    /// * `order` - Requested quadrature order for the inner Gaussian integration;
-    ///   the Gamma mixing rule uses this order bounded to 10 through 64 points.
-    ///
-    /// # Returns
-    ///
-    /// A Student-t copula using the requested quadrature order.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `df` is not finite or is at most 2.
-    #[must_use]
-    pub fn with_quadrature_order(df: f64, order: u8) -> Self {
-        assert!(
-            df.is_finite() && df > 2.0,
-            "Student-t df must be > 2 and finite"
-        );
-        Self {
-            degrees_of_freedom: df,
-            quadrature_order: order,
-            inner_quadrature: get_cached_quadrature(order),
-            gamma_quadrature: Self::compute_gamma_quadrature(df, order as usize),
-        }
-    }
-
-    /// Get the degrees of freedom.
-    ///
-    /// # Returns
-    ///
-    /// The Student-t degrees of freedom used by this copula.
-    #[must_use]
-    pub fn df(&self) -> f64 {
-        self.degrees_of_freedom
     }
 
     /// Compute quadrature for W ~ Gamma(ν/2, ν/2) integration.
@@ -250,8 +212,7 @@ impl StudentTCopula {
 const MIN_LAGUERRE_ORDER: usize = 10;
 
 /// Upper bound on the Gauss-Laguerre order accepted by the Student-t
-/// copula. `O(n²)` eigendecomposition inside
-/// [`GaussLaguerreQuadrature::new`] remains cheap below this bound;
+/// copula. The `O(n²)` Golub-Welsch eigendecomposition remains cheap below this bound;
 /// above it, numerical conditioning of the Jacobi matrix starts to
 /// erode reliable weight recovery for the highest-index nodes.
 const MAX_LAGUERRE_ORDER: usize = 64;
@@ -544,7 +505,7 @@ mod tests {
         // [Z, W]: the quadrature engine must integrate over both the Gaussian
         // systematic factor and the shared mixing variable.
         assert_eq!(copula.num_factors(), 2);
-        assert!((copula.df() - 5.0).abs() < 1e-10);
+        assert!((copula.degrees_of_freedom - 5.0).abs() < 1e-10);
         assert_eq!(copula.model_name(), "Student-t Copula");
     }
 
@@ -894,30 +855,6 @@ mod tests {
         assert!((copula.conditional_default_prob(-1.0, &[3.0], 0.0) - expected).abs() < 1e-14);
     }
 
-    /// Requesting `with_quadrature_order(n)` with `n > 10` must
-    /// actually produce a larger rule (the Golub-Welsch runtime
-    /// generator has no fixed node cap).
-    #[test]
-    fn test_with_quadrature_order_uses_requested_order() {
-        let df = 5.0;
-        let copula10 = StudentTCopula::with_quadrature_order(df, 10);
-        let copula30 = StudentTCopula::with_quadrature_order(df, 30);
-
-        let n10 = copula10.gamma_quadrature.len();
-        let n30 = copula30.gamma_quadrature.len();
-        assert_eq!(n10, 10);
-        assert_eq!(n30, 30);
-        // Both must still integrate the constant 1 to approximately 1.
-        for copula in [&copula10, &copula30] {
-            let sum: f64 = copula.gamma_quadrature.iter().map(|(_, w)| w).sum();
-            assert!(
-                (sum - 1.0).abs() < 1e-12,
-                "n={}: Σ w_i = {sum}, expected ~1",
-                copula.gamma_quadrature.len()
-            );
-        }
-    }
-
     #[test]
     fn test_factor_length_mismatch_contract() {
         let df = 5.0;
@@ -967,7 +904,7 @@ mod tests {
         use finstack_quant_models::monte_carlo::traits::RandomStream;
 
         let nu = 5.0;
-        let copula = StudentTCopula::with_quadrature_order(nu, 40);
+        let copula = StudentTCopula::new(nu);
         let pd = 0.05;
         let threshold = student_t_inv_cdf(pd, nu).expect("valid Student-t inputs");
         let rho = 0.30;
@@ -1080,8 +1017,11 @@ mod tests {
         // Default-order copula (20 generalized Laguerre nodes).
         let copula_default = StudentTCopula::new(nu);
 
-        // High-order reference: 64-node rule (MAX_LAGUERRE_ORDER).
-        let copula_ref = StudentTCopula::with_quadrature_order(nu, 64);
+        // High-order reference: 64-node Gamma mixing rule (MAX_LAGUERRE_ORDER).
+        let copula_ref = StudentTCopula {
+            gamma_quadrature: StudentTCopula::compute_gamma_quadrature(nu, 64),
+            ..StudentTCopula::new(nu)
+        };
 
         let integrate = |c: &StudentTCopula| {
             c.integrate_fn(&|z| c.conditional_default_prob(threshold, z, correlation))

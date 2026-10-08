@@ -1,14 +1,16 @@
 //! WASM bindings for the Monte Carlo engine in `finstack-quant-models`.
 //!
 //! Mirrors `finstack-quant-py/src/bindings/models/monte_carlo/`: Heston and
-//! GBM convenience pricers, GBM path simulation and finite-difference Greeks.
-//! Estimates cross the boundary as the canonical Rust `MoneyEstimate` /
-//! `Estimate` serde objects. Closed-form Black-Scholes references live in
-//! `models.bsPrice`; processes, discretizations and RNGs remain Rust-only.
+//! GBM convenience pricers, path simulation for the built-in processes (Markov
+//! and path-dependent) and finite-difference Greeks. Estimates cross the boundary as the canonical
+//! Rust `MoneyEstimate` / `Estimate` serde objects, and simulated paths as the
+//! `PathSummary` object. Closed-form Black-Scholes references live in
+//! `models.bsPrice`; `simulatePaths` selects a process and discretization by
+//! spec, while the process, discretization and RNG types remain Rust-only.
 
 use crate::utils::input::{
     from_js_json, js_bool, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_opt_u64, js_opt_uint,
-    js_u64, js_uint,
+    js_u64,
 };
 use std::str::FromStr;
 
@@ -16,12 +18,12 @@ use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::convenience::{self, LsmcConvenience};
 use finstack_quant_models::monte_carlo::greeks::gbm_european::{
-    finite_diff_delta_crn_gbm, finite_diff_delta_gbm, finite_diff_gamma_crn_gbm,
-    finite_diff_gamma_gbm, GbmEuropeanFdSpec,
+    finite_diff_delta_gbm, finite_diff_gamma_gbm, GbmEuropeanFdSpec,
 };
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
+use finstack_quant_models::monte_carlo::simulate::PathSimulationSpec;
 use finstack_quant_models::OptionType;
 use wasm_bindgen::prelude::*;
 
@@ -257,7 +259,7 @@ pub fn heston_satisfies_feller(
     vol_of_vol: JsValue,
 ) -> Result<bool, JsValue> {
     Ok(
-        finstack_quant_models::monte_carlo::process::heston::feller_condition(
+        finstack_quant_models::monte_carlo::process::heston::heston_satisfies_feller(
             js_f64(&kappa, "kappa")?,
             js_f64(&theta, "theta")?,
             js_f64(&vol_of_vol, "volOfVol")?,
@@ -265,47 +267,44 @@ pub fn heston_satisfies_feller(
     )
 }
 
-/// Simulate a compact set of GBM spot paths.
-/// @param spot - Spot level at time 0.
-/// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-/// @param div_yield - Continuous dividend yield (decimal, annualized).
-/// @param vol - Annualized GBM volatility (decimal).
-/// @param expiry - Horizon in years; the grid is uniform from 0 to `expiry`.
-/// @param num_steps - Number of time-grid steps; a positive safe integer.
-/// @param num_paths - Number of captured paths; a positive safe integer.
-/// @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the Rust `GbmPathConfig` default.
-/// @returns The `GbmPathSummary` object (`num_paths`, `num_simulated_paths`, `times`, `paths`).
+/// Simulate paths of any built-in process on a shared time grid.
+///
+/// Twin of the Rust and Python `simulate_paths`: the spec selects the process,
+/// the discretization scheme, the time grid and the random streams, and Rust
+/// validates every field.
+/// @param spec - `PathSimulationSpec` object or JSON: `process` (tagged by `type`, with annualized decimal rates and volatilities), optional `scheme` (`"default"` uses the process's canonical scheme), `initial_state` in the process's state layout, `time_grid` in years, `num_paths` in [1, 100000], `seed`, optional `antithetic` (default `false`), and optional `fbm`, the fractional-noise generator of the `rough_bergomi` and `cheyette_rough` processes (`{ type: "volterra" }` when omitted).
+/// @returns The `PathSummary` object: `num_paths`, `num_simulated_paths`, `dim`, `times`, `factor_names`, and `values` in row-major `[path][time][factor]` order, so factor `f` on path `p` at `times[s]` is `values[(p * times.length + s) * dim + f]`.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const paths = models.monteCarlo.simulatePaths({
+///   process: { type: "gbm", r: 0.05, q: 0.0, sigma: 0.2 },
+///   initial_state: [100],
+///   time_grid: { type: "uniform", expiry: 1.0, num_steps: 2 },
+///   num_paths: 3,
+///   seed: 7,
+/// });
+/// console.log(paths.times); // [0, 0.5, 1]
+/// console.log(paths.factor_names); // ["spot"]
+/// console.log(paths.values.length); // 9 = 3 paths x 3 times x 1 factor
+/// ```
 ///
 /// # Errors
 ///
-/// Throws a `TypeError` if a count is not a safe integer, and a `validation`
-/// error if an input is non-finite or out of range.
-#[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = simulateGbmPaths)]
-pub fn simulate_gbm_paths(
-    spot: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    num_steps: JsValue,
-    num_paths: JsValue,
-    seed: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let mut config = finstack_quant_models::monte_carlo::GbmPathConfig::new(
-        js_f64(&spot, "spot")?,
-        js_f64(&rate, "rate")?,
-        js_f64(&div_yield, "divYield")?,
-        js_f64(&vol, "vol")?,
-        js_f64(&expiry, "expiry")?,
-        js_uint(&num_steps, "numSteps")?,
-        js_uint(&num_paths, "numPaths")?,
-    );
-    if let Some(seed) = js_opt_u64(seed.as_ref(), "seed")? {
-        config = config.with_seed(seed);
-    }
+/// Throws a `TypeError` if `spec` is neither an object nor JSON text, and a
+/// `validation` error if it does not match `PathSimulationSpec`, a process
+/// parameter is out of range, the scheme is not available for the process,
+/// `fbm` is set for a process that does not consume fractional noise,
+/// `initial_state` has the wrong length or lies outside the process's domain,
+/// the time grid is invalid, `num_paths` is outside [1, 100000], the output
+/// would exceed 64 million stored values, or a simulated state is non-finite.
+#[wasm_bindgen(js_name = simulatePaths)]
+pub fn simulate_paths(spec: JsValue) -> Result<JsValue, JsValue> {
+    let spec: PathSimulationSpec = from_js_json(&spec, "spec")?;
     let summary =
-        finstack_quant_models::monte_carlo::simulate_gbm_paths(&config).map_err(to_js_err)?;
+        finstack_quant_models::monte_carlo::simulate::simulate_paths(&spec).map_err(to_js_err)?;
     to_js_value(&summary)
 }
 
@@ -356,7 +355,11 @@ fn fd_spec(
     })
 }
 
-/// Monte Carlo finite-difference delta of a GBM European option, with independent draws per bump.
+/// Monte Carlo finite-difference delta of a GBM European option under common random numbers.
+///
+/// The up and down valuations share each path's random draws; the estimate
+/// is the mean of the per-path central differences and `stderr` is their
+/// paired (common-random-number) standard error.
 /// @param spot - Spot level at time 0.
 /// @param strike - Exercise price in the same units as `spot`.
 /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
@@ -369,7 +372,7 @@ fn fd_spec(
 /// @param num_steps - Optional time-grid steps; omitted uses the registry default.
 /// @param bump_size - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
 /// @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-/// @returns The `Estimate` object for delta (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+/// @returns The `Estimate` object for delta (`mean`, paired `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
 ///
 /// # Errors
 ///
@@ -408,7 +411,11 @@ pub fn finite_diff_delta(
     to_js_value(&finite_diff_delta_gbm(spec).map_err(to_js_err)?)
 }
 
-/// Monte Carlo finite-difference delta of a GBM European option under common random numbers.
+/// Monte Carlo finite-difference gamma of a GBM European option under common random numbers.
+///
+/// The three stencil valuations share each path's random draws; the estimate
+/// is the mean of the per-path second differences and `stderr` is their
+/// paired (common-random-number) standard error.
 /// @param spot - Spot level at time 0.
 /// @param strike - Exercise price in the same units as `spot`.
 /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
@@ -421,59 +428,7 @@ pub fn finite_diff_delta(
 /// @param num_steps - Optional time-grid steps; omitted uses the registry default.
 /// @param bump_size - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
 /// @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-/// @returns The `Estimate` object for delta (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-///
-/// # Errors
-///
-/// Throws a `validation` error if an input is non-finite or out of range or
-/// the currency code is unknown.
-#[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = finiteDiffDeltaCrn)]
-pub fn finite_diff_delta_crn(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
-    num_paths: Option<JsValue>,
-    seed: Option<JsValue>,
-    num_steps: Option<JsValue>,
-    bump_size: Option<JsValue>,
-    currency: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let spec = fd_spec(
-        &spot,
-        &strike,
-        &rate,
-        &div_yield,
-        &vol,
-        &expiry,
-        &is_call,
-        num_paths.as_ref(),
-        seed.as_ref(),
-        num_steps.as_ref(),
-        bump_size.as_ref(),
-        currency.as_ref(),
-    )?;
-    to_js_value(&finite_diff_delta_crn_gbm(spec).map_err(to_js_err)?)
-}
-
-/// Monte Carlo finite-difference gamma of a GBM European option, with independent draws per bump.
-/// @param spot - Spot level at time 0.
-/// @param strike - Exercise price in the same units as `spot`.
-/// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-/// @param div_yield - Continuous dividend yield (decimal, annualized).
-/// @param vol - Annualized GBM volatility (decimal); positive.
-/// @param expiry - Time to expiry in years.
-/// @param is_call - `true` for a call payoff, `false` for a put.
-/// @param num_paths - Optional paths per evaluation; omitted uses the registry default.
-/// @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
-/// @param num_steps - Optional time-grid steps; omitted uses the registry default.
-/// @param bump_size - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
-/// @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-/// @returns The `Estimate` object for gamma (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+/// @returns The `Estimate` object for gamma (`mean`, paired `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
 ///
 /// # Errors
 ///
@@ -510,58 +465,6 @@ pub fn finite_diff_gamma(
         currency.as_ref(),
     )?;
     to_js_value(&finite_diff_gamma_gbm(spec).map_err(to_js_err)?)
-}
-
-/// Monte Carlo finite-difference gamma of a GBM European option under common random numbers.
-/// @param spot - Spot level at time 0.
-/// @param strike - Exercise price in the same units as `spot`.
-/// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-/// @param div_yield - Continuous dividend yield (decimal, annualized).
-/// @param vol - Annualized GBM volatility (decimal); positive.
-/// @param expiry - Time to expiry in years.
-/// @param is_call - `true` for a call payoff, `false` for a put.
-/// @param num_paths - Optional paths per evaluation; omitted uses the registry default.
-/// @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
-/// @param num_steps - Optional time-grid steps; omitted uses the registry default.
-/// @param bump_size - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
-/// @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-/// @returns The `Estimate` object for gamma (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-///
-/// # Errors
-///
-/// Throws a `validation` error if an input is non-finite or out of range or
-/// the currency code is unknown.
-#[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = finiteDiffGammaCrn)]
-pub fn finite_diff_gamma_crn(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
-    num_paths: Option<JsValue>,
-    seed: Option<JsValue>,
-    num_steps: Option<JsValue>,
-    bump_size: Option<JsValue>,
-    currency: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let spec = fd_spec(
-        &spot,
-        &strike,
-        &rate,
-        &div_yield,
-        &vol,
-        &expiry,
-        &is_call,
-        num_paths.as_ref(),
-        seed.as_ref(),
-        num_steps.as_ref(),
-        bump_size.as_ref(),
-        currency.as_ref(),
-    )?;
-    to_js_value(&finite_diff_gamma_crn_gbm(spec).map_err(to_js_err)?)
 }
 
 /// Monte Carlo pricer for European options under geometric Brownian motion.
@@ -885,6 +788,77 @@ impl JsPathDependentPricer {
             )
             .map_err(to_js_err)?;
         to_js_value(&estimate)
+    }
+
+    /// Price an arithmetic-average Asian option under GBM with
+    /// likelihood-ratio delta and vega estimated from the same paths.
+    ///
+    /// Every path is kept in memory, so `numPaths x (numSteps + 1)` may not
+    /// exceed 4,000,000 and the default step count is 32, not the 252 steps
+    /// of `priceAsianCall`.
+    /// @param spot - Finite, strictly positive spot level at time 0.
+    /// @param strike - Exercise price in the same units as `spot`.
+    /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
+    /// @param div_yield - Continuous dividend yield (decimal, annualized).
+    /// @param vol - Annualized GBM volatility (decimal), strictly positive.
+    /// @param expiry - Time to expiry in years.
+    /// @param is_call - `true` for a call on the arithmetic average, `false` for a put.
+    /// @param num_steps - Optional number of time-grid steps, each an averaging date; omitted uses the registry default `convenience.greeks.lrm_num_steps` (32).
+    /// @param currency - Optional ISO-4217 code stamped on the price estimate; omitted uses the registry default.
+    /// @returns The `LrmGreeks` object: `price` (a `MoneyEstimate`), `delta` per unit of spot and `vega` per volatility point (`0.01`), each an `Estimate` with `mean`, `stderr` and `ci_95`.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { models } from "finstack-quant-wasm";
+    /// await init();
+    /// const pricer = new models.monteCarlo.PathDependentPricer(20000, 7);
+    /// const greeks = pricer.priceWithLrmGreeks(100, 100, 0.04, 0.01, 0.25, 1.0, true, 12);
+    /// console.log(greeks.price.mean.amount, greeks.price.mean.currency);
+    /// console.log(greeks.delta.mean > 0 && greeks.delta.mean < 1); // true
+    /// console.log(greeks.vega.stderr > 0); // true
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` if an argument has the wrong JavaScript type, and
+    /// a `validation` error if `spot`, `vol` or `expiry` is not finite and
+    /// strictly positive, `numSteps` is zero, the currency code is unknown,
+    /// the pricer uses Sobol or antithetic sampling, `numPaths` exceeds
+    /// 100,000, or `numPaths x (numSteps + 1)` exceeds 4,000,000.
+    #[allow(clippy::too_many_arguments)]
+    #[wasm_bindgen(js_name = priceWithLrmGreeks)]
+    pub fn price_with_lrm_greeks(
+        &self,
+        spot: JsValue,
+        strike: JsValue,
+        rate: JsValue,
+        div_yield: JsValue,
+        vol: JsValue,
+        expiry: JsValue,
+        is_call: JsValue,
+        num_steps: Option<JsValue>,
+        currency: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
+        let gbm = gbm_inputs(&spot, &strike, &rate, &div_yield, &vol, &expiry)?;
+        let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
+        let num_steps = convenience::lrm_num_steps(js_opt_uint(num_steps.as_ref(), "numSteps")?)
+            .map_err(to_js_err)?;
+        let currency = js_currency(currency.as_ref())?;
+        let greeks = self
+            .inner
+            .price_gbm_asian_with_lrm_greeks(
+                option_type,
+                gbm.spot,
+                gbm.strike,
+                gbm.rate,
+                gbm.div_yield,
+                gbm.vol,
+                gbm.expiry,
+                num_steps,
+                currency,
+            )
+            .map_err(to_js_err)?;
+        to_js_value(&greeks)
     }
 }
 

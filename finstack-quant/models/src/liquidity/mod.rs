@@ -29,7 +29,7 @@
 //! against an existing VaR number:
 //!
 //! ```
-//! use finstack_quant_models::liquidity::{lvar_bangia_scalar, roll_effective_spread};
+//! use finstack_quant_models::liquidity::{lvar_bangia, roll_effective_spread};
 //!
 //! # fn main() -> finstack_quant_core::Result<()> {
 //! let returns = [0.004, -0.005, 0.006, -0.004, 0.005, -0.006];
@@ -37,7 +37,7 @@
 //! assert!(spread > 0.0);
 //!
 //! // VaR uses the loss-sign convention, so it is non-positive.
-//! let result = lvar_bangia_scalar(-100_000.0, spread, 0.25 * spread, 0.99, 1_000_000.0)?;
+//! let result = lvar_bangia(-100_000.0, spread, 0.25 * spread, 0.99, 1_000_000.0)?;
 //! assert!(result.spread_cost >= 0.0);
 //! assert!(result.lvar <= result.var);
 //! # Ok(())
@@ -65,7 +65,7 @@ pub use types::{
 
 pub use estimators::{amihud_illiquidity, roll_effective_spread};
 
-pub use lvar::{lvar_bangia_scalar, LvarBangiaScalar};
+pub use lvar::{lvar_bangia, LvarBangiaScalar};
 
 pub use almgren_chriss::AlmgrenChrissModel;
 pub use impact::{ExecutionTrajectory, ImpactEstimate, TradeParams};
@@ -111,7 +111,7 @@ pub use kyle::KyleLambdaModel;
 /// Returns an error when the liquidity inputs are not finite and positive, or
 /// when the underlying model/profile validation fails.
 #[allow(clippy::too_many_arguments)]
-pub fn almgren_chriss_uniform_impact(
+pub fn almgren_chriss_impact(
     position_size: f64,
     avg_daily_volume: f64,
     volatility: f64,
@@ -178,7 +178,7 @@ mod tests {
     #[test]
     fn uniform_impact_responds_to_avg_daily_volume() {
         let cost = |adv: f64| {
-            almgren_chriss_uniform_impact(100_000.0, adv, 0.02, 5.0, 1.0, 1.0, Some(100.0))
+            almgren_chriss_impact(100_000.0, adv, 0.02, 5.0, 1.0, 1.0, Some(100.0))
                 .expect("valid inputs")
                 .total_cost
         };
@@ -198,11 +198,10 @@ mod tests {
     /// multiplicatively, so doubling a coefficient doubles its component.
     #[test]
     fn uniform_impact_coefficients_scale_their_components() {
-        let base = almgren_chriss_uniform_impact(100_000.0, 1e6, 0.02, 5.0, 1.0, 1.0, Some(100.0))
+        let base = almgren_chriss_impact(100_000.0, 1e6, 0.02, 5.0, 1.0, 1.0, Some(100.0))
             .expect("valid inputs");
-        let scaled =
-            almgren_chriss_uniform_impact(100_000.0, 1e6, 0.02, 5.0, 2.0, 1.0, Some(100.0))
-                .expect("valid inputs");
+        let scaled = almgren_chriss_impact(100_000.0, 1e6, 0.02, 5.0, 2.0, 1.0, Some(100.0))
+            .expect("valid inputs");
         assert!(
             (scaled.permanent_impact - 2.0 * base.permanent_impact).abs()
                 <= 1e-9 * base.permanent_impact,

@@ -8,7 +8,7 @@
 //!
 //! Reference: Andersen (2008) - "Simple and efficient simulation of the Heston stochastic volatility model"
 
-use super::super::process::cir::CirProcess;
+use super::super::process::cir::{CirPlusPlusProcess, CirProcess};
 use super::super::traits::Discretization;
 use super::qe_common::qe_step_variance;
 
@@ -84,6 +84,26 @@ impl Discretization<CirProcess> for QeCir {
     }
 
     fn work_size(&self, _process: &CirProcess) -> usize {
+        0
+    }
+}
+
+// The CIR++ state is the unshifted CIR factor, so its transition is the base
+// CIR transition; the deterministic shift φ(t) never enters the step.
+impl Discretization<CirPlusPlusProcess> for QeCir {
+    fn step(
+        &self,
+        process: &CirPlusPlusProcess,
+        t: f64,
+        dt: f64,
+        x: &mut [f64],
+        z: &[f64],
+        work: &mut [f64],
+    ) {
+        self.step(process.cir(), t, dt, x, z, work);
+    }
+
+    fn work_size(&self, _process: &CirPlusPlusProcess) -> usize {
         0
     }
 }

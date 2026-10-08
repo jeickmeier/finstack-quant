@@ -11,23 +11,18 @@ use finstack_quant_models::credit::migration::{
     self, projection, GeneratorMatrix, MigrationSimulator, RatingPath, RatingScale,
     TransitionMatrix,
 };
+use finstack_quant_models::factor::risk::flatten_square_matrix;
 use wasm_bindgen::prelude::*;
 
-/// Square-matrix input as flat row-major numbers or as an array of rows.
-fn js_matrix_data(value: &JsValue, label: &str) -> Result<Vec<f64>, JsValue> {
+/// Square-matrix input for an `n`-state scale, as flat row-major numbers or as
+/// an array of `n` rows of `n` numbers.
+fn js_matrix_data(value: &JsValue, n: usize, label: &str) -> Result<Vec<f64>, JsValue> {
     let nested = js_sys::Array::is_array(value)
         && js_sys::Array::is_array(&js_sys::Array::from(value).get(0));
     if !nested {
         return js_f64_seq(value, label);
     }
-    let rows = js_f64_matrix(value, label)?;
-    let width = rows.first().map_or(0, Vec::len);
-    if rows.iter().any(|row| row.len() != width) {
-        return Err(to_js_err(format!(
-            "{label}: matrix rows must all have the same length"
-        )));
-    }
-    Ok(rows.into_iter().flatten().collect())
+    flatten_square_matrix(js_f64_matrix(value, label)?, n, label).map_err(to_js_err)
 }
 
 /// Ordered set of rating states, optionally with an absorbing default state.
@@ -216,7 +211,7 @@ impl JsTransitionMatrix {
         data: JsValue,
         horizon: JsValue,
     ) -> Result<JsTransitionMatrix, JsValue> {
-        let data = js_matrix_data(&data, "data")?;
+        let data = js_matrix_data(&data, scale.inner.n_states(), "data")?;
         TransitionMatrix::new(scale.inner.clone(), &data, js_f64(&horizon, "horizon")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -247,7 +242,7 @@ impl JsTransitionMatrix {
     #[wasm_bindgen(js_name = probabilityByIndex)]
     pub fn probability_by_index(&self, from: JsValue, to: JsValue) -> Result<f64, JsValue> {
         self.inner
-            .try_probability_by_index(js_uint(&from, "from")?, js_uint(&to, "to")?)
+            .probability_by_index(js_uint(&from, "from")?, js_uint(&to, "to")?)
             .map_err(to_js_err)
     }
 
@@ -340,7 +335,7 @@ impl JsGeneratorMatrix {
     /// the entries do not form a valid generator.
     #[wasm_bindgen(constructor)]
     pub fn new(scale: &JsRatingScale, data: JsValue) -> Result<JsGeneratorMatrix, JsValue> {
-        let data = js_matrix_data(&data, "data")?;
+        let data = js_matrix_data(&data, scale.inner.n_states(), "data")?;
         GeneratorMatrix::new(scale.inner.clone(), &data)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -606,7 +601,7 @@ impl JsMigrationSimulator {
         seed: JsValue,
     ) -> Result<JsRatingPaths, JsValue> {
         self.inner
-            .simulate_seeded(
+            .simulate(
                 js_uint(&initial_state, "initialState")?,
                 js_uint(&n_paths, "nPaths")?,
                 js_u64(&seed, "seed")?,
@@ -630,7 +625,7 @@ impl JsMigrationSimulator {
         seed: JsValue,
     ) -> Result<JsTransitionMatrix, JsValue> {
         self.inner
-            .empirical_matrix_seeded(
+            .empirical_matrix(
                 js_uint(&n_paths_per_state, "nPathsPerState")?,
                 js_u64(&seed, "seed")?,
             )

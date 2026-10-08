@@ -2,11 +2,11 @@
 
 use finstack_quant_core::{currency::Currency, market_data::surfaces::VolSurface};
 use finstack_quant_models::correlation::PortfolioLossResult;
-use finstack_quant_models::fourier::cos::{bs_cos_price, BlackScholesCosParams};
+use finstack_quant_models::fourier::cos::{bs_cos_price, CosMarketParams};
 use finstack_quant_models::monte_carlo::{
     pricer::{
         basis::PolynomialBasis,
-        lsmc::{AmericanPut, LsmcConfig, LsmcPricer},
+        lsmc::{AmericanExercise, LsmcConfig, LsmcPricer},
     },
     process::gbm::GbmProcess,
 };
@@ -42,26 +42,25 @@ fn checked_black_scholes_rejects_invalid_inputs_without_masking_nan() {
 
 #[test]
 fn cos_requires_a_nonempty_expansion_and_reconciles_to_black_scholes() {
-    let mut params = BlackScholesCosParams {
+    let mut market = CosMarketParams {
         spot: 100.0,
         strike: 100.0,
         rate: 0.05,
         div_yield: 0.0,
-        vol: 0.2,
         expiry: 1.0,
         is_call: true,
         n_terms: Some(0),
     };
-    assert!(bs_cos_price(params).is_err());
-    params.n_terms = Some(128);
+    assert!(bs_cos_price(market, 0.2).is_err());
+    market.n_terms = Some(128);
     let exact = bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, OptionType::Call).unwrap();
-    assert!((bs_cos_price(params).unwrap() - exact).abs() < 1e-8);
+    assert!((bs_cos_price(market, 0.2).unwrap() - exact).abs() < 1e-8);
 }
 
 #[test]
 fn lsmc_only_applies_immediate_exercise_when_scheduled_in_both_pricing_modes() {
     let process = GbmProcess::with_params(0.2, 0.0, 0.0).unwrap();
-    let payoff = AmericanPut::new(100.0).unwrap();
+    let payoff = AmericanExercise::new(OptionType::Put, 100.0).unwrap();
     let basis = PolynomialBasis::new(1).expect("valid regression basis");
     for (dates, expected) in [
         (vec![1], 100.0 * (-0.2_f64).exp() - 50.0),

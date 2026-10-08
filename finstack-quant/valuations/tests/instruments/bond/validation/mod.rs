@@ -11,6 +11,7 @@
 //! - `metric_relationships`: Cross-metric consistency checks
 //! - `settlement_conventions`: PV anchoring and quote-date consistency
 
+mod black_karasinski_tree;
 mod daycount_consistency;
 mod market_benchmarks;
 mod metric_relationships;

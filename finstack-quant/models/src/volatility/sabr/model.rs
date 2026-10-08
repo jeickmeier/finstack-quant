@@ -1,6 +1,7 @@
 //! SABR model, smile, parameter, and calibration support.
 //!
 use super::parameters::SabrParameters;
+use crate::volatility::conventions::VolatilityConvention;
 use finstack_quant_core::{Error, Result};
 
 /// Snap β to the exact endpoints 0 or 1 when it is within this tolerance.
@@ -13,77 +14,40 @@ use finstack_quant_core::{Error, Result};
 /// branch when ATM-pricing the same parameter set.
 pub(crate) const BETA_SNAP_TOL: f64 = 1e-4;
 
-/// Quoting convention of the implied volatility produced by Hagan's SABR
-/// expansion.
-///
-/// The β≈0 (normal-SABR) branch of `implied_volatility` outputs a **normal
-/// (Bachelier)** vol in absolute rate units; every other β outputs a
-/// **lognormal (Black)** vol. Storing a Bachelier vol in a Black surface (or
-/// vice versa) is a silent unit error, so callers must branch on this tag.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SabrVolType {
-    /// Normal (Bachelier) volatility in absolute rate units (β≈0 branch).
-    Normal,
-    /// Lognormal (Black) volatility (β > 0 branches, including β=1).
-    Black,
-}
-
-/// SABR model wrapping validated [`SabrParameters`].
-pub struct SabrModel {
-    params: SabrParameters,
-}
-
-impl SabrModel {
-    /// Wrap validated SABR parameters.
+impl SabrParameters {
+    /// Quoting convention of the vols [`Self::implied_volatility`] produces.
     ///
-    /// # Arguments
-    ///
-    /// * `params` - Already-validated SABR parameters (α, β, ρ, ν, optional
-    ///   shift) used by every subsequent expansion call.
-    pub fn new(params: SabrParameters) -> Self {
-        Self { params }
-    }
-
-    /// Quoting convention of the vols this model's Hagan expansion produces.
-    ///
-    /// Determined by the same β-snap tolerance the pricing branches use:
-    /// β within `BETA_SNAP_TOL` of 0 routes to the normal-SABR branch and
-    /// yields [`SabrVolType::Normal`]; everything else yields
-    /// [`SabrVolType::Black`].
-    pub fn vol_type(&self) -> SabrVolType {
-        if self.params.beta < BETA_SNAP_TOL {
-            SabrVolType::Normal
+    /// The β≈0 (normal-SABR) branch outputs a **normal (Bachelier)** vol in
+    /// absolute rate units, displaced or not; every other β outputs a
+    /// **lognormal (Black)** vol, displaced by `shift` when one is set.
+    /// Storing a Bachelier vol in a Black surface (or vice versa) is a silent
+    /// unit error, so callers must branch on this tag. Determined by the same
+    /// β-snap tolerance the pricing branches use.
+    #[must_use]
+    pub fn quote_convention(&self) -> VolatilityConvention {
+        if self.beta < BETA_SNAP_TOL {
+            VolatilityConvention::Normal
+        } else if let Some(shift) = self.shift {
+            VolatilityConvention::ShiftedLognormal { shift }
         } else {
-            SabrVolType::Black
+            VolatilityConvention::Lognormal
         }
-    }
-
-    /// Implied volatility together with its quoting convention.
-    ///
-    /// Identical to [`Self::implied_volatility`] but returns the
-    /// [`SabrVolType`] tag alongside the number so callers cannot silently
-    /// store a Bachelier vol (β≈0 branch) in a Black-vol surface.
-    #[must_use = "computed volatility should be used"]
-    pub fn implied_volatility_with_type(
-        &self,
-        forward: f64,
-        strike: f64,
-        time_to_expiry: f64,
-    ) -> Result<(f64, SabrVolType)> {
-        Ok((
-            self.implied_volatility(forward, strike, time_to_expiry)?,
-            self.vol_type(),
-        ))
     }
 
     /// Hagan et al. (2002) implied-vol expansion with Obloj (2008) z/χ
     /// correction and optional shifted SABR for negative rates.
     ///
+    /// Selects the branch from β: a normal (Bachelier) vol for β≈0 and a
+    /// lognormal (Black) vol otherwise, as reported by
+    /// [`Self::quote_convention`]. [`Self::implied_vol_lognormal`] and
+    /// [`Self::implied_vol_normal`] are the separate fixed-convention
+    /// expansions used by SABR cubes.
+    ///
     /// # Arguments
     ///
     /// * `forward` - Forward price or rate used by the volatility or pricing model
     /// * `strike` - Option strike in the surface's quote units (absolute or relative)
-    /// * `time_to_expiry` - Time to expiry used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `time_to_expiry` - Time to expiry in years; must be strictly positive.
     #[must_use = "computed volatility should be used"]
     #[inline]
     pub fn implied_volatility(
@@ -94,11 +58,11 @@ impl SabrModel {
     ) -> Result<f64> {
         self.validate_inputs(forward, strike, time_to_expiry)?;
 
-        if self.params.beta < BETA_SNAP_TOL {
+        if self.beta < BETA_SNAP_TOL {
             let vol = super::expansion::normal_beta_zero(
-                self.params.alpha,
-                self.params.nu,
-                self.params.rho,
+                self.alpha,
+                self.nu,
+                self.rho,
                 forward,
                 strike,
                 time_to_expiry,
@@ -112,19 +76,19 @@ impl SabrModel {
             };
         }
 
-        let (effective_forward, effective_strike) = match self.params.shift {
+        let (effective_forward, effective_strike) = match self.shift {
             Some(shift) => (forward + shift, strike + shift),
             None => (forward, strike),
         };
 
-        let alpha = self.params.alpha;
-        let nu = self.params.nu;
-        let rho = self.params.rho;
+        let alpha = self.alpha;
+        let nu = self.nu;
+        let rho = self.rho;
 
         // Snap β to 0 or 1 with the same `BETA_SNAP_TOL` used by
-        // `atm_volatility` / `vol_type`, so smile and ATM paths take the same
+        // `atm_volatility` / `quote_convention`, so smile and ATM paths take the same
         // branch for a given raw β.
-        let raw_beta = self.params.beta;
+        let raw_beta = self.beta;
         let beta_is_zero = raw_beta < BETA_SNAP_TOL;
         let beta_is_one = !beta_is_zero && (1.0 - raw_beta).abs() < BETA_SNAP_TOL;
         let beta = if beta_is_zero {
@@ -238,14 +202,14 @@ impl SabrModel {
     /// ATM implied volatility (Hagan et al. (2002) eq. 2.18).
     #[inline]
     pub(crate) fn atm_volatility(&self, forward: f64, time_to_expiry: f64) -> Result<f64> {
-        let alpha = self.params.alpha;
-        let nu = self.params.nu;
-        let rho = self.params.rho;
+        let alpha = self.alpha;
+        let nu = self.nu;
+        let rho = self.rho;
         // Same β snap as `implied_volatility`. Snapping only β≈0 (and not
         // β≈1) would price exact-ATM with prefactor α/F^(1−β) while
         // neighbouring strikes use snapped β=1 and α — an ATM smile
         // discontinuity of ~F^(−(1−β)).
-        let raw_beta = self.params.beta;
+        let raw_beta = self.beta;
         let beta_is_zero = raw_beta < BETA_SNAP_TOL;
         let beta_is_one = !beta_is_zero && (1.0 - raw_beta).abs() < BETA_SNAP_TOL;
         let beta = if beta_is_zero {
@@ -308,7 +272,7 @@ impl SabrModel {
     /// - Closed-form limits at ρ → ±1
     #[inline]
     pub(crate) fn calculate_chi_robust(&self, z: f64) -> Result<f64> {
-        chi(z, self.params.rho)
+        chi(z, self.rho)
     }
 
     /// `z / χ(z)` correction using a Taylor ratio for small `|z|`.
@@ -326,7 +290,7 @@ impl SabrModel {
         const Z_SERIES: f64 = 1e-5;
 
         if z.abs() < Z_SERIES {
-            let rho = self.params.rho;
+            let rho = self.rho;
             let z2 = z * z;
             let z3 = z2 * z;
             // z/χ(z) Taylor coefficients from χ(z) = z + (ρ/2)z²
@@ -340,25 +304,109 @@ impl SabrModel {
             return Err(Error::Validation(format!(
                 "SABR z/χ(z) correction is undefined: χ(z)={:.3e} underflowed while \
                  z={:.6e} is not small. Check parameter values (ρ={:.6}).",
-                chi, z, self.params.rho
+                chi, z, self.rho
             )));
         }
 
         Ok(z / chi)
     }
 
-    /// Validated SABR parameters used by this model.
-    pub fn parameters(&self) -> &SabrParameters {
-        &self.params
-    }
-
-    /// Replace the model's SABR parameters.
+    /// Reject non-positive expiry and rates that fall outside the model's
+    /// (possibly shifted) domain.
     ///
     /// # Arguments
     ///
-    /// * `params` - Replacement validated SABR parameters.
-    pub fn set_parameters(&mut self, params: SabrParameters) {
-        self.params = params;
+    /// * `forward` - Unshifted forward rate or price to be expanded.
+    /// * `strike` - Unshifted strike in the same units as `forward`.
+    /// * `time_to_expiry` - Expiry in years; must be strictly positive.
+    pub(crate) fn validate_inputs(
+        &self,
+        forward: f64,
+        strike: f64,
+        time_to_expiry: f64,
+    ) -> Result<()> {
+        if !forward.is_finite()
+            || !strike.is_finite()
+            || !time_to_expiry.is_finite()
+            || time_to_expiry <= 0.0
+        {
+            return Err(Error::Validation(format!(
+                "SABR time_to_expiry must be positive, got: {:.6}",
+                time_to_expiry
+            )));
+        }
+
+        if self.shift.is_none() {
+            // Normal SABR (β≈0) permits non-positive forwards and strikes.
+            let beta_is_zero = self.beta < BETA_SNAP_TOL;
+            if !beta_is_zero && (forward <= 0.0 || strike <= 0.0) {
+                return Err(Error::Validation(format!(
+                    "Standard SABR with beta={:.4} requires positive rates. \
+                     Got forward={:.6}, strike={:.6}. \
+                     Use shifted SABR (or beta=0 normal SABR) for negative rates.",
+                    self.beta, forward, strike
+                )));
+            }
+        } else if let Some(shift) = self.shift {
+            if self.beta >= BETA_SNAP_TOL && (forward + shift <= 0.0 || strike + shift <= 0.0) {
+                return Err(Error::Validation(format!(
+                    "Shifted SABR: effective rates must be positive. \
+                     Got forward+shift={:.6}, strike+shift={:.6} (shift={:.6})",
+                    forward + shift,
+                    strike + shift,
+                    shift
+                )));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// SABR model wrapping validated [`SabrParameters`].
+pub struct SabrModel {
+    params: SabrParameters,
+}
+
+impl SabrModel {
+    /// Wrap validated SABR parameters.
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - Already-validated SABR parameters (α, β, ρ, ν, optional
+    ///   shift) used by every subsequent expansion call.
+    pub fn new(params: SabrParameters) -> Self {
+        Self { params }
+    }
+
+    /// Implied volatility from [`SabrParameters::implied_volatility`].
+    ///
+    /// # Arguments
+    ///
+    /// * `forward` - Forward price or rate used by the volatility or pricing model
+    /// * `strike` - Option strike in the surface's quote units (absolute or relative)
+    /// * `time_to_expiry` - Time to expiry in years; must be strictly positive.
+    #[must_use = "computed volatility should be used"]
+    #[inline]
+    pub fn implied_volatility(
+        &self,
+        forward: f64,
+        strike: f64,
+        time_to_expiry: f64,
+    ) -> Result<f64> {
+        self.params
+            .implied_volatility(forward, strike, time_to_expiry)
+    }
+
+    /// ATM implied volatility (Hagan et al. (2002) eq. 2.18).
+    #[inline]
+    pub(crate) fn atm_volatility(&self, forward: f64, time_to_expiry: f64) -> Result<f64> {
+        self.params.atm_volatility(forward, time_to_expiry)
+    }
+
+    /// Validated SABR parameters used by this model.
+    pub fn parameters(&self) -> &SabrParameters {
+        &self.params
     }
 
     /// Whether normal beta=0 dynamics or a displacement permit negative rates.
@@ -389,43 +437,7 @@ impl SabrModel {
     /// * `strike` - Unshifted strike in the same units as `forward`.
     /// * `time_to_expiry` - Expiry in years; must be strictly positive.
     pub fn validate_inputs(&self, forward: f64, strike: f64, time_to_expiry: f64) -> Result<()> {
-        if !forward.is_finite()
-            || !strike.is_finite()
-            || !time_to_expiry.is_finite()
-            || time_to_expiry <= 0.0
-        {
-            return Err(Error::Validation(format!(
-                "SABR time_to_expiry must be positive, got: {:.6}",
-                time_to_expiry
-            )));
-        }
-
-        if self.params.shift.is_none() {
-            // Normal SABR (β≈0) permits non-positive forwards and strikes.
-            let beta_is_zero = self.params.beta < BETA_SNAP_TOL;
-            if !beta_is_zero && (forward <= 0.0 || strike <= 0.0) {
-                return Err(Error::Validation(format!(
-                    "Standard SABR with beta={:.4} requires positive rates. \
-                     Got forward={:.6}, strike={:.6}. \
-                     Use shifted SABR (or beta=0 normal SABR) for negative rates.",
-                    self.params.beta, forward, strike
-                )));
-            }
-        } else if let Some(shift) = self.params.shift {
-            if self.params.beta >= BETA_SNAP_TOL
-                && (forward + shift <= 0.0 || strike + shift <= 0.0)
-            {
-                return Err(Error::Validation(format!(
-                    "Shifted SABR: effective rates must be positive. \
-                     Got forward+shift={:.6}, strike+shift={:.6} (shift={:.6})",
-                    forward + shift,
-                    strike + shift,
-                    shift
-                )));
-            }
-        }
-
-        Ok(())
+        self.params.validate_inputs(forward, strike, time_to_expiry)
     }
 }
 

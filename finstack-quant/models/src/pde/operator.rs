@@ -210,59 +210,16 @@ impl TridiagOperator {
         }
     }
 
-    /// Number of interior points this operator covers.
-    #[inline]
-    pub fn n(&self) -> usize {
-        self.n
-    }
-
-    /// Compute `y = A * x + source` for interior points.
+    /// Compute `y = A * x + source` for interior points, writing into `out`.
     ///
-    /// `x` has length `n` (interior values only). Boundary contributions are
-    /// added from the stored corrections.
+    /// Boundary contributions are added from the stored corrections.
     ///
     /// # Arguments
     ///
-    /// * `x` - Independent variable at which the function or interpolant is evaluated
-    pub fn apply(&self, x: &[f64]) -> Vec<f64> {
-        debug_assert_eq!(x.len(), self.n);
-        let mut y = vec![0.0; self.n];
-
-        if self.n == 0 {
-            return y;
-        }
-
-        y[0] = self.main[0] * x[0] + self.source[0] + self.bc_lower_rhs;
-        if self.n > 1 {
-            y[0] += self.upper[0] * x[1];
-        }
-
-        for i in 1..self.n.saturating_sub(1) {
-            y[i] = self.lower[i] * x[i - 1]
-                + self.main[i] * x[i]
-                + self.upper[i] * x[i + 1]
-                + self.source[i];
-        }
-
-        if self.n > 1 {
-            let last = self.n - 1;
-            y[last] = self.lower[last] * x[last - 1]
-                + self.main[last] * x[last]
-                + self.source[last]
-                + self.bc_upper_rhs;
-        } else {
-            // n == 1: single interior point gets both boundary corrections
-            y[0] += self.bc_upper_rhs;
-        }
-
-        y
-    }
-
-    /// Compute `y = A * x + source` for interior points, writing into `out`.
-    ///
-    /// Like [`apply`](Self::apply) but writes into a pre-allocated slice
-    /// instead of allocating.
-    pub fn apply_into(&self, x: &[f64], out: &mut [f64]) {
+    /// * `x` - Interior solution values, length `n`.
+    /// * `out` - Pre-allocated output slice of length `n`, overwritten with
+    ///   `A * x + source` plus the boundary corrections.
+    pub fn apply(&self, x: &[f64], out: &mut [f64]) {
         debug_assert_eq!(x.len(), self.n);
         debug_assert_eq!(out.len(), self.n);
 
@@ -596,7 +553,7 @@ mod tests {
     fn operator_assembly_size() {
         let grid = Grid1D::uniform(0.0, 1.0, 11).expect("valid grid");
         let op = TridiagOperator::assemble(&HeatEquation, &grid, 0.0);
-        assert_eq!(op.n(), 9); // 11 points - 2 boundaries
+        assert_eq!(op.n, 9); // 11 points - 2 boundaries
     }
 
     #[test]

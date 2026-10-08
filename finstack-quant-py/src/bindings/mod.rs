@@ -16,6 +16,7 @@ pub(crate) mod date_utils;
 pub(crate) mod extract;
 pub mod features;
 pub(crate) mod json_bridge;
+pub(crate) mod macros;
 pub mod margin;
 pub(crate) mod matrix_input;
 pub mod models;

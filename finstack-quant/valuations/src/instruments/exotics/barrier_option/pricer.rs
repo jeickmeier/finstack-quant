@@ -338,9 +338,7 @@ pub(crate) fn price_expired_barrier(
     Money::new(pv, ccy)
 }
 
-use finstack_quant_models::closed_form::barrier::{
-    barrier_call_continuous, barrier_put_continuous, barrier_rebate, BarrierParams,
-};
+use finstack_quant_models::closed_form::barrier::{barrier_price, barrier_rebate, BarrierParams};
 /// Reiner-Rubinstein pricer for continuous contractual monitoring.
 /// Discrete observation dates require the Monte Carlo or PDE engine.
 pub(crate) struct BarrierOptionAnalyticalPricer;
@@ -444,14 +442,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
 
         let params =
             BarrierParams::with_df(spot, barrier_opt.strike, effective_barrier, t, df, q, sigma)?;
-        let price = match barrier_opt.option_type {
-            crate::instruments::OptionType::Call => {
-                barrier_call_continuous(&params, analytical_barrier_type)
-            }
-            crate::instruments::OptionType::Put => {
-                barrier_put_continuous(&params, analytical_barrier_type)
-            }
-        };
+        let price = barrier_price(&params, analytical_barrier_type, barrier_opt.option_type);
 
         let rebate_val = if let Some(rebate) = barrier_opt.rebate {
             barrier_rebate(
@@ -494,7 +485,7 @@ mod tests {
     use finstack_quant_core::types::InstrumentId;
     use finstack_quant_core::types::{BarrierType, PayoutTiming};
     use finstack_quant_models::closed_form::barrier::{
-        barrier_put_continuous, barrier_rebate, down_out_call, BarrierParams,
+        barrier_price, barrier_rebate, BarrierParams,
     };
     use time::Month;
 
@@ -577,7 +568,11 @@ mod tests {
             .day_count
             .year_fraction(as_of, expiry, DayCountContext::default())
             .expect("year fraction");
-        let expected = down_out_call(spot, strike, barrier, t, rate, div_yield, vol);
+        let expected = barrier_price(
+            &BarrierParams::new(spot, strike, barrier, t, rate, div_yield, vol),
+            BarrierType::DownAndOut,
+            OptionType::Call,
+        );
 
         assert!((pv - expected).abs() < 1e-12);
     }
@@ -863,7 +858,7 @@ mod tests {
         let df = (-rate * t).exp();
         let p = BarrierParams::with_df(spot, strike, barrier, t, df, div_yield, vol)
             .expect("positive df constructs");
-        let expected = barrier_put_continuous(&p, AnalyticalBarrierType::UpAndOut);
+        let expected = barrier_price(&p, AnalyticalBarrierType::UpAndOut, OptionType::Put);
 
         assert!((pv - expected).abs() < 1e-12);
     }

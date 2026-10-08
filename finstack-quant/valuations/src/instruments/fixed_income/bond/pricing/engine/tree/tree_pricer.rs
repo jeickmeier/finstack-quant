@@ -9,12 +9,11 @@ use crate::instruments::common_impl::pricing::rates_credit::build_daily_bond_rat
 use crate::instruments::pricing_overrides::resolve_rates_credit_config;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::HashMap;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
 use finstack_quant_models::trees::short_rate_tree::TreeCalibrationResult;
 use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
-use finstack_quant_models::{short_rate_keys, ShortRateTree, ShortRateTreeConfig, TreeModel};
+use finstack_quant_models::{ShortRateTree, ShortRateTreeConfig};
 use std::borrow::Cow;
 
 /// Tree-based pricer for bonds with embedded options and OAS calculations.
@@ -175,6 +174,7 @@ impl TreePricer {
         match &self.config.tree_model {
             TreeModelChoice::HullWhite { sigma, .. }
             | TreeModelChoice::BlackDermanToy { sigma, .. }
+            | TreeModelChoice::BlackKarasinski { sigma, .. }
             | TreeModelChoice::HoLee { sigma } => *sigma == 0.0,
         }
     }
@@ -244,7 +244,10 @@ impl TreePricer {
         day_count: finstack_quant_core::dates::DayCount,
         model: &TreeModelChoice,
     ) -> usize {
-        if !matches!(model, TreeModelChoice::BlackDermanToy { .. }) {
+        if !matches!(
+            model,
+            TreeModelChoice::BlackDermanToy { .. } | TreeModelChoice::BlackKarasinski { .. }
+        ) {
             return self.config.tree_steps;
         }
 
@@ -518,7 +521,7 @@ impl TreePricer {
                     kappa,
                     sigma,
                     steps: self.config.tree_steps,
-                    max_nodes: None,
+                    volatility: None,
                     compounding: self.config.tree_compounding,
                 };
                 // Thread coupon and call/put dates into the tree grid so
@@ -526,7 +529,7 @@ impl TreePricer {
                 // and build the valuator on the tree's (non-uniform) grid.
                 let mandatory =
                     BondValuator::mandatory_grid_times(&tree_bond, market_context, as_of)?;
-                let tree = HullWhiteTree::calibrate_with_times(
+                let tree = HullWhiteTree::calibrate(
                     hw_config,
                     discount_curve.as_ref(),
                     time_to_maturity,
@@ -547,11 +550,11 @@ impl TreePricer {
                     discount_curve.day_count(),
                     &model,
                 );
-                let tree_config = ShortRateTreeConfig::bdt(tree_steps, sigma, 0.0)
+                let tree_config = ShortRateTreeConfig::bdt(tree_steps, sigma)
                     .with_compounding(self.config.tree_compounding);
                 let mut tree = ShortRateTree::new(tree_config);
                 tree.calibrate(discount_curve.as_ref(), time_to_maturity)?;
-                validate_bdt_calibration_quality(tree.calibration_result())?;
+                validate_calibration_quality("BDT", tree.calibration_result())?;
                 let valuator = BondValuator::new(
                     tree_bond.clone(),
                     market_context,
@@ -559,11 +562,30 @@ impl TreePricer {
                     time_to_maturity,
                     tree_steps,
                 )?;
-                PreparedTree::ShortRate {
-                    tree,
-                    valuator,
+                PreparedTree::ShortRate { tree, valuator }
+            }
+            model @ TreeModelChoice::BlackKarasinski { sigma, kappa } => {
+                // Same uniform grid and exercise-date step alignment as BDT;
+                // only the lattice differs.
+                let tree_steps = self.effective_steps_for_model(
+                    &tree_bond,
+                    as_of,
+                    discount_curve.day_count(),
+                    &model,
+                );
+                let tree_config = ShortRateTreeConfig::black_karasinski(tree_steps, sigma, kappa)
+                    .with_compounding(self.config.tree_compounding);
+                let mut tree = ShortRateTree::new(tree_config);
+                tree.calibrate(discount_curve.as_ref(), time_to_maturity)?;
+                validate_calibration_quality("Black-Karasinski", tree.calibration_result())?;
+                let valuator = BondValuator::new(
+                    tree_bond.clone(),
+                    market_context,
+                    as_of,
                     time_to_maturity,
-                }
+                    tree_steps,
+                )?;
+                PreparedTree::ShortRate { tree, valuator }
             }
             TreeModelChoice::HoLee { sigma } => {
                 let tree_config = ShortRateTreeConfig {
@@ -582,11 +604,7 @@ impl TreePricer {
                     time_to_maturity,
                     self.config.tree_steps,
                 )?;
-                PreparedTree::ShortRate {
-                    tree,
-                    valuator,
-                    time_to_maturity,
-                }
+                PreparedTree::ShortRate { tree, valuator }
             }
         };
         Ok(pricer(prepared))
@@ -605,11 +623,10 @@ enum PreparedTree {
     RatesCredit(RatesCreditTree, BondValuator),
     /// Hull-White trinomial tree through the bond's mandatory dates.
     HullWhite(HullWhiteTree, BondValuator),
-    /// BDT or Ho-Lee short-rate tree on a uniform grid.
+    /// BDT, Black-Karasinski or Ho-Lee short-rate tree on a uniform grid.
     ShortRate {
         tree: ShortRateTree,
         valuator: BondValuator,
-        time_to_maturity: f64,
     },
 }
 
@@ -654,16 +671,7 @@ impl OasPricer<'_> {
                 valuator.price_deterministic_rates_credit(tree, oas)?
             }
             PreparedTree::HullWhite(tree, valuator) => valuator.price_with_hw_tree(tree, oas)?,
-            PreparedTree::ShortRate {
-                tree,
-                valuator,
-                time_to_maturity,
-            } => {
-                let mut vars = HashMap::<&'static str, f64>::default();
-                vars.insert(short_rate_keys::SHORT_RATE, tree.rate_at_node(0, 0)?);
-                vars.insert(short_rate_keys::OAS, oas);
-                tree.price(vars, *time_to_maturity, self.market, valuator)?
-            }
+            PreparedTree::ShortRate { tree, valuator } => tree.price(oas, valuator)?,
         };
         Ok(TreePriceOutcome::deterministic(amount))
     }
@@ -675,9 +683,17 @@ impl Default for TreePricer {
     }
 }
 
-fn validate_bdt_calibration_quality(quality: Option<&TreeCalibrationResult>) -> Result<()> {
+/// Reject a lognormal short-rate tree whose calibration missed the curve.
+///
+/// `model` names the lattice ("BDT", "Black-Karasinski") in the error.
+fn validate_calibration_quality(
+    model: &str,
+    quality: Option<&TreeCalibrationResult>,
+) -> Result<()> {
     let quality = quality.ok_or_else(|| {
-        Error::internal("BDT calibration quality is unavailable after calibration")
+        Error::internal(format!(
+            "{model} calibration quality is unavailable after calibration"
+        ))
     })?;
 
     if quality.is_acceptable() {
@@ -685,7 +701,7 @@ fn validate_bdt_calibration_quality(quality: Option<&TreeCalibrationResult>) -> 
     }
 
     Err(Error::Validation(format!(
-        "BDT calibration quality is unacceptable: max_error_bp={:.6}, max_error_step={}, fallback_count={}, converged={}",
+        "{model} calibration quality is unacceptable: max_error_bp={:.6}, max_error_step={}, fallback_count={}, converged={}",
         quality.max_error_bp, quality.max_error_step, quality.fallback_count, quality.converged
     )))
 }
@@ -712,7 +728,7 @@ mod tests {
             converged: true,
         };
 
-        let err = validate_bdt_calibration_quality(Some(&poor))
+        let err = validate_calibration_quality("BDT", Some(&poor))
             .expect_err("poor BDT calibration should be rejected");
         let msg = err.to_string();
 

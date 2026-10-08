@@ -10,4 +10,9 @@ export const liquidity = {
   lvarBangia: wasm.lvarBangia,
   almgrenChrissImpact: wasm.almgrenChrissImpact,
   kyleLambda: wasm.kyleLambda,
+  liquidityProfileSpread: wasm.liquidityProfileSpread,
+  liquidityProfileRelativeSpread: wasm.liquidityProfileRelativeSpread,
+  liquidityProfileHalfSpread: wasm.liquidityProfileHalfSpread,
+  liquidityProfileRelativeSpreadVolatility: wasm.liquidityProfileRelativeSpreadVolatility,
+  tradeParamsEffectiveReferencePrice: wasm.tradeParamsEffectiveReferencePrice,
 };

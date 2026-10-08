@@ -24,7 +24,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "Credit factor hierarchy artifacts, calibration, and decomposition.",
     )?;
     credit::register(py, &credit)?;
-    risk::register_credit_forecast(&credit)?;
 
     let credit_all = PyList::new(
         py,

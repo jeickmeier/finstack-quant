@@ -113,12 +113,6 @@ impl TransitionMatrix {
         Ok(self.data[(i, j)])
     }
 
-    /// Transition probability by row/column index (no bounds check).
-    #[must_use]
-    pub fn probability_by_index(&self, from: usize, to: usize) -> f64 {
-        self.data[(from, to)]
-    }
-
     /// Transition probability by row/column index, with bounds checking.
     ///
     /// # Arguments
@@ -130,7 +124,7 @@ impl TransitionMatrix {
     ///
     /// Returns [`MigrationError::InvalidState`] if either index is outside the
     /// scale.
-    pub fn try_probability_by_index(&self, from: usize, to: usize) -> Result<f64, MigrationError> {
+    pub fn probability_by_index(&self, from: usize, to: usize) -> Result<f64, MigrationError> {
         let n_states = self.n_states();
         for state in [from, to] {
             if state >= n_states {

@@ -43,7 +43,7 @@
 //! ```
 
 use finstack_quant_core::dates::PeriodId;
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{

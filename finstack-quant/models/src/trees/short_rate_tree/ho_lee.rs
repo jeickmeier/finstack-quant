@@ -1,5 +1,5 @@
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::math::{BrentSolver, Solver};
+use finstack_quant_core::math::BrentSolver;
 use finstack_quant_core::{Error, Result};
 
 use super::{ShortRateTree, TreeCalibrationResult, TreeDiscounting};

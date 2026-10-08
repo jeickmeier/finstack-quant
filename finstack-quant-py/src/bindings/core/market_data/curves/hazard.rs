@@ -7,12 +7,13 @@ use std::sync::Arc;
 use pyo3::prelude::*;
 
 use super::helpers::{
-    columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods,
-    impl_repr_html_via_dataframe, par_interp_name, parse_par_interp, parse_seniority, TimePoint,
+    columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods, par_interp_name,
+    parse_par_interp, parse_seniority, TimePoint,
 };
 use crate::bindings::core::currency::{extract_currency, PyCurrency};
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::impl_repr_html_via_dataframe;
 use crate::errors::core_to_py;
 
 /// Options accepted by the ``HazardCurve`` constructor beyond the knots.

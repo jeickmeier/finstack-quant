@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "LocalVolSurface": {
+      "additionalProperties": false,
+      "description": "Local volatility surface `σ_loc(T, K)` on a rectangular expiry-by-strike\ngrid, extracted from an implied volatility surface via the Dupire formula.\n\nOff-grid queries are interpolated bilinearly; outside the grid the nearest\nboundary value applies (flat extrapolation).\n\n# Invariants\n\n- Expiries and strikes are finite and strictly increasing; expiries are\n  non-negative and strikes positive.\n- There is one finite, non-negative local volatility per grid node, stored\n  row-major with the expiry as the slow axis.\n\nDeserialization enforces the same invariants.\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::surfaces::VolSurface;\nuse finstack_quant_models::volatility::local_vol::LocalVolSurface;\n\n// Implied vol skewed in strike and flat in expiry.\nlet expiries = [0.25, 0.5, 1.0, 2.0];\nlet strikes = [80.0, 90.0, 100.0, 110.0, 120.0];\nlet smile = [0.24, 0.22, 0.20, 0.19, 0.185];\nlet mut builder = VolSurface::builder(\"SKEW\").expiries(&expiries).strikes(&strikes);\nfor _ in &expiries {\n    builder = builder.row(&smile);\n}\nlet surface = builder.build()?;\n\n// One forward per expiry: F(T) = S·exp((r − q)·T) with S = 100, r − q = 2%.\nlet forwards: Vec<f64> = expiries.iter().map(|t| 100.0 * (0.02 * t).exp()).collect();\nlet local_vol = LocalVolSurface::from_implied_vol(&surface, &forwards)?;\n\nassert_eq!(local_vol.grid_shape(), (4, 5));\n// A negative skew is steeper in local than in implied volatility.\nassert!(local_vol.value(1.0, 90.0) > local_vol.value(1.0, 110.0));\n# Ok::<(), finstack_quant_core::Error>(())\n```",
+      "properties": {
+        "expiries": {
+          "description": "Expiry axis in years, strictly increasing and non-negative.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "local_vols": {
+          "description": "Local volatilities as annualized decimals, finite and non-negative,\nrow-major: `local_vols[expiry_index * strikes.len() + strike_index]`.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "strikes": {
+          "description": "Strike axis in price units of the underlying, strictly increasing and\npositive.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "expiries",
+        "strikes",
+        "local_vols"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/local_vol_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Rates and local volatility surface of the Dupire local-volatility process.",
+  "properties": {
+    "q": {
+      "description": "Dividend yield or foreign rate, continuously compounded (annualized\ndecimal).",
+      "format": "double",
+      "type": "number"
+    },
+    "r": {
+      "description": "Risk-free rate, continuously compounded (annualized decimal).",
+      "format": "double",
+      "type": "number"
+    },
+    "surface": {
+      "$ref": "#/$defs/LocalVolSurface",
+      "description": "Local volatility `σ_loc(t, S)`: expiry axis in years from the\nsimulation start, strike axis in spot price units. Flat outside its\ngrid."
+    }
+  },
+  "required": [
+    "r",
+    "q",
+    "surface"
+  ],
+  "title": "LocalVolParams",
+  "type": "object"
+}

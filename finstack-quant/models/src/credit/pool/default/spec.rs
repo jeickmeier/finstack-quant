@@ -266,7 +266,7 @@ mod tests {
             .build()
             .expect("valid spec")
             .expect("Should build intensity process model");
-        assert_eq!(model.model_name(), "Intensity Process Default Model");
+        assert!(format!("{model:?}").starts_with("IntensityProcessDefault"));
     }
 
     /// Every stochastic default/prepay variant clamps its systematic-factor
@@ -317,10 +317,10 @@ mod tests {
             .build()
             .expect("valid spec")
             .expect("factor-correlated model should build");
-        assert_eq!(model.model_name(), "Factor-Correlated Default");
+        assert!(format!("{model:?}").starts_with("FactorCorrelatedDefault"));
         // Canonical convention: low factor = stress, so a negative factor
         // realization must raise the conditional MDR above its expectation.
-        assert!(model.conditional_mdr(12, &[-2.0], &Default::default()) > model.expected_mdr(12));
+        assert!(model.conditional_mdr(12, &[-2.0]) > model.expected_mdr(12));
     }
 
     #[test]

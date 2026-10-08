@@ -30,7 +30,7 @@ use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::valuation::{
     revalue_affected, value_portfolio, PortfolioValuationOptions, RequestedMetrics,
 };
-use finstack_quant_portfolio::{MarketFactorKey, PortfolioBuilder};
+use finstack_quant_portfolio::{MarketFactorKey, Portfolio};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::RatesCurveKind;
 use rust_decimal_macros::dec;
@@ -59,7 +59,7 @@ fn create_selective_benchmark_portfolio(
     let sparse_end = num_positions * 3 / 100;
     let quarter_end = num_positions / 4;
     let half_end = num_positions / 2;
-    let mut builder = PortfolioBuilder::new("SELECTIVE_BENCHMARK")
+    let mut builder = Portfolio::builder("SELECTIVE_BENCHMARK")
         .base_currency(Currency::USD)
         .as_of(base_date())
         .entity(Entity::new("SELECTIVE_ENTITY"));

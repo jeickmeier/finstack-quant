@@ -224,53 +224,6 @@ fn dated_flows<'py>(
         .collect()
 }
 
-/// Compute accrued interest for a schedule as of a given date.
-///
-/// Parameters
-/// ----------
-/// schedule_json : str
-///     JSON-encoded `CashFlowSchedule`.
-/// as_of : datetime.date | str
-///     Accrual snapshot date, either a date-like object (``datetime.date``,
-///     ``pandas.Timestamp``) or an ISO 8601 string.
-/// config_json : str, optional
-///     JSON-encoded `AccrualConfig` overriding defaults.
-///
-/// Returns
-/// -------
-/// float
-///     Accrued interest in the schedule's settlement currency, returned as a
-///     host-language double. The Rust engine computes from the canonical
-///     schedule and then crosses the binding boundary as `f64`; for large
-///     notionals, compare results with an absolute tolerance scaled to the
-///     schedule notional rather than expecting decimal-string equality.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If either JSON document is malformed, the schedule fails validation,
-///     compounded accrual has a non-finite period rate or a rate at or below
-///     -100%, or the resulting accrued interest is non-finite.
-/// KeyError
-///     If a configured ex-coupon calendar id cannot be resolved.
-#[pyfunction]
-#[pyo3(
-    signature = (schedule_json, as_of, config_json = None),
-    text_signature = "(schedule_json, as_of, config_json=None)"
-)]
-fn accrued_interest(
-    py: Python<'_>,
-    schedule_json: &str,
-    as_of: &Bound<'_, PyAny>,
-    config_json: Option<&str>,
-) -> PyResult<f64> {
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    py.detach(|| {
-        finstack_quant_cashflows::accrued_interest(schedule_json, &as_of, config_json)
-            .map_err(crate::errors::core_to_py)
-    })
-}
-
 /// Schedule-level inputs shared by ``schedule_from_dated_flows`` and
 /// ``schedule_from_classified_flows``.
 ///
@@ -461,7 +414,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     fixings::register(py, &m)?;
 
     m.add_class::<PyScheduleBuildOpts>()?;
-    m.add_function(wrap_pyfunction!(accrued_interest, &m)?)?;
     m.add_function(wrap_pyfunction!(build_cashflow_schedule, &m)?)?;
     m.add_function(wrap_pyfunction!(build_cashflow_schedule_json, &m)?)?;
     m.add_function(wrap_pyfunction!(dated_flows, &m)?)?;
@@ -469,38 +421,23 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(schedule_from_classified_flows, &m)?)?;
     m.add_function(wrap_pyfunction!(schedule_from_dated_flows, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_cashflow_schedule_json, &m)?)?;
-    // Prepayment/default rate-convention conversions. The Rust crate root
-    // re-exports these from `builder::credit_rates`, so they are exposed both
-    // flat here (mirroring the crate root, and the WASM facade) and on the
-    // typed `builder` submodule (mirroring `builder::`).
-    m.add_function(wrap_pyfunction!(builder::abs_to_smm, &m)?)?;
-    m.add_function(wrap_pyfunction!(builder::cdr_to_mdr, &m)?)?;
-    m.add_function(wrap_pyfunction!(builder::cpr_to_smm, &m)?)?;
-    m.add_function(wrap_pyfunction!(builder::mdr_to_cdr, &m)?)?;
-    m.add_function(wrap_pyfunction!(builder::smm_to_cpr, &m)?)?;
 
     let all = PyList::new(
         py,
         [
             "ScheduleBuildOpts",
-            "abs_to_smm",
             "accrual",
-            "accrued_interest",
             "aggregation",
             "build_cashflow_schedule",
             "build_cashflow_schedule_json",
             "builder",
-            "cdr_to_mdr",
-            "cpr_to_smm",
             "dated_flows",
             "dated_flows_json",
             "fixings",
-            "mdr_to_cdr",
             "primitives",
             "schedule_from_classified_flows",
             "schedule_from_dated_flows",
             "schema",
-            "smm_to_cpr",
             "validate_cashflow_schedule_json",
         ],
     )?;

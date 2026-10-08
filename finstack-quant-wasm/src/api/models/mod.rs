@@ -1,10 +1,12 @@
 //! WASM bindings for the `finstack-quant-models` crate.
 //!
 //! Split by model family:
-//! - [`analytic`] — closed-form option primitives.
+//! - [`closed_form`] — closed-form option primitives.
 //! - [`fourier`] — COS-method Fourier pricers.
 //! - [`volatility`] — volatility models, evaluators, and convention conversion.
-//! - [`credit`] — structural-credit model factories.
+//! - [`credit`] — structural-credit, LGD, PD, migration, scoring, recovery-waterfall
+//!   and liability-management models.
+//! - [`factor`] — credit factor hierarchy and factor-risk decomposition.
 //! - [`correlation`] — copula, recovery, and joint-probability utilities.
 //! - [`monte_carlo`] — stochastic option-pricing convenience functions.
 //! - [`liquidity`] — liquidity estimation, risk, and market-impact models.
@@ -53,29 +55,11 @@ macro_rules! json_round_trip {
     };
 }
 
-/// Canonical serde tag of an externally tagged enum value (`"constant"`, or
-/// the single key of `{"inverse_power": {...}}`), as the Python binding reports
-/// it through `kind`.
-pub(crate) fn serde_tag<T: serde::Serialize>(value: &T) -> Result<String, wasm_bindgen::JsValue> {
-    match serde_json::to_value(value).map_err(crate::utils::to_js_err)? {
-        serde_json::Value::String(tag) => Ok(tag),
-        serde_json::Value::Object(map) if map.len() == 1 => Ok(map
-            .into_iter()
-            .next()
-            .map(|(tag, _)| tag)
-            .unwrap_or_default()),
-        other => Err(crate::utils::to_js_err(format!(
-            "expected an externally tagged enum value, got {other}"
-        ))),
-    }
-}
-
-pub mod analytic;
+pub mod closed_form;
 pub mod correlation;
 pub mod credit;
 pub mod factor;
 pub mod fourier;
-pub mod liability_management;
 pub mod liquidity;
 pub mod monte_carlo;
 pub mod rates;

@@ -1,11 +1,12 @@
 """
 Monte Carlo convenience bindings (``finstack-quant-models``).
 
-Exposes simulation primitives: time grids, engine configuration, pricers,
-closed-form Black-Scholes helpers, and selected non-GBM process wrappers.
-Advanced Rust process, discretization, RNG, payoff, and Greeks types are not
-surfaced as standalone Python types yet; their parameters are passed directly
-as numeric arguments to the exposed pricer constructors and methods.
+Exposes path simulation for the built-in processes, Markov and
+path-dependent (:func:`simulate_paths`), GBM and Heston pricers, and finite-difference Greek
+estimators. Processes and discretization schemes are selected by the plain-data
+spec passed to :func:`simulate_paths`; the Rust process, discretization, RNG
+and payoff types are not surfaced as standalone Python types, and the pricers
+take their parameters directly as numeric arguments.
 
 Examples
 --------
@@ -17,6 +18,7 @@ True
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 import pandas as pd
 
@@ -25,18 +27,17 @@ from finstack_quant.core.money import Money
 __all__ = [
     "Estimate",
     "EuropeanPricer",
-    "GbmPathSummary",
+    "LrmGreeks",
     "LsmcPricer",
     "MoneyEstimate",
     "PathDependentPricer",
+    "PathSummary",
     "finite_diff_delta",
-    "finite_diff_delta_crn",
     "finite_diff_gamma",
-    "finite_diff_gamma_crn",
     "heston_satisfies_feller",
     "price_heston_call",
     "price_heston_put",
-    "simulate_gbm_paths",
+    "simulate_paths",
 ]
 
 class MoneyEstimate:
@@ -612,22 +613,30 @@ class Estimate:
         """
         ...
 
-class GbmPathSummary:
+class LrmGreeks:
     """
-    Compact captured GBM spot paths.
+    Monte Carlo price with likelihood-ratio delta and vega from the same paths.
+
+    Returned by :meth:`PathDependentPricer.price_with_lrm_greeks`. Each Greek
+    is a sample mean of ``discounted payoff x score``, so it carries its own
+    standard error and 95% confidence interval. The three estimates share one
+    set of paths and are correlated.
 
     Examples
     --------
-    >>> from finstack_quant.models.monte_carlo import simulate_gbm_paths
-    >>> paths = simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 2, 3, seed=7)
-    >>> (paths.num_paths, paths.times)
-    (3, [0.0, 0.5, 1.0])
+    >>> from finstack_quant.models.monte_carlo import PathDependentPricer
+    >>> pricer = PathDependentPricer(2000, 7, use_parallel=False)
+    >>> greeks = pricer.price_with_lrm_greeks(100, 100, 0.04, 0.01, 0.25, 1.0, True, num_steps=12)
+    >>> (greeks.price.num_paths, greeks.delta.num_paths, greeks.vega.num_paths)
+    (2000, 2000, 2000)
+    >>> list(greeks.to_dataframe().index)
+    ['price', 'delta', 'vega']
     """
 
     @staticmethod
-    def from_json(json: str) -> GbmPathSummary:
+    def from_json(json: str) -> LrmGreeks:
         """
-        Deserialize a ``GbmPathSummary`` from JSON.
+        Deserialize an ``LrmGreeks`` from JSON.
 
         Parameters
         ----------
@@ -636,8 +645,8 @@ class GbmPathSummary:
 
         Returns
         -------
-        GbmPathSummary
-            Parsed ``GbmPathSummary`` instance.
+        LrmGreeks
+            Parsed ``LrmGreeks`` instance.
 
         Raises
         ------
@@ -646,10 +655,166 @@ class GbmPathSummary:
 
         Examples
         --------
-        >>> from finstack_quant.models.monte_carlo import GbmPathSummary, simulate_gbm_paths
-        >>> paths = simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 2, 3, seed=7)
-        >>> GbmPathSummary.from_json(paths.to_json()).times
-        [0.0, 0.5, 1.0]
+        >>> from finstack_quant.models.monte_carlo import LrmGreeks, PathDependentPricer
+        >>> pricer = PathDependentPricer(2000, 7, use_parallel=False)
+        >>> greeks = pricer.price_with_lrm_greeks(100, 100, 0.04, 0.01, 0.25, 1.0, False, num_steps=12)
+        >>> LrmGreeks.from_json(greeks.to_json()).delta.mean == greeks.delta.mean
+        True
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON string with the ``price``, ``delta`` and ``vega``
+            estimates.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+
+    @property
+    def price(self) -> MoneyEstimate:
+        """
+        Discounted price estimate in the payoff currency.
+
+        Returns
+        -------
+        MoneyEstimate
+            Mean, standard error and 95% confidence interval of the price.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def delta(self) -> Estimate:
+        """
+        Likelihood-ratio delta.
+
+        Returns
+        -------
+        Estimate
+            Change in price per unit change in the initial spot, with its
+            standard error and 95% confidence interval.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def vega(self) -> Estimate:
+        """
+        Likelihood-ratio vega.
+
+        Returns
+        -------
+        Estimate
+            Change in price per one volatility point (``0.01`` of annualized
+            volatility), with its standard error and 95% confidence interval.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        Tabulate the three estimates as a pandas DataFrame.
+
+        Returns
+        -------
+        pd.DataFrame
+            Three rows indexed ``["price", "delta", "vega"]`` with float64
+            columns ``mean``, ``stderr``, ``ci_lower`` and ``ci_upper`` (the
+            95% confidence interval). The price row is in units of the price
+            currency.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.monte_carlo import PathDependentPricer
+        >>> pricer = PathDependentPricer(2000, 7, use_parallel=False)
+        >>> frame = pricer.price_with_lrm_greeks(100, 100, 0.04, 0.01, 0.25, 1.0, True, num_steps=12).to_dataframe()
+        >>> list(frame.columns)
+        ['mean', 'stderr', 'ci_lower', 'ci_upper']
+        """
+        ...
+
+class PathSummary:
+    """
+    Simulated paths of one built-in process on a shared time grid.
+
+    Returned by :func:`simulate_paths`. ``values`` holds every state in
+    row-major ``[path][time][factor]`` order; :meth:`to_dataframe` reshapes it
+    into one row per path and time.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.monte_carlo import simulate_paths
+    >>> spec = {
+    ...     "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.2},
+    ...     "initial_state": [100.0],
+    ...     "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 2},
+    ...     "num_paths": 3,
+    ...     "seed": 7,
+    ... }
+    >>> paths = simulate_paths(spec)
+    >>> (paths.num_simulated_paths, paths.times, paths.factor_names)
+    (3, [0.0, 0.5, 1.0], ['spot'])
+    >>> paths.to_dataframe().shape
+    (9, 1)
+    """
+
+    @staticmethod
+    def from_json(json: str) -> PathSummary:
+        """
+        Deserialize a ``PathSummary`` from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON string produced by :meth:`to_json`.
+
+        Returns
+        -------
+        PathSummary
+            Parsed ``PathSummary`` instance.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or does not satisfy the serialized schema.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.monte_carlo import PathSummary, simulate_paths
+        >>> spec = {
+        ...     "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.2},
+        ...     "initial_state": [100.0],
+        ...     "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 2},
+        ...     "num_paths": 3,
+        ...     "seed": 7,
+        ... }
+        >>> paths = simulate_paths(spec)
+        >>> PathSummary.from_json(paths.to_json()).values == paths.values
+        True
         """
         ...
 
@@ -672,12 +837,12 @@ class GbmPathSummary:
     @property
     def num_paths(self) -> int:
         """
-        Number of independent path estimators.
+        Number of independent random streams requested.
 
         Returns
         -------
         int
-            Count of independent estimators; half of simulated paths when antithetic.
+            The ``num_paths`` of the simulation spec.
 
         Notes
         -----
@@ -688,12 +853,30 @@ class GbmPathSummary:
     @property
     def num_simulated_paths(self) -> int:
         """
-        Total number of simulated sample paths.
+        Number of stored paths.
 
         Returns
         -------
         int
-            Raw simulated path count including antithetic partners when enabled.
+            ``num_paths``, or ``2 * num_paths`` with antithetic sampling, where
+            stored paths ``2k`` and ``2k + 1`` are stream ``k`` and its
+            antithetic partner.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def dim(self) -> int:
+        """
+        State dimension of the process.
+
+        Returns
+        -------
+        int
+            Number of state components; equals ``len(factor_names)``.
 
         Notes
         -----
@@ -704,12 +887,12 @@ class GbmPathSummary:
     @property
     def times(self) -> list[float]:
         """
-        Shared path times in year fractions, including time zero.
+        Simulation times in year fractions, starting at zero.
 
         Returns
         -------
         list[float]
-            Common time grid in years, including the origin at time zero.
+            Shared time grid in years; its length is the step count plus one.
 
         Notes
         -----
@@ -718,14 +901,34 @@ class GbmPathSummary:
         ...
 
     @property
-    def paths(self) -> list[list[float]]:
+    def factor_names(self) -> list[str]:
         """
-        Captured spot paths in deterministic path-id order.
+        Name of each state component, in state-vector order.
 
         Returns
         -------
-        list[list[float]]
-            One spot path per captured estimator, each aligned to ``times``.
+        list[str]
+            For example ``["spot"]`` for GBM, ``["spot", "variance"]`` for
+            Heston and ``["short_rate"]`` for the short-rate models.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def values(self) -> list[float]:
+        """
+        Simulated states in row-major ``[path][time][factor]`` order.
+
+        Returns
+        -------
+        list[float]
+            Flat list of ``num_simulated_paths * len(times) * dim`` states: the
+            value of factor ``f`` on stored path ``p`` at ``times[s]`` is
+            ``values[(p * len(times) + s) * dim + f]``. Reshape with
+            ``numpy.asarray(values).reshape(num_simulated_paths, len(times), dim)``.
 
         Notes
         -----
@@ -735,93 +938,177 @@ class GbmPathSummary:
 
     def to_dataframe(self) -> pd.DataFrame:
         """
-        Export the captured paths as a pandas DataFrame indexed by time.
+        Export the paths as a long pandas DataFrame.
 
-        Columns: ``path_0``, ``path_1``, ... — one column per captured path,
-        in the deterministic path-id order Rust produced. The index is the
-        shared time grid in year fractions, including time zero.
-
-        Wide (time x path) rather than one row: it is the shape ``df.plot()``
-        and ``df.quantile(axis=1)`` expect for a path bundle, and every path
-        already shares the one time grid. There is always at least one column:
-        the engine rejects a zero-path simulation.
+        One row per stored path and time, indexed by a ``(path, time)``
+        ``MultiIndex`` in the order Rust produced (``path`` is the zero-based
+        stored-path number, ``time`` the year fraction), with one float64
+        column per entry of ``factor_names``. Use
+        ``frame["spot"].unstack("path")`` for the time-by-path table of one
+        factor.
 
         Returns
         -------
         pd.DataFrame
-            Time-indexed frame with one column per captured path.
+            ``num_simulated_paths * len(times)`` rows and ``dim`` columns.
 
         Raises
         ------
         ValueError
-            If a captured path's length differs from the time grid's, which
-            would silently misalign the index.
+            If ``values`` does not hold ``num_simulated_paths * len(times) *
+            len(factor_names)`` entries, which is only possible for a summary
+            rebuilt from inconsistent JSON.
         """
         ...
 
-def simulate_gbm_paths(
-    spot: float,
-    rate: float,
-    div_yield: float,
-    vol: float,
-    expiry: float,
-    num_steps: int,
-    num_paths: int,
-    seed: int | None = None,
-) -> GbmPathSummary:
+def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
     """
-    Simulate compact GBM spot paths with Rust's exact GBM transitions.
+    Simulate paths of any built-in process on a shared time grid.
 
-    ``num_paths`` is the estimator and simulated-path count because captured
-    paths are independently simulated. The compact output and shared time grids must satisfy
-    ``(num_paths + 3) * (num_steps + 1) <= 64_000_000`` scalar values,
-    including time zero in every path.
+    Binds Rust ``monte_carlo::simulate::simulate_paths``. The spec is plain
+    data validated in Rust: it selects the process, the discretization scheme,
+    the time grid and the random streams. The same spec always reproduces the
+    same paths bit for bit, on any thread count.
 
     Parameters
     ----------
-    spot : float
-        Positive initial underlying price in the output path's price units.
-    rate : float
-        Continuously compounded annual risk-free rate as a decimal.
-    div_yield : float
-        Continuously compounded annual dividend or carry yield as a decimal.
-    vol : float
-        Strictly positive annualized GBM volatility as a decimal, such as ``0.20``.
-    expiry : float
-        Positive time to maturity in years.
-    num_steps : int
-        Positive number of equally spaced simulation steps over the expiry
-        horizon, subject to the aggregate storage limit above.
-    num_paths : int
-        Number of independently simulated paths retained in the summary,
-        in ``[1, 100_000]`` and subject to the aggregate storage limit above.
-    seed : int or None, default None
-        Optional deterministic Philox seed; ``None`` uses the Rust
-        ``GbmPathConfig`` default (``42``), so unseeded calls are repeatable.
+    spec : dict or str
+        ``PathSimulationSpec`` as a dict or its JSON text, with keys:
+
+        - ``process`` : dict tagged by ``"type"`` plus that process's
+          parameters. Rates, yields and volatilities are annualized decimals
+          (``0.05`` for 5%); times are in years.
+
+          - ``"gbm"`` : ``r``, ``q``, ``sigma``. State ``[spot]``.
+          - ``"gbm_with_dividends"`` : ``params`` (GBM parameters) and
+            ``dividends``, a list of ``[time, {"cash": amount}]`` or
+            ``[time, {"proportional": fraction}]``. State ``[spot]``.
+          - ``"multi_gbm"`` : ``assets`` (list of GBM parameters) and optional
+            ``correlation`` (row-major ``n x n``). State ``[spot_0, ...]``.
+          - ``"brownian"`` : ``mu``, ``sigma``. State ``[x]``.
+          - ``"multi_brownian"`` : ``mus``, ``sigmas``, optional
+            ``correlation``. State ``[x_0, ...]``.
+          - ``"multi_ou"`` : ``kappas``, ``thetas``, ``sigmas``, optional
+            ``correlation``. State ``[x_0, ...]``.
+          - ``"hull_white_1f"`` : ``kappa``, ``volatility``
+            (``{"times": [...], "values": [...]}``), ``theta_curve``,
+            ``theta_times``. State ``[short_rate]``.
+          - ``"cir"`` : ``kappa``, ``theta``, ``sigma``. State ``[short_rate]``.
+          - ``"cir_plus_plus"`` : ``params`` (CIR parameters),
+            ``shift_curve``, ``shift_times``. State ``[short_rate]``.
+          - ``"heston"`` : ``r``, ``q``, ``kappa``, ``theta``, ``sigma_v``,
+            ``rho``, ``v0``. State ``[spot, variance]``; the starting variance
+            must equal ``v0``.
+          - ``"schwartz_smith"`` : ``kappa``, ``sigma_x``, ``mu_y``,
+            ``sigma_y``, ``rho_xy``, optional ``lambda_x``. State ``[x, y]``.
+          - ``"local_vol"`` : ``r``, ``q`` and ``surface``, a Dupire local
+            volatility grid ``{"expiries": [...], "strikes": [...],
+            "local_vols": [...]}`` (row-major, expiry as the slow axis) such
+            as ``json.loads(LocalVolSurface.to_json())`` from
+            :mod:`finstack_quant.models.volatility`. State ``[spot]``. Use a
+            fine time grid: the scheme freezes the volatility over each step.
+          - ``"lmm"`` : ``num_forwards``, ``num_factors`` (2 or 3),
+            ``tenors`` (``num_forwards + 1`` year fractions),
+            ``accrual_factors``, ``displacements``, ``vol_times``,
+            ``vol_values`` (per volatility period, per forward, three factor
+            loadings) and ``initial_forwards``. State ``[forward_0, ...]``,
+            simple forward rates under the terminal measure;
+            ``initial_state`` must equal ``initial_forwards``, and the time
+            grid must contain every fixing date and volatility breakpoint
+            inside the horizon.
+          - ``"rough_bergomi"`` : ``r``, ``q``, ``hurst`` (``{"h": H}`` with
+            ``H`` in ``(0, 1)``), ``eta``, ``rho`` and ``xi``, the forward
+            variance curve ``{"interpolation": "linear" |
+            "constant_intervals", "times": [...], "values": [...]}``. State
+            ``[spot]``.
+          - ``"rough_heston"`` : ``r``, ``q``, ``hurst`` (``H`` in
+            ``(0, 0.5)``), ``kappa``, ``theta``, ``sigma_v``, ``rho``, ``v0``.
+            State ``[spot, variance]``; the starting variance must equal
+            ``v0``. At most 8,000 steps.
+          - ``"cheyette_rough"`` : ``kappa``, ``sigma_base`` (base volatility
+            curve, same shape as ``xi``), ``hurst``, ``eta``, ``rho``,
+            ``phi_times`` and ``phi_values`` (initial forward curve). State
+            ``[x, y]``, normally started at ``[0, 0]``; the short rate is
+            ``x`` plus the initial forward rate.
+
+        - ``scheme`` : ``"default"`` (the process's canonical scheme — its
+          exact transition where one exists, quadratic-exponential for
+          square-root variance, Euler otherwise; used when omitted),
+          ``"euler"``, ``"log_euler"`` or ``"milstein"``. ``"log_euler"`` and
+          ``"milstein"`` apply to ``"gbm"`` and ``"multi_gbm"`` only, except
+          that ``"local_vol"`` also accepts ``"log_euler"`` (its default);
+          ``"lmm"``, ``"rough_bergomi"``, ``"rough_heston"`` and
+          ``"cheyette_rough"`` accept ``"default"`` only.
+        - ``initial_state`` : list of float, the state at time zero in the
+          process's state layout.
+        - ``time_grid`` : ``{"type": "uniform", "expiry": years, "num_steps": n}``
+          or ``{"type": "times", "times": [0.0, ...]}`` with strictly
+          increasing year fractions.
+        - ``num_paths`` : int in ``[1, 100_000]``, the number of independent
+          random streams.
+        - ``seed`` : int, root seed of the Philox generator.
+        - ``antithetic`` : bool, default ``False``. When ``True`` each stream's
+          path is followed by its antithetic partner, driven by the negated
+          normal draws.
+        - ``fbm`` : dict, optional. Generator of the fractional noise that
+          ``"rough_bergomi"`` and ``"cheyette_rough"`` consume:
+          ``{"type": "volterra"}`` (used when omitted; the Riemann-Liouville
+          Volterra process of the published models, uniform grids only),
+          ``{"type": "cholesky"}`` (exact fractional Brownian motion, at most
+          8,000 steps) or ``{"type": "windowed_conditional",
+          "near_field_size": n}`` (approximate fractional Brownian motion
+          with an ``n``-step window; ``n`` optional). The last two give a
+          different model with the same forwards.
 
     Returns
     -------
-    GbmPathSummary
-        Captured time grid and simulated spot paths. ``num_paths`` is the
-        number of returned paths and ``num_simulated_paths`` records the same
-        count.
+    PathSummary
+        Every simulated state, including the initial state at time zero, in
+        stream order.
 
     Raises
     ------
     ValueError
-        If ``spot`` is non-finite or not strictly positive; ``rate`` or
-        ``div_yield`` is non-finite; ``vol`` is not strictly positive or is
-        non-finite; ``expiry`` is non-finite or not strictly positive; ``num_steps`` is
-        zero or cannot form a time grid; ``num_paths`` is zero or exceeds the
-        ``100_000``-path capture limit; the compact output and shared time grids
-        exceed ``64_000_000`` scalar values; or a simulated spot is non-finite.
+        If ``spec`` is not valid ``PathSimulationSpec`` data (unknown key or
+        tag, missing field, wrong type); a process parameter or correlation
+        matrix is out of range; the scheme is not available for the process;
+        ``fbm`` is set for a process that does not consume fractional noise;
+        ``initial_state`` has the wrong length or lies outside the process's
+        domain (for example a non-positive GBM spot); the time grid is
+        invalid; ``num_paths`` is outside ``[1, 100_000]``; the output would
+        exceed ``64_000_000`` stored values; or a simulated state is
+        non-finite.
 
     Examples
     --------
-    >>> from finstack_quant.models.monte_carlo import simulate_gbm_paths
-    >>> summary = simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 2, 3, seed=7)
-    >>> (summary.num_paths, summary.times)
-    (3, [0.0, 0.5, 1.0])
+    >>> from finstack_quant.models.monte_carlo import simulate_paths
+    >>> spec = {
+    ...     "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.2},
+    ...     "initial_state": [100.0],
+    ...     "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 2},
+    ...     "num_paths": 3,
+    ...     "seed": 7,
+    ... }
+    >>> paths = simulate_paths(spec)
+    >>> (paths.num_paths, paths.times, paths.factor_names)
+    (3, [0.0, 0.5, 1.0], ['spot'])
+    >>> heston = simulate_paths({
+    ...     **spec,
+    ...     "process": {
+    ...         "type": "heston",
+    ...         "r": 0.04,
+    ...         "q": 0.01,
+    ...         "kappa": 2.0,
+    ...         "theta": 0.05,
+    ...         "sigma_v": 0.3,
+    ...         "rho": -0.7,
+    ...         "v0": 0.03,
+    ...     },
+    ...     "initial_state": [100.0, 0.03],
+    ...     "antithetic": True,
+    ... })
+    >>> (heston.num_simulated_paths, heston.factor_names)
+    (6, ['spot', 'variance'])
     """
     ...
 
@@ -1266,6 +1553,81 @@ class PathDependentPricer:
         TypeError
             If a non-``None`` ``currency`` is neither a string nor a ``Currency`` instance.
 
+        """
+        ...
+
+    def price_with_lrm_greeks(
+        self,
+        spot: float,
+        strike: float,
+        rate: float,
+        div_yield: float,
+        vol: float,
+        expiry: float,
+        is_call: bool,
+        num_steps: int | None = None,
+        currency: str | None = None,
+    ) -> LrmGreeks:
+        """
+        Price an arithmetic Asian option with likelihood-ratio delta and vega.
+
+        The price, delta and vega come from one set of GBM paths: the Greeks
+        weight each discounted payoff by the score of the path density
+        (Glasserman 2003, section 7.3), so no bumped re-simulation is needed.
+        The payoff is the one :meth:`price_asian_call` / :meth:`price_asian_put`
+        price: unit notional, fixings at steps ``1..=num_steps``.
+
+        Parameters
+        ----------
+        spot : float
+            Finite, strictly positive spot price at time zero.
+        strike : float
+            Strike price in the same units as ``spot``.
+        rate : float
+            Risk-free rate (continuously compounded decimal).
+        div_yield : float
+            Dividend yield (continuously compounded decimal).
+        vol : float
+            Annualized volatility (decimal), strictly positive.
+        expiry : float
+            Maturity in years.
+        is_call : bool
+            ``True`` for a call on the arithmetic average, ``False`` for a put.
+        num_steps : int, optional
+            Time-grid steps, each an averaging date. Defaults to the registry
+            value ``convenience.greeks.lrm_num_steps`` (32), not the 252 steps
+            of :meth:`price_asian_call`: every path is kept in memory, so
+            ``num_paths * (num_steps + 1)`` may not exceed ``4_000_000``. A
+            default pricer (100,000 paths) therefore accepts at most 39 steps.
+        currency : str, optional
+            ISO currency code. Defaults to USD.
+
+        Returns
+        -------
+        LrmGreeks
+            Price in ``currency``, delta per unit of spot and vega per
+            volatility point (``0.01``), each with its standard error and 95%
+            confidence interval.
+
+        Raises
+        ------
+        ValueError
+            If ``spot``, ``vol`` or ``expiry`` is not finite and strictly
+            positive, ``rate`` or ``div_yield`` is non-finite, ``num_steps``
+            is zero, the pricer uses Sobol or antithetic sampling,
+            ``num_paths`` exceeds ``100_000``, ``num_paths * (num_steps + 1)``
+            exceeds ``4_000_000``, or ``currency`` is unknown.
+        TypeError
+            If a non-``None`` ``currency`` is neither a string nor a ``Currency`` instance.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.monte_carlo import PathDependentPricer
+        >>> greeks = PathDependentPricer().price_with_lrm_greeks(100, 100, 0.04, 0.01, 0.25, 1.0, True)
+        >>> 0.0 < greeks.delta.mean < 1.0
+        True
+        >>> greeks.vega.stderr > 0.0
+        True
         """
         ...
 
@@ -2002,11 +2364,12 @@ def finite_diff_delta(
     currency: str | None = None,
 ) -> Estimate:
     """
-    Finite-difference delta for a European option (independence-bound stderr).
+    Finite-difference delta for a vanilla European option under GBM.
 
-    Both this function and :func:`finite_diff_delta_crn` reuse common random
-    numbers. This function reports a conservative independence-bound stderr;
-    :func:`finite_diff_delta_crn` reports the tighter paired CRN stderr.
+    Central difference in spot with common random numbers: the up and down
+    valuations share each path's random draws, the estimate is the mean of
+    the per-path differences, and ``stderr`` is the paired
+    (common-random-number) standard error of those differences.
 
     Parameters
     ----------
@@ -2042,8 +2405,8 @@ def finite_diff_delta(
     Returns
     -------
     Estimate
-        ``mean`` is the delta, ``stderr`` its standard error, ``ci_lower`` /
-        ``ci_upper`` the symmetric 95% band.
+        ``mean`` is the delta, ``stderr`` its paired (common-random-number)
+        standard error, ``ci_lower`` / ``ci_upper`` the symmetric 95% band.
 
     Raises
     ------
@@ -2056,79 +2419,6 @@ def finite_diff_delta(
     --------
     >>> from finstack_quant.models.monte_carlo import finite_diff_delta
     >>> est = finite_diff_delta(100, 100, 0.05, 0.0, 0.2, 1.0, True, num_paths=200, seed=7, num_steps=10)
-    >>> 0 < est.mean < 1 and est.stderr >= 0
-    True
-    """
-    ...
-
-def finite_diff_delta_crn(
-    spot: float,
-    strike: float,
-    rate: float,
-    div_yield: float,
-    vol: float,
-    expiry: float,
-    is_call: bool,
-    num_paths: int | None = None,
-    seed: int | None = None,
-    num_steps: int | None = None,
-    bump_size: float | None = None,
-    currency: str | None = None,
-) -> Estimate:
-    """
-    Finite-difference delta with paired common-random-number stderr.
-
-    Same CRN-priced central difference as :func:`finite_diff_delta`; only the
-    reported stderr estimator differs (paired pathwise differences instead of
-    the independence bound). Always runs serially.
-
-    Parameters
-    ----------
-    spot : float
-        Finite positive spot price. The down-bumped state must remain at least
-        ``1e-12``.
-    strike : float
-        Strike price.
-    rate : float
-        Risk-free rate (continuously compounded decimal).
-    div_yield : float
-        Dividend yield (continuously compounded decimal).
-    vol : float
-        Volatility (decimal); must be strictly positive.
-    expiry : float
-        Maturity in years.
-    is_call : bool
-        ``True`` for a call, ``False`` for a put.
-    num_paths : int, optional
-        Paths per evaluation (default ``10_000``).
-    seed : int, optional
-        RNG seed (default ``42``).
-    num_steps : int, optional
-        Time-grid steps (default ``50``).
-    bump_size : float, optional
-        Relative Monte Carlo spot shock (default ``0.01`` = 1% of spot), not
-        a closed-form local Greek step. The absolute bump is
-        ``max(abs(spot) * bump_size, 1e-8)`` and must leave a symmetric
-        central stencil above the spot floor.
-    currency : str, optional
-        ISO currency code. Defaults to USD.
-
-    Returns
-    -------
-    Estimate
-        ``mean`` is the delta, ``stderr`` the paired CRN standard error.
-
-    Raises
-    ------
-    ValueError
-        If ``vol`` is not strictly positive, ``spot`` or ``bump_size`` is
-        non-finite or non-positive, the symmetric down-bump falls below
-        ``1e-12``, or another pricing input is invalid.
-
-    Examples
-    --------
-    >>> from finstack_quant.models.monte_carlo import finite_diff_delta_crn
-    >>> est = finite_diff_delta_crn(100, 100, 0.05, 0.0, 0.2, 1.0, True, num_paths=200, seed=7, num_steps=10)
     >>> 0 < est.mean < 1 and est.stderr >= 0
     True
     """
@@ -2149,9 +2439,11 @@ def finite_diff_gamma(
     currency: str | None = None,
 ) -> Estimate:
     """
-    Finite-difference gamma (independence-bound stderr).
+    Finite-difference gamma for a vanilla European option under GBM.
 
-    See :func:`finite_diff_gamma_crn` for the tighter paired CRN variant.
+    Second central difference in spot with common random numbers; the
+    estimate is the mean of the per-path second differences and ``stderr``
+    is their paired (common-random-number) standard error.
 
     Parameters
     ----------
@@ -2187,7 +2479,8 @@ def finite_diff_gamma(
     Returns
     -------
     Estimate
-        ``mean`` is the gamma, ``stderr`` its standard error.
+        ``mean`` is the gamma, ``stderr`` its paired (common-random-number)
+        standard error.
 
     Raises
     ------
@@ -2200,79 +2493,6 @@ def finite_diff_gamma(
     --------
     >>> from finstack_quant.models.monte_carlo import finite_diff_gamma
     >>> est = finite_diff_gamma(100, 100, 0.05, 0.0, 0.2, 1.0, True, num_paths=200, seed=7, num_steps=10)
-    >>> est.mean > 0 and est.stderr >= 0
-    True
-    """
-    ...
-
-def finite_diff_gamma_crn(
-    spot: float,
-    strike: float,
-    rate: float,
-    div_yield: float,
-    vol: float,
-    expiry: float,
-    is_call: bool,
-    num_paths: int | None = None,
-    seed: int | None = None,
-    num_steps: int | None = None,
-    bump_size: float | None = None,
-    currency: str | None = None,
-) -> Estimate:
-    """
-    Finite-difference gamma with paired common-random-number stderr.
-
-    Returns ``(gamma, paired_stderr)`` where the standard error is the
-    per-path paired error of ``(V_up_i − 2 V_base_i + V_down_i) / h²``.
-    Always runs serially.
-
-    Parameters
-    ----------
-    spot : float
-        Finite positive spot price. The down-bumped state must remain at least
-        ``1e-12``.
-    strike : float
-        Strike price.
-    rate : float
-        Risk-free rate (continuously compounded decimal).
-    div_yield : float
-        Dividend yield (continuously compounded decimal).
-    vol : float
-        Volatility (decimal); must be strictly positive.
-    expiry : float
-        Maturity in years.
-    is_call : bool
-        ``True`` for a call, ``False`` for a put.
-    num_paths : int, optional
-        Paths per evaluation (default ``10_000``).
-    seed : int, optional
-        RNG seed (default ``42``).
-    num_steps : int, optional
-        Time-grid steps (default ``50``).
-    bump_size : float, optional
-        Relative Monte Carlo spot shock (default ``0.01`` = 1% of spot), not
-        a closed-form local Greek step. The absolute bump is
-        ``max(abs(spot) * bump_size, 1e-8)`` and must leave a symmetric
-        central stencil above the spot floor.
-    currency : str, optional
-        ISO currency code. Defaults to USD.
-
-    Returns
-    -------
-    Estimate
-        ``mean`` is the gamma, ``stderr`` the paired CRN standard error.
-
-    Raises
-    ------
-    ValueError
-        If ``vol`` is not strictly positive, ``spot`` or ``bump_size`` is
-        non-finite or non-positive, the symmetric down-bump falls below
-        ``1e-12``, or another pricing input is invalid.
-
-    Examples
-    --------
-    >>> from finstack_quant.models.monte_carlo import finite_diff_gamma_crn
-    >>> est = finite_diff_gamma_crn(100, 100, 0.05, 0.0, 0.2, 1.0, True, num_paths=200, seed=7, num_steps=10)
     >>> est.mean > 0 and est.stderr >= 0
     True
     """

@@ -7,8 +7,6 @@ use finstack_quant_models::credit::migration::{
     projection, GeneratorMatrix, MigrationSimulator, RatingScale, TransitionMatrix,
 };
 use finstack_quant_models::credit::pd::MasterScale;
-use rand::SeedableRng;
-use rand_pcg::Pcg64;
 
 fn reference_transition_matrix() -> TransitionMatrix {
     let labels = vec!["AAA", "AA", "A", "BBB", "BB", "B", "D"]
@@ -83,17 +81,14 @@ fn migration_empirical_matrix_is_reproducible_for_same_seed() {
     let scale = RatingScale::custom(vec!["IG".to_string(), "D".to_string()]).unwrap();
     let generator = GeneratorMatrix::new(scale, &[-0.1, 0.1, 0.0, 0.0]).unwrap();
     let simulator = MigrationSimulator::new(generator, 1.0).unwrap();
-    let mut rng1 = Pcg64::seed_from_u64(12345);
-    let mut rng2 = Pcg64::seed_from_u64(12345);
-
-    let first = simulator.empirical_matrix(1_000, &mut rng1).unwrap();
-    let second = simulator.empirical_matrix(1_000, &mut rng2).unwrap();
+    let first = simulator.empirical_matrix(1_000, 12345).unwrap();
+    let second = simulator.empirical_matrix(1_000, 12345).unwrap();
 
     for i in 0..first.n_states() {
         for j in 0..first.n_states() {
             assert_eq!(
-                first.probability_by_index(i, j),
-                second.probability_by_index(i, j)
+                first.probability_by_index(i, j).unwrap(),
+                second.probability_by_index(i, j).unwrap()
             );
         }
     }

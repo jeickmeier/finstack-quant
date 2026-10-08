@@ -1283,7 +1283,7 @@ fn test_price_with_capture_uses_actual_path_count_after_auto_stop() {
     let expected = super::pricing::AUTO_STOP_MIN_SAMPLES;
     assert_eq!(result.estimate.num_paths, expected);
     assert_eq!(captured.num_paths_total, expected);
-    assert_eq!(captured.num_captured(), expected);
+    assert_eq!(captured.paths.len(), expected);
 }
 
 fn assert_captured_path_statistics(result: &MonteCarloResult) {

@@ -142,29 +142,16 @@ fn date_to_period_id(
     PeriodId::from_date(date, frequency)
 }
 
-/// Calendar-bucket compounded returns, tagging each bucket with its **last
-/// observation date** (the period-end). Reuses [`comp_total`] so buckets
-/// reconcile exactly with `cumulative_returns`. Calendar bucketing only
-/// (no fiscal config); `Annual` uses the calendar year.
-pub(crate) fn group_by_period_dated(
-    dates: &[Date],
-    returns: &[f64],
-    frequency: PeriodKind,
-) -> Vec<PeriodicReturn> {
-    group_period_buckets(dates, returns, frequency, None)
-        .into_iter()
-        .map(|(_, date, value)| PeriodicReturn { date, value })
-        .collect()
-}
-
-/// Shared period grouper: one `(PeriodId, last observation date, compounded)`
-/// row per contiguous bucket of `frequency`.
+/// Compound each contiguous calendar or fiscal bucket into a dated return.
+///
+/// Each point carries the bucket's last observation date and uses [`comp_total`]
+/// so its value reconciles with cumulative returns.
 pub(crate) fn group_period_buckets(
     dates: &[Date],
     returns: &[f64],
     frequency: PeriodKind,
     fiscal_config: Option<FiscalConfig>,
-) -> Vec<(PeriodId, Date, f64)> {
+) -> Vec<PeriodicReturn> {
     let mut observations = dates.iter().copied().zip(returns.iter().copied());
     let Some((first_date, first_return)) = observations.next() else {
         return Vec::new();
@@ -178,14 +165,20 @@ pub(crate) fn group_period_buckets(
     for (date, ret) in observations {
         let pid = date_to_period_id(date, frequency, fiscal_config);
         if pid != current_pid {
-            result.push((current_pid, last_date, comp_total(&period_returns)));
+            result.push(PeriodicReturn {
+                date: last_date,
+                value: comp_total(&period_returns),
+            });
             period_returns.clear();
             current_pid = pid;
         }
         period_returns.push(ret);
         last_date = date;
     }
-    result.push((current_pid, last_date, comp_total(&period_returns)));
+    result.push(PeriodicReturn {
+        date: last_date,
+        value: comp_total(&period_returns),
+    });
     result
 }
 
@@ -320,7 +313,7 @@ mod periodic_dated_tests {
     }
 
     #[test]
-    fn group_by_period_dated_monthly_buckets_and_reconciles() {
+    fn group_period_buckets_monthly_reconciles() {
         let dates = vec![
             d(2021, 1, 5),
             d(2021, 1, 20),
@@ -328,7 +321,7 @@ mod periodic_dated_tests {
             d(2021, 2, 25),
         ];
         let rets = vec![0.01, 0.02, -0.01, 0.03];
-        let out = group_by_period_dated(&dates, &rets, PeriodKind::Monthly);
+        let out = group_period_buckets(&dates, &rets, PeriodKind::Monthly, None);
 
         assert_eq!(out.len(), 2);
         assert_eq!(out[0].date, d(2021, 1, 20));
@@ -341,8 +334,8 @@ mod periodic_dated_tests {
     }
 
     #[test]
-    fn group_by_period_dated_empty_is_empty() {
-        let out = group_by_period_dated(&[], &[], PeriodKind::Monthly);
+    fn group_period_buckets_empty_is_empty() {
+        let out = group_period_buckets(&[], &[], PeriodKind::Monthly, None);
         assert!(out.is_empty());
     }
 }
@@ -376,48 +369,33 @@ mod tests {
             .expect("valid date")
     }
 
-    fn month(year: i32, month: u8) -> PeriodId {
-        PeriodId::month(year, month).expect("valid period fixture")
-    }
-
     #[test]
     fn group_by_monthly() {
         let dates = vec![d(2025, 1, 2), d(2025, 1, 3), d(2025, 2, 3), d(2025, 2, 4)];
         let returns = vec![0.01, 0.02, -0.01, 0.03];
         let grouped = group_period_buckets(&dates, &returns, PeriodKind::Monthly, None);
         assert_eq!(grouped.len(), 2);
-        assert_eq!(grouped[0].0, month(2025, 1));
-        assert_eq!(grouped[1].0, month(2025, 2));
+        assert_eq!(grouped[0].date, d(2025, 1, 3));
+        assert_eq!(grouped[1].date, d(2025, 2, 4));
     }
 
     #[test]
-    fn period_stats_from_grouped_basic() {
-        let grouped = [
-            (month(2025, 1), 0.05),
-            (month(2025, 2), -0.02),
-            (month(2025, 3), 0.03),
-            (month(2025, 4), 0.01),
-        ];
-        let stats = period_stats_inner(grouped.iter().map(|&(_, r)| r));
+    fn period_stats_basic() {
+        let stats = period_stats_inner([0.05, -0.02, 0.03, 0.01].into_iter());
         assert!((stats.best - 0.05).abs() < 1e-12);
         assert!((stats.worst - (-0.02)).abs() < 1e-12);
         assert!((stats.win_rate - 0.75).abs() < 1e-12);
     }
 
     #[test]
-    fn period_stats_from_grouped_empty() {
+    fn period_stats_empty() {
         let stats = period_stats_inner(std::iter::empty());
         assert_eq!(stats.win_rate, 0.0);
     }
 
     #[test]
-    fn period_stats_from_grouped_all_winning_reports_full_kelly() {
-        let grouped = [
-            (month(2025, 1), 0.02),
-            (month(2025, 2), 0.01),
-            (month(2025, 3), 0.03),
-        ];
-        let stats = period_stats_inner(grouped.iter().map(|&(_, r)| r));
+    fn period_stats_all_winning_reports_full_kelly() {
+        let stats = period_stats_inner([0.02, 0.01, 0.03].into_iter());
         assert!(stats.payoff_ratio.is_infinite());
         assert!(stats.profit_factor.is_infinite());
         assert!(stats.cpc_ratio.is_infinite());
@@ -436,6 +414,7 @@ mod tests {
             1,
             "all observations should fall in one ISO week"
         );
-        assert_eq!(grouped[0].0.to_string(), "2025W01");
+        assert_eq!(grouped[0].date, d(2025, 1, 2));
+        assert!((grouped[0].value - (1.01 * 1.02 * 1.03 - 1.0)).abs() < 1e-12);
     }
 }

@@ -16,11 +16,12 @@
 //!   `theta_days_per_year`). Forward-option Greeks are undiscounted and their
 //!   `vega` is per unit volatility change.
 
+use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{
     labeled_values_to_series, serde_object_to_single_row_dataframe,
 };
 use crate::bindings::repr_support::repr_from_serde;
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_models::closed_form::implied_vol::{black76_implied_vol, bs_implied_vol};
 use finstack_quant_models::closed_form::{
     asian_option_price, bachelier_greeks, bachelier_price, barrier_call, barrier_put,
@@ -133,32 +134,12 @@ impl PyBsGreeks {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
 
-    /// Serialize to compact JSON with the canonical field names.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "BsGreeks"))
-    }
-
-    /// Deserialize from the JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when a field is missing or unknown.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: BsGreeks =
-            serde_json::from_str(json).map_err(|e| serde_json_to_py(e, "invalid BsGreeks JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` (and therefore ``copy.deepcopy``, ``multiprocessing``).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("BsGreeks", &self.inner)
     }
 }
+
+wire_methods!(PyBsGreeks, BsGreeks, "BsGreeks");
 
 impl PyBsGreeks {
     fn values(&self) -> Vec<f64> {
@@ -248,32 +229,12 @@ impl PyForwardGreeks {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
 
-    /// Serialize to compact JSON with the canonical field names.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "ForwardGreeks"))
-    }
-
-    /// Deserialize from the JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when a field is missing or unknown.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: ForwardGreeks = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid ForwardGreeks JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` (and therefore ``copy.deepcopy``, ``multiprocessing``).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("ForwardGreeks", &self.inner)
     }
 }
+
+wire_methods!(PyForwardGreeks, ForwardGreeks, "ForwardGreeks");
 
 // bs_price
 

@@ -272,19 +272,6 @@ pub struct ConvertibleGreeks {
     pub rho: f64,
 }
 
-impl From<finstack_quant_models::TreeGreeks> for ConvertibleGreeks {
-    fn from(g: finstack_quant_models::TreeGreeks) -> Self {
-        Self {
-            price: g.price,
-            delta: g.delta,
-            gamma: g.gamma,
-            vega: g.vega,
-            theta: g.theta,
-            rho: g.rho,
-        }
-    }
-}
-
 /// Defines how and when conversion can occur.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -1004,13 +991,12 @@ impl ConvertibleBond {
             &finstack_quant_core::config::FinstackConfig::default(),
             Some(&self.metric_pricing_overrides),
         )?;
-        let greeks = pricing::calculate_convertible_greeks(
+        pricing::calculate_convertible_greeks(
             self,
             market,
             crate::instruments::GreekBumps::from(&bumps),
             as_of,
-        )?;
-        Ok(greeks.into())
+        )
     }
 }
 

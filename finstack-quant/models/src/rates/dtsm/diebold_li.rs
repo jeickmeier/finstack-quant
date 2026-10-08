@@ -550,49 +550,6 @@ impl DieboldLi {
         &self.tenors
     }
 
-    /// Convert forecast yields to a `ParametricCurve` by fitting NS parameters
-    /// to the forecast point estimates.
-    ///
-    /// Since the forecast is already NS-shaped (by construction), this is a
-    /// near-exact fit that reuses the forecast factor values directly.
-    ///
-    /// `forecast.factors` become the Nelson-Siegel level, slope, and curvature
-    /// loadings without refitting the point yields. The decay horizon is
-    /// `tau = 1 / self.lambda`; the resulting curve uses the parametric
-    /// builder's default Act/365F day count unless callers construct a curve
-    /// directly with a different convention. `forecast.yields` and confidence
-    /// bands are not used by this conversion.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error propagated by the parametric-curve builder when the
-    /// derived Nelson-Siegel model is invalid, including a non-positive decay
-    /// horizon. Callers should fit a positive, finite `lambda` before invoking
-    /// this conversion.
-    pub fn to_parametric_curve(
-        &self,
-        id: impl Into<finstack_quant_core::types::CurveId>,
-        base_date: finstack_quant_core::dates::Date,
-        forecast: &YieldForecast,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_core::market_data::term_structures::ParametricCurve,
-    > {
-        use finstack_quant_core::market_data::term_structures::NelsonSiegelModel;
-
-        // The forecast factors are already NS parameters; tau = 1/lambda
-        let model = NelsonSiegelModel::Ns {
-            beta0: forecast.factors[0],
-            beta1: forecast.factors[1],
-            beta2: forecast.factors[2],
-            tau: 1.0 / self.lambda,
-        };
-
-        finstack_quant_core::market_data::term_structures::ParametricCurve::builder(id)
-            .base_date(base_date)
-            .model(model)
-            .build()
-    }
-
     /// Nelson-Siegel loading matrix for the current lambda and tenor grid.
     ///
     /// Returns an N x 3 matrix where column 0 = level loading (all 1s),
@@ -746,75 +703,6 @@ pub fn nelson_siegel_yields(
     Ok((loadings * beta).as_slice().to_vec())
 }
 
-/// Build a Diebold-Li model from an optional decay parameter.
-///
-/// # Arguments
-///
-/// * `lambda` - Decay parameter for tenors in years; `None` selects the
-///   crate default `0.7308` (years-equivalent of Diebold-Li's 0.0609 months).
-///
-/// # Errors
-///
-/// Returns [`finstack_quant_core::Error::Validation`] when `lambda` is
-/// supplied but non-finite or not strictly positive.
-pub fn diebold_li_model(lambda: Option<f64>) -> finstack_quant_core::Result<DieboldLi> {
-    match lambda {
-        Some(value) => DieboldLi::new(value),
-        None => Ok(DieboldLi::with_default_lambda()),
-    }
-}
-
-/// Extract Diebold-Li factors from row-major yield observations.
-///
-/// Same as [`DieboldLi::extract_factors`] for callers holding plain nested
-/// vectors instead of a [`YieldPanel`].
-///
-/// # Arguments
-///
-/// * `tenors` - Tenor grid in years, strictly ascending and positive.
-/// * `yield_rows` - `yield_rows[date_idx][tenor_idx]` decimal zero rates.
-/// * `lambda` - Decay parameter for tenors in years; `None` uses the default.
-///
-/// # Errors
-///
-/// Propagates panel validation and factor-extraction errors.
-pub fn diebold_li_fit_factors(
-    tenors: Vec<f64>,
-    yield_rows: Vec<Vec<f64>>,
-    lambda: Option<f64>,
-) -> finstack_quant_core::Result<FactorTimeSeries> {
-    let panel = YieldPanel::from_rows(tenors, yield_rows, None)?;
-    let model = diebold_li_model(lambda)?.extract_factors(&panel)?;
-    model.factors.ok_or_else(|| {
-        finstack_quant_core::Error::Internal(
-            "factor extraction completed without populating factors".into(),
-        )
-    })
-}
-
-/// Extract factors, fit VAR(1) dynamics and forecast `horizon` steps ahead
-/// from row-major yield observations.
-///
-/// # Arguments
-///
-/// * `tenors` - Tenor grid in years, strictly ascending and positive.
-/// * `yield_rows` - `yield_rows[date_idx][tenor_idx]` decimal zero rates.
-/// * `horizon` - Forecast horizon in observation periods; must be `>= 1`.
-/// * `lambda` - Decay parameter for tenors in years; `None` uses the default.
-///
-/// # Errors
-///
-/// Propagates panel validation, extraction, VAR-fit and forecast errors.
-pub fn diebold_li_forecast(
-    tenors: Vec<f64>,
-    yield_rows: Vec<Vec<f64>>,
-    horizon: usize,
-    lambda: Option<f64>,
-) -> finstack_quant_core::Result<YieldForecast> {
-    let panel = YieldPanel::from_rows(tenors, yield_rows, None)?;
-    diebold_li_model(lambda)?.fit(&panel)?.forecast(horizon)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -927,22 +815,9 @@ mod tests {
     }
 
     #[test]
-    fn free_helpers_match_typed_pipeline() {
-        let panel = dated_panel();
-        let rows: Vec<Vec<f64>> = (0..panel.num_dates())
-            .map(|i| {
-                (0..panel.num_tenors())
-                    .map(|j| panel.yields[(i, j)])
-                    .collect()
-            })
-            .collect();
-        let typed = DieboldLi::with_default_lambda().fit(&panel).unwrap();
-        let factors = diebold_li_fit_factors(panel.tenors.clone(), rows.clone(), None).unwrap();
-        assert_eq!(factors.columns(), typed.factors().unwrap().columns());
-        let forecast = diebold_li_forecast(panel.tenors, rows, 3, None).unwrap();
-        assert_eq!(forecast.yields, typed.forecast(3).unwrap().yields);
-        assert!(diebold_li_model(Some(-1.0)).is_err());
-        assert!((diebold_li_model(None).unwrap().lambda() - DEFAULT_LAMBDA).abs() < 1e-12);
+    fn constructors_validate_lambda_and_default_to_the_years_convention() {
+        assert!(DieboldLi::new(-1.0).is_err());
+        assert!((DieboldLi::with_default_lambda().lambda() - DEFAULT_LAMBDA).abs() < 1e-12);
     }
 
     #[test]
@@ -1125,49 +1000,6 @@ mod tests {
             .unwrap();
         // No fit_var called
         assert!(model.forecast(1).is_err());
-    }
-
-    #[test]
-    fn to_parametric_curve_roundtrip() {
-        let lambda = 0.0609;
-        let tenors = standard_tenors();
-        let n = tenors.len();
-        let t = 50;
-        let mut data = DMatrix::zeros(t, n);
-        for i in 0..t {
-            let b0 = 0.06 + 0.002 * ((i as f64) * 0.3).sin();
-            let b1 = -0.02 + 0.001 * ((i as f64) * 0.5).cos();
-            let b2 = 0.01 + 0.001 * ((i as f64) * 0.7).sin();
-            let row = make_ns_yields(b0, b1, b2, lambda, &tenors);
-            for j in 0..n {
-                data[(i, j)] = row[j];
-            }
-        }
-        let panel = YieldPanel::new(data, tenors, None).unwrap();
-        let model = DieboldLi::new(lambda)
-            .unwrap()
-            .extract_factors(&panel)
-            .unwrap()
-            .fit_var()
-            .unwrap();
-
-        let fc = model.forecast(1).unwrap();
-        let base_date =
-            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
-                .unwrap();
-        let curve = model
-            .to_parametric_curve("USD-FORECAST", base_date, &fc)
-            .unwrap();
-
-        // The parametric curve should produce rates close to forecast
-        for (i, &tau) in fc.tenors.iter().enumerate() {
-            let curve_rate = curve.zero_rate(tau);
-            assert!(
-                (curve_rate - fc.yields[i]).abs() < 0.005,
-                "Mismatch at tenor {tau}: curve={curve_rate}, forecast={}",
-                fc.yields[i]
-            );
-        }
     }
 
     #[test]

@@ -321,7 +321,6 @@ fn test_bond_valuator_street_call_redemption_includes_accrued_interest() {
 #[test]
 fn test_rates_credit_default_lowers_price() {
     use finstack_quant_core::market_data::term_structures::HazardCurve;
-    use finstack_quant_core::HashMap;
     use finstack_quant_models::trees::two_factor_rates_credit::{
         RatesCreditConfig, RatesCreditTree,
     };
@@ -389,7 +388,6 @@ fn test_rates_credit_default_lowers_price() {
     let valuator_high =
         BondValuator::new(bond, &ctx_high, as_of, time_to_maturity, steps).expect("valuator");
 
-    use finstack_quant_models::TreeModel;
     let disc_low = ctx_low
         .get_discount("USD-OIS")
         .expect("Discount curve should exist");
@@ -436,14 +434,14 @@ fn test_rates_credit_default_lowers_price() {
         .calibrate(&high_targets)
         .expect("calibration high");
 
-    let vars = HashMap::<&'static str, f64>::default();
+    let oas_bp = 0.0;
 
     let pv_low = tree_low
-        .price(vars.clone(), time_to_maturity, &ctx_low, &valuator_low)
+        .price_with_node_coupons(oas_bp, &valuator_low, &[])
         .expect("price low");
 
     let pv_high = tree_high
-        .price(vars, time_to_maturity, &ctx_high, &valuator_high)
+        .price_with_node_coupons(oas_bp, &valuator_high, &[])
         .expect("price high");
 
     assert!(pv_high < pv_low, "pv_high={} pv_low={}", pv_high, pv_low);

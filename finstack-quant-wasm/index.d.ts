@@ -660,7 +660,7 @@ export type ReplayResult = WithFields<generated.portfolio.ReplayResult, { steps:
 export type PortfolioOptimizationResult = generated.portfolio.PortfolioOptimizationResultWire;
 
 /**
- * A dated amount (Rust `DatedFlowJson`); in `cashflows.scheduleOutstandingByDate`
+ * A dated amount (Rust `DatedFlowJson`); in `CashFlowSchedule.outstandingByDate`
  * the amount is the outstanding balance after that date's flows.
  */
 export interface DatedFlowJson {
@@ -11259,8 +11259,8 @@ export interface PortfolioLossResult extends WasmOwned {
   ): TrancheLossStatistics;
   /**
    * Serialize to the canonical JSON wire format.
-   * @returns Canonical `PortfolioLossResult` JSON.
-   * @throws Error - Throws a `validation` error if serialization fails.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
    */
   toJson(): string;
 }
@@ -11297,9 +11297,9 @@ export interface PortfolioLossResultConstructor {
    * Load a result from its canonical JSON form; the losses and confidence are
    * validated and the aggregates recomputed, so a payload whose aggregates
    * disagree with its losses is rejected.
-   * @param json - `PortfolioLossResult` JSON (`losses`, `expected_loss`, `var`, `expected_shortfall`, `confidence`), as a string or plain object.
-   * @returns A `PortfolioLossResult` handle.
-   * @throws Error - Throws a `TypeError` if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the checks above.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
    */
   fromJson(json: JsonInput): PortfolioLossResult;
 }
@@ -12133,6 +12133,43 @@ export interface PathDependentPricer extends WasmOwned {
     currency?: string
   ): MoneyEstimate;
   /**
+   * Price an arithmetic-average Asian option under GBM with likelihood-ratio delta and vega estimated from the same paths.
+   *
+   * Every path is kept in memory, so `numPaths x (numSteps + 1)` may not exceed 4,000,000 and the default step count is 32, not the 252 steps of `priceAsianCall`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const pricer = new models.monteCarlo.PathDependentPricer(20000, 7);
+   * const greeks = pricer.priceWithLrmGreeks(100, 100, 0.04, 0.01, 0.25, 1.0, true, 12);
+   * console.log(greeks.price.mean.amount, greeks.price.mean.currency);
+   * console.log(greeks.delta.mean > 0 && greeks.delta.mean < 1); // true
+   * console.log(greeks.vega.stderr > 0); // true
+   * ```
+   * @param spot - Finite, strictly positive spot level at time 0.
+   * @param strike - Exercise price in the same units as `spot`.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal), strictly positive.
+   * @param expiry - Time to expiry in years.
+   * @param isCall - `true` for a call on the arithmetic average, `false` for a put.
+   * @param numSteps - Optional number of time-grid steps, each an averaging date; omitted uses the registry default `convenience.greeks.lrm_num_steps` (32).
+   * @param currency - Optional ISO-4217 code stamped on the price estimate; omitted uses the registry default.
+   * @returns The `LrmGreeks` object: `price` (a `MoneyEstimate`), `delta` per unit of spot and `vega` per volatility point (`0.01`), each an `Estimate` with `mean`, `stderr` and `ci_95`.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `spot`, `vol` or `expiry` is not finite and strictly positive, `numSteps` is zero, the currency code is unknown, the pricer uses Sobol or antithetic sampling, `numPaths` exceeds 100,000, or `numPaths x (numSteps + 1)` exceeds 4,000,000.
+   */
+  priceWithLrmGreeks(
+    spot: number,
+    strike: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    isCall: boolean,
+    numSteps?: number,
+    currency?: string
+  ): generated.models.LrmGreeks;
+  /**
    * Whether antithetic variates are used.
    */
   readonly antithetic: boolean;
@@ -12297,7 +12334,11 @@ export interface MonteCarloNamespace {
    */
   PathDependentPricer: PathDependentPricerConstructor;
   /**
-   * Monte Carlo finite-difference delta of a GBM European option, with independent draws per bump.
+   * Monte Carlo finite-difference delta of a GBM European option under common random numbers.
+   *
+   * The up and down valuations share each path's random draws; the estimate
+   * is the mean of the per-path central differences and `stderr` is their
+   * paired (common-random-number) standard error.
    * @param spot - Spot level at time 0.
    * @param strike - Exercise price in the same units as `spot`.
    * @param rate - Continuously compounded risk-free rate (decimal, annualized).
@@ -12310,7 +12351,7 @@ export interface MonteCarloNamespace {
    * @param numSteps - Optional time-grid steps; omitted uses the registry default.
    * @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
    * @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-   * @returns The `Estimate` object for delta (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @returns The `Estimate` object for delta (`mean`, paired `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
    * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
    */
   finiteDiffDelta(
@@ -12328,7 +12369,11 @@ export interface MonteCarloNamespace {
     currency?: string
   ): generated.models.Estimate;
   /**
-   * Monte Carlo finite-difference delta of a GBM European option under common random numbers.
+   * Monte Carlo finite-difference gamma of a GBM European option under common random numbers.
+   *
+   * The three stencil valuations share each path's random draws; the estimate
+   * is the mean of the per-path second differences and `stderr` is their
+   * paired (common-random-number) standard error.
    * @param spot - Spot level at time 0.
    * @param strike - Exercise price in the same units as `spot`.
    * @param rate - Continuously compounded risk-free rate (decimal, annualized).
@@ -12341,72 +12386,10 @@ export interface MonteCarloNamespace {
    * @param numSteps - Optional time-grid steps; omitted uses the registry default.
    * @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
    * @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-   * @returns The `Estimate` object for delta (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
-   */
-  finiteDiffDeltaCrn(
-    spot: number,
-    strike: number,
-    rate: number,
-    divYield: number,
-    vol: number,
-    expiry: number,
-    isCall: boolean,
-    numPaths?: number,
-    seed?: number | bigint,
-    numSteps?: number,
-    bumpSize?: number,
-    currency?: string
-  ): generated.models.Estimate;
-  /**
-   * Monte Carlo finite-difference gamma of a GBM European option, with independent draws per bump.
-   * @param spot - Spot level at time 0.
-   * @param strike - Exercise price in the same units as `spot`.
-   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
-   * @param divYield - Continuous dividend yield (decimal, annualized).
-   * @param vol - Annualized GBM volatility (decimal); positive.
-   * @param expiry - Time to expiry in years.
-   * @param isCall - `true` for a call payoff, `false` for a put.
-   * @param numPaths - Optional paths per evaluation; omitted uses the registry default.
-   * @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
-   * @param numSteps - Optional time-grid steps; omitted uses the registry default.
-   * @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
-   * @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-   * @returns The `Estimate` object for gamma (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @returns The `Estimate` object for gamma (`mean`, paired `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
    * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
    */
   finiteDiffGamma(
-    spot: number,
-    strike: number,
-    rate: number,
-    divYield: number,
-    vol: number,
-    expiry: number,
-    isCall: boolean,
-    numPaths?: number,
-    seed?: number | bigint,
-    numSteps?: number,
-    bumpSize?: number,
-    currency?: string
-  ): generated.models.Estimate;
-  /**
-   * Monte Carlo finite-difference gamma of a GBM European option under common random numbers.
-   * @param spot - Spot level at time 0.
-   * @param strike - Exercise price in the same units as `spot`.
-   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
-   * @param divYield - Continuous dividend yield (decimal, annualized).
-   * @param vol - Annualized GBM volatility (decimal); positive.
-   * @param expiry - Time to expiry in years.
-   * @param isCall - `true` for a call payoff, `false` for a put.
-   * @param numPaths - Optional paths per evaluation; omitted uses the registry default.
-   * @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
-   * @param numSteps - Optional time-grid steps; omitted uses the registry default.
-   * @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
-   * @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-   * @returns The `Estimate` object for gamma (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
-   */
-  finiteDiffGammaCrn(
     spot: number,
     strike: number,
     rate: number,
@@ -12439,28 +12422,35 @@ export interface MonteCarloNamespace {
    */
   relativeStderr(estimate: MoneyEstimate | string): number;
   /**
-   * Simulate a compact set of GBM spot paths.
-   * @param spot - Spot level at time 0.
-   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
-   * @param divYield - Continuous dividend yield (decimal, annualized).
-   * @param vol - Annualized GBM volatility (decimal).
-   * @param expiry - Horizon in years; the grid is uniform from 0 to `expiry`.
-   * @param numSteps - Number of time-grid steps; a positive safe integer.
-   * @param numPaths - Number of captured paths; a positive safe integer.
-   * @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the Rust `GbmPathConfig` default.
-   * @returns The `GbmPathSummary` object (`num_paths`, `num_simulated_paths`, `times`, `paths`).
-   * @throws Error - Throws a `TypeError` if a count is not a safe integer, and a `validation` error if an input is non-finite or out of range.
+   * Simulate paths of any built-in process on a shared time grid.
+   *
+   * Twin of the Rust and Python `simulate_paths`: the spec selects the process,
+   * the discretization scheme, the time grid and the random streams, and Rust
+   * validates every field.
+   *
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const paths = models.monteCarlo.simulatePaths({
+   *   process: { type: "gbm", r: 0.05, q: 0.0, sigma: 0.2 },
+   *   initial_state: [100],
+   *   time_grid: { type: "uniform", expiry: 1.0, num_steps: 2 },
+   *   num_paths: 3,
+   *   seed: 7,
+   * });
+   * console.log(paths.times); // [0, 0.5, 1]
+   * console.log(paths.factor_names); // ["spot"]
+   * console.log(paths.values.length); // 9 = 3 paths x 3 times x 1 factor
+   * ```
+   *
+   * @param spec - `PathSimulationSpec` object or JSON: `process` (tagged by `type`, with annualized decimal rates and volatilities), optional `scheme` (`"default"` uses the process's canonical scheme), `initial_state` in the process's state layout, `time_grid` in years, `num_paths` in [1, 100000], `seed`, optional `antithetic` (default `false`), and optional `fbm`, the fractional-noise generator of the `rough_bergomi` and `cheyette_rough` processes (`{ type: "volterra" }` when omitted).
+   * @returns The `PathSummary` object: `num_paths`, `num_simulated_paths`, `dim`, `times`, `factor_names`, and `values` in row-major `[path][time][factor]` order, so factor `f` on path `p` at `times[s]` is `values[(p * times.length + s) * dim + f]`.
+   * @throws Error - Throws a `TypeError` if `spec` is neither an object nor JSON text, and a `validation` error if it does not match `PathSimulationSpec`, a process parameter is out of range, the scheme is not available for the process, `fbm` is set for a process that does not consume fractional noise, `initial_state` has the wrong length or lies outside the process's domain, the time grid is invalid, `num_paths` is outside [1, 100000], the output would exceed 64 million stored values, or a simulated state is non-finite.
    */
-  simulateGbmPaths(
-    spot: number,
-    rate: number,
-    divYield: number,
-    vol: number,
-    expiry: number,
-    numSteps: number,
-    numPaths: number,
-    seed?: number | bigint
-  ): generated.models.GbmPathSummary;
+  simulatePaths(
+    spec: generated.models.PathSimulationSpec | string
+  ): generated.models.PathSummary;
 }
 
 /**
@@ -14774,17 +14764,6 @@ export interface CashflowsNamespace {
   datedFlowsJson(scheduleJson: JsonInput): string;
 
   /**
-   * Compute accrued interest from a cashflow schedule JSON string as of a given date.
-   *
-   * @param scheduleJson - JSON-encoded `CashFlowSchedule`.
-   * @param asOf - ISO-8601 date (YYYY-MM-DD) for the accrual snapshot.
-   * @param configJson - Optional JSON-encoded `AccrualConfig` overriding defaults.
-   * @returns Accrued interest in the schedule's settlement currency as a JS number. The Rust engine computes from the canonical schedule and then crosses the WASM boundary as `f64`; for large notionals, compare with an absolute tolerance scaled to the schedule notional rather than expecting decimal-string equality.
-   * @throws If any JSON input is malformed, a compounded period rate is non-finite or at or below -1, or the accrual computation fails or produces a non-finite result.
-   */
-  accruedInterest(scheduleJson: JsonInput, asOf: string, configJson?: JsonInput | null): number;
-
-  /**
    * Convert an annual CPR (constant prepayment rate) to a monthly SMM.
    *
    * Uses the standard relationship `SMM = 1 - (1 - CPR)^(1/12)`.
@@ -14838,38 +14817,6 @@ export interface CashflowsNamespace {
    * @throws If `speed` is non-finite or outside `[0, 1]` (kind `validation`), or `month` is not a non-negative integer (kind `invalid_type`).
    */
   absToSmm(speed: number, month: number): number;
-
-  /**
-   * Weighted average life of a schedule, in years from `asOf`.
-   *
-   * @param scheduleJson - `CashFlowSchedule` (object or JSON).
-   * @param asOf - ISO-8601 measurement date; only principal flows strictly after it count.
-   * @returns WAL in years; `0` when no principal flow falls after `asOf`.
-   * @throws If the schedule or date is malformed or the schedule fails validation (kind `validation`).
-   */
-  scheduleWal(scheduleJson: JsonInput, asOf: string): number;
-
-  /**
-   * Outstanding principal balance after each unique date of a schedule.
-   *
-   * @param scheduleJson - `CashFlowSchedule` (object or JSON) with `meta.issue_date` set.
-   * @returns `{ date, amount }` entries in date order; `amount` is the outstanding balance after that date's flows.
-   * @throws If the schedule is malformed or fails validation, `meta.issue_date` is unset, or principal flows mix currencies (kind `validation`).
-   */
-  scheduleOutstandingByDate(scheduleJson: JsonInput): DatedFlowJson[];
-
-  /**
-   * Calendar-year non-principal / principal / PV ladder of a schedule.
-   *
-   * @param scheduleJson - `CashFlowSchedule` (object or JSON).
-   * @param pvs - Present value of each schedule flow, one per flow in schedule order, in flow-amount units.
-   * @returns `{ year, non_principal, principal, pv }` rows in ascending year order.
-   * @throws If the schedule is malformed or fails validation, `pvs` does not have one entry per flow, or a value is non-finite (kind `validation`).
-   */
-  scheduleCalendarYearLadder(
-    scheduleJson: JsonInput,
-    pvs: number[] | Float64Array
-  ): CalendarYearLadderRow[];
 
   /**
    * `CashFlowSchedule` handle: canonical cashflow schedule: classified dated flows with their notional,
@@ -15003,9 +14950,6 @@ export interface CashflowsNamespace {
 
   /**
    * Accrued interest of a schedule as of a date.
-   *
-   * Typed twin of `accruedInterest`, which takes schedule JSON and returns a
-   * number.
    *
    * @param schedule - `CashFlowSchedule` handle.
    * @param asOf - ISO-8601 accrual snapshot date; interest accrues through accrual end and stays accrued until payment.
@@ -25782,8 +25726,8 @@ export interface SabrParameters extends WasmOwned {
   isShifted(): boolean;
   /**
    * Serialize to the Rust `SabrParameters` JSON wire form.
-   * @returns JSON text with `alpha`, `beta`, `nu`, `rho` and, when set, `shift`.
-   * @throws If serialization fails (not expected).
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
    */
   toJson(): string;
 }
@@ -25872,11 +25816,11 @@ export interface SabrParametersConstructor {
   shiftedLognormal(alpha: number, nu: number, rho: number, shift: number): SabrParameters;
   /**
    * Deserialize from the Rust `SabrParameters` JSON wire form produced by `toJson`.
-   * @param json - JSON text with `alpha`, `beta`, `nu`, `rho` and an optional `shift`; unknown fields are rejected and every field is range-checked.
-   * @returns The parsed `SabrParameters` handle.
-   * @throws `TypeError` if `json` is not a string; `FinstackError` (kind `validation`) on malformed JSON, an unknown field, or a parameter outside its domain.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
    */
-  fromJson(json: string): SabrParameters;
+  fromJson(json: JsonInput): SabrParameters;
 }
 
 /**
@@ -27067,7 +27011,7 @@ export interface MertonModel extends WasmOwned {
    * @returns A `Float64Array` of length 2: `[equityValue, equityVolatility]`.
    * @throws Error - Throws a `validation` error if `horizon` is not positive and finite, the firm is economically in default, or the inversion is ill-conditioned.
    */
-  tryImpliedEquity(horizon: number): Float64Array;
+  impliedEquity(horizon: number): Float64Array;
   /**
    * Current fair value of the firm's assets, in monetary units.
    */
@@ -27768,14 +27712,16 @@ export interface ToggleExerciseModel extends WasmOwned {
   /**
    * Whether the rule elects PIK for a credit state given one uniform draw.
    *
-   * Threshold rules ignore `u`; stochastic rules use it as the Bernoulli
-   * draw; optimal-exercise rules need nested simulation and return `false`.
+   * Threshold rules ignore `u`; stochastic rules elect PIK when `u` is
+   * below the logistic probability; optimal-exercise rules run their nested
+   * simulation with a seed derived from `u`, so equal draws give equal
+   * decisions.
    * @param state - `CreditState` JSON or plain object (`hazard_rate`, `distance_to_default`, `leverage`, `accreted_notional`, `coupon_due`, `asset_value`).
    * @param u - Uniform draw in `[0, 1)`.
    * @returns `true` when the rule elects to pay in kind.
    * @throws Error - Throws a `TypeError` if `state` is neither a string nor a plain object or `u` is not a number, and a `validation` error if `state` is malformed.
    */
-  shouldPikWithUniform(state: generated.models.CreditState | string, u: number): boolean;
+  shouldPik(state: generated.models.CreditState | string, u: number): boolean;
   /**
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
@@ -27802,7 +27748,7 @@ export interface ToggleExerciseModel extends WasmOwned {
  * await init();
  * const rule = models.credit.ToggleExerciseModel.threshold("leverage", 0.7, "above");
  * const state = { hazard_rate: 0.05, distance_to_default: null, leverage: 0.8, accreted_notional: 100, coupon_due: 4, asset_value: null };
- * console.log(rule.kind, rule.shouldPikWithUniform(state, 0.5));
+ * console.log(rule.kind, rule.shouldPik(state, 0.5));
  * rule.free();
  * ```
  */
@@ -28426,6 +28372,23 @@ export interface ModelCreditNamespace {
    * @throws Error - Throws a `validation` error if the series is empty or a rate is non-finite or outside `[0, 1]`.
    */
   centralTendency(annualDefaultRates: NumericArray): number;
+  /**
+   * Net liquidation value of a collateral piece after its haircut.
+   *
+   * Twin of the Rust `CollateralPiece::liquidation_value` and the Python
+   * property `CollateralPiece.liquidation_value`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const piece = { collateral_type: "real_estate" as const, book_value: 800_000, haircut: 0.25 };
+   * console.log(models.credit.collateralPieceLiquidationValue(piece)); // 600000
+   * ```
+   * @param piece - `CollateralPiece` object or JSON (`collateral_type`, `book_value`, `haircut`), as held by `WorkoutLgd.collateral`.
+   * @returns `book_value * (1 - haircut)`, in the book value's monetary units.
+   * @throws Error - Throws a `TypeError` if `piece` is neither a string nor a plain object, and a `validation` error if it is malformed, the book value is negative or non-finite, or the haircut is outside `[0, 1]`.
+   */
+  collateralPieceLiquidationValue(piece: generated.models.CollateralPiece | string): number;
 
   /**
    * Moody's WARF rating factor for one credit rating.
@@ -28476,6 +28439,33 @@ export interface ModelCreditNamespace {
    * @throws Error - Throws a `validation` error if `t` is not positive and finite, and a `computation` error if the matrix exponential fails.
    */
   project(generator: GeneratorMatrix, t: number): TransitionMatrix;
+  /**
+   * Total allowed amount of a recovery claim: principal plus accrued amounts
+   * and penalties.
+   *
+   * Twin of the Rust `RecoveryClaim::total_claim` and the Python property
+   * `RecoveryClaim.total_claim`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const claim = {
+   *   id: "TL-B",
+   *   seniority: "senior_secured",
+   *   priority: 1,
+   *   principal: 100,
+   *   accrued: 5,
+   *   penalties: 1,
+   *   collateral_value: null,
+   *   collateral_haircut: 0,
+   * };
+   * console.log(models.credit.recoveryClaimTotalClaim(claim)); // 106
+   * ```
+   * @param claim - `RecoveryClaim` object or JSON, as passed to `allocateRecovery`.
+   * @returns `principal + accrued + penalties`, in the claim's monetary units.
+   * @throws Error - Throws a `TypeError` if `claim` is neither a string nor a plain object, and a `validation` error if it is malformed.
+   */
+  recoveryClaimTotalClaim(claim: generated.models.RecoveryClaim | string): number;
   /**
    * Historical Beta recovery distribution for a debt seniority class.
    * @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
@@ -29178,34 +29168,6 @@ export interface DtsmNamespace {
    * Principal-component analysis of yield-curve changes.
    */
   YieldPca: YieldPcaConstructor;
-  /**
-   * Extract Diebold-Li level, slope and curvature factors from a yield matrix.
-   * @param tenors - Maturities in years, one per column of `yieldsMatrix`.
-   * @param yieldsMatrix - Yields as nested rows: one `number[]` per date, one decimal yield per tenor.
-   * @param lambda - Optional decay parameter; omitted uses the Rust default (0.7308).
-   * @returns The `FactorTimeSeries` object (`factors`, `residuals`, `r_squared`, `r_squared_avg`, `dates`).
-   * @throws Error - Throws a `validation` error if the inputs are ragged, too small or non-finite.
-   */
-  dieboldLiFitFactors(
-    tenors: NumericArray,
-    yieldsMatrix: NumericArray[],
-    lambda?: number
-  ): generated.models.FactorTimeSeries;
-  /**
-   * Fit Diebold-Li to a yield matrix and forecast the curve.
-   * @param tenors - Maturities in years, one per column of `yieldsMatrix`.
-   * @param yieldsMatrix - Yields as nested rows: one `number[]` per date, one decimal yield per tenor.
-   * @param horizon - Forecast horizon in observation periods; a positive safe integer.
-   * @param lambda - Optional decay parameter; omitted uses the Rust default (0.7308).
-   * @returns The `YieldForecast` object (`horizon`, `yields`, `tenors`, `factors`, `lower_95`, `upper_95`).
-   * @throws Error - Throws a `validation` error if the inputs are ragged, too small or non-finite, and a `computation` error if the VAR regression is singular.
-   */
-  dieboldLiForecast(
-    tenors: NumericArray,
-    yieldsMatrix: NumericArray[],
-    horizon: number,
-    lambda?: number
-  ): generated.models.YieldForecast;
 }
 
 /**
@@ -29648,6 +29610,90 @@ export interface VolatilityNamespace {
    * @throws Error - Throws a JavaScript exception if `params` fails validation, `t` is not positive, or the total variance at `k` is negative.
    */
   sviImpliedVol(params: SviParams, k: number, t: number): number;
+  /**
+   * Extract Dupire local volatility from an implied volatility surface.
+   *
+   * Twin of the Rust and Python `LocalVolSurface.from_implied_vol`. The local variance at each node of the implied grid is `(dw/dT) / g` in total variance `w = sigma^2 T` and log-moneyness `k = ln(K / F_T)` (Gatheral 2006, eq. 1.10), with the time derivative taken at fixed `k`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const implied = {
+   *   id: "FLAT",
+   *   expiries: [0.5, 1.0],
+   *   strikes: [90, 100, 110],
+   *   vols_row_major: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+   *   secondary_axis: "strike" as const,
+   *   interpolation_mode: "vol" as const,
+   *   quote_type: "black_lognormal" as const,
+   * };
+   * const local = models.volatility.localVolFromImpliedVol(implied, [100, 100]);
+   * console.log(local.expiries, local.strikes); // [0.5, 1] [90, 100, 110]
+   * console.log(local.local_vols.every((v) => Math.abs(v - 0.2) < 1e-12)); // true
+   * ```
+   * @param surface - `VolSurface` object or JSON in the canonical wire form: unshifted Black implied volatilities (decimals) on expiries in years and positive cash strikes, at least two expiries and three strikes.
+   * @param forwards - Forward price of the underlying for each surface expiry, in strike units and in the order of `surface.expiries`; finite and positive. For a flat carry, `F(T) = S * exp((r - q) * T)`.
+   * @returns The `LocalVolSurface` object: `expiries` in years, `strikes`, and `local_vols` as annualized decimals in row-major order (`local_vols[i * strikes.length + j]` for expiry `i`, strike `j`).
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `surface` is malformed, has fewer than two expiries or three strikes, is not an unshifted Black strike surface, `forwards` has the wrong length or a non-positive entry, or the surface has butterfly or calendar arbitrage at a node (the message names the node).
+   */
+  localVolFromImpliedVol(
+    surface: generated.core.VolSurface | string,
+    forwards: NumericArray
+  ): generated.models.LocalVolSurface;
+  /**
+   * Extract Dupire local volatility after Gaussian smoothing of the implied volatilities along the strike axis.
+   *
+   * Twin of the Rust and Python `LocalVolSurface.from_implied_vol_smoothed`. Smoothing regularises the second strike derivative, the usual source of a non-positive Dupire density on market-calibrated grids.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const implied = {
+   *   id: "FLAT",
+   *   expiries: [0.5, 1.0],
+   *   strikes: [90, 100, 110],
+   *   vols_row_major: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+   *   secondary_axis: "strike" as const,
+   *   interpolation_mode: "vol" as const,
+   *   quote_type: "black_lognormal" as const,
+   * };
+   * const local = models.volatility.localVolFromImpliedVolSmoothed(implied, [100, 100], 5.0);
+   * console.log(local.local_vols.length); // 6
+   * ```
+   * @param surface - `VolSurface` object or JSON, as for `localVolFromImpliedVol`.
+   * @param forwards - One forward per surface expiry, as for `localVolFromImpliedVol`.
+   * @param sigmaStrikes - Standard deviation of the Gaussian kernel in strike (price) units, non-negative; zero disables smoothing.
+   * @returns The `LocalVolSurface` object on the grid of `surface`.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `sigmaStrikes` is negative or non-finite, or for any error of `localVolFromImpliedVol` on the smoothed surface.
+   */
+  localVolFromImpliedVolSmoothed(
+    surface: generated.core.VolSurface | string,
+    forwards: NumericArray,
+    sigmaStrikes: number
+  ): generated.models.LocalVolSurface;
+  /**
+   * Evaluate a local volatility surface: bilinear inside its grid, flat outside it.
+   *
+   * Twin of the Rust and Python `LocalVolSurface.value`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const local = { expiries: [1, 2], strikes: [100, 200], local_vols: [0.1, 0.2, 0.3, 0.4] };
+   * console.log(models.volatility.localVolValue(local, 1.5, 150)); // 0.25
+   * console.log(models.volatility.localVolValue(local, 9, 50)); // 0.3
+   * ```
+   * @param localVol - `LocalVolSurface` object or JSON (`expiries`, `strikes`, `local_vols`), validated on decode.
+   * @param expiry - Time in years from the valuation date.
+   * @param strike - Level of the underlying in price units.
+   * @returns The local volatility as an annualized decimal.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `localVol` is malformed: an empty or unsorted axis, a non-positive strike, a negative volatility or a value count that does not match the grid.
+   */
+  localVolValue(
+    localVol: generated.models.LocalVolSurface | string,
+    expiry: number,
+    strike: number
+  ): number;
   /**
    * Butterfly-arbitrage check on a strike by expiry volatility grid.
    * @param strikes - Strictly increasing strike grid shared by every row.
@@ -30111,6 +30157,152 @@ export interface LiquidityNamespace {
     volumes: NumericArray,
     referencePrice: number
   ): number | undefined;
+  /**
+   * Absolute bid-ask spread of a liquidity profile.
+   *
+   * Twin of the Rust `LiquidityProfile::spread` and the Python property
+   * `LiquidityProfile.spread`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const profile = {
+   *   instrument_id: "XYZ",
+   *   mid: 100,
+   *   bid: 99.5,
+   *   ask: 100.5,
+   *   avg_daily_volume: 1_000_000,
+   *   avg_trade_size: 200,
+   *   spread_volatility: 0.05,
+   *   spread_volatility_kind: "absolute" as const,
+   *   observation_days: 20,
+   * };
+   * console.log(models.liquidity.liquidityProfileSpread(profile)); // 1
+   * ```
+   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+   * @returns `ask - bid`, in price units.
+   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
+   */
+  liquidityProfileSpread(profile: generated.models.LiquidityProfile | string): number;
+  /**
+   * Relative bid-ask spread of a liquidity profile, as a fraction of mid.
+   *
+   * Twin of the Rust `LiquidityProfile::relative_spread` and the Python
+   * property `LiquidityProfile.relative_spread`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const profile = {
+   *   instrument_id: "XYZ",
+   *   mid: 100,
+   *   bid: 99.5,
+   *   ask: 100.5,
+   *   avg_daily_volume: 1_000_000,
+   *   avg_trade_size: 200,
+   *   spread_volatility: 0.05,
+   *   spread_volatility_kind: "absolute" as const,
+   *   observation_days: 20,
+   * };
+   * console.log(models.liquidity.liquidityProfileRelativeSpread(profile)); // 0.01
+   * ```
+   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+   * @returns `(ask - bid) / mid`, as a decimal fraction of the mid price.
+   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
+   */
+  liquidityProfileRelativeSpread(profile: generated.models.LiquidityProfile | string): number;
+  /**
+   * Half the absolute bid-ask spread of a liquidity profile: the one-way
+   * transaction cost at mid.
+   *
+   * Twin of the Rust `LiquidityProfile::half_spread` and the Python property
+   * `LiquidityProfile.half_spread`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const profile = {
+   *   instrument_id: "XYZ",
+   *   mid: 100,
+   *   bid: 99.5,
+   *   ask: 100.5,
+   *   avg_daily_volume: 1_000_000,
+   *   avg_trade_size: 200,
+   *   spread_volatility: 0.05,
+   *   spread_volatility_kind: "absolute" as const,
+   *   observation_days: 20,
+   * };
+   * console.log(models.liquidity.liquidityProfileHalfSpread(profile)); // 0.5
+   * ```
+   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+   * @returns `0.5 * (ask - bid)`, in price units.
+   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
+   */
+  liquidityProfileHalfSpread(profile: generated.models.LiquidityProfile | string): number;
+  /**
+   * Spread volatility of a liquidity profile normalised to relative
+   * (fraction-of-mid) units.
+   *
+   * A `"relative"` `spread_volatility_kind` returns the stored value; an
+   * `"absolute"` one divides it by `mid`. Twin of the Rust
+   * `LiquidityProfile::relative_spread_volatility` and the Python property
+   * `LiquidityProfile.relative_spread_volatility`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const profile = {
+   *   instrument_id: "XYZ",
+   *   mid: 100,
+   *   bid: 99.5,
+   *   ask: 100.5,
+   *   avg_daily_volume: 1_000_000,
+   *   avg_trade_size: 200,
+   *   spread_volatility: 0.05,
+   *   spread_volatility_kind: "absolute" as const,
+   *   observation_days: 20,
+   * };
+   * console.log(models.liquidity.liquidityProfileRelativeSpreadVolatility(profile)); // 0.0005
+   * ```
+   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+   * @returns The spread standard deviation as a decimal fraction of the mid price.
+   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
+   */
+  liquidityProfileRelativeSpreadVolatility(
+    profile: generated.models.LiquidityProfile | string
+  ): number;
+  /**
+   * Reference price a trade actually uses: its explicit `reference_price`, or
+   * the profile's `mid` when that is `null`.
+   *
+   * Twin of the Rust `TradeParams::effective_reference_price` and the Python
+   * property `TradeParams.effective_reference_price`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const profile = {
+   *   instrument_id: "XYZ",
+   *   mid: 100,
+   *   bid: 99.5,
+   *   ask: 100.5,
+   *   avg_daily_volume: 1_000_000,
+   *   avg_trade_size: 200,
+   *   spread_volatility: 0.05,
+   *   spread_volatility_kind: "absolute" as const,
+   *   observation_days: 20,
+   * };
+   * const params = { quantity: 10_000, horizon_days: 2, daily_volatility: 0.02, profile };
+   * console.log(models.liquidity.tradeParamsEffectiveReferencePrice(params)); // 100
+   * console.log(
+   *   models.liquidity.tradeParamsEffectiveReferencePrice({ ...params, reference_price: 101 })
+   * ); // 101
+   * ```
+   * @param params - `TradeParams` object or JSON (`quantity`, `horizon_days`, `daily_volatility`, `risk_aversion`, `reference_price`, `profile`).
+   * @returns The reference price in price units.
+   * @throws Error - Throws a `TypeError` if `params` is neither a string nor a plain object, and a `validation` error if it is malformed.
+   */
+  tradeParamsEffectiveReferencePrice(params: generated.models.TradeParams | string): number;
   /**
    * Almgren-Chriss market-impact model.
    */
@@ -35942,7 +36134,7 @@ export interface PortfolioNamespace {
   /**
    * Read one position-by-factor sensitivity.
    *
-   * Twin of Python `SensitivityMatrix.delta` (Rust `SensitivityMatrix::try_delta`).
+   * Twin of Python `SensitivityMatrix.delta` (Rust `SensitivityMatrix::delta`).
    * @param matrix - Sensitivity-matrix object or JSON `{ base_currency, position_ids, factor_ids, data }` from `computeFactorSensitivities`.
    * @param positionIdx - Zero-based row index into `position_ids`.
    * @param factorIdx - Zero-based column index into `factor_ids`.
@@ -35958,7 +36150,7 @@ export interface PortfolioNamespace {
    * Sensitivities of one position to every factor.
    *
    * Twin of Python `SensitivityMatrix.position_deltas` (Rust
-   * `SensitivityMatrix::try_position_deltas`).
+   * `SensitivityMatrix::position_deltas`).
    * @param matrix - Sensitivity-matrix object or JSON from `computeFactorSensitivities`.
    * @param positionIdx - Zero-based row index into `position_ids`.
    * @returns One value per factor, in `factor_ids` order.
@@ -35972,7 +36164,7 @@ export interface PortfolioNamespace {
    * Sensitivities of every position to one factor.
    *
    * Twin of Python `SensitivityMatrix.factor_deltas` (Rust
-   * `SensitivityMatrix::try_factor_deltas`).
+   * `SensitivityMatrix::factor_deltas`).
    * @param matrix - Sensitivity-matrix object or JSON from `computeFactorSensitivities`.
    * @param factorIdx - Zero-based column index into `factor_ids`.
    * @returns One value per position, in `position_ids` order.

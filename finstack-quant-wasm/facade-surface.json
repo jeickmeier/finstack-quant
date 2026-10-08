@@ -410,7 +410,6 @@
       "CashFlowBuilder",
       "CashFlowSchedule",
       "absToSmm",
-      "accruedInterest",
       "accruedInterestAmount",
       "aggregateByPeriod",
       "aggregateCashflowsChecked",
@@ -464,10 +463,8 @@
       "prepaymentModelSpecVector",
       "recoveryModelSpecRecoveryRate",
       "recoveryModelSpecValidate",
-      "scheduleCalendarYearLadder",
       "scheduleFromClassifiedFlows",
       "scheduleFromDatedFlows",
-      "scheduleOutstandingByDate",
       "scheduleParamsAnnualActact",
       "scheduleParamsEurEstrSwap",
       "scheduleParamsEurGovBond",
@@ -479,7 +476,6 @@
       "scheduleParamsUsdSofrSwap",
       "scheduleParamsUsdTreasury",
       "scheduleParamsValidate",
-      "scheduleWal",
       "schema",
       "smmToCpr",
       "validateCashflowScheduleJson"
@@ -538,9 +534,6 @@
     "getters": []
   },
   "cashflows.absToSmm": {
-    "kind": "function"
-  },
-  "cashflows.accruedInterest": {
     "kind": "function"
   },
   "cashflows.accruedInterestAmount": {
@@ -702,16 +695,10 @@
   "cashflows.recoveryModelSpecValidate": {
     "kind": "function"
   },
-  "cashflows.scheduleCalendarYearLadder": {
-    "kind": "function"
-  },
   "cashflows.scheduleFromClassifiedFlows": {
     "kind": "function"
   },
   "cashflows.scheduleFromDatedFlows": {
-    "kind": "function"
-  },
-  "cashflows.scheduleOutstandingByDate": {
     "kind": "function"
   },
   "cashflows.scheduleParamsAnnualActact": {
@@ -745,9 +732,6 @@
     "kind": "function"
   },
   "cashflows.scheduleParamsValidate": {
-    "kind": "function"
-  },
-  "cashflows.scheduleWal": {
     "kind": "function"
   },
   "cashflows.smmToCpr": {
@@ -2701,10 +2685,12 @@
       "applyBaselIrbPdFloor",
       "baselIrbPdFloor",
       "centralTendency",
+      "collateralPieceLiquidationValue",
       "moodysWarfFactor",
       "ohlsonOScore",
       "pitToTtc",
       "project",
+      "recoveryClaimTotalClaim",
       "seniorityRecoveryStats",
       "tenderRecommendationHurdle",
       "ttcToPit",
@@ -2732,11 +2718,11 @@
       "distanceToDefault",
       "distanceToDefaultWithDrift",
       "free",
+      "impliedEquity",
       "impliedSpread",
       "simulatePaths",
       "toHazardCurve",
-      "toJson",
-      "tryImpliedEquity"
+      "toJson"
     ],
     "getters": [
       "assetValue",
@@ -2788,7 +2774,7 @@
   "models.credit.ToggleExerciseModel": {
     "kind": "class",
     "statics": ["fromJson", "optimal", "stochastic", "threshold"],
-    "methods": ["free", "shouldPikWithUniform", "toJson"],
+    "methods": ["free", "shouldPik", "toJson"],
     "getters": ["kind", "params"]
   },
   "models.credit.RatingFactorTable": {
@@ -2864,6 +2850,9 @@
     "kind": "function"
   },
   "models.credit.workoutLgd": {
+    "kind": "function"
+  },
+  "models.credit.collateralPieceLiquidationValue": {
     "kind": "function"
   },
   "models.credit.MasterScale": {
@@ -2973,6 +2962,9 @@
     "kind": "function"
   },
   "models.credit.allocateRecovery": {
+    "kind": "function"
+  },
+  "models.credit.recoveryClaimTotalClaim": {
     "kind": "function"
   },
   "models.factor": {
@@ -3157,9 +3149,14 @@
       "amihudIlliquidity",
       "daysToLiquidate",
       "kyleLambda",
+      "liquidityProfileHalfSpread",
+      "liquidityProfileRelativeSpread",
+      "liquidityProfileRelativeSpreadVolatility",
+      "liquidityProfileSpread",
       "liquidityTier",
       "lvarBangia",
-      "rollEffectiveSpread"
+      "rollEffectiveSpread",
+      "tradeParamsEffectiveReferencePrice"
     ]
   },
   "models.liquidity.AlmgrenChrissModel": {
@@ -3195,6 +3192,21 @@
   "models.liquidity.kyleLambda": {
     "kind": "function"
   },
+  "models.liquidity.liquidityProfileSpread": {
+    "kind": "function"
+  },
+  "models.liquidity.liquidityProfileRelativeSpread": {
+    "kind": "function"
+  },
+  "models.liquidity.liquidityProfileHalfSpread": {
+    "kind": "function"
+  },
+  "models.liquidity.liquidityProfileRelativeSpreadVolatility": {
+    "kind": "function"
+  },
+  "models.liquidity.tradeParamsEffectiveReferencePrice": {
+    "kind": "function"
+  },
   "models.monteCarlo": {
     "kind": "namespace",
     "keys": [
@@ -3202,14 +3214,12 @@
       "LsmcPricer",
       "PathDependentPricer",
       "finiteDiffDelta",
-      "finiteDiffDeltaCrn",
       "finiteDiffGamma",
-      "finiteDiffGammaCrn",
       "hestonSatisfiesFeller",
       "priceHestonCall",
       "priceHestonPut",
       "relativeStderr",
-      "simulateGbmPaths"
+      "simulatePaths"
     ]
   },
   "models.monteCarlo.EuropeanPricer": {
@@ -3221,7 +3231,7 @@
   "models.monteCarlo.PathDependentPricer": {
     "kind": "class",
     "statics": [],
-    "methods": ["free", "priceAsianCall", "priceAsianPut"],
+    "methods": ["free", "priceAsianCall", "priceAsianPut", "priceWithLrmGreeks"],
     "getters": ["antithetic", "numPaths", "seed", "useBrownianBridge", "useParallel", "useSobol"]
   },
   "models.monteCarlo.LsmcPricer": {
@@ -3245,19 +3255,13 @@
   "models.monteCarlo.hestonSatisfiesFeller": {
     "kind": "function"
   },
-  "models.monteCarlo.simulateGbmPaths": {
+  "models.monteCarlo.simulatePaths": {
     "kind": "function"
   },
   "models.monteCarlo.finiteDiffDelta": {
     "kind": "function"
   },
-  "models.monteCarlo.finiteDiffDeltaCrn": {
-    "kind": "function"
-  },
   "models.monteCarlo.finiteDiffGamma": {
-    "kind": "function"
-  },
-  "models.monteCarlo.finiteDiffGammaCrn": {
     "kind": "function"
   },
   "models.monteCarlo.relativeStderr": {
@@ -3269,14 +3273,7 @@
   },
   "models.rates.dtsm": {
     "kind": "namespace",
-    "keys": [
-      "DieboldLi",
-      "YieldPanel",
-      "YieldPca",
-      "dieboldLiFitFactors",
-      "dieboldLiForecast",
-      "nelsonSiegelYields"
-    ]
+    "keys": ["DieboldLi", "YieldPanel", "YieldPca", "nelsonSiegelYields"]
   },
   "models.rates.dtsm.YieldPanel": {
     "kind": "class",
@@ -3315,12 +3312,6 @@
     ]
   },
   "models.rates.dtsm.nelsonSiegelYields": {
-    "kind": "function"
-  },
-  "models.rates.dtsm.dieboldLiFitFactors": {
-    "kind": "function"
-  },
-  "models.rates.dtsm.dieboldLiForecast": {
     "kind": "function"
   },
   "models.rates.hullWhite": {
@@ -3381,6 +3372,9 @@
       "getSurfaceVolClamped",
       "impliedVolBachelier",
       "impliedVolBlack",
+      "localVolFromImpliedVol",
+      "localVolFromImpliedVolSmoothed",
+      "localVolValue",
       "materializeCubeExpirySlice",
       "materializeCubeExpirySliceNormal",
       "materializeCubeTenorSlice",
@@ -3478,6 +3472,15 @@
     "kind": "function"
   },
   "models.volatility.impliedVolBlack": {
+    "kind": "function"
+  },
+  "models.volatility.localVolFromImpliedVol": {
+    "kind": "function"
+  },
+  "models.volatility.localVolFromImpliedVolSmoothed": {
+    "kind": "function"
+  },
+  "models.volatility.localVolValue": {
     "kind": "function"
   },
   "models.volatility.strikeToDelta": {

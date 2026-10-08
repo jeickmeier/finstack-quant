@@ -1,3 +1,4 @@
+use crate::bindings::macros::impl_repr_html_via_dataframe;
 use std::collections::HashMap;
 
 use pyo3::prelude::*;
@@ -14,7 +15,6 @@ use crate::bindings::pandas_utils::{
 };
 use crate::bindings::repr_support::repr_from_serde;
 
-use super::config::decomposition_method_label;
 use crate::bindings::json_bridge::{deserialize_json, serialize_json};
 
 /// Python-style rendering of an optional float (`None` or the number).
@@ -618,18 +618,9 @@ impl PyPositionVarContribution {
             py_opt(self.inner.incremental_var),
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+impl_repr_html_via_dataframe!(PyPositionVarContribution);
 
 /// Per-position component ES and marginal ES.
 #[pyclass(
@@ -809,7 +800,8 @@ impl PyPositionRiskDecomposition {
     /// Decomposition method: ``"parametric"`` or ``"historical"``.
     #[getter]
     fn method(&self) -> PyResult<String> {
-        decomposition_method_label(self.inner.method)
+        finstack_quant_core::wire::serde_label(&self.inner.method)
+            .map_err(crate::errors::core_to_py)
     }
 
     /// Parametric-mode numerical residual; ``None`` in historical mode.
@@ -900,19 +892,10 @@ impl PyPositionRiskDecomposition {
             self.inner.portfolio_es,
             self.inner.confidence,
             self.inner.n_positions,
-            decomposition_method_label(self.inner.method).unwrap_or_else(|_| "?".to_string()),
+            finstack_quant_core::wire::serde_label(&self.inner.method).unwrap_or_else(|_| "?".to_string()),
             py_opt(self.inner.euler_residual),
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+impl_repr_html_via_dataframe!(PyPositionRiskDecomposition);

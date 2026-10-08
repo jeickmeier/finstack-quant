@@ -198,11 +198,6 @@ impl MarketDataHierarchy {
         &self.roots
     }
 
-    /// Mutable access to root nodes.
-    pub fn roots_mut(&mut self) -> &mut IndexMap<String, HierarchyNode> {
-        &mut self.roots
-    }
-
     /// Look up a node by path. Returns `None` if the path doesn't exist.
     pub fn get_node(&self, path: &[String]) -> Option<&HierarchyNode> {
         let mut path_iter = path.iter();
@@ -232,111 +227,6 @@ impl MarketDataHierarchy {
             ids.extend(root.all_curve_ids());
         }
         ids
-    }
-
-    /// Insert a curve at a `/`-separated path, creating intermediate nodes as needed.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `path` is malformed or if `curve_id` already exists
-    /// somewhere else in the hierarchy.
-    pub fn insert_curve(&mut self, path: &str, curve_id: impl Into<CurveId>) -> crate::Result<()> {
-        let segments = parse_path(path)?;
-        let curve_id = curve_id.into();
-
-        if let Some(existing_path) = self.path_for_curve(&curve_id) {
-            return Err(crate::Error::Validation(format!(
-                "CurveId '{}' already exists in hierarchy at '{}'",
-                curve_id.as_str(),
-                existing_path.join("/")
-            )));
-        }
-
-        let root_name = &segments[0];
-
-        let root = self
-            .roots
-            .entry(root_name.to_string())
-            .or_insert_with(|| HierarchyNode::new(root_name));
-
-        let mut current = root;
-        for segment in &segments[1..] {
-            current = current.get_or_create_child(segment);
-        }
-
-        current.curve_ids.push(curve_id);
-        Ok(())
-    }
-
-    /// Remove a curve from wherever it sits in the tree. Returns `true` if found.
-    pub fn remove_curve(&mut self, curve_id: &CurveId) -> bool {
-        fn remove_from_node(node: &mut HierarchyNode, target: &CurveId) -> bool {
-            if let Some(pos) = node.curve_ids.iter().position(|id| id == target) {
-                node.curve_ids.remove(pos);
-                return true;
-            }
-            for child in node.children.values_mut() {
-                if remove_from_node(child, target) {
-                    return true;
-                }
-            }
-            false
-        }
-
-        for root in self.roots.values_mut() {
-            if remove_from_node(root, curve_id) {
-                return true;
-            }
-        }
-        false
-    }
-
-    /// Find the path from root to a specific curve. Returns `None` if not found.
-    pub fn path_for_curve(&self, curve_id: &CurveId) -> Option<Vec<String>> {
-        fn find_in_node(node: &HierarchyNode, target: &CurveId, path: &mut Vec<String>) -> bool {
-            path.push(node.name().to_string());
-            if node.curve_ids.iter().any(|id| id == target) {
-                return true;
-            }
-            for child in node.children.values() {
-                if find_in_node(child, target, path) {
-                    return true;
-                }
-            }
-            path.pop();
-            false
-        }
-
-        for root in self.roots.values() {
-            let mut path = Vec::new();
-            if find_in_node(root, curve_id, &mut path) {
-                return Some(path);
-            }
-        }
-        None
-    }
-
-    /// Set or replace a tag on a node at the given `/`-separated path.
-    ///
-    /// `path` is split into non-empty hierarchy segments. Existing tags with
-    /// the same `key` are overwritten; this operation does not alter the
-    /// node's children or curve references.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the path syntax is invalid or if no node exists at
-    /// the resolved path. It does not create missing hierarchy nodes; use the
-    /// builder or mutable node APIs for that workflow.
-    pub fn set_tag(&mut self, path: &str, key: &str, value: &str) -> crate::Result<()> {
-        let segments = parse_path(path)?;
-        let node = self.get_node_mut(&segments).ok_or_else(|| {
-            crate::Error::Validation(format!(
-                "Hierarchy path '{}' does not exist",
-                segments.join("/")
-            ))
-        })?;
-        node.set_tag(key, value);
-        Ok(())
     }
 
     /// Validate structural hierarchy invariants.

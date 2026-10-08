@@ -66,25 +66,6 @@ pub fn poisson_inverse_cdf(lambda: f64, u: f64) -> usize {
     }
 }
 
-/// Sample from Poisson using standard normal input.
-///
-/// Converts a standard normal variate to Poisson via CDF transform.
-///
-/// # Arguments
-///
-/// * `lambda` - Mean number of events
-/// * `z` - Standard normal variate
-///
-/// # Returns
-///
-/// Number of Poisson events
-pub fn poisson_from_normal(lambda: f64, z: f64) -> usize {
-    use crate::math::special_functions::norm_cdf;
-
-    let u = norm_cdf(z);
-    poisson_inverse_cdf(lambda, u)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,22 +128,5 @@ mod tests {
             (empirical_mean - lambda).abs() < 0.25,
             "empirical mean {empirical_mean} too far from {lambda}"
         );
-    }
-
-    #[test]
-    fn test_poisson_from_normal() {
-        let lambda = 2.0;
-
-        // z = 0 (median) should give around lambda
-        let k = poisson_from_normal(lambda, 0.0);
-        assert!(k <= 4); // Should be close to 2
-
-        // Very negative z should give 0 or low value
-        let k_low = poisson_from_normal(lambda, -3.0);
-        assert!(k_low <= 2);
-
-        // Very positive z should give higher value
-        let k_high = poisson_from_normal(lambda, 3.0);
-        assert!(k_high >= 2);
     }
 }

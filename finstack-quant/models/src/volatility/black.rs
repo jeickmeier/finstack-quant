@@ -60,28 +60,6 @@ pub fn d1(spot: f64, strike: f64, r: f64, sigma: f64, t: f64, q: f64) -> f64 {
     d1_d2(spot, strike, r, sigma, t, q).0
 }
 
-/// Calculate d2 for Black–Scholes (general form with dividends/carry)
-///
-/// d2 = d1 - σ√T
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's price units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `r` - Continuously compounded domestic risk-free rate as a decimal.
-/// * `sigma` - Annualized lognormal volatility as a decimal.
-/// * `t` - Remaining time to expiry in years.
-/// * `q` - Continuously compounded dividend yield or foreign-rate carry as a
-///   decimal annual rate.
-///
-/// # Performance
-/// If you need both d1 and d2, use [`d1_d2`] instead to avoid redundant work.
-#[inline]
-#[must_use]
-pub fn d2(spot: f64, strike: f64, r: f64, sigma: f64, t: f64, q: f64) -> f64 {
-    d1_d2(spot, strike, r, sigma, t, q).1
-}
-
 /// Calculate both d1 and d2 for Black–Scholes in a single pass.
 ///
 /// # Arguments
@@ -167,25 +145,6 @@ fn moneyness_limit(difference: f64) -> f64 {
 #[must_use]
 pub fn d1_black76(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
     d1_d2_black76(forward, strike, sigma, t).0
-}
-
-/// Calculate d2 for Black76 model
-///
-/// d2 = d1 - σ√T
-///
-/// # Arguments
-///
-/// * `forward` - Forward price or rate at option expiry.
-/// * `strike` - Exercise price or rate in the same units as `forward`.
-/// * `sigma` - Annualized lognormal volatility as a decimal.
-/// * `t` - Remaining time to expiry in years.
-///
-/// # Performance
-/// If you need both d1 and d2, use [`d1_d2_black76`] instead.
-#[inline]
-#[must_use]
-pub fn d2_black76(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
-    d1_d2_black76(forward, strike, sigma, t).1
 }
 
 /// Calculate both d1 and d2 for Black76 model in a single pass.

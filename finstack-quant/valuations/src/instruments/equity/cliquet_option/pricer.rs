@@ -12,7 +12,7 @@ use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
+use finstack_quant_models::monte_carlo::engine::McEngine;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::TimeGrid;
@@ -256,18 +256,11 @@ impl CliquetOptionMcPricer {
             &self.config,
             &inst.instrument_pricing_overrides,
         )?;
-        let engine_config = McEngineConfig {
-            num_paths: merged_cfg.num_paths,
-            time_grid,
-            target_ci_half_width: inst
-                .instrument_pricing_overrides
-                .model_config
-                .mc_target_ci_half_width,
-            use_parallel: merged_cfg.use_parallel,
-            chunk_size: Some(merged_cfg.chunk_size),
-            path_capture: merged_cfg.path_capture.clone(),
-            antithetic: merged_cfg.antithetic,
-        };
+        let mut engine_config = merged_cfg.engine_config(time_grid);
+        engine_config.target_ci_half_width = inst
+            .instrument_pricing_overrides
+            .model_config
+            .mc_target_ci_half_width;
         let engine = McEngine::new(engine_config);
 
         let rng = PhiloxRng::new(seed);

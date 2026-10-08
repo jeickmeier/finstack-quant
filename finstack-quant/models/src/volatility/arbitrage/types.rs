@@ -121,18 +121,3 @@ pub struct ArbitrageReport {
     /// Count of violations by severity.
     pub counts_by_severity: BTreeMap<ArbitrageSeverity, usize>,
 }
-
-impl ArbitrageReport {
-    /// Filter violations to only those at or above the given severity.
-    pub fn above_severity(&self, min: ArbitrageSeverity) -> Vec<&ArbitrageViolation> {
-        self.violations
-            .iter()
-            .filter(|v| v.severity >= min)
-            .collect()
-    }
-
-    /// True if any violation is at or above the given severity.
-    pub fn has_violations_above(&self, min: ArbitrageSeverity) -> bool {
-        self.violations.iter().any(|v| v.severity >= min)
-    }
-}

@@ -5,8 +5,6 @@
 pub struct EvolutionParams {
     /// Volatility for this factor
     pub volatility: f64,
-    /// Drift rate (e.g., r-q for equity)
-    pub drift: f64,
     /// Up factor
     pub up_factor: f64,
     /// Down factor
@@ -74,7 +72,6 @@ impl EvolutionParams {
 
         Ok(Self {
             volatility,
-            drift,
             up_factor: u,
             down_factor: d,
             middle_factor: None,
@@ -135,7 +132,6 @@ impl EvolutionParams {
 
         Ok(Self {
             volatility,
-            drift,
             up_factor: u,
             down_factor: d,
             middle_factor: Some(m),

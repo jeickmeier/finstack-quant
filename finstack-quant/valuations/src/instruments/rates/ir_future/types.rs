@@ -1120,8 +1120,8 @@ mod tests {
 
     #[test]
     fn convexity_adjustment_rolls_with_valuation_date_not_curve_base() {
+        use finstack_quant_core::market_data::surfaces::VolSurface;
         use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
-        use finstack_quant_core::prelude::VolSurface;
 
         let curve_base = date!(2025 - 01 - 02);
         let later_as_of = date!(2025 - 02 - 03);

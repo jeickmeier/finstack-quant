@@ -8,7 +8,7 @@
 //!
 //! Paths are generated with the Quadratic-Exponential (QE) discretization of
 //! Andersen (2008), which stays stable when the Feller condition
-//! (`2κθ ≥ σ_v²`, see [`crate::monte_carlo::process::heston::feller_condition`]) is
+//! (`2κθ ≥ σ_v²`, see [`crate::monte_carlo::process::heston::heston_satisfies_feller`]) is
 //! violated — the common case for equity calibrations.
 //!
 //! # Determinism
@@ -25,8 +25,6 @@
 //! - Heston, S. L. (1993). "A Closed-Form Solution for Options with
 //!   Stochastic Volatility with Applications to Bond and Currency Options."
 //!   *Review of Financial Studies*, 6(2), 327-343. `docs/REFERENCES.md#heston-1993`
-
-use std::str::FromStr;
 
 use crate::monte_carlo::discretization::QeHeston;
 use crate::monte_carlo::engine::{McEngine, McEngineConfig};
@@ -157,18 +155,6 @@ pub fn price_heston_put(
     )
 }
 
-/// Parse the registry's default currency code into a [`Currency`].
-///
-/// Shared by the canonical convenience pricers so an invalid registry value
-/// surfaces as a core validation error rather than a raw parse error.
-pub(crate) fn parse_registry_currency(code: &str) -> Result<Currency> {
-    Currency::from_str(code).map_err(|err| {
-        finstack_quant_core::Error::Validation(format!(
-            "invalid registry default currency '{code}': {err}"
-        ))
-    })
-}
-
 /// Shared call/put composition behind the public Heston entry points.
 #[allow(clippy::too_many_arguments)]
 fn price_heston_european(
@@ -193,10 +179,7 @@ fn price_heston_european(
     let num_paths = num_paths.unwrap_or(pricer_defaults.num_paths);
     let seed = seed.unwrap_or(pricer_defaults.seed);
     let num_steps = num_steps.unwrap_or(pricer_defaults.num_steps);
-    let currency = match currency {
-        Some(currency) => currency,
-        None => parse_registry_currency(&defaults.default_currency)?,
-    };
+    let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
     // Serial ≡ parallel by the determinism invariant, so the flag only sets
     // throughput. On wasm32 no thread pool exists, so force serial there.
     #[cfg(target_arch = "wasm32")]

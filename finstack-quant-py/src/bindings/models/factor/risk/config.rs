@@ -1,168 +1,11 @@
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use finstack_quant_models::factor::credit::VolHorizon;
-use finstack_quant_models::factor::risk::{DecompositionConfig, DecompositionMethod};
+use finstack_quant_models::factor::risk::DecompositionConfig;
 
 use crate::bindings::pickle_support::reduce_via_json;
 use crate::bindings::repr_support::repr_from_serde;
-use crate::errors::{core_to_py, serde_json_to_py, value_error};
-
-/// Serde name of a [`DecompositionMethod`] (`"parametric"` / `"historical"`).
-pub(super) fn decomposition_method_label(method: DecompositionMethod) -> PyResult<String> {
-    finstack_quant_core::wire::serde_label(&method).map_err(core_to_py)
-}
-
-/// Extract a [`VolHorizon`] from either a `VolHorizon` instance or a
-/// descriptor string (`"one_step"`, `"unconditional"`, `'{"n_steps": N}'`,
-/// `'{"years": Y}'`).
-pub(crate) fn extract_vol_horizon(obj: &Bound<'_, PyAny>) -> PyResult<VolHorizon> {
-    if let Ok(horizon) = obj.extract::<PyRef<'_, PyVolHorizon>>() {
-        return Ok(horizon.inner);
-    }
-    if let Ok(descriptor) = obj.extract::<std::borrow::Cow<'_, str>>() {
-        return VolHorizon::parse(&descriptor).map_err(value_error);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(
-        "horizon must be a VolHorizon or a descriptor string such as \"one_step\", \
-         \"unconditional\", '{\"n_steps\": N}' or '{\"years\": Y}'",
-    ))
-}
-
-/// Forecast horizon used to scale a calibrated ``Sample`` vol estimate.
-///
-/// Construct with one of the classmethods:
-///
-/// - ``VolHorizon.one_step()`` — calibrated annualized variance unchanged.
-/// - ``VolHorizon.unconditional()`` — long-run variance (identical to
-///   ``one_step`` for the ``Sample`` and ``Ewma`` vol models).
-/// - ``VolHorizon.n_steps(n)`` — variance scaled by ``n`` model periods.
-/// - ``VolHorizon.years(years)`` — variance scaled by a fractional year.
-/// - ``VolHorizon.parse(s)`` — from a descriptor string.
-///
-/// Every ``FactorCovarianceForecast`` method also accepts the descriptor
-/// string directly, so a ``VolHorizon`` instance is optional.
-///
-/// Example:
-///     >>> from finstack_quant.models.factor.credit import VolHorizon
-///     >>> VolHorizon.n_steps(5) == VolHorizon.parse('{"n_steps": 5}')
-///     True
-#[pyclass(
-    name = "VolHorizon",
-    module = "finstack_quant.models.factor.credit",
-    frozen,
-    eq,
-    from_py_object
-)]
-#[derive(Clone, Copy, PartialEq)]
-pub(crate) struct PyVolHorizon {
-    pub(crate) inner: VolHorizon,
-}
-
-impl PyVolHorizon {
-    pub(crate) fn from_inner(inner: VolHorizon) -> Self {
-        Self { inner }
-    }
-}
-
-#[pymethods]
-impl PyVolHorizon {
-    /// One-period horizon: the calibrated annualized variance unchanged.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls)")]
-    fn one_step(_cls: &Bound<'_, PyType>) -> Self {
-        Self::from_inner(VolHorizon::OneStep)
-    }
-
-    /// Long-run horizon; numerically identical to ``one_step`` for the
-    /// ``Sample`` and ``Ewma`` vol models.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls)")]
-    fn unconditional(_cls: &Bound<'_, PyType>) -> Self {
-        Self::from_inner(VolHorizon::Unconditional)
-    }
-
-    /// ``n`` annualized model periods; variance scales linearly with ``n``.
-    ///
-    /// Args:
-    ///     n: Non-negative period count (``0`` yields zero variance).
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, n)")]
-    fn n_steps(_cls: &Bound<'_, PyType>, n: usize) -> Self {
-        Self::from_inner(VolHorizon::NSteps(n))
-    }
-
-    /// Fractional-year horizon; variance scales linearly with ``years``.
-    ///
-    /// Args:
-    ///     years: Finite, non-negative horizon in years (``10 / 252`` for ten
-    ///         trading days of an annualized variance).
-    ///
-    /// Raises:
-    ///     ValueError: If ``years`` is negative or non-finite.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, years)")]
-    fn years(_cls: &Bound<'_, PyType>, years: f64) -> PyResult<Self> {
-        VolHorizon::years(years)
-            .map(Self::from_inner)
-            .map_err(value_error)
-    }
-
-    /// Parse a horizon descriptor string (matches the Rust ``VolHorizon::parse``).
-    ///
-    /// Args:
-    ///     s: ``"one_step"``, ``"unconditional"``, ``'{"n_steps": N}'``,
-    ///         ``'{"years": Y}'`` or ``'{"n_steps": N, "periods_per_year": P}'``.
-    ///
-    /// Raises:
-    ///     ValueError: If ``s`` is not one of the accepted forms.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, s)")]
-    fn parse(_cls: &Bound<'_, PyType>, s: &str) -> PyResult<Self> {
-        VolHorizon::parse(s)
-            .map(Self::from_inner)
-            .map_err(value_error)
-    }
-
-    /// Support pickle through the canonical descriptor string.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let parse = py.get_type::<Self>().getattr("parse")?;
-        reduce_via_json(parse, self.inner.descriptor())
-    }
-
-    /// Variant label: ``"one_step"`` / ``"unconditional"`` / ``"n_steps"`` / ``"years"``.
-    #[getter]
-    fn kind(&self) -> &'static str {
-        self.inner.kind()
-    }
-
-    /// Step count when ``kind == "n_steps"``, ``None`` otherwise.
-    #[getter]
-    fn n(&self) -> Option<usize> {
-        match self.inner {
-            VolHorizon::NSteps(n) => Some(n),
-            _ => None,
-        }
-    }
-
-    /// Fractional-year horizon when ``kind == "years"``, ``None`` otherwise.
-    #[getter]
-    fn years_value(&self) -> Option<f64> {
-        match self.inner {
-            VolHorizon::Years(years) => Some(years),
-            _ => None,
-        }
-    }
-
-    fn __repr__(&self) -> String {
-        match self.inner {
-            VolHorizon::OneStep => "VolHorizon.one_step()".to_owned(),
-            VolHorizon::Unconditional => "VolHorizon.unconditional()".to_owned(),
-            VolHorizon::NSteps(n) => format!("VolHorizon.n_steps({n})"),
-            VolHorizon::Years(years) => format!("VolHorizon.years({years})"),
-        }
-    }
-}
+use crate::errors::{core_to_py, serde_json_to_py};
 
 /// Configuration for position-level VaR / ES decomposition.
 ///
@@ -284,7 +127,7 @@ impl PyDecompositionConfig {
     /// Decomposition method: ``"parametric"`` or ``"historical"``.
     #[getter]
     fn method(&self) -> PyResult<String> {
-        decomposition_method_label(self.inner.method)
+        finstack_quant_core::wire::serde_label(&self.inner.method).map_err(core_to_py)
     }
 
     /// Whether leave-one-out incremental VaR is computed.

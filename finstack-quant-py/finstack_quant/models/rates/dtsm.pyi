@@ -9,9 +9,6 @@ Typed wrappers over the Rust engines:
 - :class:`YieldPca` / :class:`YieldPcaView` — PCA of yield changes and
   scenario shocks.
 
-The free functions are thin twins over the same Rust entry points for callers
-holding plain nested lists.
-
 Yields are continuously compounded zero rates in decimal form (``0.045`` for
 4.5%). Tenors are in years and the Diebold-Li decay ``lambda_`` is per year
 (default ``0.7308``, the years-equivalent of Diebold-Li's ``0.0609`` months
@@ -39,8 +36,6 @@ __all__ = [
     "YieldPanel",
     "YieldPca",
     "YieldPcaView",
-    "diebold_li_fit_factors",
-    "diebold_li_forecast",
     "nelson_siegel_yields",
 ]
 
@@ -301,8 +296,9 @@ class FactorTimeSeries:
 
     Examples
     --------
-    >>> from finstack_quant.models.rates.dtsm import diebold_li_fit_factors
-    >>> fts = diebold_li_fit_factors([1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]])
+    >>> from finstack_quant.models.rates.dtsm import DieboldLi, YieldPanel
+    >>> panel = YieldPanel([1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]])
+    >>> fts = DieboldLi().extract_factors(panel).factors
     >>> (len(fts.level), fts.num_dates)
     (2, 2)
     """
@@ -468,10 +464,9 @@ class FactorTimeSeries:
 
         Examples
         --------
-        >>> from finstack_quant.models.rates.dtsm import diebold_li_fit_factors
-        >>> fts = diebold_li_fit_factors(
-        ...     [1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]]
-        ... )
+        >>> from finstack_quant.models.rates.dtsm import DieboldLi, YieldPanel
+        >>> panel = YieldPanel([1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]])
+        >>> fts = DieboldLi().extract_factors(panel).factors
         >>> fts.to_dataframe().columns.tolist()
         ['level', 'slope', 'curvature']
         """
@@ -492,10 +487,9 @@ class FactorTimeSeries:
 
         Examples
         --------
-        >>> from finstack_quant.models.rates.dtsm import FactorTimeSeries, diebold_li_fit_factors
-        >>> fts = diebold_li_fit_factors(
-        ...     [1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]]
-        ... )
+        >>> from finstack_quant.models.rates.dtsm import DieboldLi, FactorTimeSeries, YieldPanel
+        >>> panel = YieldPanel([1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]])
+        >>> fts = DieboldLi().extract_factors(panel).factors
         >>> FactorTimeSeries.from_json(fts.to_json()).num_dates
         2
         """
@@ -523,10 +517,9 @@ class FactorTimeSeries:
 
         Examples
         --------
-        >>> from finstack_quant.models.rates.dtsm import FactorTimeSeries, diebold_li_fit_factors
-        >>> fts = diebold_li_fit_factors(
-        ...     [1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]]
-        ... )
+        >>> from finstack_quant.models.rates.dtsm import DieboldLi, FactorTimeSeries, YieldPanel
+        >>> panel = YieldPanel([1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]])
+        >>> fts = DieboldLi().extract_factors(panel).factors
         >>> FactorTimeSeries.from_json(fts.to_json()).r_squared_avg == fts.r_squared_avg
         True
         """
@@ -883,7 +876,7 @@ class YieldForecast:
 
     Examples
     --------
-    >>> from finstack_quant.models.rates.dtsm import diebold_li_forecast
+    >>> from finstack_quant.models.rates.dtsm import DieboldLi, YieldPanel
     >>> tenors = [1.0, 2.0, 5.0, 10.0]
     >>> yields = [
     ...     [0.020, 0.025, 0.030, 0.035],
@@ -893,7 +886,7 @@ class YieldForecast:
     ...     [0.020, 0.027, 0.030, 0.037],
     ...     [0.023, 0.026, 0.033, 0.035],
     ... ]
-    >>> fc = diebold_li_forecast(tenors, yields, 2)
+    >>> fc = DieboldLi().fit(YieldPanel(tenors, yields)).forecast(2)
     >>> (fc.horizon, len(fc.yields), len(fc.factors))
     (2, 4, 3)
     """
@@ -1011,7 +1004,7 @@ class YieldForecast:
 
         Examples
         --------
-        >>> from finstack_quant.models.rates.dtsm import diebold_li_forecast
+        >>> from finstack_quant.models.rates.dtsm import DieboldLi, YieldPanel
         >>> tenors = [1.0, 2.0, 5.0, 10.0]
         >>> yields = [
         ...     [0.020, 0.025, 0.030, 0.035],
@@ -1021,7 +1014,7 @@ class YieldForecast:
         ...     [0.020, 0.027, 0.030, 0.037],
         ...     [0.023, 0.026, 0.033, 0.035],
         ... ]
-        >>> diebold_li_forecast(tenors, yields, 2).to_dataframe().columns.tolist()
+        >>> DieboldLi().fit(YieldPanel(tenors, yields)).forecast(2).to_dataframe().columns.tolist()
         ['tenor', 'yield', 'lower_95', 'upper_95']
         """
         ...
@@ -1772,112 +1765,6 @@ class YieldPcaView:
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
-def diebold_li_fit_factors(
-    tenors: Sequence[float],
-    yields_matrix: Sequence[Sequence[float]],
-    lambda_: float | None = None,
-) -> FactorTimeSeries:
-    """
-    Extract Nelson-Siegel factors from a yield panel via Diebold-Li (2006).
-
-    Thin twin of ``DieboldLi(lambda_).extract_factors(YieldPanel(tenors, yields_matrix)).factors``.
-
-    Parameters
-    ----------
-    tenors : Sequence[float]
-        Tenor grid in years, length ``N``, strictly ascending and all positive.
-    yields_matrix : Sequence[Sequence[float]]
-        Yield panel ``yields_matrix[date_idx][tenor_idx]`` with ``T`` rows of
-        ``N`` continuously compounded zero rates each.
-    lambda_ : float or None, default None
-        Diebold-Li decay parameter for tenors **in years**; ``None`` uses the
-        Rust default ``0.7308``. Named ``lambda_`` because ``lambda`` is a
-        Python keyword.
-
-    Returns
-    -------
-    FactorTimeSeries
-        Level/slope/curvature per date, residuals and R-squared, with
-        ``to_dataframe()``.
-
-    Raises
-    ------
-    ValueError
-        If tenors or the yield panel are malformed, non-finite, have fewer
-        than three tenors, or ``lambda_`` is invalid.
-
-    Sources
-    -------
-    See ``docs/REFERENCES.md#diebold-li-2006``.
-
-    Examples
-    --------
-    >>> from finstack_quant.models.rates.dtsm import diebold_li_fit_factors
-    >>> tenors = [1.0, 2.0, 5.0, 10.0]
-    >>> yields = [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]]
-    >>> len(diebold_li_fit_factors(tenors, yields).level)
-    2
-
-    """
-    ...
-
-def diebold_li_forecast(
-    tenors: Sequence[float],
-    yields_matrix: Sequence[Sequence[float]],
-    horizon: int,
-    lambda_: float | None = None,
-) -> YieldForecast:
-    """
-    VAR(1) forecast of Diebold-Li factors and yields out to ``horizon`` periods.
-
-    Thin twin of ``DieboldLi(lambda_).fit(panel).forecast(horizon)``.
-
-    Parameters
-    ----------
-    tenors : Sequence[float]
-        Tenor grid in years, length ``N``.
-    yields_matrix : Sequence[Sequence[float]]
-        Yield panel ``yields_matrix[date_idx][tenor_idx]`` (at least five rows
-        for the VAR fit).
-    horizon : int
-        Forecast horizon in observation periods (must be ``>= 1``).
-    lambda_ : float or None, default None
-        Diebold-Li decay for tenors in years; ``None`` uses the Rust default.
-
-    Returns
-    -------
-    YieldForecast
-        Point forecast, factor triple and 95% bands with ``to_dataframe()``.
-
-    Raises
-    ------
-    ValueError
-        If inputs are invalid, the panel is too short for the VAR fit,
-        ``horizon`` is zero, or ``lambda_`` is invalid.
-
-    Sources
-    -------
-    See ``docs/REFERENCES.md#diebold-li-2006``.
-
-    Examples
-    --------
-    >>> from finstack_quant.models.rates.dtsm import diebold_li_forecast
-    >>> tenors = [1.0, 2.0, 5.0, 10.0]
-    >>> yields = [
-    ...     [0.02, 0.025, 0.03, 0.035],
-    ...     [0.021, 0.024, 0.031, 0.034],
-    ...     [0.019, 0.026, 0.029, 0.036],
-    ...     [0.022, 0.025, 0.032, 0.033],
-    ...     [0.020, 0.027, 0.030, 0.037],
-    ...     [0.023, 0.026, 0.033, 0.035],
-    ... ]
-    >>> fc = diebold_li_forecast(tenors, yields, 2)
-    >>> (fc.horizon, len(fc.yields))
-    (2, 4)
-
-    """
-    ...
-
 def nelson_siegel_yields(
     lambda_: float,
     factors: tuple[float, float, float],
@@ -1892,7 +1779,7 @@ def nelson_siegel_yields(
         s(tau) = (1 - exp(-lambda * tau)) / (lambda * tau)
 
     Use it to reconstruct a fitted or forecast curve from the factors returned
-    by :class:`DieboldLi` or :func:`diebold_li_forecast`.
+    by :class:`DieboldLi`.
 
     Parameters
     ----------

@@ -1,10 +1,10 @@
+use crate::bindings::macros::impl_repr_html_via_dataframe;
 use numpy::{PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use finstack_quant_models::factor::risk::{
-    parametric_es_decomposition_view, DecompositionConfig, HistoricalPositionDecomposer,
-    ParametricEsDecompositionView, ParametricPositionDecomposer, PositionEsContributionView,
+    self as model_risk, ParametricEsDecompositionView, PositionEsContributionView,
 };
 
 use crate::bindings::pandas_utils::{dict_to_dataframe, serde_object_to_single_row_dataframe};
@@ -152,21 +152,14 @@ pub(super) fn parametric_var_decomposition(
 ) -> PyResult<PyPositionRiskDecomposition> {
     let n = weights.len();
     let (position_ids, cov_flat) = extract_covariance_input(py, position_ids, covariance, n)?;
-    let mut config = confidence.map_or_else(
-        DecompositionConfig::parametric_95,
-        DecompositionConfig::parametric,
-    );
-    if compute_incremental {
-        config = config.with_incremental();
-    }
-
     let result = py
         .detach(move || {
-            ParametricPositionDecomposer.decompose_positions(
+            model_risk::parametric_var_decomposition(
+                &position_ids,
                 &weights,
                 &cov_flat,
-                &position_ids,
-                &config,
+                confidence,
+                compute_incremental,
             )
         })
         .map_err(core_to_py)?;
@@ -210,16 +203,9 @@ pub(super) fn parametric_es_decomposition(
 ) -> PyResult<PyParametricEsDecompositionView> {
     let n = weights.len();
     let (position_ids, cov_flat) = extract_covariance_input(py, position_ids, covariance, n)?;
-    let config = confidence.map_or_else(
-        DecompositionConfig::parametric_95,
-        DecompositionConfig::parametric,
-    );
-
     let view = py
         .detach(move || {
-            ParametricPositionDecomposer
-                .decompose_positions(&weights, &cov_flat, &position_ids, &config)
-                .map(|decomposition| parametric_es_decomposition_view(&decomposition))
+            model_risk::parametric_es_decomposition(&position_ids, &weights, &cov_flat, confidence)
         })
         .map_err(core_to_py)?;
 
@@ -261,19 +247,10 @@ pub(super) fn historical_var_decomposition(
     let n = position_ids.len();
     let n_scenarios = position_pnls.n_scenarios();
 
-    let config = confidence.map_or_else(
-        DecompositionConfig::historical_95,
-        DecompositionConfig::historical,
-    );
     let result = py
         .detach(move || {
             let flat = position_pnls.into_scenario_major(n);
-            HistoricalPositionDecomposer.decompose_from_pnls(
-                &flat,
-                &position_ids,
-                n_scenarios,
-                &config,
-            )
+            model_risk::historical_var_decomposition(&position_ids, &flat, n_scenarios, confidence)
         })
         .map_err(core_to_py)?;
 
@@ -295,10 +272,7 @@ pub(super) fn position_component_var(
     decomp: &PyPositionRiskDecomposition,
     position_id: &str,
 ) -> PyResult<f64> {
-    decomp
-        .inner
-        .try_component_var(position_id)
-        .map_err(core_to_py)
+    decomp.inner.component_var(position_id).map_err(core_to_py)
 }
 
 /// One position's row in a ``ParametricEsDecompositionView``.
@@ -497,11 +471,6 @@ impl PyParametricEsDecompositionView {
     fn __repr__(&self) -> String {
         repr_from_serde("ParametricEsDecompositionView", &self.inner)
     }
-
-    /// Render as an HTML table in Jupyter notebooks (delegates to
-    /// ``to_dataframe``; returns ``None`` if the frame cannot be built).
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+impl_repr_html_via_dataframe!(PyParametricEsDecompositionView);

@@ -11,8 +11,9 @@
 //! callers holding plain nested lists.
 
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
-use crate::errors::{core_to_py, serde_json_to_py, value_error};
+use crate::errors::{core_to_py, value_error};
 use finstack_quant_models::rates::dtsm::{
     self, DieboldLi, FactorTimeSeries, YieldForecast, YieldPanel, YieldPca, YieldPcaView,
 };
@@ -210,29 +211,6 @@ impl PyYieldPanel {
         dict_to_dataframe(py, &data, index)
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "YieldPanel serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed or violates the
-    /// panel's observation, tenor, yield, or date-alignment requirements.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid YieldPanel JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "YieldPanel(num_dates={}, num_tenors={}, tenors={:?}, dated={})",
@@ -247,6 +225,8 @@ impl PyYieldPanel {
         )
     }
 }
+
+wire_methods!(PyYieldPanel, YieldPanel, "YieldPanel");
 
 /// Time series of Nelson-Siegel factors extracted by ``DieboldLi``.
 ///
@@ -350,29 +330,6 @@ impl PyFactorTimeSeries {
         dict_to_dataframe(py, &data, index)
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "FactorTimeSeries serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed or has non-finite
-    /// values or misaligned factor, residual, date, or fit-statistic dimensions.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid FactorTimeSeries JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "FactorTimeSeries(num_dates={}, num_tenors={}, r_squared_avg={:?})",
@@ -382,6 +339,8 @@ impl PyFactorTimeSeries {
         )
     }
 }
+
+wire_methods!(PyFactorTimeSeries, FactorTimeSeries, "FactorTimeSeries");
 
 /// Diebold-Li (2006) dynamic Nelson-Siegel model.
 ///
@@ -420,9 +379,11 @@ impl PyDieboldLi {
     #[pyo3(signature = (lambda_ = None))]
     #[pyo3(text_signature = "(lambda_=None)")]
     fn new(lambda_: Option<f64>) -> PyResult<Self> {
-        dtsm::diebold_li_model(lambda_)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
+        match lambda_ {
+            Some(lambda) => DieboldLi::new(lambda).map_err(core_to_py),
+            None => Ok(DieboldLi::with_default_lambda()),
+        }
+        .map(Self::from_inner)
     }
 
     /// Decay parameter in the years convention.
@@ -519,29 +480,6 @@ impl PyDieboldLi {
             .map_err(core_to_py)
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "DieboldLi serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed, ``lambda`` is invalid,
-    /// or its factor history, tenor grid, or fitted VAR state is inconsistent.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid DieboldLi JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "DieboldLi(lambda_={:?}, factors_extracted={}, var_fitted={})",
@@ -559,6 +497,8 @@ impl PyDieboldLi {
         )
     }
 }
+
+wire_methods!(PyDieboldLi, DieboldLi, "DieboldLi");
 
 /// h-step-ahead Diebold-Li yield-curve forecast with 95% Gaussian bands.
 #[pyclass(
@@ -631,33 +571,12 @@ impl PyYieldForecast {
         dict_to_dataframe(py, &data, None)
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "YieldForecast serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed, the horizon is zero,
-    /// or yields, tenors, factors, and confidence bands violate their invariants.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid YieldForecast JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("YieldForecast", &self.inner)
     }
 }
+
+wire_methods!(PyYieldForecast, YieldForecast, "YieldForecast");
 
 /// PCA decomposition of yield-curve changes (Litterman-Scheinkman).
 ///
@@ -826,29 +745,6 @@ impl PyYieldPca {
         loadings_dataframe(py, &matrix_rows(self.inner.loadings()), self.inner.tenors())
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "YieldPca serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed or its loadings,
-    /// scores, eigenvalues, means, or variance vectors are invalid or misaligned.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid YieldPca JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "YieldPca(num_components={}, num_tenors={}, cumulative_variance={:?})",
@@ -858,6 +754,8 @@ impl PyYieldPca {
         )
     }
 }
+
+wire_methods!(PyYieldPca, YieldPca, "YieldPca");
 
 fn loadings_dataframe<'py>(
     py: Python<'py>,
@@ -965,29 +863,6 @@ impl PyYieldPcaView {
         dict_to_dataframe(py, &data, None)
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "YieldPcaView serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed or its loadings,
-    /// scores, eigenvalues, means, or variance vectors are invalid or misaligned.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid YieldPcaView JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "YieldPcaView(num_components={}, num_tenors={}, explained_variance_ratio={:?})",
@@ -998,86 +873,7 @@ impl PyYieldPcaView {
     }
 }
 
-/// Extract time-varying Nelson-Siegel factors (level, slope, curvature) from a
-/// yield panel using the Diebold-Li (2006) parameterization.
-///
-/// Thin twin of ``DieboldLi(lambda_).extract_factors(YieldPanel(tenors, yields_matrix)).factors``.
-///
-/// Parameters
-/// ----------
-/// tenors : list[float]
-///     Tenor grid in years, strictly ascending and positive (length ``N``).
-/// yields_matrix : list[list[float]]
-///     ``yields_matrix[date_idx][tenor_idx]`` decimal zero rates.
-/// lambda_ : float | None, default ``None``
-///     Decay parameter for tenors in years; ``None`` uses the Rust default
-///     ``0.7308``.
-///
-/// Returns
-/// -------
-/// FactorTimeSeries
-///     Extracted factors with ``to_dataframe()``.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the panel is malformed, has fewer than three tenors, or
-///     ``lambda_`` is invalid.
-#[pyfunction]
-#[pyo3(signature = (tenors, yields_matrix, lambda_ = None))]
-#[pyo3(text_signature = "(tenors, yields_matrix, lambda_=None)")]
-fn diebold_li_fit_factors(
-    py: Python<'_>,
-    tenors: Vec<f64>,
-    yields_matrix: Vec<Vec<f64>>,
-    lambda_: Option<f64>,
-) -> PyResult<PyFactorTimeSeries> {
-    py.detach(|| dtsm::diebold_li_fit_factors(tenors, yields_matrix, lambda_))
-        .map(PyFactorTimeSeries::from_inner)
-        .map_err(core_to_py)
-}
-
-/// Extract Diebold-Li factors, fit VAR(1) dynamics, and forecast the yield
-/// curve ``horizon`` steps ahead.
-///
-/// Thin twin of ``DieboldLi(lambda_).fit(panel).forecast(horizon)``.
-///
-/// Parameters
-/// ----------
-/// tenors : list[float]
-///     Tenor grid in years, length ``N``.
-/// yields_matrix : list[list[float]]
-///     ``yields_matrix[date_idx][tenor_idx]`` decimal zero rates (at least
-///     five rows for the VAR fit).
-/// horizon : int
-///     Forecast horizon in observation periods (``>= 1``).
-/// lambda_ : float | None, default ``None``
-///     Decay parameter for tenors in years; ``None`` uses the Rust default.
-///
-/// Returns
-/// -------
-/// YieldForecast
-///     Point forecast, factor triple and 95% bands with ``to_dataframe()``.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the panel is malformed, too short for the VAR fit, ``horizon`` is
-///     zero or ``lambda_`` is invalid.
-#[pyfunction]
-#[pyo3(signature = (tenors, yields_matrix, horizon, lambda_ = None))]
-#[pyo3(text_signature = "(tenors, yields_matrix, horizon, lambda_=None)")]
-fn diebold_li_forecast(
-    py: Python<'_>,
-    tenors: Vec<f64>,
-    yields_matrix: Vec<Vec<f64>>,
-    horizon: usize,
-    lambda_: Option<f64>,
-) -> PyResult<PyYieldForecast> {
-    py.detach(|| dtsm::diebold_li_forecast(tenors, yields_matrix, horizon, lambda_))
-        .map(PyYieldForecast::from_inner)
-        .map_err(core_to_py)
-}
+wire_methods!(PyYieldPcaView, YieldPcaView, "YieldPcaView");
 
 /// Evaluate the static Nelson-Siegel (1987) yield curve for a given decay
 /// parameter, factor triple, and tenor grid.
@@ -1086,7 +882,7 @@ fn diebold_li_forecast(
 /// ``y(tau) = beta1 + beta2 * slope(tau) + beta3 * (slope(tau) - exp(-lambda*tau))``
 /// where ``slope(tau) = (1 - exp(-lambda*tau)) / (lambda*tau)``. Use it to
 /// reconstruct a fitted or forecast curve from factors returned by
-/// ``DieboldLi`` / ``diebold_li_forecast``.
+/// ``DieboldLi``.
 ///
 /// Parameters
 /// ----------
@@ -1132,8 +928,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyYieldPanel>()?;
     m.add_class::<PyYieldPca>()?;
     m.add_class::<PyYieldPcaView>()?;
-    m.add_function(wrap_pyfunction!(diebold_li_fit_factors, &m)?)?;
-    m.add_function(wrap_pyfunction!(diebold_li_forecast, &m)?)?;
     m.add_function(wrap_pyfunction!(nelson_siegel_yields, &m)?)?;
 
     let all = PyList::new(
@@ -1145,8 +939,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "YieldPanel",
             "YieldPca",
             "YieldPcaView",
-            "diebold_li_fit_factors",
-            "diebold_li_forecast",
             "nelson_siegel_yields",
         ],
     )?;

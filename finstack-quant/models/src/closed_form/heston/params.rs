@@ -2,24 +2,6 @@ use std::ops::Deref;
 
 use crate::volatility::heston::HestonParams;
 
-/// Default Heston parameters used when no market scalar is supplied.
-///
-/// These are conservative, broadly representative SPX-style values. They are
-/// the single source of truth for Heston defaults across all equity option
-/// pricers (Fourier, PDE, Monte Carlo).
-pub mod heston_defaults {
-    /// Default mean reversion speed of variance (κ).
-    pub const KAPPA: f64 = 2.0;
-    /// Default long-run variance level (θ).
-    pub const THETA: f64 = 0.04;
-    /// Default vol-of-vol (σᵥ).
-    pub const SIGMA_V: f64 = 0.3;
-    /// Default spot/variance correlation (ρ); negative for equity (leverage effect).
-    pub const RHO: f64 = -0.7;
-    /// Default initial variance (v₀).
-    pub const V0: f64 = 0.04;
-}
-
 /// Relative price tolerance for residual integration mass and no-arbitrage bounds.
 pub(super) const HESTON_TAIL_DIAGNOSTIC_THRESHOLD: f64 = 1e-9;
 
@@ -94,12 +76,6 @@ impl HestonPricingParams {
             q,
             model: HestonParams::new(v0, kappa, theta, sigma_v, rho)?,
         })
-    }
-
-    /// Return whether the variance process satisfies the inclusive Feller condition.
-    #[must_use]
-    pub fn satisfies_feller(&self) -> bool {
-        self.model.satisfies_feller_condition()
     }
 }
 
@@ -215,20 +191,6 @@ impl HestonFourierSettings {
         Ok(())
     }
 
-    /// Create settings adapted continuously to time to maturity at 20% initial volatility.
-    ///
-    /// The integration limit grows as `1/sqrt(time)` for short-dated options.
-    /// Pricing also accounts for the model's stochastic-variance tail and checks
-    /// numerical convergence before returning a value.
-    ///
-    /// # Arguments
-    ///
-    /// * `time` - Positive remaining time to expiry in years.
-    #[must_use]
-    pub fn for_maturity(time: f64) -> Self {
-        Self::for_maturity_with_variance(time, 0.04)
-    }
-
     /// Create settings adapted continuously to maturity and initial variance.
     ///
     /// Uses the Gaussian short-time decay `exp(-v0*time*u²/2)` with a target
@@ -243,7 +205,7 @@ impl HestonFourierSettings {
     /// * `time` - Positive remaining time to expiry in years.
     /// * `v0` - Positive initial instantaneous variance, in annual decimal-volatility squared.
     #[must_use]
-    pub fn for_maturity_with_variance(time: f64, v0: f64) -> Self {
+    pub fn for_maturity(time: f64, v0: f64) -> Self {
         let u_max = if time.is_finite() && time > 0.0 && v0.is_finite() && v0 > 0.0 {
             (2.0 * HESTON_TAIL_LOG_TARGET / (v0 * time))
                 .sqrt()

@@ -10,7 +10,7 @@ use super::CashflowSpec;
 impl Bond {
     /// Whether instrument-owned inputs request the joint rates-credit family
     /// on the native default path, including short-rate inputs of other
-    /// models (`implied_volatility`, `bdt_sigma`) that the joint resolver must
+    /// models (`implied_volatility`, `bdt_sigma`, `bk_*`) that the joint resolver must
     /// reject rather than silently ignore.
     fn has_rates_credit_factor_inputs(&self) -> bool {
         let model = &self.instrument_pricing_overrides.model_config;
@@ -21,6 +21,8 @@ impl Bond {
             || model.hazard_mean_reversion.is_some()
             || model.rate_credit_correlation.is_some()
             || model.bdt_sigma.is_some()
+            || model.bk_sigma.is_some()
+            || model.bk_mean_reversion.is_some()
             || self
                 .instrument_pricing_overrides
                 .market_quotes

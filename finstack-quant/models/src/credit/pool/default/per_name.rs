@@ -162,6 +162,17 @@ impl PerNameCopulaDefault {
 
     /// Realize per-name default indicators for one payment period.
     ///
+    /// The shared Student-t mixing variable `W` is drawn once here (one
+    /// uniform), then reused for every name so tail dependence is preserved.
+    ///
+    /// When `antithetic` is `true`, every idiosyncratic `εᵢ` draw is negated.
+    /// Paired with a negated systematic factor `Z`, the copula latent variable
+    /// `Aᵢ = √ρ·Z + √(1−ρ)·εᵢ` becomes `−Aᵢ`, giving the genuine antithetic
+    /// variate. The two paired paths MUST share the same RNG substream so the
+    /// underlying uniforms (and hence the εᵢ before negation, and the shared
+    /// mixing `W`) match. The Student-t mixing `W` is *not* negated — only the
+    /// Gaussian components are, per standard antithetic treatment.
+    ///
     /// # Arguments
     ///
     /// * `systematic` — the period systematic factor `Z` (shared by all names).
@@ -174,9 +185,9 @@ impl PerNameCopulaDefault {
     ///   order-stable for a fixed seed.
     /// * `out` — filled with one `bool` per name: `true` ⇒ name defaults this
     ///   period.
-    ///
-    /// The shared Student-t mixing variable `W` is drawn once here (one
-    /// uniform), then reused for every name so tail dependence is preserved.
+    /// * `antithetic` — `false` for a base path; `true` to negate every
+    ///   idiosyncratic draw for the antithetic partner of a base path that
+    ///   used the same substream.
     ///
     /// # Errors
     ///
@@ -184,47 +195,6 @@ impl PerNameCopulaDefault {
     /// latent default variable is non-finite. Output may be partially filled
     /// on error and must be discarded.
     pub fn simulate_period(
-        &self,
-        systematic: f64,
-        marginal_pd: &[f64],
-        rng: &mut PhiloxRng,
-        out: &mut Vec<bool>,
-    ) -> Result<()> {
-        self.simulate_period_inner(systematic, marginal_pd, rng, out, false)
-    }
-
-    /// Realize per-name default indicators with optional antithetic negation.
-    ///
-    /// When `antithetic` is `true`, every idiosyncratic `εᵢ` draw is negated.
-    /// Paired with a negated systematic factor `Z`, the copula latent variable
-    /// `Aᵢ = √ρ·Z + √(1−ρ)·εᵢ` becomes `−Aᵢ`, giving the genuine antithetic
-    /// variate. The two paired paths MUST share the same RNG substream so the
-    /// underlying uniforms (and hence the εᵢ before negation, and the shared
-    /// mixing `W`) match. The Student-t mixing `W` is *not* negated — only the
-    /// Gaussian components are, per standard antithetic treatment.
-    ///
-    /// # Arguments
-    ///
-    /// * `systematic` - Period systematic factor shared by every pool name.
-    /// * `marginal_pd` - Unconditional period default probability for each live name.
-    /// * `rng` - Path-local Philox stream shared with the paired base path.
-    /// * `out` - Reused output buffer populated with one default flag per name.
-    ///
-    /// # Errors
-    ///
-    /// Propagates the mixing and latent-variable failures documented by
-    /// [`Self::simulate_period`]. Output must be discarded on error.
-    pub fn simulate_period_antithetic(
-        &self,
-        systematic: f64,
-        marginal_pd: &[f64],
-        rng: &mut PhiloxRng,
-        out: &mut Vec<bool>,
-    ) -> Result<()> {
-        self.simulate_period_inner(systematic, marginal_pd, rng, out, true)
-    }
-
-    fn simulate_period_inner(
         &self,
         systematic: f64,
         marginal_pd: &[f64],
@@ -458,8 +428,8 @@ mod tests {
         let mut indicators = Vec::new();
         let mut probabilities = Vec::new();
         for result in [
-            sim.simulate_period(0.0, &[0.05], &mut rng, &mut indicators),
-            sim.simulate_period_antithetic(0.0, &[0.05], &mut rng, &mut indicators),
+            sim.simulate_period(0.0, &[0.05], &mut rng, &mut indicators, false),
+            sim.simulate_period(0.0, &[0.05], &mut rng, &mut indicators, true),
             sim.conditional_default_probs(0.0, &[0.05], &mut rng, &mut probabilities),
             sim.conditional_default_prob(0.0, 0.05, &mut rng)
                 .map(|_| ()),
@@ -474,7 +444,7 @@ mod tests {
         let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.3).expect("valid copula");
         let mut rng = PhiloxRng::new(42);
         assert!(sim
-            .simulate_period(f64::NAN, &[0.05], &mut rng, &mut Vec::new())
+            .simulate_period(f64::NAN, &[0.05], &mut rng, &mut Vec::new(), false)
             .is_err());
         assert!(sim
             .conditional_default_probs(f64::NAN, &[0.05], &mut rng, &mut Vec::new())
@@ -530,7 +500,7 @@ mod tests {
         let mut total_defaults = 0usize;
         for _ in 0..periods {
             let z = rng.next_std_normal();
-            sim.simulate_period(z, &names, &mut rng, &mut out)
+            sim.simulate_period(z, &names, &mut rng, &mut out, false)
                 .expect("valid copula simulation");
             total_defaults += out.iter().filter(|d| **d).count();
         }
@@ -554,7 +524,7 @@ mod tests {
         let mut out = Vec::new();
 
         for &z in &[-1.5_f64, 0.0, 1.5] {
-            sim.simulate_period(z, &names, &mut rng, &mut out)
+            sim.simulate_period(z, &names, &mut rng, &mut out, false)
                 .expect("valid copula simulation");
             let realized = out.iter().filter(|d| **d).count() as f64 / n as f64;
             let lhp = sim
@@ -577,10 +547,10 @@ mod tests {
         let mut rng = PhiloxRng::new(7);
         let mut out = Vec::new();
 
-        sim.simulate_period(-2.0, &names, &mut rng, &mut out)
+        sim.simulate_period(-2.0, &names, &mut rng, &mut out, false)
             .expect("valid copula simulation");
         let stressed = out.iter().filter(|d| **d).count();
-        sim.simulate_period(2.0, &names, &mut rng, &mut out)
+        sim.simulate_period(2.0, &names, &mut rng, &mut out, false)
             .expect("valid copula simulation");
         let benign = out.iter().filter(|d| **d).count();
 
@@ -606,7 +576,7 @@ mod tests {
         let trials = 600usize;
         let mut counts = Vec::with_capacity(trials);
         for _ in 0..trials {
-            sim.simulate_period(z, &names, &mut rng, &mut out)
+            sim.simulate_period(z, &names, &mut rng, &mut out, false)
                 .expect("valid copula simulation");
             counts.push(out.iter().filter(|d| **d).count());
         }
@@ -640,7 +610,7 @@ mod tests {
         let mut total = 0usize;
         for _ in 0..periods {
             let z = rng.next_std_normal();
-            sim.simulate_period(z, &names, &mut rng, &mut out)
+            sim.simulate_period(z, &names, &mut rng, &mut out, false)
                 .expect("valid copula simulation");
             total += out.iter().filter(|d| **d).count();
         }
@@ -708,7 +678,7 @@ mod tests {
         let mut lhp_sum = 0.0;
         for _ in 0..periods {
             let z = pn_rng.next_std_normal();
-            sim.simulate_period(z, &names, &mut pn_rng, &mut out)
+            sim.simulate_period(z, &names, &mut pn_rng, &mut out, false)
                 .expect("valid copula simulation");
             pn_defaults += out.iter().filter(|d| **d).count();
             lhp_sum += sim
@@ -750,10 +720,10 @@ mod tests {
         let z = 0.7_f64;
         let mut normal_out = Vec::new();
         let mut anti_out = Vec::new();
-        sim.simulate_period(z, &names, &mut normal_rng, &mut normal_out)
+        sim.simulate_period(z, &names, &mut normal_rng, &mut normal_out, false)
             .expect("valid copula simulation");
         // Antithetic partner: negated Z AND negated εᵢ ⇒ latent = −Aᵢ.
-        sim.simulate_period_antithetic(-z, &names, &mut anti_rng, &mut anti_out)
+        sim.simulate_period(-z, &names, &mut anti_rng, &mut anti_out, true)
             .expect("valid copula simulation");
 
         assert_eq!(normal_out.len(), anti_out.len());
@@ -801,7 +771,7 @@ mod tests {
         let mut total = 0usize;
         for _ in 0..periods {
             let z = rng.next_std_normal();
-            sim.simulate_period(z, &names, &mut rng, &mut out)
+            sim.simulate_period(z, &names, &mut rng, &mut out, false)
                 .expect("valid copula simulation");
             total += out.iter().filter(|d| **d).count();
         }
@@ -830,7 +800,7 @@ mod tests {
             let mut lhp_rng = PhiloxRng::new(seed);
             let mut out = Vec::new();
 
-            sim.simulate_period(z, &names, &mut pn_rng, &mut out)
+            sim.simulate_period(z, &names, &mut pn_rng, &mut out, false)
                 .expect("valid copula simulation");
             let realized = out.iter().filter(|d| **d).count() as f64 / n as f64;
             let lhp = sim
@@ -858,7 +828,7 @@ mod tests {
             let mut all = Vec::new();
             for _ in 0..10 {
                 let z = rng.next_std_normal();
-                sim.simulate_period(z, &names, &mut rng, &mut out)
+                sim.simulate_period(z, &names, &mut rng, &mut out, false)
                     .expect("valid copula simulation");
                 all.extend_from_slice(&out);
             }

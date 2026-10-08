@@ -25,8 +25,9 @@
 //!   [`traits::StochasticProcess`], [`traits::Discretization`], and
 //!   [`traits::Payoff`] into a generic simulation.
 //! - [`pricer`] provides higher-level European, path-dependent, and LSMC workflows.
-//! - [`simulate_gbm_paths`] returns compact captured GBM paths for plotting and
-//!   diagnostics.
+//! - [`simulate::simulate_paths`] returns compact simulated paths for any
+//!   built-in process and scheme selected by a serializable
+//!   [`simulate::PathSimulationSpec`].
 //!
 //! # Module map
 //!
@@ -82,7 +83,6 @@
 mod captured_path_stats;
 pub mod discretization;
 pub mod estimate;
-mod gbm_paths;
 mod indexed_spot_table;
 pub mod paths;
 pub mod process;
@@ -99,18 +99,15 @@ pub mod pricer;
 pub mod registry;
 pub mod results;
 pub mod seed;
+pub mod simulate;
 pub mod variance_reduction;
 
 #[cfg(test)]
 mod mc_process_params_serialization;
 
-pub use finstack_quant_core::math::stats::{required_samples, OnlineCovariance, OnlineStats};
+pub use finstack_quant_core::math::stats::{OnlineCovariance, OnlineStats};
 pub use finstack_quant_core::math::time_grid::TimeGrid;
-pub use gbm_paths::{simulate_gbm_paths, GbmPathConfig, GbmPathSummary};
-pub use traits::{
-    state_keys, Discretization, PathState, Payoff, ProportionalDiffusion, RandomStream, StateKey,
-    StochasticProcess,
-};
+pub use traits::RandomStream;
 
 /// Reject a non-finite or non-positive volatility before a convenience pricer runs.
 ///
@@ -130,26 +127,6 @@ pub(crate) fn require_positive_vol(vol: f64) -> finstack_quant_core::Result<()> 
         )));
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod gbm_path_summary_tests {
-    use super::{simulate_gbm_paths, GbmPathConfig};
-
-    #[test]
-    fn gbm_path_summary_is_deterministic_and_shaped() {
-        let config = GbmPathConfig::new(100.0, 0.05, 0.01, 0.2, 1.0, 4, 3).with_seed(42);
-        let first = simulate_gbm_paths(&config).expect("GBM paths should simulate");
-        let second = simulate_gbm_paths(&config).expect("same GBM paths should simulate");
-
-        assert_eq!(first, second);
-        assert_eq!(first.num_paths, 3);
-        assert_eq!(first.num_simulated_paths, 3);
-        assert_eq!(first.times.len(), 5);
-        assert_eq!(first.paths.len(), 3);
-        assert!(first.paths.iter().all(|path| path.len() == 5));
-        assert!(first.paths.iter().all(|path| path[0] == 100.0));
-    }
 }
 
 /// Compiles the crate `README.md` Rust samples as doctests.

@@ -9,5 +9,3 @@
 //! reweighted or paired, and the units of the returned diagnostics.
 
 pub mod control_variate;
-
-pub use control_variate::apply_control_variate;

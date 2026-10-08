@@ -23,7 +23,7 @@
 //! - Gatheral, J. (2006). *The Volatility Surface*. Wiley. Chapter 3. `docs/REFERENCES.md#gatheral-volatility-surface`
 //! - Roper, M. (2010). *Arbitrage Free Implied Volatility Surfaces*.
 
-use super::{classify_severity, ArbitrageCheck};
+use super::classify_severity;
 use crate::volatility::arbitrage::types::{ArbitrageType, ArbitrageViolation, ViolationLocation};
 use finstack_quant_core::market_data::surfaces::VolSurface;
 
@@ -50,12 +50,16 @@ impl Default for CalendarSpreadCheck {
     }
 }
 
-impl ArbitrageCheck for CalendarSpreadCheck {
-    fn name(&self) -> &str {
-        "Calendar Spread"
-    }
-
-    fn check(&self, surface: &VolSurface) -> Vec<ArbitrageViolation> {
+impl CalendarSpreadCheck {
+    /// Run the calendar-spread check and return every violation found.
+    ///
+    /// An empty `Vec` means the check passes. The surface is not mutated.
+    ///
+    /// # Arguments
+    ///
+    /// * `surface` - Implied-volatility surface on an expiry (years) by cash
+    ///   strike grid; expiries pair positionally with `self.forwards`.
+    pub fn check(&self, surface: &VolSurface) -> Vec<ArbitrageViolation> {
         let expiries = surface.expiries();
         let strikes = surface.strikes();
         let mut violations = Vec::new();

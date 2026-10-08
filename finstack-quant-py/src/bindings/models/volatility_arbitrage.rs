@@ -7,6 +7,8 @@
 //! rows of the Rust `ArbitrageViolation`; the combined `check_surface_grid`
 //! returns a typed `ArbitrageReport`.
 
+use crate::bindings::macros::wire_methods;
+use finstack_quant_core::wire::serde_label;
 use finstack_quant_models::volatility::arbitrage::{
     self as model_arbitrage, ArbitrageReport, ArbitrageSeverity, ArbitrageType, ArbitrageViolation,
 };
@@ -14,12 +16,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyModule};
 
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe, serde_to_py};
-use crate::errors::{core_to_py, serde_json_to_py};
-
-/// Serde name of an arbitrage enum variant (the `snake_case` wire form).
-fn label<T: serde::Serialize>(value: &T) -> PyResult<String> {
-    finstack_quant_core::wire::serde_label(value).map_err(core_to_py)
-}
+use crate::errors::core_to_py;
 
 /// Convert a slice of violations into a Python list of serde dicts.
 ///
@@ -111,7 +108,7 @@ impl PyArbitrageReport {
             ArbitrageSeverity::Critical,
         ] {
             by_sev.set_item(
-                label(&sev)?,
+                serde_label(&sev).map_err(core_to_py)?,
                 self.inner
                     .counts_by_severity
                     .get(&sev)
@@ -135,7 +132,7 @@ impl PyArbitrageReport {
             ArbitrageType::SviCalendarSpread,
         ] {
             by_type.set_item(
-                label(&t)?,
+                serde_label(&t).map_err(core_to_py)?,
                 self.inner.counts_by_type.get(&t).copied().unwrap_or(0),
             )?;
         }
@@ -154,8 +151,8 @@ impl PyArbitrageReport {
             .iter()
             .map(|v| {
                 Ok(ViolationRow {
-                    violation_type: label(&v.violation_type)?,
-                    severity: label(&v.severity)?,
+                    violation_type: serde_label(&v.violation_type).map_err(core_to_py)?,
+                    severity: serde_label(&v.severity).map_err(core_to_py)?,
                     strike: v.location.strike,
                     expiry: v.location.expiry,
                     adjacent_expiry: v.location.adjacent_expiry,
@@ -168,28 +165,6 @@ impl PyArbitrageReport {
         serde_rows_to_dataframe(py, &rows)
     }
 
-    /// Serialize to compact JSON (the Rust ``ArbitrageReport`` wire form).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "ArbitrageReport"))
-    }
-
-    /// Deserialize from the JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` on malformed JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: ArbitrageReport = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid ArbitrageReport JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` (and therefore ``copy.deepcopy``, ``multiprocessing``).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "ArbitrageReport(passed={}, total_violations={}, vol_surface_id='{}')",
@@ -199,6 +174,8 @@ impl PyArbitrageReport {
         )
     }
 }
+
+wire_methods!(PyArbitrageReport, ArbitrageReport, "ArbitrageReport");
 
 /// Check butterfly arbitrage via Durrleman's g(k) density condition.
 ///

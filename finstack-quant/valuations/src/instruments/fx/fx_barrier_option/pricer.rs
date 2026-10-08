@@ -278,9 +278,7 @@ fn validate_monitoring_state(
 }
 
 use finstack_quant_core::types::BarrierType as AnalyticalBarrierType;
-use finstack_quant_models::closed_form::barrier::{
-    barrier_call_continuous, barrier_put_continuous, barrier_rebate, BarrierParams,
-};
+use finstack_quant_models::closed_form::barrier::{barrier_price, barrier_rebate, BarrierParams};
 
 fn expired_barrier_value_per_unit(
     inst: &FxBarrierOption,
@@ -464,14 +462,7 @@ fn bs_barrier_price_per_unit(
         r_for,
         sigma,
     );
-    let price = match fx_barrier.option_type {
-        crate::instruments::OptionType::Call => {
-            barrier_call_continuous(&params, analytical_barrier_type)
-        }
-        crate::instruments::OptionType::Put => {
-            barrier_put_continuous(&params, analytical_barrier_type)
-        }
-    };
+    let price = barrier_price(&params, analytical_barrier_type, fx_barrier.option_type);
 
     let rebate_val = if let Some(rebate) = fx_barrier.rebate_per_unit() {
         barrier_rebate(

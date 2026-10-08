@@ -121,7 +121,7 @@ impl PdeProblem2D for HestonPde {
 
 #[cfg(test)]
 mod tests {
-    use super::super::adi::{fill_boundaries, CraigSneydStepper};
+    use super::super::adi::{fill_boundaries, AdiWorkBuffers, CraigSneydStepper};
     use super::super::grid::Grid1D;
     use super::super::grid2d::Grid2D;
     use super::super::solver2d::Solver2D;
@@ -475,6 +475,7 @@ mod tests {
         }
 
         let levels = stepper.time_levels(maturity);
+        let mut buffers = AdiWorkBuffers::for_grid(grid);
         for step in 0..stepper.n_steps() {
             stepper
                 .step(
@@ -485,6 +486,7 @@ mod tests {
                     levels[step],
                     levels[step + 1],
                     step,
+                    &mut buffers,
                 )
                 .expect("Heston test grid is within the MCS stability regime");
         }

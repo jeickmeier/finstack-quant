@@ -73,8 +73,8 @@ d₂ = d₁ - σ√T
 
 `BsGreeks` carries `delta`, `gamma`, `vega`, `theta`, `rho_r` (domestic /
 risk-free) and `rho_q` (dividend yield or foreign rate), so the same struct
-serves equity and FX. `is_valid()` and `clamped()` deliberately check and clamp
-only gamma and vega: the true delta bound is `|Δ| ≤ e^{−qT}`, which exceeds 1
+serves equity and FX. `is_valid()` deliberately checks the sign of gamma and
+vega only: the true delta bound is `|Δ| ≤ e^{−qT}`, which exceeds 1
 under negative carry, and this type does not know `q` or `T`.
 
 `bs_greeks` asserts `theta_days_per_year > 0.0` in release builds; a
@@ -87,9 +87,7 @@ References: Black & Scholes (1973); Merton (1973); Garman & Kohlhagen (1983).
 | Item | Notes |
 |------|-------|
 | `geometric_asian_call` / `_put` | Exact under geometric averaging (Kemna-Vorst) |
-| `geometric_asian_call_df` / `_put_df` | Discount-factor-first variant; derives `r = -ln(df)/t` |
 | `arithmetic_asian_call_tw` / `_put_tw` | Turnbull-Wakeman two-moment lognormal match |
-| `arithmetic_asian_call_tw_df` / `_put_tw_df` | Discount-factor-first variant |
 | `geometric_asian_price_times` | Arbitrary (unequally spaced) fixing schedule, `-> Result<f64>` |
 | `arithmetic_asian_tw_price_times` | Same, Turnbull-Wakeman |
 
@@ -133,9 +131,7 @@ with `λ = (r - q + σ²/2) / σ²`.
 
 | Item | Notes |
 |------|-------|
-| `up_out_call`, `up_in_call`, `down_out_call`, `down_in_call` | `(spot, strike, barrier, time, rate, div_yield, vol) -> f64` |
-| `up_out_put`, `up_in_put`, `down_out_put`, `down_in_put` | same shape (module-level only; not re-exported at `closed_form` root) |
-| `barrier_call_continuous`, `barrier_put_continuous` | `(&BarrierParams, BarrierType) -> f64` |
+| `barrier_price` | `(&BarrierParams, BarrierType, OptionType) -> f64`; all eight up/down, in/out, call/put variants |
 | `barrier_touch_probability` | `(spot, barrier, time, rate, div_yield, vol, is_up) -> f64` |
 | `barrier_rebate` | explicit `PayoutTiming::{AtHit, AtExpiry}` |
 
@@ -232,11 +228,8 @@ P_j = 0.5 + (1/π) ∫₀^∞ Re[e^(-iφ·ln K) · ψ_j(φ) / (iφ)] dφ
 |------|-------|
 | `heston_call_price_fourier` | `(spot, strike, time, &HestonPricingParams, Option<&HestonFourierSettings>) -> f64` |
 | `heston_put_price_fourier` | same, via put-call parity |
-| `heston_call_prices_fourier` / `heston_put_prices_fourier` | strike-strip variants |
-| `HestonStripPricer` | caches the strike-independent characteristic function on the quadrature grid |
 | `HestonPricingParams` | `r` and `q` plus canonical `volatility::heston::HestonParams` — `new()` validates and returns `Result` |
 | `HestonFourierSettings` | `u_max`, `panels`, `gl_order`, `phi_eps`; `new()` / `validate()` |
-| `heston_defaults` | module of `KAPPA`/`THETA`/`SIGMA_V`/`RHO`/`V0` constants — the single source of truth for Heston defaults across the Fourier, PDE, and Monte Carlo equity pricers |
 
 The "Little Heston Trap" algebra (Albrecher et al. 2007) lives once in
 `models::volatility::heston`;
@@ -245,7 +238,7 @@ maps this module's market-aware parameter grouping onto the volatility engine's
 five stochastic parameters.
 
 Passing `settings: None` selects
-`HestonFourierSettings::for_maturity_with_variance(time, v0)`, which widens the
+`HestonFourierSettings::for_maturity(time, v0)`, which widens the
 grid for short maturities and for small `v0` — the integrand tail decays on a
 `u`-scale proportional to `1/√(v0·T)`. Buckets: `u_max = 200/panels = 200`
 under 0.05y, `150/150` under 0.25y, the default `100/100` under 1y, `80/80`
@@ -326,9 +319,10 @@ Decimal/f64 split.
 ## Example
 
 ```rust
+use finstack_quant_core::types::BarrierType;
 use finstack_quant_models::OptionType;
 use finstack_quant_models::closed_form::{
-    barrier::down_out_call,
+    barrier::{barrier_price, BarrierParams},
     bs_greeks, bs_price,
     heston::{heston_call_price_fourier, HestonPricingParams},
     implied_vol::bs_implied_vol,
@@ -346,7 +340,8 @@ let iv = bs_implied_vol(spot, strike, r, q, t, price, OptionType::Call)?;
 assert!((iv - vol).abs() < 1e-8);
 
 // Knock-out barrier below spot: worth strictly less than the vanilla.
-let ko = down_out_call(spot, strike, 90.0, t, r, q, vol);
+let params = BarrierParams::new(spot, strike, 90.0, t, r, q, vol);
+let ko = barrier_price(&params, BarrierType::DownAndOut, OptionType::Call);
 assert!(ko < price);
 
 // Heston with adaptive quadrature settings.

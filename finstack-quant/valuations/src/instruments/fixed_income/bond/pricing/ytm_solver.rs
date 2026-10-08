@@ -5,7 +5,7 @@
 
 use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::dates::{Date, DayCount};
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;

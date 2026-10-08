@@ -1,12 +1,11 @@
+use super::black_karasinski::{compute_probabilities, transition_index, transition_offsets};
 use super::*;
-use crate::trees::hull_white_tree::HullWhiteTree;
-use crate::trees::tree_framework::{NodeState, TreeModel, TreeValuator};
+use crate::trees::tree_framework::{NodeState, TreeValuator};
 use crate::volatility::{convert_atm_volatility, VolatilityConvention};
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::math::Compounding;
-use finstack_quant_core::{Error, HashMap, Result};
+use finstack_quant_core::{Error, Result};
 use time::Month;
 
 const TEST_CURVE_ID: &str = "USD-OIS";
@@ -28,17 +27,14 @@ impl finstack_quant_core::market_data::traits::Discounting for InvalidDiscountCu
 #[test]
 fn failed_recalibration_preserves_rates_times_and_transition_lattice() {
     let curve = create_flat_curve(0.05);
-    let market = MarketContext::new();
     for config in [
         ShortRateTreeConfig::ho_lee(8, 0.01),
-        ShortRateTreeConfig::bdt(8, 0.2, 0.1),
+        ShortRateTreeConfig::black_karasinski(8, 0.2, 0.1),
     ] {
         let mut tree = ShortRateTree::new(config);
         tree.calibrate(&curve, 1.0).expect("initial calibration");
         let before = tree.clone();
-        let value_before = tree
-            .price(HashMap::default(), 1.0, &market, &ConstantValuator)
-            .expect("price");
+        let value_before = tree.price(0.0, &ConstantValuator).expect("price");
         assert!(tree.calibrate(&InvalidDiscountCurve(&curve), 2.0).is_err());
         assert_eq!(tree.time_steps, before.time_steps);
         assert_eq!(tree.rates, before.rates);
@@ -48,41 +44,9 @@ fn failed_recalibration_preserves_rates_times_and_transition_lattice() {
         assert_eq!(quality.converged, before_quality.converged);
         assert_eq!(quality.max_error_bp, before_quality.max_error_bp);
         let value_after = tree
-            .price(HashMap::default(), 1.0, &market, &ConstantValuator)
+            .price(0.0, &ConstantValuator)
             .expect("price after failure");
         assert_eq!(value_after, value_before);
-    }
-}
-
-#[test]
-fn pricing_requires_the_calibrated_horizon_for_every_short_rate_model() {
-    let curve = create_test_curve();
-    let market = MarketContext::new();
-    for config in [
-        ShortRateTreeConfig::ho_lee(20, 0.01),
-        ShortRateTreeConfig::bdt(20, 0.2, 0.0),
-        ShortRateTreeConfig::bdt(20, 0.2, 0.1),
-    ] {
-        let mut tree = ShortRateTree::new(config);
-        tree.calibrate(&curve, 1.0).expect("calibration");
-        for horizon in [2.0, 0.0, -1.0, f64::NAN, f64::INFINITY] {
-            assert!(
-                tree.price(HashMap::default(), horizon, &market, &ConstantValuator)
-                    .is_err(),
-                "must not reuse calibrated nodes over horizon {horizon}"
-            );
-        }
-        let price = tree
-            .price(HashMap::default(), 1.0, &market, &ConstantValuator)
-            .expect("matching horizon");
-        assert!((price - curve.df(1.0)).abs() < 1e-8);
-        let nearby = tree
-            .price(HashMap::default(), 1.0 + 1e-12, &market, &ConstantValuator)
-            .expect("roundoff in horizon");
-        assert_eq!(
-            nearby, price,
-            "use the stored grid after horizon validation"
-        );
     }
 }
 
@@ -110,8 +74,8 @@ fn invalid_later_discount_targets_fail_without_replacing_calibration() {
     let curve = create_flat_curve(0.02);
     for config in [
         ShortRateTreeConfig::ho_lee(2, 0.01),
-        ShortRateTreeConfig::bdt(2, 0.2, 0.0),
-        ShortRateTreeConfig::bdt(2, 0.2, 0.1),
+        ShortRateTreeConfig::bdt(2, 0.2),
+        ShortRateTreeConfig::black_karasinski(2, 0.2, 0.1),
     ] {
         let mut tree = ShortRateTree::new(config);
         tree.calibrate(&curve, 1.0).expect("valid calibration");
@@ -220,14 +184,8 @@ fn ho_lee_stored_lattice_prices_zero_coupon_to_calibration_curve() {
     tree.calibrate(&curve, maturity)
         .expect("Ho-Lee calibration");
 
-    let market = MarketContext::new();
     let actual = tree
-        .price(
-            HashMap::<&'static str, f64>::default(),
-            maturity,
-            &market,
-            &ConstantValuator,
-        )
+        .price(0.0, &ConstantValuator)
         .expect("Ho-Lee zero-coupon price");
     let expected = curve.df(maturity);
 
@@ -264,14 +222,8 @@ fn ho_lee_noncontinuous_compounding_reprices_curve() {
              got {quality:?}"
         );
 
-        let market = MarketContext::new();
         let actual = tree
-            .price(
-                HashMap::<&'static str, f64>::default(),
-                maturity,
-                &market,
-                &ConstantValuator,
-            )
+            .price(0.0, &ConstantValuator)
             .expect("zero-coupon price");
         let expected = curve.df(maturity);
         assert!(
@@ -363,15 +315,15 @@ fn test_rate_access() {
 #[test]
 fn test_bdt_tree_creation() {
     // BDT with realistic 20% lognormal volatility
-    let tree = ShortRateTree::new(ShortRateTreeConfig::bdt(25, 0.20, 0.03));
+    let tree = ShortRateTree::new(ShortRateTreeConfig::bdt(25, 0.20));
     assert_eq!(tree.config.model, ShortRateModel::BlackDermanToy);
     assert_eq!(tree.config.volatility, 0.20);
-    assert_eq!(tree.config.mean_reversion, 0.03);
+    assert_eq!(tree.config.mean_reversion, 0.0);
 }
 
 #[test]
 fn test_bdt_calibration_populates_quality_metrics() {
-    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(6, 0.20, 0.0));
+    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(6, 0.20));
     let curve = create_test_curve();
 
     tree.calibrate(&curve, 2.0).expect("should succeed");
@@ -386,18 +338,13 @@ fn test_bdt_calibration_populates_quality_metrics() {
 fn test_bdt_stored_lattice_prices_zero_coupon_to_calibration_curve() {
     let steps = 8;
     let maturity = 2.0;
-    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, 0.20, 0.0));
+    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, 0.20));
     let curve = create_test_curve();
     tree.calibrate(&curve, maturity).expect("BDT calibration");
 
-    let mut vars = HashMap::<&'static str, f64>::default();
-    vars.insert(
-        short_rate_keys::SHORT_RATE,
-        tree.rate_at_node(0, 0).expect("root rate"),
-    );
-    let market = MarketContext::new();
+    let oas_bp = 0.0;
     let actual = tree
-        .price(vars, maturity, &market, &ConstantValuator)
+        .price(oas_bp, &ConstantValuator)
         .expect("BDT zero coupon price");
     let expected = curve.df(maturity);
 
@@ -409,7 +356,7 @@ fn test_bdt_stored_lattice_prices_zero_coupon_to_calibration_curve() {
 
 #[test]
 fn test_bdt_config_uses_binomial_branching_matching_calibration_geometry() {
-    let config = ShortRateTreeConfig::bdt(6, 0.20, 0.0);
+    let config = ShortRateTreeConfig::bdt(6, 0.20);
     let mut tree = ShortRateTree::new(config);
     let curve = create_test_curve();
     tree.calibrate(&curve, 2.0).expect("BDT calibration");
@@ -445,10 +392,8 @@ fn bk_terminal_x_distribution(tree: &ShortRateTree) -> (Vec<f64>, Vec<f64>) {
         let mut next = vec![0.0; 2 * next_j_max + 1];
         for (j, &pj) in dist.iter().enumerate() {
             let j_signed = j as i32 - curr_j_max as i32;
-            for (offset, p) in
-                HullWhiteTree::transition_offsets(j_signed, boundary, lattice.probs[step][j])
-            {
-                if let Some(idx) = HullWhiteTree::transition_index(j_signed, offset, next_j_max) {
+            for (offset, p) in transition_offsets(j_signed, boundary, lattice.probs[step][j]) {
+                if let Some(idx) = transition_index(j_signed, offset, next_j_max) {
                     next[idx] += pj * p;
                 }
             }
@@ -475,15 +420,14 @@ fn weighted_std(values: &[f64], weights: &[f64]) -> f64 {
     var.sqrt()
 }
 
-/// with κ ≠ 0 the BDT model routes to a genuine
-/// trinomial Black-Karasinski lattice that still reprices the curve and
+/// The trinomial Black-Karasinski lattice still reprices the curve and
 /// tightens the (probability-weighted) terminal log-rate dispersion
-/// relative to κ = 0.
+/// relative to Black-Derman-Toy.
 #[test]
 fn test_bdt_mean_reversion_calibrates_and_tightens_rate_dispersion() {
     let steps = 50;
-    let mut tree_no_mr = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, 0.20, 0.0));
-    let mut tree_mr = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, 0.20, 0.05));
+    let mut tree_no_mr = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, 0.20));
+    let mut tree_mr = ShortRateTree::new(ShortRateTreeConfig::black_karasinski(steps, 0.20, 0.05));
     let curve = create_test_curve();
 
     tree_no_mr.calibrate(&curve, 2.0).expect("BDT(κ=0)");
@@ -516,15 +460,8 @@ fn test_bdt_mean_reversion_calibrates_and_tightens_rate_dispersion() {
          no_mr={std_no_mr:.6}, mr={std_mr:.6}"
     );
 
-    let market = MarketContext::new();
-    let mut vars = HashMap::<&'static str, f64>::default();
-    vars.insert(
-        short_rate_keys::SHORT_RATE,
-        tree_mr.rate_at_node(0, 0).expect("root"),
-    );
-    let zcb = tree_mr
-        .price(vars, 2.0, &market, &ConstantValuator)
-        .expect("ZCB price");
+    let oas_bp = 0.0;
+    let zcb = tree_mr.price(oas_bp, &ConstantValuator).expect("ZCB price");
     let target = curve.df(2.0);
     assert!(
         (zcb - target).abs() < 1e-6,
@@ -539,7 +476,7 @@ fn test_bdt_mean_reversion_calibrates_and_tightens_rate_dispersion() {
 fn bk_trinomial_reprices_curve_to_a_tenth_bp() {
     let steps = 200;
     let maturity = 5.0;
-    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, 0.20, 0.03));
+    let mut tree = ShortRateTree::new(ShortRateTreeConfig::black_karasinski(steps, 0.20, 0.03));
     let curve = create_test_curve();
     tree.calibrate(&curve, maturity).expect("BK calibration");
 
@@ -549,15 +486,7 @@ fn bk_trinomial_reprices_curve_to_a_tenth_bp() {
         "BK calibration must reprice the curve to <0.1bp, got {quality:?}"
     );
 
-    let market = MarketContext::new();
-    let zcb = tree
-        .price(
-            HashMap::<&'static str, f64>::default(),
-            maturity,
-            &market,
-            &ConstantValuator,
-        )
-        .expect("ZCB price");
+    let zcb = tree.price(0.0, &ConstantValuator).expect("ZCB price");
     let target = curve.df(maturity);
     let error_bp = ((zcb - target) / target).abs() * 10_000.0;
     assert!(
@@ -578,7 +507,7 @@ fn bk_terminal_log_rate_dispersion_matches_ou_limit() {
     let kappa = 0.03;
     let curve = create_flat_curve(0.04);
 
-    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, sigma, kappa));
+    let mut tree = ShortRateTree::new(ShortRateTreeConfig::black_karasinski(steps, sigma, kappa));
     tree.calibrate(&curve, maturity).expect("BK calibration");
 
     let (xs, dist) = bk_terminal_x_distribution(&tree);
@@ -607,22 +536,17 @@ fn bk_kappa_to_zero_converges_to_bdt() {
     let maturity = 5.0;
     let sigma = 0.20;
     let curve = create_flat_curve(0.04);
-    let market = MarketContext::new().insert(curve.clone());
     let valuator = RateCallValuator { strike: 0.04 };
-    let vars = HashMap::<&'static str, f64>::default();
+    let oas_bp = 0.0;
 
-    let mut bdt = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, sigma, 0.0));
+    let mut bdt = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, sigma));
     bdt.calibrate(&curve, maturity).expect("BDT(κ=0)");
-    let price_bdt = bdt
-        .price(vars.clone(), maturity, &market, &valuator)
-        .expect("BDT price");
+    let price_bdt = bdt.price(oas_bp, &valuator).expect("BDT price");
 
-    let mut bk = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, sigma, 1e-4));
+    let mut bk = ShortRateTree::new(ShortRateTreeConfig::black_karasinski(steps, sigma, 1e-4));
     bk.calibrate(&curve, maturity).expect("BK(κ→0)");
-    assert!(bk.bk_trinomial.is_some(), "κ=1e-4 must route to BK lattice");
-    let price_bk = bk
-        .price(vars, maturity, &market, &valuator)
-        .expect("BK price");
+    assert!(bk.bk_trinomial.is_some(), "Black-Karasinski is trinomial");
+    let price_bk = bk.price(oas_bp, &valuator).expect("BK price");
 
     // Tiny terminal dispersion check: at κ→0 the OU limit is σ√T.
     let (xs, dist) = bk_terminal_x_distribution(&bk);
@@ -818,7 +742,7 @@ fn compounding_conventions_stay_finite_for_deeply_negative_rates() {
 #[test]
 fn bdt_calibrates_near_zero_flat_curve_without_fallbacks() {
     let curve = create_flat_curve(0.0001);
-    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(12, 0.20, 0.0));
+    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(12, 0.20));
 
     tree.calibrate(&curve, 2.0)
         .expect("near-zero BDT calibration");
@@ -837,7 +761,7 @@ fn bdt_calibrates_near_zero_flat_curve_without_fallbacks() {
 #[test]
 fn bdt_calibrates_high_rate_flat_curve_with_finite_rates() {
     let curve = create_flat_curve(0.75);
-    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(12, 0.20, 0.0));
+    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(12, 0.20));
 
     tree.calibrate(&curve, 2.0)
         .expect("high-rate BDT calibration");
@@ -867,7 +791,7 @@ fn bdt_calibration_fails_when_node_rate_clamp_engages_materially() {
     // sigma = 1.50, 120 steps, T = 60 => step_vol ~ 1.50*sqrt(0.5) ~ 1.06,
     // u ~ 2.89; the lattice is so wide the clamp wrecks repricing.
     let curve = create_flat_curve(0.05);
-    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(120, 1.50, 0.0));
+    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(120, 1.50));
 
     let result = tree.calibrate(&curve, 60.0);
     assert!(
@@ -888,7 +812,7 @@ fn bdt_calibration_succeeds_for_a_normal_well_posed_tree() {
     // BDT tree (moderate vol, moderate horizon) whose node rates stay
     // comfortably inside `[1e-8, 5.0]` must still calibrate cleanly.
     let curve = create_test_curve();
-    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(40, 0.20, 0.0));
+    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(40, 0.20));
     tree.calibrate(&curve, 5.0)
         .expect("a well-posed BDT tree must calibrate");
     let quality = tree.calibration_result().expect("quality");
@@ -907,11 +831,64 @@ fn test_config_ho_lee_factory() {
 
 #[test]
 fn test_config_bdt_factory() {
-    let config = ShortRateTreeConfig::bdt(100, 0.20, 0.03);
+    let config = ShortRateTreeConfig::bdt(100, 0.20);
     assert_eq!(config.steps, 100);
     assert_eq!(config.model, ShortRateModel::BlackDermanToy);
     assert_eq!(config.volatility, 0.20);
+    assert_eq!(config.mean_reversion, 0.0);
+}
+
+#[test]
+fn test_config_black_karasinski_factory() {
+    let config = ShortRateTreeConfig::black_karasinski(100, 0.20, 0.03);
+    assert_eq!(config.steps, 100);
+    assert_eq!(config.model, ShortRateModel::BlackKarasinski);
+    assert_eq!(config.volatility, 0.20);
     assert_eq!(config.mean_reversion, 0.03);
+}
+
+#[test]
+fn bdt_rejects_nonzero_mean_reversion() {
+    let mut config = ShortRateTreeConfig::bdt(10, 0.20);
+    config.mean_reversion = 0.05;
+    let mut tree = ShortRateTree::new(config);
+    let err = tree
+        .calibrate(&create_test_curve(), 2.0)
+        .expect_err("BDT with mean reversion must be rejected");
+    assert!(
+        err.to_string()
+            .contains("Black-Derman-Toy has no mean reversion"),
+        "unexpected error: {err}"
+    );
+    assert!(tree.calibration_result().is_none());
+}
+
+#[test]
+fn black_karasinski_requires_positive_mean_reversion() {
+    let curve = create_test_curve();
+    for kappa in [0.0, -0.05, f64::NAN, f64::INFINITY] {
+        let mut tree = ShortRateTree::new(ShortRateTreeConfig::black_karasinski(10, 0.20, kappa));
+        let err = tree
+            .calibrate(&curve, 2.0)
+            .expect_err("Black-Karasinski needs a positive finite mean reversion");
+        assert!(
+            err.to_string().contains("mean reversion")
+                || err.to_string().contains("mean_reversion"),
+            "kappa={kappa}: unexpected error: {err}"
+        );
+    }
+}
+
+#[test]
+fn lattice_follows_the_model_variant() {
+    let curve = create_test_curve();
+    let mut bdt = ShortRateTree::new(ShortRateTreeConfig::bdt(12, 0.20));
+    bdt.calibrate(&curve, 2.0).expect("BDT");
+    assert!(bdt.bk_trinomial.is_none(), "BDT is binomial");
+    let mut bk = ShortRateTree::new(ShortRateTreeConfig::black_karasinski(12, 0.20, 0.05));
+    bk.calibrate(&curve, 2.0).expect("BK");
+    assert!(bk.bk_trinomial.is_some(), "BK is trinomial");
+    assert_eq!(bk.rates[12].len(), 25);
 }
 
 #[test]
@@ -935,7 +912,7 @@ fn test_calibrate_rejects_zero_steps_and_non_positive_horizon() {
         .expect_err("zero steps must be rejected");
     assert!(err.to_string().contains("at least one step"), "{err}");
 
-    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(5, 0.20, 0.0));
+    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(5, 0.20));
     for ttm in [0.0, -1.0, f64::NAN] {
         let err = tree
             .calibrate(&curve, ttm)
@@ -948,12 +925,7 @@ fn test_calibrate_rejects_zero_steps_and_non_positive_horizon() {
 fn test_price_rejects_uncalibrated_tree() {
     let tree = ShortRateTree::new(ShortRateTreeConfig::ho_lee(5, 0.01));
     let err = tree
-        .price(
-            HashMap::<&'static str, f64>::default(),
-            1.0,
-            &MarketContext::new(),
-            &ConstantValuator,
-        )
+        .price(0.0, &ConstantValuator)
         .expect_err("uncalibrated tree should error");
     assert!(err.to_string().contains("must be calibrated"));
 }
@@ -993,4 +965,152 @@ fn test_ho_lee_allows_zero_mean_reversion() {
     let curve = create_test_curve();
     tree.calibrate(&curve, 2.0)
         .expect("Ho-Lee with κ=0 should succeed");
+}
+
+#[test]
+fn probabilities_fail_fast_when_invalid() {
+    let err = compute_probabilities(0.03, 0.25, 0.0, 1, 1).expect_err("should fail");
+    match err {
+        Error::Validation(msg) => {
+            assert!(msg.contains("finite"), "message={msg}");
+        }
+        other => panic!("expected validation error, got {other:?}"),
+    }
+}
+
+#[test]
+fn interior_probabilities_match_mean_reversion_moments() {
+    let kappa = 0.03;
+    let dt = 0.05;
+    let dx = 0.01 * (3.0_f64 * dt).sqrt();
+    let j = 12;
+    let j_max = 50;
+
+    let (p_up, p_mid, p_down) =
+        compute_probabilities(kappa, dt, dx, j, j_max).expect("probabilities");
+
+    let m = kappa * dt;
+    let expected_mean_offset = -(j as f64) * m;
+    let expected_second_moment = 1.0 / 3.0 + expected_mean_offset * expected_mean_offset;
+
+    let actual_mean_offset = p_up - p_down;
+    let actual_second_moment = p_up + p_down;
+
+    assert!(
+        (actual_mean_offset - expected_mean_offset).abs() < 1e-12,
+        "mean offset should pull positive j back toward zero: actual={actual_mean_offset}, expected={expected_mean_offset}"
+    );
+    assert!(
+        (actual_second_moment - expected_second_moment).abs() < 1e-12,
+        "second moment mismatch: actual={actual_second_moment}, expected={expected_second_moment}"
+    );
+    assert!((p_up + p_mid + p_down - 1.0).abs() < 1e-12);
+}
+
+#[test]
+fn boundary_probabilities_match_shifted_branch_moments() {
+    let kappa = 0.15;
+    let dt = 0.05;
+    let dx = 0.01 * (3.0_f64 * dt).sqrt();
+    let j_max = 25;
+
+    let (p_upper_0, p_upper_m1, p_upper_m2) =
+        compute_probabilities(kappa, dt, dx, j_max as i32, j_max)
+            .expect("upper boundary probabilities");
+    let m = kappa * dt;
+    let upper_expected_mean = -(j_max as f64) * m;
+    let upper_expected_second = 1.0 / 3.0 + upper_expected_mean * upper_expected_mean;
+    let upper_mean = -p_upper_m1 - 2.0 * p_upper_m2;
+    let upper_second = p_upper_m1 + 4.0 * p_upper_m2;
+
+    assert!((upper_mean - upper_expected_mean).abs() < 1e-12);
+    assert!((upper_second - upper_expected_second).abs() < 1e-12);
+    assert!((p_upper_0 + p_upper_m1 + p_upper_m2 - 1.0).abs() < 1e-12);
+
+    let (p_lower_p2, p_lower_p1, p_lower_0) =
+        compute_probabilities(kappa, dt, dx, -(j_max as i32), j_max)
+            .expect("lower boundary probabilities");
+    let lower_expected_mean = (j_max as f64) * m;
+    let lower_expected_second = 1.0 / 3.0 + lower_expected_mean * lower_expected_mean;
+    let lower_mean = 2.0 * p_lower_p2 + p_lower_p1;
+    let lower_second = 4.0 * p_lower_p2 + p_lower_p1;
+
+    assert!((lower_mean - lower_expected_mean).abs() < 1e-12);
+    assert!((lower_second - lower_expected_second).abs() < 1e-12);
+    assert!((p_lower_p2 + p_lower_p1 + p_lower_0 - 1.0).abs() < 1e-12);
+}
+
+#[test]
+fn computed_probabilities_sum_to_one_in_release_builds() {
+    // The probability-sum invariant must hold even when `debug_assert!`
+    // is compiled out (release builds). Sweep interior and boundary
+    // nodes across a range of mean-reversion regimes.
+    for &(kappa, dt) in &[(0.03_f64, 0.05_f64), (0.15, 0.05), (0.50, 0.02)] {
+        let dx = 0.01 * (3.0 * dt).sqrt();
+        let j_max = (0.184 / (kappa * dt)).ceil() as usize;
+        for j in -(j_max as i32)..=(j_max as i32) {
+            let (p_up, p_mid, p_down) = compute_probabilities(kappa, dt, dx, j, j_max)
+                .expect("probabilities should be valid");
+            let sum = p_up + p_mid + p_down;
+            assert!(
+                (sum - 1.0).abs() < 1e-12,
+                "probabilities must sum to 1 (kappa={kappa}, j={j}): sum={sum}"
+            );
+        }
+    }
+}
+
+/// Valuator reading every node datum a short-rate tree hands to valuators.
+struct NodeProbeValuator;
+
+impl TreeValuator for NodeProbeValuator {
+    fn value_at_maturity(&self, state: &NodeState) -> Result<f64> {
+        let rate = state
+            .interest_rate()
+            .ok_or_else(|| Error::internal("probe node missing interest rate"))?;
+        let oas_bp = state.oas_bp;
+        Ok((rate - 0.03).max(0.0) + oas_bp / 10_000.0)
+    }
+
+    fn value_at_node(&self, state: &NodeState, continuation_value: f64, dt: f64) -> Result<f64> {
+        let rate = state.interest_rate().unwrap_or(0.0);
+        let oas_bp = state.oas_bp;
+        Ok(continuation_value
+            + 1e-3 * rate * dt
+            + 1e-6 * oas_bp
+            + 1e-9 * state.step as f64
+            + state.hazard_rate().unwrap_or(0.0)
+            + state.spot().unwrap_or(0.0)
+            + state.discount_factor().unwrap_or(0.0))
+    }
+}
+
+/// Bit-exact prices for every lattice with a non-zero OAS: the node state and
+/// the OAS argument must not perturb the backward induction arithmetic.
+#[test]
+fn short_rate_tree_prices_are_bit_pinned() {
+    let curve = create_test_curve();
+    let bits: Vec<u64> = [
+        ShortRateTreeConfig::ho_lee(24, 0.012),
+        ShortRateTreeConfig::bdt(24, 0.20),
+        ShortRateTreeConfig::black_karasinski(24, 0.20, 0.05),
+    ]
+    .into_iter()
+    .map(|config| {
+        let mut tree = ShortRateTree::new(config);
+        tree.calibrate(&curve, 2.0).expect("calibration");
+        let oas_bp = 125.0;
+        tree.price(oas_bp, &NodeProbeValuator)
+            .expect("price")
+            .to_bits()
+    })
+    .collect();
+    assert_eq!(
+        bits,
+        [
+            4_581_796_644_146_762_841_u64,
+            4_580_922_846_417_299_575,
+            4_583_511_401_778_341_392,
+        ]
+    );
 }

@@ -614,18 +614,13 @@ impl PerNameDefaultEngine {
         marginal_pd: &[f64],
         defaults: &mut Vec<bool>,
     ) -> Result<()> {
-        if self.antithetic {
-            self.simulator.simulate_period_antithetic(
-                systematic_z,
-                marginal_pd,
-                &mut self.rng,
-                defaults,
-            )?;
-        } else {
-            self.simulator
-                .simulate_period(systematic_z, marginal_pd, &mut self.rng, defaults)?;
-        }
-        Ok(())
+        self.simulator.simulate_period(
+            systematic_z,
+            marginal_pd,
+            &mut self.rng,
+            defaults,
+            self.antithetic,
+        )
     }
 
     /// Resolve one period's defaults for names with their own marginals.

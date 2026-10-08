@@ -817,6 +817,18 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/bk_mean_reversion",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bk_mean_reversion",
+    "description": "Black-Karasinski mean-reversion speed (κ) of the log short rate, in\nannualised units (`0.03` = 3% per year).\n\nCompanion to [`Self::bk_sigma`]: read only by the rates-only bond tree\nwhen `tree_model = black_karasinski`, where it is required. Must be\nfinite and strictly positive; typical values are 0.01–0.10. A lognormal\nshort rate without mean reversion is `tree_model = black_derman_toy`\nwith [`Self::bdt_sigma`].",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/bk_sigma",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bk_sigma",
+    "description": "Black-Karasinski lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_karasinski`,\nwhere it is required together with [`Self::bk_mean_reversion`]. It is\na relative (lognormal) volatility on the same scale as\n[`Self::bdt_sigma`], unlike the absolute [`Self::hw1f_sigma`]; typical\nvalues are 0.10–0.40. Must be finite and non-negative; `0.0` prices on\nthe deterministic curve.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/call_friction_cents",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/call_friction_cents",
     "default": null,
@@ -961,7 +973,7 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_model",
-    "description": "Short-rate lattice for the rates-only bond tree (`hull_white` or\n`black_derman_toy`). `None` selects Hull-White."
+    "description": "Short-rate lattice for the rates-only bond tree (`hull_white`,\n`black_derman_toy` or `black_karasinski`). `None` selects Hull-White."
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_model/anyOf/0",
@@ -1377,6 +1389,12 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/1",
     "const": "black_derman_toy",
     "description": "Black-Derman-Toy (lognormal short rate) with volatility\n`model_config.bdt_sigma`."
+  },
+  {
+    "path": "#/$defs/d_948cdc4db846a21357a4/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ShortRateTreeModel/oneOf/2",
+    "const": "black_karasinski",
+    "description": "Black-Karasinski (mean-reverting lognormal short rate) with `(κ, σ)`\nfrom `model_config.bk_mean_reversion` / `model_config.bk_sigma`."
   },
   {
     "path": "#/$defs/d_94cb251104de5cf587b6",

@@ -115,28 +115,6 @@ impl BsGreeks {
             && self.rho_r.is_finite()
             && self.rho_q.is_finite()
     }
-
-    /// Clamp Greeks to their carry-independent bounds.
-    ///
-    /// This corrects for minor numerical precision issues near boundaries:
-    /// - Gamma: clamped to [0, ∞)
-    /// - Vega: clamped to [0, ∞)
-    ///
-    /// Delta is NOT clamped: its true bound `|Δ| ≤ e^{−qT}` depends on the
-    /// carry, which this type does not carry — a ±1 clamp would silently
-    /// corrupt correct negative-carry deltas above 1 (see [`Self::is_valid`]).
-    /// Theta and rhos are not clamped as they have no theoretical bounds.
-    #[must_use]
-    pub fn clamped(self) -> Self {
-        Self {
-            delta: self.delta,
-            gamma: self.gamma.max(0.0),
-            vega: self.vega.max(0.0),
-            theta: self.theta,
-            rho_r: self.rho_r,
-            rho_q: self.rho_q,
-        }
-    }
 }
 
 /// Vanilla option payoff at expiry: `max(±(spot - strike), 0)`.
@@ -758,29 +736,6 @@ mod tests {
         assert!(deep_otm.is_valid(), "Deep OTM put Greeks should be valid");
     }
 
-    #[test]
-    fn test_bs_greeks_clamped() {
-        // Gamma/vega noise is floored; delta is untouched (its true bound
-        // depends on the carry, which the struct does not know).
-        let greeks = BsGreeks {
-            delta: 1.0000001,  // Legitimate under negative carry; left as-is
-            gamma: -0.0000001, // Slightly negative
-            vega: -0.0000001,  // Slightly negative
-            theta: -0.05,
-            rho_r: 0.5,
-            rho_q: -0.3,
-        };
-
-        let clamped = greeks.clamped();
-        assert_eq!(clamped.delta, 1.0000001); // Unchanged
-        assert_eq!(clamped.gamma, 0.0);
-        assert_eq!(clamped.vega, 0.0);
-        assert_eq!(clamped.theta, -0.05); // Unchanged
-        assert_eq!(clamped.rho_r, 0.5); // Unchanged
-        assert_eq!(clamped.rho_q, -0.3); // Unchanged
-        assert!(clamped.is_valid());
-    }
-
     /// Independent finite-difference cross-check of every analytic Greek
     /// against `bs_price`. The price formula and the Greek formulas are
     /// separate derivations, so central differences of the price are a
@@ -917,10 +872,10 @@ mod tests {
 
     /// Under NEGATIVE carry (q < 0 — negative dividend yield, or the foreign
     /// rate above domestic in the Garman-Kohlhagen reuse of this struct), the
-    /// call delta `e^{−qT}·N(d1)` legitimately exceeds 1. `clamped()` must not
-    /// corrupt such a delta to 1.0, and `is_valid()` must not reject it.
+    /// call delta `e^{−qT}·N(d1)` legitimately exceeds 1; `is_valid()` must not
+    /// reject it.
     #[test]
-    fn negative_carry_delta_above_one_is_neither_clamped_nor_invalid() {
+    fn negative_carry_delta_above_one_is_not_invalid() {
         // Deep ITM call, q = −5%, T = 2y: delta = e^{0.1}·N(d1) ≈ 1.105·~1.
         let greeks = bs_greeks_unchecked(
             200.0,
@@ -941,11 +896,6 @@ mod tests {
         assert!(
             greeks.is_valid(),
             "a correct negative-carry delta > 1 must not be flagged invalid"
-        );
-        let clamped = greeks.clamped();
-        assert_eq!(
-            clamped.delta, greeks.delta,
-            "clamped() must not corrupt a legitimate delta > 1 down to 1.0"
         );
     }
 

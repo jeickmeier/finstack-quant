@@ -69,6 +69,7 @@ pub mod arbitrage;
 pub mod black;
 mod conventions;
 mod convert;
+mod dupire;
 mod fx;
 pub mod heston;
 mod implied;
@@ -79,12 +80,12 @@ pub mod sabr;
 mod source;
 pub mod svi;
 
-pub use black::{d1, d1_black76, d1_d2, d1_d2_black76, d2, d2_black76};
+pub use black::{d1, d1_black76, d1_d2, d1_d2_black76};
 pub use conventions::VolatilityConvention;
 pub use convert::convert_atm_volatility;
 pub use finstack_quant_core::math::{norm_cdf, norm_pdf};
 pub use implied::{implied_vol_bachelier, implied_vol_black};
-pub use normal::{bachelier_price_with_annuity, d_bachelier};
+pub use normal::bachelier_price_with_annuity;
 pub use sabr::{
     vega_weight, SabrCalibrationOutcome, SabrCalibrator, SabrModel, SabrParameters, SabrShift,
     SabrSmile,
@@ -92,9 +93,9 @@ pub use sabr::{
 pub use source::{
     get_cube_expiry_slice_vol, get_cube_expiry_slice_vol_clamped, get_cube_normal_vol,
     get_cube_normal_vol_clamped, get_cube_vol, get_cube_vol_clamped, get_surface_vol,
-    get_surface_vol_clamped, get_surface_vol_extrapolated, materialize_cube_expiry_slice,
-    materialize_cube_expiry_slice_normal, materialize_cube_grid, materialize_cube_tenor_slice,
-    materialize_cube_tenor_slice_normal, measure_vol_surface_shift, VolSource,
+    get_surface_vol_clamped, materialize_cube_expiry_slice, materialize_cube_expiry_slice_normal,
+    materialize_cube_tenor_slice, materialize_cube_tenor_slice_normal, measure_vol_surface_shift,
+    VolSource,
 };
 
 pub use fx::{

@@ -97,10 +97,12 @@
 //!
 //! # Examples
 //!
-//! ## Down-and-Out Call
+//! ## Down-and-Out and Down-and-In Calls
 //!
 //! ```
-//! use finstack_quant_models::closed_form::barrier::down_out_call;
+//! use finstack_quant_core::types::BarrierType;
+//! use finstack_quant_models::closed_form::barrier::{barrier_price, BarrierParams};
+//! use finstack_quant_models::types::OptionType;
 //!
 //! let spot = 100.0;
 //! let strike = 100.0;
@@ -109,29 +111,15 @@
 //! let rate = 0.05;
 //! let div_yield = 0.02;
 //! let vol = 0.20;
-//!
-//! let price = down_out_call(spot, strike, barrier, time, rate, div_yield, vol);
+//! let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
 //!
 //! // Price should be less than vanilla call (knockout feature reduces value)
-//! assert!(price >= 0.0);
-//! ```
+//! let knock_out = barrier_price(&params, BarrierType::DownAndOut, OptionType::Call);
+//! assert!(knock_out >= 0.0);
 //!
-//! ## Down-and-In Call
-//!
-//! ```
-//! use finstack_quant_models::closed_form::barrier::down_in_call;
-//!
-//! let spot = 100.0;
-//! let strike = 100.0;
-//! let barrier = 90.0;    // Barrier below current spot
-//! let time = 0.5;
-//! let rate = 0.05;
-//! let div_yield = 0.0;
-//! let vol = 0.25;
-//!
-//! // Option only activates if spot falls to 90
-//! let price = down_in_call(spot, strike, barrier, time, rate, div_yield, vol);
-//! assert!(price >= 0.0);
+//! // The knock-in only activates if spot falls to 90
+//! let knock_in = barrier_price(&params, BarrierType::DownAndIn, OptionType::Call);
+//! assert!(knock_in >= 0.0);
 //! ```
 //!
 //! # See Also
@@ -140,6 +128,7 @@
 //! - [`BarrierParams`] for parameter grouping
 //! - Monte Carlo barrier pricing for discrete monitoring and exotic payoffs
 
+use crate::types::OptionType;
 use crate::volatility::black::d1_d2;
 use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::special_functions::{log_norm_cdf, norm_cdf};
@@ -729,7 +718,14 @@ fn discounted_touch_value(params: &BarrierParams, is_up: bool) -> f64 {
     }
 }
 
-/// Price a continuous up-and-out call.
+/// Price a continuously monitored European barrier option (Reiner-Rubinstein).
+///
+/// Covers all eight up/down, knock-in/knock-out, call/put combinations. A
+/// knock-out is priced as `vanilla - knock-in` and floored at zero, because
+/// catastrophic cancellation near the barrier can produce tiny negative
+/// values. When `spot` is already on or beyond the barrier, a knock-in is the
+/// vanilla option and a knock-out is worth zero (rebates are priced
+/// separately by [`barrier_rebate`]).
 ///
 /// Returns a non-finite (`NaN`) sentinel — never a plausible finite price — if
 /// `spot`, `strike` or `barrier` is not strictly positive and finite. Such
@@ -738,165 +734,34 @@ fn discounted_touch_value(params: &BarrierParams, is_up: bool) -> f64 {
 ///
 /// # Arguments
 ///
-/// * `spot` - Current underlying spot price in the option's quote units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `barrier` - Upper continuously monitored knock-out level.
-/// * `time` - Remaining monitoring and option lifetime in years.
-/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
-/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
-///   carry as a decimal.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-pub fn up_out_call(
-    spot: f64,
-    strike: f64,
-    barrier: f64,
-    time: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
+/// * `params` - Spot, strike and barrier level in the same quote units, time
+///   to expiry in years, continuously compounded risk-free rate and dividend
+///   yield (or foreign-rate carry) as decimals, and annualized lognormal
+///   volatility as a decimal.
+/// * `barrier_type` - Up/down and knock-in/knock-out convention. "Up" means the
+///   barrier is hit when spot rises to it, "down" when spot falls to it.
+/// * `option_type` - Call or put payoff at expiry.
+///
+/// # Examples
+///
+/// ```
+/// use finstack_quant_core::types::BarrierType;
+/// use finstack_quant_models::closed_form::barrier::{barrier_price, BarrierParams};
+/// use finstack_quant_models::types::OptionType;
+///
+/// // spot 100, strike 100, barrier 90, 1y, r = 5%, q = 2%, vol = 20%
+/// let params = BarrierParams::new(100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20);
+/// let knock_out = barrier_price(&params, BarrierType::DownAndOut, OptionType::Call);
+/// let knock_in = barrier_price(&params, BarrierType::DownAndIn, OptionType::Call);
+///
+/// // The knock-out feature reduces value relative to the vanilla call.
+/// assert!(knock_out >= 0.0 && knock_in >= 0.0);
+/// ```
+pub fn barrier_price(
+    params: &BarrierParams,
+    barrier_type: BarrierType,
+    option_type: OptionType,
 ) -> f64 {
-    if validate_barrier_inputs(spot, strike, barrier).is_err() {
-        return f64::NAN;
-    }
-    if spot >= barrier {
-        return 0.0; // Already knocked out
-    }
-
-    // Up-and-out = Vanilla - Up-and-in
-    // Clamp to zero: catastrophic cancellation near the barrier can produce
-    // tiny negative values (order 1e-10).
-    let vanilla = vanilla_option_price(spot, strike, time, rate, div_yield, vol, 1.0);
-
-    let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    match barrier_helper(&params, 1.0, 1.0) {
-        Ok(up_in) => (vanilla - up_in).clamp(0.0, f64::INFINITY),
-        Err(_) => f64::NAN,
-    }
-}
-
-/// Price a continuous up-and-in call.
-///
-/// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
-/// `spot`/`strike`/`barrier` (see [`up_out_call`]).
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's quote units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `barrier` - Upper continuously monitored knock-in level.
-/// * `time` - Remaining monitoring and option lifetime in years.
-/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
-/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
-///   carry as a decimal.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-pub fn up_in_call(
-    spot: f64,
-    strike: f64,
-    barrier: f64,
-    time: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-) -> f64 {
-    if validate_barrier_inputs(spot, strike, barrier).is_err() {
-        return f64::NAN;
-    }
-    if spot >= barrier {
-        // Already knocked in, price as vanilla
-        return vanilla_option_price(spot, strike, time, rate, div_yield, vol, 1.0);
-    }
-
-    let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    barrier_helper(&params, 1.0, 1.0).unwrap_or(f64::NAN)
-}
-
-/// Price a continuous down-and-out call.
-///
-/// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
-/// `spot`/`strike`/`barrier` (see [`up_out_call`]).
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's quote units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `barrier` - Lower continuously monitored knock-out level.
-/// * `time` - Remaining monitoring and option lifetime in years.
-/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
-/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
-///   carry as a decimal.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-pub fn down_out_call(
-    spot: f64,
-    strike: f64,
-    barrier: f64,
-    time: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-) -> f64 {
-    if validate_barrier_inputs(spot, strike, barrier).is_err() {
-        return f64::NAN;
-    }
-    if spot <= barrier {
-        return 0.0; // Already knocked out
-    }
-
-    // Clamp to zero: catastrophic cancellation near the barrier can produce
-    // tiny negative values.
-    let vanilla = vanilla_option_price(spot, strike, time, rate, div_yield, vol, 1.0);
-
-    let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    match barrier_helper(&params, 1.0, -1.0) {
-        Ok(down_in) => (vanilla - down_in).clamp(0.0, f64::INFINITY),
-        Err(_) => f64::NAN,
-    }
-}
-
-/// Price a continuous down-and-in call.
-///
-/// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
-/// `spot`/`strike`/`barrier` (see [`up_out_call`]).
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's quote units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `barrier` - Lower continuously monitored knock-in level.
-/// * `time` - Remaining monitoring and option lifetime in years.
-/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
-/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
-///   carry as a decimal.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-pub fn down_in_call(
-    spot: f64,
-    strike: f64,
-    barrier: f64,
-    time: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-) -> f64 {
-    if validate_barrier_inputs(spot, strike, barrier).is_err() {
-        return f64::NAN;
-    }
-    if spot <= barrier {
-        // Already knocked in, price as vanilla
-        return vanilla_option_price(spot, strike, time, rate, div_yield, vol, 1.0);
-    }
-
-    let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    barrier_helper(&params, 1.0, -1.0).unwrap_or(f64::NAN)
-}
-
-/// Generic barrier call price dispatcher.
-///
-/// # Arguments
-///
-/// * `params` - Complete barrier option market parameter bag used by the
-///   selected continuous-monitoring formula.
-/// * `barrier_type` - Up/down and knock-in/knock-out convention selecting the
-///   call formula to dispatch.
-pub fn barrier_call_continuous(params: &BarrierParams, barrier_type: BarrierType) -> f64 {
     let BarrierParams {
         spot,
         strike,
@@ -906,193 +771,43 @@ pub fn barrier_call_continuous(params: &BarrierParams, barrier_type: BarrierType
         div_yield,
         vol,
     } = *params;
-    match barrier_type {
-        BarrierType::UpAndIn => up_in_call(spot, strike, barrier, time, rate, div_yield, vol),
-        BarrierType::UpAndOut => up_out_call(spot, strike, barrier, time, rate, div_yield, vol),
-        BarrierType::DownAndIn => down_in_call(spot, strike, barrier, time, rate, div_yield, vol),
-        BarrierType::DownAndOut => down_out_call(spot, strike, barrier, time, rate, div_yield, vol),
-    }
-}
-
-/// Price a continuous down-and-in put.
-///
-/// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
-/// `spot`/`strike`/`barrier` (see [`up_out_call`]).
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's quote units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `barrier` - Lower continuously monitored knock-in level.
-/// * `time` - Remaining monitoring and option lifetime in years.
-/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
-/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
-///   carry as a decimal.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-pub fn down_in_put(
-    spot: f64,
-    strike: f64,
-    barrier: f64,
-    time: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-) -> f64 {
     if validate_barrier_inputs(spot, strike, barrier).is_err() {
         return f64::NAN;
     }
-    if spot <= barrier {
-        // Already knocked in, price as vanilla put
-        return vanilla_option_price(spot, strike, time, rate, div_yield, vol, -1.0);
+    // eta: +1 call / -1 put. phi: +1 upper barrier / -1 lower barrier.
+    let eta = match option_type {
+        OptionType::Call => 1.0,
+        OptionType::Put => -1.0,
+    };
+    let (is_up, is_in) = match barrier_type {
+        BarrierType::UpAndIn => (true, true),
+        BarrierType::UpAndOut => (true, false),
+        BarrierType::DownAndIn => (false, true),
+        BarrierType::DownAndOut => (false, false),
+    };
+    let phi = if is_up { 1.0 } else { -1.0 };
+    let already_hit = if is_up {
+        spot >= barrier
+    } else {
+        spot <= barrier
+    };
+
+    if is_in {
+        if already_hit {
+            // Already knocked in, price as vanilla
+            return vanilla_option_price(spot, strike, time, rate, div_yield, vol, eta);
+        }
+        return barrier_helper(params, eta, phi).unwrap_or(f64::NAN);
     }
 
-    let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    barrier_helper(&params, -1.0, -1.0).unwrap_or(f64::NAN)
-}
-
-/// Price a continuous down-and-out put.
-///
-/// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
-/// `spot`/`strike`/`barrier` (see [`up_out_call`]).
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's quote units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `barrier` - Lower continuously monitored knock-out level.
-/// * `time` - Remaining monitoring and option lifetime in years.
-/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
-/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
-///   carry as a decimal.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-pub fn down_out_put(
-    spot: f64,
-    strike: f64,
-    barrier: f64,
-    time: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-) -> f64 {
-    if validate_barrier_inputs(spot, strike, barrier).is_err() {
-        return f64::NAN;
-    }
-    if spot <= barrier {
+    if already_hit {
         return 0.0; // Already knocked out
     }
-
-    // Clamp to zero: catastrophic cancellation near the barrier can produce
-    // tiny negative values.
-    let vanilla = vanilla_option_price(spot, strike, time, rate, div_yield, vol, -1.0);
-
-    let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    match barrier_helper(&params, -1.0, -1.0) {
-        Ok(down_in) => (vanilla - down_in).clamp(0.0, f64::INFINITY),
+    // Knock-out = vanilla - knock-in, clamped to zero.
+    let vanilla = vanilla_option_price(spot, strike, time, rate, div_yield, vol, eta);
+    match barrier_helper(params, eta, phi) {
+        Ok(knock_in) => (vanilla - knock_in).clamp(0.0, f64::INFINITY),
         Err(_) => f64::NAN,
-    }
-}
-
-/// Price a continuous up-and-in put.
-///
-/// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
-/// `spot`/`strike`/`barrier` (see [`up_out_call`]).
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's quote units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `barrier` - Upper continuously monitored knock-in level.
-/// * `time` - Remaining monitoring and option lifetime in years.
-/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
-/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
-///   carry as a decimal.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-pub fn up_in_put(
-    spot: f64,
-    strike: f64,
-    barrier: f64,
-    time: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-) -> f64 {
-    if validate_barrier_inputs(spot, strike, barrier).is_err() {
-        return f64::NAN;
-    }
-    if spot >= barrier {
-        // Already knocked in, price as vanilla put
-        return vanilla_option_price(spot, strike, time, rate, div_yield, vol, -1.0);
-    }
-
-    let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    barrier_helper(&params, -1.0, 1.0).unwrap_or(f64::NAN)
-}
-
-/// Price a continuous up-and-out put.
-///
-/// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
-/// `spot`/`strike`/`barrier` (see [`up_out_call`]).
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's quote units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `barrier` - Upper continuously monitored knock-out level.
-/// * `time` - Remaining monitoring and option lifetime in years.
-/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
-/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
-///   carry as a decimal.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-pub fn up_out_put(
-    spot: f64,
-    strike: f64,
-    barrier: f64,
-    time: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-) -> f64 {
-    if validate_barrier_inputs(spot, strike, barrier).is_err() {
-        return f64::NAN;
-    }
-    if spot >= barrier {
-        return 0.0; // Already knocked out
-    }
-
-    // Clamp to zero: catastrophic cancellation near the barrier can produce
-    // tiny negative values.
-    let vanilla = vanilla_option_price(spot, strike, time, rate, div_yield, vol, -1.0);
-
-    let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    match barrier_helper(&params, -1.0, 1.0) {
-        Ok(up_in) => (vanilla - up_in).clamp(0.0, f64::INFINITY),
-        Err(_) => f64::NAN,
-    }
-}
-
-/// Generic barrier put price dispatcher.
-///
-/// # Arguments
-///
-/// * `params` - Complete barrier option market parameter bag used by the
-///   selected continuous-monitoring formula.
-/// * `barrier_type` - Up/down and knock-in/knock-out convention selecting the
-///   put formula to dispatch.
-pub fn barrier_put_continuous(params: &BarrierParams, barrier_type: BarrierType) -> f64 {
-    let BarrierParams {
-        spot,
-        strike,
-        barrier,
-        time,
-        rate,
-        div_yield,
-        vol,
-    } = *params;
-    match barrier_type {
-        BarrierType::UpAndIn => up_in_put(spot, strike, barrier, time, rate, div_yield, vol),
-        BarrierType::UpAndOut => up_out_put(spot, strike, barrier, time, rate, div_yield, vol),
-        BarrierType::DownAndIn => down_in_put(spot, strike, barrier, time, rate, div_yield, vol),
-        BarrierType::DownAndOut => down_out_put(spot, strike, barrier, time, rate, div_yield, vol),
     }
 }
 
@@ -1101,11 +816,97 @@ pub fn barrier_put_continuous(params: &BarrierParams, barrier_type: BarrierType)
 // lookup), callers should build the parameter bag via
 // [`BarrierParams::with_df`], which derives `rate = -ln(df)/t`. The
 // resulting `BarrierParams` can be passed to
-// [`barrier_call_continuous`], [`barrier_put_continuous`], or [`barrier_rebate`].
+// [`barrier_price`] or [`barrier_rebate`].
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Exact bit patterns of every barrier variant, captured before the eight
+    /// named entry points were collapsed into [`barrier_price`].
+    #[rustfmt::skip]
+    const BARRIER_PRICE_PIN: &[u64] = &[
+        0x0000000000000000, 0x0000000000000000, 0x4022743a10e31120, 0x40195200a7f17af0,
+        0x401e590a761be416, 0x3fc412db3b15cc40, 0x3ffa3da6aea8f8a8, 0x4018b169ce18cc8e,
+        0x3fbdef199885af80, 0x4013431f57c7fd3a, 0x4022385bddb205c1, 0x3ff83b8540a5f6d8,
+        0x0000000000000000, 0x0000000000000000, 0x4022743a10e31120, 0x40195200a7f17af0,
+        0x3fdad8f6c7939030, 0x40239921d0f4f390, 0x401a402433a1a145, 0x3fe3d562c0646248,
+        0x0000000000000000, 0x0000000000000000, 0x401bedb3a01ada48, 0x4024d677fcfb39b4,
+        0x0000000000000000, 0x0000000000000000, 0x40219729ed6b6320, 0x401ec72b75fdd838,
+        0x402123182990a783, 0x3fed7188a1f39df0, 0x3fcd0470f6aee750, 0x401b18fa61bf647a,
+        0x0000000000000000, 0x0000000000000000, 0x402fdff0134d3ef8, 0x40069aa018d30bc0,
+        0x40177d9f923740c8, 0x0000000000000000, 0x402421204a319e94, 0x40069aa018d30bc0,
+        0x0000000000000000, 0x0000000000000000, 0x4022743a10e31120, 0x40195200a7f17af0,
+        0x0000000000000000, 0x0000000000000000, 0x4022743a10e31120, 0x40195200a7f17af0,
+        0x0000000000000000, 0x0000000000000000, 0x4022743a10e31120, 0x40195200a7f17af0,
+        0x3f53fc292c8d8000, 0x3d00000000000000, 0x4022739a2f99acb4, 0x40195200a7f17ae8,
+        0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
+        0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
+        0x4024000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
+        0x0000000000000000, 0x0000000000000000, 0x4024000000000000, 0x0000000000000000,
+        0x0000000000000000, 0x0000000000000000, 0x3f4a254442570000, 0x3f4a2503d5a90000,
+        0x3f4a254442570000, 0x3f4a2503d5a90000, 0x0000000000000000, 0x0000000000000000,
+        0x0000000000000000, 0x0000000000000000, 0x40072ce6f3a94ed9, 0x0000000000000000,
+        0x40072ce6f3a94ed9, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
+        0x40072ce6f3a94ed9, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
+        0x0000000000000000, 0x0000000000000000, 0x40072ce6f3a94ed9, 0x0000000000000000,
+        0x0000000000000000, 0x0000000000000000, 0x40072ce6f3a94ea0, 0x0000000000000000,
+        0x40072ce6f3a94ea0, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
+        0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000,
+        0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000,
+        0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000,
+        0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000,
+        0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000,
+        0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000,
+        0x0000000000000000, 0x0000000000000000, 0x7ff8000000000000, 0x7ff8000000000000,
+        0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000,
+        0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
+        0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
+    ];
+
+    fn barrier_price_pin_values() -> Vec<u64> {
+        // (spot, strike, barrier, time, rate, div_yield, vol)
+        let sets: [(f64, f64, f64, f64, f64, f64, f64); 18] = [
+            (100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20),
+            (100.0, 100.0, 110.0, 1.0, 0.05, 0.02, 0.20),
+            (100.0, 105.0, 120.0, 0.5, 0.03, 0.0, 0.30),
+            (100.0, 95.0, 80.0, 2.0, -0.01, 0.01, 0.15),
+            (100.0, 85.0, 95.0, 0.75, 0.04, 0.06, 0.25),
+            (100.0, 100.0, 100.0, 1.0, 0.05, 0.02, 0.20),
+            (100.0, 100.0, 99.999, 1.0, 0.05, 0.02, 0.20),
+            (100.0, 100.0, 90.0, 0.0, 0.05, 0.02, 0.20),
+            (100.0, 90.0, 110.0, 0.0, 0.05, 0.02, 0.20),
+            (100.0, 100.0, 90.0, 1e-8, 0.05, 0.02, 0.20),
+            (100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.0),
+            (100.0, 100.0, 110.0, 1.0, 0.05, 0.02, 0.0),
+            (100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 1e-6),
+            (-1.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20),
+            (100.0, 0.0, 90.0, 1.0, 0.05, 0.02, 0.20),
+            (100.0, 100.0, f64::NAN, 1.0, 0.05, 0.02, 0.20),
+            (100.0, 100.0, 90.0, 1.0, 0.05, 0.02, f64::NAN),
+            (100.0, 100.0, 110.0, -1.0, 0.05, 0.02, 0.20),
+        ];
+        let types = [
+            BarrierType::UpAndOut,
+            BarrierType::UpAndIn,
+            BarrierType::DownAndOut,
+            BarrierType::DownAndIn,
+        ];
+        let mut out = Vec::new();
+        for (spot, strike, barrier, time, rate, div_yield, vol) in sets {
+            let p = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
+            for ty in types {
+                out.push(barrier_price(&p, ty, OptionType::Call).to_bits());
+                out.push(barrier_price(&p, ty, OptionType::Put).to_bits());
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn barrier_price_bit_pin() {
+        assert_eq!(barrier_price_pin_values().as_slice(), BARRIER_PRICE_PIN);
+    }
 
     #[test]
     fn low_volatility_barriers_preserve_exact_payoff_identities() {
@@ -1117,13 +918,29 @@ mod tests {
             let vanilla = vanilla_option_price(100.0, strike, time, rate, 0.0, 0.01, eta);
             let (knock_in, knock_out) = if eta > 0.0 {
                 (
-                    up_in_call(100.0, strike, barrier, time, rate, 0.0, 0.01),
-                    up_out_call(100.0, strike, barrier, time, rate, 0.0, 0.01),
+                    barrier_price(
+                        &BarrierParams::new(100.0, strike, barrier, time, rate, 0.0, 0.01),
+                        BarrierType::UpAndIn,
+                        OptionType::Call,
+                    ),
+                    barrier_price(
+                        &BarrierParams::new(100.0, strike, barrier, time, rate, 0.0, 0.01),
+                        BarrierType::UpAndOut,
+                        OptionType::Call,
+                    ),
                 )
             } else {
                 (
-                    down_in_put(100.0, strike, barrier, time, rate, 0.0, 0.01),
-                    down_out_put(100.0, strike, barrier, time, rate, 0.0, 0.01),
+                    barrier_price(
+                        &BarrierParams::new(100.0, strike, barrier, time, rate, 0.0, 0.01),
+                        BarrierType::DownAndIn,
+                        OptionType::Put,
+                    ),
+                    barrier_price(
+                        &BarrierParams::new(100.0, strike, barrier, time, rate, 0.0, 0.01),
+                        BarrierType::DownAndOut,
+                        OptionType::Put,
+                    ),
                 )
             };
             assert!(vanilla > 0.5);
@@ -1182,9 +999,17 @@ mod tests {
                 )
                 .expect("valid conditional bridge integration");
             let actual = if is_up {
-                up_out_call(100.0, strike, barrier, 1.0, rate, 0.0, vol)
+                barrier_price(
+                    &BarrierParams::new(100.0, strike, barrier, 1.0, rate, 0.0, vol),
+                    BarrierType::UpAndOut,
+                    OptionType::Call,
+                )
             } else {
-                down_out_put(100.0, strike, barrier, 1.0, rate, 0.0, vol)
+                barrier_price(
+                    &BarrierParams::new(100.0, strike, barrier, 1.0, rate, 0.0, vol),
+                    BarrierType::DownAndOut,
+                    OptionType::Put,
+                )
             };
             assert!(expected > 1.0);
             assert!(
@@ -1275,8 +1100,16 @@ mod tests {
         let div_yield = 0.02;
         let vol = 0.2;
 
-        let up_in = up_in_call(spot, strike, barrier, time, rate, div_yield, vol);
-        let up_out = up_out_call(spot, strike, barrier, time, rate, div_yield, vol);
+        let up_in = barrier_price(
+            &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+            BarrierType::UpAndIn,
+            OptionType::Call,
+        );
+        let up_out = barrier_price(
+            &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+            BarrierType::UpAndOut,
+            OptionType::Call,
+        );
 
         let d1 = ((spot / strike).ln() + (rate - div_yield + 0.5 * vol * vol) * time)
             / (vol * time.sqrt());
@@ -1305,8 +1138,8 @@ mod tests {
         let vol = 0.2;
 
         let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-        let down_in = barrier_put_continuous(&params, BarrierType::DownAndIn);
-        let down_out = barrier_put_continuous(&params, BarrierType::DownAndOut);
+        let down_in = barrier_price(&params, BarrierType::DownAndIn, OptionType::Put);
+        let down_out = barrier_price(&params, BarrierType::DownAndOut, OptionType::Put);
 
         let d1 = ((spot / strike).ln() + (rate - div_yield + 0.5 * vol * vol) * time)
             / (vol * time.sqrt());
@@ -1326,13 +1159,21 @@ mod tests {
 
     #[test]
     fn test_up_out_call_knocked_out() {
-        let price = up_out_call(125.0, 100.0, 120.0, 1.0, 0.05, 0.02, 0.2);
+        let price = barrier_price(
+            &BarrierParams::new(125.0, 100.0, 120.0, 1.0, 0.05, 0.02, 0.2),
+            BarrierType::UpAndOut,
+            OptionType::Call,
+        );
         assert_eq!(price, 0.0, "Already above barrier should be zero");
     }
 
     #[test]
     fn test_down_out_call_knocked_out() {
-        let price = down_out_call(75.0, 100.0, 80.0, 1.0, 0.05, 0.02, 0.2);
+        let price = barrier_price(
+            &BarrierParams::new(75.0, 100.0, 80.0, 1.0, 0.05, 0.02, 0.2),
+            BarrierType::DownAndOut,
+            OptionType::Call,
+        );
         assert_eq!(price, 0.0, "Already below barrier should be zero");
     }
 
@@ -1347,10 +1188,34 @@ mod tests {
         let div_yield = 0.02;
         let vol = 0.2;
 
-        assert!(up_in_call(spot, strike, barrier_up, time, rate, div_yield, vol) >= 0.0);
-        assert!(up_out_call(spot, strike, barrier_up, time, rate, div_yield, vol) >= 0.0);
-        assert!(down_in_call(spot, strike, barrier_down, time, rate, div_yield, vol) >= 0.0);
-        assert!(down_out_call(spot, strike, barrier_down, time, rate, div_yield, vol) >= 0.0);
+        assert!(
+            barrier_price(
+                &BarrierParams::new(spot, strike, barrier_up, time, rate, div_yield, vol),
+                BarrierType::UpAndIn,
+                OptionType::Call
+            ) >= 0.0
+        );
+        assert!(
+            barrier_price(
+                &BarrierParams::new(spot, strike, barrier_up, time, rate, div_yield, vol),
+                BarrierType::UpAndOut,
+                OptionType::Call
+            ) >= 0.0
+        );
+        assert!(
+            barrier_price(
+                &BarrierParams::new(spot, strike, barrier_down, time, rate, div_yield, vol),
+                BarrierType::DownAndIn,
+                OptionType::Call
+            ) >= 0.0
+        );
+        assert!(
+            barrier_price(
+                &BarrierParams::new(spot, strike, barrier_down, time, rate, div_yield, vol),
+                BarrierType::DownAndOut,
+                OptionType::Call
+            ) >= 0.0
+        );
     }
 
     // ==================== DF-CONSTRUCTION TESTS ====================
@@ -1388,8 +1253,8 @@ mod tests {
             let p_rate = BarrierParams::new(spot, strike, b, time, rate, div_yield, vol);
             let p_df = BarrierParams::with_df(spot, strike, b, time, df, div_yield, vol)
                 .expect("positive df constructs");
-            let price_rate = barrier_call_continuous(&p_rate, barrier_type);
-            let price_df = barrier_call_continuous(&p_df, barrier_type);
+            let price_rate = barrier_price(&p_rate, barrier_type, OptionType::Call);
+            let price_df = barrier_price(&p_df, barrier_type, OptionType::Call);
 
             assert!(
                 (price_rate - price_df).abs() < 1e-10,
@@ -1430,8 +1295,8 @@ mod tests {
             let p_rate = BarrierParams::new(spot, strike, b, time, rate, div_yield, vol);
             let p_df = BarrierParams::with_df(spot, strike, b, time, df, div_yield, vol)
                 .expect("positive df constructs");
-            let price_rate = barrier_put_continuous(&p_rate, barrier_type);
-            let price_df = barrier_put_continuous(&p_df, barrier_type);
+            let price_rate = barrier_price(&p_rate, barrier_type, OptionType::Put);
+            let price_df = barrier_price(&p_df, barrier_type, OptionType::Put);
 
             assert!(
                 (price_rate - price_df).abs() < 1e-10,
@@ -1574,23 +1439,31 @@ mod tests {
         for c in &cases {
             // --- Up barrier calls ---
             let vc = vanilla_call(c.spot, c.strike, c.time, c.rate, c.div_yield, c.vol);
-            let ui_c = up_in_call(
-                c.spot,
-                c.strike,
-                c.barrier_up,
-                c.time,
-                c.rate,
-                c.div_yield,
-                c.vol,
+            let ui_c = barrier_price(
+                &BarrierParams::new(
+                    c.spot,
+                    c.strike,
+                    c.barrier_up,
+                    c.time,
+                    c.rate,
+                    c.div_yield,
+                    c.vol,
+                ),
+                BarrierType::UpAndIn,
+                OptionType::Call,
             );
-            let uo_c = up_out_call(
-                c.spot,
-                c.strike,
-                c.barrier_up,
-                c.time,
-                c.rate,
-                c.div_yield,
-                c.vol,
+            let uo_c = barrier_price(
+                &BarrierParams::new(
+                    c.spot,
+                    c.strike,
+                    c.barrier_up,
+                    c.time,
+                    c.rate,
+                    c.div_yield,
+                    c.vol,
+                ),
+                BarrierType::UpAndOut,
+                OptionType::Call,
             );
             assert!(
                 (ui_c + uo_c - vc).abs() < tol,
@@ -1603,23 +1476,31 @@ mod tests {
             );
 
             // --- Down barrier calls ---
-            let di_c = down_in_call(
-                c.spot,
-                c.strike,
-                c.barrier_down,
-                c.time,
-                c.rate,
-                c.div_yield,
-                c.vol,
+            let di_c = barrier_price(
+                &BarrierParams::new(
+                    c.spot,
+                    c.strike,
+                    c.barrier_down,
+                    c.time,
+                    c.rate,
+                    c.div_yield,
+                    c.vol,
+                ),
+                BarrierType::DownAndIn,
+                OptionType::Call,
             );
-            let do_c = down_out_call(
-                c.spot,
-                c.strike,
-                c.barrier_down,
-                c.time,
-                c.rate,
-                c.div_yield,
-                c.vol,
+            let do_c = barrier_price(
+                &BarrierParams::new(
+                    c.spot,
+                    c.strike,
+                    c.barrier_down,
+                    c.time,
+                    c.rate,
+                    c.div_yield,
+                    c.vol,
+                ),
+                BarrierType::DownAndOut,
+                OptionType::Call,
             );
             assert!(
                 (di_c + do_c - vc).abs() < tol,
@@ -1633,23 +1514,31 @@ mod tests {
 
             // --- Up barrier puts ---
             let vp = vanilla_put(c.spot, c.strike, c.time, c.rate, c.div_yield, c.vol);
-            let ui_p = up_in_put(
-                c.spot,
-                c.strike,
-                c.barrier_up,
-                c.time,
-                c.rate,
-                c.div_yield,
-                c.vol,
+            let ui_p = barrier_price(
+                &BarrierParams::new(
+                    c.spot,
+                    c.strike,
+                    c.barrier_up,
+                    c.time,
+                    c.rate,
+                    c.div_yield,
+                    c.vol,
+                ),
+                BarrierType::UpAndIn,
+                OptionType::Put,
             );
-            let uo_p = up_out_put(
-                c.spot,
-                c.strike,
-                c.barrier_up,
-                c.time,
-                c.rate,
-                c.div_yield,
-                c.vol,
+            let uo_p = barrier_price(
+                &BarrierParams::new(
+                    c.spot,
+                    c.strike,
+                    c.barrier_up,
+                    c.time,
+                    c.rate,
+                    c.div_yield,
+                    c.vol,
+                ),
+                BarrierType::UpAndOut,
+                OptionType::Put,
             );
             assert!(
                 (ui_p + uo_p - vp).abs() < tol,
@@ -1662,23 +1551,31 @@ mod tests {
             );
 
             // --- Down barrier puts ---
-            let di_p = down_in_put(
-                c.spot,
-                c.strike,
-                c.barrier_down,
-                c.time,
-                c.rate,
-                c.div_yield,
-                c.vol,
+            let di_p = barrier_price(
+                &BarrierParams::new(
+                    c.spot,
+                    c.strike,
+                    c.barrier_down,
+                    c.time,
+                    c.rate,
+                    c.div_yield,
+                    c.vol,
+                ),
+                BarrierType::DownAndIn,
+                OptionType::Put,
             );
-            let do_p = down_out_put(
-                c.spot,
-                c.strike,
-                c.barrier_down,
-                c.time,
-                c.rate,
-                c.div_yield,
-                c.vol,
+            let do_p = barrier_price(
+                &BarrierParams::new(
+                    c.spot,
+                    c.strike,
+                    c.barrier_down,
+                    c.time,
+                    c.rate,
+                    c.div_yield,
+                    c.vol,
+                ),
+                BarrierType::DownAndOut,
+                OptionType::Put,
             );
             assert!(
                 (di_p + do_p - vp).abs() < tol,
@@ -1711,8 +1608,16 @@ mod tests {
         {
             let barrier = 90.0;
             let strike = 100.0;
-            let di = down_in_call(spot, strike, barrier, time, rate, div_yield, vol);
-            let do_ = down_out_call(spot, strike, barrier, time, rate, div_yield, vol);
+            let di = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::DownAndIn,
+                OptionType::Call,
+            );
+            let do_ = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::DownAndOut,
+                OptionType::Call,
+            );
             let v = vanilla_call(spot, strike, time, rate, div_yield, vol);
             assert!(di >= 0.0, "Down-in call (K>H) must be non-negative: {}", di);
             assert!(
@@ -1739,8 +1644,16 @@ mod tests {
         {
             let barrier = 95.0;
             let strike = 90.0;
-            let di = down_in_call(spot, strike, barrier, time, rate, div_yield, vol);
-            let do_ = down_out_call(spot, strike, barrier, time, rate, div_yield, vol);
+            let di = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::DownAndIn,
+                OptionType::Call,
+            );
+            let do_ = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::DownAndOut,
+                OptionType::Call,
+            );
             let v = vanilla_call(spot, strike, time, rate, div_yield, vol);
             assert!(di >= 0.0, "Down-in call (K<H) must be non-negative: {}", di);
             assert!(
@@ -1761,8 +1674,16 @@ mod tests {
         {
             let barrier = 110.0;
             let strike = 100.0;
-            let ui = up_in_put(spot, strike, barrier, time, rate, div_yield, vol);
-            let uo = up_out_put(spot, strike, barrier, time, rate, div_yield, vol);
+            let ui = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::UpAndIn,
+                OptionType::Put,
+            );
+            let uo = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::UpAndOut,
+                OptionType::Put,
+            );
             let v = vanilla_put(spot, strike, time, rate, div_yield, vol);
             assert!(ui >= 0.0, "Up-in put (K<H) must be non-negative: {}", ui);
             assert!(uo >= 0.0, "Up-out put (K<H) must be non-negative: {}", uo);
@@ -1785,8 +1706,16 @@ mod tests {
         {
             let barrier = 105.0;
             let strike = 110.0;
-            let ui = up_in_put(spot, strike, barrier, time, rate, div_yield, vol);
-            let uo = up_out_put(spot, strike, barrier, time, rate, div_yield, vol);
+            let ui = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::UpAndIn,
+                OptionType::Put,
+            );
+            let uo = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::UpAndOut,
+                OptionType::Put,
+            );
             let v = vanilla_put(spot, strike, time, rate, div_yield, vol);
             assert!(ui >= 0.0, "Up-in put (K>H) must be non-negative: {}", ui);
             assert!(uo >= 0.0, "Up-out put (K>H) must be non-negative: {}", uo);
@@ -1817,8 +1746,16 @@ mod tests {
         let div_yield = 0.04;
         let vol = 0.25;
 
-        let di = down_in_call(spot, strike, barrier, time, rate, div_yield, vol);
-        let do_ = down_out_call(spot, strike, barrier, time, rate, div_yield, vol);
+        let di = barrier_price(
+            &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+            BarrierType::DownAndIn,
+            OptionType::Call,
+        );
+        let do_ = barrier_price(
+            &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+            BarrierType::DownAndOut,
+            OptionType::Call,
+        );
         let v = vanilla_call(spot, strike, time, rate, div_yield, vol);
 
         assert!(di > 0.0, "Down-in call must be positive, got {}", di);
@@ -1847,8 +1784,16 @@ mod tests {
         let div_yield = 0.04;
         let vol = 0.25;
 
-        let uo = up_out_call(spot, strike, barrier, time, rate, div_yield, vol);
-        let ui = up_in_call(spot, strike, barrier, time, rate, div_yield, vol);
+        let uo = barrier_price(
+            &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+            BarrierType::UpAndOut,
+            OptionType::Call,
+        );
+        let ui = barrier_price(
+            &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+            BarrierType::UpAndIn,
+            OptionType::Call,
+        );
         let v = vanilla_call(spot, strike, time, rate, div_yield, vol);
 
         assert!(uo > 0.0, "Up-out call must be positive, got {}", uo);
@@ -1877,8 +1822,16 @@ mod tests {
         {
             let strike = 100.0;
             let barrier = 90.0;
-            let di = down_in_call(spot, strike, barrier, time, rate, div_yield, vol);
-            let do_ = down_out_call(spot, strike, barrier, time, rate, div_yield, vol);
+            let di = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::DownAndIn,
+                OptionType::Call,
+            );
+            let do_ = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::DownAndOut,
+                OptionType::Call,
+            );
             let v = vanilla_call(spot, strike, time, rate, div_yield, vol);
             assert!(
                 (di + do_ - v).abs() < tol,
@@ -1894,8 +1847,16 @@ mod tests {
         {
             let strike = 100.0;
             let barrier = 120.0;
-            let ui = up_in_call(spot, strike, barrier, time, rate, div_yield, vol);
-            let uo = up_out_call(spot, strike, barrier, time, rate, div_yield, vol);
+            let ui = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::UpAndIn,
+                OptionType::Call,
+            );
+            let uo = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::UpAndOut,
+                OptionType::Call,
+            );
             let v = vanilla_call(spot, strike, time, rate, div_yield, vol);
             assert!(
                 (ui + uo - v).abs() < tol,
@@ -1922,8 +1883,16 @@ mod tests {
         {
             let strike = 100.0;
             let barrier = 90.0;
-            let di = down_in_put(spot, strike, barrier, time, rate, div_yield, vol);
-            let do_ = down_out_put(spot, strike, barrier, time, rate, div_yield, vol);
+            let di = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::DownAndIn,
+                OptionType::Put,
+            );
+            let do_ = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::DownAndOut,
+                OptionType::Put,
+            );
             let v = vanilla_put(spot, strike, time, rate, div_yield, vol);
             assert!(di > 0.0, "Down-in put must be positive, got {}", di);
             assert!(do_ >= 0.0, "Down-out put must be non-negative, got {}", do_);
@@ -1940,8 +1909,16 @@ mod tests {
         {
             let strike = 100.0;
             let barrier = 115.0;
-            let ui = up_in_put(spot, strike, barrier, time, rate, div_yield, vol);
-            let uo = up_out_put(spot, strike, barrier, time, rate, div_yield, vol);
+            let ui = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::UpAndIn,
+                OptionType::Put,
+            );
+            let uo = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+                BarrierType::UpAndOut,
+                OptionType::Put,
+            );
             let v = vanilla_put(spot, strike, time, rate, div_yield, vol);
             assert!(ui > 0.0, "Up-in put must be positive, got {}", ui);
             assert!(uo >= 0.0, "Up-out put must be non-negative, got {}", uo);
@@ -1969,8 +1946,16 @@ mod tests {
         let vol = 0.25;
         let tol = 1e-8;
 
-        let di = down_in_call(spot, strike, barrier, time, rate, div_yield, vol);
-        let do_ = down_out_call(spot, strike, barrier, time, rate, div_yield, vol);
+        let di = barrier_price(
+            &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+            BarrierType::DownAndIn,
+            OptionType::Call,
+        );
+        let do_ = barrier_price(
+            &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+            BarrierType::DownAndOut,
+            OptionType::Call,
+        );
         let v = vanilla_call(spot, strike, time, rate, div_yield, vol);
 
         assert!(di >= 0.0, "Down-in call (H==K) negative: {}", di);
@@ -1983,8 +1968,16 @@ mod tests {
             v,
         );
 
-        let ui = up_in_put(spot, strike, barrier, time, rate, div_yield, vol);
-        let uo = up_out_put(spot, strike, barrier, time, rate, div_yield, vol);
+        let ui = barrier_price(
+            &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+            BarrierType::UpAndIn,
+            OptionType::Put,
+        );
+        let uo = barrier_price(
+            &BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol),
+            BarrierType::UpAndOut,
+            OptionType::Put,
+        );
         let vp = vanilla_put(spot, strike, time, rate, div_yield, vol);
 
         assert!(ui >= 0.0);
@@ -2016,8 +2009,16 @@ mod tests {
 
         // Spot just above a down-barrier
         let spot_above = barrier + 0.01;
-        let di = down_in_call(spot_above, strike, barrier, time, rate, div_yield, vol);
-        let do_ = down_out_call(spot_above, strike, barrier, time, rate, div_yield, vol);
+        let di = barrier_price(
+            &BarrierParams::new(spot_above, strike, barrier, time, rate, div_yield, vol),
+            BarrierType::DownAndIn,
+            OptionType::Call,
+        );
+        let do_ = barrier_price(
+            &BarrierParams::new(spot_above, strike, barrier, time, rate, div_yield, vol),
+            BarrierType::DownAndOut,
+            OptionType::Call,
+        );
         let v = vanilla_call(spot_above, strike, time, rate, div_yield, vol);
         assert!(!di.is_nan(), "Near-barrier down-in call NaN");
         assert!(!do_.is_nan(), "Near-barrier down-out call NaN");
@@ -2031,8 +2032,16 @@ mod tests {
 
         // Spot just below an up-barrier
         let spot_below = barrier - 0.01;
-        let ui = up_in_call(spot_below, strike, barrier, time, rate, div_yield, vol);
-        let uo = up_out_call(spot_below, strike, barrier, time, rate, div_yield, vol);
+        let ui = barrier_price(
+            &BarrierParams::new(spot_below, strike, barrier, time, rate, div_yield, vol),
+            BarrierType::UpAndIn,
+            OptionType::Call,
+        );
+        let uo = barrier_price(
+            &BarrierParams::new(spot_below, strike, barrier, time, rate, div_yield, vol),
+            BarrierType::UpAndOut,
+            OptionType::Call,
+        );
         let v = vanilla_call(spot_below, strike, time, rate, div_yield, vol);
         assert!(!ui.is_nan(), "Near-barrier up-in call NaN");
         assert!(!uo.is_nan(), "Near-barrier up-out call NaN");
@@ -2059,8 +2068,16 @@ mod tests {
 
         // Down-barrier calls
         let barrier_down = 85.0;
-        let di = down_in_call(spot, strike, barrier_down, time, rate, div_yield, vol);
-        let do_ = down_out_call(spot, strike, barrier_down, time, rate, div_yield, vol);
+        let di = barrier_price(
+            &BarrierParams::new(spot, strike, barrier_down, time, rate, div_yield, vol),
+            BarrierType::DownAndIn,
+            OptionType::Call,
+        );
+        let do_ = barrier_price(
+            &BarrierParams::new(spot, strike, barrier_down, time, rate, div_yield, vol),
+            BarrierType::DownAndOut,
+            OptionType::Call,
+        );
         let vc = vanilla_call(spot, strike, time, rate, div_yield, vol);
         assert!(!di.is_nan(), "NaN in down-in call with q=0");
         assert!(!do_.is_nan(), "NaN in down-out call with q=0");
@@ -2074,8 +2091,16 @@ mod tests {
 
         // Up-barrier puts
         let barrier_up = 115.0;
-        let ui = up_in_put(spot, strike, barrier_up, time, rate, div_yield, vol);
-        let uo = up_out_put(spot, strike, barrier_up, time, rate, div_yield, vol);
+        let ui = barrier_price(
+            &BarrierParams::new(spot, strike, barrier_up, time, rate, div_yield, vol),
+            BarrierType::UpAndIn,
+            OptionType::Put,
+        );
+        let uo = barrier_price(
+            &BarrierParams::new(spot, strike, barrier_up, time, rate, div_yield, vol),
+            BarrierType::UpAndOut,
+            OptionType::Put,
+        );
         let vp = vanilla_put(spot, strike, time, rate, div_yield, vol);
         assert!(!ui.is_nan(), "NaN in up-in put with q=0");
         assert!(!uo.is_nan(), "NaN in up-out put with q=0");
@@ -2100,8 +2125,16 @@ mod tests {
         let tol = 1e-6;
 
         let barrier_up = 120.0;
-        let ui = up_in_call(spot, strike, barrier_up, time, rate, div_yield, vol);
-        let uo = up_out_call(spot, strike, barrier_up, time, rate, div_yield, vol);
+        let ui = barrier_price(
+            &BarrierParams::new(spot, strike, barrier_up, time, rate, div_yield, vol),
+            BarrierType::UpAndIn,
+            OptionType::Call,
+        );
+        let uo = barrier_price(
+            &BarrierParams::new(spot, strike, barrier_up, time, rate, div_yield, vol),
+            BarrierType::UpAndOut,
+            OptionType::Call,
+        );
         let v = vanilla_call(spot, strike, time, rate, div_yield, vol);
         assert!(
             (ui + uo - v).abs() < tol,
@@ -2131,8 +2164,16 @@ mod tests {
             let vol = 0.25;
             let t = 1.0;
 
-            let ki = down_in_call(spot, strike, barrier, t, r, q, vol);
-            let ko = down_out_call(spot, strike, barrier, t, r, q, vol);
+            let ki = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, t, r, q, vol),
+                BarrierType::DownAndIn,
+                OptionType::Call,
+            );
+            let ko = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, t, r, q, vol),
+                BarrierType::DownAndOut,
+                OptionType::Call,
+            );
             let v = vanilla_call(spot, strike, t, r, q, vol);
 
             assert!(ki >= 0.0, "Down-in call (K<H) negative: {}", ki);
@@ -2157,8 +2198,16 @@ mod tests {
             let vol = 0.25;
             let t = 1.0;
 
-            let ki = up_in_put(spot, strike, barrier, t, r, q, vol);
-            let ko = up_out_put(spot, strike, barrier, t, r, q, vol);
+            let ki = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, t, r, q, vol),
+                BarrierType::UpAndIn,
+                OptionType::Put,
+            );
+            let ko = barrier_price(
+                &BarrierParams::new(spot, strike, barrier, t, r, q, vol),
+                BarrierType::UpAndOut,
+                OptionType::Put,
+            );
             let v = vanilla_put(spot, strike, t, r, q, vol);
 
             assert!(ki >= 0.0, "Up-in put (K>H) negative: {}", ki);
@@ -2179,35 +2228,67 @@ mod tests {
         let zero_time_cases = [
             (
                 "up_out_call",
-                up_out_call(100.0, 100.0, 120.0, 0.0, 0.05, 0.02, 0.2),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 120.0, 0.0, 0.05, 0.02, 0.2),
+                    BarrierType::UpAndOut,
+                    OptionType::Call,
+                ),
             ),
             (
                 "up_in_call",
-                up_in_call(100.0, 100.0, 100.0, 0.0, 0.05, 0.02, 0.2),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 100.0, 0.0, 0.05, 0.02, 0.2),
+                    BarrierType::UpAndIn,
+                    OptionType::Call,
+                ),
             ),
             (
                 "down_out_call",
-                down_out_call(100.0, 100.0, 80.0, 0.0, 0.05, 0.02, 0.2),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 80.0, 0.0, 0.05, 0.02, 0.2),
+                    BarrierType::DownAndOut,
+                    OptionType::Call,
+                ),
             ),
             (
                 "down_in_call",
-                down_in_call(100.0, 100.0, 100.0, 0.0, 0.05, 0.02, 0.2),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 100.0, 0.0, 0.05, 0.02, 0.2),
+                    BarrierType::DownAndIn,
+                    OptionType::Call,
+                ),
             ),
             (
                 "up_out_put",
-                up_out_put(100.0, 100.0, 120.0, 0.0, 0.05, 0.02, 0.2),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 120.0, 0.0, 0.05, 0.02, 0.2),
+                    BarrierType::UpAndOut,
+                    OptionType::Put,
+                ),
             ),
             (
                 "up_in_put",
-                up_in_put(100.0, 100.0, 100.0, 0.0, 0.05, 0.02, 0.2),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 100.0, 0.0, 0.05, 0.02, 0.2),
+                    BarrierType::UpAndIn,
+                    OptionType::Put,
+                ),
             ),
             (
                 "down_out_put",
-                down_out_put(100.0, 100.0, 80.0, 0.0, 0.05, 0.02, 0.2),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 80.0, 0.0, 0.05, 0.02, 0.2),
+                    BarrierType::DownAndOut,
+                    OptionType::Put,
+                ),
             ),
             (
                 "down_in_put",
-                down_in_put(100.0, 100.0, 100.0, 0.0, 0.05, 0.02, 0.2),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 100.0, 0.0, 0.05, 0.02, 0.2),
+                    BarrierType::DownAndIn,
+                    OptionType::Put,
+                ),
             ),
         ];
 
@@ -2221,35 +2302,67 @@ mod tests {
         let zero_vol_cases = [
             (
                 "up_out_call",
-                up_out_call(100.0, 100.0, 120.0, 1.0, 0.0, 0.0, 0.0),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 120.0, 1.0, 0.0, 0.0, 0.0),
+                    BarrierType::UpAndOut,
+                    OptionType::Call,
+                ),
             ),
             (
                 "up_in_call",
-                up_in_call(100.0, 100.0, 100.0, 1.0, 0.0, 0.0, 0.0),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 100.0, 1.0, 0.0, 0.0, 0.0),
+                    BarrierType::UpAndIn,
+                    OptionType::Call,
+                ),
             ),
             (
                 "down_out_call",
-                down_out_call(100.0, 100.0, 80.0, 1.0, 0.0, 0.0, 0.0),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 80.0, 1.0, 0.0, 0.0, 0.0),
+                    BarrierType::DownAndOut,
+                    OptionType::Call,
+                ),
             ),
             (
                 "down_in_call",
-                down_in_call(100.0, 100.0, 100.0, 1.0, 0.0, 0.0, 0.0),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 100.0, 1.0, 0.0, 0.0, 0.0),
+                    BarrierType::DownAndIn,
+                    OptionType::Call,
+                ),
             ),
             (
                 "up_out_put",
-                up_out_put(100.0, 100.0, 120.0, 1.0, 0.0, 0.0, 0.0),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 120.0, 1.0, 0.0, 0.0, 0.0),
+                    BarrierType::UpAndOut,
+                    OptionType::Put,
+                ),
             ),
             (
                 "up_in_put",
-                up_in_put(100.0, 100.0, 100.0, 1.0, 0.0, 0.0, 0.0),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 100.0, 1.0, 0.0, 0.0, 0.0),
+                    BarrierType::UpAndIn,
+                    OptionType::Put,
+                ),
             ),
             (
                 "down_out_put",
-                down_out_put(100.0, 100.0, 80.0, 1.0, 0.0, 0.0, 0.0),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 80.0, 1.0, 0.0, 0.0, 0.0),
+                    BarrierType::DownAndOut,
+                    OptionType::Put,
+                ),
             ),
             (
                 "down_in_put",
-                down_in_put(100.0, 100.0, 100.0, 1.0, 0.0, 0.0, 0.0),
+                barrier_price(
+                    &BarrierParams::new(100.0, 100.0, 100.0, 1.0, 0.0, 0.0, 0.0),
+                    BarrierType::DownAndIn,
+                    OptionType::Put,
+                ),
             ),
         ];
 
@@ -2371,14 +2484,54 @@ mod tests {
     #[test]
     fn public_wrappers_do_not_return_finite_price_for_non_positive_inputs() {
         // Negative spot through every call/put wrapper.
-        assert!(!down_out_call(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2).is_finite());
-        assert!(!down_in_call(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2).is_finite());
-        assert!(!up_out_call(100.0, 100.0, -120.0, 1.0, 0.05, 0.02, 0.2).is_finite());
-        assert!(!up_in_call(100.0, 0.0, 120.0, 1.0, 0.05, 0.02, 0.2).is_finite());
-        assert!(!down_out_put(100.0, -100.0, 90.0, 1.0, 0.05, 0.02, 0.2).is_finite());
-        assert!(!down_in_put(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2).is_finite());
-        assert!(!up_out_put(100.0, 100.0, -120.0, 1.0, 0.05, 0.02, 0.2).is_finite());
-        assert!(!up_in_put(0.0, 100.0, 120.0, 1.0, 0.05, 0.02, 0.2).is_finite());
+        assert!(!barrier_price(
+            &BarrierParams::new(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2),
+            BarrierType::DownAndOut,
+            OptionType::Call
+        )
+        .is_finite());
+        assert!(!barrier_price(
+            &BarrierParams::new(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2),
+            BarrierType::DownAndIn,
+            OptionType::Call
+        )
+        .is_finite());
+        assert!(!barrier_price(
+            &BarrierParams::new(100.0, 100.0, -120.0, 1.0, 0.05, 0.02, 0.2),
+            BarrierType::UpAndOut,
+            OptionType::Call
+        )
+        .is_finite());
+        assert!(!barrier_price(
+            &BarrierParams::new(100.0, 0.0, 120.0, 1.0, 0.05, 0.02, 0.2),
+            BarrierType::UpAndIn,
+            OptionType::Call
+        )
+        .is_finite());
+        assert!(!barrier_price(
+            &BarrierParams::new(100.0, -100.0, 90.0, 1.0, 0.05, 0.02, 0.2),
+            BarrierType::DownAndOut,
+            OptionType::Put
+        )
+        .is_finite());
+        assert!(!barrier_price(
+            &BarrierParams::new(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2),
+            BarrierType::DownAndIn,
+            OptionType::Put
+        )
+        .is_finite());
+        assert!(!barrier_price(
+            &BarrierParams::new(100.0, 100.0, -120.0, 1.0, 0.05, 0.02, 0.2),
+            BarrierType::UpAndOut,
+            OptionType::Put
+        )
+        .is_finite());
+        assert!(!barrier_price(
+            &BarrierParams::new(0.0, 100.0, 120.0, 1.0, 0.05, 0.02, 0.2),
+            BarrierType::UpAndIn,
+            OptionType::Put
+        )
+        .is_finite());
     }
 
     /// At-hit KO rebates discount over the (random) hit time τ ≤ T, so with a

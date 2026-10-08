@@ -5,7 +5,6 @@
 //! - **bootstrap**: Curve bootstrapping determinism and smoke tests
 //! - **repricing**: Repricing accuracy for calibrated curves
 //! - **config**: Configuration helpers and validation rules
-//! - **finstack_config**: Finstack Quant-specific config integration
 //! - **serialization**: Serde roundtrip tests for calibration types
 //! - **builder**: Simple calibration builder API tests
 //! - **hazard_curve**: Hazard/credit curve calibration

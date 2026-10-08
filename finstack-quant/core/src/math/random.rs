@@ -59,7 +59,7 @@ pub mod poisson;
 pub mod sobol;
 
 pub use brownian_bridge::BrownianBridge;
-pub use poisson::{poisson_from_normal, poisson_inverse_cdf};
+pub use poisson::poisson_inverse_cdf;
 
 /// Random number generator trait for statistical sampling.
 ///
@@ -207,7 +207,7 @@ impl Pcg64Rng {
     /// negligible for practical sample counts, but — unlike generators with
     /// explicitly partitioned counters (e.g. Philox) — there is no *hard*
     /// mathematical guarantee that two streams never share a state window.
-    /// Use `finstack_quant_models::monte_carlo::rng::PhiloxRng` (a counter-based RNG
+    /// Use `finstack_quant_models::monte_carlo::rng::philox::PhiloxRng` (a counter-based RNG
     /// with `split(path_id)` substreams) when provable non-overlap is required.
     ///
     /// Note: `new_with_stream(seed, 0)` is not the same sequence as

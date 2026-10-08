@@ -3,7 +3,7 @@
 use crate::bindings::pandas_utils::{
     serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
 };
-use crate::errors::{display_to_py, portfolio_to_py};
+use crate::errors::portfolio_to_py;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 
@@ -29,6 +29,12 @@ const ALLOCATION_COLUMNS: &[ColumnSchema<'static>] = &[
 pub struct PyWeightAllocationResult {
     pub(crate) inner: finstack_quant_portfolio::WeightAllocationResult,
 }
+
+crate::bindings::macros::wire_methods!(
+    PyWeightAllocationResult,
+    finstack_quant_portfolio::WeightAllocationResult,
+    "WeightAllocationResult"
+);
 
 #[pymethods]
 impl PyWeightAllocationResult {
@@ -57,26 +63,6 @@ impl PyWeightAllocationResult {
     /// produce them).
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_rows_to_dataframe_with_schema(py, &self.inner.allocations, ALLOCATION_COLUMNS)
-    }
-
-    /// Serialize to a compact JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Deserialize from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::WeightAllocationResult =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
     fn __repr__(&self) -> String {
@@ -121,18 +107,9 @@ fn allocate_weights(
     spec_json: &Bound<'_, PyAny>,
 ) -> PyResult<PyWeightAllocationResult> {
     let spec_json = crate::bindings::extract::extract_records_json(py, spec_json, "spec")?;
-    let spec_json: &str = &spec_json;
-    let spec_json = spec_json.to_owned();
     let inner = py
         .detach(move || {
-            // Mirrors the crate-private `parse_allocation_spec` so the typed
-            // and `_json` twins raise identical parse errors.
-            let spec: finstack_quant_portfolio::WeightAllocationSpec =
-                serde_json::from_str(&spec_json).map_err(|err| {
-                    finstack_quant_portfolio::Error::validation(format!(
-                        "invalid allocation JSON: {err}"
-                    ))
-                })?;
+            let spec = finstack_quant_portfolio::WeightAllocationSpec::from_json(&spec_json)?;
             finstack_quant_portfolio::allocate_weights(&spec)
         })
         .map_err(portfolio_to_py)?;
@@ -164,8 +141,6 @@ fn allocate_weights(
 #[pyo3(text_signature = "(spec_json)")]
 fn allocate_weights_json(py: Python<'_>, spec_json: &Bound<'_, PyAny>) -> PyResult<String> {
     let spec_json = crate::bindings::extract::extract_records_json(py, spec_json, "spec")?;
-    let spec_json: &str = &spec_json;
-    let spec_json = spec_json.to_owned();
     py.detach(move || finstack_quant_portfolio::allocate_weights_json(&spec_json))
         .map_err(portfolio_to_py)
 }
@@ -194,8 +169,6 @@ fn allocate_weights_json(py: Python<'_>, spec_json: &Bound<'_, PyAny>) -> PyResu
 #[pyo3(text_signature = "(spec_json)")]
 fn validate_allocation_json(py: Python<'_>, spec_json: &Bound<'_, PyAny>) -> PyResult<String> {
     let spec_json = crate::bindings::extract::extract_records_json(py, spec_json, "spec")?;
-    let spec_json: &str = &spec_json;
-    let spec_json = spec_json.to_owned();
     py.detach(move || finstack_quant_portfolio::validate_allocation_json(&spec_json))
         .map_err(portfolio_to_py)
 }

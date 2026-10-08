@@ -517,7 +517,7 @@ fn prior_matches_portfolio(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::PortfolioBuilder;
+
     use crate::position::{Position, PositionUnit};
     use crate::test_utils::build_test_market;
     use crate::types::DUMMY_ENTITY_ID;
@@ -639,7 +639,7 @@ mod tests {
             metric_calls: Arc::clone(&metric_calls),
             metrics_fail,
         });
-        let mut builder = PortfolioBuilder::new(id)
+        let mut builder = Portfolio::builder(id)
             .base_currency(Currency::USD)
             .as_of(date!(2024 - 01 - 01));
         for index in 0..positions {
@@ -663,7 +663,7 @@ mod tests {
     }
 
     fn empty_portfolio() -> Portfolio {
-        PortfolioBuilder::new("EVALUATION_TEST")
+        Portfolio::builder("EVALUATION_TEST")
             .base_currency(Currency::USD)
             .as_of(date!(2024 - 01 - 01))
             .build()

@@ -3,7 +3,6 @@
 //! This module provides factor-driven prepayment models that capture:
 //! - Interest rate sensitivity (refinancing incentive)
 //! - Burnout effects (pool exhaustion)
-//! - Seasonality patterns
 //! - Correlation with systematic factors
 //!
 //! # Models
@@ -25,6 +24,6 @@ mod traits;
 
 pub(crate) use factor_correlated::FactorCorrelatedPrepay;
 pub(crate) use regime_switching::RegimeSwitchingPrepay;
-pub use richard_roll::RichardRollPrepay;
+pub(crate) use richard_roll::RichardRollPrepay;
 pub use spec::StochasticPrepaySpec;
 pub use traits::{PrepaymentState, StochasticPrepayment};

@@ -21,6 +21,9 @@ pub enum ShortRateTreeModel {
     /// Black-Derman-Toy (lognormal short rate) with volatility
     /// `model_config.bdt_sigma`.
     BlackDermanToy,
+    /// Black-Karasinski (mean-reverting lognormal short rate) with `(κ, σ)`
+    /// from `model_config.bk_mean_reversion` / `model_config.bk_sigma`.
+    BlackKarasinski,
 }
 
 /// Policy for evaluating volatility surfaces outside their calibrated grid.
@@ -452,8 +455,8 @@ pub struct ModelConfig {
     /// Volatility surface extrapolation policy when `implied_volatility` is not set.
     #[serde(default)]
     pub vol_surface_extrapolation: VolSurfaceExtrapolation,
-    /// Short-rate lattice for the rates-only bond tree (`hull_white` or
-    /// `black_derman_toy`). `None` selects Hull-White.
+    /// Short-rate lattice for the rates-only bond tree (`hull_white`,
+    /// `black_derman_toy` or `black_karasinski`). `None` selects Hull-White.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tree_model: Option<ShortRateTreeModel>,
     /// Number of time steps for tree-based pricing (e.g., 100)
@@ -533,6 +536,27 @@ pub struct ModelConfig {
     /// deterministic curve.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bdt_sigma: Option<f64>,
+    /// Black-Karasinski lognormal short-rate volatility (σ), as an annual
+    /// decimal proportion of the short rate (`0.20` = 20%).
+    ///
+    /// Read only by the rates-only bond tree when `tree_model = black_karasinski`,
+    /// where it is required together with [`Self::bk_mean_reversion`]. It is
+    /// a relative (lognormal) volatility on the same scale as
+    /// [`Self::bdt_sigma`], unlike the absolute [`Self::hw1f_sigma`]; typical
+    /// values are 0.10–0.40. Must be finite and non-negative; `0.0` prices on
+    /// the deterministic curve.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bk_sigma: Option<f64>,
+    /// Black-Karasinski mean-reversion speed (κ) of the log short rate, in
+    /// annualised units (`0.03` = 3% per year).
+    ///
+    /// Companion to [`Self::bk_sigma`]: read only by the rates-only bond tree
+    /// when `tree_model = black_karasinski`, where it is required. Must be
+    /// finite and strictly positive; typical values are 0.01–0.10. A lognormal
+    /// short rate without mean reversion is `tree_model = black_derman_toy`
+    /// with [`Self::bdt_sigma`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bk_mean_reversion: Option<f64>,
     /// Pre-calibrated flat LMM forward-rate volatility loading scale.
     ///
     /// This is the positive annualized decimal scale applied to the Bermudan
@@ -705,6 +729,8 @@ impl ModelConfig {
             (self.hw1f_sigma, true),
             (self.hw1f_mean_reversion, true),
             (self.bdt_sigma, true),
+            (self.bk_sigma, true),
+            (self.bk_mean_reversion, true),
             (self.hazard_sigma, true),
             (self.hazard_mean_reversion, true),
         ])?;
@@ -834,7 +860,8 @@ impl InstrumentPricingOverrides {
     ///
     /// * `vol` - option-implied volatility as a decimal (e.g. `0.35`); this
     ///   is an option-quote channel, not a short-rate σ — the bond lattices
-    ///   read [`Self::with_hw1f_sigma`] or `model_config.bdt_sigma` instead
+    ///   read [`Self::with_hw1f_sigma`], `model_config.bdt_sigma` or
+    ///   [`Self::with_bk_sigma`] instead
     pub fn with_implied_volatility(mut self, vol: f64) -> Self {
         self.market_quotes.implied_volatility = Some(vol);
         self
@@ -865,6 +892,34 @@ impl InstrumentPricingOverrides {
     /// * `kappa` - mean-reversion speed per year (e.g. `0.03` is 3%/yr)
     pub fn with_hw1f_mean_reversion(mut self, kappa: f64) -> Self {
         self.model_config.hw1f_mean_reversion = Some(kappa);
+        self
+    }
+
+    /// Set the Black-Karasinski lognormal short-rate volatility σ.
+    ///
+    /// Read only by the rates-only bond tree when `tree_model = black_karasinski`,
+    /// which also requires [`Self::with_bk_mean_reversion`].
+    ///
+    /// # Arguments
+    ///
+    /// * `sigma` - lognormal short-rate volatility as a decimal proportion
+    ///   (e.g. `0.20` is 20%)
+    pub fn with_bk_sigma(mut self, sigma: f64) -> Self {
+        self.model_config.bk_sigma = Some(sigma);
+        self
+    }
+
+    /// Set the Black-Karasinski mean-reversion speed κ (annualised).
+    ///
+    /// Companion to [`Self::with_bk_sigma`]: the rates-only bond tree
+    /// requires the complete pair when `tree_model = black_karasinski`.
+    ///
+    /// # Arguments
+    ///
+    /// * `kappa` - mean-reversion speed of the log short rate per year
+    ///   (e.g. `0.03` is 3%/yr); must be strictly positive
+    pub fn with_bk_mean_reversion(mut self, kappa: f64) -> Self {
+        self.model_config.bk_mean_reversion = Some(kappa);
         self
     }
 
@@ -999,6 +1054,18 @@ pub(crate) fn resolve_rates_credit_config(
              instrument_pricing_overrides.model_config.hw1f_sigma"
                 .to_string(),
         ));
+    }
+    for (name, value) in [
+        ("bk_sigma", model.bk_sigma),
+        ("bk_mean_reversion", model.bk_mean_reversion),
+    ] {
+        if value.is_some() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "instrument_pricing_overrides.model_config.{name} is a Black-Karasinski input; \
+                 the rates-credit callable path is a Hull-White lattice and reads \
+                 instrument_pricing_overrides.model_config.hw1f_sigma and hw1f_mean_reversion"
+            )));
+        }
     }
 
     let rate_vol = model.hw1f_sigma.unwrap_or(0.0);
@@ -1416,6 +1483,64 @@ mod tests {
             .expect_err("a BDT volatility is not a rates-credit input")
             .to_string()
             .contains("instrument_pricing_overrides.model_config.bdt_sigma"));
+
+        for field in ["bk_sigma", "bk_mean_reversion"] {
+            let mut bk = InstrumentPricingOverrides::default();
+            match field {
+                "bk_sigma" => bk.model_config.bk_sigma = Some(0.20),
+                _ => bk.model_config.bk_mean_reversion = Some(0.03),
+            }
+            assert!(resolve_rates_credit_config(&bk, 32)
+                .expect_err("a Black-Karasinski input is not a rates-credit input")
+                .to_string()
+                .contains(&format!(
+                    "instrument_pricing_overrides.model_config.{field}"
+                )));
+        }
+    }
+
+    #[test]
+    fn black_karasinski_model_config_round_trips_and_validates() {
+        let config: ModelConfig = serde_json::from_value(serde_json::json!({
+            "tree_model": "black_karasinski",
+            "bk_sigma": 0.20,
+            "bk_mean_reversion": 0.03
+        }))
+        .expect("Black-Karasinski model_config");
+        assert_eq!(config.tree_model, Some(ShortRateTreeModel::BlackKarasinski));
+        assert_eq!(config.bk_sigma, Some(0.20));
+        assert_eq!(config.bk_mean_reversion, Some(0.03));
+        config.validate().expect("valid Black-Karasinski inputs");
+
+        let json = serde_json::to_value(&config).expect("serialize");
+        assert_eq!(json["tree_model"], "black_karasinski");
+        assert_eq!(json["bk_sigma"], 0.20);
+        assert_eq!(json["bk_mean_reversion"], 0.03);
+        let back: ModelConfig = serde_json::from_value(json).expect("round trip");
+        assert_eq!(back, config);
+
+        // Unset fields stay off the wire, so existing payloads are unchanged.
+        let default_json = serde_json::to_value(ModelConfig::default()).expect("serialize");
+        assert!(default_json.get("bk_sigma").is_none());
+        assert!(default_json.get("bk_mean_reversion").is_none());
+
+        // schema-rejection-test: misspelled Black-Karasinski key
+        let unknown = serde_json::json!({ "tree_model": "black_karasinski", "bk_kappa": 0.03 });
+        assert!(serde_json::from_value::<ModelConfig>(unknown).is_err());
+
+        for (sigma, kappa) in [
+            (-0.20, 0.03),
+            (0.20, -0.03),
+            (f64::NAN, 0.03),
+            (0.20, f64::NAN),
+        ] {
+            let invalid = ModelConfig {
+                bk_sigma: Some(sigma),
+                bk_mean_reversion: Some(kappa),
+                ..ModelConfig::default()
+            };
+            assert!(invalid.validate().is_err(), "sigma={sigma}, kappa={kappa}");
+        }
     }
 
     #[test]

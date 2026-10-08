@@ -83,9 +83,6 @@ pub(super) fn build_overnight_coupon(
     let fixing_id = fixing_series_id(forward_curve_id);
     let fixings = market.get_series(&fixing_id).ok();
     let forward = market.get_forward(forward_curve_id).ok();
-    let horizon = *times.last().ok_or_else(|| {
-        Error::internal("bond hazard LSMC overnight replay has an empty tree grid")
-    })?;
     let mut sources = BTreeMap::new();
 
     for observation in observations.observations() {
@@ -168,11 +165,8 @@ pub(super) fn build_overnight_coupon(
                         accrual,
                         base_index_rate,
                         base_discount_forward: (1.0 / base_df - 1.0) / accrual,
-                        conditional_discount_factors: tree.conditional_discount_factors(
-                            observation_step,
-                            end_step,
-                            horizon,
-                        )?,
+                        conditional_discount_factors: tree
+                            .conditional_discount_factors(observation_step, end_step)?,
                     })
                 }
             } else {

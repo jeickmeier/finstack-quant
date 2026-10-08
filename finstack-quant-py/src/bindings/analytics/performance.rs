@@ -1468,25 +1468,6 @@ impl PyPerformance {
         drawdowns_to_dataframe(py, &episodes)
     }
 
-    /// Period-to-date lookback returns as a pandas ``DataFrame``.
-    ///
-    /// Returns a DataFrame with ticker names as index and columns:
-    /// mtd, qtd, ytd, and fytd. See :meth:`lookback_returns` for the FYTD
-    /// fiscal-start semantics.
-    #[pyo3(signature = (ref_date, fiscal_year_start_month = None, fiscal_year_start_day = None))]
-    fn to_lookback_returns_dataframe<'py>(
-        &self,
-        py: Python<'py>,
-        ref_date: Bound<'_, PyAny>,
-        fiscal_year_start_month: Option<u8>,
-        fiscal_year_start_day: Option<u8>,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        let d = py_to_date(&ref_date)?;
-        let lb = self.lookback_returns_inner(d, fiscal_year_start_month, fiscal_year_start_day)?;
-
-        PyLookbackReturns { inner: lb }.to_dataframe(py)
-    }
-
     /// Beta regression statistics for every ticker vs the benchmark as a
     /// pandas ``DataFrame`` indexed by ticker.
     ///

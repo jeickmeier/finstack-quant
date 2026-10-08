@@ -120,16 +120,8 @@ pub trait StochasticPrepayment: Send + Sync + std::fmt::Debug {
     /// ```
     fn factor_loading(&self) -> f64;
 
-    /// Model name for diagnostics.
-    fn model_name(&self) -> &'static str;
-
     /// Whether the model incorporates burnout.
     fn has_burnout(&self) -> bool {
-        false
-    }
-
-    /// Whether the model is rate-sensitive (refi incentive).
-    fn is_rate_sensitive(&self) -> bool {
         false
     }
 
@@ -197,10 +189,6 @@ mod tests {
 
         fn factor_loading(&self) -> f64 {
             self.factor_loading
-        }
-
-        fn model_name(&self) -> &'static str {
-            "Mock Prepayment"
         }
     }
 

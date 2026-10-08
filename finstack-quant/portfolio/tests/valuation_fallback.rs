@@ -10,7 +10,7 @@ use finstack_quant_core::{Error, InputError};
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::valuation::{PortfolioValuationOptions, RequestedMetrics};
-use finstack_quant_portfolio::PortfolioBuilder;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::pricer::InstrumentType;
 use finstack_quant_valuations::results::{FxValuationDetails, ValuationDetails, ValuationResult};
@@ -163,7 +163,7 @@ fn valuation_falls_back_when_metrics_fail() {
     let inst = Arc::new(ValueOnlyInstrument::new("VO", Currency::USD, 123.45));
     let pos = Position::new("P", "E", "VO", inst, 1.0, PositionUnit::Units).unwrap();
 
-    let portfolio = PortfolioBuilder::new("PF")
+    let portfolio = Portfolio::builder("PF")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E"))
@@ -218,7 +218,7 @@ fn fallback_valuation_stamps_caller_config() {
         PositionUnit::Units,
     )
     .expect("position");
-    let portfolio = PortfolioBuilder::new("PF_CONFIG")
+    let portfolio = Portfolio::builder("PF_CONFIG")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E_CONFIG"))
@@ -272,7 +272,7 @@ fn empty_metric_request_uses_the_pv_only_path() {
         PositionUnit::Units,
     )
     .expect("position");
-    let portfolio = PortfolioBuilder::new("PF_PV_ONLY")
+    let portfolio = Portfolio::builder("PF_PV_ONLY")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E_PV_ONLY"))
@@ -331,7 +331,7 @@ fn empty_metric_request_in_strict_mode_surfaces_canonical_pricer_failure() {
         PositionUnit::Units,
     )
     .expect("position");
-    let portfolio = PortfolioBuilder::new("PF_PV_ONLY_STRICT")
+    let portfolio = Portfolio::builder("PF_PV_ONLY_STRICT")
         .base_currency(Currency::USD)
         .as_of(base_date())
         .entity(Entity::new("E_PV_ONLY_STRICT"))
@@ -367,7 +367,7 @@ fn empty_metric_request_preserves_canonical_valuation_result() {
         PositionUnit::Units,
     )
     .expect("position");
-    let portfolio = PortfolioBuilder::new("PF_CANONICAL_PV")
+    let portfolio = Portfolio::builder("PF_CANONICAL_PV")
         .base_currency(Currency::USD)
         .as_of(base_date())
         .entity(Entity::new("E_CANONICAL_PV"))
@@ -415,7 +415,7 @@ fn scenario_pnl_rejects_noncanonical_pv_fallback() {
         PositionUnit::Units,
     )
     .expect("position");
-    let portfolio = PortfolioBuilder::new("PF_SCENARIO_STRICT")
+    let portfolio = Portfolio::builder("PF_SCENARIO_STRICT")
         .base_currency(Currency::USD)
         .as_of(base_date())
         .entity(Entity::new("E_SCENARIO_STRICT"))

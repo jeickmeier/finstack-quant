@@ -1,5 +1,6 @@
 //! Python bindings for `finstack_quant_models::credit::migration`.
 
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use finstack_quant_models::credit::migration::{
     projection, GeneratorMatrix, MigrationSimulator, RatingPath, RatingScale, TransitionMatrix,
 };
@@ -7,7 +8,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
 
 use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::errors::{migration_to_py, serde_json_to_py, value_error};
+use crate::errors::{migration_to_py, value_error};
 
 /// Build a labelled square `pd.DataFrame` (`index` = origin, `columns` = destination).
 fn labelled_square_frame<'py>(
@@ -160,27 +161,6 @@ impl PyRatingScale {
             .map_err(migration_to_py)
     }
 
-    /// Deserialize a scale from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid RatingScale JSON"))?,
-        })
-    }
-
-    /// Serialize this scale to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "RatingScale serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __len__(&self) -> usize {
         self.inner.n_states()
     }
@@ -203,6 +183,8 @@ impl PyRatingScale {
         )
     }
 }
+
+wire_methods!(PyRatingScale, RatingScale, "RatingScale");
 
 /// Row-stochastic rating transition matrix over a horizon in years.
 ///
@@ -316,7 +298,7 @@ impl PyTransitionMatrix {
     #[pyo3(text_signature = "($self, from_, to)")]
     fn probability_by_index(&self, from_: usize, to: usize) -> PyResult<f64> {
         self.inner
-            .try_probability_by_index(from_, to)
+            .probability_by_index(from_, to)
             .map_err(migration_to_py)
     }
 
@@ -376,27 +358,6 @@ impl PyTransitionMatrix {
         self.inner.default_probabilities()
     }
 
-    /// Deserialize a matrix from canonical JSON (re-validated on load).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid TransitionMatrix JSON"))?,
-        })
-    }
-
-    /// Serialize this matrix to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "TransitionMatrix serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     fn __repr__(&self) -> String {
         format!(
@@ -406,13 +367,10 @@ impl PyTransitionMatrix {
             self.inner.n_states()
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks (delegates to ``to_dataframe``).
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(PyTransitionMatrix, TransitionMatrix, "TransitionMatrix");
+impl_repr_html_via_dataframe!(PyTransitionMatrix);
 
 /// Annualized continuous-time Markov generator ``Q`` (rows sum to zero,
 /// non-negative off-diagonals) over a rating scale.
@@ -549,27 +507,6 @@ impl PyGeneratorMatrix {
         self.inner.round_trip_error()
     }
 
-    /// Deserialize a generator from canonical JSON (re-validated on load).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid GeneratorMatrix JSON"))?,
-        })
-    }
-
-    /// Serialize this generator to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "GeneratorMatrix serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     fn __repr__(&self) -> String {
         format!(
@@ -579,13 +516,10 @@ impl PyGeneratorMatrix {
             self.inner.round_trip_error()
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks (delegates to ``to_dataframe``).
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(PyGeneratorMatrix, GeneratorMatrix, "GeneratorMatrix");
+impl_repr_html_via_dataframe!(PyGeneratorMatrix);
 
 /// One simulated rating trajectory: piecewise-constant state over
 /// ``[0, horizon]`` recorded as ``(time, new_state)`` transitions.
@@ -657,27 +591,6 @@ impl PyRatingPath {
         PyRatingScale::from_inner(self.inner.scale().clone())
     }
 
-    /// Deserialize a path from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid RatingPath JSON"))?,
-        })
-    }
-
-    /// Serialize this path to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "RatingPath serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     fn __repr__(&self) -> String {
         let default_time = match self.inner.default_time() {
@@ -692,6 +605,8 @@ impl PyRatingPath {
         )
     }
 }
+
+wire_methods!(PyRatingPath, RatingPath, "RatingPath");
 
 /// Collection of simulated rating paths from ``MigrationSimulator.simulate``.
 ///
@@ -752,27 +667,6 @@ impl PyRatingPaths {
         dict_to_dataframe(py, &columns, None)
     }
 
-    /// Deserialize paths from a canonical JSON array.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid RatingPaths JSON"))?,
-        })
-    }
-
-    /// Serialize the paths to a compact canonical JSON array.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "RatingPaths serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __len__(&self) -> usize {
         self.inner.len()
     }
@@ -799,6 +693,8 @@ impl PyRatingPaths {
         )
     }
 }
+
+wire_methods!(PyRatingPaths, Vec<RatingPath>, "RatingPaths");
 
 /// Gillespie CTMC simulator over a generator matrix and horizon.
 #[pyclass(
@@ -866,7 +762,7 @@ impl PyMigrationSimulator {
         seed: u64,
     ) -> PyResult<PyRatingPaths> {
         let paths = py
-            .detach(|| self.inner.simulate_seeded(initial_state, n_paths, seed))
+            .detach(|| self.inner.simulate(initial_state, n_paths, seed))
             .map_err(migration_to_py)?;
         Ok(PyRatingPaths { inner: paths })
     }
@@ -891,7 +787,7 @@ impl PyMigrationSimulator {
         n_paths_per_state: usize,
         seed: u64,
     ) -> PyResult<PyTransitionMatrix> {
-        let matrix = py.detach(|| self.inner.empirical_matrix_seeded(n_paths_per_state, seed));
+        let matrix = py.detach(|| self.inner.empirical_matrix(n_paths_per_state, seed));
         matrix
             .map(PyTransitionMatrix::from_inner)
             .map_err(migration_to_py)
@@ -909,27 +805,6 @@ impl PyMigrationSimulator {
         PyGeneratorMatrix::from_inner(self.inner.generator().clone())
     }
 
-    /// Deserialize a simulator from canonical JSON (re-validated on load).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid MigrationSimulator JSON"))?,
-        })
-    }
-
-    /// Serialize this simulator to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "MigrationSimulator serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     fn __repr__(&self) -> String {
         format!(
@@ -939,6 +814,12 @@ impl PyMigrationSimulator {
         )
     }
 }
+
+wire_methods!(
+    PyMigrationSimulator,
+    MigrationSimulator,
+    "MigrationSimulator"
+);
 
 /// Project a generator matrix to a transition matrix over a horizon.
 ///

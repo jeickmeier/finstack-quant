@@ -47,16 +47,4 @@ impl XccyQuote {
         }
         Ok(())
     }
-
-    /// Create a new quote with its spread bumped by basis-point units.
-    pub fn bump_spread_bp(&self, bump_bp: f64) -> Self {
-        let mut quote = self.clone();
-        quote.basis_spread_bp += bump_bp;
-        quote
-    }
-
-    /// Create a new quote with its spread bumped by decimal units (e.g., `0.0001` = 1bp).
-    pub fn bump_spread_decimal(&self, bump_decimal: f64) -> Self {
-        self.bump_spread_bp(bump_decimal * 10_000.0)
-    }
 }

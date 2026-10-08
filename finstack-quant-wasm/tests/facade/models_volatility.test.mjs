@@ -233,6 +233,13 @@ test('SABR parameters, smile and calibrator expose the Rust members', () => {
   assert.throws(() => SabrParameters.fromJson('{"alpha":-0.2,"beta":1,"nu":0.3,"rho":0}'), {
     kind: 'validation',
   });
+  // `fromJson` takes a plain object as well as JSON text, like every other handle.
+  const fromObject = SabrParameters.fromJson({ alpha: 0.2, beta: 1.0, nu: 0.3, rho: -0.3 });
+  assert.equal(fromObject.toJson(), new SabrParameters(0.2, 1.0, 0.3, -0.3).toJson());
+  assert.throws(() => SabrParameters.fromJson({ alpha: -0.2, beta: 1, nu: 0.3, rho: 0 }), {
+    kind: 'validation',
+  });
+  assert.throws(() => SabrParameters.fromJson(1), { kind: 'invalid_type' });
   assert.equal(SabrParameters.lognormal(0.2, 0.3, -0.2).beta, 1.0);
   assert.equal(SabrParameters.ratesStandard(0.2, 0.3, -0.2).beta, 0.5);
   assert.equal(SabrParameters.normal(0.01, 0.3, -0.2).beta, 0.0);

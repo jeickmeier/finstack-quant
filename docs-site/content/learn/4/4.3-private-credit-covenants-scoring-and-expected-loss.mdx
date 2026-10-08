@@ -332,7 +332,7 @@ from finstack_quant.models.credit import MertonModel
 structural = MertonModel(180_000_000,0.25,100_000_000,0.04)
 structural_dd = structural.distance_to_default(1.0)
 structural_pd = structural.default_probability(1.0)
-implied_equity,implied_equity_vol = structural.try_implied_equity(1.0)
+implied_equity,implied_equity_vol = structural.implied_equity(1.0)
 recovered = MertonModel.from_equity(implied_equity,implied_equity_vol,100_000_000,0.04,0.0,1.0)
 physical_dd = structural.distance_to_default_with_drift(0.08,1.0)
 physical_pd = structural.default_probability_with_drift(0.08,1.0)

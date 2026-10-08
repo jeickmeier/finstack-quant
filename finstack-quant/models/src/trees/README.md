@@ -7,7 +7,7 @@ lattice for credit-risky callables.
 
 A shared backward-induction engine drives every recombining model, and
 instrument payoff logic is decoupled from lattice evolution through the
-`TreeValuator` / `TreeModel` trait pair.
+`TreeValuator` trait.
 
 ## Position in the stack
 
@@ -25,7 +25,7 @@ only through the instrument pricers.
 
 | Path | Contents |
 |------|----------|
-| [`tree_framework/`](tree_framework/) | Traits, `NodeState`, evolution parameters, the generic recombining engine, `state_keys` |
+| [`tree_framework/`](tree_framework/) | Traits, `NodeState`, evolution parameters, the generic recombining engine |
 | [`binomial_tree.rs`](binomial_tree.rs) | `BinomialTree` (CRR, Leisen-Reimer) plus American/European/Bermudan entry points |
 | [`short_rate_tree/`](short_rate_tree/) | `ShortRateTree`: Ho-Lee, Black-Derman-Toy, Black-Karasinski |
 | [`hull_white_tree.rs`](hull_white_tree.rs) | `HullWhiteTree`: 1-factor trinomial in auxiliary x-space |
@@ -36,35 +36,40 @@ The shared `price_recombining_tree` engine is binomial. Trinomial lattices
 convertible-bond Tsiveriotis-Zhang engine over `EvolutionParams::equity_trinomial`)
 carry their own backward induction.
 
-## Traits
+## The valuator trait
 
 ```text
-TreeValuator                       TreeModel
-  ├─ value_at_maturity(&NodeState)   └─ price(initial_vars, ttm, &MarketContext, &valuator)
-  └─ value_at_node(&NodeState,
-       continuation_value, dt)
+TreeValuator
+  ├─ value_at_maturity(&NodeState)
+  └─ value_at_node(&NodeState, continuation_value, dt)
 ```
 
 `TreeValuator` owns the instrument: terminal payoff, and the per-node decision
-(hold vs. exercise, cap/floor, coupon accrual). `TreeModel` owns the lattice:
-state evolution and backward-induction orchestration. Both require
-`Send + Sync`.
+(hold vs. exercise, cap/floor, coupon accrual); it requires `Send + Sync`.
+Each tree owns its lattice — state evolution and backward-induction
+orchestration — and exposes its own inherent pricing methods; there is no
+trait over the trees.
 
-`initial_vars` is a plain `HashMap<&'static str, f64>` keyed by `state_keys`
-constants.
+| Tree | Valuator-driven entry point |
+|------|-----------------------------|
+| `ShortRateTree` | `price(oas_bp, &valuator)` |
+| `RatesCreditTree` | `price_with_node_coupons(oas_bp, &valuator, &node_coupons)` |
+| `BinomialTree` | `price_european` / `price_american` / `price_bermudan` (option payoffs built in) |
 
-Implementors: `BinomialTree`, `ShortRateTree`, `RatesCreditTree`.
-`HullWhiteTree` is not a `TreeModel` — it exposes its own
-`backward_induction`, `bond_price`, `forward_swap_rate`, and `annuity`
-accessors instead, because swaption pricing needs the calibrated tree's
-internals directly.
+Calibrated trees price over the horizon they were calibrated to. `oas_bp` is
+the option-adjusted spread in basis points (continuously compounded); pass
+`0.0` to price on the calibrated curve.
+
+`HullWhiteTree` exposes `backward_induction`, `bond_price`,
+`forward_swap_rate`, and `annuity` accessors instead, because swaption pricing
+needs the calibrated tree's internals directly.
 
 ## Model comparison
 
 | Model | Branching | Factors | Calibration target | Primary use |
 |-------|-----------|---------|--------------------|-------------|
 | `BinomialTree` | Binomial | 1 (equity) | None (parametric) | American / Bermudan equity and commodity options |
-| `ShortRateTree` | Binomial (Ho-Lee, BDT) or trinomial (BK, κ > 0) | 1 (short rate) | Discount curve | Callable/putable bonds, term loans, OAS |
+| `ShortRateTree` | Binomial (Ho-Lee, BDT) or trinomial (Black-Karasinski) | 1 (short rate) | Discount curve | Callable/putable bonds, term loans, OAS |
 | `HullWhiteTree` | Trinomial | 1 (short rate) | Discount curve | Bermudan swaptions, mean reversion beyond the binomial limit |
 | `RatesCreditTree` | Binomial × binomial | 2 (rate + hazard) | Discount + hazard curves | Credit-risky bonds and loans with embedded options |
 
@@ -106,13 +111,12 @@ assert!(american >= european - 1e-9); // early exercise never destroys value
 
 `BinomialTree::leisen_reimer(steps)` rounds positive even requests up to the next odd step count. Additional entry points:
 `price_bermudan(&params, &exercise_times)`,
-`price_american_with_discrete_dividends`, `price_bermudan_with_discrete_dividends`,
-and `price_generic::<V: TreeValuator>`. Greeks are finite differences owned by
+`price_american_with_discrete_dividends` and `price_bermudan_with_discrete_dividends`.
+Greeks are finite differences owned by
 the instrument pricers, not the lattice.
 
-Vanilla option entry points require positive finite spot and strike. The
-generic CRR entry point has no option strike and retains its arbitrary-payoff
-contract. Cash-dividend pricing keeps `dividend_yield` active: the escrowed
+Vanilla option entry points require positive finite spot and strike.
+Cash-dividend pricing keeps `dividend_yield` active: the escrowed
 dividend reserve uses `exp(-(r-q)(t_div-t))`, and the stock component evolves
 with carry `r-q`. Continuous yield must exclude the separately scheduled cash
 payments. This matches the reserve convention in
@@ -123,11 +127,13 @@ payments. This matches the reserve convention in
 | Model | Dynamics | Vol convention | Negative rates | Mean reversion |
 |-------|----------|----------------|----------------|----------------|
 | Ho-Lee | `dr = θ(t)dt + σdW` | Normal (rate units) | Yes | Not supported — breaks lattice recombination; use `HullWhiteTree` |
-| BDT / Black-Karasinski | `d(ln r) = [θ(t) − κ·ln r]dt + σdW` | Lognormal (proportional) | No | κ = 0 → binomial BDT; κ > 0 → trinomial BK |
+| Black-Derman-Toy | `d(ln r) = θ(t)dt + σdW` | Lognormal (proportional) | No | Not supported (binomial); a non-zero κ is rejected |
+| Black-Karasinski | `d(ln r) = [θ(t) − κ·ln r]dt + σdW` | Lognormal (proportional) | No | Required, κ > 0 (trinomial) |
 
+The lattice is chosen by `ShortRateModel`, never by the value of κ.
 Calibration uses Arrow-Debreu forward induction to reproduce the input discount
-curve exactly at every step. For κ > 0 the lattice is a genuine trinomial
-Black-Karasinski tree in `x = ln r`, reusing the Hull-White trinomial geometry
+curve exactly at every step. Black-Karasinski is a trinomial
+tree in `x = ln r`, reusing the Hull-White trinomial geometry
 (spacing `σ√(3dt)`, width cap with edge branch switching, per-node
 mean-reverting probabilities) with a Brent solve on the per-step additive shift
 in `x`.
@@ -135,7 +141,8 @@ in `x`.
 ```rust
 use finstack_quant_models::trees::{ShortRateTree, ShortRateTreeConfig};
 
-// Ho-Lee, 100 steps, 80 bp normal vol. Or: ShortRateTreeConfig::bdt(100, 0.20, 0.0)
+// Ho-Lee, 100 steps, 80 bp normal vol. Or: ShortRateTreeConfig::bdt(100, 0.20),
+// ShortRateTreeConfig::black_karasinski(100, 0.20, 0.03)
 let config = ShortRateTreeConfig::ho_lee(100, 0.008);
 let mut tree = ShortRateTree::new(config);
 tree.calibrate(discount_curve, time_to_maturity)?;
@@ -143,17 +150,18 @@ tree.calibrate(discount_curve, time_to_maturity)?;
 let rate = tree.rate_at_node(10, 3)?;
 ```
 
-`ShortRateTreeConfig` fields: `steps`, `model` (`ShortRateModel::HoLee` or
-`::BlackDermanToy`), `volatility`, `mean_reversion` (must be `0.0` for Ho-Lee),
+`ShortRateTreeConfig` fields: `steps`, `model` (`ShortRateModel::HoLee`,
+`::BlackDermanToy` or `::BlackKarasinski`), `volatility`, `mean_reversion`
+(must be `0.0` for Ho-Lee and BDT, positive for Black-Karasinski),
 `compounding` (`TreeDiscounting::{Continuous, Simple, SemiAnnual, Quarterly,
 Monthly}` — Bloomberg's lognormal OAS model uses `Simple`), and
-`curve_fit_tolerance_bp`. Constructors `ho_lee` and `bdt` set consistent
-defaults; `Default` is Ho-Lee with `DEFAULT_NORMAL_VOL = 0.01`.
+`curve_fit_tolerance_bp`. Constructors `ho_lee`, `bdt` and `black_karasinski`
+set consistent defaults; `Default` is Ho-Lee with `DEFAULT_NORMAL_VOL = 0.01`.
 
 `calibrate` takes `(&dyn Discounting, time_to_maturity)` and rejects
 `steps == 0`, a non-finite/non-positive horizon, or any non-finite/non-positive
 curve discount target. All three models enforce `curve_fit_tolerance_bp`.
-Pricing must use the calibrated horizon; changing it requires recalibration.
+`price` rolls back over the calibrated horizon; a different horizon requires recalibration.
 Ho-Lee and binomial BDT use equal up/down probabilities; the drift lives in
 the calibrated node rates.
 
@@ -163,12 +171,11 @@ Ho-Lee σ is absolute (50-150 bp, i.e. 0.005-0.015); BDT σ is proportional
 `finstack_quant_models::volatility::convert_atm_volatility`.
 
 **Node ordering differs by model.** Ho-Lee: node 0 is the *lowest* rate.
-BDT (κ = 0, binomial): node 0 is the *highest* rate (`α·u^(n-1)`).
-BK (κ > 0, trinomial): node 0 is the lowest (`j = −j_max`).
+BDT (binomial): node 0 is the *highest* rate (`α·u^(n-1)`).
+Black-Karasinski (trinomial): node 0 is the lowest (`j = −j_max`).
 
-`short_rate_keys` supplies `SHORT_RATE` (the same key as
-`state_keys::INTEREST_RATE`) and `OAS` (basis points). Every OAS reader and
-writer uses the constant; a missing key prices with OAS = 0.
+The OAS is an explicit `oas_bp` argument (basis points) of `price`; it shifts
+every node's discounting rate and reaches the valuator as `NodeState::oas_bp`.
 
 ## Hull-White tree
 
@@ -183,10 +190,8 @@ dx(t) = −κx(t)dt + σdW(t)
 
 Level spacing is `dx_i = σ√(3·dt_{i-1})`, matching the variance of the step
 arriving at level `i`. Width is set by the natural branching geometry (each
-node's central child plus one node either side), optionally hard-capped by
-`config.max_nodes`; if that cap is too tight the transition probabilities go
-negative and calibration fails loudly. Boundary handling follows Hull & White
-(1994).
+node's central child plus one node either side): mean reversion pulls the
+central child inward, so the lattice limits its own width.
 
 ```rust
 use finstack_quant_models::trees::{HullWhiteTree, HullWhiteTreeConfig};
@@ -195,12 +200,11 @@ let config = HullWhiteTreeConfig {
     kappa: 0.03,
     sigma: 0.01,
     steps: 100,
-    max_nodes: None,
     ..Default::default()
 };
 
 // Exercise dates land exactly on grid points.
-let tree = HullWhiteTree::calibrate_with_times(
+let tree = HullWhiteTree::calibrate(
     config,
     discount_curve,
     time_to_maturity,
@@ -215,8 +219,8 @@ let price = tree.backward_induction(&terminal_values, |step, node, continuation|
 `backward_induction` takes terminal values indexed by node at the final step
 (`terminal_values.len()` must equal `tree.num_nodes(tree.num_steps())`) and a
 closure `(step, node_idx, continuation_value) -> f64`. `calibrate` is the
-uniform-grid shorthand for `calibrate_with_times(.., &[])`;
-`calibrate_with_times_and_volatility` additionally accepts a left-continuous
+single entry point: pass `&[]` as the mandatory times for a uniform grid.
+`HullWhiteTreeConfig::with_volatility` supplies a left-continuous
 piecewise-constant `σ` schedule whose knots are merged into the grid so no
 transition straddles a change.
 
@@ -287,21 +291,20 @@ Other accessors: `max_feasible_correlation(ttm)`, `rate_at_node`,
 
 ## State variables
 
-Nodes carry a `HashMap<&'static str, f64>` keyed by `state_keys`:
+Each node hands the valuator a `NodeState`, a small `Copy` struct of typed
+fields:
 
-| Constant | Key | Meaning |
-|----------|-----|---------|
-| `SPOT` | `"spot"` | Underlying asset price |
-| `INTEREST_RATE` | `"interest_rate"` | Risk-free short rate |
-| `HAZARD_RATE` | `"hazard_rate"` | Default intensity |
-| `DIVIDEND_YIELD` | `"dividend_yield"` | Continuous dividend yield |
-| `VOLATILITY` | `"volatility"` | Volatility |
-| `DF` | `"df"` | Pre-computed per-node discount factor |
+| Field | Meaning | Set by |
+|-------|---------|--------|
+| `step` | Time-step index | every tree |
+| `oas_bp` | Option-adjusted spread in basis points | `ShortRateTree`, `RatesCreditTree` |
+| `spot` | Underlying asset price | `BinomialTree` |
+| `interest_rate` | Short rate | every tree (flat rate on `BinomialTree`) |
+| `hazard_rate` | Default intensity | `RatesCreditTree` |
+| `df` | Discount factor over the interval starting at the node | `RatesCreditTree` interior nodes |
 
-`NodeState` pre-extracts `spot`, `interest_rate`, `hazard_rate`, and
-`discount_factor` into cached fields so the hot path avoids hash lookups; the
-accessors return `Option<f64>`. `get_var` / `get_var_or` reach anything else.
-`single_factor_equity_state` assembles the common equity map.
+The optional fields are `Option<f64>`; a tree leaves the ones it does not
+model as `None`.
 
 ## Usage in the codebase
 
@@ -311,7 +314,7 @@ accessors return `Option<f64>`. `get_var` / `get_var_or` reach anything else.
 | Commodity options | `BinomialTree::leisen_reimer` | `instruments/commodity/commodity_option/types.rs` |
 | Callable / putable bonds | `ShortRateTree`, `RatesCreditTree`, `HullWhiteTree` | `instruments/fixed_income/bond/pricing/engine/tree/` |
 | Term loans | `ShortRateTree`, `RatesCreditTree` | `instruments/fixed_income/term_loan/pricing/tree_engine.rs` |
-| Bermudan swaptions | `HullWhiteTree::calibrate_with_times` | `instruments/rates/swaption/` |
+| Bermudan swaptions | `HullWhiteTree::calibrate` | `instruments/rates/swaption/` |
 | Convertible bonds | Tsiveriotis-Zhang engine over `EvolutionParams` (binomial or trinomial) | `instruments/fixed_income/convertible/pricing/` |
 
 ## Serialization
@@ -327,7 +330,8 @@ types non-serializable.
 
 - Complexity as tabulated above; step-count guidance: 50 for fast estimates,
   100-200 for production, 200+ for high precision.
-- `NodeState` caching removes hash lookups from the inner loop.
+- `NodeState` is a plain `Copy` struct, so the inner loop does no hashing or
+  allocation.
 - Parallel Greeks, node-value caching, and SIMD are deliberately deferred to
   keep the engine simple and deterministic.
 
@@ -354,19 +358,18 @@ mise run rust-bench
 
 1. Add the file (or directory) and declare it in [`mod.rs`](mod.rs) with the
    public re-exports.
-2. Implement `TreeModel`. The shortest path is to build a `RecombiningInputs`
+2. Give the tree an inherent pricing method. The shortest path is to build a `RecombiningInputs`
    and call `price_recombining_tree(inputs)` — note it takes the struct **by
-   value**. Fields: `steps`, `initial_vars`, `time_to_maturity`,
-   `market_context`, `valuator`, `up_factor`, `down_factor`, `prob_up`,
-   `prob_down`, `interest_rate`, `custom_state_generator`,
-   `custom_rate_generator`.
+   value**. Fields: `steps`, `time_to_maturity`, `valuator`, `prob_up`,
+   `prob_down`, and `lattice` — a `RecombiningLattice::Spot` (multiplicative
+   factors and a flat rate) or `RecombiningLattice::ShortRate` (per-node rate
+   and discount-rate closures plus `oas_bp`).
 3. Implement `TreeValuator` for the instrument: terminal payoff in
    `value_at_maturity`, the hold-vs-exercise decision in `value_at_node`.
 4. For calibrated trees, add a `calibrate()` that stores per-node state
-   privately and inject it through `custom_state_generator` /
-   `custom_rate_generator`.
-5. Add any new state keys to `state_keys`; add a cached `NodeState` field only
-   if the key is read on the hot path.
+   privately and inject it through the `RecombiningLattice::ShortRate`
+   closures.
+5. Add a typed `NodeState` field for any new per-node datum a valuator reads.
 6. Derive evolution parameters through `EvolutionParams::equity_crr` /
    `equity_trinomial` / `with_drift` where possible — they validate that the
    risk-neutral probabilities lie in `[0, 1]` and sum to one in release builds,

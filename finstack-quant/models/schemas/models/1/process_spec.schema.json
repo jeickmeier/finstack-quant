@@ -1,0 +1,962 @@
+{
+  "$defs": {
+    "CheyetteRoughVolParams": {
+      "description": "Cheyette + rough stochastic volatility model parameters.\n\nEncapsulates all inputs required to define the Cheyette dynamics with a\nrough vol driver. Serialization preserves both the base-volatility curve\nand initial-forward curve; deserialization validates the complete model\nthrough the same constructor used for market inputs.",
+      "properties": {
+        "eta": {
+          "description": "Vol-of-vol scaling (η > 0).",
+          "format": "double",
+          "type": "number"
+        },
+        "hurst": {
+          "$ref": "#/$defs/HurstExponent",
+          "description": "Hurst exponent H ∈ (0, 0.5) for the rough vol driver."
+        },
+        "kappa": {
+          "description": "Mean reversion of the short rate (κ > 0).",
+          "format": "double",
+          "type": "number"
+        },
+        "phi_times": {
+          "description": "Time knots for the initial forward rate curve φ(t) = f(0, t).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "phi_values": {
+          "description": "Value knots for the initial forward rate curve φ(t) = f(0, t).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "rho": {
+          "description": "Correlation between rate and vol innovations ρ ∈ [-1, 1].",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma_base": {
+          "$ref": "#/$defs/ForwardVarianceCurve",
+          "description": "Base volatility term structure σ₀(t) for the rate process."
+        }
+      },
+      "required": [
+        "kappa",
+        "sigma_base",
+        "hurst",
+        "eta",
+        "rho",
+        "phi_times",
+        "phi_values"
+      ],
+      "type": "object"
+    },
+    "CirParams": {
+      "additionalProperties": false,
+      "description": "CIR process parameters.",
+      "properties": {
+        "kappa": {
+          "description": "Mean reversion speed (κ)",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma": {
+          "description": "Volatility of volatility (σ)",
+          "format": "double",
+          "type": "number"
+        },
+        "theta": {
+          "description": "Long-term mean (θ)",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kappa",
+        "theta",
+        "sigma"
+      ],
+      "type": "object"
+    },
+    "Dividend": {
+      "description": "Dividend payment specification.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Cash dividend: fixed dollar amount",
+          "properties": {
+            "cash": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "cash"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Proportional dividend: percentage of spot (e.g., 0.02 for 2%)",
+          "properties": {
+            "proportional": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "proportional"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ForwardVarianceCurve": {
+      "description": "Forward variance curve ξ₀(t) for rough volatility models.\n\nRepresents `ξ₀(t) = E^Q[V_t | F₀]`, expected instantaneous variance under\nthe consuming model's pricing measure. Values are supplied or calibrated by\nthe caller. The integral sets the model's expected accumulated variance.\n\nDifferencing ATM implied total variance is an optional proxy, not an exact\nvariance-swap bootstrap. This type interpolates the supplied curve; it does\nnot perform market calibration.",
+      "properties": {
+        "interpolation": {
+          "$ref": "#/$defs/Interpolation",
+          "description": "Interpolation contract used by the constructor."
+        },
+        "times": {
+          "description": "Point times or interval ends (strictly increasing year fractions).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "values": {
+          "description": "Point samples or constant interval variances (all > 0).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "interpolation",
+        "times",
+        "values"
+      ],
+      "type": "object"
+    },
+    "GbmParams": {
+      "additionalProperties": false,
+      "description": "Geometric Brownian Motion parameters.",
+      "properties": {
+        "q": {
+          "description": "Dividend/foreign rate (annual)",
+          "format": "double",
+          "type": "number"
+        },
+        "r": {
+          "description": "Risk-free rate (annual)",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma": {
+          "description": "Volatility (annual)",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "r",
+        "q",
+        "sigma"
+      ],
+      "type": "object"
+    },
+    "HestonPricingParams": {
+      "description": "Market inputs for closed-form Heston pricing.\n\nThe stochastic parameters are stored once in the canonical models-layer\n[`HestonParams`]; this wrapper adds only the continuous carry rates required\nby risk-neutral pricing.\n\n# References\n\n- Heston, S. L. (1993). \"A Closed-Form Solution for Options with Stochastic Volatility\n  with Applications to Bond and Currency Options.\" *Review of Financial Studies*, 6(2), 327-343. `docs/REFERENCES.md#heston-1993`",
+      "properties": {
+        "kappa": {
+          "description": "Mean reversion speed.",
+          "format": "double",
+          "type": "number"
+        },
+        "q": {
+          "description": "Continuously compounded dividend or foreign yield as an annual decimal.",
+          "format": "double",
+          "type": "number"
+        },
+        "r": {
+          "description": "Continuously compounded risk-free rate as an annual decimal.",
+          "format": "double",
+          "type": "number"
+        },
+        "rho": {
+          "description": "Spot-variance correlation.",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma_v": {
+          "description": "Vol-of-vol.",
+          "format": "double",
+          "type": "number"
+        },
+        "theta": {
+          "description": "Long-run variance.",
+          "format": "double",
+          "type": "number"
+        },
+        "v0": {
+          "description": "Initial variance.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "r",
+        "q",
+        "v0",
+        "kappa",
+        "theta",
+        "sigma_v",
+        "rho"
+      ],
+      "type": "object"
+    },
+    "HullWhite1FParams": {
+      "description": "Validated Hull-White one-factor process parameters.",
+      "properties": {
+        "kappa": {
+          "format": "double",
+          "type": "number"
+        },
+        "theta_curve": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "theta_times": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "volatility": {
+          "$ref": "#/$defs/PiecewiseConstantCurve"
+        }
+      },
+      "required": [
+        "kappa",
+        "volatility",
+        "theta_curve",
+        "theta_times"
+      ],
+      "type": "object"
+    },
+    "HurstExponent": {
+      "description": "Validated Hurst exponent H ∈ (0, 1).\n\nThe Hurst exponent determines the roughness of fractional Brownian motion:\n\n- H < 0.5 — rough (anti-persistent increments)\n- H = 0.5 — standard Brownian motion\n- H > 0.5 — smooth (persistent increments)",
+      "properties": {
+        "h": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "h"
+      ],
+      "type": "object"
+    },
+    "Interpolation": {
+      "enum": [
+        "linear",
+        "constant_intervals"
+      ],
+      "type": "string"
+    },
+    "LocalVolSurface": {
+      "additionalProperties": false,
+      "description": "Local volatility surface `σ_loc(T, K)` on a rectangular expiry-by-strike\ngrid, extracted from an implied volatility surface via the Dupire formula.\n\nOff-grid queries are interpolated bilinearly; outside the grid the nearest\nboundary value applies (flat extrapolation).\n\n# Invariants\n\n- Expiries and strikes are finite and strictly increasing; expiries are\n  non-negative and strikes positive.\n- There is one finite, non-negative local volatility per grid node, stored\n  row-major with the expiry as the slow axis.\n\nDeserialization enforces the same invariants.\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::surfaces::VolSurface;\nuse finstack_quant_models::volatility::local_vol::LocalVolSurface;\n\n// Implied vol skewed in strike and flat in expiry.\nlet expiries = [0.25, 0.5, 1.0, 2.0];\nlet strikes = [80.0, 90.0, 100.0, 110.0, 120.0];\nlet smile = [0.24, 0.22, 0.20, 0.19, 0.185];\nlet mut builder = VolSurface::builder(\"SKEW\").expiries(&expiries).strikes(&strikes);\nfor _ in &expiries {\n    builder = builder.row(&smile);\n}\nlet surface = builder.build()?;\n\n// One forward per expiry: F(T) = S·exp((r − q)·T) with S = 100, r − q = 2%.\nlet forwards: Vec<f64> = expiries.iter().map(|t| 100.0 * (0.02 * t).exp()).collect();\nlet local_vol = LocalVolSurface::from_implied_vol(&surface, &forwards)?;\n\nassert_eq!(local_vol.grid_shape(), (4, 5));\n// A negative skew is steeper in local than in implied volatility.\nassert!(local_vol.value(1.0, 90.0) > local_vol.value(1.0, 110.0));\n# Ok::<(), finstack_quant_core::Error>(())\n```",
+      "properties": {
+        "expiries": {
+          "description": "Expiry axis in years, strictly increasing and non-negative.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "local_vols": {
+          "description": "Local volatilities as annualized decimals, finite and non-negative,\nrow-major: `local_vols[expiry_index * strikes.len() + strike_index]`.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "strikes": {
+          "description": "Strike axis in price units of the underlying, strictly increasing and\npositive.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "expiries",
+        "strikes",
+        "local_vols"
+      ],
+      "type": "object"
+    },
+    "PiecewiseConstantCurve": {
+      "description": "A finite, left-continuous piecewise-constant curve.",
+      "properties": {
+        "times": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "values": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "times",
+        "values"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/process_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Stochastic process to simulate, with its parameters.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Geometric Brownian motion `dS = (r - q) S dt + σ S dW`.\n\nState: `[spot]`, which must start strictly positive.",
+      "properties": {
+        "q": {
+          "description": "Dividend/foreign rate (annual)",
+          "format": "double",
+          "type": "number"
+        },
+        "r": {
+          "description": "Risk-free rate (annual)",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma": {
+          "description": "Volatility (annual)",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "gbm",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "r",
+        "q",
+        "sigma"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Geometric Brownian motion with discrete dividends paid at fixed times.\n\nState: `[spot]`, which must start strictly positive.",
+      "properties": {
+        "dividends": {
+          "description": "Dividend schedule as `[time, dividend]` pairs. `time` is the\nex-dividend time in years: strictly positive and distinct, in any\norder. A cash dividend is a non-negative amount in spot units and\na proportional dividend a non-negative decimal fraction of spot.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "$ref": "#/$defs/Dividend"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "params": {
+          "$ref": "#/$defs/GbmParams",
+          "description": "Diffusion parameters between dividend dates. Set `q` to zero when\nevery dividend is listed explicitly."
+        },
+        "type": {
+          "const": "gbm_with_dividends",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "params",
+        "dividends"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Correlated geometric Brownian motions, one per asset.\n\nState: `[spot_0, spot_1, ...]`, each starting strictly positive.",
+      "properties": {
+        "assets": {
+          "description": "Per-asset parameters; the vector length is the state dimension.",
+          "items": {
+            "$ref": "#/$defs/GbmParams"
+          },
+          "type": "array"
+        },
+        "correlation": {
+          "default": null,
+          "description": "Row-major `n x n` correlation matrix of the driving Brownian\nmotions; omitted means independent assets.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "type": {
+          "const": "multi_gbm",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "assets"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Arithmetic Brownian motion with drift `dX = μ dt + σ dW`.\n\nState: `[x]`.",
+      "properties": {
+        "mu": {
+          "description": "Constant drift per year.",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma": {
+          "description": "Constant diffusion scale per square root year.",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "brownian",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "mu",
+        "sigma"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Correlated arithmetic Brownian motions.\n\nState: `[x_0, x_1, ...]`.",
+      "properties": {
+        "correlation": {
+          "default": null,
+          "description": "Row-major `n x n` correlation matrix of the driving Brownian\nmotions; omitted means independent components.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "mus": {
+          "description": "Per-component drifts per year; the vector length is the state\ndimension.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "sigmas": {
+          "description": "Per-component diffusion scales per square-root year, non-negative.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "type": {
+          "const": "multi_brownian",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "mus",
+        "sigmas"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Correlated Ornstein-Uhlenbeck processes `dX_i = κ_i (θ_i - X_i) dt + σ_i dW_i`.\n\nState: `[x_0, x_1, ...]`.",
+      "properties": {
+        "correlation": {
+          "description": "Optional row-major `n x n` correlation matrix.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "kappas": {
+          "description": "Mean-reversion speeds `κ_i` per year.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "sigmas": {
+          "description": "Diffusion scales `σ_i` per square root year.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "thetas": {
+          "description": "Long-run means `θ_i` in state units.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "type": {
+          "const": "multi_ou",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "kappas",
+        "thetas",
+        "sigmas"
+      ],
+      "type": "object"
+    },
+    {
+      "$ref": "#/$defs/HullWhite1FParams",
+      "description": "Hull-White one-factor short rate `dr = κ (θ(t) - r) dt + σ(t) dW`.\n\nState: `[short_rate]` as a decimal.",
+      "properties": {
+        "type": {
+          "const": "hull_white_1f",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Cox-Ingersoll-Ross square-root process `dv = κ (θ - v) dt + σ √v dW`.\n\nState: `[short_rate]` (or an intensity or variance), starting\nnon-negative.",
+      "properties": {
+        "kappa": {
+          "description": "Mean reversion speed (κ)",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma": {
+          "description": "Volatility of volatility (σ)",
+          "format": "double",
+          "type": "number"
+        },
+        "theta": {
+          "description": "Long-term mean (θ)",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "cir",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "kappa",
+        "theta",
+        "sigma"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "CIR++ short rate `r_t = x_t + φ(t)` with `x` a CIR factor and `φ` a\npiecewise-constant deterministic shift.\n\nState: `[short_rate]`. The initial state is the short rate `r_0`, not\nthe factor: the factor starts at `r_0 - φ(0)`, which must be\nnon-negative, and every reported value is the shifted rate.",
+      "properties": {
+        "params": {
+          "$ref": "#/$defs/CirParams",
+          "description": "Parameters of the unshifted CIR factor."
+        },
+        "shift_curve": {
+          "description": "Shift values `φ` as decimal rates, one per entry of `shift_times`;\neach applies from its time until the next.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "shift_times": {
+          "description": "Strictly increasing shift start times in years. Times before the\nfirst entry use the first shift value.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "type": {
+          "const": "cir_plus_plus",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "params",
+        "shift_curve",
+        "shift_times"
+      ],
+      "type": "object"
+    },
+    {
+      "$ref": "#/$defs/HestonPricingParams",
+      "description": "Heston stochastic volatility.\n\nState: `[spot, variance]`; spot starts strictly positive, and the\nstarting variance `initial_state[1]` must equal the `v0` parameter.",
+      "properties": {
+        "type": {
+          "const": "heston",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Schwartz-Smith two-factor commodity model.\n\nState: `[x, y]`, the short-term deviation and the long-term level of\nthe log price; the spot is `exp(x + y)`.",
+      "properties": {
+        "kappa": {
+          "description": "Mean reversion speed for short-term deviation (κ_X)",
+          "format": "double",
+          "type": "number"
+        },
+        "lambda_x": {
+          "default": 0.0,
+          "description": "Constant risk-premium drift shift for the short-term factor (λ_X).\n\nUnder the risk-neutral measure the short-term factor follows\n`dX = (−κ_X X − λ_X) dt + σ_X dW*` (Schwartz & Smith 2000): a constant\ndrift shift at unchanged κ_X. Defaults to 0 (physical measure).",
+          "format": "double",
+          "type": "number"
+        },
+        "mu_y": {
+          "description": "Drift of long-term trend (μ_Y)",
+          "format": "double",
+          "type": "number"
+        },
+        "rho_xy": {
+          "description": "Correlation between X and Y (ρ)",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma_x": {
+          "description": "Volatility of short-term component (σ_X)",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma_y": {
+          "description": "Volatility of long-term component (σ_Y)",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "schwartz_smith",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "kappa",
+        "sigma_x",
+        "mu_y",
+        "sigma_y",
+        "rho_xy"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Dupire local volatility `dS = (r - q) S dt + σ_loc(t, S) S dW`, with\n`σ_loc` read from a local volatility surface at the simulation time\nand the current spot.\n\nState: `[spot]`, which must start strictly positive. The default\nscheme is `log_euler`; its discretization error falls with the step\nsize, so use a fine time grid (about 100 steps per year).",
+      "properties": {
+        "q": {
+          "description": "Dividend yield or foreign rate, continuously compounded (annualized\ndecimal).",
+          "format": "double",
+          "type": "number"
+        },
+        "r": {
+          "description": "Risk-free rate, continuously compounded (annualized decimal).",
+          "format": "double",
+          "type": "number"
+        },
+        "surface": {
+          "$ref": "#/$defs/LocalVolSurface",
+          "description": "Local volatility `σ_loc(t, S)`: expiry axis in years from the\nsimulation start, strike axis in spot price units. Flat outside its\ngrid."
+        },
+        "type": {
+          "const": "local_vol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "r",
+        "q",
+        "surface"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "LIBOR market model: displaced-lognormal forward rates under the\nterminal measure, with piecewise-constant factor loadings.\n\nState: `[forward_0, forward_1, ...]`, simple forward rates as decimals,\none per accrual period. `initial_state` must equal the\n`initial_forwards` parameter. A forward stops moving at its fixing\ndate, and the time grid must contain every fixing date and volatility\nbreakpoint inside the horizon.",
+      "properties": {
+        "accrual_factors": {
+          "description": "Accrual factors τ_i = T_{i+1} − T_i (length N).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "displacements": {
+          "description": "Displacement per forward for negative-rate support (length N).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "initial_forwards": {
+          "description": "Initial forward rates F_i(0) from the curve (length N).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "num_factors": {
+          "description": "Number of Brownian factors (2 or 3).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "num_forwards": {
+          "description": "Number of forward rates (N).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tenors": {
+          "description": "Tenor dates T_0, T_1, ..., T_N (N+1 dates, year fractions).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "type": {
+          "const": "lmm",
+          "type": "string"
+        },
+        "vol_times": {
+          "description": "Piecewise-constant vol breakpoints (ascending, length M).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "vol_values": {
+          "description": "Factor loadings λ_{i,k}(t) per forward, per time period.\n\nOuter: M+1 time periods.\nInner: N forwards, each with up to 3 factor loadings.",
+          "items": {
+            "items": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "num_forwards",
+        "num_factors",
+        "tenors",
+        "accrual_factors",
+        "displacements",
+        "vol_times",
+        "vol_values",
+        "initial_forwards"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Rough Bergomi stochastic volatility: lognormal variance driven by a\nRiemann-Liouville Volterra process, around the forward variance curve\n`xi`.\n\nState: `[spot]`, which must start strictly positive. The variance is a\nfunctional of the driver's history and is not part of the state.\nConsumes fractional noise; see [`FbmSpec`].",
+      "properties": {
+        "eta": {
+          "description": "Vol-of-vol scaling (η > 0).",
+          "format": "double",
+          "type": "number"
+        },
+        "hurst": {
+          "$ref": "#/$defs/HurstExponent",
+          "description": "Hurst exponent H ∈ (0, 0.5), typically 0.07–0.12 for equity indices."
+        },
+        "q": {
+          "description": "Dividend yield (annual, continuously compounded).",
+          "format": "double",
+          "type": "number"
+        },
+        "r": {
+          "description": "Risk-free rate (annual, continuously compounded).",
+          "format": "double",
+          "type": "number"
+        },
+        "rho": {
+          "description": "Spot-vol correlation ρ ∈ [-1, 1].",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "rough_bergomi",
+          "type": "string"
+        },
+        "xi": {
+          "$ref": "#/$defs/ForwardVarianceCurve",
+          "description": "Initial forward variance curve ξ₀(t)."
+        }
+      },
+      "required": [
+        "type",
+        "r",
+        "q",
+        "hurst",
+        "eta",
+        "rho",
+        "xi"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Rough Heston stochastic volatility: a Volterra square-root variance\nwith a power-law kernel, `hurst` in `(0, 0.5)`.\n\nState: `[spot, variance]`; spot starts strictly positive, and the\nstarting variance `initial_state[1]` must equal the `v0` parameter.\nAt most 8,000 steps.",
+      "properties": {
+        "hurst": {
+          "$ref": "#/$defs/HurstExponent",
+          "description": "Hurst exponent H ∈ (0, 0.5) — controls the roughness of the variance."
+        },
+        "kappa": {
+          "description": "Mean reversion speed (κ > 0).",
+          "format": "double",
+          "type": "number"
+        },
+        "q": {
+          "description": "Dividend yield (annual, continuously compounded).",
+          "format": "double",
+          "type": "number"
+        },
+        "r": {
+          "description": "Risk-free rate (annual, continuously compounded).",
+          "format": "double",
+          "type": "number"
+        },
+        "rho": {
+          "description": "Spot–variance correlation ρ ∈ \\[−1, 1\\].",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma_v": {
+          "description": "Volatility of variance — vol-of-vol (σᵥ > 0).",
+          "format": "double",
+          "type": "number"
+        },
+        "theta": {
+          "description": "Long-run variance level (θ > 0).",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "rough_heston",
+          "type": "string"
+        },
+        "v0": {
+          "description": "Initial variance (v₀ > 0).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "type",
+        "r",
+        "q",
+        "hurst",
+        "kappa",
+        "theta",
+        "sigma_v",
+        "rho",
+        "v0"
+      ],
+      "type": "object"
+    },
+    {
+      "$ref": "#/$defs/CheyetteRoughVolParams",
+      "description": "Cheyette short-rate model with rough stochastic volatility.\n\nState: `[x, y]`, the deviation of the short rate from the initial\nforward curve and the accumulated variance; both normally start at\nzero. The short rate at time `t` is `x + φ(t)`, with `φ` the initial\nforward curve in the parameters. Consumes fractional noise; see\n[`FbmSpec`].",
+      "properties": {
+        "type": {
+          "const": "cheyette_rough",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "ProcessSpec"
+}

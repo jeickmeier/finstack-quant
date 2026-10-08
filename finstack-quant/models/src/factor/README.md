@@ -15,7 +15,7 @@ commodity, and inflation factors are first-class through the generic
 ## Position in the stack
 
 Depends on `finstack-quant-core` and `finstack-quant-analytics` (the latter for
-`beta` OLS slopes in the peel and `nearest_correlation_matrix` /
+`beta` OLS slopes in the peel and `nearest_correlation` /
 `validate_correlation_matrix` in covariance assembly). Consumed by
 `finstack-quant-valuations`, `finstack-quant-attribution` (credit-factor P&L
 decomposition), and `finstack-quant-portfolio`. Exposed by the umbrella crate
@@ -249,8 +249,8 @@ The published base URI is
 with the original credit-only schemas. Regenerate and verify with:
 
 ```bash
-cargo run -p finstack-quant-models --bin gen_factor_model_schemas -- --write
-cargo run -p finstack-quant-models --bin gen_factor_model_schemas -- --check
+cargo run -p finstack-quant-models --bin gen_models_schemas -- --write
+cargo run -p finstack-quant-models --bin gen_models_schemas -- --check
 ```
 
 `mise run rust-gen-schemas` and `mise run rust-check-schemas` do this for every

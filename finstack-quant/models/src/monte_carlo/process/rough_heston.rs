@@ -84,6 +84,7 @@ use finstack_quant_core::math::fractional::HurstExponent;
 /// [`HurstExponent`]; a warning is logged when `H ≥ 0.5` (non-rough regime).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct RoughHestonParams {
     /// Risk-free rate (annual, continuously compounded).
     pub r: f64,

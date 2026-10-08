@@ -61,13 +61,11 @@ pub(crate) fn assign_position_factors(
     let mut unmatched = Vec::new();
 
     for dependency in dependencies {
-        let entries = matcher
-            .match_factor_with_betas(dependency, attributes)
-            .map_err(|e| {
-                crate::error::Error::invalid_input(format!(
-                    "factor assignment failed for position '{position_id}': {e}"
-                ))
-            })?;
+        let entries = matcher.match_factor(dependency, attributes).map_err(|e| {
+            crate::error::Error::invalid_input(format!(
+                "factor assignment failed for position '{position_id}': {e}"
+            ))
+        })?;
         match entries {
             Some(entries) if !entries.is_empty() => {
                 for entry in entries {
@@ -151,7 +149,7 @@ mod tests {
     }
 
     impl FactorMatcher for StubMatcher {
-        fn match_factor_with_betas(
+        fn match_factor(
             &self,
             _dependency: &MarketDependency,
             _attributes: &Attributes,

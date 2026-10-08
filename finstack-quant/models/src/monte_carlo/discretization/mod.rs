@@ -21,23 +21,20 @@ pub mod rough_bergomi;
 pub mod rough_heston;
 pub mod schwartz_smith;
 
-pub use cheyette_rough::CheyetteRoughEuler;
-pub use euler::{EulerMaruyama, LogEuler};
-pub use exact::{ExactGbm, ExactMultiGbm, ExactMultiGbmCorrelated};
-pub use exact_gbm_dividends::ExactGbmWithDividends;
+pub use euler::EulerMaruyama;
+pub use exact::{ExactGbm, ExactMultiGbmCorrelated};
 pub use exact_hw1f::ExactHullWhite1F;
-pub use lmm_predictor_corrector::LmmPredictorCorrector;
-pub use milstein::Milstein;
 pub use qe_cir::QeCir;
 pub use qe_heston::QeHeston;
-pub use rough_bergomi::RoughBergomiEuler;
-pub use rough_heston::RoughHestonHybrid;
 pub use schwartz_smith::ExactSchwartzSmith;
 
 #[cfg(test)]
 mod work_size_contract {
+    use super::cheyette_rough::CheyetteRoughEuler;
     use super::lmm_predictor_corrector::LmmPredictorCorrector;
-    use super::{CheyetteRoughEuler, ExactGbm, RoughBergomiEuler, RoughHestonHybrid};
+    use super::rough_bergomi::RoughBergomiEuler;
+    use super::rough_heston::RoughHestonHybrid;
+    use super::ExactGbm;
     use crate::monte_carlo::process::cheyette_rough::{
         CheyetteRoughVolParams, CheyetteRoughVolProcess,
     };

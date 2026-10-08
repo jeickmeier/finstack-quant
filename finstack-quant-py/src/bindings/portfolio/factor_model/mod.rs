@@ -9,7 +9,6 @@
 //! ``FactorModel`` is a stateful handle built once from a ``FactorModelConfig``
 //! (Rust ``FactorModel::from_config``) and reused for assignment,
 //! sensitivities, risk decomposition, position what-if and factor stress. The
-//! Borrowed ``WhatIfEngine`` stays Rust-only; the handle owns its lifecycle.
 
 mod assignment;
 mod budget_whatif;

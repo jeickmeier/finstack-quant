@@ -1,0 +1,60 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/fbm_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Generator of the fractional increments consumed by the rough-volatility processes.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Riemann-Liouville Volterra increments from the Bennedsen-Lunde-Pakkanen\nhybrid scheme. Needs an equally spaced time grid. `O(n²)` work per path\nin the number of steps `n`.",
+      "properties": {
+        "type": {
+          "const": "volterra",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Exact fractional Brownian motion increments from the Cholesky factor\nof their covariance. Any time grid. `O(n³)` setup, `O(n²)` storage and\nwork per path; limited to 8,000 steps.",
+      "properties": {
+        "type": {
+          "const": "cholesky",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Approximate fractional Brownian motion increments: exact for the first\n`near_field_size` steps, then each increment is drawn conditionally on\nthe previous `near_field_size` increments only. Any time grid.\n`O(n · near_field_size)` work per path.",
+      "properties": {
+        "near_field_size": {
+          "default": null,
+          "description": "Positive window length in steps, capped at the number of steps.\nOmitted selects `min(max(10, √n), 50)`.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "type": {
+          "const": "windowed_conditional",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "FbmSpec"
+}

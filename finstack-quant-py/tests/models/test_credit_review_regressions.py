@@ -6,7 +6,7 @@ import pytest
 
 from finstack_quant.models.correlation import RecoverySpec
 from finstack_quant.models.credit import AssetDynamics, MertonBarrierType, MertonModel
-from finstack_quant.models.monte_carlo import LsmcPricer, simulate_gbm_paths
+from finstack_quant.models.monte_carlo import LsmcPricer, simulate_paths
 
 
 def test_high_intensity_zero_size_jumps_preserve_gbm_default_probability() -> None:
@@ -53,9 +53,15 @@ def test_lsmc_constructor_rejects_oversized_workload(num_paths: int, num_steps: 
         LsmcPricer(num_paths=num_paths, num_steps=num_steps)
 
 
-def test_compact_gbm_rejects_oversized_output_before_grid_allocation() -> None:
+def test_path_simulation_rejects_oversized_output_before_grid_allocation() -> None:
     with pytest.raises(ValueError, match="exceed"):
-        simulate_gbm_paths(100.0, 0.05, 0.0, 0.20, 1.0, 64_000_000, 1)
+        simulate_paths({
+            "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.20},
+            "initial_state": [100.0],
+            "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 64_000_000},
+            "num_paths": 1,
+            "seed": 42,
+        })
 
 
 def test_workout_replay_validates_costs_and_collateral() -> None:

@@ -11,7 +11,7 @@ use crate::instruments::fixed_income::cmo::AgencyCmo;
 use crate::instruments::fixed_income::mbs_passthrough::pricer::quote_basis_pool;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::Result;
 
 /// Calculate the static Z-spread for a CMO tranche.
@@ -84,7 +84,7 @@ pub(crate) fn calculate_tranche_zspread(
         .initial_bracket_size(Some(0.05));
 
     // Capture any pricing error from the objective so it can be propagated
-    // after the solver finishes (the `Solver` trait expects `Fn(f64) -> f64`).
+    // after the solver finishes (`BrentSolver::solve` expects `Fn(f64) -> f64`).
     let pricing_error: std::cell::RefCell<Option<finstack_quant_core::Error>> =
         std::cell::RefCell::new(None);
     let objective = |spread: f64| -> f64 {

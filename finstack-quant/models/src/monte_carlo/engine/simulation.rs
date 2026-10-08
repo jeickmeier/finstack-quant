@@ -103,7 +103,7 @@ fn fill_shocks<R: RandomStream>(
 /// undiscounted payoff amount in `currency`.
 ///
 /// The work buffer is zero-initialised before every path. This makes
-/// path-history-dependent discretizations (e.g. [`crate::monte_carlo::discretization::RoughHestonHybrid`])
+/// path-history-dependent discretizations (e.g. [`crate::monte_carlo::discretization::rough_heston::RoughHestonHybrid`])
 /// work without fragile float comparisons such as `t < ε` to detect path
 /// boundaries — the cost is one memset of `work_size()` doubles per path,
 /// which is negligible relative to the path simulation itself.

@@ -17,14 +17,12 @@
 //! use finstack_quant_models::credit::toggle_exercise::{
 //!     CreditState, CreditStateVariable, ThresholdDirection, ToggleExerciseModel,
 //! };
-//! use finstack_quant_core::math::random::Pcg64Rng;
 //!
 //! let model = ToggleExerciseModel::threshold(
 //!     CreditStateVariable::HazardRate, 0.15, ThresholdDirection::Above,
 //! )?;
 //! let state = CreditState::new(0.20, None, 0.0, 0.0, 0.0, None)?;
-//! let mut rng = Pcg64Rng::new(42);
-//! assert!(model.should_pik(&state, &mut rng));
+//! assert!(model.should_pik(&state, 0.5));
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 
@@ -290,38 +288,7 @@ const NESTED_STEPS_PER_YEAR: usize = 12;
 /// `equity_discount_rate` is therefore retained as a tunable knob that
 /// does not bias the elected branch (see the `discount_rate_invariant`
 /// test).
-fn optimal_toggle_decision(
-    o: &OptimalToggle,
-    state: &CreditState,
-    rng: &mut dyn RandomNumberGenerator,
-) -> bool {
-    let seed_bits = rng.next_u64();
-    optimal_toggle_decision_seeded(o, state, seed_bits)
-}
-
-/// Derive a full-entropy `u64` seed from a uniform draw `u` in `[0, 1)`.
-///
-/// The naive `(u * u64::MAX as f64) as u64` is low-entropy: a `[0, 1)` double
-/// carries at most ~52 mantissa bits, and scaling then truncating leaves the
-/// low ~11 bits of the result effectively zero, so a whole band of distinct
-/// uniforms collapses onto the same seed — weakening the antithetic toggle
-/// pairing in [`should_pik_with_uniform`](ToggleExerciseModel::should_pik_with_uniform).
-///
-/// Instead, capture **every** bit of `u` losslessly via [`f64::to_bits`] and
-/// run it through the SplitMix64 finalizer (Steele, Lea & Flood, 2014), whose
-/// avalanche property diffuses each input bit across all 64 output bits. Two
-/// adjacent doubles therefore produce well-separated, distinct seeds.
-#[inline]
-fn uniform_to_seed(u: f64) -> u64 {
-    // SplitMix64 finalizing mix: a bijection on `u64`, so distinct inputs map
-    // to distinct outputs (no collisions) while achieving full avalanche.
-    let mut z = u.to_bits();
-    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-    z ^ (z >> 31)
-}
-
-fn optimal_toggle_decision_seeded(o: &OptimalToggle, state: &CreditState, seed_bits: u64) -> bool {
+fn optimal_toggle_decision(o: &OptimalToggle, state: &CreditState, seed_bits: u64) -> bool {
     let v = state.asset_value.unwrap_or_else(|| {
         if state.leverage > 0.0 {
             state.accreted_notional / state.leverage
@@ -384,6 +351,28 @@ fn optimal_toggle_decision_seeded(o: &OptimalToggle, state: &CreditState, seed_b
     );
 
     avg_equity_pik > avg_equity_cash
+}
+
+/// Derive a full-entropy `u64` seed from a uniform draw `u` in `[0, 1)`.
+///
+/// The naive `(u * u64::MAX as f64) as u64` is low-entropy: a `[0, 1)` double
+/// carries at most ~52 mantissa bits, and scaling then truncating leaves the
+/// low ~11 bits of the result effectively zero, so a whole band of distinct
+/// uniforms collapses onto the same seed — weakening the antithetic toggle
+/// pairing in [`should_pik`](ToggleExerciseModel::should_pik).
+///
+/// Instead, capture **every** bit of `u` losslessly via [`f64::to_bits`] and
+/// run it through the SplitMix64 finalizer (Steele, Lea & Flood, 2014), whose
+/// avalanche property diffuses each input bit across all 64 output bits. Two
+/// adjacent doubles therefore produce well-separated, distinct seeds.
+#[inline]
+fn uniform_to_seed(u: f64) -> u64 {
+    // SplitMix64 finalizing mix: a bijection on `u64`, so distinct inputs map
+    // to distinct outputs (no collisions) while achieving full avalanche.
+    let mut z = u.to_bits();
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
 }
 
 /// Estimate `E[max(V(T) - barrier, 0)]` via simple GBM with first-passage
@@ -564,36 +553,21 @@ impl ToggleExerciseModel {
 
     /// Returns `true` if the borrower elects PIK at this coupon date.
     ///
+    /// The decision is a pure function of `state` and the uniform draw `u`,
+    /// so antithetic Monte Carlo paths can share identical toggle randomness
+    /// across the base and antithetic pair, preserving variance reduction
+    /// when toggle decisions are active.
+    ///
     /// # Arguments
     ///
-    /// * `state` - Serializable state used to restore the documented object.
-    /// * `rng` - Random-number generator supplying uniform or Gaussian draws for simulation
-    pub fn should_pik(&self, state: &CreditState, rng: &mut dyn RandomNumberGenerator) -> bool {
-        match self {
-            Self::Threshold(t) => {
-                let value = extract_state_value(state, &t.state_variable);
-                match t.direction {
-                    ThresholdDirection::Above => value > t.threshold,
-                    ThresholdDirection::Below => value < t.threshold,
-                }
-            }
-            Self::Stochastic(s) => {
-                let value = extract_state_value(state, &s.state_variable);
-                let p = 1.0 / (1.0 + (-s.intercept - s.sensitivity * value).exp());
-                rng.uniform() < p
-            }
-            Self::OptimalExercise(o) => optimal_toggle_decision(o, state, rng),
-        }
-    }
-
-    /// Deterministic variant of [`should_pik`](Self::should_pik) that uses a
-    /// pre-generated uniform draw `u` in `[0, 1)` instead of pulling from a
-    /// mutable RNG.
-    ///
-    /// This enables antithetic MC paths to share identical toggle randomness
-    /// across the base and antithetic pair, preserving variance reduction
-    /// effectiveness when toggle decisions are active.
-    pub fn should_pik_with_uniform(&self, state: &CreditState, u: f64) -> bool {
+    /// * `state` - Observable credit state at the coupon date (hazard rate,
+    ///   leverage, distance to default, accreted notional, coupon due, asset
+    ///   value).
+    /// * `u` - Uniform draw in `[0, 1)`. Ignored by the threshold rule; the
+    ///   stochastic rule elects PIK when `u` is below the sigmoid PIK
+    ///   probability; the optimal-exercise rule derives the nested Monte
+    ///   Carlo seed from every bit of `u`.
+    pub fn should_pik(&self, state: &CreditState, u: f64) -> bool {
         match self {
             Self::Threshold(t) => {
                 let value = extract_state_value(state, &t.state_variable);
@@ -612,21 +586,8 @@ impl ToggleExerciseModel {
                 // `uniform_to_seed`. The naive `(u * u64::MAX as f64) as u64`
                 // discards the low bits of `u` and weakens antithetic pairing.
                 let seed_bits = uniform_to_seed(u);
-                optimal_toggle_decision_seeded(o, state, seed_bits)
+                optimal_toggle_decision(o, state, seed_bits)
             }
-        }
-    }
-
-    /// Returns the PIK fraction in `[0, 1]`.
-    ///
-    /// For threshold: returns `0.0` or `1.0`.
-    /// For stochastic: returns `0.0` or `1.0` (sampled from probability).
-    /// For optimal exercise: returns `0.0` or `1.0` (nested MC decision).
-    pub fn pik_fraction(&self, state: &CreditState, rng: &mut dyn RandomNumberGenerator) -> f64 {
-        if self.should_pik(state, rng) {
-            1.0
-        } else {
-            0.0
         }
     }
 }
@@ -713,7 +674,6 @@ mod tests {
             ThresholdDirection::Above,
         )
         .unwrap();
-        let mut rng = Pcg64Rng::new(42);
         let state_low = CreditState {
             hazard_rate: 0.10,
             ..Default::default()
@@ -722,8 +682,8 @@ mod tests {
             hazard_rate: 0.20,
             ..Default::default()
         };
-        assert!(!model.should_pik(&state_low, &mut rng));
-        assert!(model.should_pik(&state_high, &mut rng));
+        assert!(!model.should_pik(&state_low, 0.5));
+        assert!(model.should_pik(&state_high, 0.5));
     }
 
     #[test]
@@ -734,7 +694,6 @@ mod tests {
             ThresholdDirection::Below,
         )
         .unwrap();
-        let mut rng = Pcg64Rng::new(42);
         let state_safe = CreditState {
             distance_to_default: Some(3.0),
             ..Default::default()
@@ -743,8 +702,8 @@ mod tests {
             distance_to_default: Some(1.5),
             ..Default::default()
         };
-        assert!(!model.should_pik(&state_safe, &mut rng));
-        assert!(model.should_pik(&state_stressed, &mut rng));
+        assert!(!model.should_pik(&state_safe, 0.5));
+        assert!(model.should_pik(&state_stressed, 0.5));
     }
 
     #[test]
@@ -754,49 +713,28 @@ mod tests {
         // Run 10k samples at lambda=0.10 and lambda=0.20
         let count_low: usize = (0..10_000)
             .filter(|i| {
-                let mut rng = Pcg64Rng::new(42 + *i as u64);
+                let u = Pcg64Rng::new(42 + *i as u64).uniform();
                 let state = CreditState {
                     hazard_rate: 0.10,
                     ..Default::default()
                 };
-                model.should_pik(&state, &mut rng)
+                model.should_pik(&state, u)
             })
             .count();
         let count_high: usize = (0..10_000)
             .filter(|i| {
-                let mut rng = Pcg64Rng::new(42 + *i as u64);
+                let u = Pcg64Rng::new(42 + *i as u64).uniform();
                 let state = CreditState {
                     hazard_rate: 0.20,
                     ..Default::default()
                 };
-                model.should_pik(&state, &mut rng)
+                model.should_pik(&state, u)
             })
             .count();
         assert!(
             count_high > count_low,
             "Higher hazard should have more PIK: low={count_low}, high={count_high}"
         );
-    }
-
-    #[test]
-    fn pik_fraction_returns_0_or_1_for_threshold() {
-        let model = ToggleExerciseModel::threshold(
-            CreditStateVariable::HazardRate,
-            0.15,
-            ThresholdDirection::Above,
-        )
-        .unwrap();
-        let mut rng = Pcg64Rng::new(42);
-        let state_above = CreditState {
-            hazard_rate: 0.20,
-            ..Default::default()
-        };
-        let state_below = CreditState {
-            hazard_rate: 0.10,
-            ..Default::default()
-        };
-        assert!((model.pik_fraction(&state_above, &mut rng) - 1.0).abs() < 1e-10);
-        assert!((model.pik_fraction(&state_below, &mut rng) - 0.0).abs() < 1e-10);
     }
 
     // Optimal toggle (nested MC) tests
@@ -818,7 +756,6 @@ mod tests {
     #[test]
     fn optimal_toggle_does_not_panic() {
         let model = ToggleExerciseModel::OptimalExercise(make_optimal_toggle(100));
-        let mut rng = Pcg64Rng::new(42);
         let state = CreditState {
             hazard_rate: 0.20,
             leverage: 0.50,
@@ -827,7 +764,7 @@ mod tests {
             asset_value: Some(200.0),
             ..Default::default()
         };
-        let _ = model.should_pik(&state, &mut rng);
+        let _ = model.should_pik(&state, 0.5);
     }
 
     #[test]
@@ -849,7 +786,6 @@ mod tests {
             risk_free_rate: 0.03,
             horizon: 1.0,
         });
-        let mut rng = Pcg64Rng::new(99);
         let n = 100.0;
         let v = 104.0; // equity cushion = 4, coupon = 5 → cash breaches barrier
         let state = CreditState {
@@ -861,7 +797,7 @@ mod tests {
             asset_value: Some(v),
         };
         assert!(
-            model.should_pik(&state, &mut rng),
+            model.should_pik(&state, 0.5),
             "Stressed firm where cash breaches barrier should prefer PIK"
         );
     }
@@ -878,7 +814,6 @@ mod tests {
             risk_free_rate: 0.0,
             horizon: 1.0,
         });
-        let mut rng = Pcg64Rng::new(99);
         let n = 100.0;
         let v = n * 3.0;
         let state = CreditState {
@@ -890,13 +825,13 @@ mod tests {
             asset_value: Some(v),
         };
         assert!(
-            !model.should_pik(&state, &mut rng),
+            !model.should_pik(&state, 0.5),
             "Equal continuation values should tie-break to cash"
         );
     }
 
     #[test]
-    fn optimal_toggle_deterministic_with_same_seed() {
+    fn optimal_toggle_deterministic_with_same_uniform() {
         let model = ToggleExerciseModel::OptimalExercise(make_optimal_toggle(200));
         let state = CreditState {
             hazard_rate: 0.10,
@@ -907,22 +842,18 @@ mod tests {
             ..Default::default()
         };
 
-        let mut rng1 = Pcg64Rng::new(12345);
-        let result1 = model.should_pik(&state, &mut rng1);
-
-        let mut rng2 = Pcg64Rng::new(12345);
-        let result2 = model.should_pik(&state, &mut rng2);
+        let result1 = model.should_pik(&state, 0.12345);
+        let result2 = model.should_pik(&state, 0.12345);
 
         assert_eq!(
             result1, result2,
-            "Same seed must produce the same toggle decision"
+            "Same uniform must produce the same toggle decision"
         );
     }
 
     #[test]
     fn optimal_toggle_returns_false_when_notional_zero() {
         let model = ToggleExerciseModel::OptimalExercise(make_optimal_toggle(100));
-        let mut rng = Pcg64Rng::new(42);
         let state = CreditState {
             hazard_rate: 0.10,
             leverage: 0.0,
@@ -931,7 +862,7 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            !model.should_pik(&state, &mut rng),
+            !model.should_pik(&state, 0.5),
             "Zero notional should return false (nothing to toggle)"
         );
     }
@@ -981,7 +912,7 @@ mod tests {
                     horizon: 1.0,
                 };
                 // Use a fixed seed so only the discount rate varies.
-                decisions.push(optimal_toggle_decision_seeded(&o, state, 777));
+                decisions.push(optimal_toggle_decision(&o, state, 777));
             }
             assert!(
                 decisions.windows(2).all(|w| w[0] == w[1]),

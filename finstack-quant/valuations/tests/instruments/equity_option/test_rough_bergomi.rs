@@ -12,7 +12,6 @@
 //! self-referential fixture.
 
 use super::helpers::*;
-use finstack_quant_models::closed_form::black_scholes_spot_call;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
 use time::macros::date;
@@ -101,7 +100,17 @@ fn rbergomi_small_eta_converges_to_black_scholes() {
     // The pricer day-counts the expiry on Act365F; 2024 is a leap year, so the
     // accrual is 366/365 years. Use the same maturity for the BS reference.
     let t = 366.0 / 365.0;
-    let bs_price = black_scholes_spot_call(spot, strike, 0.0, 0.0, vol, t) * 100.0; // contract size 100
+    let bs_price = finstack_quant_models::closed_form::bs_price(
+        spot,
+        strike,
+        0.0,
+        0.0,
+        vol,
+        t,
+        finstack_quant_models::types::OptionType::Call,
+    )
+    .expect("valid Black-Scholes inputs")
+        * 100.0; // contract size 100
 
     let rel = (mc_price - bs_price).abs() / bs_price;
     assert!(
@@ -131,7 +140,17 @@ fn rbergomi_nonzero_rate_price_is_discounted() {
 
     // Act365F over a leap year ⇒ t = 366/365.
     let t = 366.0 / 365.0;
-    let bs_price = black_scholes_spot_call(spot, strike, rate, 0.0, vol, t) * 100.0; // contract size 100
+    let bs_price = finstack_quant_models::closed_form::bs_price(
+        spot,
+        strike,
+        rate,
+        0.0,
+        vol,
+        t,
+        finstack_quant_models::types::OptionType::Call,
+    )
+    .expect("valid Black-Scholes inputs")
+        * 100.0; // contract size 100
 
     let rel = (mc_price - bs_price).abs() / bs_price;
     assert!(

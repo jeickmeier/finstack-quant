@@ -5,11 +5,13 @@
 //! [`PyFactorCovarianceForecast`] which wraps the vol-forecast engine from
 //! `finstack-quant-models`.
 
+use crate::bindings::macros::wire_methods;
+use finstack_quant_core::wire::serde_label;
 use std::collections::BTreeMap;
 
 use numpy::{PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyTuple};
+use pyo3::types::{PyDict, PyTuple, PyType};
 
 use finstack_quant_core::types::IssuerId;
 use finstack_quant_models::factor::credit::calibration::{
@@ -19,17 +21,17 @@ use finstack_quant_models::factor::credit::calibration::{
 use finstack_quant_models::factor::credit::hierarchy::{
     dimension_key, CreditFactorModel, GenericFactorSpec, IssuerTags,
 };
+use finstack_quant_models::factor::credit::VolHorizon;
 use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
 
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::models::factor::risk::config::extract_vol_horizon;
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py,
     ColumnSchema,
 };
 use crate::bindings::pickle_support::reduce_via_json;
-use crate::errors::{core_to_py, decomposition_error_to_py, serde_json_to_py};
+use crate::errors::{core_to_py, decomposition_error_to_py, serde_json_to_py, value_error};
 
 /// Column schema of `PyLevelsAtDate::to_dataframe`, kept so a level-free
 /// snapshot still exports the documented columns.
@@ -76,11 +78,6 @@ const ISSUER_ROW_COLUMNS: &[ColumnSchema<'static>] = &[
     ("n_obs", "float64"),
     ("spread_duration", "float64"),
 ];
-
-/// Serde label (snake_case string) of a unit-variant enum.
-fn label<T: serde::Serialize>(value: &T) -> PyResult<String> {
-    finstack_quant_core::wire::serde_label(value).map_err(core_to_py)
-}
 
 /// Deserialize `obj` into `T`, accepting a JSON string, a mapping / list, or
 /// any object exposing ``to_dict()`` (``pandas.Series`` / ``DataFrame``).
@@ -198,13 +195,13 @@ impl PyCreditFactorModel {
     /// ``"quarterly"``) that fixed the annualization factor.
     #[getter]
     fn panel_frequency(&self) -> PyResult<String> {
-        label(&self.inner.panel_frequency)
+        serde_label(&self.inner.panel_frequency).map_err(core_to_py)
     }
 
     /// Bucket-mean weighting used at calibration (``"equal"`` or ``"dts"``).
     #[getter]
     fn bucket_weighting(&self) -> PyResult<String> {
-        label(&self.inner.bucket_weighting)
+        serde_label(&self.inner.bucket_weighting).map_err(core_to_py)
     }
 
     /// Point-in-time factor-model configuration (factors, covariance,
@@ -289,12 +286,12 @@ impl PyCreditFactorModel {
             rows.push(serde_json::json!({
                 "issuer_id": row.issuer_id.as_str(),
                 "tags": row.tags,
-                "mode": label(&row.mode)?,
+                "mode": serde_label(&row.mode).map_err(core_to_py)?,
                 "beta_pc": row.betas.pc,
                 "beta_levels": row.betas.levels,
                 "adder_at_anchor": row.adder_at_anchor,
                 "adder_vol_annualized": row.adder_vol_annualized,
-                "adder_vol_source": label(&row.adder_vol_source)?,
+                "adder_vol_source": serde_label(&row.adder_vol_source).map_err(core_to_py)?,
                 "r_squared": fit.map(|f| f.r_squared),
                 "n_obs": fit.map(|f| f.n_obs),
                 "spread_duration": row.spread_duration,
@@ -547,11 +544,11 @@ impl PyCreditCalibrator {
         let config = self.inner.config();
         format!(
             "CreditCalibrator(policy={:?}, n_levels={}, vol_model={:?}, covariance_strategy={:?}, bucket_weighting={:?})",
-            label(&config.policy).unwrap_or_default(),
+            serde_label(&config.policy).unwrap_or_default(),
             config.hierarchy.levels.len(),
-            label(&config.vol_model).unwrap_or_default(),
-            label(&config.covariance_strategy).unwrap_or_default(),
-            label(&config.bucket_weighting).unwrap_or_default(),
+            serde_label(&config.vol_model).unwrap_or_default(),
+            serde_label(&config.covariance_strategy).unwrap_or_default(),
+            serde_label(&config.bucket_weighting).unwrap_or_default(),
         )
     }
 }
@@ -1089,24 +1086,6 @@ impl PyFactorCovarianceMatrix {
         Ok(Self { inner })
     }
 
-    /// Deserialize and validate a covariance matrix from canonical JSON
-    /// (``{"factor_ids": [...], "n": N, "data": [...]}``).
-    ///
-    /// Raises:
-    ///     ValueError: If the JSON is malformed or the matrix fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid FactorCovarianceMatrix JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this covariance matrix to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "cannot serialize FactorCovarianceMatrix"))
-    }
-
     /// Number of factors represented by the matrix.
     #[getter]
     fn n_factors(&self) -> usize {
@@ -1178,12 +1157,6 @@ impl PyFactorCovarianceMatrix {
         dict_to_dataframe(py, &data, Some(index.into_any()))
     }
 
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "FactorCovarianceMatrix(factor_ids={:?}, n_factors={})",
@@ -1192,6 +1165,12 @@ impl PyFactorCovarianceMatrix {
         )
     }
 }
+
+wire_methods!(
+    PyFactorCovarianceMatrix,
+    FactorCovarianceMatrix,
+    "FactorCovarianceMatrix"
+);
 
 /// Portfolio factor-model configuration assembled at a forecast horizon.
 ///
@@ -1219,25 +1198,6 @@ impl PyFactorModelConfig {
 
 #[pymethods]
 impl PyFactorModelConfig {
-    /// Deserialize and validate a factor-model configuration from canonical JSON.
-    ///
-    /// Raises:
-    ///     ValueError: If the JSON is malformed or the configuration is
-    ///         inconsistent (unknown factor in a matching rule, bad covariance).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: FactorModelConfig = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid FactorModelConfig JSON"))?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this configuration to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "cannot serialize FactorModelConfig"))
-    }
-
     /// Number of configured factors.
     #[getter]
     fn n_factors(&self) -> usize {
@@ -1304,16 +1264,17 @@ impl PyFactorModelConfig {
         self.inner.validate().map_err(core_to_py)
     }
 
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!("FactorModelConfig(n_factors={})", self.inner.factors.len(),)
     }
 }
+
+wire_methods!(
+    PyFactorModelConfig,
+    FactorModelConfig,
+    "FactorModelConfig",
+    validate
+);
 
 /// Vol-forecast view over a calibrated ``CreditFactorModel``.
 ///
@@ -1340,6 +1301,157 @@ impl PyFactorModelConfig {
 ///     >>> model = CreditCalibrator(config).calibrate(inputs)
 ///     >>> forecast = FactorCovarianceForecast(model)
 ///     >>> forecast.covariance_at(VolHorizon.one_step()).factor_ids
+/// Extract a [`VolHorizon`] from either a `VolHorizon` instance or a
+/// descriptor string (`"one_step"`, `"unconditional"`, `'{"n_steps": N}'`,
+/// `'{"years": Y}'`).
+pub(crate) fn extract_vol_horizon(obj: &Bound<'_, PyAny>) -> PyResult<VolHorizon> {
+    if let Ok(horizon) = obj.extract::<PyRef<'_, PyVolHorizon>>() {
+        return Ok(horizon.inner);
+    }
+    if let Ok(descriptor) = obj.extract::<std::borrow::Cow<'_, str>>() {
+        return VolHorizon::parse(&descriptor).map_err(value_error);
+    }
+    Err(pyo3::exceptions::PyTypeError::new_err(
+        "horizon must be a VolHorizon or a descriptor string such as \"one_step\", \
+         \"unconditional\", '{\"n_steps\": N}' or '{\"years\": Y}'",
+    ))
+}
+
+/// Forecast horizon used to scale a calibrated ``Sample`` vol estimate.
+///
+/// Construct with one of the classmethods:
+///
+/// - ``VolHorizon.one_step()`` — calibrated annualized variance unchanged.
+/// - ``VolHorizon.unconditional()`` — long-run variance (identical to
+///   ``one_step`` for the ``Sample`` and ``Ewma`` vol models).
+/// - ``VolHorizon.n_steps(n)`` — variance scaled by ``n`` model periods.
+/// - ``VolHorizon.years(years)`` — variance scaled by a fractional year.
+/// - ``VolHorizon.parse(s)`` — from a descriptor string.
+///
+/// Every ``FactorCovarianceForecast`` method also accepts the descriptor
+/// string directly, so a ``VolHorizon`` instance is optional.
+///
+/// Example:
+///     >>> from finstack_quant.models.factor.credit import VolHorizon
+///     >>> VolHorizon.n_steps(5) == VolHorizon.parse('{"n_steps": 5}')
+///     True
+#[pyclass(
+    name = "VolHorizon",
+    module = "finstack_quant.models.factor.credit",
+    frozen,
+    eq,
+    from_py_object
+)]
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) struct PyVolHorizon {
+    pub(crate) inner: VolHorizon,
+}
+
+impl PyVolHorizon {
+    pub(crate) fn from_inner(inner: VolHorizon) -> Self {
+        Self { inner }
+    }
+}
+
+#[pymethods]
+impl PyVolHorizon {
+    /// One-period horizon: the calibrated annualized variance unchanged.
+    #[classmethod]
+    #[pyo3(text_signature = "(cls)")]
+    fn one_step(_cls: &Bound<'_, PyType>) -> Self {
+        Self::from_inner(VolHorizon::OneStep)
+    }
+
+    /// Long-run horizon; numerically identical to ``one_step`` for the
+    /// ``Sample`` and ``Ewma`` vol models.
+    #[classmethod]
+    #[pyo3(text_signature = "(cls)")]
+    fn unconditional(_cls: &Bound<'_, PyType>) -> Self {
+        Self::from_inner(VolHorizon::Unconditional)
+    }
+
+    /// ``n`` annualized model periods; variance scales linearly with ``n``.
+    ///
+    /// Args:
+    ///     n: Non-negative period count (``0`` yields zero variance).
+    #[classmethod]
+    #[pyo3(text_signature = "(cls, n)")]
+    fn n_steps(_cls: &Bound<'_, PyType>, n: usize) -> Self {
+        Self::from_inner(VolHorizon::NSteps(n))
+    }
+
+    /// Fractional-year horizon; variance scales linearly with ``years``.
+    ///
+    /// Args:
+    ///     years: Finite, non-negative horizon in years (``10 / 252`` for ten
+    ///         trading days of an annualized variance).
+    ///
+    /// Raises:
+    ///     ValueError: If ``years`` is negative or non-finite.
+    #[classmethod]
+    #[pyo3(text_signature = "(cls, years)")]
+    fn years(_cls: &Bound<'_, PyType>, years: f64) -> PyResult<Self> {
+        VolHorizon::years(years)
+            .map(Self::from_inner)
+            .map_err(value_error)
+    }
+
+    /// Parse a horizon descriptor string (matches the Rust ``VolHorizon::parse``).
+    ///
+    /// Args:
+    ///     s: ``"one_step"``, ``"unconditional"``, ``'{"n_steps": N}'``,
+    ///         ``'{"years": Y}'`` or ``'{"n_steps": N, "periods_per_year": P}'``.
+    ///
+    /// Raises:
+    ///     ValueError: If ``s`` is not one of the accepted forms.
+    #[classmethod]
+    #[pyo3(text_signature = "(cls, s)")]
+    fn parse(_cls: &Bound<'_, PyType>, s: &str) -> PyResult<Self> {
+        VolHorizon::parse(s)
+            .map(Self::from_inner)
+            .map_err(value_error)
+    }
+
+    /// Support pickle through the canonical descriptor string.
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
+        let parse = py.get_type::<Self>().getattr("parse")?;
+        reduce_via_json(parse, self.inner.descriptor())
+    }
+
+    /// Variant label: ``"one_step"`` / ``"unconditional"`` / ``"n_steps"`` / ``"years"``.
+    #[getter]
+    fn kind(&self) -> &'static str {
+        self.inner.kind()
+    }
+
+    /// Step count when ``kind == "n_steps"``, ``None`` otherwise.
+    #[getter]
+    fn n(&self) -> Option<usize> {
+        match self.inner {
+            VolHorizon::NSteps(n) => Some(n),
+            _ => None,
+        }
+    }
+
+    /// Fractional-year horizon when ``kind == "years"``, ``None`` otherwise.
+    #[getter]
+    fn years_value(&self) -> Option<f64> {
+        match self.inner {
+            VolHorizon::Years(years) => Some(years),
+            _ => None,
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        match self.inner {
+            VolHorizon::OneStep => "VolHorizon.one_step()".to_owned(),
+            VolHorizon::Unconditional => "VolHorizon.unconditional()".to_owned(),
+            VolHorizon::NSteps(n) => format!("VolHorizon.n_steps({n})"),
+            VolHorizon::Years(years) => format!("VolHorizon.years({years})"),
+        }
+    }
+}
+
 ///     ['credit::generic']
 #[pyclass(
     name = "FactorCovarianceForecast",
@@ -1461,7 +1573,7 @@ impl PyFactorCovarianceForecast {
                 let forecast = finstack_quant_models::factor::credit::FactorCovarianceForecast::new(
                     &self.model,
                 );
-                forecast.factor_model_config_at(h, measure)
+                forecast.factor_model_at(h, measure)
             })
             .map_err(core_to_py)?;
         Ok(PyFactorModelConfig::from_inner(config))
@@ -1486,5 +1598,6 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFactorCovarianceForecast>()?;
     m.add_function(pyo3::wrap_pyfunction!(decompose_levels, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(decompose_period, m)?)?;
+    m.add_class::<PyVolHorizon>()?;
     Ok(())
 }

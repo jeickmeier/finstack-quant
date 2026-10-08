@@ -251,89 +251,14 @@ impl CorrelationStructure {
         }
     }
 
-    /// Get the intra-sector correlation (for sectored structures).
-    pub fn intra_sector_correlation(&self) -> Option<f64> {
-        match self {
-            CorrelationStructure::Sectored { intra_sector, .. } => Some(*intra_sector),
-            _ => None,
-        }
-    }
-
-    /// Get the inter-sector correlation (for sectored structures).
-    pub fn inter_sector_correlation(&self) -> Option<f64> {
-        match self {
-            CorrelationStructure::Sectored { inter_sector, .. } => Some(*inter_sector),
-            _ => None,
-        }
-    }
-
-    /// Check if this is a flat correlation structure.
-    pub fn is_flat(&self) -> bool {
-        matches!(self, CorrelationStructure::Flat { .. })
-    }
-
-    /// Check if this is a sectored correlation structure.
-    pub fn is_sectored(&self) -> bool {
-        matches!(self, CorrelationStructure::Sectored { .. })
-    }
-
-    /// Get correlation between two assets.
-    ///
-    /// # Arguments
-    /// * `i` - First asset index
-    /// * `j` - Second asset index
-    /// * `same_sector` - Whether assets are in the same sector
-    pub fn pairwise_correlation(&self, i: usize, j: usize, same_sector: bool) -> f64 {
-        if i == j {
-            return 1.0;
-        }
-
-        match self {
-            CorrelationStructure::Flat {
-                asset_correlation, ..
-            } => *asset_correlation,
-            CorrelationStructure::Sectored {
-                intra_sector,
-                inter_sector,
-                ..
-            } => {
-                if same_sector {
-                    *intra_sector
-                } else {
-                    *inter_sector
-                }
-            }
-            CorrelationStructure::Matrix {
-                correlations,
-                labels,
-            } => {
-                let n = labels.len();
-                if i < n && j < n {
-                    correlations.get(i * n + j).copied().unwrap_or(0.0)
-                } else {
-                    0.0
-                }
-            }
-        }
-    }
-
-    /// Bump asset correlation by the given amount.
+    /// Bump asset correlation by the given amount and report whether any
+    /// underlying field was clamped.
     ///
     /// For flat structures, bumps the single asset correlation.
     /// For sectored structures, bumps intra-sector by `delta` and inter-sector by `delta * 0.5`.
     /// For matrix structures, bumps all off-diagonal elements.
     ///
-    /// # Arguments
-    /// * `delta` - Amount to add to correlation (clamped to valid range)
-    pub fn bump_asset(&self, delta: f64) -> Self {
-        self.bump_asset_with_clamp_info(delta).0
-    }
-
-    /// Bump asset correlation and report whether any underlying field was
-    /// clamped.
-    ///
-    /// This is the primitive used by scenario adapters that need to surface a
-    /// clamp warning. The clamp is detected at the underlying field level
+    /// Scenario adapters surface the clamp report as a warning. The clamp is detected at the underlying field level
     /// (`asset_correlation`, `intra_sector`, `inter_sector`, or each off-diagonal
     /// matrix entry) rather than at the aggregated
     /// [`Self::asset_correlation`] value, which for `Sectored` averages
@@ -348,8 +273,10 @@ impl CorrelationStructure {
     ///
     /// # Arguments
     ///
-    /// * `delta` - FX option delta in decimal form used to locate the smile point
-    pub fn bump_asset_with_clamp_info(&self, delta: f64) -> (Self, Option<String>) {
+    /// * `delta` - Amount to add to the correlation, in correlation points
+    ///   (`0.05` moves 0.20 to 0.25); each bumped field is clamped to
+    ///   `[0, 0.99]`.
+    pub fn bump_asset(&self, delta: f64) -> (Self, Option<String>) {
         const LO: f64 = 0.0;
         const HI: f64 = 0.99;
         match self {
@@ -553,18 +480,16 @@ impl CorrelationStructure {
         }
     }
 
-    /// Bump prepay-default correlation by the given amount.
+    /// Bump prepay-default correlation by the given amount and report
+    /// whether the underlying field was clamped.
+    ///
+    /// Returns `(new_structure, clamp_info)` as [`Self::bump_asset`] does.
     ///
     /// # Arguments
-    /// * `delta` - Amount to add to correlation (clamped to [-0.99, 0.99])
-    pub fn bump_prepay_default(&self, delta: f64) -> Self {
-        self.bump_prepay_default_with_clamp_info(delta).0
-    }
-
-    /// Bump prepay-default correlation and report whether the underlying
-    /// field was clamped. See [`Self::bump_asset_with_clamp_info`] for
-    /// rationale.
-    pub fn bump_prepay_default_with_clamp_info(&self, delta: f64) -> (Self, Option<String>) {
+    ///
+    /// * `delta` - Amount to add to the correlation, in correlation points;
+    ///   the result is clamped to `[-0.99, 0.99]`.
+    pub fn bump_prepay_default(&self, delta: f64) -> (Self, Option<String>) {
         const LO: f64 = -0.99;
         const HI: f64 = 0.99;
         match self {
@@ -650,7 +575,7 @@ mod tests {
 
         assert!((corr.asset_correlation() - 0.10).abs() < 1e-10);
         assert!((corr.prepay_default_correlation() - (-0.30)).abs() < 1e-10);
-        assert!(corr.is_flat());
+        assert!(matches!(corr, CorrelationStructure::Flat { .. }));
     }
 
     #[test]
@@ -658,22 +583,16 @@ mod tests {
         let corr =
             CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("valid sector correlation");
 
-        assert!(corr.is_sectored());
-        assert_eq!(corr.intra_sector_correlation(), Some(0.30));
-        assert_eq!(corr.inter_sector_correlation(), Some(0.10));
-    }
-
-    #[test]
-    fn test_pairwise_correlation() {
-        let sectored =
-            CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("valid sector correlation");
-
-        // Same sector
-        assert!((sectored.pairwise_correlation(0, 1, true) - 0.30).abs() < 1e-10);
-        // Different sector
-        assert!((sectored.pairwise_correlation(0, 1, false) - 0.10).abs() < 1e-10);
-        // Same asset
-        assert!((sectored.pairwise_correlation(0, 0, true) - 1.0).abs() < 1e-10);
+        let CorrelationStructure::Sectored {
+            intra_sector,
+            inter_sector,
+            ..
+        } = corr
+        else {
+            panic!("should be sectored");
+        };
+        assert_eq!(intra_sector, 0.30);
+        assert_eq!(inter_sector, 0.10);
     }
 
     #[test]
@@ -694,14 +613,14 @@ mod tests {
     #[test]
     fn test_default() {
         let corr = CorrelationStructure::default();
-        assert!(corr.is_flat());
+        assert!(matches!(corr, CorrelationStructure::Flat { .. }));
         assert!(corr.asset_correlation() > 0.0);
     }
 
     #[test]
     fn test_bump_asset_flat() {
         let corr = CorrelationStructure::flat(0.20, -0.30).expect("valid flat correlation");
-        let bumped = corr.bump_asset(0.05);
+        let bumped = corr.bump_asset(0.05).0;
 
         assert!((bumped.asset_correlation() - 0.25).abs() < 1e-10);
         assert!((bumped.prepay_default_correlation() - (-0.30)).abs() < 1e-10);
@@ -711,32 +630,26 @@ mod tests {
     fn test_bump_asset_sectored() {
         let corr =
             CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("valid sector correlation");
-        let bumped = corr.bump_asset(0.10);
+        let bumped = corr.bump_asset(0.10).0;
 
+        let CorrelationStructure::Sectored {
+            intra_sector,
+            inter_sector,
+            ..
+        } = bumped
+        else {
+            panic!("should be sectored");
+        };
         // Intra bumps by full delta
-        assert!(
-            (bumped
-                .intra_sector_correlation()
-                .expect("should be sectored")
-                - 0.40)
-                .abs()
-                < 1e-10
-        );
+        assert!((intra_sector - 0.40).abs() < 1e-10);
         // Inter bumps by half delta
-        assert!(
-            (bumped
-                .inter_sector_correlation()
-                .expect("should be sectored")
-                - 0.15)
-                .abs()
-                < 1e-10
-        );
+        assert!((inter_sector - 0.15).abs() < 1e-10);
     }
 
     #[test]
     fn test_bump_asset_clamping() {
         let corr = CorrelationStructure::flat(0.95, -0.30).expect("valid flat correlation");
-        let bumped = corr.bump_asset(0.10);
+        let bumped = corr.bump_asset(0.10).0;
 
         assert!(bumped.asset_correlation() <= 0.99);
     }
@@ -744,7 +657,7 @@ mod tests {
     #[test]
     fn test_bump_prepay_default() {
         let corr = CorrelationStructure::flat(0.20, -0.30).expect("valid flat correlation");
-        let bumped = corr.bump_prepay_default(0.10);
+        let bumped = corr.bump_prepay_default(0.10).0;
 
         assert!((bumped.asset_correlation() - 0.20).abs() < 1e-10);
         assert!((bumped.prepay_default_correlation() - (-0.20)).abs() < 1e-10);
@@ -753,7 +666,7 @@ mod tests {
     #[test]
     fn test_bump_prepay_default_clamping() {
         let corr = CorrelationStructure::flat(0.20, -0.95).expect("valid flat correlation");
-        let bumped = corr.bump_prepay_default(-0.10);
+        let bumped = corr.bump_prepay_default(-0.10).0;
 
         assert!(bumped.prepay_default_correlation() >= -0.99);
     }

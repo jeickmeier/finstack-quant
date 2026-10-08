@@ -16,7 +16,7 @@ regression and the constrained least-squares solver. Consumed by:
 
 | Consumer | What it uses |
 |----------|--------------|
-| `finstack-quant-models` | `beta` (OLS slope in the credit peel), `correlation::{nearest_correlation_matrix, validate_correlation_matrix, NearestCorrelationOpts}` |
+| `finstack-quant-models` | `beta` (OLS slope in the credit peel), `correlation::{nearest_correlation, validate_correlation_matrix, NearestCorrelationOpts}` |
 | `finstack-quant-valuations` | `correlation::*`, re-exported verbatim through `finstack_quant_models::correlation` |
 | `finstack-quant` (umbrella) | re-exported as `finstack_quant::analytics` |
 | `finstack-quant-py`, `finstack-quant-wasm` | `Performance`, `regression::constrained_least_squares` |
@@ -91,7 +91,7 @@ Canonical home for the shared correlation-matrix helpers. Exports:
 - `validate_correlation_matrix(matrix, n)` — square-shape, unit-diagonal,
   symmetry, `[-1, 1]` bounds, and PSD (Cholesky) checks, classifying failures
   as the canonical core `CorrelationError`, re-exported here as `Error`.
-- `nearest_correlation_matrix(matrix, n, opts)` with `NearestCorrelationOpts` —
+- `nearest_correlation(matrix, n, opts)` with `NearestCorrelationOpts` —
   Higham (2002) alternating-projection PSD repair.
 - `Error` — re-export of
   `finstack_quant_core::math::linalg::CorrelationError`.
@@ -196,8 +196,8 @@ caches. Unknown fields, including serialized caches, are rejected. `LookbackRetu
   only (see [`exports/analytics.js`](../../finstack-quant-wasm/exports/analytics.js)).
   WASM `Performance` methods return plain JS values instead of typed wrappers.
 - Shared correlation helpers are bound under
-  `finstack_quant.models.correlation` in both hosts, with
-  `nearest_correlation_matrix` exposed as `nearest_correlation`.
+  `finstack_quant.models.correlation` in both hosts, with the canonical
+  `nearest_correlation` name shared across Rust, Python, and WASM.
 
 The authoritative contract, including every known gap, is
 [`parity_contract.toml`](../../finstack-quant-py/parity_contract.toml)

@@ -1167,12 +1167,8 @@ fn lagged_term_reset_uses_curve_tenor_and_captures_post_pik_start_balance() {
     assert!((rate.accrual - (times[observation_end] - times[coupon.reset_step])).abs() < 1e-14);
     assert_eq!(
         rate.conditional_discount_factors,
-        tree.conditional_discount_factors(
-            coupon.reset_step,
-            observation_end,
-            *times.last().expect("terminal time")
-        )
-        .expect("conditional discount factors")
+        tree.conditional_discount_factors(coupon.reset_step, observation_end)
+            .expect("conditional discount factors")
     );
 
     let schedule = bullet

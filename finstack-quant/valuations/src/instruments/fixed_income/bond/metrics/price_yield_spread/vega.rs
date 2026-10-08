@@ -33,6 +33,9 @@ enum ShortRateSigma {
     HullWhite { kappa: f64 },
     /// Rates-only Black-Derman-Toy tree: `model_config.bdt_sigma`.
     BlackDermanToy,
+    /// Rates-only Black-Karasinski tree: `model_config.bk_sigma`. The mean
+    /// reversion is an explicit override, so the bumped clone keeps it.
+    BlackKarasinski,
 }
 
 /// Resolve which volatility input the model reads, and its base value.
@@ -54,6 +57,9 @@ fn short_rate_sigma(
             Ok((ShortRateSigma::HullWhite { kappa }, sigma))
         }
         TreeModelChoice::BlackDermanToy { sigma } => Ok((ShortRateSigma::BlackDermanToy, sigma)),
+        TreeModelChoice::BlackKarasinski { sigma, .. } => {
+            Ok((ShortRateSigma::BlackKarasinski, sigma))
+        }
         TreeModelChoice::HoLee { .. } => Err(finstack_quant_core::Error::Validation(format!(
             "bond '{}' vega: the tree selected no short-rate volatility input",
             bond.id
@@ -78,6 +84,7 @@ fn holder_option_value_at_vol(
             model_config.hw1f_sigma = Some(volatility);
         }
         ShortRateSigma::BlackDermanToy => model_config.bdt_sigma = Some(volatility),
+        ShortRateSigma::BlackKarasinski => model_config.bk_sigma = Some(volatility),
     }
     clear_price_driving_overrides(&mut bumped);
     bumped.instrument_pricing_overrides.market_quotes.quoted_oas = Some(oas_decimal);

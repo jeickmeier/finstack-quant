@@ -1,0 +1,58 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/path_summary.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Simulated paths on a shared time grid.",
+  "properties": {
+    "dim": {
+      "description": "State dimension; equals `factor_names.len()`.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "factor_names": {
+      "description": "Name of each state component, in state-vector order.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "num_paths": {
+      "description": "Number of independent random streams requested.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "num_simulated_paths": {
+      "description": "Number of stored paths: `num_paths`, or `2 * num_paths` with\nantithetic sampling, where stored paths `2k` and `2k + 1` are stream\n`k` and its antithetic partner.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "times": {
+      "description": "Simulation times in years, starting at zero; length `num_steps + 1`.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "values": {
+      "description": "States in row-major `[path][time][factor]` order: the value of factor\n`f` on stored path `p` at `times[s]` is\n`values[(p * times.len() + s) * dim + f]`.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "num_paths",
+    "num_simulated_paths",
+    "dim",
+    "times",
+    "factor_names",
+    "values"
+  ],
+  "title": "PathSummary",
+  "type": "object"
+}

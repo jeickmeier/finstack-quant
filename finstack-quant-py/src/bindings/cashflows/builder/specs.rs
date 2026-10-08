@@ -1,5 +1,6 @@
 //! Spec-type bindings for `finstack_quant_cashflows::builder::specs`.
 
+use crate::bindings::macros::wire_methods;
 use finstack_quant_cashflows::builder::{
     AmortizationSpec, CouponType, DefaultModelSpec, FeeAccrualBasis, FeeBase, FeeSpec,
     FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding, FloatingRateFallback,
@@ -87,45 +88,6 @@ fn decimal_opt_to_py<'py>(
     value: Option<Decimal>,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
     value.map(|v| decimal_to_py(py, v)).transpose()
-}
-
-/// Generate `to_json` / `from_json` / `__reduce__` for a serde-backed wrapper.
-macro_rules! wire_methods {
-    ($py_type:ident, $rust_type:ty, $name:literal) => {
-        #[pymethods]
-        impl $py_type {
-            /// Serialize to the canonical JSON wire form.
-            #[allow(clippy::wrong_self_convention)]
-            #[pyo3(text_signature = "(self)")]
-            fn to_json(&self) -> PyResult<String> {
-                serde_json::to_string(&self.inner).map_err(|e| {
-                    crate::errors::serde_json_to_py(e, concat!("failed to serialize ", $name))
-                })
-            }
-
-            /// Deserialize from the canonical JSON wire form (strict field names).
-            ///
-            /// Raises
-            /// ------
-            /// ValueError
-            ///     If the JSON is malformed or carries unknown fields.
-            #[staticmethod]
-            #[pyo3(text_signature = "(json)")]
-            fn from_json(json: &str) -> PyResult<Self> {
-                serde_json::from_str::<$rust_type>(json)
-                    .map(|inner| Self { inner })
-                    .map_err(|e| {
-                        crate::errors::serde_json_to_py(e, concat!("invalid ", $name, " JSON"))
-                    })
-            }
-
-            /// Support ``pickle`` through the JSON wire form.
-            fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-                let from_json = py.get_type::<Self>().getattr("from_json")?;
-                crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-            }
-        }
-    };
 }
 
 /// Roll-date rule for schedule anchors: ``RollRule.NONE`` (plain tenor
@@ -692,7 +654,7 @@ impl PyScheduleParams {
             end_of_month,
             payment_lag_days,
             adjust_accrual_dates,
-            roll_rule: roll_rule.map_or(RollRule::None, |r| r.inner),
+            roll_rule: roll_rule.map(|r| r.inner).unwrap_or_default(),
         };
         inner.validate().map_err(core_to_py)?;
         Ok(Self::from_inner(inner))
@@ -1828,8 +1790,7 @@ impl PyFeeSpec {
                 },
                 calendar_id: calendar_id.to_string(),
                 stub: stub.map_or_else(serde_defaults::stub_short_front, |s| s.inner),
-                accrual_basis: accrual_basis
-                    .map_or(FeeAccrualBasis::PointInTime, |a| a.inner.clone()),
+                accrual_basis: accrual_basis.map(|a| a.inner.clone()).unwrap_or_default(),
             },
         })
     }

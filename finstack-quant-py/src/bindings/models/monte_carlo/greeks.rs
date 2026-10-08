@@ -7,8 +7,7 @@ use super::engine::resolve_currency;
 use super::results::PyEstimate;
 use crate::errors::core_to_py;
 use finstack_quant_models::monte_carlo::greeks::gbm_european::{
-    finite_diff_delta_crn_gbm, finite_diff_delta_gbm, finite_diff_gamma_crn_gbm,
-    finite_diff_gamma_gbm, GbmEuropeanFdSpec,
+    finite_diff_delta_gbm, finite_diff_gamma_gbm, GbmEuropeanFdSpec,
 };
 use finstack_quant_models::OptionType;
 use pyo3::prelude::*;
@@ -46,8 +45,10 @@ fn spec_from_args(
 
 /// Finite-difference delta for a vanilla European option under GBM.
 ///
-/// Both this function and ``finite_diff_delta_crn`` reuse common random
-/// numbers. This function reports a conservative independence-bound stderr.
+/// Central difference in spot with common random numbers: the up and down
+/// valuations share each path's random draws, the estimate is the mean of
+/// the per-path differences, and ``stderr`` is the paired
+/// (common-random-number) standard error of those differences.
 ///
 /// Parameters
 /// ----------
@@ -82,8 +83,8 @@ fn spec_from_args(
 /// Returns
 /// -------
 /// Estimate
-///     ``mean`` is the delta, ``stderr`` its standard error, ``ci_lower`` /
-///     ``ci_upper`` the symmetric 95% band.
+///     ``mean`` is the delta, ``stderr`` its paired (common-random-number)
+///     standard error, ``ci_lower`` / ``ci_upper`` the symmetric 95% band.
 ///
 /// Raises
 /// ------
@@ -121,84 +122,11 @@ fn finite_diff_delta(
         .map_err(core_to_py)
 }
 
-/// Finite-difference delta with paired common-random-number stderr.
+/// Finite-difference gamma for a vanilla European option under GBM.
 ///
-/// Same CRN-priced central difference as ``finite_diff_delta``; only the
-/// reported stderr estimator differs (paired pathwise differences, usually
-/// far tighter than the independence bound).
-///
-/// Parameters
-/// ----------
-/// spot : float
-///     Finite positive spot price; see ``finite_diff_delta`` for the bump rule.
-/// strike : float
-///     Strike price.
-/// rate : float
-///     Risk-free rate (continuously compounded decimal).
-/// div_yield : float
-///     Dividend yield (continuously compounded decimal).
-/// vol : float
-///     Annualized volatility (decimal); must be strictly positive.
-/// expiry : float
-///     Maturity in years.
-/// is_call : bool
-///     ``True`` for a call, ``False`` for a put.
-/// num_paths : int, optional
-///     Paths per evaluation; defaults to the registry value.
-/// seed : int, optional
-///     RNG seed; defaults to the registry value.
-/// num_steps : int, optional
-///     Time-grid steps; defaults to the registry value.
-/// bump_size : float, optional
-///     Relative Monte Carlo spot shock (registry default ``0.01``).
-/// currency : Currency or str, optional
-///     Currency stamped on the simulated payoffs; defaults to the registry value.
-///
-/// Returns
-/// -------
-/// Estimate
-///     ``mean`` is the delta, ``stderr`` the paired CRN standard error.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``vol`` is not strictly positive, the inputs cannot form a
-///     symmetric central stencil, or another pricing input is invalid.
-#[pyfunction]
-#[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (
-    spot, strike, rate, div_yield, vol, expiry, is_call,
-    num_paths=None, seed=None, num_steps=None,
-    bump_size=None, currency=None,
-))]
-fn finite_diff_delta_crn(
-    py: Python<'_>,
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
-    is_call: bool,
-    num_paths: Option<usize>,
-    seed: Option<u64>,
-    num_steps: Option<usize>,
-    bump_size: Option<f64>,
-    currency: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyEstimate> {
-    let spec = spec_from_args(
-        spot, strike, rate, div_yield, vol, expiry, is_call, num_paths, seed, num_steps, bump_size,
-        currency,
-    )?;
-    py.detach(|| finite_diff_delta_crn_gbm(spec))
-        .map(PyEstimate::from_inner)
-        .map_err(core_to_py)
-}
-
-/// Finite-difference gamma (independence-bound stderr).
-///
-/// Both this function and ``finite_diff_gamma_crn`` reuse common random
-/// numbers. This function reports a conservative independence-bound stderr.
+/// Second central difference in spot with common random numbers; the
+/// estimate is the mean of the per-path second differences and ``stderr``
+/// is their paired (common-random-number) standard error.
 ///
 /// Parameters
 /// ----------
@@ -230,7 +158,8 @@ fn finite_diff_delta_crn(
 /// Returns
 /// -------
 /// Estimate
-///     ``mean`` is the gamma, ``stderr`` its standard error.
+///     ``mean`` is the gamma, ``stderr`` its paired (common-random-number)
+///     standard error.
 ///
 /// Raises
 /// ------
@@ -268,83 +197,8 @@ fn finite_diff_gamma(
         .map_err(core_to_py)
 }
 
-/// Finite-difference gamma with paired common-random-number stderr.
-///
-/// Same CRN-priced second difference as ``finite_diff_gamma``; only the
-/// reported stderr estimator differs.
-///
-/// Parameters
-/// ----------
-/// spot : float
-///     Finite positive spot price; see ``finite_diff_delta`` for the bump rule.
-/// strike : float
-///     Strike price.
-/// rate : float
-///     Risk-free rate (continuously compounded decimal).
-/// div_yield : float
-///     Dividend yield (continuously compounded decimal).
-/// vol : float
-///     Annualized volatility (decimal); must be strictly positive.
-/// expiry : float
-///     Maturity in years.
-/// is_call : bool
-///     ``True`` for a call, ``False`` for a put.
-/// num_paths : int, optional
-///     Paths per evaluation; defaults to the registry value.
-/// seed : int, optional
-///     RNG seed; defaults to the registry value.
-/// num_steps : int, optional
-///     Time-grid steps; defaults to the registry value.
-/// bump_size : float, optional
-///     Relative Monte Carlo spot shock (registry default ``0.01``).
-/// currency : Currency or str, optional
-///     Currency stamped on the simulated payoffs; defaults to the registry value.
-///
-/// Returns
-/// -------
-/// Estimate
-///     ``mean`` is the gamma, ``stderr`` the paired CRN standard error.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``vol`` is not strictly positive, the inputs cannot form a
-///     symmetric central stencil, or another pricing input is invalid.
-#[pyfunction]
-#[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (
-    spot, strike, rate, div_yield, vol, expiry, is_call,
-    num_paths=None, seed=None, num_steps=None,
-    bump_size=None, currency=None,
-))]
-fn finite_diff_gamma_crn(
-    py: Python<'_>,
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
-    is_call: bool,
-    num_paths: Option<usize>,
-    seed: Option<u64>,
-    num_steps: Option<usize>,
-    bump_size: Option<f64>,
-    currency: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyEstimate> {
-    let spec = spec_from_args(
-        spot, strike, rate, div_yield, vol, expiry, is_call, num_paths, seed, num_steps, bump_size,
-        currency,
-    )?;
-    py.detach(|| finite_diff_gamma_crn_gbm(spec))
-        .map(PyEstimate::from_inner)
-        .map_err(core_to_py)
-}
-
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(finite_diff_delta, m)?)?;
-    m.add_function(wrap_pyfunction!(finite_diff_delta_crn, m)?)?;
     m.add_function(wrap_pyfunction!(finite_diff_gamma, m)?)?;
-    m.add_function(wrap_pyfunction!(finite_diff_gamma_crn, m)?)?;
     Ok(())
 }

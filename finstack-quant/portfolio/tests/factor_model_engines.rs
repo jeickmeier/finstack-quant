@@ -109,7 +109,7 @@ fn delta_based_engine_matches_bond_dv01_metric() -> Result<()> {
         Currency::USD,
     )?;
 
-    let actual_dv01 = matrix.delta(0, 0);
+    let actual_dv01 = matrix.delta(0, 0).expect("in range");
     assert!(
         (actual_dv01 - expected_dv01).abs() < dv01_tolerance(expected_dv01),
         "delta engine DV01 {} should match bond metric {}",
@@ -225,11 +225,13 @@ fn delta_based_engine_eur_in_usd_book_has_nonzero_fx_factor() -> Result<()> {
     )?;
 
     assert!(
-        matrix.delta(0, 0).abs() > 1e-8,
+        matrix.delta(0, 0).expect("in range").abs() > 1e-8,
         "EUR translation through bumped USD spot must be a non-zero FX factor"
     );
     assert!(
-        (matrix.delta(0, 0) - 2.0 * one_lot.delta(0, 0)).abs() < 1e-8,
+        (matrix.delta(0, 0).expect("in range") - 2.0 * one_lot.delta(0, 0).expect("in range"))
+            .abs()
+            < 1e-8,
         "engine weight must scale the FX-factor column"
     );
     Ok(())
@@ -324,11 +326,12 @@ fn portfolio_wrap_uses_scale_factor_weight_for_eur_fx_factor() -> Result<()> {
     let two = model.compute_sensitivities(&two_lot_book, &market, as_of)?;
     let one = model.compute_sensitivities(&one_lot_book, &market, as_of)?;
     assert!(
-        two.delta(0, 0).abs() > 1e-8,
+        two.delta(0, 0).expect("in range").abs() > 1e-8,
         "EUR instrument in a USD book must have a non-zero FX-factor column"
     );
     assert!(
-        (two.delta(0, 0) - 2.0 * one.delta(0, 0)).abs() < 1e-8,
+        (two.delta(0, 0).expect("in range") - 2.0 * one.delta(0, 0).expect("in range")).abs()
+            < 1e-8,
         "Portfolio wrap weight must be scale_factor()"
     );
 
@@ -443,7 +446,7 @@ fn vol_factor_delta_matches_equity_option_vega() -> Result<()> {
         .compute_pnl_profiles(&positions, &factors, &market, as_of, Currency::USD)?;
 
     for (label, actual) in [
-        ("delta engine", delta_matrix.delta(0, 0)),
+        ("delta engine", delta_matrix.delta(0, 0).expect("in range")),
         (
             "full repricing",
             (repricing_profiles[0].position_pnls[3][0] - repricing_profiles[0].position_pnls[1][0])

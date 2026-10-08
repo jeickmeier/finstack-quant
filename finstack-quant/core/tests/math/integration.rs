@@ -3,7 +3,7 @@
 use finstack_quant_core::math::{
     erf, gauss_legendre_integrate, gauss_legendre_integrate_adaptive,
     gauss_legendre_integrate_composite,
-    integration::{adaptive_simpson, simpson_rule, trapezoidal_rule},
+    integration::{adaptive_simpson, simpson_rule},
     norm_cdf, GaussHermiteQuadrature,
 };
 use std::f64::consts::PI;
@@ -23,22 +23,6 @@ fn test_simpson_rule_sin() {
     let result = simpson_rule(f, 0.0, PI, 100).unwrap();
     // Simpson with n=100 on sin(x): error ~ π/180 * (π/100)^4 ≈ 1.7e-9
     assert!((result - 2.0).abs() < 1e-7);
-}
-
-#[test]
-fn test_trapezoidal_rule_linear() {
-    // Test trapezoidal rule on linear function x over [0, 2] = 2
-    let f = |x: f64| x;
-    let result = trapezoidal_rule(f, 0.0, 2.0, 100).unwrap();
-    assert!((result - 2.0).abs() < 1e-6);
-}
-
-#[test]
-fn test_trapezoidal_rule_quadratic() {
-    // Test trapezoidal rule on x² over [0, 1] = 1/3
-    let f = |x: f64| x * x;
-    let result = trapezoidal_rule(f, 0.0, 1.0, 1000).unwrap();
-    assert!((result - 1.0 / 3.0).abs() < 1e-3); // Less accurate than Simpson
 }
 
 #[test]
@@ -116,13 +100,10 @@ fn test_integration_methods_comparison() {
     let exact = 4.0;
 
     let simpson = simpson_rule(f, 0.0, 2.0, 100).unwrap();
-    let trapezoidal = trapezoidal_rule(f, 0.0, 2.0, 100).unwrap();
     let adaptive = adaptive_simpson(f, 0.0, 2.0, 1e-6, 20).unwrap();
 
     // Simpson should be most accurate for polynomials
     assert!((simpson - exact).abs() < 1e-8);
-    // Trapezoidal less accurate
-    assert!((trapezoidal - exact).abs() < 1e-2);
     // Adaptive should be very accurate
     assert!((adaptive - exact).abs() < 1e-10);
 }
@@ -136,7 +117,6 @@ fn test_integration_error_cases() {
 
     // Zero intervals should fail
     assert!(simpson_rule(f, 0.0, 1.0, 0).is_err());
-    assert!(trapezoidal_rule(f, 0.0, 1.0, 0).is_err());
 }
 
 #[test]
@@ -167,64 +147,6 @@ fn gauss_hermite_supported_orders_match_standard_normal_moments() {
                 "order {order}, E[X^{power}]: got {actual:.16e}, expected {expected:.16e}"
             );
         }
-    }
-}
-
-fn assert_gauss_hermite_adaptive_branch(start: usize, next: usize, fallback: usize) {
-    let f = |x: f64| 1.0 / (1.0 + x * x);
-    let start_quad = GaussHermiteQuadrature::new(start).expect("supported start order");
-    let next_value = GaussHermiteQuadrature::new(next)
-        .expect("supported next order")
-        .integrate(f);
-    let fallback_value = GaussHermiteQuadrature::new(fallback)
-        .expect("supported fallback order")
-        .integrate(f);
-    let base_value = start_quad.integrate(f);
-    let promotion_gap = (next_value - base_value).abs();
-    assert!(
-        promotion_gap > 0.0,
-        "order {start} and order {next} must differ for the branch oracle"
-    );
-
-    let loose = promotion_gap.next_up();
-    let tight = promotion_gap.next_down();
-    assert_eq!(
-        start_quad.integrate_adaptive(f, loose).to_bits(),
-        next_value.to_bits(),
-        "order {start} should accept order {next} just above the promotion gap"
-    );
-    assert_eq!(
-        start_quad.integrate_adaptive(f, tight).to_bits(),
-        fallback_value.to_bits(),
-        "order {start} should fall back to order {fallback} just below the promotion gap"
-    );
-}
-
-#[test]
-fn gauss_hermite_adaptive_tolerance_selects_documented_order() {
-    assert_gauss_hermite_adaptive_branch(5, 7, 10);
-    assert_gauss_hermite_adaptive_branch(7, 10, 15);
-    assert_gauss_hermite_adaptive_branch(10, 15, 20);
-}
-
-#[test]
-fn gauss_hermite_orders_15_and_20_are_terminal() {
-    let f = |x: f64| 1.0 / (1.0 + x * x);
-    let quad15 = GaussHermiteQuadrature::new(15).expect("supported order");
-    let quad20 = GaussHermiteQuadrature::new(20).expect("supported order");
-    let value20 = quad20.integrate(f);
-
-    for tolerance in [f64::NEG_INFINITY, 0.0, f64::INFINITY, f64::NAN] {
-        assert_eq!(
-            quad15.integrate_adaptive(f, tolerance).to_bits(),
-            value20.to_bits(),
-            "order 15 must promote to order 20 regardless of tolerance"
-        );
-        assert_eq!(
-            quad20.integrate_adaptive(f, tolerance).to_bits(),
-            value20.to_bits(),
-            "order 20 must return its base estimate regardless of tolerance"
-        );
     }
 }
 
@@ -350,21 +272,6 @@ fn test_simpson_rule_edge_cases() {
     // Negative interval (b < a)
     let result = simpson_rule(f, 5.0, 0.0, 100).unwrap();
     assert!((result + 12.5).abs() < 1e-3); // Should be negative of [0,5]
-}
-
-#[test]
-fn test_trapezoidal_rule_edge_cases() {
-    let f = |x: f64| x * x;
-
-    // Very small interval
-    let result = trapezoidal_rule(f, 0.0, 0.001, 10).unwrap();
-    assert!(result.abs() < 1e-6);
-
-    // Large interval with few points
-    let result = trapezoidal_rule(f, 0.0, 100.0, 10).unwrap();
-    let exact = 100.0_f64.powi(3) / 3.0;
-    // Should be less accurate but still reasonable
-    assert!((result - exact).abs() / exact < 0.1); // Within 10%
 }
 
 #[test]
@@ -507,36 +414,6 @@ fn test_convergence_behavior() {
 
     assert!(err100 < err10);
     assert!(err1000 < err100);
-}
-
-#[test]
-fn test_gauss_hermite_serde() {
-    let quad5 = GaussHermiteQuadrature::new(5).expect("valid order");
-    let quad7 = GaussHermiteQuadrature::new(7).expect("valid order");
-    let quad10 = GaussHermiteQuadrature::new(10).expect("valid order");
-
-    // Serialize
-    let json5 = serde_json::to_string(&quad5).unwrap();
-    let json7 = serde_json::to_string(&quad7).unwrap();
-    let json10 = serde_json::to_string(&quad10).unwrap();
-
-    // Deserialize
-    let deser5: GaussHermiteQuadrature = serde_json::from_str(&json5).unwrap();
-    let deser7: GaussHermiteQuadrature = serde_json::from_str(&json7).unwrap();
-    let deser10: GaussHermiteQuadrature = serde_json::from_str(&json10).unwrap();
-
-    // Check they work the same
-    let f = |x: f64| x * x;
-    assert!((quad5.integrate(f) - deser5.integrate(f)).abs() < 1e-12);
-    assert!((quad7.integrate(f) - deser7.integrate(f)).abs() < 1e-12);
-    assert!((quad10.integrate(f) - deser10.integrate(f)).abs() < 1e-12);
-}
-
-#[test]
-fn test_gauss_hermite_serde_invalid_order() {
-    let json = r#"{"order":99}"#;
-    let result: Result<GaussHermiteQuadrature, _> = serde_json::from_str(json);
-    assert!(result.is_err());
 }
 
 // ── H1 regression: compensated accumulation for order-20 cancellation-prone integrand ──

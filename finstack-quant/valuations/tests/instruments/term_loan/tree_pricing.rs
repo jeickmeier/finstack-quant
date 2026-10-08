@@ -623,3 +623,42 @@ fn off_cycle_immediate_par_call_includes_accrued() {
         10_000_000.0 + accrued
     );
 }
+
+/// Bit-exact settlement values at a non-zero quoted OAS on both the
+/// short-rate lattice and the rates-credit lattice: the OAS reaches the
+/// valuator and the induction unchanged.
+#[test]
+fn term_loan_tree_prices_are_bit_pinned() {
+    use finstack_quant_core::market_data::term_structures::HazardCurve;
+    use finstack_quant_core::market_data::term_structures::ParInterp;
+
+    let as_of = date!(2025 - 01 - 01);
+    let pricer =
+        finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanTreePricer::new();
+
+    let mut loan = build_callable_loan(as_of);
+    loan.instrument_pricing_overrides.market_quotes.quoted_oas = Some(0.0075);
+    let short_rate = pricer
+        .price_callable(&loan, &base_market(as_of), as_of)
+        .unwrap()
+        .amount();
+
+    let hazard = HazardCurve::builder("USD-HAZ")
+        .base_date(as_of)
+        .recovery_rate(0.4)
+        .knots([(0.0, 0.02), (5.0, 0.03)])
+        .par_interp(ParInterp::Linear)
+        .build()
+        .unwrap();
+    loan.credit_curve_id = Some(CurveId::from("USD-HAZ"));
+    let rates_credit = pricer
+        .price_callable(&loan, &base_market(as_of).insert(hazard), as_of)
+        .unwrap()
+        .amount();
+
+    assert_eq!(
+        [short_rate.to_bits(), rates_credit.to_bits()],
+        [4_711_601_891_810_740_306_u64, 4_711_280_227_318_290_590],
+        "short_rate={short_rate} rates_credit={rates_credit}"
+    );
+}

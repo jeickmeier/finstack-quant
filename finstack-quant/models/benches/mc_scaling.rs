@@ -21,7 +21,7 @@ use finstack_quant_core::math::fractional::HurstExponent;
 use finstack_quant_models::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
-use finstack_quant_models::monte_carlo::pricer::lsmc::{AmericanPut, LsmcConfig, LsmcPricer};
+use finstack_quant_models::monte_carlo::pricer::lsmc::{AmericanExercise, LsmcConfig, LsmcPricer};
 use finstack_quant_models::monte_carlo::pricer::lsq::solve_least_squares;
 use finstack_quant_models::monte_carlo::process::rough_heston::{
     RoughHestonParams, RoughHestonProcess,
@@ -29,6 +29,7 @@ use finstack_quant_models::monte_carlo::process::rough_heston::{
 use finstack_quant_models::monte_carlo::rng::fbm::FractionalNoiseGenerator;
 use finstack_quant_models::monte_carlo::rng::volterra::RiemannLiouvilleVolterra;
 use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream};
+use finstack_quant_models::types::OptionType;
 use fixtures::{
     discount, european_call, exact_gbm, gbm, heston, lmm_process, lmm_scheme, multi_gbm, philox,
     qe_heston, serial_engine, RATE, SEED, SPOT, STRIKE,
@@ -114,7 +115,7 @@ fn scaling_heston_paths(c: &mut Criterion) {
 fn scaling_lsmc_paths(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_lsmc_paths");
     let process = gbm();
-    let exercise = AmericanPut::new(STRIKE).expect("valid strike");
+    let exercise = AmericanExercise::new(OptionType::Put, STRIKE).expect("valid strike");
     let basis = PolynomialBasis::new(2).expect("valid regression basis");
     let num_steps = 12;
     let exercise_dates: Vec<usize> = (1..=num_steps).collect();

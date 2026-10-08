@@ -17,8 +17,8 @@ Per-item detail is in the rustdoc (`cargo doc -p finstack-quant-models --open`).
 | `greeks/` | Sensitivity estimators | `pathwise`, `lrm`, `finite_diff`, `gbm_european` |
 | `payoff/` | Contract definitions evaluated on `PathState` | `vanilla`, `asian`, `barrier`, `lookback` |
 | `pricer/` | Higher-level workflows over `McEngine` | `european`, `path_dependent`, `lsmc`, `heston`, `basis`, `lsq` |
-| `process/` | SDE definitions and process metadata | all 12 model modules plus `metadata` |
-| `rng/` | Random and quasi-random generation | `philox`, `sobol`, `fbm`, `volterra`; `brownian_bridge`, `poisson`, and `BrownianBridge` are re-exported from `finstack_quant_core::math::random` |
+| `process/` | SDE definitions and process metadata | all 13 model modules (including Dupire `local_vol`) plus `metadata` |
+| `rng/` | Random and quasi-random generation | `philox`, `sobol`, `fbm`, `volterra`; `brownian_bridge`, `poisson`, and `BrownianBridge` live in `finstack_quant_core::math::random` |
 | `variance_reduction/` | `control_variate` only — antithetic pairing lives in the engine loop, not here | `control_variate` |
 
 ## Top-level files
@@ -33,7 +33,7 @@ Per-item detail is in the rustdoc (`cargo doc -p finstack-quant-models --open`).
 | `paths.rs` | `PathDataset`, `SimulatedPath`, `PathPoint`, `PathSamplingMethod`, `ProcessParams`, `CashflowType` |
 | `registry.rs` | Embedded runtime defaults from `../data/defaults/pricer_defaults.v1.json`; `MONTE_CARLO_DEFAULTS_EXTENSION_KEY` |
 | `seed.rs` | `derive_seed` — FNV-1a seed derivation from instrument id + scenario name |
-| `gbm_paths.rs` | Private module; `simulate_gbm_paths`, `GbmPathConfig`, `GbmPathSummary` are re-exported at the crate root |
+| `simulate.rs` | `simulate_paths`: one entry point returning a compact `PathSummary` for any built-in process (Markov, LMM or rough-volatility) and scheme named by a serializable `PathSimulationSpec` (`ProcessSpec`, `SchemeSpec`, `TimeGridSpec`) |
 | `captured_path_stats.rs` | Private: folds captured-path distribution statistics into an `Estimate` |
 | `indexed_spot_table.rs` | Private: static `spot_0` … `spot_127` key table backing `traits::state_keys::indexed_spot` (higher indices fall through to a cached overflow path) |
 | `mc_process_params_serialization.rs` | `#[cfg(test)]` only |

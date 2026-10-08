@@ -568,71 +568,23 @@ fn validate_student_t_degrees_of_freedom(df: f64) -> Result<()> {
 /// Industry standard (QuantLib, Bloomberg) uses 20-50 points for tranche pricing.
 pub(crate) const DEFAULT_QUADRATURE_ORDER: u8 = 20;
 
-/// Global cache of Gauss-Hermite quadrature instances keyed by order.
-/// Wrapped in `Arc` so copula clones are cheap (refcount bump instead of O(n²) recomputation).
-static QUADRATURE_CACHE: std::sync::OnceLock<
-    std::sync::Mutex<std::collections::HashMap<u8, std::sync::Arc<GaussHermiteQuadrature>>>,
-> = std::sync::OnceLock::new();
+/// Shared default-order Gauss-Hermite rule.
+/// Wrapped in `Arc` so copula clones are cheap (refcount bump instead of a rebuild).
+static DEFAULT_QUADRATURE: std::sync::OnceLock<std::sync::Arc<GaussHermiteQuadrature>> =
+    std::sync::OnceLock::new();
 
-fn get_cached_quadrature(order: u8) -> std::sync::Arc<GaussHermiteQuadrature> {
-    let cache =
-        QUADRATURE_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
-    let mut map = match cache.lock() {
-        Ok(guard) => guard,
-        Err(poisoned) => poisoned.into_inner(),
-    };
-    if let Some(q) = map.get(&order) {
-        return std::sync::Arc::clone(q);
-    }
-    // Resolve the order BEFORE caching: an unsupported order falls back to
-    // the default, and the result must be cached under the *substituted*
-    // order — caching the default-order quadrature under the requested key
-    // would silently serve the wrong order to later callers that request it
-    // once it becomes supported, and hides the substitution entirely.
-    match GaussHermiteQuadrature::new(order as usize) {
-        Ok(q) => {
-            let q = std::sync::Arc::new(q);
-            map.insert(order, std::sync::Arc::clone(&q));
-            q
-        }
-        Err(_) => {
-            warn_unsupported_quadrature_order(order);
-            std::sync::Arc::clone(
-                map.entry(DEFAULT_QUADRATURE_ORDER)
-                    .or_insert_with(|| std::sync::Arc::new(default_quadrature())),
-            )
-        }
-    }
+fn default_quadrature() -> std::sync::Arc<GaussHermiteQuadrature> {
+    std::sync::Arc::clone(
+        DEFAULT_QUADRATURE
+            .get_or_init(|| std::sync::Arc::new(select_quadrature(DEFAULT_QUADRATURE_ORDER))),
+    )
 }
 
-fn warn_unsupported_quadrature_order(order: u8) {
-    tracing::warn!(
-        requested_order = order,
-        substituted_order = DEFAULT_QUADRATURE_ORDER,
-        "unsupported Gauss-Hermite quadrature order; substituting the default order"
-    );
-}
-
-#[allow(clippy::unreachable)] // The compile-time default is one of the supported orders.
-fn default_quadrature() -> GaussHermiteQuadrature {
-    GaussHermiteQuadrature::new(DEFAULT_QUADRATURE_ORDER as usize).unwrap_or_else(|_| {
-        unreachable!("DEFAULT_QUADRATURE_ORDER must be a valid Gauss-Hermite order")
-    })
-}
-
-/// Select quadrature based on order (uncached — used to populate the cache).
-///
-/// Emits a warning and substitutes the default order when the requested
-/// order is unsupported, so the substitution is never silent.
-///
-/// # Arguments
-///
-/// * `order` - Requested Gauss-Hermite order. Unsupported values use the
-///   model's documented default order.
-pub fn select_quadrature(order: u8) -> GaussHermiteQuadrature {
+/// Build the Gauss-Hermite rule for a copula's fixed quadrature order.
+#[allow(clippy::unreachable)] // Every copula passes a supported compile-time order.
+fn select_quadrature(order: u8) -> GaussHermiteQuadrature {
     GaussHermiteQuadrature::new(order as usize).unwrap_or_else(|_| {
-        warn_unsupported_quadrature_order(order);
-        default_quadrature()
+        unreachable!("copula quadrature orders are supported Gauss-Hermite orders")
     })
 }
 

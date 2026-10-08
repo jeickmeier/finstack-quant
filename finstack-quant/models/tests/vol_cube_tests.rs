@@ -435,39 +435,6 @@ fn normal_sabr_clamped_path_rejects_nonpositive_shifted_levels() {
     );
 }
 
-#[test]
-fn test_vol_cube_materialize_grid_flattens_expiry_tenor_strike_order() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
-    let cube = VolCube::from_grid(
-        "TEST",
-        &[1.0, 5.0],
-        &[5.0, 10.0],
-        &[p; 4],
-        &[0.03, 0.035, 0.04, 0.045],
-    )
-    .unwrap();
-    let strikes = [0.02, 0.03, 0.04];
-
-    let grid = finstack_quant_models::volatility::materialize_cube_grid(&cube, &strikes)
-        .expect("materializes");
-
-    assert_eq!(grid.len(), 2 * 2 * strikes.len());
-    let expected_first =
-        finstack_quant_models::volatility::get_cube_vol(&cube, 1.0, 5.0, strikes[0])
-            .expect("cube vol");
-    let expected_second_strike =
-        finstack_quant_models::volatility::get_cube_vol(&cube, 1.0, 5.0, strikes[1])
-            .expect("cube vol");
-    let expected_next_tenor =
-        finstack_quant_models::volatility::get_cube_vol(&cube, 1.0, 10.0, strikes[0])
-            .expect("cube vol");
-    assert!((grid[0] - expected_first).abs() < 1e-14);
-    assert!((grid[1] - expected_second_strike).abs() < 1e-14);
-    assert!((grid[strikes.len()] - expected_next_tenor).abs() < 1e-14);
-
-    assert!(finstack_quant_models::volatility::materialize_cube_grid(&cube, &[]).is_err());
-}
-
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_models::volatility::VolSource;
@@ -729,4 +696,104 @@ fn zero_vol_of_vol_cube_preserves_the_exact_black_limit() {
             }
         }
     }
+}
+
+/// Bit-level pin of the SABR-cube lookups that branch on the node's quote
+/// convention: `VolSource::get_convention`, the Black and normal lookups and
+/// their clamped forms, for lognormal, displaced and β = 0 cubes in both
+/// interpolation modes. `u64::MAX` marks a rejected lookup.
+#[test]
+fn cube_convention_and_vol_lookups_are_bit_stable() {
+    use finstack_quant_models::volatility::{
+        get_cube_normal_vol, get_cube_normal_vol_clamped, get_cube_vol, get_cube_vol_clamped,
+        VolSource, VolatilityConvention,
+    };
+    use std::sync::Arc;
+
+    // (number of pinned values, FNV-1a style fold of their bit patterns)
+    const EXPECTED: (usize, u64) = (1044, 5_268_942_217_510_307_716);
+    let nodes = |beta: f64, shift: Option<f64>| -> Vec<SabrParameterData> {
+        [
+            (0.030, -0.2, 0.4),
+            (0.040, -0.1, 0.5),
+            (0.032, -0.3, 0.35),
+            (0.045, 0.1, 0.6),
+        ]
+        .into_iter()
+        .map(|(alpha, rho, nu)| {
+            let alpha = if beta == 0.0 { alpha * 0.2 } else { alpha };
+            SabrParameterData::new_with_shift(alpha, beta, rho, nu, shift).unwrap()
+        })
+        .collect()
+    };
+    let mut actual = Vec::new();
+    for (beta, shift, forwards) in [
+        (0.5, None, [0.030, 0.035, 0.040, 0.045]),
+        (1.0, None, [0.030, 0.035, 0.040, 0.045]),
+        (0.5, Some(0.02), [-0.005, 0.001, 0.010, 0.020]),
+        (0.0, None, [-0.005, 0.001, 0.010, 0.020]),
+        (0.0, Some(0.02), [-0.005, 0.001, 0.010, 0.020]),
+        (0.5, None, [-0.005, 0.001, 0.010, 0.020]),
+    ] {
+        for mode in [
+            VolInterpolationMode::Vol,
+            VolInterpolationMode::TotalVariance,
+        ] {
+            let Ok(cube) = VolCube::from_grid(
+                "PIN",
+                &[1.0, 5.0],
+                &[2.0, 10.0],
+                &nodes(beta, shift),
+                &forwards,
+            ) else {
+                actual.push(u64::MAX - 1);
+                continue;
+            };
+            let cube = cube.with_interpolation_mode(mode);
+            let source = VolSource::Cube(Arc::new(cube.clone()));
+            for (expiry, tenor) in [(1.0, 2.0), (2.5, 6.0), (5.0, 10.0)] {
+                actual.push(match source.get_convention(expiry, tenor) {
+                    Ok(VolatilityConvention::Normal) => 1,
+                    Ok(VolatilityConvention::Lognormal) => 2,
+                    Ok(VolatilityConvention::ShiftedLognormal { shift }) => shift.to_bits(),
+                    Err(_) => u64::MAX,
+                });
+                for strike in [-0.01, 0.005, 0.03, 0.08] {
+                    actual.push(
+                        source
+                            .get_vol(expiry, tenor, strike)
+                            .map_or(u64::MAX, f64::to_bits),
+                    );
+                    actual.push(
+                        source
+                            .get_normal_vol(expiry, tenor, strike)
+                            .map_or(u64::MAX, f64::to_bits),
+                    );
+                    actual.push(
+                        get_cube_vol(&cube, expiry, tenor, strike).map_or(u64::MAX, f64::to_bits),
+                    );
+                    actual.push(
+                        get_cube_normal_vol(&cube, expiry, tenor, strike)
+                            .map_or(u64::MAX, f64::to_bits),
+                    );
+                    // NaN payloads are not part of the contract; fold every NaN to one marker.
+                    for clamped in [
+                        get_cube_vol_clamped(&cube, expiry, tenor, strike),
+                        get_cube_normal_vol_clamped(&cube, expiry, tenor, strike),
+                        get_cube_normal_vol_clamped(&cube, 0.25, 30.0, strike),
+                    ] {
+                        actual.push(if clamped.is_nan() {
+                            u64::MAX
+                        } else {
+                            clamped.to_bits()
+                        });
+                    }
+                }
+            }
+        }
+    }
+    let fold = actual.iter().fold(0xcbf2_9ce4_8422_2325_u64, |hash, bits| {
+        (hash ^ bits).wrapping_mul(0x0000_0100_0000_01b3)
+    });
+    assert_eq!((actual.len(), fold), EXPECTED);
 }

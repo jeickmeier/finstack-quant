@@ -775,6 +775,16 @@ export type DefaultModelSpec =
       curve: "timing";
     };
 /**
+ * Dividend payment specification.
+ */
+export type Dividend =
+  | {
+      cash: number;
+    }
+  | {
+      proportional: number;
+    };
+/**
  * Method for computing downturn LGD from base (through-the-cycle) LGD.
  */
 export type DownturnMethod =
@@ -894,6 +904,24 @@ export type ExerciseStyle = "european" | "american" | "bermudan";
  * Exact schema marker accepted by [`FactorModelConfigEnvelope`].
  */
 export type FactorModelConfigSchema = "finstack_quant.factor_model_config/1";
+/**
+ * Generator of the fractional increments consumed by the rough-volatility processes.
+ */
+export type FbmSpec =
+  | {
+      type: "volterra";
+    }
+  | {
+      type: "cholesky";
+    }
+  | {
+      /**
+       * Positive window length in steps, capped at the number of steps.
+       * Omitted selects `min(max(10, √n), 50)`.
+       */
+      near_field_size?: number | null;
+      type: "windowed_conditional";
+    };
 /**
  * Factor model specification for configuration and serialization.
  */
@@ -1089,6 +1117,323 @@ export type OptionKind = "call" | "put";
  * Option payoff direction used by analytical and numerical model engines.
  */
 export type OptionType = "call" | "put";
+/**
+ * Stochastic process to simulate, with its parameters.
+ *
+ * Serialized as an internally tagged object: `{"type": "gbm", "r": 0.03, ...}`.
+ * Parameters are re-validated when [`simulate_paths`] runs, so a spec read
+ * from JSON cannot bypass the range checks of the Rust constructors.
+ */
+export type ProcessSpec =
+  | {
+      /**
+       * Dividend/foreign rate (annual)
+       */
+      q: number;
+      /**
+       * Risk-free rate (annual)
+       */
+      r: number;
+      /**
+       * Volatility (annual)
+       */
+      sigma: number;
+      type: "gbm";
+    }
+  | {
+      /**
+       * Dividend schedule as `[time, dividend]` pairs. `time` is the
+       * ex-dividend time in years: strictly positive and distinct, in any
+       * order. A cash dividend is a non-negative amount in spot units and
+       * a proportional dividend a non-negative decimal fraction of spot.
+       */
+      dividends: [unknown, unknown][];
+      /**
+       * Diffusion parameters between dividend dates. Set `q` to zero when
+       * every dividend is listed explicitly.
+       */
+      params: GbmParams;
+      type: "gbm_with_dividends";
+    }
+  | {
+      /**
+       * Per-asset parameters; the vector length is the state dimension.
+       */
+      assets: GbmParams[];
+      /**
+       * Row-major `n x n` correlation matrix of the driving Brownian
+       * motions; omitted means independent assets.
+       */
+      correlation?: number[] | null;
+      type: "multi_gbm";
+    }
+  | {
+      /**
+       * Constant drift per year.
+       */
+      mu: number;
+      /**
+       * Constant diffusion scale per square root year.
+       */
+      sigma: number;
+      type: "brownian";
+    }
+  | {
+      /**
+       * Row-major `n x n` correlation matrix of the driving Brownian
+       * motions; omitted means independent components.
+       */
+      correlation?: number[] | null;
+      /**
+       * Per-component drifts per year; the vector length is the state
+       * dimension.
+       */
+      mus: number[];
+      /**
+       * Per-component diffusion scales per square-root year, non-negative.
+       */
+      sigmas: number[];
+      type: "multi_brownian";
+    }
+  | {
+      /**
+       * Optional row-major `n x n` correlation matrix.
+       */
+      correlation?: number[] | null;
+      /**
+       * Mean-reversion speeds `κ_i` per year.
+       */
+      kappas: number[];
+      /**
+       * Diffusion scales `σ_i` per square root year.
+       */
+      sigmas: number[];
+      /**
+       * Long-run means `θ_i` in state units.
+       */
+      thetas: number[];
+      type: "multi_ou";
+    }
+  | (HullWhite1FParams & {
+      type: "hull_white_1f";
+      [k: string]: unknown;
+    })
+  | {
+      /**
+       * Mean reversion speed (κ)
+       */
+      kappa: number;
+      /**
+       * Volatility of volatility (σ)
+       */
+      sigma: number;
+      /**
+       * Long-term mean (θ)
+       */
+      theta: number;
+      type: "cir";
+    }
+  | {
+      /**
+       * Parameters of the unshifted CIR factor.
+       */
+      params: CirParams;
+      /**
+       * Shift values `φ` as decimal rates, one per entry of `shift_times`;
+       * each applies from its time until the next.
+       */
+      shift_curve: number[];
+      /**
+       * Strictly increasing shift start times in years. Times before the
+       * first entry use the first shift value.
+       */
+      shift_times: number[];
+      type: "cir_plus_plus";
+    }
+  | (HestonPricingParams & {
+      type: "heston";
+      [k: string]: unknown;
+    })
+  | {
+      /**
+       * Mean reversion speed for short-term deviation (κ_X)
+       */
+      kappa: number;
+      /**
+       * Constant risk-premium drift shift for the short-term factor (λ_X).
+       *
+       * Under the risk-neutral measure the short-term factor follows
+       * `dX = (−κ_X X − λ_X) dt + σ_X dW*` (Schwartz & Smith 2000): a constant
+       * drift shift at unchanged κ_X. Defaults to 0 (physical measure).
+       */
+      lambda_x?: number;
+      /**
+       * Drift of long-term trend (μ_Y)
+       */
+      mu_y: number;
+      /**
+       * Correlation between X and Y (ρ)
+       */
+      rho_xy: number;
+      /**
+       * Volatility of short-term component (σ_X)
+       */
+      sigma_x: number;
+      /**
+       * Volatility of long-term component (σ_Y)
+       */
+      sigma_y: number;
+      type: "schwartz_smith";
+    }
+  | {
+      /**
+       * Dividend yield or foreign rate, continuously compounded (annualized
+       * decimal).
+       */
+      q: number;
+      /**
+       * Risk-free rate, continuously compounded (annualized decimal).
+       */
+      r: number;
+      /**
+       * Local volatility `σ_loc(t, S)`: expiry axis in years from the
+       * simulation start, strike axis in spot price units. Flat outside its
+       * grid.
+       */
+      surface: LocalVolSurface;
+      type: "local_vol";
+    }
+  | {
+      /**
+       * Accrual factors τ_i = T_{i+1} − T_i (length N).
+       */
+      accrual_factors: number[];
+      /**
+       * Displacement per forward for negative-rate support (length N).
+       */
+      displacements: number[];
+      /**
+       * Initial forward rates F_i(0) from the curve (length N).
+       */
+      initial_forwards: number[];
+      /**
+       * Number of Brownian factors (2 or 3).
+       */
+      num_factors: number;
+      /**
+       * Number of forward rates (N).
+       */
+      num_forwards: number;
+      /**
+       * Tenor dates T_0, T_1, ..., T_N (N+1 dates, year fractions).
+       */
+      tenors: number[];
+      type: "lmm";
+      /**
+       * Piecewise-constant vol breakpoints (ascending, length M).
+       */
+      vol_times: number[];
+      /**
+       * Factor loadings λ_{i,k}(t) per forward, per time period.
+       *
+       * Outer: M+1 time periods.
+       * Inner: N forwards, each with up to 3 factor loadings.
+       */
+      vol_values: [number, number, number][][];
+    }
+  | {
+      /**
+       * Vol-of-vol scaling (η > 0).
+       */
+      eta: number;
+      /**
+       * Hurst exponent H ∈ (0, 0.5), typically 0.07–0.12 for equity indices.
+       */
+      hurst: HurstExponent;
+      /**
+       * Dividend yield (annual, continuously compounded).
+       */
+      q: number;
+      /**
+       * Risk-free rate (annual, continuously compounded).
+       */
+      r: number;
+      /**
+       * Spot-vol correlation ρ ∈ [-1, 1].
+       */
+      rho: number;
+      type: "rough_bergomi";
+      /**
+       * Initial forward variance curve ξ₀(t).
+       */
+      xi: ForwardVarianceCurve;
+    }
+  | {
+      /**
+       * Hurst exponent H ∈ (0, 0.5) — controls the roughness of the variance.
+       */
+      hurst: HurstExponent;
+      /**
+       * Mean reversion speed (κ > 0).
+       */
+      kappa: number;
+      /**
+       * Dividend yield (annual, continuously compounded).
+       */
+      q: number;
+      /**
+       * Risk-free rate (annual, continuously compounded).
+       */
+      r: number;
+      /**
+       * Spot–variance correlation ρ ∈ \[−1, 1\].
+       */
+      rho: number;
+      /**
+       * Volatility of variance — vol-of-vol (σᵥ > 0).
+       */
+      sigma_v: number;
+      /**
+       * Long-run variance level (θ > 0).
+       */
+      theta: number;
+      type: "rough_heston";
+      /**
+       * Initial variance (v₀ > 0).
+       */
+      v0: number;
+    }
+  | (CheyetteRoughVolParams & {
+      type: "cheyette_rough";
+      [k: string]: unknown;
+    });
+/**
+ * Time-discretization scheme used to advance the process.
+ */
+export type SchemeSpec = "default" | "euler" | "log_euler" | "milstein";
+/**
+ * Simulation dates, as year fractions from the simulation start.
+ */
+export type TimeGridSpec =
+  | {
+      /**
+       * Finite positive horizon in years.
+       */
+      expiry: number;
+      /**
+       * Positive number of steps.
+       */
+      num_steps: number;
+      type: "uniform";
+    }
+  | {
+      /**
+       * Strictly increasing finite times in years, starting at exactly
+       * `0.0`, with at least two entries.
+       */
+      times: number[];
+      type: "times";
+    };
 /**
  * AssetPool-granularity policy for the structured-credit default engine.
  */
@@ -1825,7 +2170,6 @@ export interface BrownianParams {
    * Constant diffusion scale per square root year.
    */
   sigma: number;
-  [k: string]: unknown;
 }
 /**
  * Black–Scholes/Garman–Kohlhagen Greeks (per unit, not scaled by contract size).
@@ -1992,7 +2336,6 @@ export interface CirParams {
    * Long-term mean (θ)
    */
   theta: number;
-  [k: string]: unknown;
 }
 /**
  * A single piece of collateral in the recovery waterfall.
@@ -3260,29 +3603,6 @@ export interface GbmParams {
    * Volatility (annual)
    */
   sigma: number;
-  [k: string]: unknown;
-}
-/**
- * Compact captured GBM paths for plotting and diagnostics.
- */
-export interface GbmPathSummary {
-  /**
-   * Number of independent estimators requested.
-   */
-  num_paths: number;
-  /**
-   * Total number of sample paths simulated.
-   */
-  num_simulated_paths: number;
-  /**
-   * Captured spot paths in deterministic path-id order.
-   */
-  paths: number[][];
-  /**
-   * Shared path times in year fractions, including time zero.
-   */
-  times: number[];
-  [k: string]: unknown;
 }
 /**
  * Continuous-time generator (intensity) matrix for a CTMC.
@@ -3718,7 +4038,163 @@ export interface LmmParams {
    * Inner: N forwards, each with up to 3 factor loadings.
    */
   vol_values: [number, number, number][][];
-  [k: string]: unknown;
+}
+/**
+ * Rates and local volatility surface of the Dupire local-volatility process.
+ */
+export interface LocalVolParams {
+  /**
+   * Dividend yield or foreign rate, continuously compounded (annualized
+   * decimal).
+   */
+  q: number;
+  /**
+   * Risk-free rate, continuously compounded (annualized decimal).
+   */
+  r: number;
+  /**
+   * Local volatility `σ_loc(t, S)`: expiry axis in years from the
+   * simulation start, strike axis in spot price units. Flat outside its
+   * grid.
+   */
+  surface: LocalVolSurface;
+}
+/**
+ * Local volatility surface `σ_loc(T, K)` on a rectangular expiry-by-strike
+ * grid, extracted from an implied volatility surface via the Dupire formula.
+ *
+ * Off-grid queries are interpolated bilinearly; outside the grid the nearest
+ * boundary value applies (flat extrapolation).
+ *
+ * # Invariants
+ *
+ * - Expiries and strikes are finite and strictly increasing; expiries are
+ *   non-negative and strikes positive.
+ * - There is one finite, non-negative local volatility per grid node, stored
+ *   row-major with the expiry as the slow axis.
+ *
+ * Deserialization enforces the same invariants.
+ */
+export interface LocalVolSurface {
+  /**
+   * Expiry axis in years, strictly increasing and non-negative.
+   */
+  expiries: number[];
+  /**
+   * Local volatilities as annualized decimals, finite and non-negative,
+   * row-major: `local_vols[expiry_index * strikes.len() + strike_index]`.
+   */
+  local_vols: number[];
+  /**
+   * Strike axis in price units of the underlying, strictly increasing and
+   * positive.
+   */
+  strikes: number[];
+}
+/**
+ * Monte Carlo price with likelihood-ratio delta and vega from the same paths.
+ */
+export interface LrmGreeks {
+  /**
+   * Delta: change in price per unit change in the initial spot.
+   */
+  delta: Estimate;
+  /**
+   * Discounted price estimate in the payoff currency.
+   */
+  price: MoneyEstimate;
+  /**
+   * Vega: change in price per one volatility point (`0.01` of annualized
+   * volatility).
+   */
+  vega: Estimate;
+}
+/**
+ * Discounted Monte Carlo estimate tagged with a currency.
+ *
+ * The engine computes these values from discounted path outcomes. `mean` and
+ * `ci_95` are stored as [`Money`], while the auxiliary statistics remain raw
+ * `f64` values in the same currency unit as `mean.amount()`.
+ */
+export interface MoneyEstimate {
+  /**
+   * 95% confidence interval for the discounted mean present value.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  ci_95: [unknown, unknown];
+  /**
+   * Optional maximum of captured discounted path values.
+   */
+  max?: number | null;
+  /**
+   * Discounted mean present value.
+   */
+  mean: Money;
+  /**
+   * Optional median of captured discounted path values.
+   *
+   * This is populated only when captured-path diagnostics are available.
+   */
+  median?: number | null;
+  /**
+   * Optional minimum of captured discounted path values.
+   */
+  min?: number | null;
+  /**
+   * Number of independent path estimators contributing to the estimate.
+   *
+   * See [`crate::monte_carlo::estimate::Estimate::num_paths`] for the full semantics,
+   * including how antithetic variates split simulated work across
+   * estimators.
+   */
+  num_paths: number;
+  /**
+   * Total number of simulated sample paths driving the estimator.
+   *
+   * See [`crate::monte_carlo::estimate::Estimate::num_simulated_paths`]. Equal to
+   * `num_paths` without variance reduction, or `2 * num_paths` with
+   * antithetic variates.
+   */
+  num_simulated_paths: number;
+  /**
+   * Optional 25th percentile of captured discounted path values.
+   */
+  percentile_25?: number | null;
+  /**
+   * Optional 75th percentile of captured discounted path values.
+   */
+  percentile_75?: number | null;
+  /**
+   * Optional sample standard deviation of discounted path values.
+   */
+  std_dev?: number | null;
+  /**
+   * Standard error of the discounted mean, in `mean.amount()` units.
+   */
+  stderr: number;
+}
+/**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ */
+export interface Money {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: DecimalWire;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency: Currency;
 }
 /**
  * Scalar Bangia LVaR outputs for an isolated position where relative spread statistics are already known.
@@ -3868,93 +4344,6 @@ export interface MertonModel {
 export interface MigrationSimulator {
   generator: GeneratorMatrix;
   horizon: number;
-}
-/**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- */
-export interface Money {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: DecimalWire;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency: Currency;
-}
-/**
- * Discounted Monte Carlo estimate tagged with a currency.
- *
- * The engine computes these values from discounted path outcomes. `mean` and
- * `ci_95` are stored as [`Money`], while the auxiliary statistics remain raw
- * `f64` values in the same currency unit as `mean.amount()`.
- */
-export interface MoneyEstimate {
-  /**
-   * 95% confidence interval for the discounted mean present value.
-   *
-   * @minItems 2
-   * @maxItems 2
-   */
-  ci_95: [unknown, unknown];
-  /**
-   * Optional maximum of captured discounted path values.
-   */
-  max?: number | null;
-  /**
-   * Discounted mean present value.
-   */
-  mean: Money;
-  /**
-   * Optional median of captured discounted path values.
-   *
-   * This is populated only when captured-path diagnostics are available.
-   */
-  median?: number | null;
-  /**
-   * Optional minimum of captured discounted path values.
-   */
-  min?: number | null;
-  /**
-   * Number of independent path estimators contributing to the estimate.
-   *
-   * See [`crate::monte_carlo::estimate::Estimate::num_paths`] for the full semantics,
-   * including how antithetic variates split simulated work across
-   * estimators.
-   */
-  num_paths: number;
-  /**
-   * Total number of simulated sample paths driving the estimator.
-   *
-   * See [`crate::monte_carlo::estimate::Estimate::num_simulated_paths`]. Equal to
-   * `num_paths` without variance reduction, or `2 * num_paths` with
-   * antithetic variates.
-   */
-  num_simulated_paths: number;
-  /**
-   * Optional 25th percentile of captured discounted path values.
-   */
-  percentile_25?: number | null;
-  /**
-   * Optional 75th percentile of captured discounted path values.
-   */
-  percentile_75?: number | null;
-  /**
-   * Optional sample standard deviation of discounted path values.
-   */
-  std_dev?: number | null;
-  /**
-   * Standard error of the discounted mean, in `mean.amount()` units.
-   */
-  stderr: number;
 }
 /**
  * Monte Carlo pricing result with optional captured paths.
@@ -4157,7 +4546,6 @@ export interface MultiOuParams {
    * Long-run means `θ_i` in state units.
    */
   thetas: number[];
-  [k: string]: unknown;
 }
 /**
  * Input for the Ohlson O-Score logistic model (1980).
@@ -4321,6 +4709,83 @@ export interface PositionEsContributionView {
    * Position identifier.
    */
   position_id: string;
+  [k: string]: unknown;
+}
+/**
+ * Complete, serializable description of one path simulation.
+ */
+export interface PathSimulationSpec {
+  /**
+   * Emit an antithetic partner after each path, driven by the negated
+   * normal draws of the same stream.
+   */
+  antithetic?: boolean;
+  /**
+   * Fractional-noise generator for `rough_bergomi` and `cheyette_rough`;
+   * omitted selects `volterra`, the generator the pricers use. Setting it
+   * for any other process is a validation error.
+   */
+  fbm?: FbmSpec | null;
+  /**
+   * State at time zero, in the layout documented on the [`ProcessSpec`]
+   * variant. Its length must equal the process dimension.
+   */
+  initial_state: number[];
+  /**
+   * Number of independent random streams, in `1..=100_000`. Each stream
+   * yields one path, or two when `antithetic` is set.
+   */
+  num_paths: number;
+  /**
+   * Process and parameters.
+   */
+  process: ProcessSpec;
+  /**
+   * Discretization scheme; defaults to the process's canonical scheme.
+   */
+  scheme?: SchemeSpec;
+  /**
+   * Root seed of the Philox generator. The same spec always reproduces the
+   * same paths bit for bit.
+   */
+  seed: number;
+  /**
+   * Simulation dates.
+   */
+  time_grid: TimeGridSpec;
+}
+/**
+ * Simulated paths on a shared time grid.
+ */
+export interface PathSummary {
+  /**
+   * State dimension; equals `factor_names.len()`.
+   */
+  dim: number;
+  /**
+   * Name of each state component, in state-vector order.
+   */
+  factor_names: string[];
+  /**
+   * Number of independent random streams requested.
+   */
+  num_paths: number;
+  /**
+   * Number of stored paths: `num_paths`, or `2 * num_paths` with
+   * antithetic sampling, where stored paths `2k` and `2k + 1` are stream
+   * `k` and its antithetic partner.
+   */
+  num_simulated_paths: number;
+  /**
+   * Simulation times in years, starting at zero; length `num_steps + 1`.
+   */
+  times: number[];
+  /**
+   * States in row-major `[path][time][factor]` order: the value of factor
+   * `f` on stored path `p` at `times[s]` is
+   * `values[(p * times.len() + s) * dim + f]`.
+   */
+  values: number[];
   [k: string]: unknown;
 }
 /**
@@ -4863,7 +5328,10 @@ export interface RoughBergomiParams {
    * Spot-vol correlation ρ ∈ [-1, 1].
    */
   rho: number;
-  [k: string]: unknown;
+  /**
+   * Initial forward variance curve ξ₀(t).
+   */
+  xi: ForwardVarianceCurve;
 }
 /**
  * Rough Heston model parameters for Fourier-based European option pricing.
@@ -4930,7 +5398,6 @@ export interface RoughHestonParams {
    * Initial variance (v₀ > 0).
    */
   v0: number;
-  [k: string]: unknown;
 }
 /**
  * SABR model parameters

@@ -1322,25 +1322,6 @@ mod monotone_convex_specific {
 mod traits {
     use super::*;
 
-    #[derive(Debug)]
-    struct TestInterp {
-        value: f64,
-    }
-
-    impl InterpFn for TestInterp {
-        fn interp(&self, _x: f64) -> f64 {
-            self.value
-        }
-    }
-
-    #[test]
-    fn interp_fn_default_derivative_uses_finite_differences() {
-        let interp = TestInterp { value: 42.0 };
-
-        let deriv = interp.interp_prime(1.0);
-        assert!(deriv.abs() < 1e-6);
-    }
-
     #[test]
     fn interp_fn_default_derivative_for_linear_function() {
         let knots = vec![0.0, 1.0, 2.0].into_boxed_slice();

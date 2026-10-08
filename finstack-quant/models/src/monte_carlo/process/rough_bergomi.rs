@@ -93,12 +93,11 @@ use finstack_quant_core::math::fractional::HurstExponent;
 /// rBergomi model parameters.
 ///
 /// Encapsulates all inputs required to define the rough Bergomi dynamics.
-/// The forward variance curve `xi` is marked `#[serde(skip)]` because it
-/// is typically reconstructed from market data rather than round-tripped
-/// through plain-text serialization. On deserialization it defaults to a
-/// flat curve at 4% (20% vol).
+/// Serialization carries the forward variance curve `xi`; it is required on
+/// deserialization.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct RoughBergomiParams {
     /// Risk-free rate (annual, continuously compounded).
     pub r: f64,
@@ -111,7 +110,6 @@ pub struct RoughBergomiParams {
     /// Spot-vol correlation ρ ∈ [-1, 1].
     pub rho: f64,
     /// Initial forward variance curve ξ₀(t).
-    #[serde(skip, default)]
     pub xi: ForwardVarianceCurve,
 }
 

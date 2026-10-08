@@ -51,7 +51,7 @@ impl MatchingConfig {
             Self::Cascade(configs) => Box::new(CascadeMatcher::new(
                 configs.iter().map(Self::build_matcher).collect(),
             )),
-            Self::Hierarchical(config) => Box::new(HierarchicalMatcher::new_scoped(
+            Self::Hierarchical(config) => Box::new(HierarchicalMatcher::new(
                 config.dependency_filter.clone(),
                 config.root.clone(),
             )),
@@ -121,7 +121,7 @@ mod tests {
         attributes: &Attributes,
     ) -> Option<FactorId> {
         matcher
-            .match_factor_with_betas(dependency, attributes)
+            .match_factor(dependency, attributes)
             .ok()
             .flatten()
             .and_then(|entries| entries.last().map(|entry| entry.factor_id.clone()))

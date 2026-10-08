@@ -47,14 +47,11 @@ use crate::pricer::{InstrumentType, ModelKey, Pricer, PricerKey, PricingError};
 use crate::results::ValuationResult;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
 use finstack_quant_models::trees::two_factor_rates_credit::{NodeCoupon, RatesCreditTree};
-use finstack_quant_models::{
-    short_rate_keys, NodeState, ShortRateTree, ShortRateTreeConfig, TreeModel, TreeValuator,
-};
+use finstack_quant_models::{NodeState, ShortRateTree, ShortRateTreeConfig, TreeValuator};
 
 /// Reject hazard-model inputs on a loan that never reaches the rates-credit
 /// lattice.
@@ -200,14 +197,11 @@ enum PreparedTree {
         tree: RatesCreditTree,
         valuator: TermLoanValuator,
         node_coupons: Vec<NodeCoupon>,
-        time_to_maturity: f64,
     },
     /// Risk-free short-rate tree.
     ShortRate {
         tree: ShortRateTree,
-        initial_rate: f64,
         valuator: TermLoanValuator,
-        time_to_maturity: f64,
     },
 }
 
@@ -693,13 +687,13 @@ impl TermLoanValuator {
 impl TreeValuator for TermLoanValuator {
     fn value_at_maturity(&self, state: &NodeState) -> Result<f64> {
         let step = state.step;
-        let oas_rate = state.get_var_or(short_rate_keys::OAS, 0.0) / 10_000.0;
+        let oas_rate = state.oas_bp / 10_000.0;
         Ok(self.coupon_fee_at(step, oas_rate) + self.principal_cf_at(step, oas_rate))
     }
 
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, dt: f64) -> Result<f64> {
         let step = state.step;
-        let oas_rate = state.get_var_or(short_rate_keys::OAS, 0.0) / 10_000.0;
+        let oas_rate = state.oas_bp / 10_000.0;
         let coupon_fee = self.coupon_fee_at(step, oas_rate);
         let principal_cf = self.principal_cf_at(step, oas_rate);
 
@@ -860,7 +854,6 @@ impl TermLoanTreePricer {
                 tree,
                 valuator,
                 node_coupons,
-                time_to_maturity,
             }));
         }
 
@@ -870,44 +863,17 @@ impl TermLoanTreePricer {
             ..Default::default()
         });
         tree.calibrate(disc.as_ref(), time_to_maturity)?;
-        let initial_rate = tree.rate_at_node(0, 0)?;
-        Ok(Some(PreparedTree::ShortRate {
-            tree,
-            initial_rate,
-            valuator,
-            time_to_maturity,
-        }))
+        Ok(Some(PreparedTree::ShortRate { tree, valuator }))
     }
 
-    fn price_on_tree(prepared: &PreparedTree, market: &MarketContext, oas_bp: f64) -> Result<f64> {
+    fn price_on_tree(prepared: &PreparedTree, oas_bp: f64) -> Result<f64> {
         match prepared {
             PreparedTree::RatesCredit {
                 tree,
                 valuator,
                 node_coupons,
-                time_to_maturity,
-            } => {
-                let mut vars = HashMap::<&'static str, f64>::default();
-                vars.insert(short_rate_keys::OAS, oas_bp);
-                tree.price_with_node_coupons(
-                    vars,
-                    *time_to_maturity,
-                    market,
-                    valuator,
-                    node_coupons,
-                )
-            }
-            PreparedTree::ShortRate {
-                tree,
-                initial_rate,
-                valuator,
-                time_to_maturity,
-            } => {
-                let mut vars = HashMap::<&'static str, f64>::default();
-                vars.insert(short_rate_keys::SHORT_RATE, *initial_rate);
-                vars.insert(short_rate_keys::OAS, oas_bp);
-                tree.price(vars, *time_to_maturity, market, valuator)
-            }
+            } => tree.price_with_node_coupons(oas_bp, valuator, node_coupons),
+            PreparedTree::ShortRate { tree, valuator } => tree.price(oas_bp, valuator),
         }
     }
 
@@ -938,10 +904,7 @@ impl TermLoanTreePricer {
         let Some(prepared) = self.prepare(loan, market, as_of)? else {
             return Ok(Money::from((0_i64, loan.currency)));
         };
-        let settlement_value = Money::new(
-            Self::price_on_tree(&prepared, market, oas_bp)?,
-            loan.currency,
-        )?;
+        let settlement_value = Money::new(Self::price_on_tree(&prepared, oas_bp)?, loan.currency)?;
         super::discounting::TermLoanDiscountingPricer::value_at_as_of(
             loan,
             market,
@@ -999,7 +962,7 @@ impl TermLoanTreePricer {
         };
 
         let objective_fn = |oas_bp: f64| -> f64 {
-            match Self::price_on_tree(&prepared, market, oas_bp) {
+            match Self::price_on_tree(&prepared, oas_bp) {
                 Ok(model_price) => model_price - dirty_target,
                 Err(e) => record_error(e),
             }
@@ -1052,7 +1015,7 @@ mod tests {
     use finstack_quant_core::dates::DayCount;
 
     use finstack_quant_core::money::Money;
-    use finstack_quant_models::{state_keys, NodeState};
+    use finstack_quant_models::NodeState;
     use time::macros::date;
 
     fn dummy_loan() -> TermLoan {
@@ -1131,16 +1094,17 @@ mod tests {
     fn risky_hold_weights_continuation_not_current_coupon() {
         let valuator =
             node_test_valuator(5.0, [0.0, 100.0], [None; 2], 100.0, 100.0, Some(0.4), 0.0);
-        let market = MarketContext::new();
         let rate = 0.03_f64;
         let hazard = 0.10_f64;
         let dt = 1.0_f64;
         let interval_df = (-rate * dt).exp();
-        let mut vars = HashMap::default();
-        vars.insert(state_keys::INTEREST_RATE, rate);
-        vars.insert(state_keys::HAZARD_RATE, hazard);
-        vars.insert(state_keys::DF, interval_df);
-        let state = NodeState::new(0, 0.0, &vars, &market);
+        let state = NodeState {
+            step: 0,
+            interest_rate: Some(rate),
+            hazard_rate: Some(hazard),
+            df: Some(interval_df),
+            ..NodeState::default()
+        };
         let discounted_continuation = 100.0 * interval_df;
 
         let actual = valuator
@@ -1160,16 +1124,17 @@ mod tests {
     fn recovery_uses_post_payment_outstanding() {
         let valuator =
             node_test_valuator(5.0, [20.0, 80.0], [None; 2], 100.0, 80.0, Some(0.4), 0.0);
-        let market = MarketContext::new();
         let rate = 0.03_f64;
         let hazard = 0.10_f64;
         let dt = 1.0_f64;
         let interval_df = (-rate * dt).exp();
-        let mut vars = HashMap::default();
-        vars.insert(state_keys::INTEREST_RATE, rate);
-        vars.insert(state_keys::HAZARD_RATE, hazard);
-        vars.insert(state_keys::DF, interval_df);
-        let state = NodeState::new(0, 0.0, &vars, &market);
+        let state = NodeState {
+            step: 0,
+            interest_rate: Some(rate),
+            hazard_rate: Some(hazard),
+            df: Some(interval_df),
+            ..NodeState::default()
+        };
         let discounted_continuation = 80.0 * interval_df;
 
         let actual = valuator
@@ -1197,12 +1162,13 @@ mod tests {
             Some(0.4),
             0.0,
         );
-        let market = MarketContext::new();
-        let mut vars = HashMap::default();
-        vars.insert(state_keys::INTEREST_RATE, 0.0);
-        vars.insert(state_keys::HAZARD_RATE, 1.0);
-        vars.insert(state_keys::DF, 1.0);
-        let state = NodeState::new(0, 0.0, &vars, &market);
+        let state = NodeState {
+            step: 0,
+            interest_rate: Some(0.0),
+            hazard_rate: Some(1.0),
+            df: Some(1.0),
+            ..NodeState::default()
+        };
 
         let actual = valuator
             .value_at_node(&state, 1_000.0, 1.0)

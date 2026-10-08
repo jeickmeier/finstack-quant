@@ -57,18 +57,17 @@
 //! - Craig, I. J. D. & Sneyd, A. D. (1988). "An alternating-direction implicit
 //!   scheme for parabolic equations with mixed derivatives."
 
-use super::boundary::BoundaryCondition;
 use super::grid2d::Grid2D;
-use super::operator2d::{apply_cross_derivative_into, Operators2D};
+use super::operator2d::{apply_cross_derivative, Operators2D};
 use super::problem2d::PdeProblem2D;
+use super::solver::boundary_value;
 use super::stepper::StepperError;
 
 /// Reusable per-step scratch buffers for the Modified Craig-Sneyd ADI stepper.
 ///
 /// Sized to the largest grid the caller intends to step. Reusing this across
-/// timesteps (and across grids of identical shape) lets `Solver2D` skip the
-/// per-call allocations the previous implementation performed every call to
-/// [`CraigSneydStepper::step_with_buffers`].
+/// timesteps (and across grids of identical shape) lets `Solver2D` skip
+/// per-step allocations in [`CraigSneydStepper::step`].
 #[derive(Clone, Default)]
 pub struct AdiWorkBuffers {
     x_line: Vec<f64>,
@@ -286,54 +285,14 @@ impl CraigSneydStepper {
     }
 
     /// Execute one Modified Craig-Sneyd ADI step from `t_from` to `t_to`
-    /// (backward).
-    ///
-    /// Allocates fresh work buffers on every call; prefer
-    /// [`CraigSneydStepper::step_with_buffers`] when stepping in a loop.
+    /// (backward), reusing caller-owned scratch buffers.
     ///
     /// `u_full` is the full (boundary-inclusive) solution of length `nx * ny`.
     /// `u_int` is the interior solution of length `nx_int * ny_int` (row-major).
     /// Both are updated in place.
     ///
     /// Returns a [`StepperError`] if the step cannot be taken reliably — a
-    /// non-positive `dt`, a convection-dominated grid outside the MCS
-    /// stable regime, or a degenerate tridiagonal solve.
-    ///
-    /// # Arguments
-    ///
-    /// * `problem` - PDE problem supplying coefficients, payoff data, and boundary conditions.
-    /// * `grid` - Numerical grid defining the state-space discretization.
-    /// * `u_full` - Full PDE solution buffer including boundary nodes.
-    /// * `u_int` - Interior PDE solution buffer excluding boundary nodes.
-    /// * `t_from` - Start time of the backward PDE step in model-year units.
-    /// * `t_to` - End time of the backward PDE step in model-year units.
-    /// * `step_index` - Zero-based index of the current numerical time step.
-    #[allow(clippy::too_many_arguments)]
-    pub fn step(
-        &self,
-        problem: &dyn PdeProblem2D,
-        grid: &Grid2D,
-        u_full: &mut [f64],
-        u_int: &mut [f64],
-        t_from: f64,
-        t_to: f64,
-        step_index: usize,
-    ) -> Result<(), StepperError> {
-        let mut buffers = AdiWorkBuffers::for_grid(grid);
-        self.step_with_buffers(
-            problem,
-            grid,
-            u_full,
-            u_int,
-            t_from,
-            t_to,
-            step_index,
-            &mut buffers,
-        )
-    }
-
-    /// Like [`CraigSneydStepper::step`], but reuses caller-owned scratch
-    /// buffers instead of allocating fresh `Vec`s on every call.
+    /// non-positive `dt` or a degenerate tridiagonal solve.
     ///
     /// # Arguments
     ///
@@ -346,7 +305,7 @@ impl CraigSneydStepper {
     /// * `step_index` - Zero-based index of the current numerical time step.
     /// * `buffers` - Reusable work buffers sized for the supplied numerical grid.
     #[allow(clippy::too_many_arguments)]
-    pub fn step_with_buffers(
+    pub(crate) fn step(
         &self,
         problem: &dyn PdeProblem2D,
         grid: &Grid2D,
@@ -445,7 +404,7 @@ impl CraigSneydStepper {
         let ops = Operators2D::assemble(problem, grid, t_from);
 
         // F_0(t_n, u^n): the mixed (cross-derivative) term applied to u^n.
-        apply_cross_derivative_into(cross, &ops.cross_deriv, u_full, grid);
+        apply_cross_derivative(cross, &ops.cross_deriv, u_full, grid);
 
         // F_1(t_n, u^n) = A_x * u^n  (for each y-line).
         apply_x_operator(&ops, u_int, nx_int, ny_int, x_line, line_out, ax_u);
@@ -503,7 +462,7 @@ impl CraigSneydStepper {
 
         // --- MCS mixed-term corrector ---
         // F_0(t_{n+1}, Y_2): mixed term applied to Y_2.
-        apply_cross_derivative_into(cross_y2, &ops_impl.cross_deriv, u_full, grid);
+        apply_cross_derivative(cross_y2, &ops_impl.cross_deriv, u_full, grid);
         // F_1(t_{n+1}, Y_2) = A_x * Y_2 and F_2(t_{n+1}, Y_2) = A_y * Y_2,
         // needed for the full-operator difference in the Ytld_0 line.
         apply_x_operator(&ops_impl, y2, nx_int, ny_int, x_line, line_out, ax_y2);
@@ -558,7 +517,7 @@ fn apply_x_operator(
         for ii in 0..nx_int {
             x_line[ii] = u_int[ii * ny_int + jj];
         }
-        ops.op_x[jj].apply_into(x_line, &mut line_out[..nx_int]);
+        ops.op_x[jj].apply(x_line, &mut line_out[..nx_int]);
         for ii in 0..nx_int {
             out[ii * ny_int + jj] = line_out[ii];
         }
@@ -580,7 +539,7 @@ fn apply_y_operator(
         for jj in 0..ny_int {
             y_line[jj] = u_int[ii * ny_int + jj];
         }
-        ops.op_y[ii].apply_into(y_line, &mut line_out[..ny_int]);
+        ops.op_y[ii].apply(y_line, &mut line_out[..ny_int]);
         for jj in 0..ny_int {
             out[ii * ny_int + jj] = line_out[jj];
         }
@@ -689,132 +648,25 @@ pub fn fill_boundaries(
     // the corners used by the mixed-derivative stencil.
     for i in 1..nx - 1 {
         let x = x_pts[i];
-        u_full[i * ny] = boundary_value_2d(
-            problem.boundary_y_lower(x, t),
-            u_full,
-            grid,
-            i,
-            0,
-            false,
-            true,
-        );
-        u_full[i * ny + ny - 1] = boundary_value_2d(
-            problem.boundary_y_upper(x, t),
-            u_full,
-            grid,
-            i,
-            ny - 1,
-            false,
-            false,
-        );
+        u_full[i * ny] = boundary_value(problem.boundary_y_lower(x, t), grid.y(), true, |k| {
+            u_full[i * ny + 1 + k]
+        });
+        u_full[i * ny + ny - 1] =
+            boundary_value(problem.boundary_y_upper(x, t), grid.y(), false, |k| {
+                u_full[i * ny + ny - 2 - k]
+            });
     }
 
     // x-boundaries last, including corners reconstructed from fresh y-edges.
     for j in 0..ny {
         let y = y_pts[j];
-        u_full[j] = boundary_value_2d(
-            problem.boundary_x_lower(y, t),
-            u_full,
-            grid,
-            0,
-            j,
-            true,
-            true,
-        );
-        u_full[(nx - 1) * ny + j] = boundary_value_2d(
-            problem.boundary_x_upper(y, t),
-            u_full,
-            grid,
-            nx - 1,
-            j,
-            true,
-            false,
-        );
-    }
-}
-
-/// Extract a boundary value from a boundary condition.
-///
-/// For Dirichlet, returns the fixed value. For Neumann, extrapolates using
-/// the derivative value. For Linear, extrapolates from two interior points
-/// (vanishing second derivative). `is_x_dir` indicates which direction the
-/// boundary is on; `is_lower` indicates lower vs upper edge.
-fn boundary_value_2d(
-    bc: BoundaryCondition,
-    u_full: &[f64],
-    grid: &Grid2D,
-    i: usize,
-    j: usize,
-    is_x_dir: bool,
-    is_lower: bool,
-) -> f64 {
-    let ny = grid.ny();
-    match bc {
-        BoundaryCondition::Dirichlet(g) => g,
-        BoundaryCondition::Neumann(g) => {
-            // du/dn = g: first-order extrapolation using the derivative value
-            if is_x_dir {
-                if is_lower {
-                    let h = grid.x().h_left(1);
-                    let u1 = u_full[ny + j];
-                    u1 - h * g
-                } else {
-                    let h = grid.x().h_right(grid.nx() - 2);
-                    let u1 = u_full[(i - 1) * ny + j];
-                    u1 + h * g
-                }
-            } else if is_lower {
-                let h = grid.y().h_left(1);
-                let u1 = u_full[i * ny + 1];
-                u1 - h * g
-            } else {
-                let h = grid.y().h_right(grid.ny() - 2);
-                let u1 = u_full[i * ny + (j - 1)];
-                u1 + h * g
-            }
-        }
-        BoundaryCondition::Linear | BoundaryCondition::LinearInExp => {
-            // Continue the interior slope over the actual boundary-cell width.
-            if is_x_dir {
-                if grid.nx_interior() == 1 {
-                    return u_full[ny + j];
-                }
-                if is_lower {
-                    let u1 = u_full[ny + j];
-                    let u2 = u_full[2 * ny + j];
-                    let ratio =
-                        bc.extrapolation_ratio(grid.x().h_left(1), grid.x().h_right(1), true);
-                    u1 + ratio * (u1 - u2)
-                } else {
-                    let u1 = u_full[(i - 1) * ny + j];
-                    let u2 = u_full[(i - 2) * ny + j];
-                    let interior = grid.nx() - 2;
-                    let ratio = bc.extrapolation_ratio(
-                        grid.x().h_right(interior),
-                        grid.x().h_left(interior),
-                        false,
-                    );
-                    u1 + ratio * (u1 - u2)
-                }
-            } else if grid.ny_interior() == 1 {
-                u_full[i * ny + 1]
-            } else if is_lower {
-                let u1 = u_full[i * ny + 1];
-                let u2 = u_full[i * ny + 2];
-                let ratio = bc.extrapolation_ratio(grid.y().h_left(1), grid.y().h_right(1), true);
-                u1 + ratio * (u1 - u2)
-            } else {
-                let u1 = u_full[i * ny + (j - 1)];
-                let u2 = u_full[i * ny + (j - 2)];
-                let interior = grid.ny() - 2;
-                let ratio = bc.extrapolation_ratio(
-                    grid.y().h_right(interior),
-                    grid.y().h_left(interior),
-                    false,
-                );
-                u1 + ratio * (u1 - u2)
-            }
-        }
+        u_full[j] = boundary_value(problem.boundary_x_lower(y, t), grid.x(), true, |k| {
+            u_full[(1 + k) * ny + j]
+        });
+        u_full[(nx - 1) * ny + j] =
+            boundary_value(problem.boundary_x_upper(y, t), grid.x(), false, |k| {
+                u_full[(nx - 2 - k) * ny + j]
+            });
     }
 }
 
@@ -905,6 +757,7 @@ mod tests {
 
         let stepper = CraigSneydStepper::new(n_time);
         let levels = stepper.time_levels(t_mat);
+        let mut buffers = AdiWorkBuffers::for_grid(&grid);
 
         for step in 0..n_time {
             stepper
@@ -916,6 +769,7 @@ mod tests {
                     levels[step],
                     levels[step + 1],
                     step,
+                    &mut buffers,
                 )
                 .expect("pure-diffusion 2D heat step is stable");
         }
@@ -1048,12 +902,22 @@ mod tests {
         let initial_min = u_int.iter().copied().fold(f64::INFINITY, f64::min).min(0.0);
 
         let stepper = CraigSneydStepper::new(100);
+        let mut buffers = AdiWorkBuffers::for_grid(&grid);
         // March several steps: instability would amplify step over step.
         let mut t_from = 0.25;
         for step in 0..10 {
             let t_to = t_from - 0.005;
             stepper
-                .step(&problem, &grid, &mut u_full, &mut u_int, t_from, t_to, step)
+                .step(
+                    &problem,
+                    &grid,
+                    &mut u_full,
+                    &mut u_int,
+                    t_from,
+                    t_to,
+                    step,
+                    &mut buffers,
+                )
                 .expect("convection-dominated step must solve via upwinding");
             t_from = t_to;
         }
@@ -1088,12 +952,31 @@ mod tests {
         let mut u_int = vec![1.0; nx_int * ny_int];
 
         let stepper = CraigSneydStepper::new(10);
-        let zero = stepper.step(&Heat2D, &grid, &mut u_full, &mut u_int, 0.3, 0.3, 0);
+        let mut buffers = AdiWorkBuffers::for_grid(&grid);
+        let zero = stepper.step(
+            &Heat2D,
+            &grid,
+            &mut u_full,
+            &mut u_int,
+            0.3,
+            0.3,
+            0,
+            &mut buffers,
+        );
         assert!(
             matches!(zero, Err(StepperError::NonPositiveStep { dt, .. }) if dt == 0.0),
             "dt = 0 must be rejected as NonPositiveStep, got {zero:?}"
         );
-        let neg = stepper.step(&Heat2D, &grid, &mut u_full, &mut u_int, 0.1, 0.4, 0);
+        let neg = stepper.step(
+            &Heat2D,
+            &grid,
+            &mut u_full,
+            &mut u_int,
+            0.1,
+            0.4,
+            0,
+            &mut buffers,
+        );
         assert!(
             matches!(neg, Err(StepperError::NonPositiveStep { dt, .. }) if dt < 0.0),
             "dt < 0 must be rejected as NonPositiveStep, got {neg:?}"

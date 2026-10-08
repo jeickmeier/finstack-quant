@@ -6,7 +6,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::{Entity, DUMMY_ENTITY_ID};
-use finstack_quant_portfolio::{Error, PortfolioBuilder};
+use finstack_quant_portfolio::{Error, Portfolio};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use std::sync::Arc;
 use time::Duration;
@@ -40,7 +40,7 @@ fn cross_currency_conversion_uses_fx_matrix() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("P")
+    let portfolio = Portfolio::builder("P")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .position(position)
@@ -108,7 +108,7 @@ fn missing_fx_matrix_errors_for_cross_currency() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("P")
+    let portfolio = Portfolio::builder("P")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .position(position)
@@ -159,7 +159,7 @@ fn quantity_scaling_and_entity_totals() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("P")
+    let portfolio = Portfolio::builder("P")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E1"))

@@ -3540,44 +3540,6 @@ class Performance:
         """
         ...
 
-    def to_lookback_returns_dataframe(
-        self,
-        ref_date: object,
-        fiscal_year_start_month: int | None = None,
-        fiscal_year_start_day: int | None = None,
-    ) -> pd.DataFrame:
-        """
-        Period-to-date lookback returns as a pandas DataFrame.
-
-        Indexed by ticker name with columns ``mtd``, ``qtd``, ``ytd``,
-        and ``fytd``. See :meth:`lookback_returns` for the FYTD fiscal-start
-        semantics.
-
-        Parameters
-        ----------
-        ref_date : object
-            Reference date.
-        fiscal_year_start_month : int, optional
-            Fiscal year start month in ``1..=12``. When only the day is given
-            the month is January; with both omitted the fiscal year is the
-            calendar year (Rust ``FiscalConfig::from_parts``).
-        fiscal_year_start_day : int, optional
-            Fiscal year start day in ``1..=31``. When only the month is given
-            the day is the 1st.
-
-        Returns
-        -------
-        pd.DataFrame
-            Lookback returns indexed by ticker name.
-
-        Raises
-        ------
-        ValueError
-            If *fiscal_year_start_month* is not in ``1..=12`` or
-            *fiscal_year_start_day* is not in ``1..=31``.
-        """
-        ...
-
     def to_beta_dataframe(self) -> pd.DataFrame:
         """
         Beta regression statistics for every ticker vs the benchmark.

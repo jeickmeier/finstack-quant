@@ -12,7 +12,7 @@ use finstack_quant_models::credit::pd::{MasterScale, MasterScaleGrade, PdCalibra
 use finstack_quant_models::credit::scoring::CreditScoringError;
 use finstack_quant_models::factor::credit::hierarchy::{dimension_key, HierarchyDimension};
 use finstack_quant_models::factor::credit::VolHorizon;
-use finstack_quant_models::factor::risk::{DecompositionConfig, ParametricPositionDecomposer};
+use finstack_quant_models::factor::risk::{decompose_positions, DecompositionConfig};
 use finstack_quant_models::factor::FactorCovarianceMatrix;
 use finstack_quant_models::factor::FactorId;
 
@@ -33,13 +33,8 @@ fn transition_matrix_checked_index_lookup_and_rows() {
     let data = [0.9, 0.08, 0.02, 0.1, 0.8, 0.1, 0.0, 0.0, 1.0];
     let matrix = TransitionMatrix::new(three_state_scale(), &data, 1.0).expect("valid matrix");
 
-    assert_eq!(
-        matrix.try_probability_by_index(0, 2).expect("in range"),
-        0.02
-    );
-    let err = matrix
-        .try_probability_by_index(0, 3)
-        .expect_err("out of range");
+    assert_eq!(matrix.probability_by_index(0, 2).expect("in range"), 0.02);
+    let err = matrix.probability_by_index(0, 3).expect_err("out of range");
     assert_eq!(err.kind(), ErrorKind::Validation);
 
     let rows = matrix.to_rows();
@@ -51,8 +46,8 @@ fn transition_matrix_checked_index_lookup_and_rows() {
 #[test]
 fn seeded_migration_simulation_is_reproducible() {
     let simulator = MigrationSimulator::new(three_state_generator(), 5.0).expect("valid horizon");
-    let first = simulator.simulate_seeded(0, 200, 7).expect("valid state");
-    let second = simulator.simulate_seeded(0, 200, 7).expect("valid state");
+    let first = simulator.simulate(0, 200, 7).expect("valid state");
+    let second = simulator.simulate(0, 200, 7).expect("valid state");
     assert_eq!(
         serde_json::to_string(&first).expect("serialize"),
         serde_json::to_string(&second).expect("serialize")
@@ -63,14 +58,14 @@ fn seeded_migration_simulation_is_reproducible() {
     assert_eq!(default_rate(&[]), 0.0);
 
     let empirical = simulator
-        .empirical_matrix_seeded(500, 7)
+        .empirical_matrix(500, 7)
         .expect("positive path count");
     let again = simulator
-        .empirical_matrix_seeded(500, 7)
+        .empirical_matrix(500, 7)
         .expect("positive path count");
     assert_eq!(empirical.to_rows(), again.to_rows());
-    assert!(simulator.empirical_matrix_seeded(0, 7).is_err());
-    assert!(simulator.simulate_seeded(9, 1, 7).is_err());
+    assert!(simulator.empirical_matrix(0, 7).is_err());
+    assert!(simulator.simulate(9, 1, 7).is_err());
 }
 
 #[test]
@@ -186,19 +181,19 @@ fn factor_covariance_rows_follow_factor_order() {
 #[test]
 fn component_var_lookup_fails_with_not_found_for_an_unknown_position() {
     let ids = vec!["A".to_string(), "B".to_string()];
-    let decomposition = ParametricPositionDecomposer
-        .decompose_positions(
-            &[1.0, 2.0],
-            &[0.04, 0.01, 0.01, 0.09],
-            &ids,
-            &DecompositionConfig::parametric_95(),
-        )
-        .expect("valid inputs");
+    let decomposition = decompose_positions(
+        &[1.0, 2.0],
+        &[0.04, 0.01, 0.01, 0.09],
+        &ids,
+        &DecompositionConfig::parametric_95(),
+    )
+    .expect("valid inputs");
 
-    let known = decomposition.try_component_var("A").expect("known id");
-    assert_eq!(Some(known), decomposition.component_var("A"));
+    let known = decomposition.component_var("A").expect("known id");
+    assert_eq!(known, decomposition.var_contributions[0].component_var);
+    assert_eq!(decomposition.var_contributions[0].position_id, "A");
     let err = decomposition
-        .try_component_var("missing")
+        .component_var("missing")
         .expect_err("unknown id");
     assert_eq!(err.kind(), ErrorKind::NotFound);
 }

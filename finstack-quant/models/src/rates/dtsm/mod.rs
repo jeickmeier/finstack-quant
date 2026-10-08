@@ -71,8 +71,6 @@ pub mod pca;
 /// Shared types: YieldPanel, FactorTimeSeries, YieldForecast.
 pub mod types;
 
-pub use diebold_li::{
-    diebold_li_fit_factors, diebold_li_forecast, diebold_li_model, nelson_siegel_yields, DieboldLi,
-};
+pub use diebold_li::{nelson_siegel_yields, DieboldLi};
 pub use pca::{YieldPca, YieldPcaView};
 pub use types::{FactorTimeSeries, YieldForecast, YieldPanel};

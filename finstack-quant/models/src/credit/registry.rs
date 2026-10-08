@@ -16,7 +16,7 @@ static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<CreditAssumptionRegistry> =
 
 /// Versioned credit-assumption registry loaded from JSON.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct CreditAssumptionRegistry {
+pub(crate) struct CreditAssumptionRegistry {
     schema: String,
     default_rating_factor_table_id: String,
     default_seniority_calibration_id: String,
@@ -32,27 +32,27 @@ pub struct CreditAssumptionRegistry {
 
 impl CreditAssumptionRegistry {
     /// Returns the default WARF factor table id.
-    pub fn default_rating_factor_table_id(&self) -> &str {
+    pub(crate) fn default_rating_factor_table_id(&self) -> &str {
         &self.default_rating_factor_table_id
     }
 
     /// Returns the default seniority recovery calibration id.
-    pub fn default_seniority_calibration_id(&self) -> &str {
+    pub(crate) fn default_seniority_calibration_id(&self) -> &str {
         &self.default_seniority_calibration_id
     }
 
     /// Returns the default PD master scale id.
-    pub fn default_pd_master_scale_id(&self) -> &str {
+    pub(crate) fn default_pd_master_scale_id(&self) -> &str {
         &self.default_pd_master_scale_id
     }
 
     /// Returns the default downturn LGD preset id.
-    pub fn default_downturn_lgd_id(&self) -> &str {
+    pub(crate) fn default_downturn_lgd_id(&self) -> &str {
         &self.default_downturn_lgd_id
     }
 
     /// Returns the default workout LGD preset id.
-    pub fn default_workout_lgd_id(&self) -> &str {
+    pub(crate) fn default_workout_lgd_id(&self) -> &str {
         &self.default_workout_lgd_id
     }
 
@@ -288,7 +288,7 @@ impl CreditAssumptionRegistry {
 /// its schema/version, identifier uniqueness, default-reference, probability,
 /// recovery, or calibration validation. An error represents a package defect,
 /// not missing market data that can safely be projected at runtime.
-pub fn embedded_registry() -> Result<&'static CreditAssumptionRegistry> {
+pub(crate) fn embedded_registry() -> Result<&'static CreditAssumptionRegistry> {
     EMBEDDED_REGISTRY.load(validate_registry)
 }
 

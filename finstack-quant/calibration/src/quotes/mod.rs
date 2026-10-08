@@ -9,7 +9,6 @@
 //! - **Stable serde names**: All quote types use strict field names for long-lived pipelines
 //! - **Type-safe identifiers**: `QuoteId` and convention IDs prevent mismatches
 //! - **Pillar support**: Quotes support both tenor-based and date-based maturity pillars
-//! - **Bump operations**: Quotes support bumping values for sensitivity calculations
 //!
 //! # Quick Example
 //!
@@ -26,8 +25,8 @@
 //!     rate: 0.0525,
 //! };
 //!
-//! // Bump the rate by 1 basis point (0.0001 in decimal)
-//! let bumped = quote.bump_rate_decimal(0.0001);
+//! // Bump the rate by 1 basis point
+//! let bumped = quote.bump_rate_bp(1.0);
 //! # Ok(())
 //! # }
 //! ```

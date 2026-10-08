@@ -78,7 +78,7 @@ use finstack_quant_core::{error::InputError, types::CurveId};
 
 use finstack_quant_core::market_data::surfaces::{FxDeltaVolSurface, VolSurface};
 use finstack_quant_core::math::interp::{
-    ExtrapolationPolicy, InterpFn, Interpolator, LinearStrategy, ValidationPolicy,
+    ExtrapolationPolicy, Interpolator, LinearStrategy, ValidationPolicy,
 };
 use finstack_quant_core::Result;
 

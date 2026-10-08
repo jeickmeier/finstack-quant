@@ -1,20 +1,18 @@
 //! Binomial tree models for option pricing.
 //!
 //! Implements Cox-Ross-Rubinstein (CRR) and Leisen-Reimer binomial trees
-//! for American and Bermudan options via the generic [`TreeModel`] engine.
+//! for American and Bermudan options on the shared recombining-lattice engine.
 
 use crate::trees::NodeState;
 use crate::types::{OptionMarketParams, OptionType};
 use crate::volatility::black::d1_d2;
-use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::math::map_exercise_dates_to_steps;
 use finstack_quant_core::validation::validate_f64_positive;
-use finstack_quant_core::HashMap;
 use finstack_quant_core::HashSet;
 use finstack_quant_core::{Error, Result};
 
 use super::tree_framework::{
-    map_exercise_dates_to_steps, price_recombining_tree, single_factor_equity_state, state_keys,
-    EvolutionParams, RecombiningInputs, TreeModel, TreeValuator,
+    price_recombining_tree, EvolutionParams, RecombiningInputs, RecombiningLattice, TreeValuator,
 };
 
 /// Binomial tree types
@@ -216,30 +214,28 @@ impl BinomialTree {
         Ok((params.up_factor, params.down_factor, params.prob_up))
     }
 
-    /// Run backward induction on the shared recombining engine with flat
-    /// discounting at `rate` and the lattice factors `(u, d, p)`.
+    /// Run backward induction on the shared recombining engine from `spot`
+    /// with flat discounting at `rate` and the lattice factors `(u, d, p)`.
     fn induct<V: TreeValuator>(
         &self,
         (u, d, p): (f64, f64, f64),
-        initial_vars: HashMap<&'static str, f64>,
+        spot: f64,
         time_to_maturity: f64,
         rate: f64,
-        market_context: &MarketContext,
         valuator: &V,
     ) -> Result<f64> {
         price_recombining_tree(RecombiningInputs {
             steps: self.steps,
-            initial_vars,
             time_to_maturity,
-            market_context,
             valuator,
-            up_factor: u,
-            down_factor: d,
             prob_up: p,
             prob_down: 1.0 - p,
-            interest_rate: rate,
-            custom_state_generator: None,
-            custom_rate_generator: None,
+            lattice: RecombiningLattice::Spot {
+                spot,
+                up_factor: u,
+                down_factor: d,
+                interest_rate: rate,
+            },
         })
     }
 
@@ -268,19 +264,11 @@ impl BinomialTree {
             remaining_dividend_values: None,
         };
 
-        let initial_vars = single_factor_equity_state(
-            market_params.spot,
-            market_params.rate,
-            market_params.dividend_yield,
-            market_params.volatility,
-        );
-
         self.induct(
             factors,
-            initial_vars,
+            market_params.spot,
             market_params.time_to_expiry,
             market_params.rate,
-            &MarketContext::new(), // not used by valuator
             &valuator,
         )
     }
@@ -368,19 +356,11 @@ impl BinomialTree {
             exercise_steps: exercise_steps.map(|steps| steps.iter().copied().collect()),
             remaining_dividend_values: Some(remaining_dividend_values),
         };
-        let initial_vars = single_factor_equity_state(
-            escrowed_spot,
-            market_params.rate,
-            market_params.dividend_yield,
-            market_params.volatility,
-        );
-
         self.induct(
             factors,
-            initial_vars,
+            escrowed_spot,
             market_params.time_to_expiry,
             market_params.rate,
-            &MarketContext::new(),
             &valuator,
         )
     }
@@ -452,58 +432,46 @@ impl BinomialTree {
         steps.dedup();
         self.price_with_exercise(market_params, Some(&steps))
     }
-
-    /// Generic [`TreeModel`] pricing for an arbitrary [`TreeValuator`].
-    ///
-    /// This entry point has no contractual strike, so it requires CRR.
-    /// Leisen-Reimer requires a strike and must use the dedicated option methods.
-    #[inline(never)] // Prevent inlining to reduce coverage metadata conflicts
-    pub fn price_generic<V: TreeValuator>(
-        &self,
-        initial_vars: HashMap<&'static str, f64>,
-        time_to_maturity: f64,
-        market_context: &MarketContext,
-        valuator: &V,
-    ) -> Result<f64> {
-        let r = *initial_vars
-            .get(state_keys::INTEREST_RATE)
-            .ok_or_else(|| Error::internal("binomial tree requires initial interest rate"))?;
-        let q = initial_vars
-            .get(state_keys::DIVIDEND_YIELD)
-            .copied()
-            .unwrap_or(0.0);
-        let sigma = *initial_vars
-            .get(state_keys::VOLATILITY)
-            .ok_or_else(|| Error::internal("binomial tree requires initial volatility"))?;
-
-        let factors = self.calculate_parameters(0.0, 0.0, r, sigma, time_to_maturity, q)?;
-        self.induct(
-            factors,
-            initial_vars,
-            time_to_maturity,
-            r,
-            market_context,
-            valuator,
-        )
-    }
-}
-
-/// Implementation of TreeModel trait for BinomialTree
-impl TreeModel for BinomialTree {
-    fn price<V: TreeValuator>(
-        &self,
-        initial_vars: HashMap<&'static str, f64>,
-        time_to_maturity: f64,
-        market_context: &MarketContext,
-        valuator: &V,
-    ) -> Result<f64> {
-        self.price_generic(initial_vars, time_to_maturity, market_context, valuator)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Bit-exact prices across lattice kinds and exercise styles: the node
+    /// state plumbing must not perturb the backward induction arithmetic.
+    #[test]
+    fn binomial_tree_prices_are_bit_pinned() {
+        let put = OptionMarketParams::put(100.0, 110.0, 0.05, 0.20, 1.0);
+        let call = OptionMarketParams::call(100.0, 95.0, 0.04, 0.25, 0.75);
+        let prices = [
+            BinomialTree::crr(50).price_american(&put),
+            BinomialTree::crr(50).price_european(&put),
+            BinomialTree::leisen_reimer(51).price_european(&call),
+            BinomialTree::leisen_reimer(51).price_bermudan(&put, &[0.25, 0.5, 0.75]),
+            BinomialTree::crr(40).price_american_with_discrete_dividends(&call, &[(0.3, 2.0)]),
+            BinomialTree::crr(40).price_bermudan_with_discrete_dividends(
+                &put,
+                &[0.5],
+                &[(0.25, 1.5), (0.6, 1.5)],
+            ),
+        ];
+        let bits: Vec<u64> = prices
+            .into_iter()
+            .map(|price| price.expect("price").to_bits())
+            .collect();
+        assert_eq!(
+            bits,
+            [
+                4_622_935_351_032_042_556_u64,
+                4_622_210_892_806_378_861,
+                4_623_374_120_383_711_458,
+                4_622_789_733_392_889_670,
+                4_622_659_889_955_153_198,
+                4_623_290_800_700_467_377,
+            ]
+        );
+    }
 
     #[test]
     fn vanilla_tree_entry_points_reject_invalid_prices() {
@@ -523,28 +491,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn generic_crr_valuator_still_requires_no_option_strike() {
-        struct UnitPayoff;
-        impl TreeValuator for UnitPayoff {
-            fn value_at_maturity(&self, _state: &NodeState) -> Result<f64> {
-                Ok(1.0)
-            }
-            fn value_at_node(&self, _state: &NodeState, value: f64, _dt: f64) -> Result<f64> {
-                Ok(value)
-            }
-        }
-        let actual = BinomialTree::crr(20)
-            .price_generic(
-                single_factor_equity_state(0.0, 0.05, 0.02, 0.2),
-                1.0,
-                &MarketContext::new(),
-                &UnitPayoff,
-            )
-            .expect("generic payoff without a strike");
-        assert!((actual - (-0.05_f64).exp()).abs() < 1e-12);
     }
 
     #[test]
@@ -753,12 +699,12 @@ mod tests {
     fn test_exercise_schedule_mapping() {
         // Map quarterly exercise dates over 1Y with 4 steps
         let dates = vec![0.0, 0.25, 0.5, 0.75, 1.0];
-        let steps = super::map_exercise_dates_to_steps(&dates, 1.0, 4);
+        let steps = map_exercise_dates_to_steps(&dates, 1.0, 4);
         assert_eq!(steps, vec![0, 1, 2, 3, 4]);
 
         // Irregular dates should round to nearest step
         let dates2 = vec![0.12, 0.37, 0.62, 0.88];
-        let steps2 = super::map_exercise_dates_to_steps(&dates2, 1.0, 4);
+        let steps2 = map_exercise_dates_to_steps(&dates2, 1.0, 4);
         assert_eq!(steps2, vec![0, 1, 2, 4]);
     }
 

@@ -32,7 +32,7 @@ pub mod pd;
 pub mod pool;
 pub mod rating_factors;
 pub mod recovery_waterfall;
-pub mod registry;
+pub(crate) mod registry;
 pub mod scoring;
 pub mod toggle_exercise;
 

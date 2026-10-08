@@ -15,15 +15,21 @@ CONSTANT_CASE) name. Everything else is recorded explicitly:
 * ``backlog``   -- Python names not yet reachable from WASM (must reach zero);
 * ``wasm_only`` -- WASM keys with no Python twin, with a reason.
 
-The same partition applies to the members of every class bound in both hosts.
+The same partition applies to the members of every class bound in both hosts,
+and to the methods of every data class recorded in a ``types`` map. A property
+of such a data class is accounted for by the TypeScript type when it is one of
+that type's fields; a property the type does not carry is computed in Rust and
+is partitioned like a method (it needs a WASM function twin).
 A member rename to ``constructor`` requires a constructor signature in that
 class's TypeScript declaration; constructors are not ordinary runtime statics.
 
 One exclusion reason, ``literal``, is for members only: the member just
 constructs or rebuilds a plain data value (an enum-variant constructor, a
 ``with_*`` setter or constructor of a data class, an enum ``from_str`` /
-``value`` / ``as_str`` label accessor, or a single-field ``*_json`` view of a
-field already on the wire object), and the TypeScript object or string literal
+``value`` / ``as_str`` label accessor, a single-field ``*_json`` view of a
+field already on the wire object, or a property that reads a count, an
+element, a column or a tag straight off wire fields), and the TypeScript object
+or string literal
 of the class's schema-generated type is its WASM twin. It is valid only on a
 class recorded in a ``types`` map, never for a member that computes, validates
 or applies defaults in Rust -- those need a WASM function.
@@ -58,6 +64,45 @@ TS_TYPES = set(re.findall(r"^(?:export )?(?:declare )?(?:interface|type|class) (
     for path in GENERATED.rglob("*.ts")
     for name in re.findall(r"^export (?:interface|type) (\w+)", path.read_text(), re.M)
 }
+TS_DECLARATION = re.compile(r"^(?:export )?(?:declare )?(interface|type|class) (\w+)\b([^\n]*)", re.M)
+
+
+def ts_declarations() -> dict[str, tuple[str, str, str]]:
+    """TypeScript declarations by name: (keyword, header line, text up to the next declaration).
+
+    The schema-generated types win over a same-named facade declaration: a
+    ``types`` entry names the wire type.
+    """
+    found: dict[str, tuple[str, str, str]] = {}
+    for text in [path.read_text() for path in sorted(GENERATED.rglob("*.ts"))] + [DTS]:
+        matches = list(TS_DECLARATION.finditer(text))
+        ends = [following.start() for following in matches[1:]] + [len(text)]
+        for match, end in zip(matches, ends, strict=False):
+            found.setdefault(match.group(2), (match.group(1), match.group(3), text[match.end() : end]))
+    return found
+
+
+TS_DECLARATIONS = ts_declarations()
+
+
+def ts_fields(ts_type: str, seen: frozenset[str] = frozenset()) -> set[str]:
+    """Field names a TypeScript data type carries.
+
+    An interface contributes its own keys plus those of the interfaces it
+    extends; a type alias contributes the keys of its inline object types plus
+    those of every declared type it names (a union of variants, an
+    intersection, or a plain alias).
+    """
+    if ts_type in seen or ts_type not in TS_DECLARATIONS:
+        return set()
+    keyword, header, body = TS_DECLARATIONS[ts_type]
+    fields = set(re.findall(r"^\s+(?:readonly )?(\w+)\??:", body, re.M))
+    referenced = header if keyword == "interface" else header + body
+    for name in set(re.findall(r"\b[A-Z]\w*\b", referenced)) & set(TS_DECLARATIONS):
+        fields |= ts_fields(name, seen | {ts_type})
+    return fields
+
+
 REASONS = set(LEDGER["exclusion_reasons"])
 PY_RULE_MEMBERS: dict[str, str] = LEDGER["python_rule_excluded_members"]
 JS_RULE_MEMBERS: dict[str, str] = LEDGER["js_rule_members"]
@@ -252,12 +297,12 @@ SHARED = shared_classes()
 DATA_EXITS = {"to_json", "from_json", "to_dict", "from_dict"}
 
 
-def typed_classes() -> dict[str, Any]:
-    """Python data classes recorded as TypeScript types: qualified name -> class."""
+def typed_classes() -> dict[str, tuple[Any, str]]:
+    """Python data classes recorded as TypeScript types: qualified name -> (class, TypeScript type)."""
     return {
-        f"{path}.{name}": PY[path][name]
+        f"{path}.{name}": (PY[path][name], ts_type)
         for path, entry in MODULES.items()
-        for name in entry.get("types", {})
+        for name, ts_type in entry.get("types", {}).items()
         if name in PY.get(path, {})
     }
 
@@ -281,6 +326,34 @@ def data_class_methods(cls: Any) -> set[str]:
         if isinstance(raw, (staticmethod, classmethod)) or inspect.isroutine(raw) or inspect.ismethoddescriptor(raw):
             methods.add(name)
     return methods
+
+
+def data_class_computed_properties(cls: Any, ts_type: str) -> set[str]:
+    """Public properties of a data class that are not fields of its TypeScript type.
+
+    A property that projects a wire field is carried by the TypeScript type
+    under the same name. Any other property is derived by a Rust method (or
+    renames a field), so the plain TypeScript object does not provide it.
+    """
+    if not inspect.isclass(cls):
+        return set()
+    fields = ts_fields(ts_type)
+    properties = set()
+    for name in dir(cls):
+        if name.startswith("_") or rule_excluded(name) or name in fields:
+            continue
+        raw = inspect.getattr_static(cls, name)
+        if inspect.isdatadescriptor(raw) and not inspect.isroutine(raw):
+            properties.add(name)
+    return properties
+
+
+# Namespaces whose data-class properties are checked against the TypeScript
+# fields. The other namespaces still hold properties that are neither a field
+# of their TypeScript type nor recorded in the ledger; add a namespace here
+# once its properties are recorded (as a rename to a WASM function, or as
+# ``literal`` for a plain view of wire fields).
+PROPERTY_CHECKED_PREFIXES = ("finstack_quant.models.",)
 
 
 LITERAL = "literal"
@@ -314,9 +387,19 @@ def test_member_ledger_names_only_bound_classes() -> None:
 
 @pytest.mark.parametrize("qualified", sorted(TYPED))
 def test_data_class_methods_are_accounted_for(qualified: str) -> None:
-    """A TypeScript type carries the data; the computations need WASM twins too."""
+    """A TypeScript type carries the data; the computations need WASM twins too.
+
+    That covers methods and, in the namespaces listed in
+    ``PROPERTY_CHECKED_PREFIXES``, properties the TypeScript type has no field
+    for.
+    """
+    cls, ts_type = TYPED[qualified]
     entry = MEMBERS.get(qualified, {})
-    problems = entry_problems(qualified, data_class_methods(TYPED[qualified]), set(), entry)
+    properties = data_class_computed_properties(cls, ts_type)
+    if not qualified.startswith(PROPERTY_CHECKED_PREFIXES):
+        # Outside the checked namespaces a property is a member only once the ledger records it.
+        properties &= set(entry.get("renames", {})) | set(entry.get("excluded", {})) | set(entry.get("backlog", []))
+    problems = entry_problems(qualified, data_class_methods(cls) | properties, set(), entry)
     for name, rename in entry.get("renames", {}).items():
         if SURFACE.get(rename["js"], {}).get("kind") != "function":
             problems.append(f"{qualified}.{name}: rename target {rename['js']!r} is not a WASM function")

@@ -6,6 +6,7 @@
 //! `models.credit`.
 
 pub mod lgd;
+pub mod liability_management;
 pub mod migration;
 pub mod pd;
 pub mod recovery_waterfall;
@@ -13,12 +14,12 @@ pub mod scoring;
 
 use std::sync::Arc;
 
-use super::serde_tag;
 use crate::api::core::market_data::JsHazardCurve;
 use crate::utils::input::{from_js_json, js_bool, js_f64, js_f64_seq, js_string, js_u64, js_uint};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::types::CreditRating;
+use finstack_quant_core::wire::serde_tag;
 use finstack_quant_models::credit::{
     self as credit, AssetDynamics, CreditState, CreditStateVariable, DynamicRecoverySpec,
     EndogenousHazardSpec, MertonBarrierType, MertonModel, RatingFactorTable, SimulatedPaths,
@@ -665,11 +666,11 @@ impl JsMertonModel {
     ///
     /// Throws a `validation` error if `horizon` is not positive and finite, the
     /// firm is economically in default, or the inversion is ill-conditioned.
-    #[wasm_bindgen(js_name = tryImpliedEquity)]
-    pub fn try_implied_equity(&self, horizon: JsValue) -> Result<Box<[f64]>, JsValue> {
+    #[wasm_bindgen(js_name = impliedEquity)]
+    pub fn implied_equity(&self, horizon: JsValue) -> Result<Box<[f64]>, JsValue> {
         let (equity, equity_vol) = self
             .inner
-            .try_implied_equity(js_f64(&horizon, "horizon")?)
+            .implied_equity(js_f64(&horizon, "horizon")?)
             .map_err(to_js_err)?;
         Ok(Box::new([equity, equity_vol]))
     }
@@ -740,7 +741,7 @@ impl JsMertonModel {
         let seed = js_u64(&seed, "seed")?;
         let antithetic = js_bool(&antithetic, "antithetic")?;
         self.inner
-            .simulate_paths_seeded(num_paths, num_steps, horizon, seed, antithetic)
+            .simulate_paths(num_paths, num_steps, horizon, seed, antithetic)
             .map(|inner| JsSimulatedPaths { inner })
             .map_err(to_js_err)
     }
@@ -952,7 +953,7 @@ impl JsDynamicRecoverySpec {
     /// `"linear_decline"`.
     #[wasm_bindgen(getter)]
     pub fn kind(&self) -> Result<String, JsValue> {
-        serde_tag(self.inner.model())
+        serde_tag(self.inner.model()).map_err(to_js_err)
     }
 
     /// Base (reference) recovery rate `R0`, as a fraction from 0 through 1.
@@ -1072,7 +1073,7 @@ impl JsEndogenousHazardSpec {
     /// `"tabular"`.
     #[wasm_bindgen(getter)]
     pub fn kind(&self) -> Result<String, JsValue> {
-        serde_tag(self.inner.leverage_hazard_map())
+        serde_tag(self.inner.leverage_hazard_map()).map_err(to_js_err)
     }
 
     /// Base (reference) hazard rate, annualized, as a decimal.
@@ -1239,17 +1240,17 @@ impl JsToggleExerciseModel {
     ///
     /// Throws a `TypeError` if `state` is neither a string nor a plain object
     /// or `u` is not a number, and a `validation` error if `state` is malformed.
-    #[wasm_bindgen(js_name = shouldPikWithUniform)]
-    pub fn should_pik_with_uniform(&self, state: JsValue, u: JsValue) -> Result<bool, JsValue> {
+    #[wasm_bindgen(js_name = shouldPik)]
+    pub fn should_pik(&self, state: JsValue, u: JsValue) -> Result<bool, JsValue> {
         let state: CreditState = from_js_json(&state, "state")?;
-        Ok(self.inner.should_pik_with_uniform(&state, js_f64(&u, "u")?))
+        Ok(self.inner.should_pik(&state, js_f64(&u, "u")?))
     }
 
     /// Which rule this model carries: `"threshold"`, `"stochastic"` or
     /// `"optimal_exercise"` (the canonical serde tag).
     #[wasm_bindgen(getter)]
     pub fn kind(&self) -> Result<String, JsValue> {
-        serde_tag(&self.inner)
+        serde_tag(&self.inner).map_err(to_js_err)
     }
 
     /// Parameters of the active rule as a plain object in canonical JSON form.

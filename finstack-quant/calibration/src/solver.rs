@@ -32,6 +32,3 @@ pub(crate) mod multi_start;
 pub(crate) mod traits;
 
 pub use config::SolverConfig;
-pub(crate) use helpers::{
-    bracket_solve_1d_nearest_first_with_diagnostics, bracket_solve_1d_with_diagnostics,
-};

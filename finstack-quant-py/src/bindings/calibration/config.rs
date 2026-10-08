@@ -1,8 +1,8 @@
 //! Typed calibration settings: `CalibrationConfig`, `SolverConfig`, `ValidationConfig`, `RateBounds`.
 
+use crate::bindings::macros::wire_methods;
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::serde_to_py;
-use crate::bindings::pickle_support::reduce_via_json;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_calibration::{CalibrationConfig, RateBounds, SolverConfig, ValidationConfig};
@@ -100,44 +100,6 @@ impl PySolverConfig {
         self.inner.max_iterations()
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize SolverConfig"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     Solver settings JSON with finite, positive tolerance and a
-    ///     positive iteration count; omitted fields use Rust defaults.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed, contains unknown solver fields, or has
-    ///     non-finite or non-positive tolerance, or a non-positive iteration count.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: SolverConfig = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid SolverConfig JSON"))?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "SolverConfig(tolerance={:e}, max_iterations={})",
@@ -146,6 +108,8 @@ impl PySolverConfig {
         )
     }
 }
+
+wire_methods!(PySolverConfig, SolverConfig, "SolverConfig", validate);
 
 /// Minimum / maximum admissible zero rates for curve validation.
 ///
@@ -234,37 +198,6 @@ impl PyRateBounds {
         self.inner.max_rate
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize RateBounds"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed, has unknown fields, or the bounds are invalid.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: RateBounds = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid RateBounds JSON"))?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "RateBounds(min_rate={}, max_rate={})",
@@ -272,6 +205,8 @@ impl PyRateBounds {
         )
     }
 }
+
+wire_methods!(PyRateBounds, RateBounds, "RateBounds", validate);
 
 /// Post-solve curve/surface validation thresholds and toggles.
 ///
@@ -340,41 +275,17 @@ impl PyValidationConfig {
         serde_to_py(py, &self.inner)
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize ValidationConfig"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed, has unknown fields, or fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: ValidationConfig = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid ValidationConfig JSON"))?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("ValidationConfig", &self.inner)
     }
 }
+
+wire_methods!(
+    PyValidationConfig,
+    ValidationConfig,
+    "ValidationConfig",
+    validate
+);
 
 /// Plan-level calibration settings (solver, validation, parallelism, diagnostics).
 ///
@@ -560,37 +471,6 @@ impl PyCalibrationConfig {
         serde_to_py(py, &self.inner)
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CalibrationConfig"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json`` (missing fields take defaults).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed, has unknown fields, or fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: CalibrationConfig = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid CalibrationConfig JSON"))?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CalibrationConfig(tolerance={:e}, max_iterations={}, use_parallel={}, fail_on_bad_fit={}, compute_diagnostics={})",
@@ -602,3 +482,10 @@ impl PyCalibrationConfig {
         )
     }
 }
+
+wire_methods!(
+    PyCalibrationConfig,
+    CalibrationConfig,
+    "CalibrationConfig",
+    validate
+);

@@ -235,9 +235,10 @@ impl FullRepricingEngine {
         let repricing_plan = FactorRepricingPlan::build(positions, factors, market);
 
         let compute_profile = |(factor_index, factor): (usize, &FactorDefinition)| {
-            let (bump_size, bump_units) = self
+            let bump_size = self
                 .bump_config
-                .bump_size_with_unit_for_factor(&factor.id, &factor.factor_type);
+                .bump_size_for_factor(&factor.id, &factor.factor_type);
+            let bump_units = factor.factor_type.bump_units();
             Self::validate_bump_size(factor, bump_size)?;
             let affected_positions = repricing_plan.affected(factor_index);
             let reconvert_all = mapping_bumps_fx(&factor.market_mapping);
@@ -627,7 +628,7 @@ mod tests {
         let matrix =
             engine.compute_sensitivities(&positions, &factors, &market, as_of, Currency::USD)?;
 
-        assert!((matrix.delta(0, 0) - 1.0).abs() < 1e-3);
+        assert!((matrix.delta(0, 0).expect("in range") - 1.0).abs() < 1e-3);
         Ok(())
     }
 
@@ -655,7 +656,7 @@ mod tests {
         )?;
 
         assert!(
-            matrix.delta(0, 0).abs() > 1e-12,
+            matrix.delta(0, 0).expect("in range").abs() > 1e-12,
             "a USD/EUR leg bump must move the triangulated EUR/JPY cross"
         );
         Ok(())
@@ -689,7 +690,7 @@ mod tests {
         )?;
 
         assert!(
-            (matrix.delta(0, 0) - 1.0).abs() < 1e-3,
+            (matrix.delta(0, 0).expect("in range") - 1.0).abs() < 1e-3,
             "linear delta should be per bp, not scaled by the 5 bp override"
         );
         Ok(())
@@ -944,8 +945,13 @@ mod tests {
                 Currency::USD,
             )?;
 
-        assert!((matrix.delta(0, 0) - reference_matrix.delta(0, 0)).abs() < 1e-12);
-        assert_eq!(matrix.delta(1, 0), 0.0);
+        assert!(
+            (matrix.delta(0, 0).expect("in range")
+                - reference_matrix.delta(0, 0).expect("in range"))
+            .abs()
+                < 1e-12
+        );
+        assert_eq!(matrix.delta(1, 0).expect("in range"), 0.0);
         assert_eq!(
             affected_calls.load(Ordering::Relaxed),
             2,
@@ -990,7 +996,7 @@ mod tests {
             Currency::USD,
         )?;
 
-        assert_eq!(matrix.delta(0, 0), 0.0);
+        assert_eq!(matrix.delta(0, 0).expect("in range"), 0.0);
         assert_eq!(
             calls.load(Ordering::Relaxed),
             2,

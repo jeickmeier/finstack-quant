@@ -7,6 +7,7 @@
 //! - Downturn LGD adjustments (stressed approximation, regulatory floor).
 //! - Exposure-at-default for term loans and revolvers.
 
+use crate::bindings::macros::wire_methods;
 use finstack_quant_models::credit::lgd::{
     self, BetaRecovery, CollateralPiece, CreditConversionFactor, DownturnLgd, EadCalculator,
     WorkoutCollateralType, WorkoutCosts, WorkoutLgd, WorkoutLgdBuilder, WorkoutLgdResult,
@@ -17,7 +18,7 @@ use pyo3::types::{PyList, PyModule};
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
 };
-use crate::errors::{core_to_py, serde_json_to_py, value_error};
+use crate::errors::{core_to_py, value_error};
 
 /// Accepted `WorkoutCollateralType` strings, in canonical order.
 const COLLATERAL_TYPES: &str =
@@ -135,27 +136,6 @@ impl PyBetaRecovery {
             .map_err(core_to_py)
     }
 
-    /// Deserialize from canonical JSON (shape parameters are re-validated).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid BetaRecovery JSON"))?,
-        })
-    }
-
-    /// Serialize to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "BetaRecovery serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Export as a single-row pandas ``DataFrame``
     /// (``mean``, ``std_dev``, ``alpha``, ``beta_param``).
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -171,6 +151,8 @@ impl PyBetaRecovery {
         crate::bindings::repr_support::repr_from_serde("BetaRecovery", &self.inner)
     }
 }
+
+wire_methods!(PyBetaRecovery, BetaRecovery, "BetaRecovery");
 
 /// Return the historical Beta recovery distribution for a seniority class.
 ///
@@ -263,32 +245,13 @@ impl PyCollateralPiece {
         self.inner.liquidation_value()
     }
 
-    /// Deserialize from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid CollateralPiece JSON"))?,
-        })
-    }
-
-    /// Serialize to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "CollateralPiece serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CollateralPiece", &self.inner)
     }
 }
+
+wire_methods!(PyCollateralPiece, CollateralPiece, "CollateralPiece");
 
 /// Direct and indirect workout cost rates as decimal fractions of EAD.
 #[pyclass(
@@ -360,32 +323,13 @@ impl PyWorkoutCosts {
         self.inner.total_rate()
     }
 
-    /// Deserialize from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid WorkoutCosts JSON"))?,
-        })
-    }
-
-    /// Serialize to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "WorkoutCosts serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("WorkoutCosts", &self.inner)
     }
 }
+
+wire_methods!(PyWorkoutCosts, WorkoutCosts, "WorkoutCosts");
 
 /// Net recovery, LGD, and recovery rate from a workout evaluation.
 #[pyclass(
@@ -420,27 +364,6 @@ impl PyWorkoutLgdResult {
         self.inner.recovery_rate
     }
 
-    /// Deserialize from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid WorkoutLgdResult JSON"))?,
-        })
-    }
-
-    /// Serialize to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "WorkoutLgdResult serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Export as a single-row pandas ``DataFrame``
     /// (``net_recovery``, ``lgd``, ``recovery_rate``).
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -456,6 +379,8 @@ impl PyWorkoutLgdResult {
         crate::bindings::repr_support::repr_from_serde("WorkoutLgdResult", &self.inner)
     }
 }
+
+wire_methods!(PyWorkoutLgdResult, WorkoutLgdResult, "WorkoutLgdResult");
 
 /// Workout (collateral-waterfall) LGD model.
 ///
@@ -569,32 +494,13 @@ impl PyWorkoutLgd {
         )
     }
 
-    /// Deserialize from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid WorkoutLgd JSON"))?,
-        })
-    }
-
-    /// Serialize to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "WorkoutLgd serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("WorkoutLgd", &self.inner)
     }
 }
+
+wire_methods!(PyWorkoutLgd, WorkoutLgd, "WorkoutLgd");
 
 /// Fluent builder for ``WorkoutLgd``; obtain via ``WorkoutLgd.builder()``.
 ///
@@ -847,19 +753,7 @@ impl PyDownturnLgd {
     /// Canonical method name: ``"stressed_approximation"`` or ``"regulatory_floor"``.
     #[getter]
     fn method(&self) -> PyResult<String> {
-        match serde_json::to_value(self.inner.method())
-            .map_err(|err| serde_json_to_py(err, "DownturnMethod serialization failed"))?
-        {
-            serde_json::Value::Object(map) => map
-                .keys()
-                .next()
-                .cloned()
-                .ok_or_else(|| value_error("DownturnMethod has no tag")),
-            serde_json::Value::String(tag) => Ok(tag),
-            other => Err(value_error(format!(
-                "unexpected DownturnMethod form {other}"
-            ))),
-        }
+        finstack_quant_core::wire::serde_tag(self.inner.method()).map_err(core_to_py)
     }
 
     /// Method parameters as a mapping in canonical JSON form.
@@ -868,32 +762,13 @@ impl PyDownturnLgd {
         crate::bindings::pandas_utils::serde_to_py(py, self.inner.method())
     }
 
-    /// Deserialize from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: DownturnLgd = serde_json::from_str(json)
-            .map_err(|err| serde_json_to_py(err, "invalid DownturnLgd JSON"))?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "DownturnLgd serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("DownturnLgd", &self.inner)
     }
 }
+
+wire_methods!(PyDownturnLgd, DownturnLgd, "DownturnLgd", validate);
 
 /// Exposure-at-default calculator: ``EAD = drawn + undrawn * CCF``.
 #[pyclass(
@@ -983,32 +858,13 @@ impl PyEadCalculator {
         self.inner.leq_from_observed_ead(observed_ead)
     }
 
-    /// Deserialize from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid EadCalculator JSON"))?,
-        })
-    }
-
-    /// Serialize to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "EadCalculator serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("EadCalculator", &self.inner)
     }
 }
+
+wire_methods!(PyEadCalculator, EadCalculator, "EadCalculator");
 
 /// Build the `finstack_quant.models.credit.lgd` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -105,30 +105,23 @@ fn regression_covariance(returns: &[f64], benchmark: &[f64]) -> (usize, OnlineCo
 /// * `returns` - Portfolio return series.
 /// * `benchmark` - Benchmark return series. Lengths are matched to the
 ///   shorter of the two.
-/// * `annualize` - Whether to scale by `sqrt(ann_factor)`.
 /// * `ann_factor` - Number of periods per year.
 ///
 /// # Returns
 ///
 /// Tracking error (non-negative). Returns `0.0` for empty or mismatched series.
-/// When `annualize` is `true`, returns [`f64::NAN`] if `ann_factor` is not finite
-/// or is `<= 0`.
+/// Returns [`f64::NAN`] if `ann_factor` is not finite or is `<= 0`.
 ///
 /// # References
 ///
 /// - Grinold & Kahn (1999): see docs/REFERENCES.md#grinoldKahn1999ActivePortfolio
 #[must_use]
-pub(crate) fn tracking_error(
-    returns: &[f64],
-    benchmark: &[f64],
-    annualize: bool,
-    ann_factor: f64,
-) -> f64 {
+pub(crate) fn tracking_error(returns: &[f64], benchmark: &[f64], ann_factor: f64) -> f64 {
     let n = returns.len().min(benchmark.len());
     if n == 0 {
         return 0.0;
     }
-    if crate::risk_metrics::invalid_annualization_factor(annualize, ann_factor) {
+    if crate::risk_metrics::invalid_annualization_factor(true, ann_factor) {
         return f64::NAN;
     }
     let mut os = OnlineStats::new();
@@ -136,11 +129,7 @@ pub(crate) fn tracking_error(
         os.update(returns[i] - benchmark[i]);
     }
     let te = os.std_dev();
-    if annualize {
-        te * ann_factor.sqrt()
-    } else {
-        te
-    }
+    te * ann_factor.sqrt()
 }
 
 /// Information ratio: annualized active return divided by tracking error.
@@ -160,7 +149,6 @@ pub(crate) fn tracking_error(
 ///
 /// * `returns`    - Portfolio return series.
 /// * `benchmark`  - Benchmark return series.
-/// * `annualize`  - Whether to annualize numerator and denominator.
 /// * `ann_factor` - Number of periods per year.
 ///
 /// # Returns
@@ -169,24 +157,19 @@ pub(crate) fn tracking_error(
 /// tracking error is zero and mean active return is also zero. When the
 /// tracking error is zero but mean active return is nonzero, returns
 /// `+∞` or `-∞` matching the sign of the excess (consistent with
-/// [`crate::risk_metrics::sharpe`]). When `annualize` is
-/// `true`, returns [`f64::NAN`] if `ann_factor` is not finite or is `<= 0`.
+/// [`crate::risk_metrics::sharpe`]). Returns [`f64::NAN`] if `ann_factor`
+/// is not finite or is `<= 0`.
 ///
 /// # References
 ///
 /// - Grinold & Kahn (1999): see docs/REFERENCES.md#grinoldKahn1999ActivePortfolio
 #[must_use]
-pub(crate) fn information_ratio(
-    returns: &[f64],
-    benchmark: &[f64],
-    annualize: bool,
-    ann_factor: f64,
-) -> f64 {
+pub(crate) fn information_ratio(returns: &[f64], benchmark: &[f64], ann_factor: f64) -> f64 {
     let n = returns.len().min(benchmark.len());
     if n == 0 {
         return 0.0;
     }
-    if crate::risk_metrics::invalid_annualization_factor(annualize, ann_factor) {
+    if crate::risk_metrics::invalid_annualization_factor(true, ann_factor) {
         return f64::NAN;
     }
     let mut os = OnlineStats::new();
@@ -204,11 +187,7 @@ pub(crate) fn information_ratio(
             0.0
         };
     }
-    if annualize {
-        (er * ann_factor) / (te * ann_factor.sqrt())
-    } else {
-        er / te
-    }
+    (er * ann_factor) / (te * ann_factor.sqrt())
 }
 
 /// R-squared: proportion of portfolio variance explained by the benchmark.
@@ -1236,7 +1215,7 @@ mod tests {
     #[test]
     fn tracking_error_zero_when_identical() {
         let r = [0.01, 0.02, -0.01, 0.03];
-        let te = tracking_error(&r, &r, false, 252.0);
+        let te = tracking_error(&r, &r, 252.0);
         assert!(te.abs() < 1e-12);
     }
 
@@ -1244,16 +1223,16 @@ mod tests {
     fn tracking_error_nan_when_annualized_with_invalid_ann_factor() {
         let r = [0.01, 0.02];
         let b = [0.01, 0.01];
-        assert!(tracking_error(&r, &b, true, 0.0).is_nan());
-        assert!(tracking_error(&r, &b, true, -1.0).is_nan());
-        assert!(tracking_error(&r, &b, true, f64::NAN).is_nan());
+        assert!(tracking_error(&r, &b, 0.0).is_nan());
+        assert!(tracking_error(&r, &b, -1.0).is_nan());
+        assert!(tracking_error(&r, &b, f64::NAN).is_nan());
     }
 
     #[test]
     fn information_ratio_basic() {
         let r = [0.02, 0.03, 0.01, 0.04];
         let b = [0.01, 0.01, 0.01, 0.01];
-        let ir = information_ratio(&r, &b, false, 252.0);
+        let ir = information_ratio(&r, &b, 252.0);
         assert!(ir > 0.0);
     }
 
@@ -1261,8 +1240,8 @@ mod tests {
     fn information_ratio_nan_when_annualized_with_invalid_ann_factor() {
         let r = [0.02, 0.03, 0.01, 0.04];
         let b = [0.01, 0.01, 0.01, 0.01];
-        assert!(information_ratio(&r, &b, true, 0.0).is_nan());
-        assert!(information_ratio(&r, &b, true, f64::INFINITY).is_nan());
+        assert!(information_ratio(&r, &b, 0.0).is_nan());
+        assert!(information_ratio(&r, &b, f64::INFINITY).is_nan());
     }
 
     #[test]

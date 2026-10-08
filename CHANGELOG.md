@@ -2,6 +2,51 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-06
+
+### Dependencies
+
+#### Removed
+
+- Unused `indexmap` dependency from `finstack-quant-models`.
+
+### Models API simplification
+
+#### Added
+
+- `simulate_paths` is the one path-simulation entry point on every host: Rust `monte_carlo::simulate::simulate_paths(&PathSimulationSpec) -> PathSummary`, Python `models.monte_carlo.simulate_paths(spec)` (dict or JSON text) and WASM `models.monteCarlo.simulatePaths(spec)`. A `ProcessSpec` (tag `type`) selects `gbm`, `gbm_with_dividends`, `multi_gbm`, `brownian`, `multi_brownian`, `multi_ou`, `hull_white_1f`, `cir`, `cir_plus_plus`, `heston`, `schwartz_smith`, `local_vol`, and the path-dependent `lmm`, `rough_bergomi`, `rough_heston` and `cheyette_rough`; a `SchemeSpec` (`default`, `euler`, `log_euler`, `milstein`) selects the discretization, and an unsupported pair is a validation error naming both. `PathSimulationSpec.fbm` chooses the fractional-noise generator of `rough_bergomi` and `cheyette_rough` (`volterra` by default, `cholesky`, or `windowed_conditional`). Antithetic sampling is supported: each stream is stored followed by its mirrored partner.
+- Likelihood-ratio Greeks are bound: Python `PathDependentPricer.price_with_lrm_greeks(...)` and WASM `priceWithLrmGreeks(...)` return `LrmGreeks { price, delta, vega }` for a GBM arithmetic Asian option. The step count defaults to the new registry key `convenience.greeks.lrm_num_steps` (32), and a request above the captured-point cap is an error.
+- `LocalVolSurface` is complete: `new(expiries, strikes, local_vols)`, `from_implied_vol(surface, forwards)` and `from_implied_vol_smoothed(surface, forwards, sigma_strikes)` take one forward per expiry and evaluate Dupire in total-variance form through the kernel shared with `LocalVolDensityCheck`; the type has serde and the schema `local_vol_surface`. `monte_carlo::process::local_vol::LocalVolProcess` (`LocalVolParams`, process tag `local_vol`) and `pde::LocalVolPde` price on it. Python binds the class `models.volatility.LocalVolSurface`; WASM uses the plain schema object with `models.volatility.localVolFromImpliedVol`, `localVolFromImpliedVolSmoothed` and `localVolValue`.
+- Black-Karasinski is its own short-rate tree model: Rust `ShortRateModel::BlackKarasinski` and `ShortRateTreeConfig::black_karasinski(steps, sigma, kappa)`; valuations `ShortRateTreeModel::BlackKarasinski` (wire `black_karasinski`) with `model_config.bk_sigma` and `model_config.bk_mean_reversion`. It was an unreachable branch of Black-Derman-Toy.
+- WASM twins for seven values Python exposes as computed properties: `models.credit.recoveryClaimTotalClaim`, `models.credit.collateralPieceLiquidationValue`, `models.liquidity.liquidityProfileSpread`, `liquidityProfileRelativeSpread`, `liquidityProfileHalfSpread`, `liquidityProfileRelativeSpreadVolatility` and `models.liquidity.tradeParamsEffectiveReferencePrice`.
+- Rust `factor::risk::{parametric_var_decomposition, parametric_es_decomposition, historical_var_decomposition}` under the names the hosts already use; `SabrParameters::quote_convention()` and `SabrParameters::implied_volatility(forward, strike, t)`; `finstack_quant_core::wire::serde_tag`.
+
+#### Changed (breaking)
+
+- Python/WASM `simulate_gbm_paths` / `simulateGbmPaths` and `GbmPathSummary` are replaced by `simulate_paths` / `simulatePaths` and `PathSummary`. `PathSummary.to_dataframe()` is long: one row per `(path, time)` and one column per factor.
+- Finite-difference Greeks are the per-path-paired estimators under the short names. `finite_diff_delta` / `finite_diff_gamma` (WASM `finiteDiffDelta` / `finiteDiffGamma`) return what the `_crn` functions returned, so `stderr` is the paired standard error; they always run serially, ignore the registry's `convenience.greeks.use_parallel` and `chunk_size`, and reject adaptive stopping and path capture. `finite_diff_delta_crn`, `finite_diff_gamma_crn`, `finiteDiffDeltaCrn`, `finiteDiffGammaCrn` and the Rust `_crn` and `_crn_gbm` functions are removed.
+- `LocalVolSurface::from_implied_vol` takes per-expiry forwards instead of one constant forward, and an implied surface with butterfly or calendar arbitrage at a node is a validation error naming the node. The fall-back to implied volatility is removed.
+- Python `MertonModel.try_implied_equity` → `implied_equity` (WASM `tryImpliedEquity` → `impliedEquity`; the error prefix follows the name) and `ToggleExerciseModel.should_pik_with_uniform` → `should_pik` (WASM `shouldPikWithUniform` → `shouldPik`). Rust `ToggleExerciseModel::should_pik(state, u)` takes the uniform draw; the RNG-taking form and `pik_fraction` are removed.
+- Python `models.rates.dtsm.diebold_li_fit_factors` / `diebold_li_forecast` and WASM `dieboldLiFitFactors` / `dieboldLiForecast` are removed with Rust `diebold_li_model`, `diebold_li_fit_factors`, `diebold_li_forecast`, `DieboldLi::to_parametric_curve` and `YieldPanel::from_yield_changes`. Use `DieboldLi().extract_factors(panel)` and `DieboldLi().fit(panel).forecast(h)`. `YieldPca.fit_yield_changes` fits the supplied changes directly: results agree with the previous level round trip to 1e-12 relative, and the messages for non-finite input and for rows without columns changed.
+- WASM `SabrParameters.fromJson` accepts a plain object as well as JSON text. A nested credit-migration matrix whose row count or row width differs from the rating scale is rejected before flattening.
+- `RoughBergomiParams.xi` is on the wire and required on input; it was skipped and defaulted to a flat 4% forward-variance curve. `RoughBergomiParams`, `RoughHestonParams`, `LmmParams`, `GbmParams`, `BrownianParams`, `MultiOuParams` and `CirParams` deny unknown fields.
+- Rust accessors and simulators keep one fallible form under the short name: `SensitivityMatrix::{delta, position_deltas, factor_deltas}`, `PositionRiskDecomposition::component_var`, `TransitionMatrix::probability_by_index` and `MertonModel::implied_equity` return `Result` (the `try_*` names are gone); `MigrationSimulator::{simulate, empirical_matrix}` and `MertonModel::simulate_paths` take a seed (the `_seeded` names are gone); `CorrelationStructure::{bump_asset, bump_prepay_default}` return the clamp information (`_with_clamp_info` gone); `PerNameCopulaDefault::simulate_period(.., antithetic)` replaces `simulate_period_antithetic`; `BrownianParams::new`, `BrownianProcess::with_params`, `MultiBrownianProcess::new`, `MultiOuParams::new` and `CirPlusPlusProcess::{new, with_constant_shift}` return `Result` instead of asserting.
+- Rust renames: `FactorMatcher::match_factor_with_betas` → `match_factor`; `liquidity::almgren_chriss_uniform_impact` → `almgren_chriss_impact`; `liquidity::lvar_bangia_scalar` → `lvar_bangia`; `FactorCovarianceForecast::factor_model_config_at` → `factor_model_at`; `HestonParams::satisfies_feller_condition` → `satisfies_feller`; `monte_carlo::process::heston::feller_condition` → `heston_satisfies_feller`; `HestonFourierSettings::for_maturity_with_variance` → `for_maturity(time, v0)`.
+- Rust call/put pairs are one type taking `OptionType`: `closed_form::barrier_price(&BarrierParams, BarrierType, OptionType)` replaces the eight `up_out_call` … `down_in_put` functions and `barrier_{call,put}_continuous`; Monte Carlo payoffs `Asian` (was `AsianCall` / `AsianPut`) and `FloatingStrikeLookback` (was `…Call` / `…Put`; `with_initial_extremum` replaces `with_initial_min` / `with_initial_max`); `Lookback` takes `OptionType` (`LookbackDirection` removed); `lsmc::AmericanExercise { option_type, strike }` replaces the `ImmediateExercise` trait with `AmericanPut` / `AmericanCall`, and the `LsmcPricer` methods lose their type parameter.
+- Rust trees: `ShortRateTree::price(oas_bp, valuator)` and `RatesCreditTree::price_with_node_coupons(oas_bp, valuator, node_coupons)` are inherent and take the OAS in basis points; `NodeState` is a `Copy` struct of typed fields; `HullWhiteTree::calibrate(config, curve, time_to_maturity, mandatory_times)` is the one calibration entry point, with the volatility schedule on `HullWhiteTreeConfig.volatility`; `ShortRateTreeConfig::bdt(steps, sigma)` has no mean-reversion argument, and calibration rejects Black-Derman-Toy with a non-zero one.
+- Rust PDE: `ThetaStepper` is the one time stepper (`crank_nicolson`, `implicit`, `rannacher(implicit_steps, n_steps)`, `explicit`, `custom`), stored by value in `Solver1D`.
+- Rust COS pricing: `fourier::cos::CosMarketParams` plus positional model parameters (`bs_cos_price(market, vol)`, `vg_cos_price(market, sigma, theta, nu)`, `merton_jump_cos_price(market, sigma, mu_jump, sigma_jump, lambda)`); the functions and `CosPricer` return `finstack_quant_core::Result`. Host error types, kinds and messages are unchanged.
+- Rust factor risk: `decompose_factors`, `decompose_positions` and `decompose_from_pnls` are free functions; `build_stress_attribution` takes `Option<f64>` confidence.
+
+#### Removed
+
+- Rust `simulate_gbm_paths`, `GbmPathConfig`, `GbmPathSummary` and the `gbm_path_summary` schema.
+- Rust `TreeModel` trait, `BinomialTree::price_generic`, `TreeGreeks`, the string-keyed node state (`state_keys`, `short_rate_keys`, `NodeState::get_var`), `HullWhiteTree::calibrate_with_times` and `calibrate_with_times_and_volatility`, `HullWhiteTreeConfig.max_nodes`, `RatesCreditTree::sample_path` and `EvolutionParams.drift`.
+- Rust `pde::TimeStepper` and `RannacherStepper`; `volatility::arbitrage::ArbitrageCheck` (the checks keep an inherent `check`); `SabrVolType`, `SabrModel::vol_type`, `SabrModel::implied_volatility_with_type` and `SabrSmile::vol_type`.
+- Rust `fourier::FourierError`, `BlackScholesCosParams`, `VarianceGammaCosParams`, `MertonJumpCosParams` and `LogForwardCf`; `cumulants_from_cf` is test-only.
+- Rust `heston_defaults`, `heston_put_prices_fourier` and the one-argument `HestonFourierSettings::for_maturity`; `HestonStripPricer` and `heston_call_prices_fourier` are crate-internal.
+- Rust `factor::risk::{ParametricDecomposer, ParametricPositionDecomposer, HistoricalPositionDecomposer}`, `BetaRecovery::sample_n` and the `HestonPricingParams::satisfies_feller` forwarder (reached through `Deref`).
+
 ### Analytics API simplification
 
 #### Changed (breaking)
@@ -10,6 +55,16 @@
 - `ReturnKind` is built with `ReturnKind::from_label(label, risk_free_rate)`. `FromStr` and `with_risk_free_rate` are removed. `multi_factor_greeks` now rejects a non-zero `risk_free_rate` with `"excess"` (or an omitted kind) instead of ignoring it.
 - Python `Performance.to_excess_returns_dataframe` no longer broadcasts a scalar `rf`; pass one value per active date, as `excess_returns` requires. `excess_returns` accepts a NumPy array or pandas `Series` as well as a list.
 - Rust `Performance::skew_kurt` and `Performance::value_at_risk_and_es` are crate-internal. Use `skewness` / `kurtosis` and `value_at_risk` / `expected_shortfall`.
+- Rust correlation repair is named `nearest_correlation` in both analytics and models, matching Python `nearest_correlation` and WASM `nearestCorrelation`; `nearest_correlation_matrix` is removed.
+- Python `Performance.to_lookback_returns_dataframe` is removed. Use `Performance.lookback_returns(...).to_dataframe()`.
+
+### Cashflows API simplification
+
+#### Changed (breaking)
+
+- Removed the JSON-string schedule analytics `schedule_wal`, `schedule_outstanding_by_date` and `schedule_calendar_year_ladder` (WASM `scheduleWal`, `scheduleOutstandingByDate`, `scheduleCalendarYearLadder`). Parse once with `CashFlowSchedule.fromJson` and call `wal`, `outstandingByDate` or `calendarYearLadder` on the handle.
+- Removed the JSON-string `accrued_interest` (WASM `accruedInterest`). Use the typed `accrued_interest_amount` / `accruedInterestAmount` on a `CashFlowSchedule`, which returns `Money`.
+- The rate conversions `abs_to_smm`, `cdr_to_mdr`, `cpr_to_smm`, `mdr_to_cdr` and `smm_to_cpr` have one path: `finstack_quant_cashflows::builder` in Rust and `finstack_quant.cashflows.builder` in Python. The crate-root and package-root re-exports are removed. WASM is unchanged.
 
 ### Margin API simplification
 

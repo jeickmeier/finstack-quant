@@ -820,11 +820,8 @@ impl ReplayTemplate {
                         accrual: index_accrual,
                         base_index_rate,
                         base_discount_forward: (1.0 / base_df - 1.0) / index_accrual,
-                        conditional_discount_factors: tree.conditional_discount_factors(
-                            reset_step,
-                            observation_end_step,
-                            times[terminal_step],
-                        )?,
+                        conditional_discount_factors: tree
+                            .conditional_discount_factors(reset_step, observation_end_step)?,
                     })
                 };
                 (

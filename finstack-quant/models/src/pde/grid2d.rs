@@ -12,7 +12,7 @@ use super::grid::Grid1D;
 ///
 /// The x-axis typically represents log-spot and the y-axis variance
 /// (or log-variance). Grid operations index in row-major layout:
-/// `flat_index = i * n_y + j`.
+/// flat index `i * n_y + j`.
 #[derive(Debug, Clone)]
 pub struct Grid2D {
     /// Grid along the x-axis (e.g., log-spot).
@@ -67,20 +67,6 @@ impl Grid2D {
     #[inline]
     pub fn ny_interior(&self) -> usize {
         self.y.n_interior()
-    }
-
-    /// Convert 2D indices to flat row-major index.
-    ///
-    /// `i` indexes x (rows), `j` indexes y (columns).
-    #[inline]
-    pub fn flat_index(&self, i: usize, j: usize) -> usize {
-        i * self.y.n() + j
-    }
-
-    /// Convert flat row-major index to `(i, j)`.
-    #[inline]
-    pub fn index_2d(&self, flat: usize) -> (usize, usize) {
-        (flat / self.y.n(), flat % self.y.n())
     }
 
     /// Bilinear interpolation of a 2D solution at point `(x, y)`.
@@ -141,8 +127,6 @@ mod tests {
         assert_eq!(g.total(), 15);
         assert_eq!(g.nx_interior(), 3);
         assert_eq!(g.ny_interior(), 1);
-        assert_eq!(g.flat_index(2, 1), 7);
-        assert_eq!(g.index_2d(7), (2, 1));
     }
 
     #[test]
@@ -154,7 +138,7 @@ mod tests {
         // f(x, y) = x + y
         let values: Vec<f64> = (0..9)
             .map(|flat| {
-                let (i, j) = g.index_2d(flat);
+                let (i, j) = (flat / g.ny(), flat % g.ny());
                 i as f64 * 0.5 + j as f64 * 0.5
             })
             .collect();

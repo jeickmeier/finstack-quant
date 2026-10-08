@@ -1,3 +1,4 @@
+use crate::bindings::macros::impl_repr_html_via_dataframe;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
@@ -413,18 +414,9 @@ impl PyStressAttribution {
             self.inner.tail_scenarios.len(),
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+impl_repr_html_via_dataframe!(PyStressAttribution);
 
 /// Build tail-scenario stress attribution from position x scenario P&Ls.
 ///
@@ -456,9 +448,6 @@ pub(super) fn build_stress_attribution(
     position_pnls: &Bound<'_, PyAny>,
     confidence: Option<f64>,
 ) -> PyResult<PyStressAttribution> {
-    let confidence = confidence.unwrap_or_else(|| {
-        finstack_quant_models::factor::risk::DecompositionConfig::historical_95().confidence
-    });
     let (position_ids, position_pnls) = extract_pnl_input(py, position_ids, position_pnls)?;
     let n_positions = position_ids.len();
     let n_scenarios = position_pnls.n_scenarios();

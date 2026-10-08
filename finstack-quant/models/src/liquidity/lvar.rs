@@ -80,7 +80,7 @@ pub struct LvarBangiaScalar {
 /// # References
 ///
 /// - Bangia et al. (1999). `docs/REFERENCES.md#bangia-1999-lvar`
-pub fn lvar_bangia_scalar(
+pub fn lvar_bangia(
     var: f64,
     spread_mean: f64,
     spread_vol: f64,
@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn mo12_scalar_rejects_sub_median_confidence() {
-        let err = lvar_bangia_scalar(-1_000.0, 0.01, 0.001, 0.49, 100_000.0)
+        let err = lvar_bangia(-1_000.0, 0.01, 0.001, 0.49, 100_000.0)
             .expect_err("MO-12: confidence below 0.5 must be rejected");
 
         assert!(

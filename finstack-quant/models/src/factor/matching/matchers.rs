@@ -31,7 +31,7 @@ pub struct FactorMatchEntry {
     pub beta: f64,
 }
 
-/// Error returned by [`FactorMatcher::match_factor_with_betas`] when the
+/// Error returned by [`FactorMatcher::match_factor`] when the
 /// matcher can determine the dependency is in scope but cannot produce
 /// a deterministic answer (e.g. a required issuer tag is missing).
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -86,7 +86,7 @@ pub trait FactorMatcher: Send + Sync {
     ///
     /// Returns [`FactorMatchError`] when the matcher recognised the dependency
     /// but the inputs (typically issuer tags) violate the matcher's contract.
-    fn match_factor_with_betas(
+    fn match_factor(
         &self,
         dependency: &MarketDependency,
         attributes: &Attributes,
@@ -110,7 +110,7 @@ fn deepest_match(
     attributes: &Attributes,
 ) -> Option<FactorId> {
     matcher
-        .match_factor_with_betas(dependency, attributes)
+        .match_factor(dependency, attributes)
         .ok()
         .flatten()
         .and_then(|entries| entries.last().map(|entry| entry.factor_id.clone()))
@@ -194,7 +194,7 @@ fn rule_matches(
 }
 
 impl FactorMatcher for MappingTableMatcher {
-    fn match_factor_with_betas(
+    fn match_factor(
         &self,
         dependency: &MarketDependency,
         attributes: &Attributes,
@@ -269,18 +269,17 @@ pub struct HierarchicalMatcher {
 }
 
 impl HierarchicalMatcher {
-    /// Creates a matcher from the provided root node.
-    #[must_use]
-    pub fn new(root: FactorNode) -> Self {
-        Self {
-            dependency_filter: DependencyFilter::default(),
-            root,
-        }
-    }
-
     /// Creates a matcher scoped to dependencies satisfying the provided filter.
+    ///
+    /// # Arguments
+    ///
+    /// * `dependency_filter` - Dependency class, curve type and id constraints a
+    ///   market dependency must satisfy before the tree is consulted;
+    ///   `DependencyFilter::default()` accepts every dependency.
+    /// * `root` - Root of the attribute-filter tree whose deepest matching node
+    ///   supplies the factor id.
     #[must_use]
-    pub fn new_scoped(dependency_filter: DependencyFilter, root: FactorNode) -> Self {
+    pub fn new(dependency_filter: DependencyFilter, root: FactorNode) -> Self {
         Self {
             dependency_filter,
             root,
@@ -315,7 +314,7 @@ impl HierarchicalMatcher {
 }
 
 impl FactorMatcher for HierarchicalMatcher {
-    fn match_factor_with_betas(
+    fn match_factor(
         &self,
         dependency: &MarketDependency,
         attributes: &Attributes,
@@ -353,13 +352,13 @@ impl CascadeMatcher {
 }
 
 impl FactorMatcher for CascadeMatcher {
-    fn match_factor_with_betas(
+    fn match_factor(
         &self,
         dependency: &MarketDependency,
         attributes: &Attributes,
     ) -> Result<Option<Vec<FactorMatchEntry>>, FactorMatchError> {
         for matcher in &self.matchers {
-            match matcher.match_factor_with_betas(dependency, attributes)? {
+            match matcher.match_factor(dependency, attributes)? {
                 Some(entries) if !entries.is_empty() => return Ok(Some(entries)),
                 _ => continue,
             }
@@ -593,7 +592,7 @@ mod tests_hierarchical {
 
     #[test]
     fn test_deepest_match_wins() {
-        let matcher = HierarchicalMatcher::new(credit_tree());
+        let matcher = HierarchicalMatcher::new(DependencyFilter::default(), credit_tree());
         let dep = MarketDependency::CreditCurve {
             id: CurveId::new("X"),
         };
@@ -611,7 +610,7 @@ mod tests_hierarchical {
 
     #[test]
     fn test_rolls_up_to_parent() {
-        let matcher = HierarchicalMatcher::new(credit_tree());
+        let matcher = HierarchicalMatcher::new(DependencyFilter::default(), credit_tree());
         let dep = MarketDependency::CreditCurve {
             id: CurveId::new("X"),
         };
@@ -628,7 +627,7 @@ mod tests_hierarchical {
 
     #[test]
     fn test_root_fallback() {
-        let matcher = HierarchicalMatcher::new(credit_tree());
+        let matcher = HierarchicalMatcher::new(DependencyFilter::default(), credit_tree());
         let dep = MarketDependency::CreditCurve {
             id: CurveId::new("X"),
         };
@@ -643,7 +642,7 @@ mod tests_hierarchical {
 
     #[test]
     fn test_eu_branch() {
-        let matcher = HierarchicalMatcher::new(credit_tree());
+        let matcher = HierarchicalMatcher::new(DependencyFilter::default(), credit_tree());
         let dep = MarketDependency::CreditCurve {
             id: CurveId::new("X"),
         };
@@ -658,7 +657,7 @@ mod tests_hierarchical {
 
     #[test]
     fn test_energy_without_rating_rolls_up_to_na() {
-        let matcher = HierarchicalMatcher::new(credit_tree());
+        let matcher = HierarchicalMatcher::new(DependencyFilter::default(), credit_tree());
         let dep = MarketDependency::CreditCurve {
             id: CurveId::new("X"),
         };
@@ -693,7 +692,7 @@ mod tests_hierarchical {
 
     #[test]
     fn test_scoped_hierarchical_matcher_filters_dependency_class() {
-        let matcher = HierarchicalMatcher::new_scoped(
+        let matcher = HierarchicalMatcher::new(
             DependencyFilter {
                 dependency_type: Some(crate::factor::DependencyType::Credit),
                 curve_type: None,

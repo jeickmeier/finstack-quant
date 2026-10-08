@@ -1,5 +1,6 @@
 //! Python bindings for `finstack_quant_models::credit::scoring`.
 
+use crate::bindings::macros::wire_methods;
 use finstack_quant_models::credit::scoring::{
     altman_em_score as core_altman_em_score, altman_z_double_prime as core_altman_z_double_prime,
     altman_z_prime as core_altman_z_prime, altman_z_score as core_altman_z_score,
@@ -11,7 +12,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
 use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema;
-use crate::errors::{core_to_py, scoring_to_py, serde_json_to_py};
+use crate::errors::{core_to_py, scoring_to_py};
 
 /// Outcome of one academic credit-scoring model.
 ///
@@ -66,27 +67,6 @@ impl PyScoringResult {
         self.inner.model.clone()
     }
 
-    /// Deserialize a scoring result from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid ScoringResult JSON"))?,
-        })
-    }
-
-    /// Serialize this result to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "ScoringResult serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Export as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``model``, ``score``, ``zone``, ``implied_pd`` (``None`` for
@@ -105,6 +85,8 @@ impl PyScoringResult {
         crate::bindings::repr_support::repr_from_serde("ScoringResult", &self.inner)
     }
 }
+
+wire_methods!(PyScoringResult, ScoringResult, "ScoringResult");
 
 /// Compute the original Altman Z-Score (1968) for publicly traded manufacturing firms.
 ///

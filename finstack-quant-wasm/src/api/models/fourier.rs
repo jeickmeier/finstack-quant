@@ -13,8 +13,7 @@ use crate::utils::input::{js_bool, js_f64, js_opt_uint};
 use crate::utils::to_js_err;
 use finstack_quant_models::fourier::cos::{
     bs_cos_price as rust_bs_cos_price, merton_jump_cos_price as rust_merton_jump_cos_price,
-    vg_cos_price as rust_vg_cos_price, BlackScholesCosParams, MertonJumpCosParams,
-    VarianceGammaCosParams,
+    vg_cos_price as rust_vg_cos_price, CosMarketParams,
 };
 use wasm_bindgen::prelude::*;
 
@@ -59,16 +58,18 @@ pub fn bs_cos_price(
     let expiry = js_f64(&expiry, "expiry")?;
     let is_call = js_bool(&is_call, "isCall")?;
     let n_terms: Option<usize> = js_opt_uint(n_terms.as_ref(), "nTerms")?;
-    rust_bs_cos_price(BlackScholesCosParams {
-        spot,
-        strike,
-        rate,
-        div_yield,
+    rust_bs_cos_price(
+        CosMarketParams {
+            spot,
+            strike,
+            rate,
+            div_yield,
+            expiry,
+            is_call,
+            n_terms,
+        },
         vol,
-        expiry,
-        is_call,
-        n_terms,
-    })
+    )
     .map_err(to_js_err)
 }
 
@@ -119,18 +120,20 @@ pub fn vg_cos_price(
     let expiry = js_f64(&expiry, "expiry")?;
     let is_call = js_bool(&is_call, "isCall")?;
     let n_terms: Option<usize> = js_opt_uint(n_terms.as_ref(), "nTerms")?;
-    rust_vg_cos_price(VarianceGammaCosParams {
-        spot,
-        strike,
-        rate,
-        div_yield,
+    rust_vg_cos_price(
+        CosMarketParams {
+            spot,
+            strike,
+            rate,
+            div_yield,
+            expiry,
+            is_call,
+            n_terms,
+        },
         sigma,
         theta,
         nu,
-        expiry,
-        is_call,
-        n_terms,
-    })
+    )
     .map_err(to_js_err)
 }
 
@@ -185,18 +188,20 @@ pub fn merton_jump_cos_price(
     let expiry = js_f64(&expiry, "expiry")?;
     let is_call = js_bool(&is_call, "isCall")?;
     let n_terms: Option<usize> = js_opt_uint(n_terms.as_ref(), "nTerms")?;
-    rust_merton_jump_cos_price(MertonJumpCosParams {
-        spot,
-        strike,
-        rate,
-        div_yield,
+    rust_merton_jump_cos_price(
+        CosMarketParams {
+            spot,
+            strike,
+            rate,
+            div_yield,
+            expiry,
+            is_call,
+            n_terms,
+        },
         sigma,
         mu_jump,
         sigma_jump,
         lambda,
-        expiry,
-        is_call,
-        n_terms,
-    })
+    )
     .map_err(to_js_err)
 }

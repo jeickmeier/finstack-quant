@@ -1,65 +1,94 @@
 //! Dupire local volatility extraction from an implied volatility surface.
 //!
 //! The Dupire formula (1994) extracts a local (instantaneous) volatility surface
-//! from observed European option prices (or equivalently, the implied volatility
-//! surface). The local volatility model prices all European options consistently
-//! with the market smile while being Markovian in the underlying.
+//! from the implied volatility surface of European options. The local
+//! volatility model `dS = (r − q) S dt + σ_loc(t, S) S dW` prices every
+//! European option consistently with that smile while staying Markovian in the
+//! underlying.
 //!
 //! # Mathematical Foundation
 //!
-//! ## From call prices
-//!
-//! The Dupire formula in terms of call prices:
-//!
-//! ```text
-//! σ_local²(K, T) = (∂C/∂T + rKC_K + qC) / ((1/2)K²∂²C/∂K²)
-//! ```
-//!
-//! This implementation works in the Black-76 / forward-measure setting on
-//! **undiscounted** forward call prices C̃(T, K) = Black_Call(F, K, σ, T). In
-//! that measure the spot-formula drift terms cancel and the ratio reduces to
-//! σ² = (∂C̃/∂T) / (½K²∂²C̃/∂K²). Discounting the prices would inject a
-//! spurious −r·C̃ term into the time derivative and bias the local vol low.
-//!
-//! For zero dividends and zero rates (the simplest special case):
+//! With total implied variance `w(k, T) = σ²(k, T)·T` and log-moneyness
+//! `k = ln(K / F_T)` (Gatheral 2006, eq. 1.10):
 //!
 //! ```text
-//! σ_local²(K, T) ≈ (∂C/∂T) / ((1/2)K²∂²C/∂K²)
+//! σ²_loc(K, T) = (∂w/∂T) / g
+//! g = 1 − (k/w)·∂w/∂k + ¼·(−¼ − 1/w + k²/w²)·(∂w/∂k)² + ½·∂²w/∂k²
 //! ```
 //!
-//! In practice we compute this via finite differences on Black-Scholes call
-//! prices reconstructed from the implied vol surface.
+//! The time derivative holds `k` fixed, so rates and dividends enter only
+//! through the forwards `F_T`: one forward per expiry carries the whole carry
+//! term structure, and no discount curve is needed. `σ_loc(K, T)` is the
+//! volatility of the underlying when it trades at level `K` at time `T`.
 //!
 //! # Implementation Notes
 //!
-//! - Call prices are computed from the implied vol surface using Black-76
-//! - Finite differences use central differences where possible, one-sided at boundaries
-//! - A small floor is applied to the denominator (gamma term) to avoid division by zero
-//! - The resulting local vol is stored on the same grid as the input implied vol surface
-//! - If you need spot-measure Dupire with explicit `r` / `q` terms, convert to
-//!   forward prices first or extend this extractor with explicit carry curves
+//! - The formula and its finite differences are the ones the arbitrage check
+//!   [`LocalVolDensityCheck`](crate::volatility::arbitrage::LocalVolDensityCheck)
+//!   evaluates: central differences inside the grid, one-sided at its edges.
+//! - The local volatility is stored on the grid of the implied surface and
+//!   interpolated bilinearly, with flat extrapolation outside it.
+//! - An implied surface with butterfly (`g ≤ 0`) or calendar (`∂w/∂T < 0`)
+//!   arbitrage has no local volatility; extraction returns an error naming the
+//!   first offending node. Smooth the quotes first
+//!   ([`LocalVolSurface::from_implied_vol_smoothed`]) or repair the surface.
 //!
 //! # Reference
 //!
 //! - Dupire, B. (1994). "Pricing with a Smile." *Risk*, 7(1), 18-20. `docs/REFERENCES.md#dupire-1994`
 //! - Gatheral, J. (2006). *The Volatility Surface: A Practitioner's Guide*.
-//!   John Wiley & Sons. Chapter 2. `docs/REFERENCES.md#gatheral-volatility-surface`
+//!   John Wiley & Sons. Chapters 1-2. `docs/REFERENCES.md#gatheral-volatility-surface`
 
-use crate::closed_form::black_call;
+use crate::volatility::arbitrage::DEFAULT_ARBITRAGE_TOLERANCE;
+use crate::volatility::dupire::{dupire_node, MoneynessLookup};
+use finstack_quant_core::error::InputError;
 use finstack_quant_core::market_data::surfaces::{
     VolGridOpts, VolQuoteType, VolSurface, VolSurfaceAxis,
 };
+use finstack_quant_core::{Error, Result};
 
-fn validate_implied_surface(surface: &VolSurface) -> finstack_quant_core::Result<()> {
+fn validate_implied_surface(surface: &VolSurface, forwards: &[f64]) -> Result<()> {
     surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
-    surface.require_quote_type(VolQuoteType::BlackLognormal)
+    surface.require_quote_type(VolQuoteType::BlackLognormal)?;
+    let expiries = surface.expiries();
+    let strikes = surface.strikes();
+    if expiries.len() < 2 || strikes.len() < 3 {
+        return Err(InputError::TooFewPoints.into());
+    }
+    if forwards.len() != expiries.len() {
+        return Err(Error::Validation(format!(
+            "local volatility needs one forward per expiry: got {} forwards for {} expiries",
+            forwards.len(),
+            expiries.len()
+        )));
+    }
+    if forwards.iter().any(|f| !f.is_finite() || *f <= 0.0) {
+        return Err(Error::Validation(
+            "local volatility forwards must be finite and positive".to_string(),
+        ));
+    }
+    if strikes.iter().any(|k| !k.is_finite() || *k <= 0.0) {
+        return Err(Error::Validation(
+            "local volatility needs finite positive strikes (log-moneyness is ln(K/F))".to_string(),
+        ));
+    }
+    Ok(())
 }
 
-/// Local volatility surface extracted from an implied volatility surface
-/// via the Dupire formula.
+/// Local volatility surface `σ_loc(T, K)` on a rectangular expiry-by-strike
+/// grid, extracted from an implied volatility surface via the Dupire formula.
 ///
-/// The surface is represented on a rectangular grid of (expiry, strike) with
-/// bilinear interpolation for off-grid queries.
+/// Off-grid queries are interpolated bilinearly; outside the grid the nearest
+/// boundary value applies (flat extrapolation).
+///
+/// # Invariants
+///
+/// - Expiries and strikes are finite and strictly increasing; expiries are
+///   non-negative and strikes positive.
+/// - There is one finite, non-negative local volatility per grid node, stored
+///   row-major with the expiry as the slow axis.
+///
+/// Deserialization enforces the same invariants.
 ///
 /// # Examples
 ///
@@ -67,226 +96,108 @@ fn validate_implied_surface(surface: &VolSurface) -> finstack_quant_core::Result
 /// use finstack_quant_core::market_data::surfaces::VolSurface;
 /// use finstack_quant_models::volatility::local_vol::LocalVolSurface;
 ///
-/// let surface = VolSurface::builder("SMILE")
-///     .expiries(&[0.25, 0.5, 1.0, 2.0])
-///     .strikes(&[80.0, 90.0, 95.0, 100.0, 105.0, 110.0, 120.0])
-///     .row(&[0.30, 0.25, 0.22, 0.20, 0.21, 0.23, 0.28])
-///     .row(&[0.28, 0.24, 0.21, 0.19, 0.20, 0.22, 0.26])
-///     .row(&[0.26, 0.22, 0.20, 0.18, 0.19, 0.21, 0.24])
-///     .row(&[0.24, 0.21, 0.19, 0.17, 0.18, 0.20, 0.22])
-///     .build()
-///     .expect("surface");
+/// // Implied vol skewed in strike and flat in expiry.
+/// let expiries = [0.25, 0.5, 1.0, 2.0];
+/// let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
+/// let smile = [0.24, 0.22, 0.20, 0.19, 0.185];
+/// let mut builder = VolSurface::builder("SKEW").expiries(&expiries).strikes(&strikes);
+/// for _ in &expiries {
+///     builder = builder.row(&smile);
+/// }
+/// let surface = builder.build()?;
 ///
-/// let local_vol = LocalVolSurface::from_implied_vol(&surface, 100.0)
-///     .expect("extraction should succeed");
+/// // One forward per expiry: F(T) = S·exp((r − q)·T) with S = 100, r − q = 2%.
+/// let forwards: Vec<f64> = expiries.iter().map(|t| 100.0 * (0.02 * t).exp()).collect();
+/// let local_vol = LocalVolSurface::from_implied_vol(&surface, &forwards)?;
 ///
-/// let lv = local_vol.value(0.5, 100.0);
-/// assert!(lv > 0.0 && lv.is_finite());
+/// assert_eq!(local_vol.grid_shape(), (4, 5));
+/// // A negative skew is steeper in local than in implied volatility.
+/// assert!(local_vol.value(1.0, 90.0) > local_vol.value(1.0, 110.0));
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "RawLocalVolSurface")]
 pub struct LocalVolSurface {
+    /// Expiry axis in years, strictly increasing.
     expiries: Vec<f64>,
+    /// Strike axis in price units of the underlying, strictly increasing.
     strikes: Vec<f64>,
-    /// Row-major storage: local_vols[expiry_idx * n_strikes + strike_idx]
+    /// Local volatilities as annualized decimals, row-major:
+    /// `local_vols[expiry_index * strikes.len() + strike_index]`.
     local_vols: Vec<f64>,
 }
 
+/// Unvalidated wire form of [`LocalVolSurface`].
+#[derive(Debug, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct RawLocalVolSurface {
+    /// Expiry axis in years, strictly increasing and non-negative.
+    expiries: Vec<f64>,
+    /// Strike axis in price units of the underlying, strictly increasing and
+    /// positive.
+    strikes: Vec<f64>,
+    /// Local volatilities as annualized decimals, finite and non-negative,
+    /// row-major: `local_vols[expiry_index * strikes.len() + strike_index]`.
+    local_vols: Vec<f64>,
+}
+
+impl TryFrom<RawLocalVolSurface> for LocalVolSurface {
+    type Error = Error;
+
+    fn try_from(raw: RawLocalVolSurface) -> Result<Self> {
+        Self::new(raw.expiries, raw.strikes, raw.local_vols)
+    }
+}
+
 impl LocalVolSurface {
-    /// Extract local volatility from an implied volatility surface using the Dupire formula.
-    ///
-    /// Computes call prices from Black-76 at each grid point, then applies finite
-    /// differences to obtain ∂C/∂T and ∂²C/∂K² for the Dupire formula.
+    /// Build a local volatility surface from an explicit grid.
     ///
     /// # Arguments
     ///
-    /// * `surface` — unshifted Black implied volatilities on expiry and strike axes (bilinear-interpolated).
-    /// * `forward` — forward price under the forward measure (assumed constant across expiries for simplicity)
-    ///
-    /// The Dupire ratio is evaluated on **undiscounted** forward call prices — discounting
-    /// would inject a spurious −r·C̃ term into ∂C̃/∂T (it cancels in the
-    /// strike derivatives but not in the time derivative).
-    ///
-    /// # Returns
-    ///
-    /// A `LocalVolSurface` on the same grid as the input.
+    /// * `expiries` - Expiry axis in years: at least one finite, non-negative,
+    ///   strictly increasing value.
+    /// * `strikes` - Strike axis in price units of the underlying: at least
+    ///   one finite, positive, strictly increasing value.
+    /// * `local_vols` - Local volatilities as annualized decimals, finite and
+    ///   non-negative, one per node in row-major order with the expiry as the
+    ///   slow axis (`expiries.len() * strikes.len()` values).
     ///
     /// # Errors
     ///
-    /// Returns an error if the surface has fewer than 2 expiries or 3 strikes
-    /// (insufficient for finite differences), does not use a strike axis, or
-    /// contains normal or displaced-Black quotes.
-    pub fn from_implied_vol(
-        surface: &VolSurface,
-        forward: f64,
-    ) -> finstack_quant_core::Result<Self> {
-        validate_implied_surface(surface)?;
-        let expiries = surface.expiries().to_vec();
-        let strikes = surface.strikes().to_vec();
-        let n_exp = expiries.len();
-        let n_str = strikes.len();
-
-        if n_exp < 2 {
-            return Err(finstack_quant_core::error::InputError::TooFewPoints.into());
-        }
-        if n_str < 3 {
-            return Err(finstack_quant_core::error::InputError::TooFewPoints.into());
-        }
-
-        // Undiscounted Black-76 forward call prices at each grid point:
-        // C̃(T, K) = Black_Call(F, K, σ(T,K), T). No discount factor: the
-        // forward-measure Dupire ratio requires undiscounted prices (the
-        // e^{-rT} factor cancels in the strike derivatives but corrupts
-        // ∂C̃/∂T with a −r·C̃ term, biasing local vol low for r > 0).
-        let mut call_prices = vec![0.0; n_exp * n_str];
-        for (ei, &t) in expiries.iter().enumerate() {
-            for (si, &k) in strikes.iter().enumerate() {
-                let iv = crate::volatility::get_surface_vol(surface, t, k)
-                    .unwrap_or_else(|_| crate::volatility::get_surface_vol_clamped(surface, t, k));
-                call_prices[ei * n_str + si] = black_call(forward, k, iv, t);
+    /// Returns a validation error when an axis is empty, non-finite or not
+    /// strictly increasing, an expiry is negative, a strike is not positive,
+    /// the value count does not match the grid, or a volatility is negative
+    /// or non-finite.
+    pub fn new(expiries: Vec<f64>, strikes: Vec<f64>, local_vols: Vec<f64>) -> Result<Self> {
+        let check_axis = |name: &str, axis: &[f64], lower_ok: fn(f64) -> bool| {
+            if axis.is_empty()
+                || axis.iter().any(|x| !x.is_finite() || !lower_ok(*x))
+                || axis.windows(2).any(|pair| pair[1] <= pair[0])
+            {
+                return Err(Error::Validation(format!(
+                    "LocalVolSurface {name} must be non-empty, finite, in range and strictly \
+                     increasing"
+                )));
             }
+            Ok(())
+        };
+        check_axis("expiries", &expiries, |t| t >= 0.0)?;
+        check_axis("strikes", &strikes, |k| k > 0.0)?;
+        if expiries.len().checked_mul(strikes.len()) != Some(local_vols.len()) {
+            return Err(Error::Validation(format!(
+                "LocalVolSurface needs {} x {} local volatilities, got {}",
+                expiries.len(),
+                strikes.len(),
+                local_vols.len()
+            )));
         }
-
-        let mut local_vols = vec![0.0; n_exp * n_str];
-
-        // Floor to prevent division by zero in gamma. The denominator
-        // ½K²·∂²C/∂K² has price units, so the floor is scaled by the forward
-        // (the natural price scale of the undiscounted call grid) rather than
-        // being a fixed absolute threshold.
-        const GAMMA_FLOOR: f64 = 1e-14;
-        let denom_floor = GAMMA_FLOOR * forward.abs().max(1.0);
-
-        for ei in 0..n_exp {
-            let t = expiries[ei];
-
-            for si in 0..n_str {
-                let k = strikes[si];
-
-                // ∂C/∂T via finite differences
-                let dc_dt = if ei == 0 {
-                    // Forward difference
-                    let dt = expiries[1] - expiries[0];
-                    if dt.abs() < 1e-14 {
-                        0.0
-                    } else {
-                        (call_prices[n_str + si] - call_prices[si]) / dt
-                    }
-                } else if ei == n_exp - 1 {
-                    // Backward difference
-                    let dt = expiries[n_exp - 1] - expiries[n_exp - 2];
-                    if dt.abs() < 1e-14 {
-                        0.0
-                    } else {
-                        (call_prices[(n_exp - 1) * n_str + si]
-                            - call_prices[(n_exp - 2) * n_str + si])
-                            / dt
-                    }
-                } else {
-                    // Central difference
-                    let dt = expiries[ei + 1] - expiries[ei - 1];
-                    if dt.abs() < 1e-14 {
-                        0.0
-                    } else {
-                        (call_prices[(ei + 1) * n_str + si] - call_prices[(ei - 1) * n_str + si])
-                            / dt
-                    }
-                };
-
-                // ∂²C/∂K² via second-order central differences
-                let d2c_dk2 = if si == 0 || si == n_str - 1 {
-                    // At boundaries, use one-sided second difference if possible
-                    if si == 0 && n_str >= 3 {
-                        let dk01 = strikes[1] - strikes[0];
-                        let dk12 = strikes[2] - strikes[1];
-                        let dk02 = strikes[2] - strikes[0];
-                        if dk01.abs() < 1e-14 || dk12.abs() < 1e-14 || dk02.abs() < 1e-14 {
-                            0.0
-                        } else {
-                            // Non-uniform second derivative at left boundary
-                            2.0 * (call_prices[ei * n_str + 2] / (dk12 * dk02)
-                                - call_prices[ei * n_str + 1] / (dk01 * dk12)
-                                + call_prices[ei * n_str] / (dk01 * dk02))
-                        }
-                    } else if si == n_str - 1 && n_str >= 3 {
-                        let s0 = n_str - 3;
-                        let dk01 = strikes[s0 + 1] - strikes[s0];
-                        let dk12 = strikes[s0 + 2] - strikes[s0 + 1];
-                        let dk02 = strikes[s0 + 2] - strikes[s0];
-                        if dk01.abs() < 1e-14 || dk12.abs() < 1e-14 || dk02.abs() < 1e-14 {
-                            0.0
-                        } else {
-                            2.0 * (call_prices[ei * n_str + s0 + 2] / (dk12 * dk02)
-                                - call_prices[ei * n_str + s0 + 1] / (dk01 * dk12)
-                                + call_prices[ei * n_str + s0] / (dk01 * dk02))
-                        }
-                    } else {
-                        0.0
-                    }
-                } else {
-                    // Standard central second difference (non-uniform spacing)
-                    let dk_minus = strikes[si] - strikes[si - 1];
-                    let dk_plus = strikes[si + 1] - strikes[si];
-                    let dk_half = 0.5 * (dk_minus + dk_plus);
-                    if dk_minus.abs() < 1e-14 || dk_plus.abs() < 1e-14 || dk_half.abs() < 1e-14 {
-                        0.0
-                    } else {
-                        (call_prices[ei * n_str + si + 1] / dk_plus
-                            - call_prices[ei * n_str + si] * (1.0 / dk_plus + 1.0 / dk_minus)
-                            + call_prices[ei * n_str + si - 1] / dk_minus)
-                            / dk_half
-                    }
-                };
-
-                // Dupire formula (Black-76 / forward measure):
-                // σ²_local = ∂C/∂T / (½K²∂²C/∂K²)
-                // When using Black-76 with forward prices, the (r-q)K∂C/∂K and qC
-                // terms from the spot-based Dupire formula cancel in the forward measure.
-                let numerator = dc_dt;
-
-                // Denominator: (1/2) × K² × ∂²C/∂K²
-                let denominator = 0.5 * k * k * d2c_dk2;
-
-                let local_var = if denominator.abs() < denom_floor {
-                    // Gamma is too small — fall back to implied vol
-                    tracing::warn!(
-                        expiry = t,
-                        strike = k,
-                        forward = forward,
-                        denominator = denominator,
-                        floor = denom_floor,
-                        "local_vol: Dupire denominator (gamma) below floor; \
-                         falling back to implied vol at this grid point",
-                    );
-                    let iv =
-                        crate::volatility::get_surface_vol(surface, t, k).unwrap_or_else(|_| {
-                            crate::volatility::get_surface_vol_clamped(surface, t, k)
-                        });
-                    iv * iv
-                } else {
-                    let lv2 = numerator / denominator;
-                    if lv2 < 0.0 {
-                        // Negative local variance — use implied vol as fallback
-                        tracing::warn!(
-                            expiry = t,
-                            strike = k,
-                            forward = forward,
-                            local_variance = lv2,
-                            "local_vol: negative Dupire local variance (calendar \
-                             arbitrage in the input surface); falling back to \
-                             implied vol at this grid point",
-                        );
-                        let iv = crate::volatility::get_surface_vol(surface, t, k).unwrap_or_else(
-                            |_| crate::volatility::get_surface_vol_clamped(surface, t, k),
-                        );
-                        iv * iv
-                    } else {
-                        lv2
-                    }
-                };
-
-                local_vols[ei * n_str + si] = local_var.sqrt();
-            }
+        if local_vols.iter().any(|v| !v.is_finite() || *v < 0.0) {
+            return Err(Error::Validation(
+                "LocalVolSurface local volatilities must be finite and non-negative".to_string(),
+            ));
         }
-
         Ok(Self {
             expiries,
             strikes,
@@ -294,77 +205,142 @@ impl LocalVolSurface {
         })
     }
 
-    /// Extract local volatility with Gaussian smoothing of the implied vol surface.
+    /// Extract local volatility from an implied volatility surface using the
+    /// Dupire formula in total-variance form.
     ///
-    /// Applies 1-D Gaussian kernel smoothing along the strike axis at each expiry
-    /// before computing call prices and applying the Dupire formula. This
-    /// regularises the second derivative ∂²C/∂K² and reduces spurious noise that
-    /// is common with market-calibrated implied volatility grids.
-    ///
-    /// The `sigma_strikes` parameter controls the Gaussian kernel width in
-    /// strike-space units (e.g. 2.0 means σ = 2.0 in the same units as the
-    /// strike grid). A value of 0.0 disables smoothing and is equivalent to
-    /// [`from_implied_vol`](Self::from_implied_vol).
+    /// At every node of the implied grid the local variance is
+    /// `(∂w/∂T) / g` (see the [module documentation](self)), with `∂w/∂T`
+    /// taken at fixed log-moneyness `k = ln(K / F_T)`. Where the remapped
+    /// strike `F_j·e^k` of a neighbouring expiry falls outside the strike
+    /// grid, that expiry is read at the nearest grid strike (a flat implied
+    /// wing).
     ///
     /// # Arguments
     ///
-    /// * `surface` — unshifted Black implied volatilities on expiry and strike axes; other quote conventions and axes are rejected before smoothing.
-    /// * `forward` — forward price
-    /// * `sigma_strikes` — Gaussian kernel width in strike-space units (≥ 0)
+    /// * `surface` - Unshifted Black (lognormal) implied volatilities as
+    ///   annualized decimals, on expiries in years and cash strikes in price
+    ///   units of the underlying; at least two expiries and three positive
+    ///   strikes.
+    /// * `forwards` - Forward price of the underlying for each surface
+    ///   expiry, in the units of the strikes and in the order of
+    ///   `surface.expiries()`; finite and positive. For a flat carry,
+    ///   `F_T = S·exp((r − q)·T)`.
+    ///
+    /// # Returns
+    ///
+    /// The local volatility on the grid of `surface`.
     ///
     /// # Errors
     ///
-    /// Returns an error if the surface has fewer than 2 expiries or 3 strikes,
-    /// if its axis or quote convention is unsupported, or if `sigma_strikes`
-    /// is negative.
+    /// Returns an input error for fewer than two expiries or three strikes,
+    /// and a validation error when the surface does not use a strike axis or
+    /// holds normal or displaced quotes, `forwards` has the wrong length or a
+    /// non-finite or non-positive entry, a strike is not positive, or the
+    /// surface is not arbitrage-free at a node: non-positive implied
+    /// variance, non-positive Dupire density `g` (butterfly arbitrage), or
+    /// total variance decreasing in expiry at fixed log-moneyness (calendar
+    /// arbitrage). The message names the node.
+    pub fn from_implied_vol(surface: &VolSurface, forwards: &[f64]) -> Result<Self> {
+        validate_implied_surface(surface, forwards)?;
+        let expiries = surface.expiries().to_vec();
+        let strikes = surface.strikes().to_vec();
+
+        let mut local_vols = Vec::with_capacity(expiries.len() * strikes.len());
+        for (ei, &t) in expiries.iter().enumerate() {
+            for (si, &strike) in strikes.iter().enumerate() {
+                let arbitrage = |what: String| {
+                    Error::Validation(format!(
+                        "cannot extract local volatility at expiry {t}, strike {strike}: {what}"
+                    ))
+                };
+                let node = dupire_node(surface, forwards, ei, si, MoneynessLookup::Clamped)
+                    .ok_or_else(|| arbitrage("implied total variance is not positive".into()))?;
+                let dw_dt = node
+                    .dw_dt
+                    .ok_or_else(|| arbitrage("neighbouring expiries coincide".into()))?;
+                if !(node.density.is_finite() && node.density > 0.0) {
+                    return Err(arbitrage(format!(
+                        "the Dupire density is {:e}, not positive (butterfly arbitrage)",
+                        node.density
+                    )));
+                }
+                if dw_dt.is_nan() || dw_dt < -DEFAULT_ARBITRAGE_TOLERANCE {
+                    return Err(arbitrage(format!(
+                        "total variance falls with expiry at fixed log-moneyness, slope {dw_dt:e} \
+                         (calendar arbitrage)"
+                    )));
+                }
+                // A slope within tolerance of zero is a flat total variance.
+                let local_vol = (dw_dt.max(0.0) / node.density).sqrt();
+                if !local_vol.is_finite() {
+                    return Err(arbitrage("the local variance is not finite".into()));
+                }
+                local_vols.push(local_vol);
+            }
+        }
+
+        Self::new(expiries, strikes, local_vols)
+    }
+
+    /// Extract local volatility after Gaussian smoothing of the implied
+    /// volatilities along the strike axis.
+    ///
+    /// Each implied volatility is replaced by the Gaussian-kernel weighted
+    /// average of its expiry row before [`Self::from_implied_vol`] runs. This
+    /// regularises the second strike derivative, which is noisy on
+    /// market-calibrated grids and is the usual source of a non-positive
+    /// Dupire density.
+    ///
+    /// # Arguments
+    ///
+    /// * `surface` - Unshifted Black implied volatilities, as for
+    ///   [`Self::from_implied_vol`]; other quote conventions and axes are
+    ///   rejected before smoothing.
+    /// * `forwards` - Forward price of the underlying for each surface expiry,
+    ///   as for [`Self::from_implied_vol`].
+    /// * `sigma_strikes` - Standard deviation of the Gaussian kernel in strike
+    ///   (price) units, non-negative. Zero disables smoothing and equals
+    ///   [`Self::from_implied_vol`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `sigma_strikes` is negative or not
+    /// finite, and every error of [`Self::from_implied_vol`], evaluated on
+    /// the smoothed surface.
     pub fn from_implied_vol_smoothed(
         surface: &VolSurface,
-        forward: f64,
+        forwards: &[f64],
         sigma_strikes: f64,
-    ) -> finstack_quant_core::Result<Self> {
-        validate_implied_surface(surface)?;
-        if sigma_strikes < 0.0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "sigma_strikes must be non-negative".to_string(),
+    ) -> Result<Self> {
+        validate_implied_surface(surface, forwards)?;
+        if !(sigma_strikes.is_finite() && sigma_strikes >= 0.0) {
+            return Err(Error::Validation(
+                "sigma_strikes must be finite and non-negative".to_string(),
             ));
         }
         if sigma_strikes < 1e-14 {
-            return Self::from_implied_vol(surface, forward);
+            return Self::from_implied_vol(surface, forwards);
         }
 
-        let expiries = surface.expiries().to_vec();
-        let strikes = surface.strikes().to_vec();
-        let n_exp = expiries.len();
-        let n_str = strikes.len();
-
-        if n_exp < 2 {
-            return Err(finstack_quant_core::error::InputError::TooFewPoints.into());
-        }
-        if n_str < 3 {
-            return Err(finstack_quant_core::error::InputError::TooFewPoints.into());
-        }
-
-        let mut smoothed_vols = vec![0.0; n_exp * n_str];
-        for (ei, &t) in expiries.iter().enumerate() {
+        let expiries = surface.expiries();
+        let strikes = surface.strikes();
+        let mut smoothed_vols = Vec::with_capacity(expiries.len() * strikes.len());
+        for &t in expiries {
             let raw: Vec<f64> = strikes
                 .iter()
-                .map(|&k| {
-                    crate::volatility::get_surface_vol(surface, t, k).unwrap_or_else(|_| {
-                        crate::volatility::get_surface_vol_clamped(surface, t, k)
-                    })
-                })
+                .map(|&k| crate::volatility::get_surface_vol_clamped(surface, t, k))
                 .collect();
 
-            for (si, &k_center) in strikes.iter().enumerate() {
+            for &k_center in strikes {
                 let mut weight_sum = 0.0;
                 let mut value_sum = 0.0;
-                for (sj, &k_j) in strikes.iter().enumerate() {
+                for (&k_j, &vol) in strikes.iter().zip(&raw) {
                     let d = (k_j - k_center) / sigma_strikes;
                     let w = (-0.5 * d * d).exp();
                     weight_sum += w;
-                    value_sum += w * raw[sj];
+                    value_sum += w * vol;
                 }
-                smoothed_vols[ei * n_str + si] = value_sum / weight_sum;
+                smoothed_vols.push(value_sum / weight_sum);
             }
         }
 
@@ -372,8 +348,8 @@ impl LocalVolSurface {
         // before the canonical extractor validates it again.
         let smoothed_surface = VolSurface::from_grid_opts(
             surface.id().as_str(),
-            &expiries,
-            &strikes,
+            expiries,
+            strikes,
             &smoothed_vols,
             VolGridOpts {
                 secondary_axis: surface.secondary_axis(),
@@ -383,7 +359,7 @@ impl LocalVolSurface {
             surface.get_displacements(),
         )?;
 
-        Self::from_implied_vol(&smoothed_surface, forward)
+        Self::from_implied_vol(&smoothed_surface, forwards)
     }
 
     /// Evaluate the local volatility at a given (expiry, strike) point.
@@ -393,26 +369,21 @@ impl LocalVolSurface {
     ///
     /// # Arguments
     ///
-    /// * `expiry` — time to expiry in years
-    /// * `strike` — option strike
+    /// * `expiry` - Time in years from the surface's valuation date.
+    /// * `strike` - Level of the underlying in price units; in a simulation,
+    ///   the spot at that time.
     ///
     /// # Returns
     ///
-    /// Local volatility σ_local(T, K). Returns `NaN` for empty surfaces.
+    /// Local volatility `σ_loc(T, K)` as an annualized decimal; `NaN` if
+    /// either coordinate is `NaN`.
     pub fn value(&self, expiry: f64, strike: f64) -> f64 {
         let n_exp = self.expiries.len();
         let n_str = self.strikes.len();
-        if n_exp == 0 || n_str == 0 {
-            return f64::NAN;
-        }
 
-        let exp_min = self.expiries[0];
-        let exp_max = self.expiries[n_exp - 1];
-        let str_min = self.strikes[0];
-        let str_max = self.strikes[n_str - 1];
-
-        let t = expiry.clamp(exp_min, exp_max);
-        let k = strike.clamp(str_min, str_max);
+        // Both axes are non-empty by construction.
+        let t = expiry.clamp(self.expiries[0], self.expiries[n_exp - 1]);
+        let k = strike.clamp(self.strikes[0], self.strikes[n_str - 1]);
 
         let ei = find_segment(&self.expiries, t);
         let si = find_segment(&self.strikes, k);
@@ -454,14 +425,21 @@ impl LocalVolSurface {
         (1.0 - u) * (1.0 - v) * q11 + u * (1.0 - v) * q21 + (1.0 - u) * v * q12 + u * v * q22
     }
 
-    /// Returns the expiry axis.
+    /// Returns the expiry axis in years.
     pub fn expiries(&self) -> &[f64] {
         &self.expiries
     }
 
-    /// Returns the strike axis.
+    /// Returns the strike axis in price units of the underlying.
     pub fn strikes(&self) -> &[f64] {
         &self.strikes
+    }
+
+    /// Returns the local volatilities as annualized decimals in row-major
+    /// order: node (`expiry_index`, `strike_index`) is at
+    /// `expiry_index * strikes().len() + strike_index`.
+    pub fn local_vols(&self) -> &[f64] {
+        &self.local_vols
     }
 
     /// Grid shape as (n_expiries, n_strikes).
@@ -487,44 +465,148 @@ fn find_segment(arr: &[f64], x: f64) -> usize {
     pos.saturating_sub(1).min(arr.len() - 2)
 }
 
+/// An arbitrage-free implied surface with a term structure of skew, shared by
+/// the local-volatility tests of the extractor, the Monte Carlo process and
+/// the PDE.
+#[cfg(test)]
+pub(crate) mod test_support {
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+
+    /// SSVI surface `w(k, θ) = θ/2·(1 + ρφk + √((φk + ρ)² + 1 − ρ²))` with
+    /// `θ = σ₀²·T` and `φ = η/√θ` (Gatheral & Jacquier 2014, free of static
+    /// arbitrage for `η(1 + |ρ|) ≤ 2`).
+    #[derive(Debug, Clone, Copy)]
+    pub(crate) struct Ssvi {
+        /// At-the-money volatility level.
+        pub(crate) sigma0: f64,
+        /// Spot-volatility correlation; negative gives an equity skew.
+        pub(crate) rho: f64,
+        /// Curvature scale.
+        pub(crate) eta: f64,
+    }
+
+    /// The surface every local-volatility repricing test uses: 20% ATM
+    /// volatility with an at-the-money skew of about `-0.15/√T` per unit of
+    /// log-moneyness.
+    pub(crate) const SKEWED: Ssvi = Ssvi {
+        sigma0: 0.2,
+        rho: -0.5,
+        eta: 0.6,
+    };
+
+    impl Ssvi {
+        /// Total variance and its exact derivatives
+        /// `(w, ∂w/∂T, ∂w/∂k, ∂²w/∂k²)` at log-moneyness `k` and expiry `t`.
+        pub(crate) fn total_variance(&self, k: f64, t: f64) -> (f64, f64, f64, f64) {
+            let theta = self.sigma0 * self.sigma0 * t;
+            let phi = self.eta / theta.sqrt();
+            let root = ((phi * k + self.rho).powi(2) + 1.0 - self.rho * self.rho).sqrt();
+            let w = 0.5 * theta * (1.0 + self.rho * phi * k + root);
+            let dw_dk = 0.5 * theta * phi * (self.rho + (phi * k + self.rho) / root);
+            let d2w_dk2 = 0.5 * theta * phi * phi * (1.0 - self.rho * self.rho) / root.powi(3);
+            // φ'(θ) = −φ/(2θ).
+            let dw_dtheta = 0.5 * (1.0 + self.rho * phi * k + root)
+                - 0.25 * phi * k * (self.rho + (phi * k + self.rho) / root);
+            (w, self.sigma0 * self.sigma0 * dw_dtheta, dw_dk, d2w_dk2)
+        }
+
+        /// Black implied volatility at log-moneyness `k` and expiry `t`.
+        pub(crate) fn implied_vol(&self, k: f64, t: f64) -> f64 {
+            (self.total_variance(k, t).0 / t).sqrt()
+        }
+
+        /// Exact Dupire local volatility at log-moneyness `k` and expiry `t`.
+        pub(crate) fn local_vol(&self, k: f64, t: f64) -> f64 {
+            let (w, dw_dt, dw_dk, d2w_dk2) = self.total_variance(k, t);
+            let density = 1.0 - k / w * dw_dk
+                + 0.25 * (-0.25 - 1.0 / w + k * k / (w * w)) * dw_dk * dw_dk
+                + 0.5 * d2w_dk2;
+            (dw_dt / density).sqrt()
+        }
+
+        /// Implied surface sampled on `expiries` x `strikes`, with
+        /// `forwards[i]` the forward of `expiries[i]`.
+        pub(crate) fn surface(
+            &self,
+            expiries: &[f64],
+            strikes: &[f64],
+            forwards: &[f64],
+        ) -> VolSurface {
+            let mut vols = Vec::with_capacity(expiries.len() * strikes.len());
+            for (&t, &forward) in expiries.iter().zip(forwards) {
+                for &strike in strikes {
+                    vols.push(self.implied_vol((strike / forward).ln(), t));
+                }
+            }
+            VolSurface::from_grid("SSVI", expiries, strikes, &vols).expect("SSVI surface builds")
+        }
+    }
+
+    /// `count` equally spaced values from `start` to `end` inclusive.
+    pub(crate) fn linspace(start: f64, end: f64, count: usize) -> Vec<f64> {
+        (0..count)
+            .map(|i| start + (end - start) * i as f64 / (count - 1) as f64)
+            .collect()
+    }
+
+    /// Forwards `spot·exp(carry·T)` for each expiry.
+    pub(crate) fn forwards(spot: f64, carry: f64, expiries: &[f64]) -> Vec<f64> {
+        expiries.iter().map(|t| spot * (carry * t).exp()).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::test_support::{forwards, linspace, SKEWED};
     use super::*;
+    use crate::volatility::arbitrage::{check_surface, ArbitrageCheckConfig};
 
-    fn test_surface() -> VolSurface {
-        VolSurface::builder("TEST-LV")
-            .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[80.0, 90.0, 95.0, 100.0, 105.0, 110.0, 120.0])
-            .row(&[0.30, 0.25, 0.22, 0.20, 0.21, 0.23, 0.28])
-            .row(&[0.28, 0.24, 0.21, 0.19, 0.20, 0.22, 0.26])
-            .row(&[0.26, 0.22, 0.20, 0.18, 0.19, 0.21, 0.24])
-            .row(&[0.24, 0.21, 0.19, 0.17, 0.18, 0.20, 0.22])
-            .build()
-            .expect("test surface should build")
+    const EXPIRIES: [f64; 4] = [0.25, 0.5, 1.0, 2.0];
+    const STRIKES: [f64; 7] = [70.0, 80.0, 90.0, 100.0, 110.0, 120.0, 130.0];
+
+    /// Coarse arbitrage-free skewed surface under a 2% carry.
+    fn test_surface() -> (VolSurface, Vec<f64>) {
+        let forwards = forwards(100.0, 0.02, &EXPIRIES);
+        (SKEWED.surface(&EXPIRIES, &STRIKES, &forwards), forwards)
+    }
+
+    fn flat_surface(expiries: &[f64], strikes: &[f64], vol: f64) -> VolSurface {
+        VolSurface::from_grid(
+            "FLAT",
+            expiries,
+            strikes,
+            &vec![vol; expiries.len() * strikes.len()],
+        )
+        .expect("flat surface should build")
     }
 
     #[test]
-    fn local_vol_from_implied_vol_succeeds() {
-        let surface = test_surface();
-        let lv =
-            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
-
-        assert_eq!(lv.grid_shape(), (4, 7));
+    fn test_surface_passes_the_arbitrage_checks() {
+        let (surface, forwards) = test_surface();
+        let report = check_surface(
+            &surface,
+            &ArbitrageCheckConfig {
+                forward_prices: Some(forwards),
+                ..ArbitrageCheckConfig::default()
+            },
+        )
+        .expect("arbitrage check runs");
+        assert!(report.passed, "{:?}", report.violations);
     }
 
     #[test]
     fn local_vol_rejects_unsupported_conventions_before_smoothing() {
-        let base = test_surface();
+        let (base, forwards) = test_surface();
         let shifted = base.clone().with_displacements(&[20.0; 4]).unwrap();
         let normal = base.clone().with_quote_type(VolQuoteType::Normal).unwrap();
         let tenor_grid = base.with_secondary_axis(VolSurfaceAxis::Tenor);
         for surface in [shifted, normal, tenor_grid] {
-            let expected_error = LocalVolSurface::from_implied_vol(&surface, 100.0)
+            let expected_error = LocalVolSurface::from_implied_vol(&surface, &forwards)
                 .expect_err("unshifted Black extraction must reject incompatible metadata")
                 .to_string();
             for width in [0.0, 7.5] {
                 let smoothed_error =
-                    LocalVolSurface::from_implied_vol_smoothed(&surface, 100.0, width)
+                    LocalVolSurface::from_implied_vol_smoothed(&surface, &forwards, width)
                         .expect_err("smoothing must preserve and enforce input convention")
                         .to_string();
                 assert_eq!(smoothed_error, expected_error);
@@ -532,23 +614,42 @@ mod tests {
         }
     }
 
+    #[test]
+    fn local_vol_rejects_bad_forwards_and_thin_grids() {
+        let (surface, forwards) = test_surface();
+        for bad in [
+            vec![100.0],
+            vec![100.0, 100.0, 100.0, f64::NAN],
+            vec![100.0, 100.0, 0.0, 100.0],
+            vec![100.0, -1.0, 100.0, 100.0],
+        ] {
+            let error = LocalVolSurface::from_implied_vol(&surface, &bad)
+                .expect_err("invalid forwards must be rejected");
+            assert!(error.to_string().contains("forward"), "{error}");
+        }
+
+        let one_expiry = flat_surface(&[1.0], &[80.0, 90.0, 100.0, 110.0, 120.0], 0.2);
+        assert!(LocalVolSurface::from_implied_vol(&one_expiry, &[100.0]).is_err());
+        let two_strikes = flat_surface(&[1.0, 2.0], &[90.0, 110.0], 0.2);
+        assert!(LocalVolSurface::from_implied_vol(&two_strikes, &[100.0, 100.0]).is_err());
+        assert!(LocalVolSurface::from_implied_vol(&surface, &forwards).is_ok());
+    }
+
     /// Pins the row-major (expiry = slow axis, strike = fast axis) storage
     /// contract on an asymmetric grid, so a transposed index would be caught
     /// rather than silently returning a neighbouring cell's volatility.
-    ///
-    /// Ported from the valuations-side BilinearInterp pin test when that
-    /// duplicate Dupire implementation was removed; this is now the only
-    /// axis-order guard for local-vol interpolation.
     #[test]
     fn local_vol_grid_is_row_major_expiry_slow_strike_fast() {
-        let surface = test_surface();
-        let lv =
-            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
+        let (surface, forwards) = test_surface();
+        let lv = LocalVolSurface::from_implied_vol(&surface, &forwards)
+            .expect("extraction should succeed");
 
         // 4 expiries x 7 strikes: a transposition would report (7, 4).
         assert_eq!(lv.grid_shape(), (4, 7));
-        assert_eq!(lv.expiries().len(), 4);
-        assert_eq!(lv.strikes().len(), 7);
+        assert_eq!(lv.expiries(), EXPIRIES);
+        assert_eq!(lv.strikes(), STRIKES);
+        assert_eq!(lv.local_vols().len(), 28);
+        assert_eq!(lv.value(EXPIRIES[1], STRIKES[5]), lv.local_vols()[7 + 5]);
 
         // Query with the axes swapped: 0.5 is a valid expiry and 100.0 a valid
         // strike, but 100.0 is far outside the expiry axis and 0.5 far below
@@ -565,220 +666,240 @@ mod tests {
 
     #[test]
     fn local_vol_smoothed_rejects_negative_sigma() {
-        let surface = test_surface();
-        let err = LocalVolSurface::from_implied_vol_smoothed(&surface, 100.0, -1.0)
-            .expect_err("negative smoothing width should be rejected");
-
-        assert!(
-            err.to_string().contains("sigma_strikes"),
-            "unexpected error: {err}"
-        );
+        let (surface, forwards) = test_surface();
+        for width in [-1.0, f64::NAN] {
+            let err = LocalVolSurface::from_implied_vol_smoothed(&surface, &forwards, width)
+                .expect_err("invalid smoothing width should be rejected");
+            assert!(
+                err.to_string().contains("sigma_strikes"),
+                "unexpected error: {err}"
+            );
+        }
     }
 
     #[test]
     fn local_vol_smoothed_zero_sigma_matches_unsmoothed() {
-        let surface = test_surface();
-        let unsmoothed =
-            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
-        let smoothed = LocalVolSurface::from_implied_vol_smoothed(&surface, 100.0, 0.0)
+        let (surface, forwards) = test_surface();
+        let unsmoothed = LocalVolSurface::from_implied_vol(&surface, &forwards)
+            .expect("extraction should succeed");
+        let smoothed = LocalVolSurface::from_implied_vol_smoothed(&surface, &forwards, 0.0)
             .expect("zero smoothing should delegate to unsmoothed extractor");
-
-        assert_eq!(smoothed.grid_shape(), unsmoothed.grid_shape());
-        for &t in unsmoothed.expiries() {
-            for &k in unsmoothed.strikes() {
-                assert_eq!(smoothed.value(t, k), unsmoothed.value(t, k));
-            }
-        }
+        assert_eq!(smoothed, unsmoothed);
     }
 
     #[test]
-    fn local_vol_smoothed_positive_sigma_is_positive_and_finite() {
-        let surface = test_surface();
-        let lv = LocalVolSurface::from_implied_vol_smoothed(&surface, 100.0, 7.5)
+    fn local_vol_smoothed_positive_sigma_flattens_the_skew() {
+        let (surface, forwards) = test_surface();
+        let raw = LocalVolSurface::from_implied_vol(&surface, &forwards).expect("raw");
+        let lv = LocalVolSurface::from_implied_vol_smoothed(&surface, &forwards, 15.0)
             .expect("positive smoothing should succeed");
 
-        for &t in lv.expiries() {
-            for &k in lv.strikes() {
-                let vol = lv.value(t, k);
-                assert!(vol > 0.0 && vol.is_finite(), "vol({t}, {k}) = {vol}");
-            }
-        }
+        assert!(lv.local_vols().iter().all(|v| *v > 0.0 && v.is_finite()));
+        let skew = |surface: &LocalVolSurface| surface.value(1.0, 80.0) - surface.value(1.0, 120.0);
+        assert!(skew(&raw) > 0.0);
+        assert!(
+            skew(&lv) < skew(&raw),
+            "smoothing should flatten the skew: {} vs {}",
+            skew(&lv),
+            skew(&raw)
+        );
     }
 
     #[test]
-    fn local_vol_positive_and_finite() {
-        let surface = test_surface();
-        let lv =
-            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
+    fn local_vol_interpolates_bilinearly_and_extrapolates_flat() {
+        let lv = LocalVolSurface::new(
+            vec![1.0, 2.0],
+            vec![100.0, 200.0],
+            vec![0.10, 0.20, 0.30, 0.40],
+        )
+        .expect("valid grid");
 
-        for &t in lv.expiries() {
-            for &k in lv.strikes() {
-                let vol = lv.value(t, k);
+        assert!((lv.value(1.5, 150.0) - 0.25).abs() < 1e-15);
+        assert!((lv.value(1.0, 125.0) - 0.125).abs() < 1e-15);
+        assert!((lv.value(1.25, 200.0) - 0.25).abs() < 1e-15);
+        // Flat outside the grid, on each side of each axis.
+        assert_eq!(lv.value(0.0, 50.0), 0.10);
+        assert_eq!(lv.value(5.0, 50.0), 0.30);
+        assert_eq!(lv.value(0.5, 1e6), 0.20);
+        assert_eq!(lv.value(9.0, 1e6), 0.40);
+        assert!(lv.value(f64::NAN, 100.0).is_nan());
+
+        let single = LocalVolSurface::new(vec![1.0], vec![100.0], vec![0.3]).expect("one node");
+        assert_eq!(single.value(0.2, 80.0), 0.3);
+        assert_eq!(single.value(3.0, 120.0), 0.3);
+    }
+
+    #[test]
+    fn local_vol_new_and_serde_enforce_the_grid_invariants() {
+        for (expiries, strikes, vols) in [
+            (vec![], vec![100.0], vec![]),
+            (vec![1.0], vec![], vec![]),
+            (vec![1.0, 1.0], vec![100.0], vec![0.2, 0.2]),
+            (vec![2.0, 1.0], vec![100.0], vec![0.2, 0.2]),
+            (vec![-1.0, 1.0], vec![100.0], vec![0.2, 0.2]),
+            (vec![1.0], vec![0.0, 100.0], vec![0.2, 0.2]),
+            (vec![1.0], vec![100.0, f64::INFINITY], vec![0.2, 0.2]),
+            (vec![1.0], vec![100.0, 110.0], vec![0.2]),
+            (vec![1.0], vec![100.0, 110.0], vec![0.2, -0.1]),
+            (vec![1.0], vec![100.0, 110.0], vec![0.2, f64::NAN]),
+        ] {
+            assert!(
+                LocalVolSurface::new(expiries.clone(), strikes.clone(), vols.clone()).is_err(),
+                "({expiries:?}, {strikes:?}, {vols:?}) must be rejected"
+            );
+        }
+
+        let (surface, forwards) = test_surface();
+        let lv = LocalVolSurface::from_implied_vol(&surface, &forwards).expect("extraction");
+        let json = serde_json::to_string(&lv).expect("serialize");
+        let restored: LocalVolSurface = serde_json::from_str(&json).expect("round trip");
+        assert_eq!(restored, lv);
+
+        for bad in [
+            r#"{"expiries":[1.0],"strikes":[100.0],"local_vols":[0.2],"extra":1}"#,
+            r#"{"expiries":[1.0],"strikes":[100.0],"local_vols":[-0.2]}"#,
+            r#"{"expiries":[1.0],"strikes":[100.0],"local_vols":[]}"#,
+            r#"{"expiries":[],"strikes":[],"local_vols":[]}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<LocalVolSurface>(bad).is_err(),
+                "{bad}"
+            );
+        }
+    }
+
+    /// A flat implied volatility is its own local volatility: `w = σ²T` has
+    /// `∂w/∂T = σ²`, no strike dependence and density one, whatever the
+    /// forwards are. Forward differences of a linear function are exact up to
+    /// rounding, so the tolerance is tight.
+    #[test]
+    fn local_vol_of_a_flat_surface_is_the_implied_vol() {
+        let expiries = linspace(0.25, 2.0, 8);
+        let strikes = linspace(60.0, 160.0, 21);
+        let flat = flat_surface(&expiries, &strikes, 0.20);
+        for carry in [0.0, 0.03, -0.02] {
+            let lv = LocalVolSurface::from_implied_vol(&flat, &forwards(100.0, carry, &expiries))
+                .expect("extraction should succeed");
+            for (index, vol) in lv.local_vols().iter().enumerate() {
                 assert!(
-                    vol > 0.0 && vol.is_finite(),
-                    "Local vol at ({t}, {k}) = {vol} should be positive and finite"
+                    (vol - 0.20).abs() < 1e-12,
+                    "carry {carry}, node {index}: local vol {vol}"
                 );
             }
+            assert!((lv.value(0.77, 93.0) - 0.20).abs() < 1e-12);
         }
     }
 
+    /// Against the exact SSVI local volatility on a fine grid with sloped
+    /// forwards. Interior nodes use second-order central differences.
     #[test]
-    fn local_vol_interpolation_works() {
-        let surface = test_surface();
-        let lv =
-            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
+    fn local_vol_matches_the_exact_ssvi_local_vol() {
+        let expiries = linspace(0.1, 2.0, 77);
+        let strikes = linspace(50.0, 170.0, 241);
+        let forwards = forwards(100.0, 0.02, &expiries);
+        let surface = SKEWED.surface(&expiries, &strikes, &forwards);
+        let lv = LocalVolSurface::from_implied_vol(&surface, &forwards).expect("extraction");
 
-        let vol = lv.value(0.75, 97.5);
-        assert!(
-            vol > 0.0 && vol.is_finite(),
-            "Interpolated local vol should be valid: {vol}"
-        );
+        let mut worst: f64 = 0.0;
+        for (ei, &t) in expiries.iter().enumerate() {
+            // Skip the edge rows and columns, which use one-sided differences.
+            if ei == 0 || ei == expiries.len() - 1 {
+                continue;
+            }
+            for &strike in &strikes[1..strikes.len() - 1] {
+                // Within about three standard deviations of the forward.
+                let k = (strike / forwards[ei]).ln();
+                if k.abs() > 3.0 * 0.2 * t.sqrt() {
+                    continue;
+                }
+                let exact = SKEWED.local_vol(k, t);
+                worst = worst.max((lv.value(t, strike) - exact).abs());
+            }
+        }
+        // Measured 3.7e-4 (under four basis points of volatility), at the short end.
+        assert!(worst < 5e-4, "worst local-vol error {worst}");
     }
 
+    /// Per-expiry forwards matter: holding the same cash-strike quotes but
+    /// declaring a carry changes the fixed-moneyness time derivative.
     #[test]
-    fn local_vol_clamped_outside_grid() {
-        let surface = test_surface();
-        let lv =
-            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
-
-        let vol_low = lv.value(0.1, 60.0);
-        let vol_high = lv.value(3.0, 150.0);
-
-        assert!(
-            vol_low > 0.0 && vol_low.is_finite(),
-            "Clamped low vol: {vol_low}"
-        );
-        assert!(
-            vol_high > 0.0 && vol_high.is_finite(),
-            "Clamped high vol: {vol_high}"
-        );
+    fn local_vol_depends_on_the_forward_term_structure() {
+        let (surface, sloped) = test_surface();
+        let with_carry = LocalVolSurface::from_implied_vol(&surface, &sloped).expect("carry");
+        let no_carry = LocalVolSurface::from_implied_vol(&surface, &[100.0; 4]).expect("flat");
+        assert!((with_carry.value(1.0, 100.0) - no_carry.value(1.0, 100.0)).abs() > 1e-4);
     }
 
+    /// The surface of the type-level doc example.
     #[test]
-    fn local_vol_reasonable_magnitude() {
-        let surface = test_surface();
-        let lv =
-            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
-
-        let atm_local = lv.value(1.0, 100.0);
-        let atm_implied =
-            crate::volatility::get_surface_vol(&surface, 1.0, 100.0).expect("in-bounds lookup");
-
-        assert!(
-            atm_local > atm_implied * 0.3 && atm_local < atm_implied * 3.0,
-            "ATM local vol {atm_local:.4} should be near implied {atm_implied:.4}"
-        );
-    }
-
-    #[test]
-    fn local_vol_flat_surface_is_flat() {
-        // For a flat implied vol surface, local vol should also be approximately flat
-        let flat = VolSurface::builder("FLAT")
-            .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
-            .row(&[0.20, 0.20, 0.20, 0.20, 0.20])
-            .row(&[0.20, 0.20, 0.20, 0.20, 0.20])
-            .row(&[0.20, 0.20, 0.20, 0.20, 0.20])
-            .row(&[0.20, 0.20, 0.20, 0.20, 0.20])
-            .build()
-            .expect("flat surface should build");
-
-        let lv =
-            LocalVolSurface::from_implied_vol(&flat, 100.0).expect("extraction should succeed");
-
-        let vol_mid = lv.value(0.75, 100.0);
-        assert!(
-            (vol_mid - 0.20).abs() < 0.05,
-            "Flat surface local vol should be ~0.20, got {vol_mid:.4}"
-        );
-    }
-
-    /// Regression for the review finding "Dupire local-vol extraction biased
-    /// low whenever r≠0": discounting the call prices fed into the
-    /// forward-measure Dupire ratio injected a spurious −r·C̃ theta term
-    /// (flat 20% surface with r=3% extracted 18.9% ATM / 16.4% at K=80 at
-    /// T=1). With undiscounted prices the rate must not bias the result.
-    #[test]
-    fn local_vol_flat_surface_is_flat_with_nonzero_rate() {
-        // Dense grid so the finite-difference discretization error is well
-        // below the 0.5-vol-pt assertion tolerance.
-        let expiries: Vec<f64> = (0..29).map(|i| 0.25 + 0.0625 * i as f64).collect();
-        let strikes: Vec<f64> = (0..25).map(|i| 70.0 + 2.5 * i as f64).collect();
-        let mut builder = VolSurface::builder("FLAT-R3")
-            .expiries(&expiries)
+    fn local_vol_of_a_cash_strike_skew_is_steeper_than_the_implied_skew() {
+        let smile = [0.24, 0.22, 0.20, 0.19, 0.185];
+        let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
+        let mut builder = VolSurface::builder("SKEW")
+            .expiries(&EXPIRIES)
             .strikes(&strikes);
-        let flat_row = vec![0.20; strikes.len()];
-        for _ in 0..expiries.len() {
-            builder = builder.row(&flat_row);
+        for _ in &EXPIRIES {
+            builder = builder.row(&smile);
         }
-        let flat = builder.build().expect("flat surface should build");
+        let surface = builder.build().expect("surface should build");
+        let lv = LocalVolSurface::from_implied_vol(&surface, &forwards(100.0, 0.02, &EXPIRIES))
+            .expect("extraction should succeed");
+        assert_eq!(lv.grid_shape(), (4, 5));
+        assert!(lv.value(1.0, 90.0) - lv.value(1.0, 110.0) > 0.22 - 0.19);
 
-        let lv =
-            LocalVolSurface::from_implied_vol(&flat, 100.0).expect("extraction should succeed");
-
-        for &t in &[0.5, 1.0, 1.5] {
-            for &k in &[80.0, 90.0, 100.0, 110.0, 120.0] {
-                let vol = lv.value(t, k);
-                assert!(
-                    (vol - 0.20).abs() < 0.005,
-                    "Flat 20% surface with r=3% must extract ~20% local vol \
-                     at (T={t}, K={k}), got {vol:.4}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn local_vol_falls_back_to_implied_vol_when_gamma_is_tiny() {
-        let surface = VolSurface::builder("TINY-GAMMA")
-            .expiries(&[1.0, 2.0])
-            .strikes(&[1_000_000.0, 2_000_000.0, 3_000_000.0])
-            .row(&[0.25, 0.25, 0.25])
-            .row(&[0.25, 0.25, 0.25])
-            .build()
-            .expect("surface should build");
-
-        let lv =
-            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
-        let fallback_vol = lv.value(1.0, 2_000_000.0);
-
+        // The fixture of the Python and WASM tests and of their parity case.
+        let host_forwards = [100.5, 101.0, 102.0, 104.0];
+        let host = LocalVolSurface::from_implied_vol(&surface, &host_forwards)
+            .expect("host fixture extracts");
+        assert!(host.value(1.0, 90.0) - host.value(1.0, 110.0) > 0.22 - 0.19);
+        let smoothed = LocalVolSurface::from_implied_vol_smoothed(&surface, &host_forwards, 10.0)
+            .expect("smoothed host fixture extracts");
         assert!(
-            (fallback_vol - 0.25).abs() < 1e-12,
-            "tiny-gamma path should fall back to implied vol, got {fallback_vol}"
+            smoothed.value(1.0, 80.0) - smoothed.value(1.0, 120.0)
+                < host.value(1.0, 80.0) - host.value(1.0, 120.0)
         );
     }
 
     #[test]
-    fn local_vol_falls_back_to_implied_vol_when_local_variance_turns_negative() {
-        let surface = VolSurface::builder("NEG-LV2")
-            .expiries(&[0.25, 0.5, 1.0])
-            .strikes(&[80.0, 100.0, 120.0])
-            .row(&[0.60, 0.50, 0.60])
-            .row(&[0.10, 0.08, 0.10])
-            .row(&[0.09, 0.07, 0.09])
-            .build()
-            .expect("surface should build");
-
-        let lv =
-            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
-        let fallback_vol = lv.value(0.5, 100.0);
-
-        assert!(
-            (fallback_vol - 0.08).abs() < 1e-12,
-            "negative local-variance fallback should use implied vol, got {fallback_vol}"
-        );
-    }
-
-    #[test]
-    fn local_vol_rejects_too_few_expiries() {
-        let surface = VolSurface::builder("THIN")
-            .expiries(&[1.0])
+    fn local_vol_rejects_calendar_arbitrage_naming_the_node() {
+        let surface = VolSurface::builder("CALENDAR-BAD")
+            .expiries(&[0.5, 1.0, 2.0])
             .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
-            .row(&[0.25, 0.22, 0.20, 0.22, 0.25])
+            .row(&[0.25, 0.25, 0.25, 0.25, 0.25])
+            .row(&[0.25, 0.25, 0.25, 0.25, 0.25])
+            .row(&[0.15, 0.15, 0.15, 0.15, 0.15])
             .build()
             .expect("surface should build");
+        let error = LocalVolSurface::from_implied_vol(&surface, &[100.0; 3])
+            .expect_err(
+                "total variance falls from T=1 to T=2, seen by the backward difference at T=2",
+            )
+            .to_string();
+        assert!(
+            error.contains("calendar arbitrage") && error.contains("expiry 2, strike 80"),
+            "{error}"
+        );
+    }
 
-        let result = LocalVolSurface::from_implied_vol(&surface, 100.0);
-        assert!(result.is_err(), "Should require at least 2 expiries");
+    #[test]
+    fn local_vol_rejects_butterfly_arbitrage_naming_the_node() {
+        let surface = VolSurface::builder("BUTTERFLY-BAD")
+            .expiries(&[0.5, 1.0, 2.0])
+            .strikes(&[70.0, 85.0, 100.0, 115.0, 130.0])
+            .row(&[0.20, 0.45, 0.20, 0.45, 0.20])
+            .row(&[0.21, 0.46, 0.21, 0.46, 0.21])
+            .row(&[0.22, 0.47, 0.22, 0.47, 0.22])
+            .build()
+            .expect("surface should build");
+        let error = LocalVolSurface::from_implied_vol(&surface, &[100.0; 3])
+            .expect_err("a concave smile has negative density")
+            .to_string();
+        assert!(
+            error.contains("butterfly arbitrage") && error.contains("expiry 0.5"),
+            "{error}"
+        );
+        // Heavy smoothing removes the oscillation and the surface extracts.
+        LocalVolSurface::from_implied_vol_smoothed(&surface, &[100.0; 3], 60.0)
+            .expect("smoothed surface is arbitrage-free");
     }
 }

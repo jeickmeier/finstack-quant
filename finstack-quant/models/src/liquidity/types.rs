@@ -328,7 +328,7 @@ impl LiquidityTier {
 /// used instead: participation is an explicit argument to
 /// [`days_to_liquidate`], risk aversion rides on
 /// [`crate::liquidity::TradeParams::risk_aversion`], and the VaR confidence
-/// is an explicit argument to [`crate::liquidity::lvar_bangia_scalar`].
+/// is an explicit argument to [`crate::liquidity::lvar_bangia`].
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]

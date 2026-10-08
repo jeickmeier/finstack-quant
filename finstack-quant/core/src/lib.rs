@@ -57,7 +57,6 @@
 //! - [`market_data`]: Term structures and market data containers
 //! - [`config`]: Configuration and global settings
 //! - [`types`]: Core type definitions (IDs, rates, etc.)
-//! - [`prelude`]: Convenient re-exports of commonly used types
 //! - [`cashflow`]: Cashflow primitives and discounting
 //! - [`canonical`]: Deterministic JSON bytes and content hashes
 //! - [`contract`]: Persisted-contract descriptors, limits, and diagnostics
@@ -70,9 +69,6 @@
 //! - [`serde_guard`]: `deny_unknown_fields` enforcement for `#[serde(flatten)]` structs
 //! - [`table`]: Serializable columnar table envelope for host-language bindings
 //! - [`validation`]: Generic invariant-checking helpers
-//!
-//! For most users, importing `use finstack_quant_core::prelude::*;` provides
-//! all commonly needed types.
 //!
 //! # Cargo features
 //!
@@ -126,8 +122,6 @@ pub mod math;
 pub mod money;
 /// Order-preserving parallel maps whose error selection matches the serial path.
 pub mod parallel;
-/// Convenient re-exports of commonly used types
-pub mod prelude;
 /// Shared credit rating-scale registry.
 pub mod rating_scales;
 /// Deterministic JSON Schema assembly helpers.

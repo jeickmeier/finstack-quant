@@ -1,6 +1,6 @@
 //! Python bindings for reusable quantitative model engines.
 
-mod analytic;
+mod closed_form;
 pub mod correlation;
 pub(crate) mod credit;
 pub mod factor;
@@ -22,7 +22,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "Reusable analytical, Fourier, volatility, credit, correlation, rates, and Monte Carlo models.",
     )?;
 
-    analytic::register(py, &module)?;
+    closed_form::register(py, &module)?;
     fourier::register(py, &module)?;
     volatility::register(py, &module)?;
     monte_carlo::register(py, &module)?;

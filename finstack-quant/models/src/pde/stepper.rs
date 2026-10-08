@@ -74,139 +74,128 @@ pub enum StepperError {
     ThomasFailure(#[from] ThomasError),
 }
 
-/// Time-stepping strategy for advancing the PDE solution backward from maturity.
+/// Theta-scheme time stepper for advancing a 1D PDE solution backward from
+/// maturity, with optional Rannacher start-up.
 ///
-/// Implementors define how each time step is executed, potentially with
-/// different theta parameters at different stages (e.g., Rannacher smoothing).
-pub trait TimeStepper: Send + Sync {
-    /// Advance the solution one step backward in time from `t_from` to `t_to`.
-    ///
-    /// * `problem` — PDE coefficients and boundary conditions
-    /// * `grid` — spatial grid
-    /// * `u` — solution vector (interior points only, length `grid.n_interior()`)
-    /// * `t_from` — current time (closer to maturity)
-    /// * `t_to` — target time (closer to t=0)
-    /// * `step_index` — zero-based step counter (for Rannacher switching)
-    ///
-    /// Returns [`StepperError::CflViolation`] if an explicit / under-damped
-    /// (`theta < 0.5`) scheme would step past its CFL stability limit.
-    /// Implicit and Crank-Nicolson (`theta >= 0.5`) steps are unconditionally
-    /// stable and never fail.
-    fn step(
-        &self,
-        problem: &dyn PdeProblem1D,
-        grid: &Grid1D,
-        u: &mut [f64],
-        t_from: f64,
-        t_to: f64,
-        step_index: usize,
-    ) -> Result<(), StepperError>;
-
-    /// Total number of time steps.
-    fn n_steps(&self) -> usize;
-
-    /// Generate time levels from maturity (T) backward to 0.
-    ///
-    /// Returns a vector of length `n_steps + 1` with `levels[0] = T`
-    /// and `levels[n_steps] = 0`. Steps proceed backward: the solver
-    /// evolves from `levels[i]` to `levels[i+1]` for `i = 0..n_steps-1`.
-    fn time_levels(&self, maturity: f64) -> Vec<f64> {
-        let n = self.n_steps();
-        let dt = maturity / n as f64;
-        (0..=n).map(|i| maturity - i as f64 * dt).collect()
-    }
-}
-
-/// Standard theta-scheme time stepper.
+/// Every step solves the theta scheme; the stepper only decides which theta
+/// applies to which step:
 ///
-/// - `theta = 0.0`: fully explicit (forward Euler) — conditionally stable, for debugging only
-/// - `theta = 0.5`: Crank-Nicolson — second-order in time, the production workhorse
-/// - `theta = 1.0`: fully implicit (backward Euler) — first-order, unconditionally stable
+/// - the first `implicit_steps` steps (those nearest the terminal condition)
+///   are fully implicit (`theta = 1.0`);
+/// - every later step uses the configured `theta`.
+///
+/// | Constructor | `implicit_steps` | `theta` | Scheme |
+/// |-------------|------------------|---------|--------|
+/// | [`ThetaStepper::crank_nicolson`] | 0 | 0.5 | Crank-Nicolson — second-order in time, the production workhorse |
+/// | [`ThetaStepper::implicit`] | 0 | 1.0 | Backward Euler — first-order, unconditionally stable |
+/// | [`ThetaStepper::rannacher`] | caller's | 0.5 | Implicit start, then Crank-Nicolson |
+/// | [`ThetaStepper::explicit`] | 0 | 0.0 | Forward Euler — conditionally stable, for debugging only |
+/// | [`ThetaStepper::custom`] | 0 | caller's | Any theta in `[0, 1]` |
+///
+/// Rannacher start-up eliminates the spurious oscillations that
+/// Crank-Nicolson produces near payoff discontinuities (e.g., at the strike of
+/// a digital option or at barrier knock-out levels). Typically 2–4 implicit
+/// steps suffice.
+#[derive(Debug, Clone, Copy)]
 pub struct ThetaStepper {
-    /// Theta parameter (0 = explicit, 0.5 = CN, 1 = implicit).
+    /// Number of initial fully-implicit steps (0 for a plain theta scheme).
+    implicit_steps: usize,
+    /// Theta for the remaining steps (0 = explicit, 0.5 = CN, 1 = implicit).
     theta: f64,
-    /// Number of time steps.
+    /// Total number of time steps.
     n_steps: usize,
 }
 
 impl ThetaStepper {
     /// Create a Crank-Nicolson stepper (theta = 0.5).
+    ///
+    /// # Arguments
+    ///
+    /// * `n_steps` - Number of uniform time steps between maturity and `t = 0`.
     pub fn crank_nicolson(n_steps: usize) -> Self {
-        Self {
-            theta: 0.5,
-            n_steps,
-        }
+        Self::custom(0.5, n_steps)
     }
 
     /// Create a fully implicit stepper (theta = 1.0).
+    ///
+    /// # Arguments
+    ///
+    /// * `n_steps` - Number of uniform time steps between maturity and `t = 0`.
     pub fn implicit(n_steps: usize) -> Self {
-        Self {
-            theta: 1.0,
-            n_steps,
-        }
+        Self::custom(1.0, n_steps)
     }
 
-    /// Create a fully explicit stepper (theta = 0.0). Use for debugging only.
+    /// Create a fully explicit stepper (theta = 0.0). Use for debugging only:
+    /// each step is rejected with [`StepperError::CflViolation`] unless it
+    /// satisfies the CFL stability bound.
+    ///
+    /// # Arguments
+    ///
+    /// * `n_steps` - Number of uniform time steps between maturity and `t = 0`.
     pub fn explicit(n_steps: usize) -> Self {
-        Self {
-            theta: 0.0,
-            n_steps,
-        }
+        Self::custom(0.0, n_steps)
     }
 
     /// Create a stepper with custom theta.
+    ///
+    /// # Arguments
+    ///
+    /// * `theta` - Implicitness weight in `[0, 1]`: 0 is explicit, 0.5 is
+    ///   Crank-Nicolson, 1 is fully implicit. Values below 0.5 are only
+    ///   conditionally stable and are CFL-checked on every step.
+    /// * `n_steps` - Number of uniform time steps between maturity and `t = 0`.
     pub fn custom(theta: f64, n_steps: usize) -> Self {
-        Self { theta, n_steps }
-    }
-}
-
-impl TimeStepper for ThetaStepper {
-    fn step(
-        &self,
-        problem: &dyn PdeProblem1D,
-        grid: &Grid1D,
-        u: &mut [f64],
-        t_from: f64,
-        t_to: f64,
-        _step_index: usize,
-    ) -> Result<(), StepperError> {
-        theta_step(problem, grid, u, t_from, t_to, self.theta)
+        Self {
+            implicit_steps: 0,
+            theta,
+            n_steps,
+        }
     }
 
-    fn n_steps(&self) -> usize {
-        self.n_steps
-    }
-}
-
-/// Rannacher time stepper: runs a few fully implicit steps at the start
-/// (near the terminal condition) then switches to Crank-Nicolson.
-///
-/// Eliminates the spurious oscillations that Crank-Nicolson produces near
-/// payoff discontinuities (e.g., at the strike of a digital option or at
-/// barrier knock-out levels). Typically 2–4 implicit steps suffice.
-pub struct RannacherStepper {
-    /// Number of initial fully-implicit steps (typically 2–4).
-    implicit_steps: usize,
-    /// Theta for remaining steps (usually 0.5 for Crank-Nicolson).
-    theta: f64,
-    /// Total number of time steps.
-    n_steps: usize,
-}
-
-impl RannacherStepper {
-    /// Create a Rannacher stepper with `implicit_steps` initial implicit steps
-    /// followed by Crank-Nicolson for the remainder.
-    pub fn new(implicit_steps: usize, n_steps: usize) -> Self {
+    /// Create a Rannacher stepper: `implicit_steps` fully implicit steps at
+    /// the start (near the terminal condition), then Crank-Nicolson for the
+    /// remainder.
+    ///
+    /// # Arguments
+    ///
+    /// * `implicit_steps` - Number of initial fully implicit steps, counted by
+    ///   the `step_index` passed to [`Self::step`] (typically 2–4).
+    /// * `n_steps` - Total number of uniform time steps between maturity and
+    ///   `t = 0`, including the implicit ones.
+    pub fn rannacher(implicit_steps: usize, n_steps: usize) -> Self {
         Self {
             implicit_steps,
             theta: 0.5,
             n_steps,
         }
     }
-}
 
-impl TimeStepper for RannacherStepper {
-    fn step(
+    /// Advance the solution one step backward in time from `t_from` to `t_to`.
+    ///
+    /// # Arguments
+    ///
+    /// * `problem` - PDE coefficients and boundary conditions.
+    /// * `grid` - Spatial grid in the problem's state coordinate whose interior
+    ///   nodes carry `u`; its spacing sets the finite-difference stencils.
+    /// * `u` - Solution vector (interior points only, length
+    ///   `grid.n_interior()`), updated in place.
+    /// * `t_from` - Current time in years (closer to maturity).
+    /// * `t_to` - Target time in years (closer to `t = 0`); must be strictly
+    ///   below `t_from`.
+    /// * `step_index` - Zero-based step counter; steps with an index below the
+    ///   Rannacher `implicit_steps` are taken fully implicitly. A caller that
+    ///   re-introduces a discontinuity mid-solve restarts the damping by
+    ///   resetting this counter to zero.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StepperError::CflViolation`] if an explicit / under-damped
+    /// (`theta < 0.5`) step would exceed its CFL stability limit,
+    /// [`StepperError::NonPositiveStep`] if `t_from - t_to` is not strictly
+    /// positive, and [`StepperError::ThomasFailure`] if the tridiagonal solve
+    /// is degenerate. Implicit and Crank-Nicolson (`theta >= 0.5`) steps are
+    /// unconditionally stable and never fail the CFL check.
+    pub fn step(
         &self,
         problem: &dyn PdeProblem1D,
         grid: &Grid1D,
@@ -223,8 +212,25 @@ impl TimeStepper for RannacherStepper {
         theta_step(problem, grid, u, t_from, t_to, theta)
     }
 
-    fn n_steps(&self) -> usize {
+    /// Total number of time steps.
+    pub fn n_steps(&self) -> usize {
         self.n_steps
+    }
+
+    /// Generate time levels from maturity (T) backward to 0.
+    ///
+    /// Returns a vector of length `n_steps + 1` with `levels[0] = T`
+    /// and `levels[n_steps] = 0`. Steps proceed backward: the solver
+    /// evolves from `levels[i]` to `levels[i+1]` for `i = 0..n_steps-1`.
+    ///
+    /// # Arguments
+    ///
+    /// * `maturity` - Time to maturity in years, split into `n_steps` equal
+    ///   intervals.
+    pub fn time_levels(&self, maturity: f64) -> Vec<f64> {
+        let n = self.n_steps;
+        let dt = maturity / n as f64;
+        (0..=n).map(|i| maturity - i as f64 * dt).collect()
     }
 }
 

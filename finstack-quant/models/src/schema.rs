@@ -9,6 +9,9 @@
 
 use finstack_quant_core::schema::SchemaArtifact;
 
+use crate::monte_carlo::simulate::{
+    FbmSpec, PathSimulationSpec, PathSummary, ProcessSpec, SchemeSpec,
+};
 use crate::{
     correlation::CreditExposure, correlation::LatentFactorSpec, correlation::PortfolioLossConfig,
     correlation::PortfolioLossResult, correlation::RecoverySpec,
@@ -37,21 +40,22 @@ use crate::{
     liquidity::AlmgrenChrissModel, liquidity::ExecutionTrajectory, liquidity::ImpactEstimate,
     liquidity::KyleLambdaModel, liquidity::LiquidityConfig, liquidity::LiquidityTier,
     liquidity::LvarBangiaScalar, liquidity::TradeParams, monte_carlo::estimate::Estimate,
-    monte_carlo::payoff::asian::AveragingMethod, monte_carlo::payoff::barrier::OptionKind,
-    monte_carlo::pricer::basis::BasisKind,
+    monte_carlo::greeks::lrm::LrmGreeks, monte_carlo::payoff::asian::AveragingMethod,
+    monte_carlo::payoff::barrier::OptionKind, monte_carlo::pricer::basis::BasisKind,
     monte_carlo::process::cheyette_rough::CheyetteRoughVolParams,
     monte_carlo::process::cir::CirParams, monte_carlo::process::lmm::LmmParams,
-    monte_carlo::process::ou::HullWhite1FParams,
+    monte_carlo::process::local_vol::LocalVolParams, monte_carlo::process::ou::HullWhite1FParams,
     monte_carlo::process::rough_bergomi::RoughBergomiParams,
     monte_carlo::process::rough_heston::RoughHestonParams,
     monte_carlo::process::schwartz_smith::SchwartzSmithParams,
     monte_carlo::process::BrownianParams, monte_carlo::process::GbmParams,
     monte_carlo::process::MultiOuParams, monte_carlo::results::MonteCarloResult,
-    monte_carlo::GbmPathSummary, rates::dtsm::DieboldLi, rates::dtsm::YieldForecast,
-    rates::dtsm::YieldPanel, rates::dtsm::YieldPca, rates::dtsm::YieldPcaView,
+    rates::dtsm::DieboldLi, rates::dtsm::YieldForecast, rates::dtsm::YieldPanel,
+    rates::dtsm::YieldPca, rates::dtsm::YieldPcaView,
     rates::hull_white::HullWhiteCalibrationParams, rates::hull_white::HullWhiteParams,
     volatility::arbitrage::ArbitrageCheckConfig, volatility::arbitrage::ArbitrageReport,
-    volatility::heston::HestonParams, volatility::rough_heston::RoughHestonFourierParams,
+    volatility::heston::HestonParams, volatility::local_vol::LocalVolSurface,
+    volatility::rough_heston::RoughHestonFourierParams,
     volatility::sabr::ArbitrageValidationResult, volatility::svi::SviParams,
     volatility::VolatilityConvention, BsGreeks, ExerciseStyle, ForwardGreeks, HestonPricingParams,
     OptionType, SabrParameters,
@@ -256,6 +260,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Exercise schedule convention for option models."
     ),
     finstack_quant_core::schema_artifact!(
+        FbmSpec,
+        "models",
+        "fbm_spec",
+        Component,
+        "Generator of the fractional increments consumed by the rough-volatility processes."
+    ),
+    finstack_quant_core::schema_artifact!(
         ForwardGreeks,
         "models",
         "forward_greeks",
@@ -268,13 +279,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "gbm_params",
         Input,
         "Geometric Brownian Motion parameters."
-    ),
-    finstack_quant_core::schema_artifact!(
-        GbmPathSummary,
-        "models",
-        "gbm_path_summary",
-        Output,
-        "Compact captured GBM paths for plotting and diagnostics."
     ),
     finstack_quant_core::schema_artifact!(
         HestonParams,
@@ -368,6 +372,27 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Parameters for the LMM/BGM model."
     ),
     finstack_quant_core::schema_artifact!(
+        LocalVolParams,
+        "models",
+        "local_vol_params",
+        Input,
+        "Rates and local volatility surface of the Dupire local-volatility process."
+    ),
+    finstack_quant_core::schema_artifact!(
+        LocalVolSurface,
+        "models",
+        "local_vol_surface",
+        Component,
+        "Dupire local volatility on an expiry-by-strike grid."
+    ),
+    finstack_quant_core::schema_artifact!(
+        LrmGreeks,
+        "models",
+        "lrm_greeks",
+        Output,
+        "Monte Carlo price with likelihood-ratio delta and vega from the same paths."
+    ),
+    finstack_quant_core::schema_artifact!(
         LvarBangiaScalar,
         "models",
         "lvar_bangia_scalar",
@@ -459,6 +484,20 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Serializable Expected Shortfall decomposition view."
     ),
     finstack_quant_core::schema_artifact!(
+        PathSimulationSpec,
+        "models",
+        "path_simulation_spec",
+        Input,
+        "Complete, serializable description of one path simulation."
+    ),
+    finstack_quant_core::schema_artifact!(
+        PathSummary,
+        "models",
+        "path_summary",
+        Output,
+        "Simulated paths on a shared time grid."
+    ),
+    finstack_quant_core::schema_artifact!(
         PdCycleParams,
         "models",
         "pd_cycle_params",
@@ -499,6 +538,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "position_risk_decomposition",
         Output,
         "Complete position-level risk decomposition of a portfolio."
+    ),
+    finstack_quant_core::schema_artifact!(
+        ProcessSpec,
+        "models",
+        "process_spec",
+        Input,
+        "Stochastic process to simulate, with its parameters."
     ),
     finstack_quant_core::schema_artifact!(
         RatingFactorTable,
@@ -576,6 +622,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "sabr_parameters",
         Input,
         "SABR model parameters"
+    ),
+    finstack_quant_core::schema_artifact!(
+        SchemeSpec,
+        "models",
+        "scheme_spec",
+        Component,
+        "Time-discretization scheme used to advance the process."
     ),
     finstack_quant_core::schema_artifact!(
         SchwartzSmithParams,

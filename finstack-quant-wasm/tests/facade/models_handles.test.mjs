@@ -226,6 +226,33 @@ test('LGD, EAD and PD handles expose their accessors and reject bad input', () =
   assert.throws(() => credit.allocateRecovery(100, [{ id: 'x' }]), kind('validation'));
 });
 
+// Twins of the Python properties `RecoveryClaim.total_claim` and
+// `CollateralPiece.liquidation_value`, computed by the same Rust methods.
+test('recovery-claim and collateral-piece derived values are computed in Rust', () => {
+  const claim = {
+    id: 'TL-B',
+    seniority: 'senior_secured',
+    priority: 1,
+    principal: 100,
+    accrued: 5,
+    penalties: 1,
+    collateral_value: null,
+    collateral_haircut: 0,
+  };
+  assert.equal(credit.recoveryClaimTotalClaim(claim), 106);
+  assert.equal(credit.recoveryClaimTotalClaim(JSON.stringify(claim)), 106);
+  assert.throws(() => credit.recoveryClaimTotalClaim({ id: 'x' }), kind('validation'));
+  assert.throws(() => credit.recoveryClaimTotalClaim(1), invalidType);
+
+  const piece = { collateral_type: 'real_estate', book_value: 800_000, haircut: 0.25 };
+  assert.equal(credit.collateralPieceLiquidationValue(piece), 600_000);
+  assert.throws(
+    () => credit.collateralPieceLiquidationValue({ ...piece, haircut: 1.5 }),
+    kind('validation')
+  );
+  assert.throws(() => credit.collateralPieceLiquidationValue(null), invalidType);
+});
+
 test('correlation handles expose their accessors and reject bad input', () => {
   const pair = new correlation.CorrelatedBernoulli(0.1, 0.2, 0.3);
   assert.equal(pair.p1, 0.1);
@@ -385,6 +412,37 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
   assert.equal(typeof asian.useBrownianBridge, 'boolean');
   assert.equal(asian.useParallel, false);
 
+  const lrmPricer = new monteCarlo.PathDependentPricer(20000, 7, false);
+  const gbm = [100, 100, 0.04, 0.01, 0.25, 1];
+  const greeks = lrmPricer.priceWithLrmGreeks(...gbm, true, 12);
+  assert.deepEqual(Object.keys(greeks).sort(), ['delta', 'price', 'vega']);
+  assert.equal(greeks.price.mean.amount, lrmPricer.priceAsianCall(...gbm, 12).mean.amount);
+  assert.equal(greeks.delta.num_paths, 20000);
+  const bumpDelta =
+    (lrmPricer.priceAsianCall(100.5, ...gbm.slice(1), 12).mean.amount -
+      lrmPricer.priceAsianCall(99.5, ...gbm.slice(1), 12).mean.amount) /
+    1.0;
+  assert.ok(Math.abs(greeks.delta.mean - bumpDelta) < 5 * greeks.delta.stderr);
+  assert.ok(greeks.vega.stderr > 0);
+  assert.deepEqual(JSON.parse(JSON.stringify(greeks)), greeks);
+  assert.equal(lrmPricer.priceWithLrmGreeks(...gbm, false, 12, 'EUR').price.mean.currency, 'EUR');
+  // The default step count keeps a default pricer under the path-capture cap.
+  assert.equal(
+    new monteCarlo.PathDependentPricer().priceWithLrmGreeks(...gbm, true).price.num_paths,
+    100000
+  );
+  assert.throws(
+    () => new monteCarlo.PathDependentPricer().priceWithLrmGreeks(...gbm, true, 252),
+    (e) => kind('validation')(e) && /must not exceed 4000000/.test(e.message)
+  );
+  assert.throws(() => lrmPricer.priceWithLrmGreeks(...gbm, 'call', 12), invalidType);
+  assert.throws(() => lrmPricer.priceWithLrmGreeks(...gbm, true, 1.5), invalidType);
+  assert.throws(
+    () => lrmPricer.priceWithLrmGreeks(0, ...gbm.slice(1), true, 12),
+    kind('validation')
+  );
+  assert.throws(() => asian.priceWithLrmGreeks(...gbm, true, 12), kind('validation'));
+
   const lsmc = new monteCarlo.LsmcPricer(500, 7, false, 10, 'polynomial', 3, false);
   assert.equal(lsmc.basis, 'polynomial');
   assert.equal(lsmc.basisDegree, 3);
@@ -397,9 +455,31 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
     () => lsmc.priceAmericanPut(100, 100, 0.05, 0, 0.2, 1, undefined, undefined, 'nope'),
     kind('validation')
   );
-  const paths = monteCarlo.simulateGbmPaths(100, 0.05, 0, 0.2, 1, 4, 3);
-  assert.equal(paths.paths.length, 3);
+  const spec = {
+    process: { type: 'gbm', r: 0.05, q: 0, sigma: 0.2 },
+    initial_state: [100],
+    time_grid: { type: 'uniform', expiry: 1, num_steps: 4 },
+    num_paths: 3,
+    seed: 42,
+  };
+  const paths = monteCarlo.simulatePaths(spec);
+  assert.equal(paths.num_simulated_paths, 3);
   assert.equal(paths.times.length, 5);
+  assert.deepEqual(paths.factor_names, ['spot']);
+  assert.equal(paths.values.length, 15);
+  assert.deepEqual(monteCarlo.simulatePaths(JSON.stringify(spec)), paths);
+  assert.throws(() => monteCarlo.simulatePaths(42), invalidType);
+  assert.throws(() => monteCarlo.simulatePaths({ ...spec, paths: 3 }), kind('validation'));
+  assert.throws(
+    () =>
+      monteCarlo.simulatePaths({
+        ...spec,
+        scheme: 'milstein',
+        process: { type: 'cir', kappa: 0.5, theta: 0.04, sigma: 0.1 },
+        initial_state: [0.03],
+      }),
+    kind('validation')
+  );
   assert.throws(() => monteCarlo.finiteDiffDelta(100, 100, 0.05, 0, 0.2, 1, 'call'), invalidType);
   assert.equal(
     monteCarlo.relativeStderr({ ...call, mean: { ...call.mean, amount: '0' } }),
@@ -538,4 +618,107 @@ test('LGD replay and uncorrelated factors use checked Rust construction', () => 
   for (const vols of [[0.2], [0.2, -0.1], [0.2, NaN]]) {
     assert.throws(() => correlation.LatentMultiFactor.uncorrelated(2, vols));
   }
+});
+
+test('local volatility is a plain object with free-function twins', () => {
+  const smile = [0.24, 0.22, 0.2, 0.19, 0.185];
+  const implied = (rows) => ({
+    id: 'IMPLIED',
+    expiries: [0.25, 0.5, 1.0, 2.0],
+    strikes: [80, 90, 100, 110, 120],
+    vols_row_major: rows.flat(),
+    secondary_axis: 'strike',
+    interpolation_mode: 'vol',
+    quote_type: 'black_lognormal',
+  });
+  const forwards = [100.5, 101.0, 102.0, 104.0];
+
+  // A flat implied volatility is its own local volatility, under any forwards.
+  const flat = volatility.localVolFromImpliedVol(
+    implied(Array(4).fill(Array(5).fill(0.2))),
+    forwards
+  );
+  assert.deepEqual(Object.keys(flat).sort(), ['expiries', 'local_vols', 'strikes']);
+  assert.deepEqual(flat.expiries, [0.25, 0.5, 1.0, 2.0]);
+  assert.equal(flat.local_vols.length, 20);
+  assert.ok(flat.local_vols.every((vol) => Math.abs(vol - 0.2) < 1e-12));
+  assert.ok(Math.abs(volatility.localVolValue(flat, 0.7, 93) - 0.2) < 1e-12);
+
+  const skew = implied(Array(4).fill(smile));
+  const local = volatility.localVolFromImpliedVol(skew, forwards);
+  const value = (surface, strike) => volatility.localVolValue(surface, 1.0, strike);
+  assert.ok(value(local, 90) - value(local, 110) > 0.22 - 0.19);
+  assert.equal(value(local, 100), local.local_vols[2 * 5 + 2]);
+  assert.deepEqual(volatility.localVolFromImpliedVol(JSON.stringify(skew), forwards), local);
+  assert.equal(volatility.localVolValue(JSON.stringify(local), 1.0, 100), value(local, 100));
+  const smoothed = volatility.localVolFromImpliedVolSmoothed(skew, forwards, 10.0);
+  assert.ok(value(smoothed, 80) - value(smoothed, 120) < value(local, 80) - value(local, 120));
+  assert.deepEqual(volatility.localVolFromImpliedVolSmoothed(skew, forwards, 0), local);
+
+  // Bilinear inside the grid, flat outside it.
+  const grid = { expiries: [1, 2], strikes: [100, 200], local_vols: [0.1, 0.2, 0.3, 0.4] };
+  assert.ok(Math.abs(volatility.localVolValue(grid, 1.5, 150) - 0.25) < 1e-15);
+  assert.equal(volatility.localVolValue(grid, 9, 50), 0.3);
+
+  const message = (pattern) => (e) => kind('validation')(e) && pattern.test(e.message);
+  assert.throws(
+    () => volatility.localVolFromImpliedVol(skew, [100]),
+    message(/one forward per expiry/)
+  );
+  assert.throws(
+    () => volatility.localVolFromImpliedVol(skew, [100, 100, -1, 100]),
+    message(/finite and positive/)
+  );
+  assert.throws(
+    () => volatility.localVolFromImpliedVolSmoothed(skew, forwards, -1),
+    message(/sigma_strikes/)
+  );
+  const calendar = {
+    ...implied([Array(5).fill(0.25), Array(5).fill(0.25), Array(5).fill(0.15)]),
+    expiries: [0.5, 1.0, 2.0],
+  };
+  assert.throws(
+    () => volatility.localVolFromImpliedVol(calendar, [100, 100, 100]),
+    message(/calendar arbitrage/)
+  );
+  assert.throws(
+    () => volatility.localVolFromImpliedVol({ ...skew, quote_type: 'normal' }, forwards),
+    kind('validation')
+  );
+  assert.throws(
+    () => volatility.localVolFromImpliedVol({ ...skew, extra: 1 }, forwards),
+    kind('validation')
+  );
+  assert.throws(() => volatility.localVolFromImpliedVol(42, forwards), invalidType);
+  assert.throws(() => volatility.localVolFromImpliedVol(skew, 'forwards'), invalidType);
+  assert.throws(() => volatility.localVolFromImpliedVolSmoothed(skew, forwards, '5'), invalidType);
+  assert.throws(() => volatility.localVolValue(grid, '1', 100), invalidType);
+  assert.throws(
+    () => volatility.localVolValue({ ...grid, local_vols: [0.1] }, 1, 100),
+    kind('validation')
+  );
+  assert.throws(() => volatility.localVolValue({ ...grid, extra: 1 }, 1, 100), kind('validation'));
+
+  // The same object drives the `local_vol` path process.
+  const paths = monteCarlo.simulatePaths({
+    process: { type: 'local_vol', r: 0.03, q: 0.01, surface: grid },
+    initial_state: [100],
+    time_grid: { type: 'uniform', expiry: 1.0, num_steps: 4 },
+    num_paths: 3,
+    seed: 5,
+  });
+  assert.deepEqual(paths.factor_names, ['spot']);
+  assert.ok(paths.values.every((spot) => spot > 0));
+  assert.throws(
+    () =>
+      monteCarlo.simulatePaths({
+        process: { type: 'local_vol', r: 0.03, q: 0.01, surface: grid },
+        scheme: 'milstein',
+        initial_state: [100],
+        time_grid: { type: 'uniform', expiry: 1.0, num_steps: 4 },
+        num_paths: 3,
+        seed: 5,
+      }),
+    message(/scheme 'milstein' is not available for process 'local_vol'/)
+  );
 });

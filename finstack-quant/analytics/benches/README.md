@@ -9,7 +9,7 @@ or matrix dimension).
 
 Most cases are driven through [`Performance`](../src/performance/mod.rs), the crate's
 canonical public entry point. The scaling target also directly benchmarks the
-intentionally public `correlation::nearest_correlation_matrix` repair helper and
+intentionally public `correlation::nearest_correlation` repair helper and
 `regression::constrained_least_squares`. Almost every per-metric building block remains
 `pub(crate)` and is not a benchmark surface.
 

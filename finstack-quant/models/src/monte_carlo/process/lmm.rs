@@ -39,9 +39,11 @@
 //! - Andersen & Piterbarg (2010). *Interest Rate Modeling*, Vol. 2,
 //!   Ch. 15-16, Atlantic Financial Press. `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
 
+use super::super::paths::ProcessParams;
 #[cfg(test)]
 use super::super::traits::state_keys;
 use super::super::traits::StochasticProcess;
+use super::metadata::ProcessMetadata;
 
 /// Maximum number of LMM factors supported.
 const MAX_FACTORS: usize = 3;
@@ -53,6 +55,7 @@ const MAX_FACTORS: usize = 3;
 /// initial forward rates.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct LmmParams {
     /// Number of forward rates (N).
     pub num_forwards: usize,
@@ -427,6 +430,19 @@ impl StochasticProcess for LmmProcess {
     /// silently simulates the wrong SDE.
     fn dedicated_scheme(&self) -> Option<&'static str> {
         Some("lmm_predictor_corrector")
+    }
+}
+
+impl ProcessMetadata for LmmProcess {
+    fn metadata(&self) -> ProcessParams {
+        let mut params = ProcessParams::new("LMM");
+        params.add_param("num_forwards", self.params.num_forwards as f64);
+        params.add_param("num_factors", self.params.num_factors as f64);
+
+        let factor_names: Vec<String> = (0..self.params.num_forwards)
+            .map(|i| format!("forward_{i}"))
+            .collect();
+        params.with_factors(factor_names)
     }
 }
 

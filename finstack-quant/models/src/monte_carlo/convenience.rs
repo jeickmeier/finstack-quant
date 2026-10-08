@@ -165,6 +165,27 @@ pub fn path_dependent_num_steps(num_steps: Option<usize>) -> Result<usize> {
     Ok(num_steps.unwrap_or(defaults()?.path_dependent_pricer.num_steps))
 }
 
+/// Time-grid step count of a likelihood-ratio Greeks convenience price
+/// ([`PathDependentPricer::price_gbm_asian_with_lrm_greeks`]).
+///
+/// The likelihood-ratio estimator keeps every simulated path in memory and is
+/// limited to four million path points, `num_paths x (num_steps + 1)`. Its
+/// default step count is therefore smaller than
+/// [`path_dependent_num_steps`]: with the registry default of 100,000 paths
+/// the default 32 steps capture 3.3 million points.
+///
+/// # Arguments
+///
+/// * `num_steps` - Time-grid steps between `0` and expiry, each an averaging
+///   date; `None` uses the registry default `convenience.greeks.lrm_num_steps`.
+///
+/// # Errors
+///
+/// Returns an error if the embedded registry cannot be loaded.
+pub fn lrm_num_steps(num_steps: Option<usize>) -> Result<usize> {
+    Ok(num_steps.unwrap_or(defaults()?.greeks.lrm_num_steps))
+}
+
 /// American LSMC pricer together with its default exercise grid and
 /// regression basis.
 ///
@@ -320,6 +341,16 @@ mod tests {
             defaults.european_pricer.num_steps
         );
         assert_eq!(european_num_steps(Some(7)).expect("explicit"), 7);
+
+        // A default pricer with the default LRM step count stays under the
+        // likelihood-ratio path-capture cap.
+        let lrm_steps = lrm_num_steps(None).expect("default");
+        assert_eq!(lrm_steps, defaults.greeks.lrm_num_steps);
+        assert!(
+            defaults.path_dependent_pricer.num_paths * (lrm_steps + 1)
+                <= super::super::pricer::path_dependent::MAX_LRM_CAPTURED_POINTS
+        );
+        assert_eq!(lrm_num_steps(Some(5)).expect("explicit"), 5);
 
         let asian =
             path_dependent_pricer(None, None, None, None, None, None).expect("defaults are valid");

@@ -21,9 +21,21 @@ from finstack_quant.models.monte_carlo import (
     EuropeanPricer,
     LsmcPricer,
     PathDependentPricer,
-    simulate_gbm_paths,
+    simulate_paths,
 )
 from finstack_quant.valuations.instruments import price_instrument
+
+
+def _gbm_spot_paths(num_steps: int, num_paths: int, seed: int) -> np.ndarray:
+    """Exact GBM spot paths (S0=100, r=5%, q=0, vol=20%, T=1) as a paths-by-times array."""
+    summary = simulate_paths({
+        "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.2},
+        "initial_state": [100.0],
+        "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": num_steps},
+        "num_paths": num_paths,
+        "seed": seed,
+    })
+    return np.asarray(summary.values).reshape(summary.num_simulated_paths, len(summary.times))
 
 
 def test_european_serial_parallel_and_seed_replay_are_identical() -> None:
@@ -54,8 +66,7 @@ def test_maturity_only_lsmc_counts_pairs_and_uses_pair_mean_standard_error() -> 
     pairs = 2048
     seed = 17
     spot, strike, rate, vol, expiry = 100.0, 100.0, 0.05, 0.2, 1.0
-    captured = simulate_gbm_paths(spot, rate, 0.0, vol, expiry, 1, 2 * pairs, seed=seed)
-    terminals = [row[-1] for row in captured.paths]
+    terminals = _gbm_spot_paths(1, 2 * pairs, seed)[:, -1].tolist()
     discount = math.exp(-rate * expiry)
     plain_payoffs = [discount * max(strike - terminal, 0.0) for terminal in terminals]
     reflection_product = (spot * math.exp((rate - 0.5 * vol**2) * expiry)) ** 2
@@ -121,7 +132,7 @@ def test_structured_note_redemption_profiles_through_supported_json_route() -> N
 
 def test_nested_barrier_monitoring_on_identical_paths_has_pathwise_order() -> None:
     """Quarterly, monthly, daily monitoring reuse one captured fine path set."""
-    paths = np.asarray(simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 252, 4096, seed=17).paths)
+    paths = _gbm_spot_paths(252, 4096, 17)
     terminal_payoff = math.exp(-0.05) * np.maximum(paths[:, -1] - 100.0, 0.0)
     monitored = [
         terminal_payoff * (np.max(paths[:, :: 252 // observations], axis=1) < 120.0) for observations in (4, 12, 252)
@@ -148,7 +159,7 @@ def test_asian_exact_one_fixing_and_geometric_benchmark() -> None:
     # The two payoff reducers may round their sample variance one ulp apart.
     assert asian.stderr == pytest.approx(european.stderr, abs=1e-14)
 
-    paths = np.asarray(simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 12, 4096, seed=17).paths)
+    paths = _gbm_spot_paths(12, 4096, 17)
     fixings = paths[:, 1:]  # Observations at T/12, ..., T; the initial spot is excluded.
     arithmetic = math.exp(-0.05) * np.maximum(fixings.mean(axis=1) - 100, 0)
     geometric = math.exp(-0.05) * np.maximum(np.exp(np.log(fixings).mean(axis=1)) - 100, 0)

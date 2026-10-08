@@ -2,7 +2,7 @@
 //!
 //! * `FullRepricingEngine::compute_pnl_profiles` — parallelized across factors
 //!   (previously a serial factor loop).
-//! * `ParametricDecomposer::decompose` — closed-form factor risk decomposition.
+//! * `decompose_factors` — closed-form factor risk decomposition.
 //!
 //! All are gated behind `autobenches = false`, so they only run when listed in
 //! `Cargo.toml`.
@@ -19,7 +19,7 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_models::factor::risk::ParametricDecomposer;
+use finstack_quant_models::factor::risk::decompose_factors;
 use finstack_quant_models::factor::{
     BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorId, FactorType, MarketMapping,
     RiskMeasure, SensitivityMatrix, UnmatchedPolicy,
@@ -481,7 +481,6 @@ fn bench_parametric_decomposition(c: &mut Criterion) {
             }
         }
         let covariance = diagonal_covariance(n_factors);
-        let decomposer = ParametricDecomposer;
 
         group.bench_with_input(
             BenchmarkId::new(
@@ -491,8 +490,7 @@ fn bench_parametric_decomposition(c: &mut Criterion) {
             &n_positions,
             |b, _| {
                 b.iter(|| {
-                    let decomposition = decomposer
-                        .decompose(&matrix, &covariance, &measure)
+                    let decomposition = decompose_factors(&matrix, &covariance, &measure)
                         .expect("bench: parametric decomposition should succeed");
                     std::hint::black_box(decomposition);
                 });

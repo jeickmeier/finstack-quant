@@ -9,7 +9,7 @@ use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::fixed_income::convertible::{
     ConversionEvent, ConversionPolicy, ConvertibleBond, PriceTrigger,
 };
-use finstack_quant_models::trees::tree_framework::map_date_to_step;
+use finstack_quant_core::math::map_date_to_step;
 
 /// Convertible bond valuator implementing the TZ logic
 pub(super) struct ConvertibleBondValuator {

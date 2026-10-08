@@ -71,7 +71,6 @@ class TestCoreNamespace:
         assert market_data.__all__ == expected
         for name in expected:
             assert hasattr(market_data, name)
-        assert not hasattr(market_data, "diebold_li_fit_factors")
         assert not hasattr(market_data, "check_butterfly")
 
     def test_models_credit_exports_do_not_leak_binding_suffixes(self) -> None:
@@ -179,12 +178,15 @@ class TestCashflowsNamespace:
 
     def test_cashflows_exports(self) -> None:
         """Cashflows should expose the JSON bridge functions."""
+        from finstack_quant import cashflows
         from finstack_quant.cashflows import (  # noqa: F401
-            accrued_interest,
             build_cashflow_schedule_json,
             dated_flows_json,
             validate_cashflow_schedule_json,
         )
+
+        assert not hasattr(cashflows, "accrued_interest")
+        assert "accrued_interest" not in cashflows.__all__
 
     def test_bond_conversion_belongs_to_valuations(self) -> None:
         """Bond construction should live with valuation instruments."""

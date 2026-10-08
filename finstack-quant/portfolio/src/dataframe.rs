@@ -228,11 +228,11 @@ pub fn aggregated_metrics_to_table(metrics: &PortfolioMetrics) -> Result<TableEn
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::PortfolioBuilder;
     use crate::position::{Position, PositionUnit};
     use crate::test_utils::build_test_market;
     use crate::types::Entity;
     use crate::valuation::value_portfolio;
+    use crate::Portfolio;
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
@@ -267,7 +267,7 @@ mod tests {
         )
         .expect("test should succeed");
 
-        let portfolio = PortfolioBuilder::new("TEST")
+        let portfolio = Portfolio::builder("TEST")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))
@@ -314,7 +314,7 @@ mod tests {
         )
         .expect("test should succeed");
 
-        let portfolio = PortfolioBuilder::new("TEST")
+        let portfolio = Portfolio::builder("TEST")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))

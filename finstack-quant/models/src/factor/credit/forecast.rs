@@ -312,7 +312,7 @@ impl<'a> FactorCovarianceForecast<'a> {
     /// # Errors
     ///
     /// Returns a validation error when [`Self::covariance_at`] fails.
-    pub fn factor_model_config_at(
+    pub fn factor_model_at(
         &self,
         horizon: VolHorizon,
         risk_measure: RiskMeasure,

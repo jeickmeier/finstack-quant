@@ -90,7 +90,7 @@ want it; domain-specific numerics (stochastic processes, payoffs) belong in
 | `math::special_functions` | `norm_cdf`, `norm_pdf`, `erf`, `ln_gamma`, `standard_normal_inv_cdf`, Student-t CDF/inverse. |
 | `math::linalg` | Cholesky (`cholesky_decomposition`, `cholesky_correlation`), `symmetric_eigen`, correlation-matrix construction and validation. |
 | `math::interp` | `Interpolator`, `InterpStyle`, `ExtrapolationPolicy`, `ValidationPolicy` and the strategies (`LinearStrategy`, `LogLinearStrategy`, `CubicHermiteStrategy`, `MonotoneConvexStrategy`, `PiecewiseQuadraticForwardStrategy`). |
-| `math::solver` / `math::solver_multi` | `NewtonSolver`, `BrentSolver`, `Solver` trait; `LevenbergMarquardtSolver` and `AnalyticalDerivatives` for systems. |
+| `math::solver` / `math::solver_multi` | `BrentSolver`; `LevenbergMarquardtSolver` and `AnalyticalDerivatives` for systems. |
 | `math::integration` | Gauss-Legendre (fixed, composite, adaptive), Gauss-Hermite, Gauss-Laguerre. |
 | `math::random` | `Pcg64Rng`, `RandomNumberGenerator`, `SobolRng` (up to `MAX_SOBOL_DIMENSION` = 40), `BrownianBridge`, Poisson inversion, `box_muller_transform`. |
 | `math::distributions` / `math::probability` | Binomial and chi-squared helpers, `CorrelatedBernoulli`, `correlation_bounds`. |
@@ -110,7 +110,6 @@ want it; domain-specific numerics (stochastic processes, payoffs) belong in
 | `config::{RoundingContext, ResultsMeta, NumericMode, results_meta, rounding_context_from}` | Policy stamps attached to result envelopes. |
 | `validation::{require, require_or, require_with}` | Convention-agnostic invariant checks returning `Result`. |
 | `explain::{ExplainOpts, ExplanationTrace, TraceEntry}` | Opt-in computation tracing, off and zero-cost by default. |
-| `prelude` | `Currency`, `Money`, FX traits, common date types, the main curve types, `FinstackConfig`, rate types, `Error`/`Result`. |
 
 `rating_scales` holds the neutral shared scorecard-scale registry
 (`data/rating_scales/`). Product-independent credit engines and assumptions

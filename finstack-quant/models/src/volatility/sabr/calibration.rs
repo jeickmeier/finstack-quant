@@ -608,7 +608,7 @@ impl SabrCalibrator {
     ///
     /// The objective compares Hagan-expansion vols to `market_vols` directly,
     /// and the expansion's output convention is β-dependent (see
-    /// `SabrVolType`): pass **normal (Bachelier)** quotes when calibrating
+    /// `SabrParameters::quote_convention`): pass **normal (Bachelier)** quotes when calibrating
     /// with β≈0 and **lognormal (Black)** quotes for β>0. Mixing conventions
     /// silently mis-calibrates.
     ///

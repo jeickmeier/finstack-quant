@@ -107,7 +107,7 @@ impl PreparedHullWhiteModel {
         }
         let config = HullWhiteTreeConfig::new(params.kappa, params.sigma, steps);
         let discount = ModelDiscountCurve::new(disc, as_of)?;
-        let tree = HullWhiteTree::calibrate_with_times(config, &discount, ttm, mandatory_times)?;
+        let tree = HullWhiteTree::calibrate(config, &discount, ttm, mandatory_times)?;
         Ok(Self {
             tree: Arc::new(tree),
             as_of,

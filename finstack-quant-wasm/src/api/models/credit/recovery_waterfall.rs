@@ -30,3 +30,38 @@ pub fn allocate_recovery(estate_value: JsValue, claims: JsValue) -> Result<JsVal
     let result = waterfall::allocate_recovery(estate_value, &claims).map_err(to_js_err)?;
     to_js_value(&result)
 }
+
+/// Total allowed amount of a recovery claim: principal plus accrued amounts
+/// and penalties.
+///
+/// Twin of the Rust `RecoveryClaim::total_claim` and the Python property
+/// `RecoveryClaim.total_claim`.
+/// @param claim - `RecoveryClaim` object or JSON, as passed to `allocateRecovery`.
+/// @returns `principal + accrued + penalties`, in the claim's monetary units.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const claim = {
+///   id: "TL-B",
+///   seniority: "senior_secured",
+///   priority: 1,
+///   principal: 100,
+///   accrued: 5,
+///   penalties: 1,
+///   collateral_value: null,
+///   collateral_haircut: 0,
+/// };
+/// console.log(models.credit.recoveryClaimTotalClaim(claim)); // 106
+/// ```
+///
+/// # Errors
+///
+/// Throws a `TypeError` if `claim` is neither a string nor a plain object,
+/// and a `validation` error if it is malformed.
+#[wasm_bindgen(js_name = recoveryClaimTotalClaim)]
+pub fn recovery_claim_total_claim(claim: JsValue) -> Result<f64, JsValue> {
+    let claim: RecoveryClaim = from_js_json(&claim, "claim")?;
+    Ok(claim.total_claim())
+}

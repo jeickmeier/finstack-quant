@@ -563,7 +563,7 @@ impl FactorCorrelationMatrix {
     /// - Any diagonal entry deviates from `1.0` by more than `1e-9`
     /// - The matrix is not symmetric within `1e-9`
     /// - `factor_ids` contains duplicates
-    pub fn check_structure(&self) -> finstack_quant_core::Result<()> {
+    pub(crate) fn check_structure(&self) -> finstack_quant_core::Result<()> {
         let n = self.factor_ids.len();
         let mut seen = std::collections::BTreeSet::new();
         for fid in &self.factor_ids {

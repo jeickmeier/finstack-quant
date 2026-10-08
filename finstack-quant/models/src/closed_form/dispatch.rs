@@ -35,10 +35,7 @@ use finstack_quant_core::{Error, Result};
 use super::asian::{
     arithmetic_asian_call_tw, arithmetic_asian_put_tw, geometric_asian_call, geometric_asian_put,
 };
-use super::barrier::{
-    down_in_call, down_in_put, down_out_call, down_out_put, up_in_call, up_in_put, up_out_call,
-    up_out_put,
-};
+use super::barrier::{barrier_price, BarrierParams};
 use super::lookback::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
     floating_strike_lookback_put,
@@ -46,6 +43,7 @@ use super::lookback::{
 use super::quanto::{quanto_call, quanto_put};
 use super::vanilla::checked_closed_form_value;
 use crate::types::OptionType;
+use finstack_quant_core::types::BarrierType;
 
 /// Averaging convention host bindings use when `averaging` is omitted from
 /// [`asian_option_price`]: `"arithmetic"` (Turnbull-Wakeman approximation).
@@ -55,10 +53,24 @@ pub const DEFAULT_ASIAN_AVERAGING: &str = "arithmetic";
 /// [`lookback_option_price`]: `"fixed"`.
 pub const DEFAULT_LOOKBACK_STRIKE_TYPE: &str = "fixed";
 
+/// Parse a `(direction, knock)` string pair into a [`BarrierType`].
+fn parse_barrier_type(direction: &str, knock: &str) -> Result<BarrierType> {
+    match (direction, knock) {
+        ("up", "in") => Ok(BarrierType::UpAndIn),
+        ("up", "out") => Ok(BarrierType::UpAndOut),
+        ("down", "in") => Ok(BarrierType::DownAndIn),
+        ("down", "out") => Ok(BarrierType::DownAndOut),
+        _ => Err(Error::Validation(format!(
+            "unknown barrier spec: direction='{direction}' knock='{knock}'; \
+             expected direction in {{'up','down'}} and knock in {{'in','out'}}"
+        ))),
+    }
+}
+
 /// Reiner-Rubinstein continuous-monitoring barrier call, selected by strings.
 ///
-/// Routes to [`up_in_call`], [`up_out_call`], [`down_in_call`], or
-/// [`down_out_call`] from the `(direction, knock)` pair.
+/// Parses the `(direction, knock)` pair into a [`BarrierType`] and calls
+/// [`barrier_price`] with [`OptionType::Call`].
 ///
 /// # Arguments
 ///
@@ -88,26 +100,19 @@ pub fn barrier_call(
     direction: &str,
     knock: &str,
 ) -> Result<f64> {
-    let value = match (direction, knock) {
-        ("up", "in") => up_in_call(spot, strike, barrier, expiry, rate, div_yield, vol),
-        ("up", "out") => up_out_call(spot, strike, barrier, expiry, rate, div_yield, vol),
-        ("down", "in") => down_in_call(spot, strike, barrier, expiry, rate, div_yield, vol),
-        ("down", "out") => down_out_call(spot, strike, barrier, expiry, rate, div_yield, vol),
-        _ => {
-            return Err(Error::Validation(format!(
-                "unknown barrier spec: direction='{direction}' knock='{knock}'; \
-                 expected direction in {{'up','down'}} and knock in {{'in','out'}}"
-            )));
-        }
-    };
+    let params = BarrierParams::new(spot, strike, barrier, expiry, rate, div_yield, vol);
+    let value = barrier_price(
+        &params,
+        parse_barrier_type(direction, knock)?,
+        OptionType::Call,
+    );
     checked_closed_form_value(value, "barrier price")
 }
 
 /// Reiner-Rubinstein continuous-monitoring barrier put, selected by strings.
 ///
-/// Routes to [`up_in_put`], [`up_out_put`], [`down_in_put`], or
-/// [`down_out_put`] from the `(direction, knock)` pair, mirroring
-/// [`barrier_call`].
+/// Parses the `(direction, knock)` pair into a [`BarrierType`] and calls
+/// [`barrier_price`] with [`OptionType::Put`], mirroring [`barrier_call`].
 ///
 /// # Arguments
 ///
@@ -137,18 +142,12 @@ pub fn barrier_put(
     direction: &str,
     knock: &str,
 ) -> Result<f64> {
-    let value = match (direction, knock) {
-        ("up", "in") => up_in_put(spot, strike, barrier, expiry, rate, div_yield, vol),
-        ("up", "out") => up_out_put(spot, strike, barrier, expiry, rate, div_yield, vol),
-        ("down", "in") => down_in_put(spot, strike, barrier, expiry, rate, div_yield, vol),
-        ("down", "out") => down_out_put(spot, strike, barrier, expiry, rate, div_yield, vol),
-        _ => {
-            return Err(Error::Validation(format!(
-                "unknown barrier spec: direction='{direction}' knock='{knock}'; \
-                 expected direction in {{'up','down'}} and knock in {{'in','out'}}"
-            )));
-        }
-    };
+    let params = BarrierParams::new(spot, strike, barrier, expiry, rate, div_yield, vol);
+    let value = barrier_price(
+        &params,
+        parse_barrier_type(direction, knock)?,
+        OptionType::Put,
+    );
     checked_closed_form_value(value, "barrier price")
 }
 
@@ -340,43 +339,74 @@ mod tests {
         let (s, k, b, t, r, q, sigma) = (100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20);
         assert_eq!(
             barrier_call(s, k, b, r, q, sigma, t, "down", "out").unwrap(),
-            down_out_call(s, k, b, t, r, q, sigma)
+            barrier_price(
+                &BarrierParams::new(s, k, b, t, r, q, sigma),
+                BarrierType::DownAndOut,
+                OptionType::Call
+            )
         );
         assert_eq!(
             barrier_call(s, k, b, r, q, sigma, t, "down", "in").unwrap(),
-            down_in_call(s, k, b, t, r, q, sigma)
+            barrier_price(
+                &BarrierParams::new(s, k, b, t, r, q, sigma),
+                BarrierType::DownAndIn,
+                OptionType::Call
+            )
         );
         let b_up = 120.0;
         assert_eq!(
             barrier_call(s, k, b_up, r, q, sigma, t, "up", "out").unwrap(),
-            up_out_call(s, k, b_up, t, r, q, sigma)
+            barrier_price(
+                &BarrierParams::new(s, k, b_up, t, r, q, sigma),
+                BarrierType::UpAndOut,
+                OptionType::Call
+            )
         );
         assert_eq!(
             barrier_call(s, k, b_up, r, q, sigma, t, "up", "in").unwrap(),
-            up_in_call(s, k, b_up, t, r, q, sigma)
+            barrier_price(
+                &BarrierParams::new(s, k, b_up, t, r, q, sigma),
+                BarrierType::UpAndIn,
+                OptionType::Call
+            )
         );
     }
 
     #[test]
     fn barrier_put_dispatch_matches_leaf_functions() {
-        use crate::closed_form::barrier::{down_in_put, down_out_put, up_in_put, up_out_put};
         let (s, k, b, t, r, q, sigma) = (100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20);
         assert_eq!(
             barrier_put(s, k, b, r, q, sigma, t, "down", "out").unwrap(),
-            down_out_put(s, k, b, t, r, q, sigma)
+            barrier_price(
+                &BarrierParams::new(s, k, b, t, r, q, sigma),
+                BarrierType::DownAndOut,
+                OptionType::Put
+            )
         );
         assert_eq!(
             barrier_put(s, k, b, r, q, sigma, t, "down", "in").unwrap(),
-            down_in_put(s, k, b, t, r, q, sigma)
+            barrier_price(
+                &BarrierParams::new(s, k, b, t, r, q, sigma),
+                BarrierType::DownAndIn,
+                OptionType::Put
+            )
         );
         let b_up = 120.0;
         assert_eq!(
             barrier_put(s, k, b_up, r, q, sigma, t, "up", "out").unwrap(),
-            up_out_put(s, k, b_up, t, r, q, sigma)
+            barrier_price(
+                &BarrierParams::new(s, k, b_up, t, r, q, sigma),
+                BarrierType::UpAndOut,
+                OptionType::Put
+            )
         );
         assert_eq!(
             barrier_put(s, k, b_up, r, q, sigma, t, "up", "in").unwrap(),
-            up_in_put(s, k, b_up, t, r, q, sigma)
+            barrier_price(
+                &BarrierParams::new(s, k, b_up, t, r, q, sigma),
+                BarrierType::UpAndIn,
+                OptionType::Put
+            )
         );
         assert!(barrier_put(s, k, b, r, q, sigma, t, "sideways", "out").is_err());
     }

@@ -133,7 +133,7 @@ impl PySensitivityMatrix {
     #[pyo3(text_signature = "(self, position_idx, factor_idx)")]
     fn delta(&self, position_idx: usize, factor_idx: usize) -> PyResult<f64> {
         self.inner
-            .try_delta(position_idx, factor_idx)
+            .delta(position_idx, factor_idx)
             .map_err(core_to_py)
     }
 
@@ -141,7 +141,7 @@ impl PySensitivityMatrix {
     #[pyo3(text_signature = "(self, position_idx)")]
     fn position_deltas(&self, position_idx: usize) -> PyResult<Vec<f64>> {
         self.inner
-            .try_position_deltas(position_idx)
+            .position_deltas(position_idx)
             .map(<[f64]>::to_vec)
             .map_err(core_to_py)
     }
@@ -149,7 +149,7 @@ impl PySensitivityMatrix {
     /// Sensitivity column for a single factor across all positions.
     #[pyo3(text_signature = "(self, factor_idx)")]
     fn factor_deltas(&self, factor_idx: usize) -> PyResult<Vec<f64>> {
-        self.inner.try_factor_deltas(factor_idx).map_err(core_to_py)
+        self.inner.factor_deltas(factor_idx).map_err(core_to_py)
     }
 
     /// Export as a pandas ``DataFrame`` with positions as rows and factors as columns.
@@ -157,7 +157,10 @@ impl PySensitivityMatrix {
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         for (fi, factor_id) in self.inner.factor_ids().iter().enumerate() {
-            data.set_item(factor_id.to_string(), self.inner.factor_deltas(fi))?;
+            data.set_item(
+                factor_id.to_string(),
+                self.inner.factor_deltas(fi).map_err(core_to_py)?,
+            )?;
         }
         let index = PyList::new(py, self.inner.position_ids())?;
         dict_to_dataframe(py, &data, Some(index.into_any()))
@@ -200,6 +203,12 @@ struct PyFactorPnlProfile {
     inner: finstack_quant_portfolio::sensitivity::FactorPnlProfile,
 }
 
+crate::bindings::macros::wire_methods!(
+    PyFactorPnlProfile,
+    finstack_quant_portfolio::sensitivity::FactorPnlProfile,
+    "FactorPnlProfile"
+);
+
 impl PyFactorPnlProfile {
     fn from_inner(inner: finstack_quant_portfolio::sensitivity::FactorPnlProfile) -> Self {
         Self { inner }
@@ -208,26 +217,6 @@ impl PyFactorPnlProfile {
 
 #[pymethods]
 impl PyFactorPnlProfile {
-    /// Support `pickle` via the same serde round-trip as ``to_json``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from JSON (``{base_currency, factor_id, position_ids, shifts, position_pnls}``).
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to compact JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// ISO reporting currency for every P&L amount.
     #[getter]
     fn base_currency(&self) -> String {
@@ -471,10 +460,9 @@ fn decompose_factor_risk(
     py.detach(move || {
         let covariance: finstack_quant_models::factor::FactorCovarianceMatrix =
             serde_json::from_str(&covariance_json).map_err(display_to_py)?;
-        let decomposer = finstack_quant_models::factor::risk::ParametricDecomposer;
-        let result = decomposer
-            .decompose(&matrix, &covariance, &measure)
-            .map_err(core_to_py)?;
+        let result =
+            finstack_quant_models::factor::risk::decompose_factors(&matrix, &covariance, &measure)
+                .map_err(core_to_py)?;
         Ok(PyRiskDecomposition::from_inner(result))
     })
 }

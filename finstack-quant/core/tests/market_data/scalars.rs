@@ -6,7 +6,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::dividends::{DividendKind, DividendSchedule};
+use finstack_quant_core::market_data::dividends::DividendSchedule;
 use finstack_quant_core::market_data::scalars::{
     InflationIndex, InflationLag, ScalarTimeSeries, SeriesInterpolation,
 };
@@ -59,13 +59,6 @@ fn dividend_schedule_builds_and_filters() {
         .get_events()
         .windows(2)
         .all(|pair| pair[0].date <= pair[1].date));
-    let between = schedule.events_between(jan(6), jan(15));
-    assert_eq!(between.len(), 1);
-    assert!(matches!(between[0].kind, DividendKind::Yield(_)));
-
-    let cash_events: Vec<_> = schedule.cash_events().collect();
-    assert_eq!(cash_events.len(), 1);
-    assert_eq!(cash_events[0].0, jan(5));
 }
 
 #[test]

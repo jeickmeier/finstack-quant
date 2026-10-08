@@ -31,7 +31,9 @@
 //! The Hull-White 1F model uses a time-dependent θ(t) to fit the initial
 //! yield curve; the Ornstein-Uhlenbeck (Vasicek) model uses constant θ.
 
+use super::super::paths::ProcessParams;
 use super::super::traits::{PathState, StateKey, StochasticProcess};
+use super::metadata::ProcessMetadata;
 use crate::rates::hull_white::{fd_instantaneous_forward, HullWhiteParams};
 use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
 use finstack_quant_core::Result;
@@ -386,6 +388,16 @@ impl StochasticProcess for HullWhite1FProcess {
             state.set_key(StateKey::ShortRate, x[0]);
             state.set_key(StateKey::Spot, x[0]);
         }
+    }
+}
+
+// The volatility and θ schedules are piecewise and do not fit the scalar
+// parameter map; only the mean-reversion speed is recorded.
+impl ProcessMetadata for HullWhite1FProcess {
+    fn metadata(&self) -> ProcessParams {
+        let mut params = ProcessParams::new("HullWhite1F");
+        params.add_param("kappa", self.params.kappa);
+        params.with_factors(vec!["short_rate".to_string()])
     }
 }
 

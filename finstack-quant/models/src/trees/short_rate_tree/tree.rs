@@ -40,7 +40,8 @@ pub struct ShortRateTree {
     pub(super) time_steps: Vec<f64>,
     /// Calibration quality metrics (populated after calibration).
     pub(super) calibration_quality: Option<TreeCalibrationResult>,
-    /// Trinomial Black-Karasinski lattice (set when BDT model has κ ≠ 0).
+    /// Trinomial lattice of a calibrated Black-Karasinski tree; `None` for
+    /// the binomial models.
     pub(super) bk_trinomial: Option<BkTrinomialLattice>,
 }
 
@@ -84,7 +85,8 @@ impl ShortRateTree {
     ///
     /// Returns [`Error::Validation`] if `steps == 0`, if `time_to_maturity`
     /// is not finite and positive, if the configured model rejects its
-    /// parameters (e.g. Ho-Lee with non-zero mean reversion), a discount
+    /// parameters (Ho-Lee or Black-Derman-Toy with non-zero mean reversion,
+    /// Black-Karasinski without a positive mean reversion), a discount
     /// target is non-finite or non-positive, or the calibrated lattice fails
     /// to reprice the curve within `curve_fit_tolerance_bp`.
     pub fn calibrate(
@@ -143,20 +145,26 @@ impl ShortRateTree {
         match self.config.model {
             ShortRateModel::HoLee => candidate.calibrate_ho_lee(&mut rates, discount_curve, dt)?,
             ShortRateModel::BlackDermanToy => {
-                let kappa = self.config.mean_reversion;
-                if kappa < 0.0 {
+                if self.config.mean_reversion != 0.0 {
                     return Err(Error::Validation(format!(
-                        "Black-Karasinski mean reversion must be non-negative, got {kappa}"
+                        "Black-Derman-Toy has no mean reversion, got {}; use \
+                         ShortRateModel::BlackKarasinski for a mean-reverting lognormal \
+                         short rate",
+                        self.config.mean_reversion
                     )));
                 }
-                if kappa.abs() < 1e-12 {
-                    // κ = 0: standard binomial BDT calibration.
-                    candidate.calibrate_bdt(&mut rates, discount_curve, dt)?;
-                } else {
-                    // κ ≠ 0: genuine trinomial Black-Karasinski lattice in
-                    // x = ln r .
-                    candidate.calibrate_bk_trinomial(&mut rates, discount_curve, dt, kappa)?;
+                candidate.calibrate_bdt(&mut rates, discount_curve, dt)?;
+            }
+            ShortRateModel::BlackKarasinski => {
+                let kappa = self.config.mean_reversion;
+                if kappa <= 0.0 {
+                    return Err(Error::Validation(format!(
+                        "Black-Karasinski mean reversion must be positive, got {kappa}; \
+                         use ShortRateModel::BlackDermanToy for a lognormal short rate \
+                         without mean reversion"
+                    )));
                 }
+                candidate.calibrate_bk_trinomial(&mut rates, discount_curve, dt, kappa)?;
             }
         }
 
@@ -175,8 +183,8 @@ impl ShortRateTree {
     /// | Model | Node 0 | Node N |
     /// |-------|--------|--------|
     /// | Ho-Lee | **lowest** rate | **highest** rate |
-    /// | BDT (κ = 0, binomial) | **highest** rate (`α·u^(n-1)`) | **lowest** rate (`α·u^(-(n-1))`) |
-    /// | BK (κ ≠ 0, trinomial) | **lowest** rate (j = −j_max) | **highest** rate (j = +j_max) |
+    /// | Black-Derman-Toy (binomial) | **highest** rate (`α·u^(n-1)`) | **lowest** rate (`α·u^(-(n-1))`) |
+    /// | Black-Karasinski (trinomial) | **lowest** rate (j = −j_max) | **highest** rate (j = +j_max) |
     pub fn rate_at_node(&self, step: usize, node: usize) -> Result<f64> {
         if step >= self.rates.len() || node >= self.rates[step].len() {
             return Err(Error::internal(format!(
@@ -196,24 +204,6 @@ impl ShortRateTree {
         Ok(self.time_steps[step])
     }
 
-    /// Validate a pricing request against the grid whose rates were calibrated.
-    pub(super) fn validate_pricing_horizon(&self, time_to_maturity: f64) -> Result<f64> {
-        let calibrated_horizon =
-            self.time_steps.last().copied().ok_or_else(|| {
-                Error::internal("short-rate tree must be calibrated before pricing")
-            })?;
-        let tolerance = 1e-12_f64.max(calibrated_horizon.abs() * 1e-10);
-        if !time_to_maturity.is_finite()
-            || time_to_maturity <= 0.0
-            || (time_to_maturity - calibrated_horizon).abs() > tolerance
-        {
-            return Err(Error::Validation(format!(
-                "short-rate pricing horizon {time_to_maturity} does not match the calibrated horizon {calibrated_horizon}"
-            )));
-        }
-        Ok(calibrated_horizon)
-    }
-
     pub(super) fn validate_lattice_geometry(&self) -> Result<()> {
         if self.rates.len() != self.config.steps + 1 {
             return Err(Error::internal(format!(
@@ -225,8 +215,19 @@ impl ShortRateTree {
 
         // Black-Karasinski trinomial lattice: width grows 2·step+1 until the
         // j_max cap, then stays at 2·j_max+1. Binomial lattices grow step+1.
-        let expected_width = |step: usize| match &self.bk_trinomial {
-            Some(lattice) => 2 * step.min(lattice.j_max) + 1,
+        let j_max = match self.config.model {
+            ShortRateModel::BlackKarasinski => Some(
+                self.bk_trinomial
+                    .as_ref()
+                    .ok_or_else(|| {
+                        Error::internal("Black-Karasinski tree has no calibrated trinomial lattice")
+                    })?
+                    .j_max,
+            ),
+            ShortRateModel::HoLee | ShortRateModel::BlackDermanToy => None,
+        };
+        let expected_width = |step: usize| match j_max {
+            Some(j_max) => 2 * step.min(j_max) + 1,
             None => step + 1,
         };
         for (step, rates_at_step) in self.rates.iter().enumerate() {

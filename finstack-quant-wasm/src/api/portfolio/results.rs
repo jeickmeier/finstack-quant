@@ -287,7 +287,7 @@ fn sensitivity_matrix(matrix: &JsValue) -> Result<SensitivityMatrix, JsValue> {
 
 /// Read one position-by-factor sensitivity.
 ///
-/// Twin of Python `SensitivityMatrix.delta` (Rust `SensitivityMatrix::try_delta`).
+/// Twin of Python `SensitivityMatrix.delta` (Rust `SensitivityMatrix::delta`).
 /// @param matrix - Sensitivity-matrix object or JSON `{ base_currency, position_ids, factor_ids, data }` from `computeFactorSensitivities`.
 /// @param position_idx - Zero-based row index into `position_ids`.
 /// @param factor_idx - Zero-based column index into `factor_ids`.
@@ -308,14 +308,14 @@ pub fn sensitivity_matrix_delta(
     let position_idx: usize = js_uint(&position_idx, "positionIdx")?;
     let factor_idx: usize = js_uint(&factor_idx, "factorIdx")?;
     sensitivity_matrix(&matrix)?
-        .try_delta(position_idx, factor_idx)
+        .delta(position_idx, factor_idx)
         .map_err(to_js_err)
 }
 
 /// Sensitivities of one position to every factor.
 ///
 /// Twin of Python `SensitivityMatrix.position_deltas` (Rust
-/// `SensitivityMatrix::try_position_deltas`).
+/// `SensitivityMatrix::position_deltas`).
 /// @param matrix - Sensitivity-matrix object or JSON from `computeFactorSensitivities`.
 /// @param position_idx - Zero-based row index into `position_ids`.
 /// @returns One value per factor, in `factor_ids` order.
@@ -333,7 +333,7 @@ pub fn sensitivity_matrix_position_deltas(
 ) -> Result<Vec<f64>, JsValue> {
     let position_idx: usize = js_uint(&position_idx, "positionIdx")?;
     sensitivity_matrix(&matrix)?
-        .try_position_deltas(position_idx)
+        .position_deltas(position_idx)
         .map(<[f64]>::to_vec)
         .map_err(to_js_err)
 }
@@ -341,7 +341,7 @@ pub fn sensitivity_matrix_position_deltas(
 /// Sensitivities of every position to one factor.
 ///
 /// Twin of Python `SensitivityMatrix.factor_deltas` (Rust
-/// `SensitivityMatrix::try_factor_deltas`).
+/// `SensitivityMatrix::factor_deltas`).
 /// @param matrix - Sensitivity-matrix object or JSON from `computeFactorSensitivities`.
 /// @param factor_idx - Zero-based column index into `factor_ids`.
 /// @returns One value per position, in `position_ids` order.
@@ -359,7 +359,7 @@ pub fn sensitivity_matrix_factor_deltas(
 ) -> Result<Vec<f64>, JsValue> {
     let factor_idx: usize = js_uint(&factor_idx, "factorIdx")?;
     sensitivity_matrix(&matrix)?
-        .try_factor_deltas(factor_idx)
+        .factor_deltas(factor_idx)
         .map_err(to_js_err)
 }
 

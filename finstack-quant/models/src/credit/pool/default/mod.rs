@@ -29,4 +29,4 @@ pub(crate) use intensity_process::IntensityProcessDefault;
 pub use per_name::PerNameCopulaDefault;
 pub use per_name::PoolGranularity;
 pub use spec::StochasticDefaultSpec;
-pub use traits::{MacroCreditFactors, StochasticDefault};
+pub use traits::StochasticDefault;

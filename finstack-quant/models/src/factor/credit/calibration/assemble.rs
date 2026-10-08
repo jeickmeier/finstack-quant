@@ -1,17 +1,16 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use finstack_quant_analytics::correlation::{
-    nearest_correlation_matrix, validate_correlation_matrix, NearestCorrelationOpts,
+    nearest_correlation, validate_correlation_matrix, NearestCorrelationOpts,
 };
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::BumpUnits;
+use finstack_quant_core::math::linalg::unflatten_square;
 use finstack_quant_core::types::IssuerId;
 use finstack_quant_core::Result;
 
 use super::config::{CovarianceStrategy, PanelSpace, VolModelChoice};
-use super::statistics::{
-    d_rho_d, flat_to_row_major, ledoit_wolf_cov_and_corr, sample_correlation_flat,
-};
+use super::statistics::{d_rho_d, ledoit_wolf_cov_and_corr, sample_correlation_flat};
 use super::validation::validation_err;
 use crate::factor::credit::hierarchy::{
     CreditCalibrationDiagnostics, CreditHierarchySpec, FactorCorrelationMatrix, FactorHistories,
@@ -171,12 +170,11 @@ pub(crate) fn assemble_factor_model_config(
             let rho_flat = if validate_correlation_matrix(&rho_flat, n).is_ok() {
                 rho_flat
             } else {
-                nearest_correlation_matrix(&rho_flat, n, NearestCorrelationOpts::default())
-                    .map_err(|e| {
-                        validation_err(format!("Ridge: nearest_correlation_matrix failed: {e}"))
-                    })?
+                nearest_correlation(&rho_flat, n, NearestCorrelationOpts::default()).map_err(
+                    |e| validation_err(format!("Ridge: nearest_correlation failed: {e}")),
+                )?
             };
-            let corr_data = flat_to_row_major(&rho_flat, n);
+            let corr_data = unflatten_square(&rho_flat, n);
             let corr =
                 FactorCorrelationMatrix::new(factor_id_order.to_vec(), corr_data).map_err(|e| {
                     validation_err(format!(
@@ -196,14 +194,15 @@ pub(crate) fn assemble_factor_model_config(
             let rho_repaired = if validate_correlation_matrix(&rho_flat, n).is_ok() {
                 rho_flat
             } else {
-                nearest_correlation_matrix(&rho_flat, n, NearestCorrelationOpts::default())
-                    .map_err(|e| {
+                nearest_correlation(&rho_flat, n, NearestCorrelationOpts::default()).map_err(
+                    |e| {
                         validation_err(format!(
-                            "FullSampleRepaired: nearest_correlation_matrix failed: {e}"
+                            "FullSampleRepaired: nearest_correlation failed: {e}"
                         ))
-                    })?
+                    },
+                )?
             };
-            let corr_data = flat_to_row_major(&rho_repaired, n);
+            let corr_data = unflatten_square(&rho_repaired, n);
             let corr =
                 FactorCorrelationMatrix::new(factor_id_order.to_vec(), corr_data).map_err(|e| {
                     validation_err(format!(

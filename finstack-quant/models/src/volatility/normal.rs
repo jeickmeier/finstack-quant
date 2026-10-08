@@ -22,38 +22,6 @@
 
 use crate::closed_form::volatility::{bachelier_call, bachelier_put};
 
-/// Calculate d parameter for Bachelier model
-///
-/// d = (F - K) / (σ * √T)
-///
-/// # Arguments
-///
-/// * `forward` - Forward rate or price at expiry, in the same units as
-///   `strike` and normal volatility.
-/// * `strike` - Exercise rate or price in the same units as `forward`.
-/// * `sigma` - Annualized normal volatility in absolute rate/price units,
-///   rather than a percentage of the forward.
-/// * `t` - Remaining time to expiry in years.
-///
-/// # Edge Cases
-/// - At expiration (t ≤ 0) or zero volatility: returns appropriate limit
-#[inline]
-#[must_use]
-pub fn d_bachelier(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
-    if t <= 0.0 || sigma <= 0.0 {
-        // At expiration: d → ±∞ based on intrinsic value
-        let intrinsic_sign = (forward - strike).signum();
-        if intrinsic_sign > 0.0 {
-            return f64::INFINITY;
-        } else if intrinsic_sign < 0.0 {
-            return f64::NEG_INFINITY;
-        } else {
-            return 0.0;
-        }
-    }
-    (forward - strike) / (sigma * t.sqrt())
-}
-
 /// Bachelier (Normal) model price scaled by an annuity (unchecked).
 ///
 /// The canonical checked unit-annuity price the host bindings expose is

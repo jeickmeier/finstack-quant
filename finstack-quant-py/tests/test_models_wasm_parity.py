@@ -25,7 +25,13 @@ from typing import Any
 import pytest
 
 from finstack_quant import models
-from finstack_quant.core.market_data import DiscountCurve, FxDeltaVolSurface, VolCube, VolCubeExpirySlice
+from finstack_quant.core.market_data import (
+    DiscountCurve,
+    FxDeltaVolSurface,
+    VolCube,
+    VolCubeExpirySlice,
+    VolSurface,
+)
 from finstack_quant.models import correlation, liquidity, monte_carlo, volatility
 from finstack_quant.models.credit import (
     AssetDynamics,
@@ -57,6 +63,99 @@ REL_TOL = 1e-9
 ABS_TOL = 1e-12
 
 MERTON = (100.0, 0.25, 80.0, 0.05)
+PATH_GRID = {"time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 4}, "num_paths": 3, "seed": 42}
+ROUGH_BERGOMI = {
+    "type": "rough_bergomi",
+    "r": 0.03,
+    "q": 0.01,
+    "hurst": {"h": 0.1},
+    "eta": 1.2,
+    "rho": -0.7,
+    "xi": {"interpolation": "linear", "times": [0.0, 1.0], "values": [0.04, 0.05]},
+}
+# One `PathSimulationSpec` per process family; the same objects are in
+# `models_parity.test.mjs`, and each case compares the whole `PathSummary`.
+PATH_SPECS = {
+    "gbm": {
+        "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.2},
+        "initial_state": [100.0],
+        **PATH_GRID,
+    },
+    "local_vol": {
+        "process": {
+            "type": "local_vol",
+            "r": 0.04,
+            "q": 0.01,
+            "surface": {
+                "expiries": [0.25, 1.0],
+                "strikes": [80.0, 100.0, 120.0],
+                "local_vols": [0.30, 0.22, 0.18, 0.26, 0.20, 0.17],
+            },
+        },
+        "initial_state": [100.0],
+        **PATH_GRID,
+    },
+    "heston": {
+        "process": {
+            "type": "heston",
+            "r": 0.04,
+            "q": 0.01,
+            "kappa": 2.0,
+            "theta": 0.05,
+            "sigma_v": 0.3,
+            "rho": -0.7,
+            "v0": 0.03,
+        },
+        "initial_state": [100.0, 0.03],
+        "antithetic": True,
+        **PATH_GRID,
+    },
+    "hull_white_1f": {
+        "process": {
+            "type": "hull_white_1f",
+            "kappa": 0.8,
+            "volatility": {"times": [0.0], "values": [0.01]},
+            "theta_curve": [0.05],
+            "theta_times": [0.0],
+        },
+        "initial_state": [0.02],
+        **PATH_GRID,
+    },
+    "multi_gbm": {
+        "process": {
+            "type": "multi_gbm",
+            "assets": [{"r": 0.04, "q": 0.01, "sigma": 0.25}, {"r": 0.04, "q": 0.03, "sigma": 0.15}],
+            "correlation": [1.0, 0.6, 0.6, 1.0],
+        },
+        "scheme": "milstein",
+        "initial_state": [100.0, 50.0],
+        **PATH_GRID,
+    },
+    "cir_plus_plus": {
+        "process": {
+            "type": "cir_plus_plus",
+            "params": {"kappa": 0.5, "theta": 0.04, "sigma": 0.1},
+            "shift_curve": [0.01, 0.02],
+            "shift_times": [0.0, 0.5],
+        },
+        "initial_state": [0.04],
+        "time_grid": {"type": "times", "times": [0.0, 0.25, 0.5, 1.0]},
+        "num_paths": 3,
+        "seed": 42,
+    },
+    "rough_bergomi": {
+        "process": ROUGH_BERGOMI,
+        "initial_state": [100.0],
+        "antithetic": True,
+        **PATH_GRID,
+    },
+    "rough_bergomi_cholesky": {
+        "process": ROUGH_BERGOMI,
+        "initial_state": [100.0],
+        "fbm": {"type": "cholesky"},
+        **PATH_GRID,
+    },
+}
 GBM = (100.0, 100.0, 0.05, 0.0, 0.2, 1.0)
 STATE = {
     "hazard_rate": 0.05,
@@ -109,6 +208,10 @@ STRIKES = [80.0, 90.0, 100.0, 110.0, 120.0]
 EXPIRIES = [0.5, 1.0]
 VOLS = [[0.28, 0.24, 0.20, 0.21, 0.23], [0.27, 0.235, 0.21, 0.215, 0.23]]
 SVI = (0.04, 0.4, -0.4, 0.0, 0.2)
+# Implied skew, flat in expiry by cash strike, and one forward per expiry.
+LV_EXPIRIES = [0.25, 0.5, 1.0, 2.0]
+LV_SMILE = [0.24, 0.22, 0.20, 0.19, 0.185]
+LV_FORWARDS = [100.5, 101.0, 102.0, 104.0]
 CAP_PERIODS = [(0.25, 0.5, 0.25), (0.5, 0.75, 0.25), (0.75, 1.0, 0.25)]
 
 
@@ -162,6 +265,22 @@ def _money(estimate: Any) -> list[float]:
     return [estimate.mean.amount, estimate.stderr]
 
 
+def _numeric_amounts(value: Any) -> Any:
+    """Parse every ``Money`` wire amount (a decimal string) into a float.
+
+    The two hosts link different ``exp``/``ln`` implementations, so simulated
+    amounts can differ in the last digit; as numbers they are compared with
+    the same tolerance as every other value.
+    """
+    if isinstance(value, dict):
+        if set(value) == {"amount", "currency"}:
+            return {"amount": float(value["amount"]), "currency": value["currency"]}
+        return {key: _numeric_amounts(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_numeric_amounts(item) for item in value]
+    return value
+
+
 def _cube() -> VolCube:
     return VolCube(
         "CUBE",
@@ -198,7 +317,7 @@ def _merton_cases() -> dict[str, Callable[[], Any]]:
             model().debt_spread(5.0),
             model().cds_par_spread(5.0, 0.4),
         ],
-        "merton.implied_equity": lambda: list(model().try_implied_equity(1.0)),
+        "merton.implied_equity": lambda: list(model().implied_equity(1.0)),
         "merton.kmv_default_point": lambda: MertonModel.kmv_default_point(40.0, 60.0),
         "merton.hazard_curve_sp": lambda: (
             model().to_hazard_curve("ACME", date(2025, 1, 15), [1.0, 3.0, 5.0], 0.4, "act_365f").sp(5.0)
@@ -247,10 +366,10 @@ def _merton_cases() -> dict[str, Callable[[], Any]]:
             EndogenousHazardSpec.power_law(0.10, 1.5, 2.5).hazard_after_pik_accrual(120.0, 80.0),
         ],
         "toggle.should_pik": lambda: [
-            ToggleExerciseModel.threshold("leverage", 0.7, "above").should_pik_with_uniform(_state(), 0.5),
-            ToggleExerciseModel.stochastic("leverage", -2.0, 4.0).should_pik_with_uniform(_state(), 0.5),
-            ToggleExerciseModel.stochastic("leverage", -2.0, 4.0).should_pik_with_uniform(_state(), 0.9),
-            ToggleExerciseModel.optimal(100, 0.1, 0.2, 0.03, 1.0).should_pik_with_uniform(_state(), 0.5),
+            ToggleExerciseModel.threshold("leverage", 0.7, "above").should_pik(_state(), 0.5),
+            ToggleExerciseModel.stochastic("leverage", -2.0, 4.0).should_pik(_state(), 0.5),
+            ToggleExerciseModel.stochastic("leverage", -2.0, 4.0).should_pik(_state(), 0.9),
+            ToggleExerciseModel.optimal(100, 0.1, 0.2, 0.03, 1.0).should_pik(_state(), 0.5),
         ],
         "rating_factors": lambda: [
             moodys_warf_factor("B2"),
@@ -509,6 +628,10 @@ def _monte_carlo_cases() -> dict[str, Callable[[], Any]]:
             _money(asian().price_asian_call(*GBM, 12)),
             _money(asian().price_asian_put(*GBM, 12)),
         ],
+        "monte_carlo.lrm_greeks": lambda: [
+            _numeric_amounts(json.loads(asian().price_with_lrm_greeks(*GBM, True, 12).to_json())),
+            _numeric_amounts(json.loads(asian().price_with_lrm_greeks(*GBM, False, 12, "EUR").to_json())),
+        ],
         "monte_carlo.lsmc": lambda: [
             _money(lsmc().price_american_put(*GBM)),
             _money(lsmc().price_american_call(*GBM, num_steps=10, basis="polynomial", basis_degree=2)),
@@ -519,13 +642,14 @@ def _monte_carlo_cases() -> dict[str, Callable[[], Any]]:
         ],
         "monte_carlo.finite_diff": lambda: [
             monte_carlo.finite_diff_delta(*GBM, True, **fd).mean,
-            monte_carlo.finite_diff_delta_crn(*GBM, True, **fd).mean,
             monte_carlo.finite_diff_gamma(*GBM, False, **fd).mean,
-            monte_carlo.finite_diff_gamma_crn(*GBM, False, **fd).mean,
         ],
-        "monte_carlo.simulate_gbm_paths": lambda: (
-            monte_carlo.simulate_gbm_paths(100.0, 0.05, 0.0, 0.2, 1.0, 4, 3, 42).paths
-        ),
+        **{
+            f"monte_carlo.simulate_paths.{name}": (
+                lambda spec=spec: json.loads(monte_carlo.simulate_paths(spec).to_json())
+            )
+            for name, spec in PATH_SPECS.items()
+        },
         "monte_carlo.heston_satisfies_feller": lambda: [
             monte_carlo.heston_satisfies_feller(2.0, 0.04, 0.3),
             monte_carlo.heston_satisfies_feller(0.5, 0.04, 0.5),
@@ -574,8 +698,8 @@ def _rates_cases() -> dict[str, Callable[[], Any]]:
             model().phi,
             list(model().mu),
             model().factors.r_squared_avg,
-            dtsm.diebold_li_fit_factors(TENORS, YIELDS).r_squared_avg,
-            list(dtsm.diebold_li_forecast(TENORS, YIELDS, 2).yields),
+            dtsm.DieboldLi().extract_factors(_panel()).factors.r_squared_avg,
+            list(model().forecast(2).yields),
         ],
         "dtsm.yield_pca": lambda: [
             list(pca().variance_explained),
@@ -600,7 +724,15 @@ def _volatility_cases() -> dict[str, Callable[[], Any]]:
     fx = lambda: FxDeltaVolSurface("EURUSD", [0.5, 1.0], [0.10, 0.11], [0.01, 0.012], [0.002, 0.003])  # noqa: E731
     greeks = lambda: models.bs_greeks(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)  # noqa: E731
     smile = lambda: volatility.SabrSmile(volatility.SabrParameters(0.2, 1.0, 0.3, -0.2), 100.0, 1.5)  # noqa: E731
+    implied = lambda: VolSurface("SKEW", LV_EXPIRIES, STRIKES, [LV_SMILE] * 4)  # noqa: E731
+    local_vol = lambda: volatility.LocalVolSurface.from_implied_vol(implied(), LV_FORWARDS)  # noqa: E731
     return {
+        "volatility.local_vol": lambda: [
+            json.loads(local_vol().to_json()),
+            local_vol().value(0.75, 95.0),
+            local_vol().value(5.0, 60.0),
+            json.loads(volatility.LocalVolSurface.from_implied_vol_smoothed(implied(), LV_FORWARDS, 10.0).to_json()),
+        ],
         "volatility.svi": lambda: [
             svi().total_variance(0.1),
             svi().durrleman_g(0.1),

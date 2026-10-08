@@ -21,8 +21,8 @@ use finstack_quant_core::{HashMap, Result};
 use finstack_quant_models::correlation::{CopulaSpec, LatentFactorSpec, RecoverySpec};
 use finstack_quant_models::credit::pool::prepayment::PrepaymentState;
 use finstack_quant_models::credit::pool::{
-    MacroCreditFactors, PerNameCopulaDefault, StochasticDefault, StochasticDefaultSpec,
-    StochasticPrepaySpec, StochasticPrepayment,
+    PerNameCopulaDefault, StochasticDefault, StochasticDefaultSpec, StochasticPrepaySpec,
+    StochasticPrepayment,
 };
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::RandomStream;
@@ -991,9 +991,7 @@ impl StochasticPricer {
 
     fn conditional_mdr(&self, prepared: &PreparedRun, seasoning: u32, factors: &[f64]) -> f64 {
         if let Some(model) = prepared.default_model.as_deref() {
-            return model
-                .conditional_mdr(seasoning, factors, &MacroCreditFactors::default())
-                .clamp(0.0, 0.50);
+            return model.conditional_mdr(seasoning, factors).clamp(0.0, 0.50);
         }
         match &self.config.tree_config.default_spec {
             StochasticDefaultSpec::Deterministic(spec) => {

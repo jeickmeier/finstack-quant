@@ -289,7 +289,7 @@ fn test_sabr_chi_function_stability() {
     // Test small z values
     let small_z_values = vec![1e-8, 1e-6, 1e-4];
     for z in small_z_values {
-        let chi = model.calculate_chi_robust(z);
+        let chi = model.parameters().calculate_chi_robust(z);
         assert!(chi.is_ok());
         assert!(chi.expect("Chi should be Some").is_finite());
     }
@@ -298,14 +298,14 @@ fn test_sabr_chi_function_stability() {
     let params_rho_one =
         SabrParameters::new(0.2, 0.5, 0.3, 0.999).expect("SABR parameters should be valid in test");
     let model_rho_one = SabrModel::new(params_rho_one);
-    let chi_rho_one = model_rho_one.calculate_chi_robust(0.1);
+    let chi_rho_one = model_rho_one.parameters().calculate_chi_robust(0.1);
     assert!(chi_rho_one.is_ok());
 
     // Test rho ≈ -1 case
     let params_rho_minus_one = SabrParameters::new(0.2, 0.5, 0.3, -0.999)
         .expect("SABR parameters should be valid in test");
     let model_rho_minus_one = SabrModel::new(params_rho_minus_one);
-    let chi_rho_minus_one = model_rho_minus_one.calculate_chi_robust(0.1);
+    let chi_rho_minus_one = model_rho_minus_one.parameters().calculate_chi_robust(0.1);
     assert!(chi_rho_minus_one.is_ok());
 }
 
@@ -318,7 +318,10 @@ fn test_sabr_chi_rho_one_uses_exact_log_limit() {
     let model = SabrModel::new(params);
 
     for &z in &[0.05_f64, 0.3, 0.7, 0.95] {
-        let chi = model.calculate_chi_robust(z).expect("chi at rho=1, z<1");
+        let chi = model
+            .parameters()
+            .calculate_chi_robust(z)
+            .expect("chi at rho=1, z<1");
         let exact = -(1.0 - z).ln();
         assert!(
             (chi - exact).abs() < 1e-12,
@@ -338,7 +341,10 @@ fn test_sabr_chi_rho_one_uses_exact_log_limit() {
     let near =
         SabrModel::new(SabrParameters::new(0.2, 0.5, 0.3, 1.0 - 1e-9).expect("valid params"));
     let z = 0.4_f64;
-    let chi_near = near.calculate_chi_robust(z).expect("chi near rho=1");
+    let chi_near = near
+        .parameters()
+        .calculate_chi_robust(z)
+        .expect("chi near rho=1");
     let chi_limit = -(1.0 - z).ln();
     assert!(
         (chi_near - chi_limit).abs() < 1e-4,
@@ -346,8 +352,8 @@ fn test_sabr_chi_rho_one_uses_exact_log_limit() {
     );
 
     // z ≥ 1 is outside the Hagan expansion's domain at rho=1.
-    assert!(model.calculate_chi_robust(1.0).is_err());
-    assert!(model.calculate_chi_robust(1.5).is_err());
+    assert!(model.parameters().calculate_chi_robust(1.0).is_err());
+    assert!(model.parameters().calculate_chi_robust(1.5).is_err());
 }
 
 /// The `z/χ(z)` correction (`factor2`) must use the well-defined `z→0` limit
@@ -367,9 +373,11 @@ fn test_sabr_z_over_chi_uses_series_not_fabricated_one() {
     let z = 1e-6_f64;
     // χ(z) for this z (exact formula) — well above the 1e-14 underflow guard.
     let chi = model
+        .parameters()
         .calculate_chi_robust(z)
         .expect("χ(z) should compute for small z");
     let ratio = model
+        .parameters()
         .z_over_chi(z, chi)
         .expect("z/χ(z) should compute for small z");
 
@@ -387,7 +395,7 @@ fn test_sabr_z_over_chi_uses_series_not_fabricated_one() {
 
     // Genuinely-pathological case: χ underflowed while z is not small ⇒ error,
     // not a fabricated 1.0.
-    let pathological = model.z_over_chi(0.5, 1e-20);
+    let pathological = model.parameters().z_over_chi(0.5, 1e-20);
     assert!(
         pathological.is_err(),
         "z/χ(z) must error when χ underflows for a non-small z, got {pathological:?}"
@@ -396,9 +404,11 @@ fn test_sabr_z_over_chi_uses_series_not_fabricated_one() {
     // Exact-division branch for a normal (non-small) z still works.
     let z_big = 0.3_f64;
     let chi_big = model
+        .parameters()
         .calculate_chi_robust(z_big)
         .expect("χ should compute for moderate z");
     let ratio_big = model
+        .parameters()
         .z_over_chi(z_big, chi_big)
         .expect("z/χ(z) should compute for moderate z");
     assert!(
@@ -1325,6 +1335,7 @@ fn test_chi_series_matches_exact_near_crossover() {
             let disc = (1.0 - 2.0 * rho * z + z * z).sqrt();
             let exact = ((disc + z - rho) / (1.0 - rho)).ln();
             let robust = model
+                .parameters()
                 .calculate_chi_robust(z)
                 .expect("chi should compute for small z");
             // Tolerance: series truncation is O(z⁵); the dominant term is the
@@ -1336,6 +1347,7 @@ fn test_chi_series_matches_exact_near_crossover() {
 
             // z/χ(z) Taylor ratio must be consistent with the same expansion.
             let ratio = model
+                .parameters()
                 .z_over_chi(z, robust)
                 .expect("z/chi should compute for small z");
             assert!(
@@ -1357,15 +1369,16 @@ fn chi_rho_minus_one_rejects_z_at_or_below_minus_one() {
         SabrParameters::new(0.2, 0.5, 0.3, -1.0).expect("rho=-1 boundary should be accepted"),
     );
     assert!(
-        model.calculate_chi_robust(-1.5).is_err(),
+        model.parameters().calculate_chi_robust(-1.5).is_err(),
         "z < -1 at rho=-1 must be a domain error"
     );
     assert!(
-        model.calculate_chi_robust(-1.0).is_err(),
+        model.parameters().calculate_chi_robust(-1.0).is_err(),
         "z = -1 at rho=-1 must be a domain error"
     );
     // Inside the domain the stable form equals ln(1+z) exactly.
     let chi = model
+        .parameters()
         .calculate_chi_robust(0.5)
         .expect("z > -1 should compute");
     assert!(
@@ -1525,4 +1538,160 @@ fn arbitrage_validation_result_serializes_its_verdict() {
         }],
     );
     assert!(!dirty.arbitrage_free);
+}
+
+/// Bit-level pin of `SabrModel::implied_volatility` across the β = 0,
+/// general-β and β = 1 branches, with and without a displacement, at the
+/// money and in both wings. `u64::MAX` marks a rejected input.
+#[test]
+fn sabr_model_implied_volatility_is_bit_stable() {
+    const EXPECTED: &[u64] = &[
+        0x3f9ef474538ef34c,
+        0x3f9ef4745295ab29,
+        0x3fa07cbc4874dd15,
+        0x3f9fa2966710b12a,
+        0x3f9e3f40a846a0cd,
+        0x3fa28363451c8743,
+        0x3fa14bbcde7221cb,
+        0x3fa1b5810624dd2f,
+        0x3fa1b58105964096,
+        0x3fa2dd48c0d7b9da,
+        0x3fa2191fb63a41c5,
+        0x3fa14dd715e52cbc,
+        0x3fa52eb7559d0d84,
+        0x3fa3ca21d94911e8,
+        0x3f9fa8db8bac710c,
+        0x3f9fa8db8aad7c1c,
+        0x3f9f2d9f39f5edaf,
+        0x3f9ee7adf2c1d377,
+        0x3fa049b03d87daec,
+        0x3fa4e58befda191e,
+        0x3f9ffb8e2cf3cb3f,
+        0x3f9ef474538ef34c,
+        0x3f9ef4745295ab29,
+        0x3fa07cbc4874dd15,
+        0x3f9fa2966710b12a,
+        0x3f9e3f40a846a0cd,
+        0x3fa28363451c8743,
+        0x3fa14bbcde7221cb,
+        0x3fa1b5810624dd2f,
+        0x3fa1b58105964096,
+        0x3fa2dd48c0d7b9da,
+        0x3fa2191fb63a41c5,
+        0x3fa14dd715e52cbc,
+        0x3fa52eb7559d0d84,
+        0x3fa3ca21d94911e8,
+        0x3f9fa8db8bac710c,
+        0x3f9fa8db8aad7c1c,
+        0x3f9f2d9f39f5edaf,
+        0x3f9ee7adf2c1d377,
+        0x3fa049b03d87daec,
+        0x3fa4e58befda191e,
+        0x3f9ffb8e2cf3cb3f,
+        0x3fc650f50885b3e8,
+        0x3fc650f5015a1cba,
+        0x3fde35370ac5d0a5,
+        0x3fcdd3cf75678c07,
+        0x3fc7d520931847f4,
+        0x3fd058cc71882cfd,
+        0xffffffffffffffff,
+        0x3fc9170bab9a4da0,
+        0x3fc9170ba3981e8e,
+        0x3fe0d9b670ff7dfc,
+        0x3fd0bda93f541893,
+        0x3fcadc64a2feb233,
+        0x3fd279d16bdf7654,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0x3fc14a2b6d0e1bc7,
+        0x3fc14a2b692c6a0f,
+        0x3fcea03b3d274220,
+        0x3fc4ea7eaf63916b,
+        0x3fc240af0e45a38b,
+        0x3fca430fb92a5aa5,
+        0x3fd8bc41f7319420,
+        0x3fc381e91d27c744,
+        0x3fc381e918cbe25e,
+        0x3fd13caeae9b6341,
+        0x3fc794fd66deda15,
+        0x3fc49f7bfd0f9005,
+        0x3fcdbb57f2b0641b,
+        0x3fdbbec462e00d37,
+        0x3fd0115c835eeda0,
+        0x3fd0115c7ac52aec,
+        0x3fcd7679647a6279,
+        0x3fd061e8ed3d3059,
+        0x3fd363c272b4a324,
+        0x3fd61f1d133fe7c2,
+        0x3fd427605c287040,
+        0x3f9ef122fad6cb52,
+        0x3f9ef122da64e2b7,
+        0x3fcb912fe765f4d4,
+        0x3fb4443ddee87128,
+        0x3fb85ea8e306cc49,
+        0x3fc6794b1749b3fb,
+        0xffffffffffffffff,
+        0x3fa194538ef34d6a,
+        0x3fa194537c845eff,
+        0x3fcf52f62fa05d7e,
+        0x3fb7074f8da70dbf,
+        0x3fbbb0e2054f0b30,
+        0x3fc9895e8be5278f,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0x3f9ef122fad6cb52,
+        0x3f9ef122e75f3f71,
+        0x3fbc588985d8f516,
+        0x3fad4afff239ef6c,
+        0x3fb2c98c6e88801e,
+        0x3fc24f1558344e2e,
+        0x3fc97ac60160176b,
+        0x3fa194538ef34d6a,
+        0x3fa1945383e3f162,
+        0x3fc01abd68d4f315,
+        0x3fb0a47e3148f569,
+        0x3fb5590219b320ca,
+        0x3fc4cdda64b35c7e,
+        0x3fccf3b76d092d19,
+        0x3f9f9b9628cbd125,
+        0x3f9f9b95e6828d12,
+        0x3fb4431ae1696fee,
+        0x3fbfd215adacd504,
+        0x3fc7a6ed12bc0570,
+        0x3fcf7d4b02175779,
+        0x3fb4b3e258d0a4d5,
+    ];
+    let mut actual = Vec::new();
+    for beta in [0.0, 0.5, 1.0] {
+        for shift in [None, Some(0.02)] {
+            let params = match shift {
+                Some(shift) => SabrParameters::new_with_shift(0.03, beta, 0.45, -0.25, shift),
+                None => SabrParameters::new(0.03, beta, 0.45, -0.25),
+            }
+            .expect("valid parameters");
+            let model = SabrModel::new(params);
+            for (forward, expiry) in [(0.03, 0.5), (0.03, 10.0), (-0.005, 2.0)] {
+                for strike in [forward, forward + 1e-9, 0.005, 0.02, 0.06, 0.15, -0.01] {
+                    actual.push(
+                        model
+                            .implied_volatility(forward, strike, expiry)
+                            .map_or(u64::MAX, f64::to_bits),
+                    );
+                }
+            }
+        }
+    }
+    assert_eq!(actual, EXPECTED, "{actual:#x?}");
 }

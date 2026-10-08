@@ -58,10 +58,10 @@ fn scaling_mapping_table(c: &mut Criterion) {
         };
         group.throughput(Throughput::Elements(n as u64));
         group.bench_with_input(BenchmarkId::new("hit_last", n), &n, |b, _| {
-            b.iter(|| black_box(matcher.match_factor_with_betas(&last_dep, &attrs)))
+            b.iter(|| black_box(matcher.match_factor(&last_dep, &attrs)))
         });
         group.bench_with_input(BenchmarkId::new("miss", n), &n, |b, _| {
-            b.iter(|| black_box(matcher.match_factor_with_betas(&miss_dep, &attrs)))
+            b.iter(|| black_box(matcher.match_factor(&miss_dep, &attrs)))
         });
     }
     group.finish();
@@ -76,7 +76,7 @@ fn scaling_credit_matcher(c: &mut Criterion) {
         let attrs = known_issuer_attrs(n - 1);
         group.throughput(Throughput::Elements(n as u64));
         group.bench_with_input(BenchmarkId::new("known_last", n), &n, |b, _| {
-            b.iter(|| black_box(matcher.match_factor_with_betas(&dep, &attrs).unwrap()))
+            b.iter(|| black_box(matcher.match_factor(&dep, &attrs).unwrap()))
         });
         group.bench_with_input(BenchmarkId::new("enumerate", n), &n, |b, _| {
             b.iter(|| black_box(config.enumerate_factor_ids()))
@@ -189,7 +189,9 @@ fn scaling_sensitivity_matrix(c: &mut Criterion) {
             &(n_pos, n_fac),
             |b, &(_, n_fac)| {
                 b.iter(|| {
-                    let cols: Vec<Vec<f64>> = (0..n_fac).map(|f| matrix.factor_deltas(f)).collect();
+                    let cols: Vec<Vec<f64>> = (0..n_fac)
+                        .map(|f| matrix.factor_deltas(f).unwrap())
+                        .collect();
                     black_box(cols);
                 })
             },

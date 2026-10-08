@@ -9,10 +9,11 @@
 //! (`LvarBangiaScalar`, `ImpactEstimate`, `ExecutionTrajectory`) with JSON,
 //! pickle and pandas exits.
 
+use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, labeled_values_to_series, serde_object_to_single_row_dataframe_with_schema,
 };
-use crate::errors::{core_to_py, serde_json_to_py, value_error};
+use crate::errors::{core_to_py, value_error};
 use finstack_quant_models::liquidity::{
     self, AlmgrenChrissModel, ExecutionTrajectory, ImpactEstimate, KyleLambdaModel,
     LiquidityProfile, LvarBangiaScalar, SpreadVolatilityKind, TradeParams,
@@ -212,32 +213,12 @@ impl PyLiquidityProfile {
         self.inner.relative_spread_volatility()
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "LiquidityProfile serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed or fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid LiquidityProfile JSON"))
-    }
-
-    /// Support ``pickle`` (and therefore ``multiprocessing``, ``joblib``).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("LiquidityProfile", &self.inner)
     }
 }
+
+wire_methods!(PyLiquidityProfile, LiquidityProfile, "LiquidityProfile");
 
 /// Inputs to a market-impact calculation.
 ///
@@ -266,12 +247,6 @@ impl PyLiquidityProfile {
 #[derive(Clone, Debug)]
 pub struct PyTradeParams {
     pub(crate) inner: TradeParams,
-}
-
-impl PyTradeParams {
-    pub(crate) fn from_inner(inner: TradeParams) -> Self {
-        Self { inner }
-    }
 }
 
 #[pymethods]
@@ -343,32 +318,12 @@ impl PyTradeParams {
         self.inner.effective_reference_price()
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "TradeParams serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid TradeParams JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("TradeParams", &self.inner)
     }
 }
+
+wire_methods!(PyTradeParams, TradeParams, "TradeParams");
 
 const IMPACT_ESTIMATE_COLUMNS: [&str; 5] = [
     "permanent_impact",
@@ -459,32 +414,12 @@ impl PyImpactEstimate {
         serde_object_to_single_row_dataframe_with_schema(py, &self.inner, &IMPACT_ESTIMATE_COLUMNS)
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "ImpactEstimate serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid ImpactEstimate JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ImpactEstimate", &self.inner)
     }
 }
+
+wire_methods!(PyImpactEstimate, ImpactEstimate, "ImpactEstimate");
 
 /// Optimal execution schedule for a trade.
 ///
@@ -558,32 +493,16 @@ impl PyExecutionTrajectory {
         dict_to_dataframe(py, &data, None)
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "ExecutionTrajectory serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid ExecutionTrajectory JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ExecutionTrajectory", &self.inner)
     }
 }
+
+wire_methods!(
+    PyExecutionTrajectory,
+    ExecutionTrajectory,
+    "ExecutionTrajectory"
+);
 
 const LVAR_COLUMNS: [&str; 4] = ["var", "spread_cost", "lvar", "lvar_ratio"];
 
@@ -663,32 +582,12 @@ impl PyLvarBangiaScalar {
         serde_object_to_single_row_dataframe_with_schema(py, &self.inner, &LVAR_COLUMNS)
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "LvarBangiaScalar serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid LvarBangiaScalar JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("LvarBangiaScalar", &self.inner)
     }
 }
+
+wire_methods!(PyLvarBangiaScalar, LvarBangiaScalar, "LvarBangiaScalar");
 
 /// Almgren-Chriss (2000) market-impact model.
 ///
@@ -809,33 +708,16 @@ impl PyAlmgrenChrissModel {
             .map_err(core_to_py)
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "AlmgrenChrissModel serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed or the impact
-    /// parameters violate the constructor's finiteness and range requirements.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid AlmgrenChrissModel JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("AlmgrenChrissModel", &self.inner)
     }
 }
+
+wire_methods!(
+    PyAlmgrenChrissModel,
+    AlmgrenChrissModel,
+    "AlmgrenChrissModel"
+);
 
 /// Kyle (1985) linear price-impact model ``dP = lambda * signed_volume``.
 ///
@@ -932,33 +814,12 @@ impl PyKyleLambdaModel {
             .map_err(core_to_py)
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "KyleLambdaModel serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed or ``lambda`` is
-    /// negative or non-finite.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid KyleLambdaModel JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!("KyleLambdaModel(lambda_={:?})", self.inner.lambda())
     }
 }
+
+wire_methods!(PyKyleLambdaModel, KyleLambdaModel, "KyleLambdaModel");
 
 /// Estimate the effective bid-ask spread via Roll's (1984) serial covariance
 /// estimator.
@@ -1130,7 +991,7 @@ fn lvar_bangia(
     confidence: f64,
     position_value: f64,
 ) -> PyResult<PyLvarBangiaScalar> {
-    liquidity::lvar_bangia_scalar(var, spread_mean, spread_vol, confidence, position_value)
+    liquidity::lvar_bangia(var, spread_mean, spread_vol, confidence, position_value)
         .map(PyLvarBangiaScalar::from_inner)
         .map_err(core_to_py)
 }
@@ -1199,7 +1060,7 @@ fn almgren_chriss_impact(
     temporary_impact_coef: f64,
     reference_price: Option<f64>,
 ) -> PyResult<PyImpactEstimate> {
-    liquidity::almgren_chriss_uniform_impact(
+    liquidity::almgren_chriss_impact(
         position_size,
         avg_daily_volume,
         volatility,

@@ -80,7 +80,7 @@ pub trait CharacteristicFunction: Send + Sync {
     ///
     /// Used by the COS method for automatic truncation range selection.
     /// Implementations should provide closed-form cumulants when available
-    /// for best accuracy. Use [`cumulants_from_cf`] for numerical estimation.
+    /// for best accuracy.
     fn cumulants(&self, t: f64) -> Cumulants;
 }
 
@@ -99,7 +99,8 @@ pub trait CharacteristicFunction: Send + Sync {
 ///   frequencies and the requested maturity.
 /// * `t` - Time to maturity in years supplied to every characteristic-function
 ///   evaluation.
-pub fn cumulants_from_cf(cf: &dyn CharacteristicFunction, t: f64) -> Cumulants {
+#[cfg(test)]
+pub(crate) fn cumulants_from_cf(cf: &dyn CharacteristicFunction, t: f64) -> Cumulants {
     let ln_phi = |u: f64| cf.cf(Complex64::new(u, 0.0), t).ln();
     let origin = ln_phi(0.0);
     // Estimate location/scale only to keep the differencing interval local
@@ -136,45 +137,6 @@ pub fn cumulants_from_cf(cf: &dyn CharacteristicFunction, t: f64) -> Cumulants {
         c2: estimate(2),
         c3: estimate(3),
         c4: estimate(4),
-    }
-}
-
-/// Wrapper that converts a risk-neutral CF into a log-forward CF.
-///
-/// Given phi(u, t) = E[exp(iu * ln(S_T/S_0))], produces
-/// psi(u, t) = E[exp(iu * ln(S_T/F))] = phi(u, t) * exp(-iu * (r-q) * t).
-///
-/// This is the standard input for COS and Lewis methods which work
-/// in the log-forward-moneyness domain.
-pub struct LogForwardCf<'a> {
-    inner: &'a dyn CharacteristicFunction,
-    r: f64,
-    q: f64,
-}
-
-impl<'a> LogForwardCf<'a> {
-    /// Create a new log-forward CF wrapper.
-    ///
-    /// # Arguments
-    ///
-    /// * `cf` - The underlying risk-neutral characteristic function
-    /// * `r` - Risk-free rate
-    /// * `q` - Dividend yield
-    pub fn new(cf: &'a dyn CharacteristicFunction, r: f64, q: f64) -> Self {
-        Self { inner: cf, r, q }
-    }
-}
-
-impl CharacteristicFunction for LogForwardCf<'_> {
-    fn cf(&self, u: Complex64, t: f64) -> Complex64 {
-        let drift_adjust = Complex64::new(0.0, -(self.r - self.q) * t) * u;
-        self.inner.cf(u, t) * drift_adjust.exp()
-    }
-
-    fn cumulants(&self, t: f64) -> Cumulants {
-        let mut c = self.inner.cumulants(t);
-        c.c1 -= (self.r - self.q) * t;
-        c
     }
 }
 
@@ -394,26 +356,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn log_forward_cf_shifts_mean() {
-        let bs = BlackScholesCf {
-            r: 0.05,
-            q: 0.02,
-            sigma: 0.2,
-        };
-        let lf = LogForwardCf::new(&bs, 0.05, 0.02);
-        let c_orig = bs.cumulants(1.0);
-        let c_fwd = lf.cumulants(1.0);
-        assert!(
-            (c_fwd.c1 - (c_orig.c1 - (0.05 - 0.02))).abs() < 1e-12,
-            "Forward CF should shift c1 by -(r-q)*t"
-        );
-        assert!(
-            (c_fwd.c2 - c_orig.c2).abs() < 1e-12,
-            "Variance should be unchanged"
-        );
     }
 
     #[test]

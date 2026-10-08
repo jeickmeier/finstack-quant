@@ -1,81 +1,83 @@
-//! Process helpers and canonical Monte Carlo convenience functions.
+//! Path simulation, process helpers and canonical Monte Carlo convenience functions.
 
-use super::results::{PyGbmPathSummary, PyMoneyEstimate};
+use super::results::{PyMoneyEstimate, PyPathSummary};
 use crate::bindings::core::currency::extract_currency;
-use crate::errors::core_to_py;
+use crate::bindings::module_utils::py_to_json_value;
+use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::currency::Currency;
+use finstack_quant_models::monte_carlo::simulate::PathSimulationSpec;
 use pyo3::prelude::*;
 
-/// Simulate compact GBM spot paths with Rust's exact GBM transitions.
+/// Simulate paths of any built-in process on a shared time grid.
 ///
-/// The compact output and shared time grids must satisfy
-/// ``(num_paths + 3) * (num_steps + 1) <= 64_000_000`` scalar values,
-/// including time zero in every path.
+/// Binds Rust ``monte_carlo::simulate::simulate_paths``: ``spec`` selects the
+/// process, the discretization scheme, the time grid and the random streams,
+/// and Rust validates every field. The GIL is released while paths are
+/// simulated.
 ///
 /// Parameters
 /// ----------
-/// spot : float
-///     Positive initial underlying price.
-/// rate : float
-///     Continuously compounded annual risk-free rate (decimal).
-/// div_yield : float
-///     Continuously compounded annual dividend or carry yield (decimal).
-/// vol : float
-///     Annualized GBM volatility (decimal); must be strictly positive.
-/// expiry : float
-///     Positive simulation horizon in years.
-/// num_steps : int
-///     Positive number of equally spaced steps over the horizon, subject to
-///     the aggregate storage limit above.
-/// num_paths : int
-///     Number of captured paths in ``[1, 100_000]``, subject to the aggregate
-///     storage limit above.
-/// seed : int, optional
-///     Deterministic Philox seed. ``None`` uses the Rust ``GbmPathConfig``
-///     default seed (``42``), so two calls without a seed are identical.
+/// spec : dict or str
+///     ``PathSimulationSpec`` as a dict or its JSON text, with keys:
+///
+///     - ``process`` : dict tagged by ``"type"`` — ``"gbm"``,
+///       ``"gbm_with_dividends"``, ``"multi_gbm"``, ``"brownian"``,
+///       ``"multi_brownian"``, ``"multi_ou"``, ``"hull_white_1f"``, ``"cir"``,
+///       ``"cir_plus_plus"``, ``"heston"``, ``"schwartz_smith"``,
+///       ``"local_vol"``, ``"lmm"``, ``"rough_bergomi"``, ``"rough_heston"`` or
+///       ``"cheyette_rough"`` — plus
+///       that process's parameters. Rates, yields and volatilities are
+///       annualized decimals.
+///     - ``scheme`` : ``"default"`` (the process's canonical scheme; used when
+///       omitted), ``"euler"``, ``"log_euler"`` or ``"milstein"``.
+///     - ``initial_state`` : list of float, the state at time zero in the
+///       process's state layout (``[spot]`` for GBM, ``[spot, variance]`` for
+///       Heston, ``[short_rate]`` for the short-rate models).
+///     - ``time_grid`` : ``{"type": "uniform", "expiry": years, "num_steps": n}``
+///       or ``{"type": "times", "times": [0.0, ...]}`` in year fractions.
+///     - ``num_paths`` : int in ``[1, 100_000]``, the number of independent
+///       random streams.
+///     - ``seed`` : int, root Philox seed; the same spec reproduces the same
+///       paths bit for bit.
+///     - ``antithetic`` : bool, default ``False``; store an antithetic partner
+///       after each stream's path.
+///     - ``fbm`` : dict, optional; fractional-noise generator for
+///       ``"rough_bergomi"`` and ``"cheyette_rough"``: ``{"type": "volterra"}``
+///       (used when omitted), ``{"type": "cholesky"}`` or
+///       ``{"type": "windowed_conditional", "near_field_size": n}``.
 ///
 /// Returns
 /// -------
-/// GbmPathSummary
-///     Shared time grid and captured spot paths.
+/// PathSummary
+///     Every simulated state, including the initial state at time zero.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If ``spot``, ``vol``, or ``expiry`` is non-positive or non-finite;
-///     ``rate`` or ``div_yield`` is non-finite; ``num_steps`` is zero or
-///     cannot form a time grid; ``num_paths`` is outside ``[1, 100_000]``;
-///     the compact output and shared time grids exceed ``64_000_000`` scalar
-///     values; or a simulated spot is non-finite.
+///     If ``spec`` is not valid ``PathSimulationSpec`` data (unknown key or
+///     tag, missing field, wrong type); a process parameter or correlation
+///     matrix is out of range; the scheme is not available for the process;
+///     ``fbm`` is set for a process that does not consume fractional noise;
+///     ``initial_state`` has the wrong length or lies outside the process's
+///     domain; the time grid is invalid; ``num_paths`` is outside
+///     ``[1, 100_000]``; the output would exceed ``64_000_000`` stored values;
+///     or a simulated state is non-finite.
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (spot, rate, div_yield, vol, expiry, num_steps, num_paths, seed=None))]
-fn simulate_gbm_paths(
-    py: Python<'_>,
-    spot: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
-    num_steps: usize,
-    num_paths: usize,
-    seed: Option<u64>,
-) -> PyResult<PyGbmPathSummary> {
-    let mut config = finstack_quant_models::monte_carlo::GbmPathConfig::new(
-        spot, rate, div_yield, vol, expiry, num_steps, num_paths,
-    );
-    if let Some(seed) = seed {
-        config = config.with_seed(seed);
-    }
-    py.detach(move || finstack_quant_models::monte_carlo::simulate_gbm_paths(&config))
-        .map(PyGbmPathSummary::from_inner)
-        .map_err(core_to_py)
+#[pyo3(text_signature = "(spec)")]
+fn simulate_paths(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyPathSummary> {
+    let value = py_to_json_value(py, spec, "PathSimulationSpec")?;
+    py.detach(move || {
+        let spec: PathSimulationSpec = serde_json::from_value(value)
+            .map_err(|e| serde_json_to_py(e, "invalid PathSimulationSpec"))?;
+        finstack_quant_models::monte_carlo::simulate::simulate_paths(&spec).map_err(core_to_py)
+    })
+    .map(PyPathSummary::from_inner)
 }
 
 /// Test the inclusive Feller condition ``2 * kappa * theta >= vol_of_vol**2``.
 ///
 /// This is the Monte Carlo engine's own predicate
-/// (`finstack_quant_models::monte_carlo::process::heston::feller_condition`), so the
+/// (`finstack_quant_models::monte_carlo::process::heston::heston_satisfies_feller`), so the
 /// answer at the boundary matches :func:`price_heston_call` /
 /// :func:`price_heston_put`. Inputs are not validated: non-finite values
 /// typically yield ``False``.
@@ -99,7 +101,9 @@ fn simulate_gbm_paths(
 /// - Heston (1993): see docs/REFERENCES.md#heston-1993
 #[pyfunction]
 fn heston_satisfies_feller(kappa: f64, theta: f64, vol_of_vol: f64) -> bool {
-    finstack_quant_models::monte_carlo::process::heston::feller_condition(kappa, theta, vol_of_vol)
+    finstack_quant_models::monte_carlo::process::heston::heston_satisfies_feller(
+        kappa, theta, vol_of_vol,
+    )
 }
 
 /// Resolve an optional currency argument, defaulting to the registry default.
@@ -306,7 +310,7 @@ fn price_heston_put(
 }
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(simulate_gbm_paths, m)?)?;
+    m.add_function(wrap_pyfunction!(simulate_paths, m)?)?;
     m.add_function(wrap_pyfunction!(heston_satisfies_feller, m)?)?;
     m.add_function(wrap_pyfunction!(price_heston_call, m)?)?;
     m.add_function(wrap_pyfunction!(price_heston_put, m)?)?;

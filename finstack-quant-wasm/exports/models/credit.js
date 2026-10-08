@@ -24,6 +24,7 @@ export const credit = {
   EadCalculator: wasm.EadCalculator,
   seniorityRecoveryStats: wasm.seniorityRecoveryStats,
   workoutLgd: wasm.workoutLgd,
+  collateralPieceLiquidationValue: wasm.collateralPieceLiquidationValue,
   // PD calibration
   MasterScale: wasm.MasterScale,
   baselIrbPdFloor: wasm.baselIrbPdFloor,
@@ -48,4 +49,5 @@ export const credit = {
   zmijewskiScore: wasm.zmijewskiScore,
   // Recovery waterfall
   allocateRecovery: wasm.allocateRecovery,
+  recoveryClaimTotalClaim: wasm.recoveryClaimTotalClaim,
 };

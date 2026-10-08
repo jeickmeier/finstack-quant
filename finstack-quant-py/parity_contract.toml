@@ -193,7 +193,7 @@ public = ["credit", "risk", "schema"]
 [crates.models.factor.modules]
 matching           = { python = "finstack_quant.models.factor.matching", status = "missing", note = "MatchingConfig typed host-language constructors deferred; JSON contracts remain Rust-owned. The crate-root matching re-exports (CascadeMatcher, HierarchicalMatcher, MappingTableMatcher, FactorMatcher trait family, MappingRule, AttributeFilter, DependencyFilter) are Rust-only." }
 credit             = { python = "finstack_quant.models.factor.credit", status = "exists", note = "Credit hierarchy artifacts, covariance forecasts, VolHorizon, and typed FactorCovarianceMatrix/FactorModelConfig forecast outputs are flattened into this namespace. CreditCalibrator accepts CreditCalibrationConfig / CreditCalibrationInputs as dicts or JSON strings (plus CreditCalibrator.from_dataframe for pandas panels, which converts the frames and calls Rust CreditCalibrationInputs::from_panel to anchor at the last panel date; the generic series is named by a required GenericFactorSpec dict/JSON); the config/input structs themselves (CreditCalibrationConfig, CreditCalibrationInputs, HistoryPanel, IssuerTagPanel, GenericFactorSeries, BucketSizeThresholds and the enum families PanelFrequency, PanelSpace, VolModelChoice, CovarianceStrategy, BetaShrinkage, BucketWeighting, IssuerBetaPolicy) are reached through those wire shapes and CreditFactorModel getters, not parallel constructors. Rust-only families: hierarchy internals (CreditHierarchySpec, HierarchyDimension, IssuerBetaRow, IssuerBetas, IssuerBetaMode, IssuerTags, FitQuality, LevelsAtAnchor, LevelAnchor, VolState, FactorVolModel, FactorHistories, FactorCorrelationMatrix, CalibrationDiagnostics, FoldUpRecord, DateRange, dimension_key; GenericFactorSpec is reached as a wire shape), the peel kernel (credit::peel), unit helpers (credit::units), DecompositionError (mapped to KeyError/ValueError/RuntimeError), and the calibration sub-pipeline (assemble, inventory, panel, peel_fit, statistics, validation)." }
-risk               = { python = "finstack_quant.models.factor.risk", status = "exists", note = "Pure factor and position decomposition, stress attribution, and risk-budget result types and functions. Both hosts return the canonical Rust results: parametric_var_decomposition / historical_var_decomposition return PositionRiskDecomposition and evaluate_risk_budget returns RiskBudgetResult (WASM returns the same serde shapes as plain objects); parametric_es_decomposition returns the ParametricEsDecompositionView reporting view in both. An omitted confidence resolves to DecompositionConfig::parametric_95() / historical_95() in both hosts. Position P&L matrices are position-major (one row per position) in both hosts; Python additionally reads a labelled pandas.DataFrame (rows = scenarios) and NumPy arrays as host input conversions. Rust-only families: the decomposer engines (ParametricDecomposer, ParametricPositionDecomposer, HistoricalPositionDecomposer, DecompositionMethod as a bare enum - hosts read DecompositionConfig.method), residual plumbing (apply_residual_contributions, ResidualContributionSource as a bare enum - hosts read source_kind/source_issuer_id), the ES view builder parametric_es_decomposition_view, the flat-matrix adapters flatten_square_matrix/flatten_position_pnls (the hosts call them on list input), evaluate_risk_budget_arrays (bound as evaluate_risk_budget), and risk::math kernels." }
+risk               = { python = "finstack_quant.models.factor.risk", status = "exists", note = "Pure factor and position decomposition, stress attribution, and risk-budget result types and functions. Both hosts return the canonical Rust results: parametric_var_decomposition / historical_var_decomposition return PositionRiskDecomposition and evaluate_risk_budget returns RiskBudgetResult (WASM returns the same serde shapes as plain objects); parametric_es_decomposition returns the ParametricEsDecompositionView reporting view in both. The three decomposition functions and build_stress_attribution are Rust free functions under the same names (finstack_quant_models::factor::risk); an omitted confidence is resolved there (DecompositionConfig::parametric_95() / historical_95()), not in the bindings, which only convert the matrix input and call them. Position P&L matrices are position-major (one row per position) in both hosts; Python additionally reads a labelled pandas.DataFrame (rows = scenarios) and NumPy arrays as host input conversions. Rust-only families: the config-taking engines (decompose_factors, decompose_positions, decompose_from_pnls, DecompositionMethod as a bare enum - hosts read DecompositionConfig.method), residual plumbing (apply_residual_contributions, ResidualContributionSource as a bare enum - hosts read source_kind/source_issuer_id), the ES view builder parametric_es_decomposition_view, the flat-matrix adapters flatten_square_matrix/flatten_position_pnls (the hosts call them on list input), evaluate_risk_budget_arrays (bound as evaluate_risk_budget), and risk::math kernels. Documented rename: position_component_var / positionComponentVar is the free-function form of the Rust method PositionRiskDecomposition::component_var in both hosts (the decomposition is a plain value there, not a handle)." }
 schema             = { python = "finstack_quant.models.factor.schema", status = "exists", note = "Compiled-in JSON Schema accessors; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 
 # The remaining crate-root `pub use` surface (BumpSizeConfig,
@@ -315,7 +315,7 @@ note = "Typed submodules (primitives/builder/accrual/aggregation) plus the JSON 
 [crates.cashflows.modules]
 fixings = { python = "finstack_quant.cashflows.fixings", status = "exists", note = "Typed raw rate/FX observations and atomic crossed-fixing materialization. Scenario rolls invoke the same Rust helper; WASM binds it as cashflows.materializeFixings over CashFlowSchedule handles or schedule JSON." }
 json        = { python = "finstack_quant.cashflows",             status = "exists", note = "JSON bridge exposes the canonical coupon_program and payment_program builder surface. Naming note: the free function validate_cashflow_schedule_json binds Rust json::validate_cashflow_schedule_json 1:1; its typed twin is CashFlowSchedule.validate() on the builder surface." }
-accrual     = { python = "finstack_quant.cashflows.accrual",     status = "exists", note = "Typed accrual engine; accrued_interest remains on the JSON bridge" }
+accrual     = { python = "finstack_quant.cashflows.accrual",     status = "exists", note = "Typed accrual engine" }
 aggregation = { python = "finstack_quant.cashflows.aggregation", status = "exists", note = "Typed period rollups and currency-checked totals. Rust-only (deliberately unbound): credit_adjusted_cashflow_pvs and DateContext — a borrow-parameterized PV kernel consumed by valuations pricers, not a host-facing API." }
 builder     = { python = "finstack_quant.cashflows.builder",     status = "exists", note = "Typed spec + builder + schedule surface; the JSON program bridge remains available on finstack_quant.cashflows" }
 primitives  = { python = "finstack_quant.cashflows.primitives",  status = "exists", note = "Typed CashFlow/CFKind primitives; CashFlow rows also travel inside schedule JSON" }
@@ -349,7 +349,7 @@ python_package = "finstack_quant.cashflows.builder"
 # schedule JSON); evaluate_fee_tiers / FeeTier / DefaultCurve /
 # PrepaymentCurve (spec internals reachable through the spec types); and the
 # credit-rate helpers psa_cpr / PSA_RAMP_MONTHS / PSA_TERMINAL_CPR.
-note = "abs_to_smm/cdr_to_mdr/cpr_to_smm/mdr_to_cdr/smm_to_cpr are also re-exported at the Rust crate root and bound flat on finstack_quant.cashflows (their WASM twins are accounted in the [parity] ledger). Typed CashFlowBuilder matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM binds CashFlowSchedule / CashFlowBuilder as classes, and the spec types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
+note = "Typed CashFlowBuilder matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM binds CashFlowSchedule / CashFlowBuilder as classes, and the spec types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
 public = [
     "AmortizationSpec", "CashFlowBuilder", "CashFlowMeta", "CashFlowSchedule", "CouponType",
     "DefaultModelSpec", "FeeAccrualBasis", "FeeBase",
@@ -532,11 +532,10 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 # `quanto_option_price` / `heston_price` defaults to a call in both hosts (a
 # host signature default mapped to `OptionType::Call`). Rust-only closed-form
 # items, deliberately not bound: `bs_price_unchecked` / `bs_greeks_unchecked`,
-# the `*_df` Asian variants, `barrier_rebate` / `PayoutTiming` /
+# `barrier_rebate` / `PayoutTiming` /
 # `BarrierParams` / `barrier_touch_probability`, `quanto_call` / `quanto_put` /
-# `quanto_drift_adjustment` (use `quanto_option_price`), the implied-vol
-# approximations (`brenner_subrahmanyam_approx`, `manaster_koehler_approx`,
-# `implied_vol_initial_guess`), `HestonStripPricer` / `HestonFourierSettings` /
+# `quanto_drift_adjustment` (use `quanto_option_price`),
+# `HestonStripPricer` / `HestonFourierSettings` /
 # `heston_*_prices_fourier` strips, `OptionMarketParams`, `ExerciseStyle`,
 # `OptionType` (hosts pass `is_call`), `ONE_PERCENT`, and the per-model COS
 # `CosPricer` / `CosConfig` / characteristic functions (hosts use `*_cos_price`).
@@ -567,29 +566,32 @@ public = [
 
 [crates.models.monte_carlo]
 python_package = "finstack_quant.models.monte_carlo"
-# `finite_diff_*` take `is_call: bool` and return a typed `Estimate`. The
-# closed-form `black_scholes_spot_call` / `_put` references are not bound here
-# (use `models.bs_price`). Rust-only: engine/process/discretization/RNG/payoff
+# `finite_diff_*` take `is_call: bool` and return a typed `Estimate` whose
+# `stderr` is the paired (common-random-number) standard error. The
+# closed-form Black-Scholes reference is `models.bs_price`. Rust-only:
+# engine/process/discretization/RNG/payoff
 # graph, `GbmEuropeanFdSpec` (flattened into kwargs), `PathDependentPricerConfig`
 # / `LsmcConfig` (flattened into constructor kwargs), captured-path datasets,
+# `PathSimulationSpec` / `ProcessSpec` / `SchemeSpec` / `TimeGridSpec` / `FbmSpec` (plain
+# data: `simulate_paths` takes the spec as a dict or JSON text in Python and
+# as the schema-typed object in WASM, validated by the Rust deserializer),
 # the registry defaults module, and `monte_carlo::convenience` (the one place
 # that resolves an omitted pricer setting, step count or currency to its
 # registry default; both hosts build their pricers through it).
 public = [
     "Estimate",
     "EuropeanPricer",
-    "GbmPathSummary",
+    "LrmGreeks",
     "LsmcPricer",
     "MoneyEstimate",
     "PathDependentPricer",
+    "PathSummary",
     "finite_diff_delta",
-    "finite_diff_delta_crn",
     "finite_diff_gamma",
-    "finite_diff_gamma_crn",
     "heston_satisfies_feller",
     "price_heston_call",
     "price_heston_put",
-    "simulate_gbm_paths",
+    "simulate_paths",
 ]
 
 # Rust-only in `liquidity`: `LiquidityConfig` (tier thresholds are passed
@@ -658,21 +660,22 @@ python_package = "finstack_quant.models.volatility"
 # discounted lognormal adapters. Rust-only, deliberately not bound:
 # `local_vol` (Dupire surface construction), `heston` / `rough_heston` model
 # helpers (Heston pricing is `models.heston_price` / `models.monte_carlo`),
-# `source` (`VolSource`,
-# `materialize_cube_grid`, `measure_vol_surface_shift`,
-# `get_surface_vol_extrapolated`), the `black` helpers
-# (`d1` / `d2` / `d1_d2` / `*_black76`), `vega_weight`, `SabrVolType` (and so
-# `SabrModel::vol_type` / `SabrSmile::vol_type` / `implied_volatility_with_type`:
-# the hosts' `implied_vol` returns the beta-dependent vol, documented on each
-# method), `SabrModel::effective_rates` (the shift is on `SabrParameters.shift`),
+# `source` (`VolSource`, `measure_vol_surface_shift`), the `black` helpers
+# (`d1` / `d1_d2` / `*_black76`), `vega_weight`,
+# `SabrParameters::quote_convention` (the hosts' `implied_vol` returns the
+# beta-dependent vol, documented on each method),
+# `SabrModel::effective_rates` (the shift is on `SabrParameters.shift`),
 # `SabrParameters::{implied_vol_normal, implied_vol_lognormal}` (raw Hagan
 # expansions; hosts use `SabrModel.implied_vol`, which selects the branch),
 # `SabrCalibrationOutcome` and the `*_with_diagnostics` / `*_with_derivatives`
 # / `*_with_atm_pinning` calibrator variants, `ArbitrageCheckConfig` /
 # `check_surface` on a `VolSurface`, and `SviParams::{validate, butterfly_violation}`
-# (validation runs in the constructor).
+# (validation runs in the constructor). `LocalVolSurface` is a class in Python
+# and a plain object with `localVol*` free functions in WASM; the Dupire
+# density check stays reachable through `check_local_vol_density_grid`.
 public = [
     "ArbitrageReport",
+    "LocalVolSurface",
     "SabrCalibrator",
     "SabrModel",
     "SabrParameters",
@@ -706,15 +709,15 @@ public = [
     "surface_to_dataframe",
 ]
 
-# `diebold_li_fit_factors` / `diebold_li_forecast` / `nelson_siegel_yields` are
-# thin twins over the Rust free functions of the same name; the first two return
-# the typed `FactorTimeSeries` / `YieldForecast` wrappers. Yield-curve PCA has no
-# free functions: it is reached through the bound `YieldPca` methods
+# Diebold-Li is one typed pipeline in Rust and both hosts:
+# `DieboldLi(lambda_=None)` (Rust `DieboldLi::new` / `with_default_lambda`)
+# `.extract_factors(panel)` / `.fit(panel)` / `.forecast(horizon)`, returning the
+# typed `FactorTimeSeries` / `YieldForecast`. `nelson_siegel_yields` is the one
+# free function. Yield-curve PCA is reached through the bound `YieldPca` methods
 # (`fit_yield_changes(...).truncated(n_components)` returns a `YieldPcaView`,
-# `scenario(shocks)` shocks components). Rust-only: `diebold_li_model` (folded
-# into `DieboldLi(lambda_=None)`) and `DieboldLi::to_parametric_curve`. WASM
-# exposes the same three free functions (`dieboldLiFitFactors`,
-# `dieboldLiForecast`, `nelsonSiegelYields`) and classes.
+# `scenario(shocks)` shocks components); a fit from changes reports the column
+# positions `1..N` as placeholder tenors. WASM exposes the same classes and
+# `nelsonSiegelYields`.
 [crates.models.rates.dtsm]
 python_package = "finstack_quant.models.rates.dtsm"
 public = [
@@ -724,8 +727,6 @@ public = [
     "YieldPanel",
     "YieldPca",
     "YieldPcaView",
-    "diebold_li_fit_factors",
-    "diebold_li_forecast",
     "nelson_siegel_yields",
 ]
 
@@ -905,10 +906,9 @@ public = [
 # `finstack_quant.models.correlation.__all__` must appear here (alphabetical,
 # matching the package __all__ ordering). Python names mirror the canonical
 # Rust names in finstack_quant_models::correlation (LatentFactorKind, not
-# LatentFactor) with one documented rename: hosts expose `nearest_correlation`
-# for the Rust `nearest_correlation_matrix` (canonical home
-# finstack_quant_analytics::correlation, re-exported through
-# finstack_quant_models::correlation).
+# LatentFactor). `nearest_correlation` is canonically owned by
+# finstack_quant_analytics::correlation and re-exported through
+# finstack_quant_models::correlation.
 # Errors: `finstack_quant_models::correlation::Error` folds into the core
 # taxonomy (`From<correlation::Error> for core::Error`); non-convergence /
 # eigendecomposition failures map to `RuntimeError`, everything else to
@@ -1592,7 +1592,7 @@ margin       = { python = "finstack_quant.portfolio.margin",       status = "mis
 metrics      = { python = "finstack_quant.portfolio.metrics",      status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
 optimization = { python = "finstack_quant.portfolio",              status = "flattened", note = "Spec/result types (PortfolioOptimizationSpec, Constraint, Objective, MetricExpr, PerPositionMetric, PositionFilter, WeightingScheme, MissingMetricPolicy, Inequality, OptimizationStatus, TradeSpec, TradeDirection, TradeType, CandidatePosition, TradeUniverse, PortfolioOptimizationResult) and the typed optimize_portfolio entry point are exported flat on finstack_quant.portfolio" }
 performance  = { python = "finstack_quant.portfolio",              status = "flattened", note = "TWRR/MWRR performance helpers are exported flat on finstack_quant.portfolio" }
-materialization = { python = "finstack_quant.portfolio",           status = "flattened", note = "InstrumentArtifactCache, MaterializationReport, Portfolio.from_materialization, and Portfolio.validate_materialization (typed twin of the WASM Portfolio.validateMaterialization; diagnostics returned, not raised) are exported flat on finstack_quant.portfolio; envelope types (PortfolioMaterializationEnvelope, MaterializedPosition, InstrumentArtifact, PortfolioHeader, MaterializerInfo, PORTFOLIO_MATERIALIZATION_CONTRACT) remain Rust-only" }
+materialization = { python = "finstack_quant.portfolio",           status = "flattened", note = "InstrumentArtifactCache, MaterializationReport, Portfolio.from_materialization, and Portfolio.validate_materialization (typed twin of the WASM Portfolio.validateMaterialization; diagnostics returned, not raised) are exported flat on finstack_quant.portfolio; envelope types (PortfolioMaterializationEnvelope, MaterializedPosition, InstrumentArtifact, PortfolioHeader, MaterializerInfo) remain Rust-only" }
 portfolio    = { python = "finstack_quant.portfolio.portfolio",    status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
 position     = { python = "finstack_quant.portfolio.position",     status = "missing", note = "Position/PositionUnit are Rust-only as types; Python adds positions through PortfolioBuilder.position(position_id, instrument, quantity, entity_id, unit, attributes) and reads them via Portfolio.positions_to_dataframe(); PositionValue (valuation module) is bound" }
 primitive    = { python = "finstack_quant.portfolio",              status = "flattened", note = "primitive::primitive_exposures is bound flat as Python primitive_exposures(portfolio, market, metrics) -> PortfolioPrimitiveExposureReport (base_currency/path_count/aggregate_count getters, to_json/from_json, to_dataframe of aggregates, to_paths_dataframe of paths) and WASM portfolio.primitiveExposures (plain PortfolioPrimitiveExposureReport object); metrics are required (pass [] for value only). PortfolioPrimitivePath/PortfolioPrimitiveAggregate are carried on the report wire form." }
@@ -2096,12 +2096,12 @@ js = "models.factor.schema"
 js = "models.liquidity"
 types = { ExecutionTrajectory = "ExecutionTrajectory", ImpactEstimate = "ImpactEstimate", LiquidityProfile = "LiquidityProfile", LvarBangiaScalar = "LvarBangiaScalar", TradeParams = "TradeParams" }
 
-# The Monte Carlo pricers return the canonical `MoneyEstimate` / `Estimate`
-# serde objects (the same wire form as Python `to_json()`);
+# The Monte Carlo pricers return the canonical `MoneyEstimate` / `Estimate` /
+# `LrmGreeks` serde objects (the same wire form as Python `to_json()`);
 # `MoneyEstimate.relative_stderr` is the free function `relativeStderr`.
 [parity.modules."finstack_quant.models.monte_carlo"]
 js = "models.monteCarlo"
-types = { Estimate = "Estimate", GbmPathSummary = "GbmPathSummary", MoneyEstimate = "MoneyEstimate" }
+types = { Estimate = "Estimate", LrmGreeks = "LrmGreeks", MoneyEstimate = "MoneyEstimate", PathSummary = "PathSummary" }
 
 [parity.modules."finstack_quant.models.rates.dtsm"]
 js = "models.rates.dtsm"
@@ -2112,7 +2112,7 @@ js = "models.rates.hullWhite"
 
 [parity.modules."finstack_quant.models.volatility"]
 js = "models.volatility"
-types = { ArbitrageReport = "ArbitrageReport", SviParams = "SviParams" }
+types = { ArbitrageReport = "ArbitrageReport", LocalVolSurface = "LocalVolSurface", SviParams = "SviParams" }
 excluded = { surface_to_dataframe = "pandas" }
 
 [parity.modules."finstack_quant.portfolio"]
@@ -2257,8 +2257,6 @@ prepaymentModelSpecValidate = "twin of Python PrepaymentModelSpec.validate (Rust
 prepaymentModelSpecVector = "twin of Python PrepaymentModelSpec.vector (Rust PrepaymentModelSpec::vector); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
 recoveryModelSpecRecoveryRate = "twin of Python RecoveryModelSpec.recovery_rate (Rust RecoveryModelSpec::recovery_rate); recorded as a member rename of finstack_quant.cashflows.builder.RecoveryModelSpec"
 recoveryModelSpecValidate = "twin of Python RecoveryModelSpec.validate (Rust RecoveryModelSpec::validate); recorded as a member rename of finstack_quant.cashflows.builder.RecoveryModelSpec"
-scheduleCalendarYearLadder = "JSON-first twin of CashFlowSchedule.calendarYearLadder (Rust schedule_calendar_year_ladder): takes schedule JSON instead of a handle"
-scheduleOutstandingByDate = "JSON-first twin of CashFlowSchedule.outstandingByDate (Rust schedule_outstanding_by_date): takes schedule JSON instead of a handle"
 scheduleParamsAnnualActact = "twin of Python ScheduleParams.annual_actact (Rust ScheduleParams::annual_actact); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
 scheduleParamsEurEstrSwap = "twin of Python ScheduleParams.eur_estr_swap (Rust ScheduleParams::eur_estr_swap); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
 scheduleParamsEurGovBond = "twin of Python ScheduleParams.eur_gov_bond (Rust ScheduleParams::eur_gov_bond); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
@@ -2270,7 +2268,6 @@ scheduleParamsUsdCorporateBond = "twin of Python ScheduleParams.usd_corporate_bo
 scheduleParamsUsdSofrSwap = "twin of Python ScheduleParams.usd_sofr_swap (Rust ScheduleParams::usd_sofr_swap); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
 scheduleParamsUsdTreasury = "twin of Python ScheduleParams.usd_treasury (Rust ScheduleParams::usd_treasury); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
 scheduleParamsValidate = "twin of Python ScheduleParams.validate (Rust ScheduleParams::validate); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
-scheduleWal = "JSON-first twin of CashFlowSchedule.wal (Rust schedule_wal): takes schedule JSON instead of a handle"
 
 [parity.js."covenants".wasm_only]
 covenantConsequenceAccelerateMaturity = "twin of Python CovenantConsequence.accelerate_maturity (Rust CovenantConsequence::AccelerateMaturity); recorded as a member rename of finstack_quant.covenants.CovenantConsequence"
@@ -2372,6 +2369,10 @@ vmResultRequiresCall = "twin of the Python property VmResult.requires_call (Rust
 [parity.js."models".wasm_only]
 bsGreeksIsValid = "free-function twin of Python BsGreeks.is_valid: the type is a plain object in WASM"
 
+[parity.js."models.credit".wasm_only]
+collateralPieceLiquidationValue = "free-function twin of the Python property CollateralPiece.liquidation_value (Rust CollateralPiece::liquidation_value), which is not serialized: the type is a plain object in WASM"
+recoveryClaimTotalClaim = "free-function twin of the Python property RecoveryClaim.total_claim (Rust RecoveryClaim::total_claim), which is not serialized: the type is a plain object in WASM"
+
 [parity.js."models.factor.credit".wasm_only]
 factorCorrelation = "free-function twin of Python FactorCovarianceMatrix.correlation: the type is a plain object in WASM"
 factorCovariance = "free-function twin of Python FactorCovarianceMatrix.covariance: the type is a plain object in WASM"
@@ -2379,10 +2380,20 @@ factorCovarianceRows = "nested-row twin of Python FactorCovarianceMatrix.to_nump
 factorVariance = "free-function twin of Python FactorCovarianceMatrix.variance: the type is a plain object in WASM"
 validateFactorModelConfig = "free-function twin of Python FactorModelConfig.validate: the type is a plain object in WASM"
 
+[parity.js."models.liquidity".wasm_only]
+liquidityProfileHalfSpread = "free-function twin of the Python property LiquidityProfile.half_spread (Rust LiquidityProfile::half_spread), which is not serialized: the type is a plain object in WASM"
+liquidityProfileRelativeSpread = "free-function twin of the Python property LiquidityProfile.relative_spread (Rust LiquidityProfile::relative_spread), which is not serialized: the type is a plain object in WASM"
+liquidityProfileRelativeSpreadVolatility = "free-function twin of the Python property LiquidityProfile.relative_spread_volatility (Rust LiquidityProfile::relative_spread_volatility), which is not serialized: the type is a plain object in WASM"
+liquidityProfileSpread = "free-function twin of the Python property LiquidityProfile.spread (Rust LiquidityProfile::spread), which is not serialized: the type is a plain object in WASM"
+tradeParamsEffectiveReferencePrice = "free-function twin of the Python property TradeParams.effective_reference_price (Rust TradeParams::effective_reference_price), which is not serialized: the type is a plain object in WASM"
+
 [parity.js."models.monteCarlo".wasm_only]
 relativeStderr = "free-function twin of Python MoneyEstimate.relative_stderr: the type is a plain object in WASM"
 
 [parity.js."models.volatility".wasm_only]
+localVolFromImpliedVol = "free-function twin of Python LocalVolSurface.from_implied_vol: the type is a plain object in WASM"
+localVolFromImpliedVolSmoothed = "free-function twin of Python LocalVolSurface.from_implied_vol_smoothed: the type is a plain object in WASM"
+localVolValue = "free-function twin of Python LocalVolSurface.value: the type is a plain object in WASM"
 sviDurrlemanG = "free-function twin of Python SviParams.durrleman_g: the type is a plain object in WASM"
 sviImpliedVol = "free-function twin of Python SviParams.implied_vol: the type is a plain object in WASM"
 sviTotalVariance = "free-function twin of Python SviParams.total_variance: the type is a plain object in WASM"
@@ -2406,9 +2417,9 @@ constraintMaxTurnover = "free-function twin of Python Constraint.max_turnover (R
 constraintWeightBounds = "free-function twin of Python Constraint.weight_bounds (Rust Constraint::weight_bounds; member rename)"
 portfolioMetricsRequireTotal = "free-function twin of Python PortfolioResult.require_metric (Rust PortfolioMetrics::require_total; member rename)"
 portfolioOptimizationResultToTradeList = "free-function twin of Python PortfolioOptimizationResult.to_trade_list (Rust PortfolioOptimizationResultWire::to_trade_list; member rename)"
-sensitivityMatrixDelta = "free-function twin of Python SensitivityMatrix.delta (Rust SensitivityMatrix::try_delta; member rename)"
-sensitivityMatrixFactorDeltas = "free-function twin of Python SensitivityMatrix.factor_deltas (Rust SensitivityMatrix::try_factor_deltas; member rename)"
-sensitivityMatrixPositionDeltas = "free-function twin of Python SensitivityMatrix.position_deltas (Rust SensitivityMatrix::try_position_deltas; member rename)"
+sensitivityMatrixDelta = "free-function twin of Python SensitivityMatrix.delta (Rust SensitivityMatrix::delta; member rename)"
+sensitivityMatrixFactorDeltas = "free-function twin of Python SensitivityMatrix.factor_deltas (Rust SensitivityMatrix::factor_deltas; member rename)"
+sensitivityMatrixPositionDeltas = "free-function twin of Python SensitivityMatrix.position_deltas (Rust SensitivityMatrix::position_deltas; member rename)"
 
 [parity.js."scenarios".wasm_only]
 parseScenarioSpec = "twin of Python ScenarioSpec.from_json (Rust ScenarioSpec::from_json)"
@@ -2822,6 +2833,73 @@ variance = { js = "models.factor.credit.factorVariance", reason = "free-function
 [parity.members."finstack_quant.models.factor.credit.FactorModelConfig".renames]
 validate = { js = "models.factor.credit.validateFactorModelConfig", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
 
+# Properties of `models` data classes that the TypeScript type has no field
+# for. Each one below is a plain view of wire fields (a count, an element of a
+# tuple, a column of a matrix, an enum tag, a host-attached label list), so the
+# TypeScript object is its twin (`literal`). Properties computed by a Rust
+# method are recorded as renames to their WASM free-function twins instead.
+[parity.members."finstack_quant.models.factor.credit.FactorCovarianceMatrix".excluded]
+n_factors = "literal"
+
+[parity.members."finstack_quant.models.factor.credit.FactorModelConfig".excluded]
+factor_ids = "literal"
+n_factors = "literal"
+
+[parity.members."finstack_quant.models.factor.risk.PositionResidualContribution".excluded]
+source_issuer_id = "literal"
+source_kind = "literal"
+
+[parity.members."finstack_quant.models.factor.risk.RiskDecomposition".excluded]
+measure_json = "literal"
+
+[parity.members."finstack_quant.models.factor.risk.TailScenarioBreakdown".excluded]
+position_ids = "literal"
+
+[parity.members."finstack_quant.models.monte_carlo.Estimate".excluded]
+ci_lower = "literal"
+ci_upper = "literal"
+
+[parity.members."finstack_quant.models.monte_carlo.MoneyEstimate".excluded]
+ci_lower = "literal"
+ci_upper = "literal"
+
+[parity.members."finstack_quant.models.rates.dtsm.FactorTimeSeries".excluded]
+curvature = "literal"
+level = "literal"
+num_dates = "literal"
+slope = "literal"
+
+[parity.members."finstack_quant.models.rates.dtsm.YieldPcaView".excluded]
+num_components = "literal"
+
+[parity.members."finstack_quant.models.volatility.ArbitrageReport".excluded]
+by_severity = "literal"
+by_type = "literal"
+total_violations = "literal"
+
+[parity.members."finstack_quant.models.volatility.LocalVolSurface".excluded]
+grid_shape = "literal"
+
+[parity.members."finstack_quant.models.credit.lgd.CollateralPiece".renames]
+liquidation_value = { js = "models.credit.collateralPieceLiquidationValue", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+
+[parity.members."finstack_quant.models.credit.recovery_waterfall.RecoveryClaim".renames]
+total_claim = { js = "models.credit.recoveryClaimTotalClaim", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+
+[parity.members."finstack_quant.models.liquidity.LiquidityProfile".renames]
+half_spread = { js = "models.liquidity.liquidityProfileHalfSpread", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+relative_spread = { js = "models.liquidity.liquidityProfileRelativeSpread", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+relative_spread_volatility = { js = "models.liquidity.liquidityProfileRelativeSpreadVolatility", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+spread = { js = "models.liquidity.liquidityProfileSpread", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+
+[parity.members."finstack_quant.models.liquidity.TradeParams".renames]
+effective_reference_price = { js = "models.liquidity.tradeParamsEffectiveReferencePrice", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+
+[parity.members."finstack_quant.models.volatility.LocalVolSurface".renames]
+from_implied_vol = { js = "models.volatility.localVolFromImpliedVol", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+from_implied_vol_smoothed = { js = "models.volatility.localVolFromImpliedVolSmoothed", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+value = { js = "models.volatility.localVolValue", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+
 [parity.members."finstack_quant.models.volatility.SviParams".renames]
 durrleman_g = { js = "models.volatility.sviDurrlemanG", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
 implied_vol = { js = "models.volatility.sviImpliedVol", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
@@ -3016,7 +3094,7 @@ excluded = { mappings_json = "literal" }
 excluded = { all = "literal", and_ = "literal", by_attribute = "literal", by_entity_id = "literal", by_position_ids = "literal", not_ = "literal", or_ = "literal" }
 
 [parity.members."finstack_quant.portfolio.SensitivityMatrix"]
-renames = { delta = { js = "portfolio.sensitivityMatrixDelta", reason = "WASM results are plain objects; the Rust SensitivityMatrix::try_delta method is a free function taking the object" }, factor_deltas = { js = "portfolio.sensitivityMatrixFactorDeltas", reason = "WASM results are plain objects; the Rust SensitivityMatrix::try_factor_deltas method is a free function taking the object" }, position_deltas = { js = "portfolio.sensitivityMatrixPositionDeltas", reason = "WASM results are plain objects; the Rust SensitivityMatrix::try_position_deltas method is a free function taking the object" } }
+renames = { delta = { js = "portfolio.sensitivityMatrixDelta", reason = "WASM results are plain objects; the Rust SensitivityMatrix::delta method is a free function taking the object" }, factor_deltas = { js = "portfolio.sensitivityMatrixFactorDeltas", reason = "WASM results are plain objects; the Rust SensitivityMatrix::factor_deltas method is a free function taking the object" }, position_deltas = { js = "portfolio.sensitivityMatrixPositionDeltas", reason = "WASM results are plain objects; the Rust SensitivityMatrix::position_deltas method is a free function taking the object" } }
 
 [parity.members."finstack_quant.portfolio.TradeDirection"]
 excluded = { buy = "literal", hold = "literal", sell = "literal" }

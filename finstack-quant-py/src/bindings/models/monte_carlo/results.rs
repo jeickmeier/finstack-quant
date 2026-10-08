@@ -1,131 +1,134 @@
 //! Result types for Monte Carlo simulations.
 
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::errors::display_to_py;
+use finstack_quant_models::monte_carlo::greeks::lrm::LrmGreeks;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
+use finstack_quant_models::monte_carlo::simulate::PathSummary;
+use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-/// Compact captured GBM paths for plotting and diagnostics.
+/// Simulated paths of one built-in process on a shared time grid.
 #[pyclass(
-    name = "GbmPathSummary",
+    name = "PathSummary",
     module = "finstack_quant.models.monte_carlo",
     frozen
 )]
-pub struct PyGbmPathSummary {
-    inner: finstack_quant_models::monte_carlo::GbmPathSummary,
+pub struct PyPathSummary {
+    pub(crate) inner: PathSummary,
 }
 
-impl PyGbmPathSummary {
-    pub(super) fn from_inner(inner: finstack_quant_models::monte_carlo::GbmPathSummary) -> Self {
+impl PyPathSummary {
+    pub(super) fn from_inner(inner: PathSummary) -> Self {
         Self { inner }
     }
 }
 
 #[pymethods]
-impl PyGbmPathSummary {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_models::monte_carlo::GbmPathSummary =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Number of independent path estimators.
+impl PyPathSummary {
+    /// Number of independent random streams requested.
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.num_paths
     }
 
-    /// Total number of simulated sample paths.
+    /// Number of stored paths: ``num_paths``, or ``2 * num_paths`` with
+    /// antithetic sampling.
     #[getter]
     fn num_simulated_paths(&self) -> usize {
         self.inner.num_simulated_paths
     }
 
-    /// Shared path times in year fractions, including time zero.
+    /// State dimension; equals ``len(factor_names)``.
+    #[getter]
+    fn dim(&self) -> usize {
+        self.inner.dim
+    }
+
+    /// Simulation times in years, starting at zero.
     #[getter]
     fn times(&self) -> Vec<f64> {
         self.inner.times.clone()
     }
 
-    /// Captured spot paths in deterministic path-id order.
+    /// Name of each state component, in state-vector order.
     #[getter]
-    fn paths(&self) -> Vec<Vec<f64>> {
-        self.inner.paths.clone()
+    fn factor_names(&self) -> Vec<String> {
+        self.inner.factor_names.clone()
     }
 
-    /// Export the captured paths as a pandas ``DataFrame`` indexed by time.
+    /// States in row-major ``[path][time][factor]`` order.
+    #[getter]
+    fn values(&self) -> Vec<f64> {
+        self.inner.values.clone()
+    }
+
+    /// Export the paths as a long pandas ``DataFrame``.
     ///
-    /// Columns: ``path_0``, ``path_1``, ... — one column per captured path,
-    /// in the deterministic path-id order Rust produced. The index is the
-    /// shared time grid in year fractions, including time zero.
-    ///
-    /// Wide (time × path) rather than one row: it is the shape
-    /// ``df.plot()`` and ``df.quantile(axis=1)`` expect for a path bundle, and
-    /// every path already shares the one time grid. There is always at least
-    /// one column: the engine rejects a zero-path simulation.
+    /// One row per stored path and time, indexed by a ``(path, time)``
+    /// ``MultiIndex`` in the order Rust produced, with one float64 column per
+    /// entry of ``factor_names``. ``frame["spot"].unstack("path")`` gives the
+    /// time-by-path table of one factor.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If a captured path's length differs from the time grid's, which
-    ///     would silently misalign the index.
+    ///     If ``values`` does not hold ``num_simulated_paths * len(times) *
+    ///     len(factor_names)`` entries, which is only possible for a summary
+    ///     rebuilt from inconsistent JSON.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let n_times = self.inner.times.len();
-        let data = PyDict::new(py);
-        for (path_id, path) in self.inner.paths.iter().enumerate() {
-            if path.len() != n_times {
-                return Err(crate::errors::value_error(format!(
-                    "path {} has {} points but the time grid has {}",
-                    path_id,
-                    path.len(),
-                    n_times
-                )));
-            }
-            data.set_item(format!("path_{path_id}"), path.clone())?;
+        let summary = &self.inner;
+        let dim = summary.factor_names.len();
+        let expected = summary
+            .num_simulated_paths
+            .saturating_mul(summary.times.len())
+            .saturating_mul(dim);
+        if dim == 0 || summary.values.len() != expected {
+            return Err(crate::errors::value_error(format!(
+                "PathSummary holds {} values but {} paths x {} times x {} factors need {}",
+                summary.values.len(),
+                summary.num_simulated_paths,
+                summary.times.len(),
+                dim,
+                expected
+            )));
         }
-        let index = self.inner.times.clone().into_pyobject(py)?.into_any();
+        let data = PyDict::new(py);
+        for (factor, name) in summary.factor_names.iter().enumerate() {
+            let column: Vec<f64> = summary
+                .values
+                .iter()
+                .skip(factor)
+                .step_by(dim)
+                .copied()
+                .collect();
+            data.set_item(name, PyArray1::from_vec(py, column))?;
+        }
+        let paths: Vec<usize> = (0..summary.num_simulated_paths).collect();
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("names", ["path", "time"])?;
+        let index = py.import("pandas")?.getattr("MultiIndex")?.call_method(
+            "from_product",
+            ((paths, summary.times.clone()),),
+            Some(&kwargs),
+        )?;
         dict_to_dataframe(py, &data, Some(index))
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "GbmPathSummary(paths={}, points={})",
-            self.inner.paths.len(),
-            self.inner.times.len()
+            "PathSummary(paths={}, points={}, factors={:?})",
+            self.inner.num_simulated_paths,
+            self.inner.times.len(),
+            self.inner.factor_names
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(PyPathSummary, PathSummary, "PathSummary");
+impl_repr_html_via_dataframe!(PyPathSummary);
 
 /// Monte Carlo pricing result with discounted statistics.
 #[pyclass(
@@ -145,29 +148,6 @@ impl PyMoneyEstimate {
 
 #[pymethods]
 impl PyMoneyEstimate {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: MoneyEstimate = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Discounted mean present value.
     #[getter]
     fn mean(&self) -> PyMoney {
@@ -259,6 +239,8 @@ impl PyMoneyEstimate {
     }
 }
 
+wire_methods!(PyMoneyEstimate, MoneyEstimate, "MoneyEstimate");
+
 /// Raw numerical estimate (non-currency).
 #[pyclass(
     name = "Estimate",
@@ -279,30 +261,6 @@ impl PyEstimate {
 
 #[pymethods]
 impl PyEstimate {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_models::monte_carlo::estimate::Estimate =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Point estimate (mean).
     #[getter]
     fn mean(&self) -> f64 {
@@ -389,8 +347,109 @@ impl PyEstimate {
     }
 }
 
+wire_methods!(
+    PyEstimate,
+    finstack_quant_models::monte_carlo::estimate::Estimate,
+    "Estimate"
+);
+
+/// Monte Carlo price with likelihood-ratio delta and vega from the same paths.
+///
+/// Returned by ``PathDependentPricer.price_with_lrm_greeks``. Each Greek is a
+/// sample mean of ``discounted payoff x score`` and carries its own standard
+/// error and 95% confidence interval; the three estimates share one set of
+/// paths and are correlated.
+#[pyclass(
+    name = "LrmGreeks",
+    module = "finstack_quant.models.monte_carlo",
+    frozen
+)]
+pub struct PyLrmGreeks {
+    pub(crate) inner: LrmGreeks,
+}
+
+impl PyLrmGreeks {
+    pub(super) fn from_inner(inner: LrmGreeks) -> Self {
+        Self { inner }
+    }
+}
+
+#[pymethods]
+impl PyLrmGreeks {
+    /// Discounted price estimate in the payoff currency.
+    #[getter]
+    fn price(&self) -> PyMoneyEstimate {
+        PyMoneyEstimate::from_inner(self.inner.price.clone())
+    }
+
+    /// Delta: change in price per unit change in the initial spot.
+    #[getter]
+    fn delta(&self) -> PyEstimate {
+        PyEstimate::from_inner(self.inner.delta.clone())
+    }
+
+    /// Vega: change in price per one volatility point (``0.01`` of annualized
+    /// volatility).
+    #[getter]
+    fn vega(&self) -> PyEstimate {
+        PyEstimate::from_inner(self.inner.vega.clone())
+    }
+
+    /// Tabulate the three estimates as a pandas ``DataFrame``.
+    ///
+    /// One row per quantity, indexed ``["price", "delta", "vega"]``, with
+    /// float64 columns ``mean``, ``stderr``, ``ci_lower`` and ``ci_upper``
+    /// (the 95% confidence interval). The price row is in units of the price
+    /// currency.
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let greeks = &self.inner;
+        let price = &greeks.price;
+        let rows = [
+            (
+                price.mean.amount(),
+                price.stderr,
+                price.ci_95.0.amount(),
+                price.ci_95.1.amount(),
+            ),
+            (
+                greeks.delta.mean,
+                greeks.delta.stderr,
+                greeks.delta.ci_95.0,
+                greeks.delta.ci_95.1,
+            ),
+            (
+                greeks.vega.mean,
+                greeks.vega.stderr,
+                greeks.vega.ci_95.0,
+                greeks.vega.ci_95.1,
+            ),
+        ];
+        let data = PyDict::new(py);
+        data.set_item("mean", rows.map(|row| row.0).to_vec())?;
+        data.set_item("stderr", rows.map(|row| row.1).to_vec())?;
+        data.set_item("ci_lower", rows.map(|row| row.2).to_vec())?;
+        data.set_item("ci_upper", rows.map(|row| row.3).to_vec())?;
+        let index = pyo3::types::PyList::new(py, ["price", "delta", "vega"])?;
+        dict_to_dataframe(py, &data, Some(index.into_any()))
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "LrmGreeks(price={}, delta={:.6}, vega={:.6}, n={})",
+            self.inner.price.mean,
+            self.inner.delta.mean,
+            self.inner.vega.mean,
+            self.inner.price.num_paths,
+        )
+    }
+}
+
+wire_methods!(PyLrmGreeks, LrmGreeks, "LrmGreeks");
+impl_repr_html_via_dataframe!(PyLrmGreeks);
+
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyGbmPathSummary>()?;
+    m.add_class::<PyPathSummary>()?;
+    m.add_class::<PyLrmGreeks>()?;
     m.add_class::<PyMoneyEstimate>()?;
     m.add_class::<PyEstimate>()?;
     Ok(())

@@ -1,13 +1,14 @@
 //! Pricer bindings — European, Path-Dependent, LSMC.
 
 use super::engine::resolve_currency;
-use super::results::PyMoneyEstimate;
+use super::results::{PyLrmGreeks, PyMoneyEstimate};
 use crate::errors::core_to_py;
 use finstack_quant_models::monte_carlo::convenience::{self, LsmcConvenience};
 use finstack_quant_models::monte_carlo::pricer::basis::BasisKind;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
 use finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
+use finstack_quant_models::OptionType;
 use pyo3::prelude::*;
 
 /// Render a bool the way Python's `repr` does.
@@ -260,6 +261,77 @@ impl PyPathDependentPricer {
             pricer.price_gbm_asian_put(spot, strike, rate, div_yield, vol, expiry, num_steps, ccy)
         })
         .map(PyMoneyEstimate::from_inner)
+        .map_err(core_to_py)
+    }
+
+    /// Price an arithmetic Asian option under GBM with likelihood-ratio delta
+    /// and vega from the same paths.
+    ///
+    /// Releases the GIL during the Monte Carlo run.
+    ///
+    /// Parameters
+    /// ----------
+    /// spot : float
+    ///     Finite, strictly positive spot level at time zero.
+    /// strike : float
+    ///     Exercise price in the same units as ``spot``.
+    /// rate, div_yield : float
+    ///     Continuously compounded risk-free rate and dividend yield, as
+    ///     annualized decimals.
+    /// vol : float
+    ///     Annualized GBM volatility as a strictly positive decimal.
+    /// expiry : float
+    ///     Time to expiry in years.
+    /// is_call : bool
+    ///     ``True`` for a call on the arithmetic average, ``False`` for a put.
+    /// num_steps : int, optional
+    ///     Time-grid steps, each an averaging date. Defaults to the registry
+    ///     value ``convenience.greeks.lrm_num_steps`` (32), not the 252 steps
+    ///     of ``price_asian_call``: every path is kept in memory, so
+    ///     ``num_paths * (num_steps + 1)`` may not exceed ``4_000_000``.
+    /// currency : Currency or str, optional
+    ///     Currency stamped on the price estimate; defaults to the registry
+    ///     value.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``spot``, ``vol`` or ``expiry`` is not finite and strictly
+    ///     positive, ``num_steps`` is zero, the pricer uses Sobol or
+    ///     antithetic sampling, ``num_paths`` exceeds ``100_000``, or
+    ///     ``num_paths * (num_steps + 1)`` exceeds ``4_000_000``.
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, num_steps=None, currency=None))]
+    fn price_with_lrm_greeks(
+        &self,
+        py: Python<'_>,
+        spot: f64,
+        strike: f64,
+        rate: f64,
+        div_yield: f64,
+        vol: f64,
+        expiry: f64,
+        is_call: bool,
+        num_steps: Option<usize>,
+        currency: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<PyLrmGreeks> {
+        let ccy = resolve_currency(currency)?;
+        let num_steps = convenience::lrm_num_steps(num_steps).map_err(core_to_py)?;
+        let pricer = &self.inner;
+        py.detach(|| {
+            pricer.price_gbm_asian_with_lrm_greeks(
+                OptionType::from(is_call),
+                spot,
+                strike,
+                rate,
+                div_yield,
+                vol,
+                expiry,
+                num_steps,
+                ccy,
+            )
+        })
+        .map(PyLrmGreeks::from_inner)
         .map_err(core_to_py)
     }
 

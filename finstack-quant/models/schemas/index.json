@@ -128,7 +128,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/brownian_params.schema.json",
-      "bytes": 600,
+      "bytes": 633,
       "kind": "input",
       "path": "schemas/models/1/brownian_params.schema.json",
       "summary": "Parameters for one-dimensional Brownian motion with drift.",
@@ -155,7 +155,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/cir_params.schema.json",
-      "bytes": 673,
+      "bytes": 706,
       "kind": "input",
       "path": "schemas/models/1/cir_params.schema.json",
       "summary": "CIR process parameters.",
@@ -289,6 +289,15 @@
       "type_name": "ExerciseStyle"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/fbm_spec.schema.json",
+      "bytes": 2004,
+      "kind": "component",
+      "path": "schemas/models/1/fbm_spec.schema.json",
+      "summary": "Generator of the fractional increments consumed by the rough-volatility processes.",
+      "title": "FbmSpec",
+      "type_name": "FbmSpec"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/forward_greeks.schema.json",
       "bytes": 886,
       "kind": "component",
@@ -299,21 +308,12 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/gbm_params.schema.json",
-      "bytes": 670,
+      "bytes": 703,
       "kind": "input",
       "path": "schemas/models/1/gbm_params.schema.json",
       "summary": "Geometric Brownian Motion parameters.",
       "title": "GbmParams",
       "type_name": "GbmParams"
-    },
-    {
-      "$id": "https://finstack_quant.dev/schemas/models/1/gbm_path_summary.schema.json",
-      "bytes": 1179,
-      "kind": "output",
-      "path": "schemas/models/1/gbm_path_summary.schema.json",
-      "summary": "Compact captured GBM paths for plotting and diagnostics.",
-      "title": "GbmPathSummary",
-      "type_name": "GbmPathSummary"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/heston_params.schema.json",
@@ -425,12 +425,39 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/lmm_params.schema.json",
-      "bytes": 2268,
+      "bytes": 2301,
       "kind": "input",
       "path": "schemas/models/1/lmm_params.schema.json",
       "summary": "Parameters for the LMM/BGM model.",
       "title": "LmmParams",
       "type_name": "LmmParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/local_vol_params.schema.json",
+      "bytes": 3610,
+      "kind": "input",
+      "path": "schemas/models/1/local_vol_params.schema.json",
+      "summary": "Rates and local volatility surface of the Dupire local-volatility process.",
+      "title": "LocalVolParams",
+      "type_name": "LocalVolParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/local_vol_surface.schema.json",
+      "bytes": 1128,
+      "kind": "component",
+      "path": "schemas/models/1/local_vol_surface.schema.json",
+      "summary": "Dupire local volatility on an expiry-by-strike grid.",
+      "title": "LocalVolSurface",
+      "type_name": "LocalVolSurface"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/lrm_greeks.schema.json",
+      "bytes": 28509,
+      "kind": "output",
+      "path": "schemas/models/1/lrm_greeks.schema.json",
+      "summary": "Monte Carlo price with likelihood-ratio delta and vega from the same paths.",
+      "title": "LrmGreeks",
+      "type_name": "LrmGreeks"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/lvar_bangia_scalar.schema.json",
@@ -506,7 +533,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/multi_ou_params.schema.json",
-      "bytes": 1164,
+      "bytes": 1197,
       "kind": "input",
       "path": "schemas/models/1/multi_ou_params.schema.json",
       "summary": "Parameters for a multi-dimensional Ornstein-Uhlenbeck process.",
@@ -548,6 +575,24 @@
       "summary": "Serializable Expected Shortfall decomposition view.",
       "title": "ParametricEsDecompositionView",
       "type_name": "ParametricEsDecompositionView"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/path_simulation_spec.schema.json",
+      "bytes": 42038,
+      "kind": "input",
+      "path": "schemas/models/1/path_simulation_spec.schema.json",
+      "summary": "Complete, serializable description of one path simulation.",
+      "title": "PathSimulationSpec",
+      "type_name": "PathSimulationSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/path_summary.schema.json",
+      "bytes": 1708,
+      "kind": "output",
+      "path": "schemas/models/1/path_summary.schema.json",
+      "summary": "Simulated paths on a shared time grid.",
+      "title": "PathSummary",
+      "type_name": "PathSummary"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/pd_cycle_params.schema.json",
@@ -602,6 +647,15 @@
       "summary": "Complete position-level risk decomposition of a portfolio.",
       "title": "PositionRiskDecomposition",
       "type_name": "PositionRiskDecomposition"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/process_spec.schema.json",
+      "bytes": 31509,
+      "kind": "input",
+      "path": "schemas/models/1/process_spec.schema.json",
+      "summary": "Stochastic process to simulate, with its parameters.",
+      "title": "ProcessSpec",
+      "type_name": "ProcessSpec"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rating_factor_table.schema.json",
@@ -668,7 +722,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rough_bergomi_params.schema.json",
-      "bytes": 1542,
+      "bytes": 3161,
       "kind": "input",
       "path": "schemas/models/1/rough_bergomi_params.schema.json",
       "summary": "rBergomi model parameters.",
@@ -686,7 +740,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rough_heston_params.schema.json",
-      "bytes": 2000,
+      "bytes": 2033,
       "kind": "input",
       "path": "schemas/models/1/rough_heston_params.schema.json",
       "summary": "Rough Heston model parameters.",
@@ -701,6 +755,15 @@
       "summary": "SABR model parameters",
       "title": "SabrParameters",
       "type_name": "SabrParameters"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/scheme_spec.schema.json",
+      "bytes": 1200,
+      "kind": "component",
+      "path": "schemas/models/1/scheme_spec.schema.json",
+      "summary": "Time-discretization scheme used to advance the process.",
+      "title": "SchemeSpec",
+      "type_name": "SchemeSpec"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/schwartz_smith_params.schema.json",
@@ -758,7 +821,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/stochastic_prepay_spec.schema.json",
-      "bytes": 11934,
+      "bytes": 11911,
       "kind": "input",
       "path": "schemas/models/1/stochastic_prepay_spec.schema.json",
       "summary": "Stochastic prepayment model specification.",

@@ -103,14 +103,6 @@ NON_MAINTAINED_SERDE_EXCEPTIONS = (
         "src/return_contribution.rs",
         ("ReturnContributionSpec",),
     ),
-    *_classification(
-        "models",
-        "src/credit/registry.rs",
-        ("CreditAssumptionRegistry",),
-        "internal-registry-document",
-        "Embedded credit-assumption registry is loaded through component-specific validation "
-        "and is outside the maintained public persistence catalog.",
-    ),
     *_computed_output("core", "src/expr/ast.rs", ("EvaluationResult",)),
     *_in_process_spec("core", "src/market_data/bumps.rs", ("BumpSpec",)),
     *_computed_output("core", "src/money/fx/types.rs", ("FxRateResult",)),

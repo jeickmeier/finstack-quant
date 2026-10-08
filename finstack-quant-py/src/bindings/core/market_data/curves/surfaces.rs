@@ -10,10 +10,10 @@ use std::sync::Arc;
 use pyo3::prelude::*;
 
 use super::helpers::{
-    columns_to_dataframe, impl_arc_serde_pymethods, impl_repr_html_via_dataframe,
-    parse_vol_interpolation_mode, parse_vol_quote_type, parse_vol_surface_axis,
-    vol_interpolation_mode_name,
+    columns_to_dataframe, impl_arc_serde_pymethods, parse_vol_interpolation_mode,
+    parse_vol_quote_type, parse_vol_surface_axis, vol_interpolation_mode_name,
 };
+use crate::bindings::macros::impl_repr_html_via_dataframe;
 use crate::errors::core_to_py;
 
 enum VolInput {

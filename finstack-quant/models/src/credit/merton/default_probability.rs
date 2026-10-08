@@ -855,14 +855,10 @@ mod tests {
 
     #[test]
     fn jump_diffusion_pd_matches_monte_carlo() {
-        use finstack_quant_core::math::random::Pcg64Rng;
         let m = jump_diffusion_model(-0.30);
         let analytic = m.default_probability(2.0);
 
-        let mut rng = Pcg64Rng::new(7);
-        let paths = m
-            .simulate_paths(200_000, 200, 2.0, &mut rng, true)
-            .expect("paths");
+        let paths = m.simulate_paths(200_000, 200, 2.0, 7, true).expect("paths");
         let defaults = paths
             .iter_paths()
             .filter(|p| *p.last().expect("non-empty") < m.debt_barrier())

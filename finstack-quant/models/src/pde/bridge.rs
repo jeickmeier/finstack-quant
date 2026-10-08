@@ -1,11 +1,33 @@
 //! Feynman-Kac bridge: converts pricing parameters into PDE problems.
 //!
 //! Provides ready-made [`PdeProblem1D`] implementations for common pricing
-//! setups (Black-Scholes, local vol) so that pricers don't need to implement
-//! the trait from scratch.
+//! setups ([`BlackScholesPde`], [`LocalVolPde`]) so that pricers don't need to
+//! implement the trait from scratch.
 
 use super::boundary::BoundaryCondition;
 use super::problem::PdeProblem1D;
+use crate::volatility::local_vol::LocalVolSurface;
+
+/// Vanilla payoff at log-spot `x`.
+fn vanilla_payoff(x: f64, strike: f64, is_call: bool) -> f64 {
+    let s = x.exp(); // x = ln(S)
+    if is_call {
+        (s - strike).max(0.0)
+    } else {
+        (strike - s).max(0.0)
+    }
+}
+
+/// Far-field condition of a vanilla option at the lower (`upper = false`) or
+/// upper edge of the log-spot grid: zero on the deep out-of-the-money side,
+/// affine in `S = exp(x)` on the other.
+fn vanilla_boundary(is_call: bool, upper: bool) -> BoundaryCondition {
+    if is_call == upper {
+        BoundaryCondition::LinearInExp
+    } else {
+        BoundaryCondition::Dirichlet(0.0)
+    }
+}
 
 /// Black-Scholes PDE in log-spot coordinates.
 ///
@@ -56,34 +78,125 @@ impl PdeProblem1D for BlackScholesPde {
     }
 
     fn terminal_condition(&self, x: f64) -> f64 {
-        let s = x.exp(); // x = ln(S)
-        if self.is_call {
-            (s - self.strike).max(0.0)
-        } else {
-            (self.strike - s).max(0.0)
-        }
+        vanilla_payoff(x, self.strike, self.is_call)
     }
 
     fn lower_boundary(&self, _t: f64) -> BoundaryCondition {
-        if self.is_call {
-            // Deep OTM call → value ≈ 0
-            BoundaryCondition::Dirichlet(0.0)
-        } else {
-            BoundaryCondition::LinearInExp
-        }
+        vanilla_boundary(self.is_call, false)
     }
 
     fn upper_boundary(&self, _t: f64) -> BoundaryCondition {
-        if self.is_call {
-            BoundaryCondition::LinearInExp
-        } else {
-            // Deep OTM put → value ≈ 0
-            BoundaryCondition::Dirichlet(0.0)
-        }
+        vanilla_boundary(self.is_call, true)
     }
 
     fn is_time_homogeneous(&self) -> bool {
         true
+    }
+}
+
+/// Dupire local-volatility PDE in log-spot coordinates.
+///
+/// The Black-Scholes PDE with the constant volatility replaced by a local
+/// volatility `σ_loc(t, S)` read from a [`LocalVolSurface`]:
+///
+/// ```text
+/// du/dt = 0.5σ_loc² d²u/dx² + (r - q - 0.5σ_loc²) du/dx - r u,   σ_loc = σ_loc(t, eˣ)
+/// ```
+///
+/// where `x = ln(S)`. The solver passes each coefficient the calendar time
+/// `t` of the time level being assembled (it steps from `t = maturity` down
+/// to `t = 0`), which is the time axis of the surface: no conversion to
+/// time-to-maturity is involved. With the surface extracted by
+/// [`LocalVolSurface::from_implied_vol`] under forwards `S₀·exp((r − q)·T)`,
+/// the solution at `x = ln(S₀)` reprices the European options of the implied
+/// surface (Dupire 1994).
+///
+/// Terminal and boundary conditions are those of [`BlackScholesPde`]. The
+/// coefficients depend on time, so the operator is reassembled at every step.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_models::pde::{Grid1D, LocalVolPde, Solver1D};
+/// use finstack_quant_models::volatility::local_vol::LocalVolSurface;
+///
+/// // 25% volatility below 100 and 20% above, constant in time.
+/// let surface = LocalVolSurface::new(vec![1.0], vec![99.0, 101.0], vec![0.25, 0.20])?;
+/// let problem = LocalVolPde {
+///     surface,
+///     rate: 0.03,
+///     dividend: 0.01,
+///     strike: 100.0,
+///     is_call: true,
+/// };
+/// let spot: f64 = 100.0;
+/// let grid = Grid1D::sinh_concentrated((0.2 * spot).ln(), (5.0 * spot).ln(), 201, spot.ln(), 0.1)?;
+/// let solution = Solver1D::builder()
+///     .grid(grid)
+///     .rannacher(4, 100)
+///     .build()?
+///     .solve(&problem, 1.0)?;
+/// let price = solution.interpolate(spot.ln());
+/// assert!(price > 8.0 && price < 11.0);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+///
+/// # References
+///
+/// - Dupire, B. (1994). "Pricing with a Smile." *Risk*, 7(1), 18-20.
+///   `docs/REFERENCES.md#dupire-1994`
+/// - Gatheral, J. (2006). *The Volatility Surface: A Practitioner's Guide*.
+///   Wiley. Chapter 1. `docs/REFERENCES.md#gatheral-volatility-surface`
+pub struct LocalVolPde {
+    /// Local volatility `σ_loc(t, S)` as an annualized decimal: expiry axis
+    /// in years from the valuation date, strike axis in spot price units.
+    /// Flat outside its grid.
+    pub surface: LocalVolSurface,
+    /// Risk-free rate (continuous, decimal).
+    pub rate: f64,
+    /// Continuous dividend yield (decimal).
+    pub dividend: f64,
+    /// Strike price.
+    pub strike: f64,
+    /// True for call, false for put.
+    pub is_call: bool,
+}
+
+impl LocalVolPde {
+    /// Local variance `σ_loc(t, eˣ)²` at log-spot `x` and calendar time `t`.
+    fn local_variance(&self, x: f64, t: f64) -> f64 {
+        let sigma = self.surface.value(t, x.exp());
+        sigma * sigma
+    }
+}
+
+impl PdeProblem1D for LocalVolPde {
+    fn diffusion(&self, x: f64, t: f64) -> f64 {
+        0.5 * self.local_variance(x, t)
+    }
+
+    fn convection(&self, x: f64, t: f64) -> f64 {
+        self.rate - self.dividend - 0.5 * self.local_variance(x, t)
+    }
+
+    fn reaction(&self, _x: f64, _t: f64) -> f64 {
+        -self.rate
+    }
+
+    fn terminal_condition(&self, x: f64) -> f64 {
+        vanilla_payoff(x, self.strike, self.is_call)
+    }
+
+    fn lower_boundary(&self, _t: f64) -> BoundaryCondition {
+        vanilla_boundary(self.is_call, false)
+    }
+
+    fn upper_boundary(&self, _t: f64) -> BoundaryCondition {
+        vanilla_boundary(self.is_call, true)
+    }
+
+    fn is_time_homogeneous(&self) -> bool {
+        false
     }
 }
 
@@ -320,5 +433,277 @@ mod tests {
         }
         assert!(errors[1] < 0.03, "fine-grid price error {}", errors[1]);
         assert!(errors[1] < errors[0] / 4.0, "mesh errors {errors:?}");
+    }
+
+    // -----------------------------------------------------------------------
+    // Local volatility
+    // -----------------------------------------------------------------------
+
+    use crate::monte_carlo::process::local_vol::LocalVolParams;
+    use crate::monte_carlo::simulate::{
+        simulate_paths, PathSimulationSpec, ProcessSpec, SchemeSpec, TimeGridSpec,
+    };
+    use crate::volatility::implied_vol_black;
+    use crate::volatility::local_vol::test_support::{forwards, linspace, SKEWED};
+
+    const LV_SPOT: f64 = 100.0;
+    const LV_RATE: f64 = 0.03;
+    const LV_DIVIDEND: f64 = 0.01;
+
+    /// Solve a vanilla problem at `LV_SPOT` on a log-spot grid concentrated at
+    /// the strike, with Rannacher start-up.
+    fn solve_at_spot(problem: &dyn PdeProblem1D, strike: f64, expiry: f64) -> f64 {
+        let grid = Grid1D::sinh_concentrated(
+            (0.1 * LV_SPOT).ln(),
+            (8.0 * LV_SPOT).ln(),
+            801,
+            strike.ln(),
+            0.1,
+        )
+        .expect("valid grid");
+        let steps = (400.0 * expiry).round() as usize;
+        Solver1D::builder()
+            .grid(grid)
+            .rannacher(4, steps)
+            .build()
+            .expect("valid solver")
+            .solve(problem, expiry)
+            .expect("local-vol solve")
+            .interpolate(LV_SPOT.ln())
+    }
+
+    /// Local volatility of the shared skewed SSVI surface: 80 expiries from
+    /// 0.02 to 1.6 years by 361 strikes from 40 to 220.
+    fn skewed_local_vol() -> LocalVolSurface {
+        let expiries = linspace(0.02, 1.6, 80);
+        let strikes = linspace(40.0, 220.0, 361);
+        let forwards = forwards(LV_SPOT, LV_RATE - LV_DIVIDEND, &expiries);
+        let implied = SKEWED.surface(&expiries, &strikes, &forwards);
+        LocalVolSurface::from_implied_vol(&implied, &forwards).expect("surface extracts")
+    }
+
+    /// Black implied volatility of a discounted option price.
+    fn implied_vol(price: f64, strike: f64, expiry: f64, is_call: bool) -> f64 {
+        let forward = LV_SPOT * ((LV_RATE - LV_DIVIDEND) * expiry).exp();
+        let undiscounted = price * (LV_RATE * expiry).exp();
+        implied_vol_black(undiscounted, forward, strike, expiry, is_call).expect("price inverts")
+    }
+
+    /// With a flat surface the coefficients equal the Black-Scholes ones at
+    /// every node and time, so the two problems give the same solution; only
+    /// the per-step reassembly differs.
+    #[test]
+    fn local_vol_pde_with_a_flat_surface_is_the_black_scholes_pde() {
+        let sigma = 0.2;
+        let flat = LocalVolSurface::new(vec![0.5, 1.0], vec![50.0, 150.0], vec![sigma; 4])
+            .expect("flat grid");
+        for (strike, is_call) in [(90.0, true), (100.0, true), (115.0, false)] {
+            let local = LocalVolPde {
+                surface: flat.clone(),
+                rate: LV_RATE,
+                dividend: LV_DIVIDEND,
+                strike,
+                is_call,
+            };
+            let black_scholes = BlackScholesPde {
+                sigma,
+                rate: LV_RATE,
+                dividend: LV_DIVIDEND,
+                strike,
+                maturity: 1.0,
+                is_call,
+            };
+            assert!(!local.is_time_homogeneous());
+            let (a, b) = (
+                solve_at_spot(&local, strike, 1.0),
+                solve_at_spot(&black_scholes, strike, 1.0),
+            );
+            assert!((a - b).abs() < 1e-10 * b, "K={strike}: {a} vs {b}");
+        }
+    }
+
+    /// The defining Dupire property through the PDE: prices on the extracted
+    /// local volatility reprice the implied surface. Out-of-the-money options
+    /// on an 801-node grid with 400 steps per year.
+    ///
+    /// Measured: errors from -0.4 to -4.2 basis points of implied volatility,
+    /// largest at the 80 strike of the six-month expiry and shrinking like
+    /// `1/T` (at the money: -1.8, -1.0 and -0.7 basis points at 0.5, 1 and
+    /// 1.5 years). That is a fixed shortfall of about 4e-5 of total variance
+    /// from the first 0.02 years, where the implied grid has no expiry and
+    /// the local volatility is extrapolated flat from its first row.
+    #[test]
+    fn local_vol_pde_reprices_the_implied_surface() {
+        let surface = skewed_local_vol();
+        let mut worst_bp: f64 = 0.0;
+        for expiry in [0.5, 1.0, 1.5] {
+            let forward = LV_SPOT * ((LV_RATE - LV_DIVIDEND) * expiry).exp();
+            for strike in [80.0, 90.0, 100.0, 110.0, 120.0] {
+                let is_call = strike >= forward;
+                let problem = LocalVolPde {
+                    surface: surface.clone(),
+                    rate: LV_RATE,
+                    dividend: LV_DIVIDEND,
+                    strike,
+                    is_call,
+                };
+                let vol = implied_vol(
+                    solve_at_spot(&problem, strike, expiry),
+                    strike,
+                    expiry,
+                    is_call,
+                );
+                let target = SKEWED.implied_vol((strike / forward).ln(), expiry);
+                let error_bp = (vol - target) * 1e4;
+                println!("T={expiry} K={strike}: PDE {vol:.5} target {target:.5} {error_bp:+.2}bp");
+                worst_bp = worst_bp.max(error_bp.abs());
+                assert!(
+                    error_bp.abs() < 5.0,
+                    "T={expiry} K={strike}: PDE implied vol {vol} vs surface {target} \
+                     ({error_bp:+.2}bp)"
+                );
+            }
+        }
+        println!("worst PDE repricing error {worst_bp:.2}bp");
+    }
+
+    /// The local volatility must be read at calendar time. A European price
+    /// under a strike-independent volatility only sees the integrated
+    /// variance and cannot tell the two time axes apart, so this uses the
+    /// skewed surface, whose skew decays with time: reading it at
+    /// time-to-maturity misprices the wing by far more than the solver error
+    /// (measured: -1.1 basis points at calendar time, +192 reversed).
+    #[test]
+    fn local_vol_pde_reads_the_surface_at_calendar_time() {
+        /// The same problem with the surface read at `maturity - t`.
+        struct TimeToMaturity {
+            inner: LocalVolPde,
+            maturity: f64,
+        }
+        impl PdeProblem1D for TimeToMaturity {
+            fn diffusion(&self, x: f64, t: f64) -> f64 {
+                self.inner.diffusion(x, self.maturity - t)
+            }
+            fn convection(&self, x: f64, t: f64) -> f64 {
+                self.inner.convection(x, self.maturity - t)
+            }
+            fn reaction(&self, x: f64, t: f64) -> f64 {
+                self.inner.reaction(x, t)
+            }
+            fn terminal_condition(&self, x: f64) -> f64 {
+                self.inner.terminal_condition(x)
+            }
+            fn lower_boundary(&self, t: f64) -> BoundaryCondition {
+                self.inner.lower_boundary(t)
+            }
+            fn upper_boundary(&self, t: f64) -> BoundaryCondition {
+                self.inner.upper_boundary(t)
+            }
+        }
+
+        let (strike, expiry) = (80.0, 1.5);
+        let forward = LV_SPOT * ((LV_RATE - LV_DIVIDEND) * expiry).exp();
+        let target = SKEWED.implied_vol((strike / forward).ln(), expiry);
+        let problem = || LocalVolPde {
+            surface: skewed_local_vol(),
+            rate: LV_RATE,
+            dividend: LV_DIVIDEND,
+            strike,
+            is_call: false,
+        };
+        let calendar = implied_vol(
+            solve_at_spot(&problem(), strike, expiry),
+            strike,
+            expiry,
+            false,
+        );
+        let reversed = implied_vol(
+            solve_at_spot(
+                &TimeToMaturity {
+                    inner: problem(),
+                    maturity: expiry,
+                },
+                strike,
+                expiry,
+            ),
+            strike,
+            expiry,
+            false,
+        );
+        println!(
+            "calendar {:+.2}bp, reversed {:+.2}bp",
+            (calendar - target) * 1e4,
+            (reversed - target) * 1e4
+        );
+        assert!((calendar - target).abs() < 5e-4);
+        assert!(
+            (reversed - target).abs() > 30e-4,
+            "a reversed time axis must be visible: calendar {calendar}, reversed {reversed}, \
+             target {target}"
+        );
+    }
+
+    /// PDE and Monte Carlo on the same local volatility agree within the
+    /// Monte Carlo sampling error and its first-order time-stepping bias.
+    /// Measured: +0.7, +0.4 and -1.5 basis points of implied volatility.
+    #[test]
+    fn local_vol_pde_agrees_with_monte_carlo() {
+        let surface = skewed_local_vol();
+        let expiry = 1.0;
+        let paths = simulate_paths(&PathSimulationSpec {
+            process: ProcessSpec::LocalVol(
+                LocalVolParams::new(LV_RATE, LV_DIVIDEND, surface.clone()).expect("valid"),
+            ),
+            scheme: SchemeSpec::Default,
+            initial_state: vec![LV_SPOT],
+            time_grid: TimeGridSpec::Uniform {
+                expiry,
+                num_steps: 100,
+            },
+            num_paths: 100_000,
+            seed: 77,
+            antithetic: true,
+            fbm: None,
+        })
+        .expect("simulation");
+        let stride = paths.times.len();
+        let forward = LV_SPOT * ((LV_RATE - LV_DIVIDEND) * expiry).exp();
+        for strike in [85.0, 100.0, 115.0] {
+            let is_call = strike >= forward;
+            let mean_payoff = paths
+                .values
+                .chunks(stride)
+                .map(|path| {
+                    let spot = path[stride - 1];
+                    if is_call {
+                        (spot - strike).max(0.0)
+                    } else {
+                        (strike - spot).max(0.0)
+                    }
+                })
+                .sum::<f64>()
+                / paths.num_simulated_paths as f64;
+            let monte_carlo = implied_vol_black(mean_payoff, forward, strike, expiry, is_call)
+                .expect("Monte Carlo price inverts");
+            let problem = LocalVolPde {
+                surface: surface.clone(),
+                rate: LV_RATE,
+                dividend: LV_DIVIDEND,
+                strike,
+                is_call,
+            };
+            let pde = implied_vol(
+                solve_at_spot(&problem, strike, expiry),
+                strike,
+                expiry,
+                is_call,
+            );
+            let difference_bp = (pde - monte_carlo) * 1e4;
+            println!("K={strike}: PDE {pde:.5} MC {monte_carlo:.5} {difference_bp:+.1}bp");
+            assert!(
+                difference_bp.abs() < 25.0,
+                "K={strike}: PDE {pde} vs Monte Carlo {monte_carlo} ({difference_bp:+.1}bp)"
+            );
+        }
     }
 }

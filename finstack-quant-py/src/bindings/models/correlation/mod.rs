@@ -4,10 +4,11 @@
 //! probability utilities to Python under `finstack_quant.models.correlation`,
 //! mirroring the Rust module [`finstack_quant_models::correlation`].
 
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_object_to_single_row_dataframe_with_schema,
 };
-use crate::errors::{core_to_py, correlation_to_py, serde_json_to_py, value_error};
+use crate::errors::{core_to_py, correlation_to_py, value_error};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule, PyType};
 
@@ -116,32 +117,12 @@ impl PyCopulaSpec {
         self.inner.is_multi_factor()
     }
 
-    /// Serialize to the canonical JSON wire format (``{"type": ...}``).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "CopulaSpec serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid CopulaSpec JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CopulaSpec", &self.inner)
     }
 }
+
+wire_methods!(PyCopulaSpec, CopulaSpec, "CopulaSpec");
 
 /// Concrete copula model for portfolio default correlation.
 ///
@@ -293,32 +274,12 @@ impl PyRecoverySpec {
         }
     }
 
-    /// Serialize to the canonical JSON wire format (``{"type": ...}``).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "RecoverySpec serialization failed"))
-    }
-
-    /// Deserialize from JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` when the payload is malformed.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| serde_json_to_py(err, "invalid RecoverySpec JSON"))
-    }
-
-    /// Support ``pickle``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RecoverySpec", &self.inner)
     }
 }
+
+wire_methods!(PyRecoverySpec, RecoverySpec, "RecoverySpec");
 
 /// Concrete recovery model for credit portfolio pricing.
 ///
@@ -901,28 +862,6 @@ impl PyCreditExposure {
         self.inner.factor_loadings.clone()
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|error| value_error(error.to_string()))
-    }
-
-    /// Deserialize from JSON produced by `to_json`.
-    ///
-    /// Completes the wire round-trip, which is also what makes this type
-    /// picklable (see `__reduce__`).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_models::correlation::CreditExposure = serde_json::from_str(json)
-            .map_err(|err| serde_json_to_py(err, "invalid CreditExposure JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -932,6 +871,8 @@ impl PyCreditExposure {
         crate::bindings::repr_support::repr_from_serde("CreditExposure", &self.inner)
     }
 }
+
+wire_methods!(PyCreditExposure, CreditExposure, "CreditExposure");
 
 /// Settings for deterministic portfolio credit-loss simulation.
 ///
@@ -987,29 +928,6 @@ impl PyPortfolioLossConfig {
         PyCopulaSpec::from_inner(self.inner.copula.clone())
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|error| value_error(error.to_string()))
-    }
-
-    /// Deserialize from JSON produced by `to_json`.
-    ///
-    /// Completes the wire round-trip, which is also what makes this type
-    /// picklable (see `__reduce__`).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_models::correlation::PortfolioLossConfig =
-            serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid PortfolioLossConfig JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -1019,6 +937,12 @@ impl PyPortfolioLossConfig {
         crate::bindings::repr_support::repr_from_serde("PortfolioLossConfig", &self.inner)
     }
 }
+
+wire_methods!(
+    PyPortfolioLossConfig,
+    PortfolioLossConfig,
+    "PortfolioLossConfig"
+);
 
 /// Simulated loss distribution and loss-positive VaR/expected shortfall.
 #[pyclass(
@@ -1164,29 +1088,6 @@ impl PyPortfolioLossResult {
         )
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|error| value_error(error.to_string()))
-    }
-
-    /// Deserialize from JSON produced by `to_json`.
-    ///
-    /// Completes the wire round-trip, which is also what makes this type
-    /// picklable (see `__reduce__`).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_models::correlation::PortfolioLossResult =
-            serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid PortfolioLossResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -1196,6 +1097,12 @@ impl PyPortfolioLossResult {
         crate::bindings::repr_support::repr_from_serde("PortfolioLossResult", &self.inner)
     }
 }
+
+wire_methods!(
+    PyPortfolioLossResult,
+    PortfolioLossResult,
+    "PortfolioLossResult"
+);
 
 /// Expected loss, tail statistics, and breach probabilities for one tranche.
 #[pyclass(
@@ -1332,40 +1239,6 @@ impl PyTrancheLossStatistics {
         )
     }
 
-    /// Serialize to the canonical JSON wire format.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|error| value_error(error.to_string()))
-    }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
-
-    /// Deserialize from JSON produced by `to_json`.
-    ///
-    /// Completes the wire round-trip, which is also what makes this type
-    /// picklable (see `__reduce__`).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_models::correlation::TrancheLossStatistics =
-            serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid TrancheLossStatistics JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -1375,6 +1248,13 @@ impl PyTrancheLossStatistics {
         crate::bindings::repr_support::repr_from_serde("TrancheLossStatistics", &self.inner)
     }
 }
+
+wire_methods!(
+    PyTrancheLossStatistics,
+    TrancheLossStatistics,
+    "TrancheLossStatistics"
+);
+impl_repr_html_via_dataframe!(PyTrancheLossStatistics);
 
 fn record_item<'py>(record: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyAny>> {
     record
@@ -1605,7 +1485,7 @@ fn nearest_correlation(
         max_iter: max_iter.unwrap_or(defaults.max_iter),
         tol: tol.unwrap_or(defaults.tol),
     };
-    py.detach(|| corr::nearest_correlation_matrix(&matrix, n, opts))
+    py.detach(|| corr::nearest_correlation(&matrix, n, opts))
         .map_err(|err| correlation_to_py(corr::Error::from(err)))
 }
 

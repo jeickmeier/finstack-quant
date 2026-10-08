@@ -37,10 +37,6 @@ pub use envelope::{
 };
 pub use report::{MaterializationPhases, MaterializationReport};
 
-/// Persistence contract for [`PortfolioMaterializationEnvelope`].
-pub const PORTFOLIO_MATERIALIZATION_CONTRACT: ContractDescriptor =
-    ContractDescriptor::new("finstack_quant.portfolio_materialization");
-
 type MaterializationInput = PortfolioMaterializationEnvelope;
 
 struct PreparedArtifact {

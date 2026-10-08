@@ -18,6 +18,30 @@ impl ForwardCurve {
         builder
     }
 
+    /// Rebuild this curve with replacement knots while preserving all metadata.
+    ///
+    /// This retains the id, tenor, reset lag, day count, interpolation,
+    /// extrapolation, projection grid, calibration provenance and FX policy.
+    /// Replacement pillars define a new interpolation; previous roll and shock
+    /// transformations are not reapplied to them.
+    ///
+    /// # Arguments
+    ///
+    /// * `knots` - Replacement `(time, forward_rate)` pillars: times in year
+    ///   fractions from the base date under the curve's day count, rates as
+    ///   decimals (0.05 = 5%).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the replacement knots violate the curve's
+    /// validation or interpolation constraints.
+    pub fn rebuild_with_knots<I>(&self, knots: I) -> crate::Result<Self>
+    where
+        I: IntoIterator<Item = (f64, f64)>,
+    {
+        self.metadata_builder(self.id.clone()).knots(knots).build()
+    }
+
     /// Builder pre-populated with this curve's full metadata but **no** knots.
     /// Shared by all rebuild-style operations (bumps, rolls) so that no
     /// metadata field (reset lag, day-count, interpolation, extrapolation,

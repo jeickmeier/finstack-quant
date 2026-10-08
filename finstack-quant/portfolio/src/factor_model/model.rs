@@ -22,7 +22,7 @@
 
 use super::assignment::{assign_position_factors, FactorAssignmentReport};
 use super::dependencies::flatten as flatten_dependencies;
-use super::whatif::{StressPnl, StressResult, WhatIfEngine};
+use super::whatif::{StressPnl, StressResult};
 use crate::error::{Error, Result};
 use crate::sensitivity::{
     exact_factor_market_keys, DeltaBasedEngine, FactorSensitivityEngine, SensitivityMatrix,
@@ -36,7 +36,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_models::factor::matching::ISSUER_ID_META_KEY;
 use finstack_quant_models::factor::risk::{
-    apply_residual_contributions, ParametricDecomposer, PositionResidualContribution,
+    apply_residual_contributions, decompose_factors, PositionResidualContribution,
     ResidualContributionSource, RiskDecomposition,
 };
 use finstack_quant_models::factor::{
@@ -57,7 +57,6 @@ pub struct FactorModel {
     covariance: FactorCovarianceMatrix,
     matcher: Box<dyn finstack_quant_models::factor::FactorMatcher>,
     sensitivity_engine: Box<dyn FactorSensitivityEngine>,
-    decomposer: ParametricDecomposer,
     risk_measure: RiskMeasure,
     unmatched_policy: UnmatchedPolicy,
     bump_config: BumpSizeConfig,
@@ -98,7 +97,6 @@ impl FactorModel {
             covariance: config.covariance,
             matcher,
             sensitivity_engine,
-            decomposer: ParametricDecomposer,
             risk_measure: config.risk_measure,
             unmatched_policy: config.unmatched_policy.unwrap_or_default(),
             bump_config,
@@ -338,7 +336,7 @@ impl FactorModel {
                 // (`attribution::credit_factor`). Dropping the beta here
                 // would overstate risk for defensive names (β < 1) and
                 // understate it for levered ones (β > 1).
-                let current = sensitivities.delta(position_idx, factor_idx);
+                let current = sensitivities.delta(position_idx, factor_idx)?;
                 let weighted_delta = current + *beta * delta;
                 if !weighted_delta.is_finite() {
                     return Err(Error::invalid_input(format!(
@@ -427,8 +425,7 @@ impl FactorModel {
             &mut credit_exposures,
         )?;
         let mut decomposition =
-            self.decomposer
-                .decompose(&sensitivities, &self.covariance, &self.risk_measure)?;
+            decompose_factors(&sensitivities, &self.covariance, &self.risk_measure)?;
         self.add_credit_residual_risk_with_credit_exposures(
             &mut decomposition,
             portfolio,
@@ -552,32 +549,6 @@ impl FactorModel {
         )?)
     }
 
-    /// Create a what-if engine anchored to a base decomposition and sensitivity matrix.
-    ///
-    /// # Arguments
-    ///
-    /// * `base` - Previously computed baseline risk decomposition.
-    /// * `sensitivities` - Baseline sensitivity matrix.
-    /// * `portfolio` - Portfolio associated with the baseline analysis.
-    /// * `market` - Baseline market context.
-    /// * `as_of` - Valuation date associated with the baseline analysis.
-    ///
-    /// # Returns
-    ///
-    /// What-if engine that can evaluate factor changes relative to the supplied
-    /// baseline.
-    #[must_use]
-    pub fn what_if<'a>(
-        &'a self,
-        base: &'a RiskDecomposition,
-        sensitivities: &'a SensitivityMatrix,
-        portfolio: &'a Portfolio,
-        market: &'a MarketContext,
-        as_of: Date,
-    ) -> WhatIfEngine<'a> {
-        WhatIfEngine::new(self, base, sensitivities, portfolio, market, as_of)
-    }
-
     /// Shock configured factors and reprice the portfolio without decomposing
     /// stressed risk.
     ///
@@ -618,9 +589,8 @@ impl FactorModel {
     /// under the stressed market.
     ///
     /// This direct workflow does not compute an unused baseline sensitivity
-    /// matrix. Call [`Self::what_if`] only when a position remove/resize
-    /// scenario also needs the supplied baseline decomposition and
-    /// sensitivities.
+    /// matrix; use [`Self::position_what_if`] for position remove/resize
+    /// scenarios against a baseline decomposition.
     ///
     /// # Arguments
     ///
@@ -654,8 +624,9 @@ impl FactorModel {
     /// Run a position remove/resize what-if against this model's baseline.
     ///
     /// Decomposes the portfolio's baseline risk with
-    /// [`Self::analyze_with_sensitivities`], then applies `changes` through the
-    /// [`WhatIfEngine`](super::WhatIfEngine) built on that baseline.
+    /// [`Self::analyze_with_sensitivities`], then applies `changes` to that
+    /// baseline: a removal zeroes the position's sensitivity row and a resize
+    /// scales it in proportion to the original nonzero quantity.
     ///
     /// # Arguments
     ///
@@ -682,17 +653,11 @@ impl FactorModel {
         as_of: Date,
         changes: &[super::PositionChange],
     ) -> Result<super::WhatIfResult> {
-        let (base, sensitivities) = self.analyze_with_sensitivities(portfolio, market, as_of)?;
-        self.what_if(&base, &sensitivities, portfolio, market, as_of)
-            .position_what_if(changes)
+        super::whatif::position_what_if(self, portfolio, market, as_of, changes)
     }
 
     pub(crate) fn covariance(&self) -> &FactorCovarianceMatrix {
         &self.covariance
-    }
-
-    pub(crate) fn decomposer(&self) -> &ParametricDecomposer {
-        &self.decomposer
     }
 
     pub(crate) fn risk_measure(&self) -> &RiskMeasure {
@@ -789,7 +754,7 @@ impl FactorModel {
                 };
                 let Some(entries) = self
                     .matcher
-                    .match_factor_with_betas(dependency, position.instrument.attributes())
+                    .match_factor(dependency, position.instrument.attributes())
                     .map_err(|e| Error::invalid_input(e.to_string()))?
                 else {
                     continue;
@@ -1495,7 +1460,7 @@ pub(super) mod tests {
     }
 
     /// Returns a sensitivity engine that places known deltas for a single
-    /// position so the downstream `ParametricDecomposer` can be verified.
+    /// position so the downstream `decompose_factors` can be verified.
     struct KnownDeltaEngine {
         deltas: Vec<f64>,
     }
@@ -2038,8 +2003,8 @@ pub(super) mod tests {
             .compute_sensitivities(&portfolio, &market, as_of)
             .expect("sensitivities");
 
-        let generic = sensitivities.delta(0, 0);
-        let rating = sensitivities.delta(0, 1);
+        let generic = sensitivities.delta(0, 0).expect("in range");
+        let rating = sensitivities.delta(0, 1).expect("in range");
         assert!(
             generic.abs() > 1e-8,
             "canonical bond should have credit sensitivity"
@@ -2415,8 +2380,8 @@ pub(super) mod tests {
         let unit_matrix = model
             .compute_sensitivities(&unit_portfolio, &market, as_of)
             .expect("ordinary quote-space credit sensitivities remain finite");
-        assert!(unit_matrix.delta(0, 0).is_finite());
-        assert!(unit_matrix.delta(0, 0).abs() > 1.0);
+        assert!(unit_matrix.delta(0, 0).expect("in range").is_finite());
+        assert!(unit_matrix.delta(0, 0).expect("in range").abs() > 1.0);
 
         let huge_portfolio = credit_bond_portfolio(as_of, &curve_id, &[("credit", 1e308)]);
         let error = model
@@ -2636,8 +2601,8 @@ pub(super) mod tests {
                 - tranche.value_raw(&down, as_of).expect("down PV"))
                 / 2.0;
             assert!(manual.abs() > 1.0);
-            assert!((matrix.delta(0, factor_idx) - manual).abs() < 1e-8);
-            assert!((full_matrix.delta(0, factor_idx) - manual).abs() < 1e-8);
+            assert!((matrix.delta(0, factor_idx).expect("in range") - manual).abs() < 1e-8);
+            assert!((full_matrix.delta(0, factor_idx).expect("in range") - manual).abs() < 1e-8);
             let pnl = model
                 .factor_stress_pnl(
                     &portfolio,

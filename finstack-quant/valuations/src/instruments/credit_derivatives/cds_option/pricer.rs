@@ -26,7 +26,7 @@ use crate::instruments::credit_derivatives::cds::{
 use crate::instruments::credit_derivatives::cds_option::CdsOption;
 use crate::pricer::expect_inst;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 

@@ -148,12 +148,7 @@ impl SwaptionHullWhitePricer {
                 .tree_steps
                 .unwrap_or(self.tree_steps),
         );
-        let tree = HullWhiteTree::calibrate_with_times(
-            config,
-            &discount,
-            swap_end_time,
-            &[time_to_expiry],
-        )?;
+        let tree = HullWhiteTree::calibrate(config, &discount, swap_end_time, &[time_to_expiry])?;
 
         let strike = swaption.strike_f64()?;
 

@@ -111,7 +111,7 @@
 //!
 //! # OAS
 //!
-//! Option-adjusted spread is read from `initial_vars["oas"]` (basis points) and
+//! Option-adjusted spread is passed to pricing as `oas_bp` (basis points) and
 //! applied as a parallel shift to calibrated short rates during backward induction.
 //! This matches the `ShortRateTree` convention.
 //!
@@ -146,16 +146,13 @@
 use finstack_quant_cashflows::builder::rate_helpers::{
     calculate_floating_rate, FloatingRateParams,
 };
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::BrentSolver;
-use finstack_quant_core::HashMap;
 use finstack_quant_core::{Error, Result};
 
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::RandomStream;
 
-use super::short_rate_keys;
-use super::tree_framework::{CachedValues, NodeState, TreeModel, TreeValuator};
+use super::tree_framework::{NodeState, TreeValuator};
 
 mod calibration;
 mod pricing;
@@ -249,7 +246,7 @@ pub struct RatesCreditCalibrationTargets {
 /// are non-negative and sum to one. Their marginals exactly preserve the
 /// factor transition probabilities used during calibration.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct RatesCreditTransition {
+pub(crate) struct RatesCreditTransition {
     /// Probability that both the rate and hazard factors move up.
     pub up_up: f64,
     /// Probability that the rate factor moves up and the hazard factor moves
@@ -391,10 +388,6 @@ pub struct RatesCreditTree {
     hazard_ref: f64,
     /// Hazard floor-saturation diagnostic from the most recent `calibrate()`.
     hazard_floor_saturation: HazardFloorSaturation,
-    /// Rate-factor variance retention from the most recent `calibrate()`.
-    rate_variance_retention: VarianceRetention,
-    /// Hazard-factor variance retention from the most recent `calibrate()`.
-    hazard_variance_retention: VarianceRetention,
     /// Explicit calibration coordinates. Empty until calibration succeeds.
     calibration_times: Vec<f64>,
 }
@@ -681,8 +674,6 @@ impl RatesCreditTree {
             rate_ref: 0.0,
             hazard_ref: 0.0,
             hazard_floor_saturation: HazardFloorSaturation::default(),
-            rate_variance_retention: VarianceRetention::default(),
-            hazard_variance_retention: VarianceRetention::default(),
             calibration_times: Vec::new(),
         }
     }
@@ -723,7 +714,12 @@ impl RatesCreditTree {
     /// default (`min_retention = 1.0`) for an uncalibrated tree or one without
     /// rate mean reversion.
     pub fn rate_variance_retention(&self) -> VarianceRetention {
-        self.rate_variance_retention
+        self.variance_retention(
+            &self.calibrated_rates,
+            self.rate_ref,
+            self.config.rate_mean_reversion,
+            self.config.rate_vol,
+        )
     }
 
     /// Hazard-factor conditional-variance retention from the most recent
@@ -732,7 +728,27 @@ impl RatesCreditTree {
     /// See [`VarianceRetention`]. Returns the undistorted default for an
     /// uncalibrated tree or one without hazard mean reversion.
     pub fn hazard_variance_retention(&self) -> VarianceRetention {
-        self.hazard_variance_retention
+        self.variance_retention(
+            &self.calibrated_hazards,
+            self.hazard_ref,
+            self.config.hazard_mean_reversion,
+            self.config.hazard_vol,
+        )
+    }
+
+    /// Scan one calibrated factor lattice for its variance retention; the
+    /// undistorted default for an uncalibrated tree.
+    fn variance_retention(
+        &self,
+        levels: &[FactorRow],
+        reference: f64,
+        kappa: f64,
+        sigma: f64,
+    ) -> VarianceRetention {
+        let Ok(dt) = self.calibrated_dt() else {
+            return VarianceRetention::default();
+        };
+        Self::scan_variance_retention(levels, self.config.steps, reference, kappa, sigma, dt)
     }
 
     /// Return the recovery rate from the most recent `calibrate()` call.
@@ -789,23 +805,6 @@ impl RatesCreditTree {
     fn calibrated_dt(&self) -> Result<f64> {
         let times = self.time_grid()?;
         Ok(times[1] - times[0])
-    }
-
-    /// Validate that a legacy tree-pricing horizon matches calibration.
-    fn validate_pricing_horizon(&self, time_to_maturity: f64) -> Result<f64> {
-        let times = self.time_grid()?;
-        let calibrated_horizon = times[self.config.steps];
-        let tolerance = 1e-12_f64.max(calibrated_horizon.abs() * 1e-10);
-        if !time_to_maturity.is_finite()
-            || time_to_maturity <= 0.0
-            || (time_to_maturity - calibrated_horizon).abs() > tolerance
-        {
-            return Err(Error::Validation(format!(
-                "rates-credit pricing horizon {time_to_maturity} does not match the \
-                 calibrated horizon {calibrated_horizon}"
-            )));
-        }
-        self.calibrated_dt()
     }
 
     /// Largest `|ρ|` this calibrated lattice can express.

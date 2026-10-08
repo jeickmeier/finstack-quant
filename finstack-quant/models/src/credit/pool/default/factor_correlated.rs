@@ -4,7 +4,7 @@
 //! (`Z < 0`) is the stress state, so a positive `factor_loading` scales the
 //! base default curve UP when `Z` falls (`exp(−loading·Z·σ)`).
 
-use super::traits::{MacroCreditFactors, StochasticDefault};
+use super::traits::StochasticDefault;
 use finstack_quant_cashflows::builder::specs::DefaultModelSpec;
 
 /// Default model that shocks a deterministic default curve by a systematic factor.
@@ -35,12 +35,7 @@ impl FactorCorrelatedDefault {
 }
 
 impl StochasticDefault for FactorCorrelatedDefault {
-    fn conditional_mdr(
-        &self,
-        seasoning: u32,
-        factors: &[f64],
-        _macro_factors: &MacroCreditFactors,
-    ) -> f64 {
+    fn conditional_mdr(&self, seasoning: u32, factors: &[f64]) -> f64 {
         let base_mdr = self.base_mdr_at_seasoning(seasoning);
         if base_mdr <= f64::EPSILON {
             return 0.0;
@@ -59,10 +54,6 @@ impl StochasticDefault for FactorCorrelatedDefault {
     /// model.
     fn correlation(&self) -> f64 {
         self.factor_loading.abs().clamp(0.0, 0.99)
-    }
-
-    fn model_name(&self) -> &'static str {
-        "Factor-Correlated Default"
     }
 
     fn expected_mdr(&self, seasoning: u32) -> f64 {
@@ -96,7 +87,7 @@ mod tests {
                 .map(|i| {
                     let z = -10.0 + (f64::from(i) + 0.5) * step;
                     let density = (-0.5 * z * z).exp() / (2.0 * std::f64::consts::PI).sqrt();
-                    model.conditional_mdr(30, &[z], &MacroCreditFactors::default()) * density * step
+                    model.conditional_mdr(30, &[z]) * density * step
                 })
                 .sum();
             assert!((model.expected_mdr(30) - integrated).abs() < 1e-8);
@@ -106,9 +97,6 @@ mod tests {
     #[test]
     fn deterministic_expected_mdr_matches_the_conditional_cap() {
         let model = FactorCorrelatedDefault::new(DefaultModelSpec::constant_cdr(1.0), 1.0, 0.0);
-        assert_eq!(
-            model.expected_mdr(30),
-            model.conditional_mdr(30, &[0.0], &MacroCreditFactors::default())
-        );
+        assert_eq!(model.expected_mdr(30), model.conditional_mdr(30, &[0.0]));
     }
 }

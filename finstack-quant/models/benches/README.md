@@ -14,7 +14,7 @@ crate's nested `monte_carlo` module.
 | Group | Id | Measures |
 |-------|-----|----------|
 | `european_pricer` | `paths/10000` | `EuropeanPricer::price` over `GbmProcess`, 252 steps, `with_seed(42)`, `with_parallel(false)`. The pricer selects `ExactGbm` internally, so no discretization is passed at the callsite |
-| `lsmc_pricer` | `paths/5000` | `LsmcPricer::price` for an `AmericanPut` with 12 monthly exercise dates and a degree-2 `PolynomialBasis` — full backward induction |
+| `lsmc_pricer` | `paths/5000` | `LsmcPricer::price` for a put `AmericanExercise` with 12 monthly exercise dates and a degree-2 `PolynomialBasis` — full backward induction |
 | `lsq_regression` | `observations/500` | `solve_least_squares` alone: the SVD solve LSMC performs once per exercise date, on a deterministic 500×3 design |
 | `heston_qe_pricer` | `paths/5000` | `McEngine::price` with `HestonProcess` + `QeHeston`, exercising `populate_path_state`, the QE variance step, and the per-step `dt`-constant transcendentals |
 | `rough_heston_step` | `steps/100`, `steps/252` | `RoughHestonHybrid::step` driven directly in a per-path loop, isolating the O(n²)-per-path Volterra discretization from engine overhead |

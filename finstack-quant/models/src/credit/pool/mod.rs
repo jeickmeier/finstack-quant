@@ -10,10 +10,9 @@ pub mod prepayment;
 
 pub use correlation::CorrelationStructure;
 pub use default::{
-    MacroCreditFactors, PerNameCopulaDefault, PoolGranularity, StochasticDefault,
-    StochasticDefaultSpec,
+    PerNameCopulaDefault, PoolGranularity, StochasticDefault, StochasticDefaultSpec,
 };
-pub use prepayment::{RichardRollPrepay, StochasticPrepaySpec, StochasticPrepayment};
+pub use prepayment::{StochasticPrepaySpec, StochasticPrepayment};
 
 fn clamped_cdr_to_mdr(cdr: f64) -> f64 {
     finstack_quant_cashflows::builder::cdr_to_mdr(cdr.clamp(0.0, 1.0)).unwrap_or(f64::NAN)

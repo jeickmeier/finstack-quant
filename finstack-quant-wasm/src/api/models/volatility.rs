@@ -7,14 +7,14 @@
 
 use crate::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube};
 use crate::utils::input::{
-    from_js_json, invalid_type, js_bool, js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_string,
-    js_uint,
+    from_js_json, invalid_type, js_bool, js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_uint,
 };
 use crate::utils::wire::js_wire;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::market_data::surfaces::{VolCubeExpirySlice, VolSurface};
 use finstack_quant_models::volatility as vol;
 use finstack_quant_models::volatility::arbitrage as model_arbitrage;
+use finstack_quant_models::volatility::local_vol::LocalVolSurface;
 use finstack_quant_models::volatility::sabr::{
     SabrCalibrator, SabrModel, SabrParameters, SabrShift, SabrSmile,
 };
@@ -28,6 +28,8 @@ use wasm_bindgen::prelude::*;
 pub struct JsSabrParameters {
     pub(crate) inner: SabrParameters,
 }
+
+json_round_trip!(JsSabrParameters, SabrParameters);
 
 #[wasm_bindgen(js_class = SabrParameters)]
 impl JsSabrParameters {
@@ -223,32 +225,6 @@ impl JsSabrParameters {
         let rho = js_f64(&rho, "rho")?;
         let shift = js_f64(&shift, "shift")?;
         SabrParameters::shifted_lognormal(alpha, nu, rho, shift)
-            .map(Self::from_inner)
-            .map_err(to_js_err)
-    }
-
-    /// Serialize to the Rust `SabrParameters` JSON wire form.
-    ///
-    /// @returns JSON text with `alpha`, `beta`, `nu`, `rho` and, when set, `shift`.
-    /// @throws If serialization fails (not expected).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from the Rust `SabrParameters` JSON wire form produced by `toJson`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - JSON text with `alpha`, `beta`, `nu`, `rho` and an optional
-    ///   `shift`; unknown fields are rejected and every field is range-checked.
-    ///
-    /// @returns The parsed `SabrParameters` handle.
-    /// @throws `TypeError` if `json` is not a string; `FinstackError` (kind
-    /// `validation`) on malformed JSON, an unknown field, or a parameter outside its domain.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsSabrParameters, JsValue> {
-        serde_json::from_str(&js_string(&json, "json")?)
             .map(Self::from_inner)
             .map_err(to_js_err)
     }
@@ -1082,46 +1058,6 @@ pub fn strike_to_delta(
     Ok(vol::strike_to_delta(strike, forward, vol, expiry))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn sabr_params_equity_default_roundtrip() {
-        let p = JsSabrParameters::equity_default();
-        assert!((p.alpha() - 0.20).abs() < 1e-12);
-        assert!((p.beta() - 1.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn sabr_auto_shift_fits_negative_rate_smile() {
-        // Native tests cannot construct `JsValue` strings or Debug a `JsValue`
-        // error: both abort off wasm32. Drive the same `"auto"` policy through
-        // the Rust keyword parser the binding calls and the domain calibrator.
-        // Synthetic quotes use the documented 2% ladder rung
-        // (`-min(strike)+10bp = 1.6%` rounds up to 2%), matching the JS facade
-        // and Python bindings.
-        let policy = "auto".parse::<SabrShift>().expect("auto shift policy");
-        let p = SabrParameters::new_with_shift(0.05, 0.5, 0.4, -0.1, 0.02).expect("params");
-        let forward = -0.005;
-        let strikes = vec![-0.015, -0.01, -0.005, 0.0, 0.005];
-        let vols = SabrSmile::new(SabrModel::new(p), forward, 1.0)
-            .generate_smile(&strikes)
-            .expect("smile");
-
-        let fitted = SabrCalibrator::new()
-            .with_shift(policy)
-            .calibrate(forward, &strikes, &vols, 1.0, 0.5)
-            .expect("auto-shift calibrate");
-        let shift = fitted
-            .shift()
-            .expect("negative-rate fit must carry a shift");
-        assert!(shift > 0.0);
-        assert!(fitted.is_shifted());
-        assert!((shift - 0.02).abs() < 1e-12);
-    }
-}
-
 #[wasm_bindgen(js_class = SabrSmile)]
 impl JsSabrSmile {
     /// Forward price or rate the smile is built around.
@@ -1168,6 +1104,129 @@ pub fn svi_total_variance(params: JsValue, k: JsValue) -> Result<f64, JsValue> {
 pub fn svi_durrleman_g(params: JsValue, k: JsValue) -> Result<f64, JsValue> {
     let params: SviParams = from_js_json(&params, "params")?;
     Ok(params.durrleman_g(js_f64(&k, "k")?))
+}
+/// Extract Dupire local volatility from an implied volatility surface.
+///
+/// Twin of the Rust and Python `LocalVolSurface.from_implied_vol`. The local
+/// variance at each node of the implied grid is `(dw/dT) / g` in total
+/// variance `w = sigma^2 T` and log-moneyness `k = ln(K / F_T)` (Gatheral
+/// 2006, eq. 1.10), with the time derivative taken at fixed `k`.
+/// @param surface - `VolSurface` object or JSON in the canonical wire form: unshifted Black implied volatilities (decimals) on expiries in years and positive cash strikes, at least two expiries and three strikes.
+/// @param forwards - Forward price of the underlying for each surface expiry, in strike units and in the order of `surface.expiries`; finite and positive. For a flat carry, `F(T) = S * exp((r - q) * T)`.
+/// @returns The `LocalVolSurface` object: `expiries` in years, `strikes`, and `local_vols` as annualized decimals in row-major order (`local_vols[i * strikes.length + j]` for expiry `i`, strike `j`).
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const implied = {
+///   id: "FLAT",
+///   expiries: [0.5, 1.0],
+///   strikes: [90, 100, 110],
+///   vols_row_major: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+///   secondary_axis: "strike" as const,
+///   interpolation_mode: "vol" as const,
+///   quote_type: "black_lognormal" as const,
+/// };
+/// const local = models.volatility.localVolFromImpliedVol(implied, [100, 100]);
+/// console.log(local.expiries, local.strikes); // [0.5, 1] [90, 100, 110]
+/// console.log(local.local_vols.every((v) => Math.abs(v - 0.2) < 1e-12)); // true
+/// ```
+///
+/// # Errors
+///
+/// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
+/// `validation` error if `surface` is malformed, has fewer than two expiries
+/// or three strikes, is not an unshifted Black strike surface, `forwards` has
+/// the wrong length or a non-positive entry, or the surface has butterfly or
+/// calendar arbitrage at a node (the message names the node).
+#[wasm_bindgen(js_name = localVolFromImpliedVol)]
+pub fn local_vol_from_implied_vol(surface: JsValue, forwards: JsValue) -> Result<JsValue, JsValue> {
+    let surface: VolSurface = from_js_json(&surface, "surface")?;
+    let forwards = js_f64_seq(&forwards, "forwards")?;
+    let local = LocalVolSurface::from_implied_vol(&surface, &forwards).map_err(to_js_err)?;
+    to_js_value(&local)
+}
+
+/// Extract Dupire local volatility after Gaussian smoothing of the implied
+/// volatilities along the strike axis.
+///
+/// Twin of the Rust and Python `LocalVolSurface.from_implied_vol_smoothed`.
+/// Smoothing regularises the second strike derivative, the usual source of a
+/// non-positive Dupire density on market-calibrated grids.
+/// @param surface - `VolSurface` object or JSON, as for `localVolFromImpliedVol`.
+/// @param forwards - One forward per surface expiry, as for `localVolFromImpliedVol`.
+/// @param sigma_strikes - Standard deviation of the Gaussian kernel in strike (price) units, non-negative; zero disables smoothing.
+/// @returns The `LocalVolSurface` object on the grid of `surface`.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const implied = {
+///   id: "FLAT",
+///   expiries: [0.5, 1.0],
+///   strikes: [90, 100, 110],
+///   vols_row_major: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+///   secondary_axis: "strike" as const,
+///   interpolation_mode: "vol" as const,
+///   quote_type: "black_lognormal" as const,
+/// };
+/// const local = models.volatility.localVolFromImpliedVolSmoothed(implied, [100, 100], 5.0);
+/// console.log(local.local_vols.length); // 6
+/// ```
+///
+/// # Errors
+///
+/// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
+/// `validation` error if `sigmaStrikes` is negative or non-finite, or for any
+/// error of `localVolFromImpliedVol` on the smoothed surface.
+#[wasm_bindgen(js_name = localVolFromImpliedVolSmoothed)]
+pub fn local_vol_from_implied_vol_smoothed(
+    surface: JsValue,
+    forwards: JsValue,
+    sigma_strikes: JsValue,
+) -> Result<JsValue, JsValue> {
+    let surface: VolSurface = from_js_json(&surface, "surface")?;
+    let forwards = js_f64_seq(&forwards, "forwards")?;
+    let sigma_strikes = js_f64(&sigma_strikes, "sigmaStrikes")?;
+    let local = LocalVolSurface::from_implied_vol_smoothed(&surface, &forwards, sigma_strikes)
+        .map_err(to_js_err)?;
+    to_js_value(&local)
+}
+
+/// Evaluate a local volatility surface: bilinear inside its grid, flat
+/// outside it.
+///
+/// Twin of the Rust and Python `LocalVolSurface.value`.
+/// @param local_vol - `LocalVolSurface` object or JSON (`expiries`, `strikes`, `local_vols`), validated on decode.
+/// @param expiry - Time in years from the valuation date.
+/// @param strike - Level of the underlying in price units.
+/// @returns The local volatility as an annualized decimal.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const local = { expiries: [1, 2], strikes: [100, 200], local_vols: [0.1, 0.2, 0.3, 0.4] };
+/// console.log(models.volatility.localVolValue(local, 1.5, 150)); // 0.25
+/// console.log(models.volatility.localVolValue(local, 9, 50)); // 0.3
+/// ```
+///
+/// # Errors
+///
+/// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
+/// `validation` error if `localVol` is malformed: an empty or unsorted axis,
+/// a non-positive strike, a negative volatility or a value count that does
+/// not match the grid.
+#[wasm_bindgen(js_name = localVolValue)]
+pub fn local_vol_value(
+    local_vol: JsValue,
+    expiry: JsValue,
+    strike: JsValue,
+) -> Result<f64, JsValue> {
+    let local_vol: LocalVolSurface = from_js_json(&local_vol, "localVol")?;
+    Ok(local_vol.value(js_f64(&expiry, "expiry")?, js_f64(&strike, "strike")?))
 }
 
 fn grid_tolerance(tolerance: Option<&JsValue>) -> Result<f64, JsValue> {
@@ -1509,4 +1568,44 @@ pub fn materialize_fx_delta_surface(
     )
     .map_err(to_js_err)?;
     to_js_value(&surface)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sabr_params_equity_default_roundtrip() {
+        let p = JsSabrParameters::equity_default();
+        assert!((p.alpha() - 0.20).abs() < 1e-12);
+        assert!((p.beta() - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn sabr_auto_shift_fits_negative_rate_smile() {
+        // Native tests cannot construct `JsValue` strings or Debug a `JsValue`
+        // error: both abort off wasm32. Drive the same `"auto"` policy through
+        // the Rust keyword parser the binding calls and the domain calibrator.
+        // Synthetic quotes use the documented 2% ladder rung
+        // (`-min(strike)+10bp = 1.6%` rounds up to 2%), matching the JS facade
+        // and Python bindings.
+        let policy = "auto".parse::<SabrShift>().expect("auto shift policy");
+        let p = SabrParameters::new_with_shift(0.05, 0.5, 0.4, -0.1, 0.02).expect("params");
+        let forward = -0.005;
+        let strikes = vec![-0.015, -0.01, -0.005, 0.0, 0.005];
+        let vols = SabrSmile::new(SabrModel::new(p), forward, 1.0)
+            .generate_smile(&strikes)
+            .expect("smile");
+
+        let fitted = SabrCalibrator::new()
+            .with_shift(policy)
+            .calibrate(forward, &strikes, &vols, 1.0, 0.5)
+            .expect("auto-shift calibrate");
+        let shift = fitted
+            .shift()
+            .expect("negative-rate fit must carry a shift");
+        assert!(shift > 0.0);
+        assert!(fitted.is_shifted());
+        assert!((shift - 0.02).abs() < 1e-12);
+    }
 }

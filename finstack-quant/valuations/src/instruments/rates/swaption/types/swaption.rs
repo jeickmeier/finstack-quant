@@ -20,7 +20,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::volatility::VolatilityConvention;
-use finstack_quant_models::SabrModel;
 use finstack_quant_models::SabrParameters;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
@@ -900,11 +899,8 @@ impl Swaption {
                         params.implied_vol_normal(forward, strike, time_to_expiry)?
                     }
                     VolatilityModel::Black => {
-                        let model = SabrModel::new(params.clone());
-                        let (sigma, quote_type) =
-                            model.implied_volatility_with_type(forward, strike, time_to_expiry)?;
-                        if quote_type != finstack_quant_models::volatility::sabr::SabrVolType::Black
-                        {
+                        let sigma = params.implied_volatility(forward, strike, time_to_expiry)?;
+                        if params.quote_convention() == VolatilityConvention::Normal {
                             return Err(Error::Validation(
                                 "normal SABR cannot supply a Black volatility quote".to_owned(),
                             ));

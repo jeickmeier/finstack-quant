@@ -12,25 +12,24 @@
 //! this; Sobol explicitly does not. These helpers therefore guard at runtime
 //! via [`RandomStream::supports_splitting`] to prevent silent CRN breakage.
 //!
-//! # Reported standard errors are conservative
+//! # Reported standard errors are paired
 //!
-//! The `stderr` returned by [`finite_diff_delta`] and [`finite_diff_gamma`]
-//! combines the per-run MC standard errors **as if the bumped and base runs
-//! were statistically independent**:
+//! [`finite_diff_delta`] and [`finite_diff_gamma`] simulate every stencil
+//! point on the same per-path substream and form the finite difference **per
+//! path**:
 //!
 //! ```text
-//! se(Δ̂) ≈ √(se_up² + se_down²) / (2h)
-//! se(Γ̂) ≈ √(se_up² + 4·se_base² + se_down²) / h²
+//! Δ̂ᵢ = (V_up,ᵢ − V_down,ᵢ) / (2h)
+//! Γ̂ᵢ = (V_up,ᵢ − 2·V_base,ᵢ + V_down,ᵢ) / h²
 //! ```
 //!
-//! CRN introduces strong positive correlation between the paired estimators,
-//! so the *true* variance of the difference is almost always smaller — often
-//! by one to two orders of magnitude for smooth payoffs. The quantity we
-//! report is therefore an **upper bound** on the CRN stderr, not the CRN
-//! stderr itself. A tight CRN stderr requires per-path pairing of the bumped
-//! and base path values, which is not exposed through the current
-//! [`McEngine::price`] API. Treat these numbers as safe for sizing error
-//! budgets but not as an accurate diagnostic of the finite-difference noise.
+//! The estimate is the mean of those per-path differences and the reported
+//! `stderr` is their sample standard error, so it reflects the strong positive
+//! correlation that common random numbers induce between the stencil points.
+//! It is typically one to two orders of magnitude below the bound obtained by
+//! combining the per-valuation standard errors as if the runs were
+//! independent. The paired loop runs serially with a fixed path count;
+//! adaptive stopping and path capture are rejected.
 
 use super::super::engine::McEngine;
 use crate::monte_carlo::engine::build_correlation_factor;
@@ -114,197 +113,6 @@ fn validate_central_bump(initial_spot: f64, bump_size: f64) -> Result<(f64, f64,
 
     Ok((down, initial_spot, up, h))
 }
-
-/// Compute delta using central finite differences with CRN.
-///
-/// ```text
-/// Δ ≈ (V(S₀+h) − V(S₀−h)) / (2h)
-/// ```
-///
-/// Both valuations reuse `rng` by reference. This works only when the RNG is
-/// splittable (e.g. [`crate::monte_carlo::rng::philox::PhiloxRng`]) so that `rng.split(i)`
-/// produces identical per-path streams across calls regardless of how much of
-/// the parent stream has been consumed.
-///
-/// # Arguments
-///
-/// * `inputs` - Shared engine, splittable RNG, process, discretization, payoff,
-///   currency, and discount factor used for every stencil valuation.
-/// * `initial_spot` - Finite positive initial spot price (S₀). The down-bumped
-///   state must remain at least `1e-12`.
-/// * `bump_size` - Finite positive relative bump (e.g. `0.01` for 1 %). The
-///   absolute bump is `max(|S₀| * bump_size, 1e-8)`.
-///
-/// # Returns
-///
-/// `(delta, stderr)` — the central-difference estimator and its standard
-/// error under the assumption of independence between the up and down runs
-/// (conservative; CRN makes the true stderr smaller but computing it exactly
-/// would require per-path pairing outside this helper).
-///
-/// # Errors
-///
-/// Returns [`finstack_quant_core::Error::Validation`] when `initial_spot` or
-/// `bump_size` is non-finite or non-positive, the symmetric down-bump is below
-/// `1e-12`, the supplied RNG does not support splitting, or either
-/// `engine.price` call fails.
-pub fn finite_diff_delta<R, P, D, F>(
-    inputs: &FiniteDiffInputs<'_, R, P, D, F>,
-    initial_spot: f64,
-    bump_size: f64,
-) -> Result<(f64, f64)>
-where
-    R: RandomStream,
-    P: StochasticProcess,
-    D: Discretization<P> + Clone,
-    F: Payoff,
-{
-    let engine = inputs.engine;
-    let rng = inputs.rng;
-    let process = inputs.process;
-    let disc = inputs.disc;
-    let payoff = inputs.payoff;
-    let currency = inputs.currency;
-    let discount_factor = inputs.discount_factor;
-    require_splittable_rng(rng, "finite_diff_delta")?;
-    let (initial_down, _initial_base, initial_up, h) =
-        validate_central_bump(initial_spot, bump_size)?;
-
-    let initial_up = vec![initial_up];
-    let result_up = engine.price(
-        rng,
-        process,
-        disc,
-        &initial_up,
-        payoff,
-        currency,
-        discount_factor,
-    )?;
-
-    let initial_down = vec![initial_down];
-    let result_down = engine.price(
-        rng,
-        process,
-        disc,
-        &initial_down,
-        payoff,
-        currency,
-        discount_factor,
-    )?;
-
-    let delta = (result_up.mean.amount() - result_down.mean.amount()) / (2.0 * h);
-    // Conservative stderr under the independence assumption. Propagating a
-    // tighter CRN stderr would require per-path bookkeeping not exposed
-    // through the current engine API.
-    let se_up = result_up.stderr;
-    let se_down = result_down.stderr;
-    let stderr = (se_up * se_up + se_down * se_down).sqrt() / (2.0 * h);
-
-    Ok((delta, stderr))
-}
-
-/// Compute gamma using a second central difference with CRN.
-///
-/// ```text
-/// Γ ≈ (V(S₀+h) − 2·V(S₀) + V(S₀−h)) / h²
-/// ```
-///
-/// # Returns
-///
-/// `(gamma, stderr)` — the second-difference estimator and a conservative
-/// standard error under the assumption of independent MC stderrs at the
-/// three grid points. Both values are in the pricing currency per squared
-/// initial-spot unit; the reported error is deliberately conservative because
-/// the common random numbers induce positive dependence between valuations.
-///
-/// The absolute bump is `max(|S₀| * bump_size, 1e-8)`. The symmetric stencil
-/// is rejected rather than clamped if its lower state would fall below
-/// `1e-12`.
-///
-/// # Arguments
-///
-/// * `inputs` - Shared engine, splittable RNG, process, discretization, payoff,
-///   currency, and discount factor used for every stencil valuation.
-/// * `initial_spot` - Finite positive base underlying spot level in the
-///   payoff's price units. The down-bumped state must remain at least `1e-12`.
-/// * `bump_size` - Finite positive relative spot bump, such as `0.01` for one
-///   percent. The absolute bump is `max(|S₀| * bump_size, 1e-8)`.
-///
-/// # Errors
-///
-/// Returns [`finstack_quant_core::Error::Validation`] when `initial_spot` or
-/// `bump_size` is non-finite or non-positive, the symmetric down-bump is below
-/// `1e-12`, or `rng` cannot split deterministically. Propagates errors from any
-/// of the three [`McEngine::price`] runs.
-pub fn finite_diff_gamma<R, P, D, F>(
-    inputs: &FiniteDiffInputs<'_, R, P, D, F>,
-    initial_spot: f64,
-    bump_size: f64,
-) -> Result<(f64, f64)>
-where
-    R: RandomStream,
-    P: StochasticProcess,
-    D: Discretization<P> + Clone,
-    F: Payoff,
-{
-    let engine = inputs.engine;
-    let rng = inputs.rng;
-    let process = inputs.process;
-    let disc = inputs.disc;
-    let payoff = inputs.payoff;
-    let currency = inputs.currency;
-    let discount_factor = inputs.discount_factor;
-    require_splittable_rng(rng, "finite_diff_gamma")?;
-    let (initial_down, initial_base, initial_up, h) =
-        validate_central_bump(initial_spot, bump_size)?;
-
-    let initial_base = vec![initial_base];
-    let result_base = engine.price(
-        rng,
-        process,
-        disc,
-        &initial_base,
-        payoff,
-        currency,
-        discount_factor,
-    )?;
-
-    let initial_up = vec![initial_up];
-    let result_up = engine.price(
-        rng,
-        process,
-        disc,
-        &initial_up,
-        payoff,
-        currency,
-        discount_factor,
-    )?;
-
-    let initial_down = vec![initial_down];
-    let result_down = engine.price(
-        rng,
-        process,
-        disc,
-        &initial_down,
-        payoff,
-        currency,
-        discount_factor,
-    )?;
-
-    let gamma = (result_up.mean.amount() - 2.0 * result_base.mean.amount()
-        + result_down.mean.amount())
-        / (h * h);
-    let se_up = result_up.stderr;
-    let se_base = result_base.stderr;
-    let se_down = result_down.stderr;
-    // Variance of (V_up − 2V_base + V_down): 1·V_up + 4·V_base + 1·V_down under
-    // independence. CRN makes this pessimistic but not wrong.
-    let stderr = (se_up * se_up + 4.0 * se_base * se_base + se_down * se_down).sqrt() / (h * h);
-
-    Ok((gamma, stderr))
-}
-
-// CRN-paired finite differences (true CRN stderr)
 
 /// Run a paired CRN finite-difference loop and return per-path payoff
 /// differences for each of `n_states` initial-state perturbations.
@@ -446,19 +254,25 @@ where
     Ok(per_state_values)
 }
 
-/// Compute delta with **true CRN stderr** by per-path pairing.
+/// Compute delta by central finite differences with common random numbers.
 ///
-/// Like [`finite_diff_delta`] but reports the proper paired standard error
-/// `stderr({(V_up_i − V_down_i) / 2h})`, which exploits the strong positive
-/// correlation introduced by common random numbers and is typically one to two
-/// orders of magnitude tighter than the conservative independence bound.
+/// ```text
+/// Δ ≈ (V(S₀+h) − V(S₀−h)) / (2h)
+/// ```
 ///
-/// Always runs serially (paired stderr requires deterministic per-path order).
-/// The pricer's `use_parallel` flag is honored only by [`finite_diff_delta`].
-/// When antithetic sampling is configured, each paired estimator averages
-/// the same two physical paths used by [`McEngine::price`]. Adaptive stopping
-/// and path capture are rejected because this helper needs a fixed set of
-/// paired observations and returns only the Greek summary.
+/// Both stencil points are simulated on the same per-path substream, which
+/// requires a splittable RNG (e.g. [`crate::monte_carlo::rng::philox::PhiloxRng`]).
+/// The estimate is the mean of the per-path differences
+/// `(V_up_i − V_down_i) / 2h` and the reported standard error is their paired
+/// sample standard error, which exploits the strong positive correlation
+/// introduced by common random numbers.
+///
+/// Always runs serially (the paired standard error needs a deterministic
+/// per-path order); the engine's `use_parallel` flag is not consulted. When
+/// antithetic sampling is configured, each paired estimator averages the same
+/// two physical paths used by [`McEngine::price`]. Adaptive stopping and path
+/// capture are rejected because this helper needs a fixed set of paired
+/// observations and returns only the Greek summary.
 ///
 /// # Arguments
 ///
@@ -471,7 +285,8 @@ where
 ///
 /// # Returns
 ///
-/// `(delta, stderr)` where `stderr` is the **paired** standard error.
+/// `(delta, stderr)` in the pricing currency per unit of spot, where `stderr`
+/// is the **paired** standard error.
 ///
 /// # Errors
 ///
@@ -479,7 +294,7 @@ where
 /// `bump_size` is non-finite or non-positive, the symmetric down-bump is below
 /// `1e-12`, the RNG is not splittable, configuration is invalid, or any path
 /// simulation fails (e.g., non-finite payoff).
-pub fn finite_diff_delta_crn<R, P, D, F>(
+pub fn finite_diff_delta<R, P, D, F>(
     inputs: &FiniteDiffInputs<'_, R, P, D, F>,
     initial_spot: f64,
     bump_size: f64,
@@ -490,7 +305,7 @@ where
     D: Discretization<P> + Clone,
     F: Payoff,
 {
-    require_splittable_rng(inputs.rng, "finite_diff_delta_crn")?;
+    require_splittable_rng(inputs.rng, "finite_diff_delta")?;
     let (initial_down, _initial_base, initial_up, h) =
         validate_central_bump(initial_spot, bump_size)?;
 
@@ -506,12 +321,16 @@ where
     Ok((stats.mean(), stats.stderr()))
 }
 
-/// Compute gamma with **true CRN stderr** by per-path pairing.
+/// Compute gamma by a second central difference with common random numbers.
 ///
-/// Like [`finite_diff_gamma`] but reports the paired standard error of the
-/// per-path second-difference estimator
-/// `(V_up_i − 2 V_base_i + V_down_i) / h²`, which is typically one to two
-/// orders of magnitude tighter than the independence bound.
+/// ```text
+/// Γ ≈ (V(S₀+h) − 2·V(S₀) + V(S₀−h)) / h²
+/// ```
+///
+/// The estimate is the mean of the per-path second differences
+/// `(V_up_i − 2 V_base_i + V_down_i) / h²` and the reported standard error is
+/// their paired sample standard error. Runs serially under the same
+/// restrictions as [`finite_diff_delta`].
 ///
 /// # Arguments
 ///
@@ -524,14 +343,15 @@ where
 ///
 /// # Returns
 ///
-/// `(gamma, stderr)` where `stderr` is the **paired** standard error.
+/// `(gamma, stderr)` in the pricing currency per squared unit of spot, where
+/// `stderr` is the **paired** standard error.
 ///
 /// # Errors
 ///
 /// Returns [`finstack_quant_core::Error::Validation`] for the invalid central
-/// stencils documented by [`finite_diff_delta_crn`], or when path simulation
+/// stencils documented by [`finite_diff_delta`], or when path simulation
 /// fails.
-pub fn finite_diff_gamma_crn<R, P, D, F>(
+pub fn finite_diff_gamma<R, P, D, F>(
     inputs: &FiniteDiffInputs<'_, R, P, D, F>,
     initial_spot: f64,
     bump_size: f64,
@@ -542,7 +362,7 @@ where
     D: Discretization<P> + Clone,
     F: Payoff,
 {
-    require_splittable_rng(inputs.rng, "finite_diff_gamma_crn")?;
+    require_splittable_rng(inputs.rng, "finite_diff_gamma")?;
     let (initial_down, initial_base, initial_up, h) =
         validate_central_bump(initial_spot, bump_size)?;
 
@@ -563,7 +383,6 @@ where
 mod tests {
     use super::super::super::engine::McEngineConfig;
     use super::*;
-    use crate::closed_form::black_scholes_spot_call;
     use crate::monte_carlo::discretization::exact::ExactGbm;
     use crate::monte_carlo::payoff::vanilla::EuropeanCall;
     use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess};
@@ -592,7 +411,16 @@ mod tests {
     }
 
     fn bs_call(spot: f64) -> f64 {
-        black_scholes_spot_call(spot, STRIKE, RATE, DIVIDEND_YIELD, VOLATILITY, EXPIRY)
+        crate::closed_form::bs_price(
+            spot,
+            STRIKE,
+            RATE,
+            DIVIDEND_YIELD,
+            VOLATILITY,
+            EXPIRY,
+            crate::types::OptionType::Call,
+        )
+        .expect("valid Black-Scholes inputs")
     }
 
     fn deterministic_stencil(bump_size: f64) -> (f64, f64) {
@@ -696,43 +524,53 @@ mod tests {
             discount_factor,
         };
 
-        let (delta_independent, delta_independent_stderr) =
-            finite_diff_delta(&inputs, SPOT, bump_size).expect("independence-bound delta");
-        let (delta_crn, delta_crn_stderr) =
-            finite_diff_delta_crn(&inputs, SPOT, bump_size).expect("paired delta");
-        let (gamma_independent, gamma_independent_stderr) =
-            finite_diff_gamma(&inputs, SPOT, bump_size).expect("independence-bound gamma");
-        let (gamma_crn, gamma_crn_stderr) =
-            finite_diff_gamma_crn(&inputs, SPOT, bump_size).expect("paired gamma");
+        let (delta, delta_stderr) =
+            finite_diff_delta(&inputs, SPOT, bump_size).expect("paired delta");
+        let (gamma, gamma_stderr) =
+            finite_diff_gamma(&inputs, SPOT, bump_size).expect("paired gamma");
 
-        assert_within_reported_error("paired delta", delta_crn, reference_delta, delta_crn_stderr);
-        assert_within_reported_error(
-            "independence-bound delta versus paired delta",
-            delta_independent,
-            delta_crn,
-            delta_independent_stderr,
+        assert_within_reported_error("paired delta", delta, reference_delta, delta_stderr);
+        assert_within_reported_error("paired gamma", gamma, reference_gamma, gamma_stderr);
+
+        // The paired standard errors must sit below the bound obtained by
+        // combining the three valuations' standard errors as if independent.
+        let stencil_stderr = |spot: f64| {
+            engine
+                .price(
+                    &rng,
+                    &gbm,
+                    &disc,
+                    &[spot],
+                    &call,
+                    Currency::USD,
+                    discount_factor,
+                )
+                .expect("stencil valuation")
+                .stderr
+        };
+        let (down, base, up, h) = validate_central_bump(SPOT, bump_size).expect("stencil");
+        let (se_down, se_base, se_up) = (
+            stencil_stderr(down),
+            stencil_stderr(base),
+            stencil_stderr(up),
         );
-        assert_within_reported_error("paired gamma", gamma_crn, reference_gamma, gamma_crn_stderr);
-        assert_within_reported_error(
-            "independence-bound gamma versus paired gamma",
-            gamma_independent,
-            gamma_crn,
-            gamma_independent_stderr,
+        let delta_bound = (se_up * se_up + se_down * se_down).sqrt() / (2.0 * h);
+        let gamma_bound =
+            (se_up * se_up + 4.0 * se_base * se_base + se_down * se_down).sqrt() / (h * h);
+        assert!(
+            delta_stderr < delta_bound,
+            "paired delta stderr {delta_stderr} should be below independence bound {delta_bound}"
         );
         assert!(
-            delta_crn_stderr < delta_independent_stderr,
-            "paired delta stderr {delta_crn_stderr} should be below independence bound {delta_independent_stderr}"
+            gamma_stderr < gamma_bound,
+            "paired gamma stderr {gamma_stderr} should be below independence bound {gamma_bound}"
         );
-        assert!(
-            gamma_crn_stderr < gamma_independent_stderr,
-            "paired gamma stderr {gamma_crn_stderr} should be below independence bound {gamma_independent_stderr}"
-        );
-        assert!(delta_crn > 0.0);
-        assert!(gamma_crn > 0.0);
+        assert!(delta > 0.0);
+        assert!(gamma > 0.0);
     }
 
     #[test]
-    fn all_estimators_reject_invalid_or_asymmetric_stencils() {
+    fn estimators_reject_invalid_or_asymmetric_stencils() {
         let engine = test_engine(8);
         let rng = PhiloxRng::new(42);
         let gbm = GbmProcess::new(
@@ -765,9 +603,7 @@ mod tests {
 
         for (spot, bump_size, expected) in cases {
             assert_validation_contains(finite_diff_delta(&inputs, spot, bump_size), expected);
-            assert_validation_contains(finite_diff_delta_crn(&inputs, spot, bump_size), expected);
             assert_validation_contains(finite_diff_gamma(&inputs, spot, bump_size), expected);
-            assert_validation_contains(finite_diff_gamma_crn(&inputs, spot, bump_size), expected);
         }
     }
 
@@ -794,8 +630,8 @@ mod tests {
                 discount_factor,
             };
             for result in [
-                finite_diff_delta_crn(&inputs, SPOT, 0.01),
-                finite_diff_gamma_crn(&inputs, SPOT, 0.01),
+                finite_diff_delta(&inputs, SPOT, 0.01),
+                finite_diff_gamma(&inputs, SPOT, 0.01),
             ] {
                 assert_validation_contains(result, message);
             }
@@ -822,7 +658,7 @@ mod tests {
             discount_factor: 1.0,
         };
         assert_validation_contains(
-            finite_diff_delta_crn(&inputs, SPOT, 0.01),
+            finite_diff_delta(&inputs, SPOT, 0.01),
             "dedicated discretization",
         );
     }
@@ -848,10 +684,29 @@ mod tests {
             currency: Currency::USD,
             discount_factor: (-RATE * EXPIRY).exp(),
         };
-        let delta = finite_diff_delta(&inputs, SPOT, 0.01).unwrap().0;
-        let delta_paired = finite_diff_delta_crn(&inputs, SPOT, 0.01).unwrap().0;
-        let gamma = finite_diff_gamma(&inputs, SPOT, 0.01).unwrap().0;
-        let gamma_paired = finite_diff_gamma_crn(&inputs, SPOT, 0.01).unwrap().0;
+        // The paired estimates must equal the finite difference of the
+        // engine's own antithetic prices at the stencil points.
+        let (down, base, up, h) = validate_central_bump(SPOT, 0.01).unwrap();
+        let price = |spot: f64| {
+            engine
+                .price(
+                    &rng,
+                    &process,
+                    &disc,
+                    &[spot],
+                    &payoff,
+                    Currency::USD,
+                    inputs.discount_factor,
+                )
+                .unwrap()
+                .mean
+                .amount()
+        };
+        let (v_down, v_base, v_up) = (price(down), price(base), price(up));
+        let delta = (v_up - v_down) / (2.0 * h);
+        let gamma = (v_up - 2.0 * v_base + v_down) / (h * h);
+        let delta_paired = finite_diff_delta(&inputs, SPOT, 0.01).unwrap().0;
+        let gamma_paired = finite_diff_gamma(&inputs, SPOT, 0.01).unwrap().0;
         assert!((delta - delta_paired).abs() < 1e-12);
         assert!((gamma - gamma_paired).abs() < 1e-12);
     }

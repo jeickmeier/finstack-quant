@@ -17,7 +17,7 @@ a risk run repeats once per instrument leg.
 | `covariance_construction` | `validated/50` | `FactorCovarianceMatrix::new` on a 50×50 matrix, including the symmetry and PSD validation it performs on every construction |
 | `covariance_lookups` | `variance/50`, `covariance/50`, `correlation/50` | Single-entry lookups by `FactorId` |
 | `covariance_batch_lookups` | `all_variances/50`, `all_correlations/50` | The N and N(N−1)/2 loop shapes a risk run actually issues |
-| `mapping_table_matcher` | `hit_first/50`, `hit_last/50`, `miss/50` | `MappingTableMatcher::match_factor_with_betas` over 50 rules; the three ids bracket best case, worst case, and full-scan miss |
+| `mapping_table_matcher` | `hit_first/50`, `hit_last/50`, `miss/50` | `MappingTableMatcher::match_factor` over 50 rules; the three ids bracket best case, worst case, and full-scan miss |
 | `hierarchical_matcher` | `{shallow_2x3,medium_3x3,deep_4x2}_{hit,fallback}` | `HierarchicalMatcher` tree traversal at three depth/branching shapes, matched on an `Attributes` tag and on a tag that hits no child |
 | `cascade_matcher` | `hit_first_stage`, `hit_second_stage`, `miss_all_stages` | `CascadeMatcher` over two `MappingTableMatcher` stages (exact rule, then generic-credit fallback) |
 
@@ -63,7 +63,7 @@ Criterion writes to `target/criterion/<group>/<id>/report/index.html`; the
 - A new `FactorMatcher` implementation should get the same three-id treatment as the
   existing ones — first-rule hit, last-rule hit, and total miss. Matcher regressions
   show up in the miss path first.
-- Build matchers and matrices outside `b.iter`; only the `match_factor_with_betas` or
+- Build matchers and matrices outside `b.iter`; only the `match_factor` or
   lookup call belongs inside.
 - Register the function in the `criterion_group!` list at the bottom of
   `factor_model.rs`, or it never runs.

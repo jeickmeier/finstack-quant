@@ -113,7 +113,7 @@ pub(crate) fn annualized_excess_return(
 
 /// Excess returns = portfolio returns minus risk-free returns.
 ///
-/// When `nperiods` is provided, the risk-free rate is de-compounded to the
+/// The risk-free rate is de-compounded to the
 /// observation frequency before subtraction:
 ///
 /// ```text
@@ -128,28 +128,21 @@ pub(crate) fn annualized_excess_return(
 /// * `returns` - Portfolio return series.
 /// * `rf` - Risk-free rate series, aligned with `returns`. If longer, the
 ///   excess length is ignored.
-/// * `nperiods` - Optional compounding periods per year. `None` uses `rf`
-///   values directly without adjustment. Negative, zero, or non-finite
-///   values yield an all-`NaN` output to flag invalid input (negative
-///   values would invert the decompounding direction).
+/// * `nperiods` - Compounding periods per year. Use `1.0` for already-periodic
+///   rates. Negative, zero, or non-finite values yield an all-`NaN` output.
 ///
 /// # Returns
 ///
 /// A `Vec<f64>` of length `min(returns.len(), rf.len())` containing
 /// `returns[i] - rf_adj[i]` for each observation.
-pub(crate) fn excess_returns(returns: &[f64], rf: &[f64], nperiods: Option<f64>) -> Vec<f64> {
+pub(crate) fn excess_returns(returns: &[f64], rf: &[f64], nperiods: f64) -> Vec<f64> {
     let n = returns.len().min(rf.len());
-    if let Some(np) = nperiods {
-        if !np.is_finite() || np <= 0.0 {
-            return vec![f64::NAN; n];
-        }
+    if !nperiods.is_finite() || nperiods <= 0.0 {
+        return vec![f64::NAN; n];
     }
     let mut out = Vec::with_capacity(n);
     for i in 0..n {
-        let rf_adj = match nperiods {
-            Some(np) => periodic_risk_free_rate(rf[i], np),
-            None => rf[i],
-        };
+        let rf_adj = periodic_risk_free_rate(rf[i], nperiods);
         out.push(returns[i] - rf_adj);
     }
     out
@@ -317,7 +310,7 @@ mod tests {
     fn excess_returns_defect_fix() {
         let ret = [0.05, 0.03, -0.02];
         let rf = [0.10, 0.10, 0.10];
-        let ex = excess_returns(&ret, &rf, Some(12.0));
+        let ex = excess_returns(&ret, &rf, 12.0);
         // rf_adj = (1.10)^(1/12) - 1 ≈ 0.00797
         let rf_adj = 1.1_f64.powf(1.0 / 12.0) - 1.0;
         assert!((ex[0] - (0.05 - rf_adj)).abs() < 1e-10);
@@ -327,7 +320,7 @@ mod tests {
     fn excess_returns_invalid_nperiods_returns_nan_series() {
         let ret = [0.05, 0.03, -0.02];
         let rf = [0.10, 0.10, 0.10];
-        let ex = excess_returns(&ret, &rf, Some(-12.0));
+        let ex = excess_returns(&ret, &rf, -12.0);
         assert_eq!(ex.len(), 3);
         assert!(ex.iter().all(|v| v.is_nan()));
     }

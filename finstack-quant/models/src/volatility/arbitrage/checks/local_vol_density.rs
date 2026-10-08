@@ -4,23 +4,15 @@
 //! This is the definitive no-arbitrage condition for a volatility surface: if
 //! the local variance is negative at any point, there exists an arbitrage.
 //!
-//! # Mathematical Background
-//!
-//! The Dupire local variance is:
-//!
-//! ```text
-//! sigma^2_local(K, T) = (dw/dT) / (1 - k/w * dw/dk
-//!     + 1/4 * (-1/4 - 1/w + k^2/w^2) * (dw/dk)^2
-//!     + 1/2 * d2w/dk2)
-//! ```
-//!
-//! where w = sigma^2 * T is total implied variance and k = ln(K/F).
-//!
+//! The formula, its coordinates and its finite differences live in
+//! the crate-private `volatility::dupire` module, shared with the
+//! local-volatility extractor.
 //! Both numerator (dw/dT >= 0) and denominator (density condition) must be
 //! non-negative.
 
-use super::{classify_severity, ArbitrageCheck};
+use super::classify_severity;
 use crate::volatility::arbitrage::types::{ArbitrageType, ArbitrageViolation, ViolationLocation};
+use crate::volatility::dupire::{dupire_node, MoneynessLookup};
 use finstack_quant_core::market_data::surfaces::VolSurface;
 
 /// Checks that the Dupire local variance is positive everywhere on the grid.
@@ -32,12 +24,16 @@ pub struct LocalVolDensityCheck {
     pub tolerance: f64,
 }
 
-impl ArbitrageCheck for LocalVolDensityCheck {
-    fn name(&self) -> &str {
-        "Local Vol Density"
-    }
-
-    fn check(&self, surface: &VolSurface) -> Vec<ArbitrageViolation> {
+impl LocalVolDensityCheck {
+    /// Run the Dupire local-variance positivity check and return every violation found.
+    ///
+    /// An empty `Vec` means the check passes. The surface is not mutated.
+    ///
+    /// # Arguments
+    ///
+    /// * `surface` - Implied-volatility surface on an expiry (years) by cash
+    ///   strike grid; expiries pair positionally with `self.forwards`.
+    pub fn check(&self, surface: &VolSurface) -> Vec<ArbitrageViolation> {
         let expiries = surface.expiries();
         let strikes = surface.strikes();
         let mut violations = Vec::new();
@@ -52,27 +48,13 @@ impl ArbitrageCheck for LocalVolDensityCheck {
 
         for (ei, &t) in expiries.iter().enumerate() {
             for (si, &big_k) in strikes.iter().enumerate() {
-                let k = (big_k / self.forwards[ei]).ln(); // log-moneyness
-                let v = crate::volatility::get_surface_vol_clamped(surface, t, big_k);
-                let w = v * v * t;
-
-                if w < 1e-14 {
-                    continue; // Skip near-zero variance points
-                }
-
-                let dw_dt = finite_diff_time(surface, expiries, &self.forwards, ei, k);
-
-                let (dw_dstrike, d2w_dstrike2) =
-                    finite_diff_strike(surface, strikes, si, expiries[ei]);
-                // k = ln(K/F): d/dk = K d/dK. The density condition is
-                // dimensionless and must be invariant to price-unit changes.
-                let dw_dk = big_k * dw_dstrike;
-                let d2w_dk2 = big_k * big_k * d2w_dstrike2 + dw_dk;
-
-                let term1 = 1.0 - k / w * dw_dk;
-                let term2 = 0.25 * (-0.25 - 1.0 / w + k * k / (w * w)) * dw_dk * dw_dk;
-                let term3 = 0.5 * d2w_dk2;
-                let denominator = term1 + term2 + term3;
+                // Near-zero variance points are skipped.
+                let Some(node) =
+                    dupire_node(surface, &self.forwards, ei, si, MoneynessLookup::Strict)
+                else {
+                    continue;
+                };
+                let (dw_dt, denominator) = (node.dw_dt, node.density);
 
                 if denominator < -self.tolerance {
                     let magnitude = -denominator;
@@ -128,125 +110,10 @@ impl ArbitrageCheck for LocalVolDensityCheck {
     }
 }
 
-/// Compute dw/dT at fixed log-moneyness, remapping the cash strike at each expiry.
-///
-/// Uses central differences for interior points and one-sided differences at
-/// boundaries.
-fn finite_diff_time(
-    surface: &VolSurface,
-    expiries: &[f64],
-    forwards: &[f64],
-    ei: usize,
-    k: f64,
-) -> Option<f64> {
-    let total_var = |idx: usize| -> Option<f64> {
-        let t = expiries[idx];
-        let strike = forwards[idx] * k.exp();
-        // Assess only overlapping observed moneyness. Clamping a remapped
-        // strike would change k and can fabricate calendar arbitrage.
-        let v = crate::volatility::get_surface_vol(surface, t, strike).ok()?;
-        Some(v * v * t)
-    };
-
-    let n = expiries.len();
-    if n < 2 {
-        return None;
-    }
-
-    if ei == 0 {
-        // Forward difference
-        let dt = expiries[1] - expiries[0];
-        if dt.abs() < 1e-14 {
-            return None;
-        }
-        Some((total_var(1)? - total_var(0)?) / dt)
-    } else if ei == n - 1 {
-        // Backward difference
-        let dt = expiries[n - 1] - expiries[n - 2];
-        if dt.abs() < 1e-14 {
-            return None;
-        }
-        Some((total_var(n - 1)? - total_var(n - 2)?) / dt)
-    } else {
-        // Central difference
-        let dt = expiries[ei + 1] - expiries[ei - 1];
-        if dt.abs() < 1e-14 {
-            return None;
-        }
-        Some((total_var(ei + 1)? - total_var(ei - 1)?) / dt)
-    }
-}
-
-/// Compute dw/dK and d2w/dK2 at a grid point using finite differences along
-/// the strike axis.
-///
-/// Returns (first_derivative, second_derivative) of total variance with
-/// respect to the raw strike K.
-fn finite_diff_strike(surface: &VolSurface, strikes: &[f64], si: usize, expiry: f64) -> (f64, f64) {
-    let total_var = |idx: usize| -> f64 {
-        let v = crate::volatility::get_surface_vol_clamped(surface, expiry, strikes[idx]);
-        v * v * expiry
-    };
-
-    let n = strikes.len();
-    if n < 3 {
-        return (0.0, 0.0);
-    }
-
-    if si == 0 {
-        // Forward differences
-        let dk1 = strikes[1] - strikes[0];
-        let dk2 = strikes[2] - strikes[0];
-        if dk1.abs() < 1e-14 || dk2.abs() < 1e-14 {
-            return (0.0, 0.0);
-        }
-        let w0 = total_var(0);
-        let w1 = total_var(1);
-        let w2 = total_var(2);
-        let dw_dk = (w1 - w0) / dk1;
-        let dk12 = strikes[2] - strikes[1];
-        let dk_avg = 0.5 * (dk1 + dk12);
-        let d2w_dk2 = (w2 / dk12 - w1 * (1.0 / dk12 + 1.0 / dk1) + w0 / dk1) / dk_avg;
-        (dw_dk, d2w_dk2)
-    } else if si == n - 1 {
-        // Backward differences
-        let dk1 = strikes[n - 1] - strikes[n - 2];
-        let dk2 = strikes[n - 1] - strikes[n - 3];
-        if dk1.abs() < 1e-14 || dk2.abs() < 1e-14 {
-            return (0.0, 0.0);
-        }
-        let w0 = total_var(n - 3);
-        let w1 = total_var(n - 2);
-        let w2 = total_var(n - 1);
-        let dw_dk = (w2 - w1) / dk1;
-        let dk01 = strikes[n - 2] - strikes[n - 3];
-        let dk_avg = 0.5 * (dk01 + dk1);
-        let d2w_dk2 = (w2 / dk1 - w1 * (1.0 / dk1 + 1.0 / dk01) + w0 / dk01) / dk_avg;
-        (dw_dk, d2w_dk2)
-    } else {
-        // Central differences
-        let dk_minus = strikes[si] - strikes[si - 1];
-        let dk_plus = strikes[si + 1] - strikes[si];
-        if dk_minus.abs() < 1e-14 || dk_plus.abs() < 1e-14 {
-            return (0.0, 0.0);
-        }
-        let w_minus = total_var(si - 1);
-        let w_center = total_var(si);
-        let w_plus = total_var(si + 1);
-
-        let dw_dk = (w_plus - w_minus) / (dk_minus + dk_plus);
-        let dk_avg = 0.5 * (dk_minus + dk_plus);
-        let d2w_dk2 = (w_plus / dk_plus - w_center * (1.0 / dk_plus + 1.0 / dk_minus)
-            + w_minus / dk_minus)
-            / dk_avg;
-
-        (dw_dk, d2w_dk2)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::volatility::dupire::finite_diff_time;
 
     #[test]
     fn time_derivative_holds_log_moneyness_fixed_under_carry() {
@@ -264,11 +131,27 @@ mod tests {
         let fixed_strike_slope = 2.0 * values[7 + 2].powi(2) - values[2].powi(2);
         assert!(fixed_strike_slope < -0.005);
         for ei in 0..2 {
-            let derivative = finite_diff_time(&surface, &expiries, &forwards, ei, 0.0).unwrap();
+            let derivative = finite_diff_time(
+                &surface,
+                &expiries,
+                &forwards,
+                ei,
+                0.0,
+                MoneynessLookup::Strict,
+            )
+            .unwrap();
             assert!((derivative - 0.001).abs() < 1e-14);
         }
         assert!(
-            finite_diff_time(&surface, &expiries, &forwards, 0, 2.0_f64.ln()).is_none(),
+            finite_diff_time(
+                &surface,
+                &expiries,
+                &forwards,
+                0,
+                2.0_f64.ln(),
+                MoneynessLookup::Strict
+            )
+            .is_none(),
             "out-of-grid moneyness must not be replaced by a clamped cash strike"
         );
         let violations = LocalVolDensityCheck {
@@ -280,5 +163,90 @@ mod tests {
             violations.is_empty(),
             "positive fixed-moneyness slopes must pass: {violations:?}"
         );
+    }
+
+    /// FNV-1a digest of every violation's location, magnitude, severity and
+    /// description, so any change in the check's arithmetic is visible.
+    fn digest(violations: &[ArbitrageViolation]) -> u64 {
+        let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+        let mut feed = |bytes: &[u8]| {
+            for byte in bytes {
+                hash ^= u64::from(*byte);
+                hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+        };
+        for violation in violations {
+            feed(&violation.location.strike.to_bits().to_le_bytes());
+            feed(&violation.location.expiry.to_bits().to_le_bytes());
+            feed(&violation.magnitude.to_bits().to_le_bytes());
+            feed(format!("{:?}", violation.severity).as_bytes());
+            feed(violation.description.as_bytes());
+        }
+        hash
+    }
+
+    /// Pins the check's output bit for bit on an arbitrage-free surface, a
+    /// calendar-violating one, a butterfly-violating one and a hand-drawn
+    /// smile, each under sloped forwards. Captured before the Dupire kernel
+    /// was shared with the local-volatility extractor.
+    #[test]
+    fn violations_are_bit_identical_to_the_pinned_run() {
+        let flat = VolSurface::from_grid(
+            "FLAT",
+            &[0.25, 0.5, 1.0, 2.0],
+            &[80.0, 90.0, 100.0, 110.0, 120.0],
+            &[0.2; 20],
+        )
+        .unwrap();
+        let calendar = VolSurface::builder("CALENDAR-BAD")
+            .expiries(&[0.5, 1.0, 2.0])
+            .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .row(&[0.30, 0.25, 0.20, 0.25, 0.30])
+            .row(&[0.30, 0.25, 0.25, 0.25, 0.30])
+            .row(&[0.20, 0.15, 0.15, 0.15, 0.20])
+            .build()
+            .unwrap();
+        let butterfly = VolSurface::builder("BUTTERFLY-BAD")
+            .expiries(&[0.5, 1.0, 2.0])
+            .strikes(&[70.0, 85.0, 100.0, 115.0, 130.0])
+            .row(&[0.20, 0.45, 0.20, 0.45, 0.20])
+            .row(&[0.21, 0.46, 0.21, 0.46, 0.21])
+            .row(&[0.22, 0.47, 0.22, 0.47, 0.22])
+            .build()
+            .unwrap();
+        let smile = VolSurface::builder("SMILE")
+            .expiries(&[0.25, 0.5, 1.0, 2.0])
+            .strikes(&[80.0, 90.0, 95.0, 100.0, 105.0, 110.0, 120.0])
+            .row(&[0.30, 0.25, 0.22, 0.20, 0.21, 0.23, 0.28])
+            .row(&[0.28, 0.24, 0.21, 0.19, 0.20, 0.22, 0.26])
+            .row(&[0.26, 0.22, 0.20, 0.18, 0.19, 0.21, 0.24])
+            .row(&[0.24, 0.21, 0.19, 0.17, 0.18, 0.20, 0.22])
+            .build()
+            .unwrap();
+        let run = |surface: &VolSurface, forwards: &[f64], tolerance: f64| {
+            let violations = LocalVolDensityCheck {
+                forwards: forwards.to_vec(),
+                tolerance,
+            }
+            .check(surface);
+            (violations.len(), digest(&violations))
+        };
+        let actual = [
+            run(&flat, &[100.0, 101.0, 102.0, 104.0], 1e-10),
+            run(&calendar, &[100.0, 101.0, 102.0], 1e-10),
+            run(&calendar, &[100.0, 100.0, 100.0], 1e-6),
+            run(&butterfly, &[100.0, 100.5, 101.5], 1e-10),
+            run(&smile, &[100.0, 100.5, 101.0, 103.0], 1e-10),
+            run(&smile, &[100.0, 100.0, 100.0, 100.0], 0.0),
+        ];
+        let expected: &[(usize, u64)] = &[
+            (0, 0xcbf2_9ce4_8422_2325),
+            (4, 0x797f_068f_cf44_9335),
+            (5, 0x927f_0170_6cf3_7ef2),
+            (7, 0xa13f_96de_6a06_612a),
+            (2, 0x1512_4344_8f8d_fbe4),
+            (2, 0x34a1_2370_010a_583f),
+        ];
+        assert_eq!(actual.as_slice(), expected, "actual = {actual:#x?}");
     }
 }

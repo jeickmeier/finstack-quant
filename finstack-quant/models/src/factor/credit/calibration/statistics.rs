@@ -374,11 +374,6 @@ pub(super) fn sample_correlation_flat(
     rho
 }
 
-/// Convert flat row-major `n×n` matrix into `Vec<Vec<f64>>` (row-per-Vec).
-pub(super) fn flat_to_row_major(flat: &[f64], n: usize) -> Vec<Vec<f64>> {
-    (0..n).map(|i| flat[i * n..(i + 1) * n].to_vec()).collect()
-}
-
 /// Compute `Σ = D · ρ · D` from standard deviations and flat correlation matrix.
 ///
 /// Returns flat row-major `n×n` covariance matrix.

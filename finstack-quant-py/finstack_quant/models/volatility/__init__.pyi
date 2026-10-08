@@ -23,6 +23,7 @@ from finstack_quant.core.market_data import FxDeltaVolSurface, VolCube, VolCubeE
 
 __all__ = [
     "ArbitrageReport",
+    "LocalVolSurface",
     "SabrCalibrator",
     "SabrModel",
     "SabrParameters",
@@ -2255,6 +2256,334 @@ def convert_atm_volatility(
     0.01
     """
     ...
+
+class LocalVolSurface:
+    """
+    Dupire local volatility ``sigma_loc(T, K)`` on an expiry-by-strike grid.
+
+    The volatility of the model ``dS = (r - q) S dt + sigma_loc(t, S) S dW``
+    that reprices every European option of an implied volatility surface
+    (Dupire 1994). :meth:`from_implied_vol` extracts it; the result feeds the
+    ``"local_vol"`` process of
+    :func:`finstack_quant.models.monte_carlo.simulate_paths` through
+    ``json.loads(surface.to_json())``. Off-grid queries are interpolated
+    bilinearly and are flat outside the grid.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import VolSurface
+    >>> from finstack_quant.models.volatility import LocalVolSurface
+    >>> implied = VolSurface("FLAT", [0.5, 1.0], [90.0, 100.0, 110.0], [[0.2] * 3] * 2)
+    >>> local = LocalVolSurface.from_implied_vol(implied, [100.0, 100.0])
+    >>> local.grid_shape
+    (2, 3)
+    >>> round(local.value(0.75, 95.0), 10)
+    0.2
+
+    Sources
+    -------
+    - Dupire (1994): see docs/REFERENCES.md#dupire-1994
+    - Gatheral (2006): see docs/REFERENCES.md#gatheral-volatility-surface
+    """
+
+    def __init__(self, expiries: list[float], strikes: list[float], local_vols: list[float]) -> None:
+        """
+        Build a local volatility surface from an explicit grid.
+
+        Parameters
+        ----------
+        expiries : list[float]
+            Expiry axis in years: at least one finite, non-negative, strictly
+            increasing value.
+        strikes : list[float]
+            Strike axis in price units of the underlying: at least one finite,
+            positive, strictly increasing value.
+        local_vols : list[float]
+            Local volatilities as annualized decimals, finite and
+            non-negative, one per node in row-major order with the expiry as
+            the slow axis (``len(expiries) * len(strikes)`` values).
+
+        Raises
+        ------
+        ValueError
+            If an axis is empty, non-finite or not strictly increasing, an
+            expiry is negative, a strike is not positive, the value count does
+            not match the grid, or a volatility is negative or non-finite.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.volatility import LocalVolSurface
+        >>> LocalVolSurface([1.0, 2.0], [100.0, 200.0], [0.1, 0.2, 0.3, 0.4])
+        LocalVolSurface(expiries=2, strikes=2)
+        """
+        ...
+
+    @staticmethod
+    def from_implied_vol(surface: VolSurface, forwards: list[float]) -> LocalVolSurface:
+        """
+        Extract local volatility from an implied volatility surface (Dupire).
+
+        At every node of the implied grid the local variance is
+        ``(dw/dT) / g`` in total variance ``w = sigma^2 T`` and log-moneyness
+        ``k = ln(K / F_T)`` (Gatheral 2006, eq. 1.10), with ``dw/dT`` taken at
+        fixed ``k`` by finite differences. Rates and dividends enter only
+        through the forwards.
+
+        Parameters
+        ----------
+        surface : VolSurface
+            Unshifted Black (lognormal) implied volatilities as annualized
+            decimals, on expiries in years and cash strikes in price units of
+            the underlying; at least two expiries and three positive strikes.
+        forwards : list[float]
+            Forward price of the underlying for each surface expiry, in strike
+            units and in the order of ``surface.expiries``; finite and
+            positive. For a flat carry, ``F(T) = S * exp((r - q) * T)``.
+
+        Returns
+        -------
+        LocalVolSurface
+            Local volatility on the grid of ``surface``.
+
+        Raises
+        ------
+        ValueError
+            If the surface has fewer than two expiries or three strikes, does
+            not use a strike axis, holds normal or displaced quotes, has a
+            non-positive strike, ``forwards`` has the wrong length or a
+            non-finite or non-positive entry, or the surface is not
+            arbitrage-free at a node: non-positive Dupire density (butterfly
+            arbitrage) or total variance decreasing in expiry at fixed
+            log-moneyness (calendar arbitrage). The message names the node.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import VolSurface
+        >>> from finstack_quant.models.volatility import LocalVolSurface
+        >>> implied = VolSurface("FLAT", [0.5, 1.0], [90.0, 100.0, 110.0], [[0.2] * 3] * 2)
+        >>> local = LocalVolSurface.from_implied_vol(implied, [100.0, 101.0])
+        >>> [round(vol, 10) for vol in local.local_vols]
+        [0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+        """
+        ...
+
+    @staticmethod
+    def from_implied_vol_smoothed(
+        surface: VolSurface,
+        forwards: list[float],
+        sigma_strikes: float,
+    ) -> LocalVolSurface:
+        """
+        Extract local volatility after Gaussian smoothing along the strike axis.
+
+        Each implied volatility is replaced by the Gaussian-kernel weighted
+        average of its expiry row before :meth:`from_implied_vol` runs. This
+        regularises the second strike derivative, the usual source of a
+        non-positive Dupire density on market-calibrated grids.
+
+        Parameters
+        ----------
+        surface : VolSurface
+            Implied surface, as for :meth:`from_implied_vol`.
+        forwards : list[float]
+            One forward per surface expiry, as for :meth:`from_implied_vol`.
+        sigma_strikes : float
+            Standard deviation of the Gaussian kernel in strike (price) units,
+            non-negative. Zero disables smoothing.
+
+        Returns
+        -------
+        LocalVolSurface
+            Local volatility of the smoothed surface, on the grid of
+            ``surface``.
+
+        Raises
+        ------
+        ValueError
+            If ``sigma_strikes`` is negative or non-finite, or for any error
+            of :meth:`from_implied_vol` on the smoothed surface.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import VolSurface
+        >>> from finstack_quant.models.volatility import LocalVolSurface
+        >>> implied = VolSurface("FLAT", [0.5, 1.0], [90.0, 100.0, 110.0], [[0.2] * 3] * 2)
+        >>> local = LocalVolSurface.from_implied_vol_smoothed(implied, [100.0, 101.0], 5.0)
+        >>> round(local.value(1.0, 100.0), 10)
+        0.2
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> LocalVolSurface:
+        """
+        Deserialize a ``LocalVolSurface`` from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON string produced by :meth:`to_json`.
+
+        Returns
+        -------
+        LocalVolSurface
+            Parsed and validated ``LocalVolSurface`` instance.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed, carries unknown fields, or violates the
+            grid invariants of the constructor.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.volatility import LocalVolSurface
+        >>> local = LocalVolSurface([1.0, 2.0], [100.0, 200.0], [0.1, 0.2, 0.3, 0.4])
+        >>> LocalVolSurface.from_json(local.to_json()).local_vols
+        [0.1, 0.2, 0.3, 0.4]
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON object with ``expiries``, ``strikes`` and
+            ``local_vols``; also the ``surface`` field of the ``"local_vol"``
+            process spec.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+
+    def value(self, expiry: float, strike: float) -> float:
+        """
+        Local volatility at a point: bilinear inside the grid, flat outside it.
+
+        Parameters
+        ----------
+        expiry : float
+            Time in years from the valuation date.
+        strike : float
+            Level of the underlying in price units; in a simulation, the spot
+            at that time.
+
+        Returns
+        -------
+        float
+            Local volatility as an annualized decimal; ``nan`` if either
+            coordinate is ``nan``.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.volatility import LocalVolSurface
+        >>> local = LocalVolSurface([1.0, 2.0], [100.0, 200.0], [0.1, 0.2, 0.3, 0.4])
+        >>> round(local.value(1.5, 150.0), 10)
+        0.25
+        >>> local.value(9.0, 50.0)
+        0.3
+        """
+        ...
+
+    @property
+    def expiries(self) -> list[float]:
+        """
+        Expiry axis in years.
+
+        Returns
+        -------
+        list[float]
+            Strictly increasing expiries.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def strikes(self) -> list[float]:
+        """
+        Strike axis in price units of the underlying.
+
+        Returns
+        -------
+        list[float]
+            Strictly increasing positive strikes.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def local_vols(self) -> list[float]:
+        """
+        Local volatilities in row-major order.
+
+        Returns
+        -------
+        list[float]
+            Annualized decimals; the node of expiry ``i`` and strike ``j`` is
+            at ``i * len(strikes) + j``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def grid_shape(self) -> tuple[int, int]:
+        """
+        Number of expiry rows and strike columns on the local volatility grid.
+
+        Returns
+        -------
+        tuple[int, int]
+            ``(len(expiries), len(strikes))``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        Tabulate the grid as a pandas DataFrame.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per expiry (index named ``"expiry"``, in years) and one
+            float64 column per strike, the layout of
+            :func:`surface_to_dataframe` for an implied surface.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.volatility import LocalVolSurface
+        >>> frame = LocalVolSurface([1.0, 2.0], [100.0, 200.0], [0.1, 0.2, 0.3, 0.4]).to_dataframe()
+        >>> frame.shape, frame.index.name
+        ((2, 2), 'expiry')
+        """
+        ...
 
 class SviParams:
     """

@@ -18,7 +18,42 @@
 //! Reference: Glasserman (2003) - "Monte Carlo Methods in Financial Engineering", Chapter 7.
 //!
 
+use crate::monte_carlo::estimate::Estimate;
+use crate::monte_carlo::results::MoneyEstimate;
 use crate::monte_carlo::OnlineStats;
+use serde::{Deserialize, Serialize};
+
+/// Price with likelihood-ratio delta and vega, all estimated from one set of
+/// simulated paths.
+///
+/// Returned by
+/// [`PathDependentPricer::price_with_lrm_greeks`](crate::monte_carlo::pricer::path_dependent::PathDependentPricer::price_with_lrm_greeks).
+/// The Greeks are sample means of `discounted payoff x score`, so each carries
+/// its own standard error and 95% confidence interval; they share the paths of
+/// `price` and are correlated with it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct LrmGreeks {
+    /// Discounted price estimate in the payoff currency.
+    pub price: MoneyEstimate,
+    /// Delta: change in price per unit change in the initial spot.
+    pub delta: Estimate,
+    /// Vega: change in price per one volatility point (`0.01` of annualized
+    /// volatility).
+    pub vega: Estimate,
+}
+
+/// Summarize per-path contributions as a mean with its sampling error.
+fn estimate(stats: &OnlineStats) -> Estimate {
+    Estimate::new(
+        stats.mean(),
+        stats.stderr(),
+        stats.confidence_interval(0.05),
+        stats.count(),
+    )
+    .with_std_dev(stats.std_dev())
+}
 
 /// Compute delta using Likelihood Ratio Method for GBM.
 ///
@@ -57,7 +92,8 @@ use crate::monte_carlo::OnlineStats;
 ///
 /// # Returns
 ///
-/// (delta estimate, standard error)
+/// The delta estimate with its standard error and 95% confidence interval
+/// over the supplied paths.
 #[must_use]
 pub fn lrm_delta(
     payoffs: &[f64],
@@ -66,7 +102,7 @@ pub fn lrm_delta(
     volatility: f64,
     time_to_maturity: f64,
     discount_factor: f64,
-) -> (f64, f64) {
+) -> Estimate {
     let mut stats = OnlineStats::new();
     let sqrt_t = time_to_maturity.sqrt();
     let score_multiplier = 1.0 / (initial_spot * volatility * sqrt_t);
@@ -78,7 +114,7 @@ pub fn lrm_delta(
         stats.update(delta_contribution);
     }
 
-    (stats.mean(), stats.stderr())
+    estimate(&stats)
 }
 
 /// Compute vega from precomputed per-path log-density score sums.
@@ -94,7 +130,7 @@ pub fn lrm_delta(
 /// GBM stepping) and pass one score per payoff.
 ///
 /// Returns vega scaled by 0.01 (sensitivity per 1% volatility change), with
-/// its standard error.
+/// its standard error and 95% confidence interval over the supplied paths.
 ///
 /// # Caveat
 ///
@@ -116,12 +152,12 @@ pub fn lrm_vega_from_scores(
     payoffs: &[f64],
     path_scores: &[f64],
     discount_factor: f64,
-) -> (f64, f64) {
+) -> Estimate {
     let mut stats = OnlineStats::new();
     for (&payoff, &score) in payoffs.iter().zip(path_scores) {
         stats.update(discount_factor * payoff * score * 0.01);
     }
-    (stats.mean(), stats.stderr())
+    estimate(&stats)
 }
 
 #[cfg(test)]
@@ -164,11 +200,13 @@ mod tests {
         let payoffs = vec![10.0, 5.0, 15.0];
         let wiener = vec![0.5, -0.3, 0.8];
 
-        let (delta, stderr) = lrm_delta(&payoffs, &wiener, 100.0, 0.2, 1.0, 1.0);
+        let delta = lrm_delta(&payoffs, &wiener, 100.0, 0.2, 1.0, 1.0);
 
         // Delta should be finite
-        assert!(delta.is_finite());
-        assert!(stderr >= 0.0);
+        assert!(delta.mean.is_finite());
+        assert!(delta.stderr >= 0.0);
+        assert_eq!(delta.num_paths, 3);
+        assert!(delta.ci_95.0 < delta.mean && delta.mean < delta.ci_95.1);
     }
 
     #[test]
@@ -191,9 +229,11 @@ mod tests {
         let payoffs = vec![0.0, 0.0, 0.0];
         let wiener = vec![0.1, 0.2, 0.3];
 
-        let (delta, _) = lrm_delta(&payoffs, &wiener, 100.0, 0.2, 1.0, 1.0);
+        let delta = lrm_delta(&payoffs, &wiener, 100.0, 0.2, 1.0, 1.0);
 
         // Zero payoffs should give zero Greeks
-        assert_eq!(delta, 0.0);
+        assert_eq!(delta.mean, 0.0);
+        let vega = lrm_vega_from_scores(&payoffs, &wiener, 1.0);
+        assert_eq!(vega.mean, 0.0);
     }
 }

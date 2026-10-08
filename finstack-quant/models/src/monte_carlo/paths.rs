@@ -287,11 +287,6 @@ impl SimulatedPath {
         self.points.first()
     }
 
-    /// Get the final point.
-    pub fn terminal_point(&self) -> Option<&PathPoint> {
-        self.points.last()
-    }
-
     fn extract_cf<T, F>(&self, f: F) -> Vec<T>
     where
         F: Fn(&(f64, f64, CashflowType)) -> T,
@@ -491,11 +486,6 @@ impl PathDataset {
         self.paths.push(path);
     }
 
-    /// Return the number of captured paths currently stored.
-    pub fn num_captured(&self) -> usize {
-        self.paths.len()
-    }
-
     /// Get a path by index.
     pub fn path(&self, index: usize) -> Option<&SimulatedPath> {
         self.paths.get(index)
@@ -504,15 +494,6 @@ impl PathDataset {
     /// Return `true` when the dataset contains every simulated path.
     pub fn is_complete(&self) -> bool {
         self.sampling_method == PathSamplingMethod::All && self.paths.len() == self.num_paths_total
-    }
-
-    /// Return `num_captured / num_paths_total`.
-    pub fn sampling_ratio(&self) -> f64 {
-        if self.num_paths_total == 0 {
-            0.0
-        } else {
-            self.paths.len() as f64 / self.num_paths_total as f64
-        }
     }
 
     /// Return names describing the captured state-vector layout.
@@ -600,7 +581,7 @@ mod tests {
             Some(100.0)
         );
         assert_eq!(
-            path.terminal_point()
+            path.point(1)
                 .expect("Path should have terminal point")
                 .spot(),
             Some(102.0)
@@ -705,7 +686,7 @@ mod tests {
         );
 
         assert_eq!(dataset.num_paths_total, 100);
-        assert_eq!(dataset.num_captured(), 0);
+        assert_eq!(dataset.paths.len(), 0);
         assert!(!dataset.is_complete());
 
         let path1 = SimulatedPath::new(0);
@@ -713,8 +694,7 @@ mod tests {
         dataset.add_path(path1);
         dataset.add_path(path2);
 
-        assert_eq!(dataset.num_captured(), 2);
-        assert_eq!(dataset.sampling_ratio(), 0.02);
+        assert_eq!(dataset.paths.len(), 2);
     }
 
     #[test]

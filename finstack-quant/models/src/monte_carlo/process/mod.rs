@@ -2,7 +2,8 @@
 //!
 //! Start with [`gbm`] for vanilla equity / FX-style simulations and
 //! [`brownian`] for additive Gaussian dynamics. This module also exposes
-//! Heston, CIR, Hull-White / Vasicek, and Schwartz-Smith models.
+//! Heston, Dupire local volatility, CIR, Hull-White / Vasicek, and
+//! Schwartz-Smith models.
 //!
 //! Important assumptions such as time units, rate / volatility quoting, and
 //! state-vector layout are documented in each process module. Use
@@ -16,6 +17,7 @@ pub mod gbm;
 pub mod gbm_dividends;
 pub mod heston;
 pub mod lmm;
+pub mod local_vol;
 pub mod metadata;
 pub mod multi_ou;
 pub mod ou;
@@ -23,8 +25,7 @@ pub mod rough_bergomi;
 pub mod rough_heston;
 pub mod schwartz_smith;
 
-pub use brownian::{BrownianParams, BrownianProcess, MultiBrownianProcess};
-pub use gbm::{GbmParams, GbmProcess, MultiGbmProcess};
-pub use gbm_dividends::{Dividend, GbmWithDividends};
+pub use brownian::BrownianParams;
+pub use gbm::{GbmParams, GbmProcess};
 pub use metadata::ProcessMetadata;
-pub use multi_ou::{MultiOuParams, MultiOuProcess};
+pub use multi_ou::MultiOuParams;
