@@ -1,12 +1,12 @@
 use super::super::helpers::*;
 use super::super::types::*;
-use super::context::AttributionInputs;
+use super::context::MetricsContext;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::collect_cashflows_in_period;
+use finstack_quant_valuations::metrics::{collect_cashflows_in_period, MetricId};
 use finstack_quant_valuations::results::ValuationResult;
 use std::sync::Arc;
 
@@ -162,7 +162,7 @@ pub fn attribute_pnl_metrics_based(
     )?;
     attribution.total_pnl = attribution.total_pnl.checked_add(realized_period_cash)?;
 
-    let inputs = AttributionInputs::new(
+    let inputs = MetricsContext::new(
         instrument, market_t0, market_t1, val_t0, val_t1, as_of_t0, as_of_t1,
     )?;
     if let Some(error) = &inputs.shifts.vol_shift_error {
@@ -207,5 +207,87 @@ pub fn attribute_pnl_metrics_based(
         1.0,
     );
 
+    Ok(attribution)
+}
+
+/// Run the metrics-based method on a repricing request.
+///
+/// Prices the T₀-parameter instrument at T₀ with `metrics` (its theta horizon
+/// set to the attribution window) and the instrument at T₁, then attributes
+/// with [`attribute_pnl_metrics_based`]. `None` requests the default menu
+/// narrowed to what the instrument type supports: that menu is a superset, not
+/// a request. Prepared endpoints on the request are not used, because the
+/// method needs priced measures.
+pub(crate) fn attribute_request(
+    request: &crate::AttributionRequest<'_>,
+    metrics: Option<Vec<MetricId>>,
+) -> Result<PnlAttribution> {
+    let crate::AttributionRequest {
+        instrument,
+        market_t0,
+        market_t1,
+        as_of_t0,
+        as_of_t1,
+        config,
+        model_params_t0,
+        ..
+    } = *request;
+    validate_attribution_period(as_of_t0, as_of_t1)?;
+    let instrument_t0 = match model_params_t0 {
+        Some(params) => crate::model_params::with_model_params(instrument, params)?,
+        None => Arc::clone(instrument),
+    };
+    let mut metrics_instrument = instrument_t0.clone_box();
+    // A zero-day window has no carry (the metrics-based carry step zeroes it),
+    // so the theta horizon is only set for a real window.
+    let window_days = (as_of_t1 - as_of_t0).whole_days();
+    if window_days > 0 {
+        if let Some(overrides) = metrics_instrument.get_metric_pricing_overrides_mut() {
+            let days = u32::try_from(window_days).map_err(|_| {
+                finstack_quant_core::Error::Validation(format!(
+                    "attribution window of {window_days} days exceeds the theta horizon range"
+                ))
+            })?;
+            overrides.theta_period = Some(finstack_quant_core::dates::Tenor::new(
+                days,
+                finstack_quant_core::dates::TenorUnit::Days,
+            )?);
+        }
+    }
+    let metrics_instrument: Arc<dyn Instrument> = Arc::from(metrics_instrument);
+    let metrics = metrics.unwrap_or_else(|| {
+        finstack_quant_valuations::metrics::standard_registry().applicable_subset(
+            &crate::default_attribution_metrics(),
+            metrics_instrument.key(),
+        )
+    });
+
+    // Attach FinstackConfig so sensitivity bump knobs (e.g. rate_bump_bp)
+    // reach the producer instead of silently falling back to defaults.
+    let pricing_options =
+        finstack_quant_calibration::recalibration::pricing_options().with_config(config);
+    let val_t0 = metrics_instrument.price_with_metrics(
+        market_t0,
+        as_of_t0,
+        &metrics,
+        pricing_options.clone(),
+    )?;
+    let val_t1 = instrument.price_with_metrics(market_t1, as_of_t1, &[], pricing_options)?;
+
+    let mut attribution = attribute_pnl_metrics_based(
+        &metrics_instrument,
+        market_t0,
+        market_t1,
+        &val_t0,
+        &val_t1,
+        as_of_t0,
+        as_of_t1,
+    )?;
+    attribution.meta.num_repricings = 2;
+    if model_params_t0.is_some() {
+        let closing_value_opening_params = instrument_t0.value(market_t1, as_of_t1)?;
+        attribution.model_params_pnl = val_t1.value.checked_sub(closing_value_opening_params)?;
+        attribution.meta.num_repricings += 1;
+    }
     Ok(attribution)
 }

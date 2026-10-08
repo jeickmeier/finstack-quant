@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Attribution API simplification
+
+#### Changed (breaking)
+
+- Rust `attribute_pnl` runs every `AttributionMethod`. `MetricsBased` prices the two endpoints with the default metrics the instrument type supports; it was a validation error. `attribute_pnl_metrics_based` remains the entry point for results that are already priced.
+- Rust `AttributionSpec::execute` and `AttributionEnvelope::execute` return a panic inside the pipeline as `Error::Internal`; `execute_contained` is removed from both. Python and WASM behaviour is unchanged.
+- Rust long-row projections are imported from `finstack_quant_attribution::long_rows` (`pnl_attribution_long_rows`, `pnl_attribution_wide_row`, `pnl_attribution_carry_rows`, `pnl_attribution_credit_factor_rows`); the crate-root re-exports are removed.
+
+#### Removed
+
+- Rust `ATTRIBUTION_SCHEMA`, `schema::ATTRIBUTION_SCHEMA_BASE`, `AttributionSchema::CURRENT` (use `AttributionSchema::Attribution`) and `Display for AttributionFactor` (it printed the `Debug` name; `as_str` is the wire name).
+- The attribution crate's direct `rayon` dependency; its parallel maps go through `finstack_quant_core::parallel`.
+
 ### Models API simplification
 
 #### Added

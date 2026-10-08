@@ -13,9 +13,10 @@ mod fixtures;
 use criterion::{criterion_group, criterion_main, Criterion};
 use finstack_quant_attribution::{
     attribute_pnl, attribute_pnl_metrics_based, attribute_return_contribution,
-    attribute_return_contribution_json, default_waterfall_order, pnl_attribution_long_rows,
-    pnl_bridge, translate_to_target_currency, AttributionMethod, AttributionRequest,
-    ExecutionPolicy, MarketRestoreFlags, MarketSnapshot, TaylorAttributionConfig,
+    attribute_return_contribution_json, default_waterfall_order,
+    long_rows::pnl_attribution_long_rows, pnl_bridge, translate_to_target_currency,
+    AttributionMethod, AttributionRequest, ExecutionPolicy, MarketRestoreFlags, MarketSnapshot,
+    TaylorAttributionConfig,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_valuations::instruments::Instrument;

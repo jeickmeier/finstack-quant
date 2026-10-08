@@ -128,6 +128,96 @@ pub(crate) struct CreditCascade {
     pub warnings: Vec<String>,
 }
 
+impl CreditCascade {
+    /// Each step paired with the cumulative parallel bp applied through it.
+    ///
+    /// Par-spread re-bootstrap bumps do not compose under chaining, so every
+    /// step's market is one bump of the cumulative bp from a fixed credit base.
+    /// The curve-shape step adds no bp of its own.
+    pub(crate) fn steps_with_cumulative_bp(&self) -> Vec<(&CreditCascadeStep, f64)> {
+        let mut running_bp = 0.0_f64;
+        self.steps
+            .iter()
+            .map(|step| {
+                if !matches!(step.kind, CreditStepKind::CurveShape) {
+                    running_bp += step.delta_bp;
+                }
+                (step, running_bp)
+            })
+            .collect()
+    }
+
+    /// End-state market of one step, built from `credit_base` (T₀ hazard).
+    ///
+    /// Generic, level and adder steps apply one parallel par-spread bump of
+    /// `cumulative_bp`. The curve-shape step snaps the hazard curves to T₁,
+    /// absorbing the non-parallel residual so `Σ steps ≡ credit_curves_pnl`.
+    pub(crate) fn step_market(
+        &self,
+        step: &CreditCascadeStep,
+        cumulative_bp: f64,
+        source_market: &MarketContext,
+        credit_base: &MarketContext,
+        market_t1: &MarketContext,
+        provider: &dyn RecalibrationProvider,
+    ) -> Result<MarketContext> {
+        match step.kind {
+            CreditStepKind::CurveShape => Ok(snap_hazard_to_t1(
+                credit_base,
+                market_t1,
+                &self.hazard_curve_ids,
+            )),
+            CreditStepKind::Generic | CreditStepKind::Level(_) | CreditStepKind::Adder => {
+                shift_credit_curves_par_spread(
+                    source_market,
+                    credit_base,
+                    &self.hazard_curve_ids,
+                    self.discount_curve_id.as_ref(),
+                    cumulative_bp,
+                    provider,
+                )
+            }
+        }
+    }
+}
+
+/// Record that a supplied credit-factor model produced no cascade.
+pub(crate) fn note_unplanned_cascade(
+    attribution: &mut super::types::PnlAttribution,
+    instrument_id: &str,
+    method: &str,
+) {
+    tracing::warn!(
+        instrument_id,
+        method,
+        "Credit factor model supplied but credit cascade could not be planned"
+    );
+    attribution.meta.notes.push(format!(
+        "credit_factor_model supplied but no resolvable issuer/hazard cascade for {instrument_id}; credit_factor_detail omitted"
+    ));
+}
+
+/// The instrument's `credit::issuer_id` tag with its row in `model`.
+///
+/// `None` when the instrument carries no issuer tag; the row is `None` when
+/// the tagged issuer is not mapped in the model.
+pub(crate) fn resolve_issuer<'m>(
+    model: &'m CreditFactorModel,
+    instrument: &dyn Instrument,
+) -> Option<(IssuerId, Option<&'m IssuerBetaRow>)> {
+    let issuer_id = IssuerId::new(instrument.attributes().get_meta(ISSUER_ID_META_KEY)?);
+    let row = model.issuer_betas.iter().find(|r| r.issuer_id == issuer_id);
+    Some((issuer_id, row))
+}
+
+fn cascade_step(kind: CreditStepKind, name: &str, delta_bp: f64) -> CreditCascadeStep {
+    CreditCascadeStep {
+        kind,
+        label: format!("credit::{name}"),
+        delta_bp,
+    }
+}
+
 /// Human-readable names for every level in model order.
 pub(crate) fn hierarchy_level_names(model: &CreditFactorModel) -> Vec<String> {
     model
@@ -212,16 +302,13 @@ pub(crate) fn plan_credit_cascade(
     market_t0: &MarketContext,
     market_t1: &MarketContext,
 ) -> Result<Option<CreditCascade>> {
-    let issuer_id_str = match instrument.attributes().get_meta(ISSUER_ID_META_KEY) {
-        Some(s) => s.to_string(),
-        None => return Ok(None),
+    let Some((issuer_id, issuer_row)) = resolve_issuer(model, instrument.as_ref()) else {
+        return Ok(None);
     };
-    let issuer_id = IssuerId::new(issuer_id_str.as_str());
-
-    let Some(issuer_row) = model.issuer_betas.iter().find(|r| r.issuer_id == issuer_id) else {
+    let Some(issuer_row) = issuer_row else {
         tracing::warn!(
             instrument_id = %instrument.id(),
-            issuer_id = %issuer_id_str,
+            issuer_id = %issuer_id,
             "Credit cascade skipped: issuer is not mapped in the credit factor model"
         );
         return Ok(None);
@@ -310,25 +397,21 @@ pub(crate) fn plan_credit_cascade(
             check_unit_coherence(factor_id, *move_bp);
         }
     }
-    if has_scalar_factor_moves {
+    let (mut steps, explained_bp) = if has_scalar_factor_moves {
         let mut steps: Vec<CreditCascadeStep> =
             Vec::with_capacity(model.hierarchy.levels.len() + 2);
         let mut explained_bp = 0.0;
         // `S_i = β_PC·F_PC + Σ_k β_k·F_level_k + adder_i`, so each scalar
         // factor move is scaled by the issuer's beta (matching
-        // `CreditStepKind`'s `bp = β × ΔF` and the synthesized path below).
+        // `CreditStepKind`'s `bp = β × ΔF`).
         let beta_pc = issuer_row.betas.pc;
-        let level_betas = issuer_row.betas.levels.clone();
+        let level_betas = &issuer_row.betas.levels;
         let mut append_factor = |factor_id: &str, steps: &mut Vec<CreditCascadeStep>| {
             if factor_id == model.generic_factor.series_id || factor_id == CREDIT_GENERIC_FACTOR_ID
             {
                 let generic_bp = beta_pc * generic_move.unwrap_or(0.0);
                 explained_bp += generic_bp;
-                steps.push(CreditCascadeStep {
-                    kind: CreditStepKind::Generic,
-                    label: "credit::generic".to_string(),
-                    delta_bp: generic_bp,
-                });
+                steps.push(cascade_step(CreditStepKind::Generic, "generic", generic_bp));
                 return true;
             }
             for (k, (level_factor_id, move_bp)) in scalar_level_moves.iter().enumerate() {
@@ -336,11 +419,11 @@ pub(crate) fn plan_credit_cascade(
                     let beta_k = level_betas.get(k).copied().unwrap_or(0.0);
                     let level_bp = beta_k * move_bp.unwrap_or(0.0);
                     explained_bp += level_bp;
-                    steps.push(CreditCascadeStep {
-                        kind: CreditStepKind::Level(k),
-                        label: format!("credit::{}", level_names[k]),
-                        delta_bp: level_bp,
-                    });
+                    steps.push(cascade_step(
+                        CreditStepKind::Level(k),
+                        &level_names[k],
+                        level_bp,
+                    ));
                     return true;
                 }
             }
@@ -365,51 +448,25 @@ pub(crate) fn plan_credit_cascade(
                 append_factor(factor_id, &mut steps);
             }
         }
-        steps.push(CreditCascadeStep {
-            kind: CreditStepKind::Adder,
-            label: "credit::adder".to_string(),
-            delta_bp: ds_i - explained_bp,
-        });
-        steps.push(CreditCascadeStep {
-            kind: CreditStepKind::CurveShape,
-            label: "credit::curve_shape".to_string(),
-            delta_bp: 0.0,
-        });
-        return Ok(Some(CreditCascade {
-            issuer_id,
-            hazard_curve_ids: credit_curves,
-            discount_curve_id,
-            steps,
-            level_names,
-            warnings,
-        }));
-    }
-
-    // No observed factor-series moves: none of ΔS_i is identifiably
-    // systematic, so the entire move is the idiosyncratic adder.
-    let mut steps: Vec<CreditCascadeStep> = Vec::with_capacity(model.hierarchy.levels.len() + 2);
-    steps.push(CreditCascadeStep {
-        kind: CreditStepKind::Generic,
-        label: "credit::generic".to_string(),
-        delta_bp: 0.0,
-    });
-    for (k, level_name) in level_names.iter().enumerate() {
-        steps.push(CreditCascadeStep {
-            kind: CreditStepKind::Level(k),
-            label: format!("credit::{level_name}"),
-            delta_bp: 0.0,
-        });
-    }
-    steps.push(CreditCascadeStep {
-        kind: CreditStepKind::Adder,
-        label: "credit::adder".to_string(),
-        delta_bp: ds_i,
-    });
-    steps.push(CreditCascadeStep {
-        kind: CreditStepKind::CurveShape,
-        label: "credit::curve_shape".to_string(),
-        delta_bp: 0.0,
-    });
+        (steps, explained_bp)
+    } else {
+        // No observed factor-series moves: none of ΔS_i is identifiably
+        // systematic, so the entire move is the idiosyncratic adder.
+        let mut steps = vec![cascade_step(CreditStepKind::Generic, "generic", 0.0)];
+        steps.extend(
+            level_names
+                .iter()
+                .enumerate()
+                .map(|(k, name)| cascade_step(CreditStepKind::Level(k), name, 0.0)),
+        );
+        (steps, 0.0)
+    };
+    steps.push(cascade_step(
+        CreditStepKind::Adder,
+        "adder",
+        ds_i - explained_bp,
+    ));
+    steps.push(cascade_step(CreditStepKind::CurveShape, "curve_shape", 0.0));
 
     Ok(Some(CreditCascade {
         issuer_id,

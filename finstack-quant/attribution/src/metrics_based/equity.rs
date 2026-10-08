@@ -1,14 +1,13 @@
-use super::super::helpers::*;
 use super::super::types::*;
-use super::context::AttributionInputs;
-use super::shifts::{average_over, inflation_source_abs_shift_bp, twist_diagnostic_note};
+use super::context::MetricsContext;
+use super::shifts::{inflation_source_abs_shift_bp, note_twist};
 use finstack_quant_core::market_data::diff::{
     measure_inflation_source_shift, measure_scalar_absolute_shift,
 };
 use finstack_quant_valuations::metrics::MetricId;
 
 pub(super) fn apply_spot(
-    inputs: &AttributionInputs<'_>,
+    inputs: &MetricsContext<'_>,
     attribution: &mut PnlAttribution,
     non_finite_detected: &mut bool,
 ) {
@@ -48,11 +47,10 @@ pub(super) fn apply_spot(
                 total_spot_pnl += 0.5 * gamma * spot_shift * spot_shift;
             }
 
-            attribution.market_scalars_pnl = factor_money_or_invalid(
+            attribution.market_scalars_pnl = inputs.money(
                 total_spot_pnl,
-                inputs.val_t1.value.currency(),
                 "market scalars (delta/gamma) P&L",
-                &mut attribution.meta.notes,
+                attribution,
                 non_finite_detected,
             );
         } else {
@@ -65,7 +63,7 @@ pub(super) fn apply_spot(
 }
 
 pub(super) fn apply_dividend(
-    inputs: &AttributionInputs<'_>,
+    inputs: &MetricsContext<'_>,
     attribution: &mut PnlAttribution,
     non_finite_detected: &mut bool,
 ) {
@@ -85,11 +83,10 @@ pub(super) fn apply_dividend(
             ) {
                 let div_shift_bp = div_abs_shift * 10_000.0;
                 let div_amount = dividend01 * div_shift_bp;
-                attribution.market_scalars_pnl = factor_money_or_invalid(
+                attribution.market_scalars_pnl = inputs.money(
                     attribution.market_scalars_pnl.amount() + div_amount,
-                    inputs.val_t1.value.currency(),
                     "dividend P&L",
-                    &mut attribution.meta.notes,
+                    attribution,
                     non_finite_detected,
                 );
             }
@@ -98,7 +95,7 @@ pub(super) fn apply_dividend(
 }
 
 pub(super) fn apply_inflation(
-    inputs: &AttributionInputs<'_>,
+    inputs: &MetricsContext<'_>,
     attribution: &mut PnlAttribution,
     non_finite_detected: &mut bool,
 ) {
@@ -147,11 +144,10 @@ pub(super) fn apply_inflation(
             0.0
         };
         let inflation_amount = inflation01 * avg_shift;
-        attribution.inflation_curves_pnl = factor_money_or_invalid(
+        attribution.inflation_curves_pnl = inputs.money(
             inflation_amount,
-            inputs.val_t1.value.currency(),
             "inflation P&L",
-            &mut attribution.meta.notes,
+            attribution,
             non_finite_detected,
         );
 
@@ -166,33 +162,20 @@ pub(super) fn apply_inflation(
             );
             let shift_decimal = avg_shift / 10_000.0;
             let convexity_pnl = 0.5 * inflation_convexity * shift_decimal * shift_decimal;
-            attribution.inflation_curves_pnl = factor_money_or_invalid(
+            attribution.inflation_curves_pnl = inputs.money(
                 attribution.inflation_curves_pnl.amount() + convexity_pnl,
-                inputs.val_t1.value.currency(),
                 "inflation convexity P&L",
-                &mut attribution.meta.notes,
+                attribution,
                 non_finite_detected,
             );
 
-            let abs_avg = average_over(curve_ids, |curve_id| {
-                let v = inflation_source_abs_shift_bp(
-                    curve_id.as_str(),
-                    inputs.market_t0,
-                    inputs.market_t1,
-                );
-                (v > 0.0).then_some(v)
-            })
-            .0;
-            if let Some(abs_avg) = abs_avg {
-                if let Some(note) = twist_diagnostic_note("Inflation convexity", avg_shift, abs_avg)
-                {
-                    attribution.meta.notes.push(note);
-                    attribution
-                        .meta
-                        .notes
-                        .push("Inflation convexity: unreliable / bounds-exceeded".to_string());
-                }
-            }
+            note_twist(
+                &mut attribution.meta.notes,
+                "Inflation convexity",
+                avg_shift,
+                curve_ids,
+                |id| inflation_source_abs_shift_bp(id, inputs.market_t0, inputs.market_t1),
+            );
         }
     }
 }

@@ -47,7 +47,7 @@
 //!
 //! ```rust
 //! use finstack_quant_attribution::{
-//!     pnl_attribution_long_rows, AttributionMethod, PnlAttribution,
+//!     long_rows::pnl_attribution_long_rows, AttributionMethod, PnlAttribution,
 //! };
 //! use finstack_quant_core::{currency::Currency, dates::create_date, money::Money};
 //! use time::Month;
@@ -100,31 +100,48 @@ pub struct LongDetailRow {
     pub currency: String,
 }
 
-/// Strip the `factor.` prefix from a dotted `kind`, leaving the sub-component.
-fn kind_sub(kind: &'static str, factor: &'static str) -> &'static str {
-    kind.strip_prefix(factor)
-        .and_then(|rest| rest.strip_prefix('.'))
-        .unwrap_or("")
-}
-
 impl LongDetailRow {
     /// Build a row from a `Money` value, stamping that value's own currency.
-    fn from_money(
+    /// `factor` and `sub` are the two halves of the dotted `kind`.
+    fn new(
         kind: &'static str,
-        factor: &'static str,
-        key_a: String,
+        key_a: impl Into<String>,
         key_b: Option<String>,
         money: &Money,
     ) -> Self {
+        let (factor, sub) = kind.split_once('.').unwrap_or((kind, ""));
         Self {
             kind,
             factor,
-            sub: kind_sub(kind, factor),
-            key_a,
+            sub,
+            key_a: key_a.into(),
             key_b,
             amount: money.amount(),
             currency: money.currency().to_string(),
         }
+    }
+}
+
+/// One row per entry of an id-keyed map.
+fn push_by_id(rows: &mut Vec<LongDetailRow>, kind: &'static str, map: &IndexMap<CurveId, Money>) {
+    for (id, money) in map {
+        rows.push(LongDetailRow::new(kind, id.as_str(), None, money));
+    }
+}
+
+/// One row per entry of a `(curve, tenor)`-keyed map.
+fn push_by_tenor(
+    rows: &mut Vec<LongDetailRow>,
+    kind: &'static str,
+    map: &IndexMap<(CurveId, String), Money>,
+) {
+    for ((curve_id, tenor), money) in map {
+        rows.push(LongDetailRow::new(
+            kind,
+            curve_id.as_str(),
+            Some(tenor.clone()),
+            money,
+        ));
     }
 }
 
@@ -241,101 +258,42 @@ pub fn pnl_attribution_long_rows(attribution: &PnlAttribution) -> Vec<LongDetail
     let mut rows = Vec::new();
 
     if let Some(detail) = &attribution.rates_detail {
-        for (curve_id, money) in &detail.by_curve {
-            rows.push(LongDetailRow::from_money(
-                "rates.by_curve",
-                "rates",
-                curve_id.as_str().to_string(),
-                None,
-                money,
-            ));
-        }
-        for ((curve_id, tenor), money) in &detail.by_tenor {
-            rows.push(LongDetailRow::from_money(
-                "rates.by_tenor",
-                "rates",
-                curve_id.as_str().to_string(),
-                Some(tenor.clone()),
-                money,
-            ));
-        }
-        rows.push(LongDetailRow::from_money(
+        push_by_id(&mut rows, "rates.by_curve", &detail.by_curve);
+        push_by_tenor(&mut rows, "rates.by_tenor", &detail.by_tenor);
+        rows.push(LongDetailRow::new(
             "rates.discount_total",
-            "rates",
-            String::new(),
+            "",
             None,
             &detail.discount_total,
         ));
-        rows.push(LongDetailRow::from_money(
+        rows.push(LongDetailRow::new(
             "rates.forward_total",
-            "rates",
-            String::new(),
+            "",
             None,
             &detail.forward_total,
         ));
     }
 
     if let Some(detail) = &attribution.credit_detail {
-        for (curve_id, money) in &detail.by_curve {
-            rows.push(LongDetailRow::from_money(
-                "credit.by_curve",
-                "credit",
-                curve_id.as_str().to_string(),
-                None,
-                money,
-            ));
-        }
-        for ((curve_id, tenor), money) in &detail.by_tenor {
-            rows.push(LongDetailRow::from_money(
-                "credit.by_tenor",
-                "credit",
-                curve_id.as_str().to_string(),
-                Some(tenor.clone()),
-                money,
-            ));
-        }
+        push_by_id(&mut rows, "credit.by_curve", &detail.by_curve);
+        push_by_tenor(&mut rows, "credit.by_tenor", &detail.by_tenor);
     }
 
     if let Some(detail) = &attribution.inflation_detail {
-        for (curve_id, money) in &detail.by_curve {
-            rows.push(LongDetailRow::from_money(
-                "inflation.by_curve",
-                "inflation",
-                curve_id.as_str().to_string(),
-                None,
-                money,
-            ));
-        }
+        push_by_id(&mut rows, "inflation.by_curve", &detail.by_curve);
         if let Some(by_tenor) = &detail.by_tenor {
-            for ((curve_id, tenor), money) in by_tenor {
-                rows.push(LongDetailRow::from_money(
-                    "inflation.by_tenor",
-                    "inflation",
-                    curve_id.as_str().to_string(),
-                    Some(tenor.clone()),
-                    money,
-                ));
-            }
+            push_by_tenor(&mut rows, "inflation.by_tenor", by_tenor);
         }
     }
 
     if let Some(detail) = &attribution.correlations_detail {
-        for (curve_id, money) in &detail.by_curve {
-            rows.push(LongDetailRow::from_money(
-                "correlations.by_curve",
-                "correlations",
-                curve_id.as_str().to_string(),
-                None,
-                money,
-            ));
-        }
+        push_by_id(&mut rows, "correlations.by_curve", &detail.by_curve);
     }
 
     if let Some(detail) = &attribution.fx_detail {
         for ((from, to), money) in &detail.by_pair {
-            rows.push(LongDetailRow::from_money(
+            rows.push(LongDetailRow::new(
                 "fx.by_pair",
-                "fx",
                 from.to_string(),
                 Some(to.to_string()),
                 money,
@@ -344,23 +302,14 @@ pub fn pnl_attribution_long_rows(attribution: &PnlAttribution) -> Vec<LongDetail
     }
 
     if let Some(detail) = &attribution.vol_detail {
-        for (vol_surface_id, money) in &detail.by_surface {
-            rows.push(LongDetailRow::from_money(
-                "vol.by_surface",
-                "vol",
-                vol_surface_id.as_str().to_string(),
-                None,
-                money,
-            ));
-        }
+        push_by_id(&mut rows, "vol.by_surface", &detail.by_surface);
     }
 
     if let Some(detail) = &attribution.cross_factor_detail {
         for (pair_label, money) in &detail.by_pair {
-            rows.push(LongDetailRow::from_money(
+            rows.push(LongDetailRow::new(
                 "cross_factor.by_pair",
-                "cross_factor",
-                pair_label.clone(),
+                pair_label.as_str(),
                 None,
                 money,
             ));
@@ -368,44 +317,31 @@ pub fn pnl_attribution_long_rows(attribution: &PnlAttribution) -> Vec<LongDetail
     }
 
     if let Some(detail) = &attribution.scalars_detail {
-        let mut push_scalar_map = |kind: &'static str, map: &IndexMap<CurveId, Money>| {
-            for (id, money) in map {
-                rows.push(LongDetailRow::from_money(
-                    kind,
-                    "scalars",
-                    id.as_str().to_string(),
-                    None,
-                    money,
-                ));
-            }
-        };
-        push_scalar_map("scalars.dividends", &detail.dividends);
-        push_scalar_map("scalars.inflation", &detail.inflation);
-        push_scalar_map("scalars.equity_prices", &detail.equity_prices);
-        push_scalar_map("scalars.commodity_prices", &detail.commodity_prices);
+        push_by_id(&mut rows, "scalars.dividends", &detail.dividends);
+        push_by_id(&mut rows, "scalars.inflation", &detail.inflation);
+        push_by_id(&mut rows, "scalars.equity_prices", &detail.equity_prices);
+        push_by_id(
+            &mut rows,
+            "scalars.commodity_prices",
+            &detail.commodity_prices,
+        );
     }
 
     if let Some(detail) = &attribution.model_params_detail {
-        let mut push_opt = |key: &'static str, money: &Option<Money>| {
-            if let Some(m) = money {
-                rows.push(LongDetailRow::from_money(
-                    "model_params.named",
-                    "model_params",
-                    key.to_string(),
-                    None,
-                    m,
-                ));
+        for (key, money) in [
+            ("prepayment", &detail.prepayment),
+            ("default_rate", &detail.default_rate),
+            ("recovery_rate", &detail.recovery_rate),
+            ("conversion_ratio", &detail.conversion_ratio),
+        ] {
+            if let Some(money) = money {
+                rows.push(LongDetailRow::new("model_params.named", key, None, money));
             }
-        };
-        push_opt("prepayment", &detail.prepayment);
-        push_opt("default_rate", &detail.default_rate);
-        push_opt("recovery_rate", &detail.recovery_rate);
-        push_opt("conversion_ratio", &detail.conversion_ratio);
-        for (k, money) in &detail.other {
-            rows.push(LongDetailRow::from_money(
+        }
+        for (key, money) in &detail.other {
+            rows.push(LongDetailRow::new(
                 "model_params.other",
-                "model_params",
-                k.clone(),
+                key.as_str(),
                 None,
                 money,
             ));
@@ -443,13 +379,7 @@ pub fn pnl_attribution_carry_rows(attribution: &PnlAttribution) -> Vec<LongDetai
     };
 
     let mut push = |kind: &'static str, key_a: &str, money: &Money| {
-        rows.push(LongDetailRow::from_money(
-            kind,
-            "carry",
-            key_a.to_string(),
-            None,
-            money,
-        ));
+        rows.push(LongDetailRow::new(kind, key_a, None, money));
     };
 
     push("carry.total", "total", &detail.total);
@@ -506,54 +436,47 @@ pub fn pnl_attribution_credit_factor_rows(attribution: &PnlAttribution) -> Vec<L
         return rows;
     };
 
-    rows.push(LongDetailRow::from_money(
+    let mut push = |kind: &'static str, key_a: &str, key_b: Option<String>, money: &Money| {
+        rows.push(LongDetailRow::new(kind, key_a, key_b, money));
+    };
+
+    push(
         "credit_factor.generic",
-        "credit_factor",
-        "generic".to_string(),
+        "generic",
         None,
         &detail.generic_pnl,
-    ));
+    );
     for level in &detail.levels {
-        rows.push(LongDetailRow::from_money(
-            "credit_factor.level",
-            "credit_factor",
-            level.level_name.clone(),
-            None,
-            &level.total,
-        ));
+        push("credit_factor.level", &level.level_name, None, &level.total);
         for (bucket, money) in &level.by_bucket {
-            rows.push(LongDetailRow::from_money(
+            push(
                 "credit_factor.level.by_bucket",
-                "credit_factor",
-                level.level_name.clone(),
+                &level.level_name,
                 Some(bucket.clone()),
                 money,
-            ));
+            );
         }
     }
-    rows.push(LongDetailRow::from_money(
+    push(
         "credit_factor.adder",
-        "credit_factor",
-        "adder".to_string(),
+        "adder",
         None,
         &detail.adder_pnl_total,
-    ));
-    rows.push(LongDetailRow::from_money(
+    );
+    push(
         "credit_factor.curve_shape",
-        "credit_factor",
-        "curve_shape".to_string(),
+        "curve_shape",
         None,
         &detail.curve_shape_pnl,
-    ));
+    );
     if let Some(by_issuer) = &detail.adder_pnl_by_issuer {
         for (issuer_id, money) in by_issuer {
-            rows.push(LongDetailRow::from_money(
+            push(
                 "credit_factor.adder_by_issuer",
-                "credit_factor",
-                "adder".to_string(),
+                "adder",
                 Some(issuer_id.as_str().to_string()),
                 money,
-            ));
+            );
         }
     }
 
@@ -773,13 +696,7 @@ mod tests {
 
     #[test]
     fn rows_serialize_with_stable_field_names() {
-        let row = LongDetailRow::from_money(
-            "rates.by_curve",
-            "rates",
-            "USD-OIS".to_string(),
-            None,
-            &usd(1.5),
-        );
+        let row = LongDetailRow::new("rates.by_curve", "USD-OIS", None, &usd(1.5));
         let value = serde_json::to_value(&row).expect("row must serialize");
         assert_eq!(
             value,

@@ -44,24 +44,20 @@
 //! [`crate::AttributionRequest`].
 
 use super::credit_cascade::{
-    build_credit_factor_attribution, plan_credit_cascade, shift_credit_curves_par_spread,
-    snap_hazard_to_t1, CreditCascadeStep,
+    build_credit_factor_attribution, note_unplanned_cascade, plan_credit_cascade, CreditCascadeStep,
 };
 use super::factors::*;
 use super::helpers::*;
 use super::model_params;
 use super::types::*;
-use crate::policy_map::{try_map_policy, try_map_policy_zip};
+use crate::policy_map::try_map_policy;
 use crate::AttributionRequest;
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
-use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
-use finstack_quant_valuations::instruments::Instrument;
 use indexmap::IndexMap;
-use std::sync::Arc;
 
 /// Additive cross-factor interaction contribution for a pair of factors.
 ///
@@ -95,106 +91,136 @@ fn cross_interaction_pnl(
 }
 
 /// Cross-factor tolerance for including an interaction term in the detail map.
-/// Matches the historical inline filter (`pnl.amount().abs() > 1e-12`).
 const CROSS_FACTOR_TOLERANCE: f64 = 1e-12;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum ParallelRestoredFactor {
-    Rates,
-    Credit,
-    Inflation,
-    Correlations,
-    Volatility,
-    MarketScalars,
-    Forward,
-    FX,
+/// One independently restored factor of the parallel method.
+///
+/// `flags` selects the market family restored to T₀. It is empty for model
+/// parameters, which restore the instrument instead of the market. `label`
+/// names the factor in cross-pair keys.
+#[derive(Clone)]
+struct FactorSpec {
+    factor: AttributionFactor,
+    flags: MarketRestoreFlags,
+    label: &'static str,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ActiveFactorKind {
-    Discount,
-    Forward,
-    Credit,
-    Inflation,
-    Correlations,
-    FX,
-    Volatility,
-    MarketScalars,
-    ModelParameters,
-}
-
-fn get_restore_flags(kind: ActiveFactorKind) -> MarketRestoreFlags {
-    match kind {
-        ActiveFactorKind::Discount => MarketRestoreFlags::DISCOUNT,
-        ActiveFactorKind::Forward => MarketRestoreFlags::FORWARD,
-        ActiveFactorKind::Credit => MarketRestoreFlags::HAZARD,
-        ActiveFactorKind::Inflation => MarketRestoreFlags::INFLATION,
-        ActiveFactorKind::Correlations => MarketRestoreFlags::CORRELATION,
-        ActiveFactorKind::FX => MarketRestoreFlags::FX,
-        ActiveFactorKind::Volatility => MarketRestoreFlags::VOL,
-        ActiveFactorKind::MarketScalars => MarketRestoreFlags::SCALARS,
-        ActiveFactorKind::ModelParameters => MarketRestoreFlags::empty(),
+const fn spec(
+    factor: AttributionFactor,
+    flags: MarketRestoreFlags,
+    label: &'static str,
+) -> FactorSpec {
+    FactorSpec {
+        factor,
+        flags,
+        label,
     }
 }
 
-enum ParallelLatentFactorSpec {
-    Market {
-        factor: ActiveFactorKind,
-        flags: MarketRestoreFlags,
-        snapshot: Box<MarketSnapshot>,
-    },
-    ModelParams {
-        snapshot: ModelParamsSnapshot,
-    },
-}
+const RATES: FactorSpec = spec(
+    AttributionFactor::RatesCurves,
+    MarketRestoreFlags::RATES,
+    "Rates",
+);
+const DISCOUNT: FactorSpec = spec(
+    AttributionFactor::RatesCurves,
+    MarketRestoreFlags::DISCOUNT,
+    "Discount",
+);
+const FORWARD: FactorSpec = spec(
+    AttributionFactor::RatesCurves,
+    MarketRestoreFlags::FORWARD,
+    "Forward",
+);
+const CREDIT: FactorSpec = spec(
+    AttributionFactor::CreditCurves,
+    MarketRestoreFlags::CREDIT,
+    "Credit",
+);
+const INFLATION: FactorSpec = spec(
+    AttributionFactor::InflationCurves,
+    MarketRestoreFlags::INFLATION,
+    "Inflation",
+);
+const CORRELATIONS: FactorSpec = spec(
+    AttributionFactor::Correlations,
+    MarketRestoreFlags::CORRELATION,
+    "Correlations",
+);
+const FX: FactorSpec = spec(AttributionFactor::Fx, MarketRestoreFlags::FX, "FX");
+const VOL: FactorSpec = spec(
+    AttributionFactor::Volatility,
+    MarketRestoreFlags::VOL,
+    "Vol",
+);
+const SCALARS: FactorSpec = spec(
+    AttributionFactor::MarketScalars,
+    MarketRestoreFlags::SCALARS,
+    "Spot",
+);
+const MODEL_PARAMS: FactorSpec = spec(
+    AttributionFactor::ModelParameters,
+    MarketRestoreFlags::empty(),
+    "ModelParameters",
+);
 
-struct FirstOrderRepriceResult {
-    factor: ActiveFactorKind,
-    pnl: Money,
-    reprice_val: Money,
-}
+/// Default factors, in the order of the module-level algorithm.
+const DEFAULT_FACTORS: [FactorSpec; 8] = [
+    RATES,
+    CREDIT,
+    INFLATION,
+    CORRELATIONS,
+    FX,
+    VOL,
+    MODEL_PARAMS,
+    SCALARS,
+];
 
-struct RestoredFactorEval {
-    factor: ParallelRestoredFactor,
+/// `full_cross_attribution` factors: rates split into discount and forward
+/// curves so their interaction is a pair of its own.
+const FULL_CROSS_FACTORS: [FactorSpec; 9] = [
+    DISCOUNT,
+    FORWARD,
+    CREDIT,
+    INFLATION,
+    CORRELATIONS,
+    FX,
+    VOL,
+    SCALARS,
+    MODEL_PARAMS,
+];
+
+/// Default cross pairs, by factor label (see the module docs). Rates×Inflation
+/// captures linkers, Credit×Correlations tranches and Credit×Vol convertibles.
+const DEFAULT_CROSS_PAIRS: [(&str, &str); 9] = [
+    ("Rates", "Credit"),
+    ("Rates", "Vol"),
+    ("Spot", "Vol"),
+    ("Spot", "Credit"),
+    ("FX", "Vol"),
+    ("FX", "Rates"),
+    ("Credit", "Vol"),
+    ("Rates", "Inflation"),
+    ("Credit", "Correlations"),
+];
+
+/// First-order outcome for one factor.
+struct FactorEval {
+    spec: FactorSpec,
+    /// T₀ snapshot of the factor's family (empty for model parameters).
     snapshot: MarketSnapshot,
-    output: Option<(Money, Money)>,
+    /// `(factor P&L, value with the factor at T₀)`. `None` when T₀ holds no
+    /// data for the family or the factor failed softly.
+    repriced: Option<(Money, Money)>,
+    /// Diagnostic for a soft failure.
+    note: Option<String>,
 }
 
-/// Accumulate a cross-factor interaction P&L into the running totals if its
-/// magnitude exceeds `CROSS_FACTOR_TOLERANCE`.
-fn record_cross_pair(
-    pair: &str,
-    pnl: Money,
-    cross_total: &mut f64,
-    cross_by_pair: &mut IndexMap<String, Money>,
-) {
-    if pnl.amount().abs() > CROSS_FACTOR_TOLERANCE {
-        *cross_total += pnl.amount();
-        cross_by_pair.insert(pair.to_string(), pnl);
-    }
-}
-
-/// Note: surface factors that were skipped because T0 had no
-/// market data for the family while T1 does — e.g. a hazard curve first
-/// marked between T0 and T1, a vol surface introduced, an FX matrix attached.
-/// Without a note the entire move silently flows into the residual and
-/// operators cannot distinguish "cross-effect residual" from "factor dropped
-/// because T0 data was missing".
-fn restored_factor_is_used(
-    factor: ParallelRestoredFactor,
-    factor_use: InstrumentFactorUse,
-) -> bool {
-    match factor {
-        ParallelRestoredFactor::Rates | ParallelRestoredFactor::Forward => factor_use.rates,
-        ParallelRestoredFactor::Credit => factor_use.credit,
-        ParallelRestoredFactor::Inflation => factor_use.inflation,
-        ParallelRestoredFactor::Correlations => true,
-        ParallelRestoredFactor::FX => factor_use.fx,
-        ParallelRestoredFactor::Volatility => factor_use.volatility,
-        ParallelRestoredFactor::MarketScalars => factor_use.scalars,
-    }
-}
-
+/// Note the factors skipped because T0 had no market data for the family
+/// while T1 does — e.g. a hazard curve first marked between T0 and T1, a vol
+/// surface introduced, an FX matrix attached. Without a note the entire move
+/// silently flows into the residual and operators cannot distinguish
+/// "cross-effect residual" from "factor dropped because T0 data was missing".
 fn note_skipped_empty_t0_factors(
     attribution: &mut PnlAttribution,
     market_t0: &MarketContext,
@@ -202,53 +228,30 @@ fn note_skipped_empty_t0_factors(
     factor_use: InstrumentFactorUse,
     dependencies: &finstack_quant_valuations::instruments::MarketDependencies,
 ) {
-    use ParallelRestoredFactor as F;
-    let families: [(F, &str); 7] = [
-        (F::Rates, "RatesCurves"),
-        (F::Credit, "CreditCurves"),
-        (F::Inflation, "InflationCurves"),
-        (F::Correlations, "Correlations"),
-        (F::FX, "Fx"),
-        (F::Volatility, "Volatility"),
-        (F::MarketScalars, "MarketScalars"),
-    ];
-    // `restored_factor_has_data` only inspects the per-family fields, so a
-    // single snapshot of the families the instrument uses answers every
-    // has-data question while iterating the market's curves once. Unused
-    // book-market families are not diagnostic noise. The T1 snapshot is
-    // built lazily and only when at least one used family is absent at T0.
-    let mut flags = MarketRestoreFlags::CORRELATION;
-    if factor_use.rates {
-        flags = flags | MarketRestoreFlags::RATES;
-    }
-    if factor_use.credit {
-        flags = flags | MarketRestoreFlags::CREDIT;
-    }
-    if factor_use.inflation {
-        flags = flags | MarketRestoreFlags::INFLATION;
-    }
-    if factor_use.fx {
-        flags = flags | MarketRestoreFlags::FX;
-    }
-    if factor_use.volatility {
-        flags = flags | MarketRestoreFlags::VOL;
-    }
-    if factor_use.scalars {
-        flags = flags | MarketRestoreFlags::SCALARS;
-    }
+    let used: Vec<FactorSpec> = DEFAULT_FACTORS
+        .into_iter()
+        .filter(|spec| {
+            spec.factor != AttributionFactor::ModelParameters
+                && factor_use.uses_attribution_factor(&spec.factor)
+        })
+        .collect();
+    // One snapshot of the families the instrument uses answers every has-data
+    // question while iterating the market's curves once. The T1 snapshot is
+    // built lazily, only when a used family is absent at T0.
+    let flags = used
+        .iter()
+        .fold(MarketRestoreFlags::empty(), |all, spec| all | spec.flags);
     let snap_t0 = MarketSnapshot::extract_with_dependencies(market_t0, flags, dependencies);
     let mut snap_t1: Option<MarketSnapshot> = None;
-    for (factor, name) in families {
-        if !restored_factor_is_used(factor, factor_use) {
-            continue;
-        }
-        if restored_factor_has_data(factor, &snap_t0) {
+    for spec in used {
+        if snap_t0.has_data(spec.flags) {
             continue;
         }
         let snap_t1 = snap_t1.get_or_insert_with(|| {
             MarketSnapshot::extract_with_dependencies(market_t1, flags, dependencies)
         });
-        if restored_factor_has_data(factor, snap_t1) {
+        if snap_t1.has_data(spec.flags) {
+            let name = format!("{:?}", spec.factor);
             tracing::warn!(
                 instrument_id = %attribution.meta.instrument_id,
                 factor = name,
@@ -263,113 +266,6 @@ fn note_skipped_empty_t0_factors(
     }
 }
 
-fn extract_if_used(
-    used: bool,
-    market: &MarketContext,
-    flags: MarketRestoreFlags,
-    dependencies: &finstack_quant_valuations::instruments::MarketDependencies,
-) -> MarketSnapshot {
-    if used {
-        MarketSnapshot::extract_with_dependencies(market, flags, dependencies)
-    } else {
-        MarketSnapshot::default()
-    }
-}
-
-fn restored_factor_has_data(factor: ParallelRestoredFactor, snapshot: &MarketSnapshot) -> bool {
-    match factor {
-        ParallelRestoredFactor::Rates => {
-            !snapshot.discount_curves.is_empty()
-                || !snapshot.forward_curves.is_empty()
-                || !snapshot.basis_spread_curves.is_empty()
-                || !snapshot.parametric_curves.is_empty()
-                || !snapshot.fixing_series.is_empty()
-        }
-        ParallelRestoredFactor::Credit => !snapshot.hazard_curves.is_empty(),
-        ParallelRestoredFactor::Inflation => {
-            !snapshot.inflation_curves.is_empty() || !snapshot.inflation_indices.is_empty()
-        }
-        ParallelRestoredFactor::Correlations => !snapshot.base_correlation_curves.is_empty(),
-        ParallelRestoredFactor::Volatility => {
-            !snapshot.surfaces.is_empty()
-                || !snapshot.vol_cubes.is_empty()
-                || !snapshot.fx_delta_vol_surfaces.is_empty()
-                || !snapshot.vol_index_curves.is_empty()
-                || !snapshot.volatility_scalars.is_empty()
-        }
-        ParallelRestoredFactor::MarketScalars => {
-            !snapshot.prices.is_empty()
-                || !snapshot.series.is_empty()
-                || !snapshot.dividends.is_empty()
-                || !snapshot.price_curves.is_empty()
-        }
-        ParallelRestoredFactor::Forward => {
-            !snapshot.forward_curves.is_empty()
-                || !snapshot.basis_spread_curves.is_empty()
-                || !snapshot.parametric_curves.is_empty()
-                || !snapshot.fixing_series.is_empty()
-        }
-        ParallelRestoredFactor::FX => snapshot.fx.is_some(),
-    }
-}
-
-/// Compute per-factor attribution P&L: reprice the instrument with T0 values
-/// for the given factor restored, then compare to T1 value using `compute_pnl`
-/// (T1-FX conversion — non-FX factors only).
-///
-/// Returns `None` if the snapshot contains no data for the factor (so the
-/// attribution field stays at its zero default). Returns
-/// `Some((factor_pnl, val_with_t0))` when the factor was populated — the
-/// caller uses `val_with_t0` for cross-factor repricings.
-#[allow(clippy::too_many_arguments)]
-fn reprice_factor_restored_once(
-    instrument: &Arc<dyn Instrument>,
-    market_t1: &MarketContext,
-    snapshot: &MarketSnapshot,
-    flags: MarketRestoreFlags,
-    has_data: bool,
-    as_of_t1: Date,
-    val_t1: Money,
-) -> Result<Option<(Money, Money)>> {
-    if !has_data {
-        return Ok(None);
-    }
-    let market_with_t0 = MarketSnapshot::restore_market(market_t1, snapshot, flags);
-    let reprice = instrument.value(&market_with_t0, as_of_t1)?;
-    let factor_pnl = compute_pnl(reprice, val_t1, val_t1.currency(), market_t1, as_of_t1)?;
-    Ok(Some((factor_pnl, reprice)))
-}
-
-/// Reprice the instrument with two factors simultaneously restored to T0 and
-/// compute the cross-factor interaction P&L.
-///
-/// The helper extracts a combined snapshot with the requested flags from
-/// `market_t0`, restores it onto `market_t1`, reprices, and feeds the result
-/// into `cross_interaction_pnl`. A combined `(A | B)` restore from `market_t0`
-/// produces the same market as stacking an `A` restore followed by a `B`
-/// restore, because `restore_market` only touches flagged families.
-///
-/// Each call performs exactly one repricing; the caller is responsible for
-/// adding to its repricing counter in a deterministic order (this function is
-/// invoked from a parallel iterator, so it does not mutate shared counters).
-#[allow(clippy::too_many_arguments)]
-fn reprice_cross_factor(
-    instrument: &Arc<dyn Instrument>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    as_of_t1: Date,
-    flags: MarketRestoreFlags,
-    val_t1: Money,
-    val_with_t0_a: Money,
-    val_with_t0_b: Money,
-) -> Result<Money> {
-    let dependencies = instrument.market_dependencies()?;
-    let combined = MarketSnapshot::extract_with_dependencies(market_t0, flags, &dependencies);
-    let market_combined = MarketSnapshot::restore_market(market_t1, &combined, flags);
-    let reprice = instrument.value(&market_combined, as_of_t1)?;
-    cross_interaction_pnl(val_t1, val_with_t0_a, val_with_t0_b, reprice)
-}
-
 /// Perform parallel P&L attribution for an instrument.
 ///
 /// Each factor is isolated independently by restoring T₀ values for that
@@ -378,14 +274,10 @@ fn reprice_cross_factor(
 ///
 /// # Arguments
 ///
-/// * `instrument` - Instrument to attribute
-/// * `market_t0` - Market context at T₀
-/// * `market_t1` - Market context at T₁
-/// * `as_of_t0` - Valuation date at T₀
-/// * `as_of_t1` - Valuation date at T₁
-/// * `config` - Finstack configuration (for rounding, etc.)
-/// * `execution_policy` - Sequential or parallel execution policy recorded in
-///   the attribution metadata and used for factor repricing work.
+/// * `request` - Instrument, T₀ and T₁ markets and dates, configuration and
+///   the optional overrides on [`AttributionRequest`]: execution policy,
+///   `full_cross_attribution`, opening model parameters, credit-factor model
+///   and prepared endpoint values.
 ///
 /// # Returns
 ///
@@ -494,13 +386,11 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
         market_t1,
         as_of_t0,
         as_of_t1,
-        config,
         execution_policy,
         full_cross_attribution,
         model_params_t0,
         credit_factor_model,
         credit_factor_detail_options,
-        prepared_endpoints,
         ..
     } = *request;
     validate_attribution_period(as_of_t0, as_of_t1)?;
@@ -512,52 +402,17 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
     // calls; it does not change the logical cost represented in metadata.
     let mut num_repricings = 2;
 
-    // Step 1: Price at T₀ and T₁
-    // Use T₀ model parameters for T₀ valuation if available
-    let instrument_t0 = if let Some(params) = model_params_t0 {
-        model_params::with_model_params(instrument, params)?
-    } else {
-        Arc::clone(instrument)
-    };
-    let (val_t0, val_t1) = if let Some(endpoints) = prepared_endpoints {
-        endpoints
-    } else {
-        (
-            instrument_t0.value(market_t0, as_of_t0)?,
-            instrument.value(market_t1, as_of_t1)?,
-        )
-    };
-
-    // Total P&L (with FX translation)
-    let total_pnl = compute_pnl_with_fx(
+    // Step 1: price at T₀ (with T₀ model parameters when supplied) and T₁.
+    let (instrument_t0, val_t0, val_t1) = endpoint_values(request)?;
+    let ccy = val_t1.currency();
+    let mut attribution = seed_attribution(
+        request,
         val_t0,
         val_t1,
-        val_t1.currency(),
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-    )?;
-
-    let mut attribution = init_attribution(
-        total_pnl,
-        instrument.id(),
-        as_of_t0,
-        as_of_t1,
         AttributionMethod::Parallel,
-        Some(config),
-    );
-    // Policy-visibility invariant: stamp the execution policy the
-    // attribution ran under (workspace rule: results carry the parallel flag).
-    attribution.meta.execution_policy = Some(execution_policy);
+        execution_policy,
+    )?;
     let factor_use = InstrumentFactorUse::of(instrument.as_ref());
-
-    let mut val_with_t0_rates: Option<Money> = None;
-    let mut val_with_t0_credit: Option<Money> = None;
-    let mut val_with_t0_fx: Option<Money> = None;
-    let mut val_with_t0_vol: Option<Money> = None;
-    let mut val_with_t0_scalars: Option<Money> = None;
-    let mut credit_snapshot = MarketSnapshot::default();
 
     // Step 2: Carry attribution (time decay + accruals + roll-down)
     //
@@ -574,11 +429,8 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
     // currency, so the `compute_pnl` conversion here is a same-currency
     // identity (no FX rate is ever applied on this path). Reporting-currency
     // translation happens exclusively in `translate_to_target_currency`; the FX
-    // factor (Step 7) captures only the *pricing impact* of swapping the FX
-    // matrix inside the pricer.
-    // Carry freezes the market at T₀: it reprices at the T₁ date against the
-    // unchanged T₀ market context, so the T₀ context is used directly rather
-    // than deep-cloned (the reprice and carry-input helpers only borrow it).
+    // factor captures only the *pricing impact* of swapping the FX matrix
+    // inside the pricer.
     //
     // FIXINGS UNDER CARRY: the frozen T₀ market has no
     // fixing for the T₁ date, so seasoned floating-rate pricing falls back to
@@ -595,666 +447,211 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
     let val_carry = instrument_t0.value(market_t0, as_of_t1)?;
     num_repricings += 1;
 
-    let theta = compute_pnl(val_t0, val_carry, val_t1.currency(), market_t1, as_of_t1)?;
+    let theta = compute_pnl(val_t0, val_carry, ccy, market_t1, as_of_t1)?;
+    let carry_inputs =
+        total_return_carry_inputs(instrument_t0.as_ref(), market_t0, as_of_t0, as_of_t1, ccy)?;
+    num_repricings += apply_total_return_carry(&mut attribution, theta, carry_inputs)?;
 
-    let carry_inputs = total_return_carry_inputs(
-        instrument_t0.as_ref(),
-        market_t0,
-        as_of_t0,
-        as_of_t1,
-        val_t1.currency(),
-    )?;
-    // Merge diagnostics BEFORE moving carry_inputs into apply_total_return_carry.
-    for w in &carry_inputs.warnings {
-        attribution.meta.notes.push(w.clone());
-    }
-    num_repricings += carry_inputs.num_repricings;
-
-    apply_total_return_carry(&mut attribution, theta, carry_inputs)?;
-
-    if full_cross_attribution {
-        let discount_snap = extract_if_used(
-            factor_use.rates,
-            market_t0,
-            MarketRestoreFlags::DISCOUNT,
-            &dependencies,
-        );
-        let forward_snap = extract_if_used(
-            factor_use.rates,
-            market_t0,
-            MarketRestoreFlags::FORWARD,
-            &dependencies,
-        );
-        let credit_snap_ext = extract_if_used(
-            factor_use.credit,
-            market_t0,
-            MarketRestoreFlags::CREDIT,
-            &dependencies,
-        );
-        let inflation_snap = extract_if_used(
-            factor_use.inflation,
-            market_t0,
-            MarketRestoreFlags::INFLATION,
-            &dependencies,
-        );
-        let correlation_snap = MarketSnapshot::extract_with_dependencies(
-            market_t0,
-            MarketRestoreFlags::CORRELATION,
-            &dependencies,
-        );
-        let fx_snap = extract_if_used(
-            factor_use.fx,
-            market_t0,
-            MarketRestoreFlags::FX,
-            &dependencies,
-        );
-        let vol_snap = extract_if_used(
-            factor_use.volatility,
-            market_t0,
-            MarketRestoreFlags::VOL,
-            &dependencies,
-        );
-        let scalars_snap = extract_if_used(
-            factor_use.scalars,
-            market_t0,
-            MarketRestoreFlags::SCALARS,
-            &dependencies,
-        );
-
-        let mut factor_specs = Vec::new();
-
-        if !discount_snap.discount_curves.is_empty() {
-            factor_specs.push(ParallelLatentFactorSpec::Market {
-                factor: ActiveFactorKind::Discount,
-                flags: MarketRestoreFlags::DISCOUNT,
-                snapshot: Box::new(discount_snap),
-            });
-        }
-        if restored_factor_has_data(ParallelRestoredFactor::Forward, &forward_snap) {
-            factor_specs.push(ParallelLatentFactorSpec::Market {
-                factor: ActiveFactorKind::Forward,
-                flags: MarketRestoreFlags::FORWARD,
-                snapshot: Box::new(forward_snap),
-            });
-        }
-        if restored_factor_has_data(ParallelRestoredFactor::Credit, &credit_snap_ext) {
-            factor_specs.push(ParallelLatentFactorSpec::Market {
-                factor: ActiveFactorKind::Credit,
-                flags: MarketRestoreFlags::CREDIT,
-                snapshot: Box::new(credit_snap_ext.clone()),
-            });
-        }
-        // Retain the credit snapshot for the cascade reprice later (Step 4).
-        credit_snapshot = credit_snap_ext;
-        if restored_factor_has_data(ParallelRestoredFactor::Inflation, &inflation_snap) {
-            factor_specs.push(ParallelLatentFactorSpec::Market {
-                factor: ActiveFactorKind::Inflation,
-                flags: MarketRestoreFlags::INFLATION,
-                snapshot: Box::new(inflation_snap),
-            });
-        }
-        if !correlation_snap.base_correlation_curves.is_empty() {
-            factor_specs.push(ParallelLatentFactorSpec::Market {
-                factor: ActiveFactorKind::Correlations,
-                flags: MarketRestoreFlags::CORRELATION,
-                snapshot: Box::new(correlation_snap),
-            });
-        }
-        if fx_snap.fx.is_some() {
-            factor_specs.push(ParallelLatentFactorSpec::Market {
-                factor: ActiveFactorKind::FX,
-                flags: MarketRestoreFlags::FX,
-                snapshot: Box::new(fx_snap),
-            });
-        }
-        // Audit M4: gate on the shared helper, which also checks SABR vol
-        // cubes, FX delta-quoted surfaces and vol-index curves — a cube-only
-        // vol market must still receive vol repricing.
-        if restored_factor_has_data(ParallelRestoredFactor::Volatility, &vol_snap) {
-            factor_specs.push(ParallelLatentFactorSpec::Market {
-                factor: ActiveFactorKind::Volatility,
-                flags: MarketRestoreFlags::VOL,
-                snapshot: Box::new(vol_snap),
-            });
-        }
-        if restored_factor_has_data(ParallelRestoredFactor::MarketScalars, &scalars_snap) {
-            factor_specs.push(ParallelLatentFactorSpec::Market {
-                factor: ActiveFactorKind::MarketScalars,
-                flags: MarketRestoreFlags::SCALARS,
-                snapshot: Box::new(scalars_snap),
-            });
-        }
-
-        let params_t0 = model_params_t0
-            .cloned()
-            .unwrap_or_else(|| instrument.model_params_snapshot());
-        if !matches!(params_t0, ModelParamsSnapshot::None) {
-            factor_specs.push(ParallelLatentFactorSpec::ModelParams {
-                snapshot: params_t0,
-            });
-        }
-
-        let reprice_first_order =
-            |spec: &ParallelLatentFactorSpec| -> Result<FirstOrderRepriceResult> {
-                match spec {
-                    ParallelLatentFactorSpec::Market {
-                        factor,
-                        flags,
-                        snapshot,
-                    } => {
-                        let market_with_t0 =
-                            MarketSnapshot::restore_market(market_t1, snapshot, *flags);
-                        let reprice = instrument.value(&market_with_t0, as_of_t1)?;
-                        let pnl = if matches!(factor, ActiveFactorKind::FX) {
-                            compute_pnl_with_fx(
-                                reprice,
-                                val_t1,
-                                val_t1.currency(),
-                                market_t0,
-                                market_t1,
-                                as_of_t0,
-                                as_of_t1,
-                            )?
-                        } else {
-                            compute_pnl(reprice, val_t1, val_t1.currency(), market_t1, as_of_t1)?
-                        };
-                        Ok(FirstOrderRepriceResult {
-                            factor: *factor,
-                            pnl,
-                            reprice_val: reprice,
-                        })
-                    }
-                    ParallelLatentFactorSpec::ModelParams { snapshot } => {
-                        let instrument_with_t0_params =
-                            model_params::with_model_params(instrument, snapshot)?;
-                        let reprice = instrument_with_t0_params.value(market_t1, as_of_t1)?;
-                        let pnl =
-                            compute_pnl(reprice, val_t1, val_t1.currency(), market_t1, as_of_t1)?;
-                        Ok(FirstOrderRepriceResult {
-                            factor: ActiveFactorKind::ModelParameters,
-                            pnl,
-                            reprice_val: reprice,
-                        })
-                    }
-                }
-            };
-        let first_order_results =
-            try_map_policy(execution_policy, &factor_specs, reprice_first_order)?;
-
-        let mut active_list = Vec::new();
-        for res in first_order_results {
-            num_repricings += 1;
-            let label = match res.factor {
-                ActiveFactorKind::Discount => {
-                    attribution.rates_curves_pnl =
-                        attribution.rates_curves_pnl.checked_add(res.pnl)?;
-                    "Discount"
-                }
-                ActiveFactorKind::Forward => {
-                    attribution.rates_curves_pnl =
-                        attribution.rates_curves_pnl.checked_add(res.pnl)?;
-                    "Forward"
-                }
-                ActiveFactorKind::Credit => {
-                    attribution.credit_curves_pnl = res.pnl;
-                    val_with_t0_credit = Some(res.reprice_val);
-                    "Credit"
-                }
-                ActiveFactorKind::Inflation => {
-                    attribution.inflation_curves_pnl = res.pnl;
-                    "Inflation"
-                }
-                ActiveFactorKind::Correlations => {
-                    attribution.correlations_pnl = res.pnl;
-                    "Correlations"
-                }
-                ActiveFactorKind::FX => {
-                    attribution.fx_pnl = res.pnl;
-                    stamp_fx_policy(
-                        &mut attribution,
-                        val_t1.currency(),
-                        "Combined FX exposure and translation P&L (see parallel.rs for details)",
-                    );
-                    "FX"
-                }
-                ActiveFactorKind::Volatility => {
-                    attribution.vol_pnl = res.pnl;
-                    "Vol"
-                }
-                ActiveFactorKind::MarketScalars => {
-                    attribution.market_scalars_pnl = res.pnl;
-                    "Spot"
-                }
-                ActiveFactorKind::ModelParameters => {
-                    attribution.model_params_pnl = res.pnl;
-                    "ModelParameters"
-                }
-            };
-            active_list.push((res.factor, label, res.reprice_val));
-        }
-
-        let mut cross_specs = Vec::new();
-        for i in 0..active_list.len() {
-            for j in (i + 1)..active_list.len() {
-                let (kind_a, label_a, val_a) = active_list[i];
-                let (kind_b, label_b, val_b) = active_list[j];
-                let label = format!("{}×{}", label_a, label_b);
-                cross_specs.push((label, kind_a, kind_b, val_a, val_b));
-            }
-        }
-
-        let reprice_cross_spec = |(label, kind_a, kind_b, val_a, val_b): &(
-            String,
-            ActiveFactorKind,
-            ActiveFactorKind,
-            Money,
-            Money,
-        )|
-         -> Result<(String, Money)> {
-            let pnl = if matches!(kind_a, ActiveFactorKind::ModelParameters)
-                || matches!(kind_b, ActiveFactorKind::ModelParameters)
-            {
-                let market_factor = if matches!(kind_a, ActiveFactorKind::ModelParameters) {
-                    *kind_b
-                } else {
-                    *kind_a
-                };
-                let val_market = if matches!(kind_a, ActiveFactorKind::ModelParameters) {
-                    *val_b
-                } else {
-                    *val_a
-                };
-                let val_params = if matches!(kind_a, ActiveFactorKind::ModelParameters) {
-                    *val_a
-                } else {
-                    *val_b
-                };
-
-                let m_flags = get_restore_flags(market_factor);
-                let combined_snap =
-                    MarketSnapshot::extract_with_dependencies(market_t0, m_flags, &dependencies);
-                let market_combined =
-                    MarketSnapshot::restore_market(market_t1, &combined_snap, m_flags);
-                let reprice_both = instrument_t0.value(&market_combined, as_of_t1)?;
-                cross_interaction_pnl(val_t1, val_market, val_params, reprice_both)?
-            } else {
-                let combined_flags = get_restore_flags(*kind_a) | get_restore_flags(*kind_b);
-                reprice_cross_factor(
-                    instrument,
-                    market_t0,
-                    market_t1,
-                    as_of_t1,
-                    combined_flags,
-                    val_t1,
-                    *val_a,
-                    *val_b,
-                )?
-            };
-            Ok((label.clone(), pnl))
-        };
-        let cross_results = try_map_policy(execution_policy, &cross_specs, reprice_cross_spec)?;
-
-        let mut cross_total = 0.0;
-        let mut cross_by_pair: IndexMap<String, Money> = IndexMap::new();
-        for (label, pnl) in cross_results {
-            num_repricings += 1;
-            record_cross_pair(&label, pnl, &mut cross_total, &mut cross_by_pair);
-        }
-
-        if !cross_by_pair.is_empty() {
-            attribution.cross_factor_pnl = Money::new(cross_total, val_t1.currency())?;
-            attribution.cross_factor_detail = Some(CrossFactorDetail {
-                total: attribution.cross_factor_pnl,
-                by_pair: cross_by_pair,
-            });
-        }
+    // Steps 3-10: restore each factor to T₀ on the T₁ market and reprice.
+    // Every factor is an independent full revaluation, so they fan out under
+    // the execution policy and reduce in list order.
+    let params_t0 = model_params_t0
+        .cloned()
+        .unwrap_or_else(|| instrument.model_params_snapshot());
+    let factors: &[FactorSpec] = if full_cross_attribution {
+        &FULL_CROSS_FACTORS
     } else {
-        // Steps 3-6: ordinary restored-market factors before FX. Order is
-        // preserved exactly so repricing counts and first-error behavior stay
-        // stable.
-        let pre_fx_specs = [
-            (ParallelRestoredFactor::Rates, MarketRestoreFlags::RATES),
-            (ParallelRestoredFactor::Credit, MarketRestoreFlags::CREDIT),
-            (
-                ParallelRestoredFactor::Inflation,
-                MarketRestoreFlags::INFLATION,
-            ),
-            (
-                ParallelRestoredFactor::Correlations,
-                MarketRestoreFlags::CORRELATION,
-            ),
-        ];
-        let pre_fx_specs: Vec<_> = pre_fx_specs
-            .into_iter()
-            .filter(|(factor, _)| restored_factor_is_used(*factor, factor_use))
-            .collect();
-        let eval_pre_fx = |(factor, flags): &(ParallelRestoredFactor, MarketRestoreFlags)| {
-            let snapshot =
-                MarketSnapshot::extract_with_dependencies(market_t0, *flags, &dependencies);
-            let has_data = restored_factor_has_data(*factor, &snapshot);
-            reprice_factor_restored_once(
-                instrument, market_t1, &snapshot, *flags, has_data, as_of_t1, val_t1,
-            )
-            .map(|output| RestoredFactorEval {
-                factor: *factor,
-                snapshot,
-                output,
-            })
+        &DEFAULT_FACTORS
+    };
+    let factors: Vec<FactorSpec> = factors
+        .iter()
+        .filter(|spec| {
+            factor_use.uses_attribution_factor(&spec.factor)
+                && (spec.factor != AttributionFactor::ModelParameters
+                    || !matches!(params_t0, ModelParamsSnapshot::None))
+        })
+        .cloned()
+        .collect();
+
+    let eval_factor = |spec: &FactorSpec| -> Result<FactorEval> {
+        let eval = |snapshot, repriced, note| FactorEval {
+            spec: spec.clone(),
+            snapshot,
+            repriced,
+            note,
         };
-        let pre_fx_evals = try_map_policy(execution_policy, &pre_fx_specs, eval_pre_fx)?;
-        let mut val_with_t0_inflation: Option<Money> = None;
-        let mut val_with_t0_correlation: Option<Money> = None;
-        for eval in pre_fx_evals {
-            let RestoredFactorEval {
-                factor,
-                snapshot,
-                output,
-            } = eval;
-            if matches!(factor, ParallelRestoredFactor::Credit) {
-                credit_snapshot = snapshot;
-            }
-            if let Some((pnl, reprice)) = output {
-                num_repricings += 1;
-                match factor {
-                    ParallelRestoredFactor::Rates => {
-                        attribution.rates_curves_pnl = pnl;
-                        val_with_t0_rates = Some(reprice);
-                    }
-                    ParallelRestoredFactor::Credit => {
-                        attribution.credit_curves_pnl = pnl;
-                        val_with_t0_credit = Some(reprice);
-                    }
-                    ParallelRestoredFactor::Inflation => {
-                        attribution.inflation_curves_pnl = pnl;
-                        val_with_t0_inflation = Some(reprice);
-                    }
-                    ParallelRestoredFactor::Correlations => {
-                        attribution.correlations_pnl = pnl;
-                        val_with_t0_correlation = Some(reprice);
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        // Step 7: FX attribution
-        let fx_snapshot = if factor_use.fx {
-            MarketSnapshot::extract_with_dependencies(
-                market_t0,
-                MarketRestoreFlags::FX,
-                &dependencies,
-            )
-        } else {
-            MarketSnapshot::default()
-        };
-        if fx_snapshot.fx.is_some() {
-            let market_with_t0_fx =
-                MarketSnapshot::restore_market(market_t1, &fx_snapshot, MarketRestoreFlags::FX);
-            let fx_reprice = instrument.value(&market_with_t0_fx, as_of_t1)?;
-            num_repricings += 1;
-            val_with_t0_fx = Some(fx_reprice);
-
-            // FX-exposure (pricing-impact) P&L: the FX matrix was restored to
-            // T₀ inside the pricer for `fx_reprice`. Both values are in the
-            // instrument's native currency, so the `compute_pnl_with_fx`
-            // conversions below are same-currency identities — the with-fx
-            // variant matters only for external callers with target ≠ native;
-            // reporting-currency translation lives in `translate_to_target_currency`.
-            attribution.fx_pnl = compute_pnl_with_fx(
-                fx_reprice,
-                val_t1,
-                val_t1.currency(),
-                market_t0,
-                market_t1,
-                as_of_t0,
-                as_of_t1,
-            )?;
-
-            // Stamp FX policy metadata for audit trail
-            stamp_fx_policy(
-                &mut attribution,
-                val_t1.currency(),
-                "Combined FX exposure and translation P&L (see parallel.rs for details)",
-            );
-        }
-
-        // Step 8: Volatility attribution.
-        if restored_factor_is_used(ParallelRestoredFactor::Volatility, factor_use) {
-            let flags = MarketRestoreFlags::VOL;
-            let snapshot =
-                MarketSnapshot::extract_with_dependencies(market_t0, flags, &dependencies);
-            // Audit M4: use the shared has-data helper so cube-only /
-            // FX-delta-only / vol-index-only markets are not silently skipped.
-            let has_vol = restored_factor_has_data(ParallelRestoredFactor::Volatility, &snapshot);
-            if let Some((pnl, reprice)) = reprice_factor_restored_once(
-                instrument, market_t1, &snapshot, flags, has_vol, as_of_t1, val_t1,
-            )? {
-                num_repricings += 1;
-                attribution.vol_pnl = pnl;
-                val_with_t0_vol = Some(reprice);
-            }
-        }
-
-        // Step 9: Model parameters attribution
-        let params_t0 = model_params_t0
-            .cloned()
-            .unwrap_or_else(|| instrument.model_params_snapshot());
-        if !matches!(params_t0, ModelParamsSnapshot::None) {
-            // Create instrument with T₀ parameters
-            match model_params::with_model_params(instrument, &params_t0) {
-                Ok(instrument_with_t0_params) => {
-                    // Reprice with T₁ market
-                    match instrument_with_t0_params.value(market_t1, as_of_t1) {
-                        Ok(val_with_t0_params) => {
-                            num_repricings += 1;
-
-                            attribution.model_params_pnl = compute_pnl(
-                                val_with_t0_params,
-                                val_t1,
-                                val_t1.currency(),
-                                market_t1,
-                                as_of_t1,
-                            )?;
-                        }
-                        Err(e) => {
-                            attribution.meta.notes.push(format!(
-                                "Model parameters attribution: repricing failed - {}",
-                                e
-                            ));
-                        }
-                    }
-                }
-                Err(e) => {
-                    attribution.meta.notes.push(format!(
-                        "Model parameters attribution: parameter modification failed - {}",
-                        e
-                    ));
-                }
-            }
-        }
-
-        // Step 10: Market scalars attribution.
-        if restored_factor_is_used(ParallelRestoredFactor::MarketScalars, factor_use) {
-            let flags = MarketRestoreFlags::SCALARS;
-            let snapshot =
-                MarketSnapshot::extract_with_dependencies(market_t0, flags, &dependencies);
-            let has_scalars =
-                restored_factor_has_data(ParallelRestoredFactor::MarketScalars, &snapshot);
-            if let Some((pnl, reprice)) = reprice_factor_restored_once(
-                instrument,
-                market_t1,
-                &snapshot,
-                flags,
-                has_scalars,
-                as_of_t1,
-                val_t1,
-            )? {
-                num_repricings += 1;
-                attribution.market_scalars_pnl = pnl;
-                val_with_t0_scalars = Some(reprice);
-            }
-        }
-
-        let mut cross_total = 0.0;
-        let mut cross_by_pair: IndexMap<String, Money> = IndexMap::new();
-
-        // (pair_label, flag_A, flag_B, reprice_A, reprice_B) — order preserved
-        // exactly as before for reduction-order stability.
-        type CrossSpec<'a> = (
-            &'a str,
-            MarketRestoreFlags,
-            MarketRestoreFlags,
-            Option<Money>,
-            Option<Money>,
-        );
-        let cross_specs: [CrossSpec<'_>; 9] = [
-            (
-                "Rates×Credit",
-                MarketRestoreFlags::RATES,
-                MarketRestoreFlags::CREDIT,
-                val_with_t0_rates,
-                val_with_t0_credit,
-            ),
-            (
-                "Rates×Vol",
-                MarketRestoreFlags::RATES,
-                MarketRestoreFlags::VOL,
-                val_with_t0_rates,
-                val_with_t0_vol,
-            ),
-            (
-                "Spot×Vol",
-                MarketRestoreFlags::SCALARS,
-                MarketRestoreFlags::VOL,
-                val_with_t0_scalars,
-                val_with_t0_vol,
-            ),
-            (
-                "Spot×Credit",
-                MarketRestoreFlags::CREDIT,
-                MarketRestoreFlags::SCALARS,
-                val_with_t0_scalars,
-                val_with_t0_credit,
-            ),
-            (
-                "FX×Vol",
-                MarketRestoreFlags::FX,
-                MarketRestoreFlags::VOL,
-                val_with_t0_fx,
-                val_with_t0_vol,
-            ),
-            (
-                "FX×Rates",
-                MarketRestoreFlags::RATES,
-                MarketRestoreFlags::FX,
-                val_with_t0_fx,
-                val_with_t0_rates,
-            ),
-            // Credit×Vol captures convertibles, where equity volatility drives
-            // the conversion option while credit curves discount the bond floor.
-            (
-                "Credit×Vol",
-                MarketRestoreFlags::CREDIT,
-                MarketRestoreFlags::VOL,
-                val_with_t0_credit,
-                val_with_t0_vol,
-            ),
-            // Rates×Inflation captures linkers (real-rate exposure
-            // is the product of nominal rates and the CPI projection) and
-            // Credit×Correlations captures tranches (loss allocation is
-            // jointly driven by hazard levels and base correlation). Both are
-            // appended after the historical seven pairs so the preceding pair
-            // reduction order stays stable.
-            (
-                "Rates×Inflation",
-                MarketRestoreFlags::RATES,
-                MarketRestoreFlags::INFLATION,
-                val_with_t0_rates,
-                val_with_t0_inflation,
-            ),
-            (
-                "Credit×Correlations",
-                MarketRestoreFlags::CREDIT,
-                MarketRestoreFlags::CORRELATION,
-                val_with_t0_credit,
-                val_with_t0_correlation,
-            ),
-        ];
-
-        // Each cross-factor block is an independent full revaluation. Reprice them
-        // in parallel, then reduce in the fixed `cross_specs` order so the result
-        // is bit-identical to the previous sequential loop.
-        let reprice_default_cross = |(pair, flag_a, flag_b, reprice_a, reprice_b): &CrossSpec<
-            '_,
-        >|
-         -> Result<Option<(String, Money)>> {
-            let (Some(val_a), Some(val_b)) = (*reprice_a, *reprice_b) else {
-                return Ok(None);
+        if spec.factor == AttributionFactor::ModelParameters {
+            let (stage, reprice) = match model_params::with_model_params(instrument, &params_t0) {
+                Ok(restored) => ("repricing", restored.value(market_t1, as_of_t1)),
+                Err(e) => ("parameter modification", Err(e)),
             };
-            let pnl = reprice_cross_factor(
-                instrument,
-                market_t0,
-                market_t1,
-                as_of_t1,
-                *flag_a | *flag_b,
-                val_t1,
-                val_a,
-                val_b,
-            )?;
-            Ok(Some(((*pair).to_string(), pnl)))
-        };
-        let cross_results = try_map_policy(execution_policy, &cross_specs, reprice_default_cross)?;
-        for result in cross_results.into_iter().flatten() {
-            let (pair, pnl) = result;
-            num_repricings += 1;
-            record_cross_pair(&pair, pnl, &mut cross_total, &mut cross_by_pair);
+            return match reprice {
+                Ok(reprice) => {
+                    let pnl = compute_pnl(reprice, val_t1, ccy, market_t1, as_of_t1)?;
+                    Ok(eval(MarketSnapshot::default(), Some((pnl, reprice)), None))
+                }
+                // A model-parameter failure aborts a full-cross run but is
+                // only noted on the default path, leaving the move in residual.
+                Err(e) if !full_cross_attribution => Ok(eval(
+                    MarketSnapshot::default(),
+                    None,
+                    Some(format!(
+                        "Model parameters attribution: {stage} failed - {e}"
+                    )),
+                )),
+                Err(e) => Err(e),
+            };
         }
 
-        if !cross_by_pair.is_empty() {
-            attribution.cross_factor_pnl = Money::new(cross_total, val_t1.currency())?;
-            attribution.cross_factor_detail = Some(CrossFactorDetail {
-                total: attribution.cross_factor_pnl,
-                by_pair: cross_by_pair,
-            });
+        let snapshot =
+            MarketSnapshot::extract_with_dependencies(market_t0, spec.flags, &dependencies);
+        if !snapshot.has_data(spec.flags) {
+            return Ok(eval(snapshot, None, None));
         }
+        let market_with_t0 = MarketSnapshot::restore_market(market_t1, &snapshot, spec.flags);
+        let reprice = instrument.value(&market_with_t0, as_of_t1)?;
+        // FX-exposure (pricing-impact) P&L: both values are in the instrument's
+        // native currency, so the conversions are same-currency identities.
+        let pnl = if spec.factor == AttributionFactor::Fx {
+            compute_pnl_with_fx(
+                reprice, val_t1, ccy, market_t0, market_t1, as_of_t0, as_of_t1,
+            )?
+        } else {
+            compute_pnl(reprice, val_t1, ccy, market_t1, as_of_t1)?
+        };
+        Ok(eval(snapshot, Some((pnl, reprice)), None))
+    };
+
+    // Factors that repriced, with the value each produced, for the cross pairs.
+    let mut active: Vec<(FactorSpec, Money)> = Vec::new();
+    let mut val_with_t0_credit: Option<Money> = None;
+    let mut credit_snapshot = MarketSnapshot::default();
+    for eval in try_map_policy(execution_policy, &factors, eval_factor)? {
+        let FactorEval {
+            spec,
+            snapshot,
+            repriced,
+            note,
+        } = eval;
+        attribution.meta.notes.extend(note);
+        if spec.factor == AttributionFactor::CreditCurves {
+            // Retained for the cascade reprice below.
+            credit_snapshot = snapshot;
+        }
+        let Some((pnl, reprice)) = repriced else {
+            continue;
+        };
+        num_repricings += 1;
+        match spec.factor {
+            // Discount and forward both land in rates on the full-cross path.
+            AttributionFactor::RatesCurves => {
+                attribution.rates_curves_pnl = attribution.rates_curves_pnl.checked_add(pnl)?;
+            }
+            AttributionFactor::CreditCurves => {
+                attribution.credit_curves_pnl = pnl;
+                val_with_t0_credit = Some(reprice);
+            }
+            AttributionFactor::InflationCurves => attribution.inflation_curves_pnl = pnl,
+            AttributionFactor::Correlations => attribution.correlations_pnl = pnl,
+            AttributionFactor::Fx => {
+                attribution.fx_pnl = pnl;
+                stamp_fx_policy(
+                    &mut attribution,
+                    ccy,
+                    "Combined FX exposure and translation P&L (see parallel.rs for details)",
+                );
+            }
+            AttributionFactor::Volatility => attribution.vol_pnl = pnl,
+            AttributionFactor::MarketScalars => attribution.market_scalars_pnl = pnl,
+            AttributionFactor::ModelParameters => attribution.model_params_pnl = pnl,
+            AttributionFactor::Carry => {}
+        }
+        active.push((spec, reprice));
     }
 
-    // Step 10c: Credit-factor hierarchy detail via cumulative-bump cascade.
+    // Cross-factor pairs: every pair of active factors on the full-cross
+    // path, otherwise the default pairs whose two factors both repriced.
+    type ActiveFactor = (FactorSpec, Money);
+    let cross_pairs: Vec<(ActiveFactor, ActiveFactor)> = if full_cross_attribution {
+        active
+            .iter()
+            .enumerate()
+            .flat_map(|(i, a)| {
+                active
+                    .iter()
+                    .skip(i + 1)
+                    .map(move |b| (a.clone(), b.clone()))
+            })
+            .collect()
+    } else {
+        let find = |label: &str| active.iter().find(|(spec, _)| spec.label == label).cloned();
+        DEFAULT_CROSS_PAIRS
+            .iter()
+            .filter_map(|(a, b)| Some((find(a)?, find(b)?)))
+            .collect()
+    };
+
+    // Each pair restores both factors to T₀ at once. A combined `(A | B)`
+    // restore from `market_t0` equals stacking the two restores, because
+    // `restore_market` only touches flagged families. A pair with model
+    // parameters restores the other factor's market and prices the
+    // T₀-parameter instrument.
+    let reprice_cross = |((a, val_a), (b, val_b)): &(ActiveFactor, ActiveFactor)| {
+        let flags = a.flags | b.flags;
+        let priced = if a.factor == AttributionFactor::ModelParameters
+            || b.factor == AttributionFactor::ModelParameters
+        {
+            &instrument_t0
+        } else {
+            instrument
+        };
+        let combined = MarketSnapshot::extract_with_dependencies(market_t0, flags, &dependencies);
+        let market_combined = MarketSnapshot::restore_market(market_t1, &combined, flags);
+        let val_both = priced.value(&market_combined, as_of_t1)?;
+        let pnl = cross_interaction_pnl(val_t1, *val_a, *val_b, val_both)?;
+        Ok::<_, finstack_quant_core::Error>((format!("{}×{}", a.label, b.label), pnl))
+    };
+    let mut cross_total = 0.0;
+    let mut cross_by_pair: IndexMap<String, Money> = IndexMap::new();
+    for (pair, pnl) in try_map_policy(execution_policy, &cross_pairs, reprice_cross)? {
+        num_repricings += 1;
+        if pnl.amount().abs() > CROSS_FACTOR_TOLERANCE {
+            cross_total += pnl.amount();
+            cross_by_pair.insert(pair, pnl);
+        }
+    }
+    if !cross_by_pair.is_empty() {
+        attribution.cross_factor_pnl = Money::new(cross_total, ccy)?;
+        attribution.cross_factor_detail = Some(CrossFactorDetail {
+            total: attribution.cross_factor_pnl,
+            by_pair: cross_by_pair,
+        });
+    }
+
+    // Credit-factor hierarchy detail via cumulative-bump cascade.
     //
     // The cascade mirrors the waterfall semantics (see `waterfall::apply_credit_cascade`):
-    // each step's market is built by accumulating the previous parallel-bump
-    // bp shifts plus the current step's bp from the same fixed
-    // `market_t0_credit` base. The step's P&L is then the *marginal*
+    // each step's market is one par-spread bump of the cumulative bp from the
+    // same fixed `market_t0_credit` base. The step's P&L is then the *marginal*
     // contribution `V_k − V_{k−1}`, which telescopes so that
     // `Σ steps ≡ V_final − V_0`. With the `CurveShape` step snapping the
     // issuer's hazard curves to T1 at the end, `V_final` reduces to the
     // instrument's T1 valuation (modulo non-issuer hazard curves) and the
-    // telescope closes to `credit_curves_pnl` without any residual back-solve.
-    //
-    // This replaces an earlier "marginal-from-same-base" formulation in which
-    // each step bumped the T0-hazard base by *only* its own `delta_bp` and
-    // `curve_shape_pnl` was back-solved as `credit_curves_pnl − Σ steps`.
-    // For instruments with non-trivial CS-gamma that approach silently routed
-    // cross-bp convexity into `curve_shape_pnl`, firing the curve-shape
-    // tracing warning even when the hazard move was perfectly parallel. The
-    // cumulative form gives a single consistent decomposition across both
-    // parallel and waterfall methods.
+    // telescope closes to `credit_curves_pnl` without any residual back-solve,
+    // so cross-bp convexity never leaks into `curve_shape_pnl`.
     if let Some(model) = credit_factor_model {
         match plan_credit_cascade(model, instrument, market_t0, market_t1)? {
             Some(cascade) => {
-                // Build a T1-base market with T0 hazard for the issuer's curves.
-                // Re-use the credit snapshot extracted in Step 4.
+                // T1 market with T0 hazard for the issuer's curves.
                 let market_t0_credit = MarketSnapshot::restore_market(
                     market_t1,
                     &credit_snapshot,
                     MarketRestoreFlags::CREDIT,
                 );
 
-                // Base value for the cascade: the instrument priced at T1
-                // markets with the issuer's hazard curves reverted to T0 —
-                // exactly the reference point `credit_curves_pnl` is measured
-                // against. Reuse the Step-4 credit reprice when present;
-                // otherwise reprice once here.
+                // Base value for the cascade: exactly the reference point
+                // `credit_curves_pnl` is measured against. Reuse the credit
+                // factor's reprice when present; otherwise reprice once here.
                 let base_credit_val = match val_with_t0_credit {
                     Some(v) => v,
                     None => {
@@ -1263,89 +660,41 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
                     }
                 };
 
-                // Precompute the cumulative bp for each parallel step. The
-                // `CurveShape` step carries no bp (it is a snap-to-T1) and
-                // contributes `None`; everywhere else `Some(running_bp)`.
-                let cumulative_bp: Vec<Option<f64>> = {
-                    let mut running_bp = 0.0_f64;
-                    cascade
-                        .steps
-                        .iter()
-                        .map(|step| {
-                            if matches!(
-                                step.kind,
-                                super::credit_cascade::CreditStepKind::CurveShape
-                            ) {
-                                None
-                            } else {
-                                running_bp += step.delta_bp;
-                                Some(running_bp)
-                            }
-                        })
-                        .collect()
-                };
-
                 // Reprice each step's end-state market. Standalone attribution
                 // can fan these out; portfolio callers pass `Serial` so the
                 // outer position loop owns Rayon.
-                let reprice_cascade_step =
-                    |(step, cumulative_bp): (&CreditCascadeStep, &Option<f64>)| -> Result<Money> {
-                        let market_step = match step.kind {
-                            super::credit_cascade::CreditStepKind::CurveShape => snap_hazard_to_t1(
-                                &market_t0_credit,
-                                market_t1,
-                                &cascade.hazard_curve_ids,
-                            ),
-                            _ => shift_credit_curves_par_spread(
-                                market_t0,
-                                &market_t0_credit,
-                                &cascade.hazard_curve_ids,
-                                cascade.discount_curve_id.as_ref(),
-                                cumulative_bp.unwrap_or(0.0),
-                                &recalibration_provider,
-                            )?,
-                        };
-                        instrument.value(&market_step, as_of_t1)
-                    };
-                let step_values: Vec<Money> = try_map_policy_zip(
-                    execution_policy,
-                    &cascade.steps,
-                    &cumulative_bp,
-                    reprice_cascade_step,
-                )?;
+                let steps = cascade.steps_with_cumulative_bp();
+                let reprice_step = |(step, cumulative_bp): &(&CreditCascadeStep, f64)| {
+                    let market_step = cascade.step_market(
+                        step,
+                        *cumulative_bp,
+                        market_t0,
+                        &market_t0_credit,
+                        market_t1,
+                        &recalibration_provider,
+                    )?;
+                    instrument.value(&market_step, as_of_t1)
+                };
+                let step_values: Vec<Money> =
+                    try_map_policy(execution_policy, &steps, reprice_step)?;
                 num_repricings += step_values.len();
 
                 // Telescope to per-step P&Ls: V_k − V_{k−1}, V_0 = base_credit_val.
-                // The sum telescopes to V_final − base_credit_val, which is
-                // `credit_curves_pnl` when the CurveShape snap leaves us at the
-                // T1 hazard state (the standard case).
                 let mut step_pnls: Vec<Money> = Vec::with_capacity(cascade.steps.len());
                 let mut prev = base_credit_val;
                 for v in &step_values {
-                    let pnl = compute_pnl(prev, *v, val_t1.currency(), market_t1, as_of_t1)?;
-                    step_pnls.push(pnl);
+                    step_pnls.push(compute_pnl(prev, *v, ccy, market_t1, as_of_t1)?);
                     prev = *v;
                 }
 
-                let detail = build_credit_factor_attribution(
+                attribution.credit_factor_detail = Some(build_credit_factor_attribution(
                     model,
                     &cascade,
                     credit_factor_detail_options,
                     &step_pnls,
-                )?;
-                attribution.credit_factor_detail = Some(detail);
+                )?);
             }
-            None => {
-                tracing::warn!(
-                    instrument_id = instrument.id(),
-                    method = "parallel",
-                    "Credit factor model supplied but credit cascade could not be planned"
-                );
-                attribution.meta.notes.push(format!(
-                    "credit_factor_model supplied but no resolvable issuer/hazard cascade for {}; credit_factor_detail omitted",
-                    instrument.id()
-                ));
-            }
+            None => note_unplanned_cascade(&mut attribution, instrument.id(), "parallel"),
         }
     }
 
@@ -1387,7 +736,8 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::HazardCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
-    use std::sync::OnceLock;
+    use finstack_quant_valuations::instruments::Instrument;
+    use std::sync::{Arc, OnceLock};
     use test_utils::TestInstrument;
     use time::macros::date;
 

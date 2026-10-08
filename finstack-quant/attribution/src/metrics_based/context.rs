@@ -28,12 +28,11 @@ pub(super) struct MarketShifts {
     pub(super) avg_spot_shift_pct: Option<f64>,
 }
 
-pub(super) struct AttributionInputs<'a> {
+pub(super) struct MetricsContext<'a> {
     pub(super) instrument: &'a Arc<dyn Instrument>,
     pub(super) market_t0: &'a MarketContext,
     pub(super) market_t1: &'a MarketContext,
     pub(super) val_t0: &'a ValuationResult,
-    pub(super) val_t1: &'a ValuationResult,
     pub(super) time_period_days: f64,
     pub(super) ccy: Currency,
     pub(super) market_deps: MarketDependencies,
@@ -43,7 +42,25 @@ pub(super) struct AttributionInputs<'a> {
     pub(super) shifts: MarketShifts,
 }
 
-impl<'a> AttributionInputs<'a> {
+impl<'a> MetricsContext<'a> {
+    /// Factor P&L in the attribution currency. A non-finite `amount` is noted
+    /// on `attribution`, sets `invalid`, and yields zero.
+    pub(super) fn money(
+        &self,
+        amount: f64,
+        label: &str,
+        attribution: &mut crate::PnlAttribution,
+        invalid: &mut bool,
+    ) -> finstack_quant_core::money::Money {
+        crate::helpers::factor_money_or_invalid(
+            amount,
+            self.ccy,
+            label,
+            &mut attribution.meta.notes,
+            invalid,
+        )
+    }
+
     pub(super) fn new(
         instrument: &'a Arc<dyn Instrument>,
         market_t0: &'a MarketContext,
@@ -133,7 +150,6 @@ impl<'a> AttributionInputs<'a> {
             market_t0,
             market_t1,
             val_t0,
-            val_t1,
             time_period_days: (as_of_t1 - as_of_t0).whole_days() as f64,
             ccy: val_t1.value.currency(),
             market_deps,

@@ -769,7 +769,6 @@ dependencies = [
  "indexmap",
  "jsonschema",
  "proptest",
- "rayon",
  "rust_decimal",
  "schemars",
  "serde",

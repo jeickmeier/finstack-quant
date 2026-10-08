@@ -483,6 +483,28 @@ pub(super) fn inflation_source_abs_shift_bp(
     mean_tenor_shift_bp(|t| (rate(&c0, t), rate(&c1, t)), true).unwrap_or(0.0)
 }
 
+/// Push the twist diagnostic for `factor_label` when `signed_avg_bp` is small
+/// against the L1 mean of `abs_shift_bp` over `curve_ids` (curves with no
+/// measurable move are skipped).
+pub(super) fn note_twist<'c>(
+    notes: &mut Vec<String>,
+    factor_label: &str,
+    signed_avg_bp: f64,
+    curve_ids: impl IntoIterator<Item = &'c CurveId>,
+    abs_shift_bp: impl Fn(&str) -> f64,
+) {
+    let (Some(l1_avg), _) = average_over(curve_ids, |curve_id| {
+        let shift = abs_shift_bp(curve_id.as_str());
+        (shift > 0.0).then_some(shift)
+    }) else {
+        return;
+    };
+    if let Some(note) = twist_diagnostic_note(factor_label, signed_avg_bp, l1_avg) {
+        notes.push(note);
+        notes.push(format!("{factor_label}: unreliable / bounds-exceeded"));
+    }
+}
+
 /// Format a diagnostic note when a signed average shift is twist-dominated
 /// — i.e. `|signed_avg| < TWIST_FRACTION_THRESHOLD × l1_avg`. In that regime,
 /// scalar second-order terms `½·γ·avg²` collapse toward 0 even though the
