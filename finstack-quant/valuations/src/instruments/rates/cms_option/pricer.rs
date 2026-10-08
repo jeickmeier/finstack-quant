@@ -35,9 +35,7 @@
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cms_common::annuity_weight;
 use crate::instruments::rates::cms_option::types::CmsOption;
-use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
+use crate::pricer::{InstrumentType, ModelKey, Pricer, PricerKey, PricingError};
 use crate::results::ValuationResult;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -256,9 +254,7 @@ impl Pricer for CmsOptionPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let cms = crate::pricer::expect_inst::<CmsOption>(instrument, InstrumentType::CmsOption)?;
 
-        let pv = self
-            .price_internal(cms, market, as_of)
-            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
+        let pv = self.price_internal(cms, market, as_of)?;
 
         Ok(ValuationResult::stamped(cms.id(), as_of, pv))
     }

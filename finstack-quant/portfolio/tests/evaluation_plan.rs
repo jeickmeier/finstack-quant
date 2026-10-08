@@ -14,7 +14,7 @@ use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::valuation::{
     value_portfolio, value_portfolio_at, PortfolioValuationOptions, RequestedMetrics,
 };
-use finstack_quant_portfolio::{Portfolio, PortfolioBuilder};
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::{Attributes, Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::InstrumentType;
@@ -157,7 +157,7 @@ fn build_probed_portfolio(
     fail_base_indices: &[usize],
     fail_metrics: bool,
 ) -> (Portfolio, Vec<Probe>) {
-    let mut builder = PortfolioBuilder::new(format!("EVALUATION_{position_count}"))
+    let mut builder = Portfolio::builder(format!("EVALUATION_{position_count}"))
         .base_currency(Currency::USD)
         .as_of(date!(2024 - 01 - 01))
         .entity(Entity::new("ENTITY"));
@@ -201,7 +201,7 @@ fn build_probed_portfolio(
 /// `bond` has a `dv01` calculator; `basket` has none, but both inherit the
 /// universally registered `theta`.
 fn build_mixed_type_portfolio() -> (Portfolio, Probe, Probe) {
-    let mut builder = PortfolioBuilder::new("EVALUATION_MIXED")
+    let mut builder = Portfolio::builder("EVALUATION_MIXED")
         .base_currency(Currency::USD)
         .as_of(date!(2024 - 01 - 01))
         .entity(Entity::new("ENTITY"));

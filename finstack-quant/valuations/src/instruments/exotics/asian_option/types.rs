@@ -385,10 +385,6 @@ impl crate::instruments::common_impl::traits::Instrument for AsianOption {
         }
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        self.fixing_dates.first().copied()
-    }
-
     /// Record the held `as_of` spot for fixing dates the roll passes.
     ///
     /// Scheduled fixings in `(as_of, rolled_date]` with no recorded value are

@@ -62,38 +62,6 @@ pub(super) fn apply_spot(
     }
 }
 
-pub(super) fn apply_dividend(
-    inputs: &MetricsContext<'_>,
-    attribution: &mut PnlAttribution,
-    non_finite_detected: &mut bool,
-) {
-    // 7. Dividend attribution (accumulates into market_scalars_pnl alongside spot Delta/Gamma)
-    if let Some(dividend01) = inputs.val_t0.measures.get(MetricId::Dividend01.as_str()) {
-        if let Some(scalar_id) = inputs.instrument.dividend_schedule_id() {
-            // Note: the `Dividend01` producers emit **$ per
-            // 1bp** of absolute dividend-yield move (the central difference is
-            // rescaled by the 1bp `ONE_BASIS_POINT` bump, see equity_option/convertible
-            // `dividend_risk.rs`). `measure_scalar_absolute_shift` returns the
-            // DECIMAL Δq, so the move must be converted to bp before
-            // multiplying.
-            if let Ok(div_abs_shift) = measure_scalar_absolute_shift(
-                scalar_id.as_str(),
-                inputs.market_t0,
-                inputs.market_t1,
-            ) {
-                let div_shift_bp = div_abs_shift * 10_000.0;
-                let div_amount = dividend01 * div_shift_bp;
-                attribution.market_scalars_pnl = inputs.money(
-                    attribution.market_scalars_pnl.amount() + div_amount,
-                    "dividend P&L",
-                    attribution,
-                    non_finite_detected,
-                );
-            }
-        }
-    }
-}
-
 pub(super) fn apply_inflation(
     inputs: &MetricsContext<'_>,
     attribution: &mut PnlAttribution,

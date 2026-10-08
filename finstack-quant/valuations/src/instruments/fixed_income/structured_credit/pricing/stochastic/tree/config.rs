@@ -1,18 +1,14 @@
-//! Scenario-tree configuration for stochastic structured-credit pricing.
+//! Scenario configuration for stochastic structured-credit pricing.
 
 use finstack_quant_models::correlation::latent_factor::LatentFactorSpec;
 use finstack_quant_models::correlation::recovery::RecoverySpec;
 use finstack_quant_models::credit::pool::{StochasticDefaultSpec, StochasticPrepaySpec};
 
-const MAX_TERMINAL_PATHS: usize = 50_000_000;
-
 /// Internal inputs shared by structured-credit setup and stochastic pricing.
 pub(crate) struct ScenarioTreeConfig {
-    /// Number of time periods (typically monthly).
+    /// Number of time periods (typically monthly); sizes the Monte Carlo
+    /// horizon.
     pub num_periods: usize,
-
-    /// Fixed number of children per tree node.
-    pub branch_count: usize,
 
     /// Factor model specification.
     pub factor_spec: LatentFactorSpec,
@@ -46,11 +42,11 @@ pub(crate) struct ScenarioTreeConfig {
 }
 
 impl ScenarioTreeConfig {
-    /// Create a fixed-branching scenario-tree configuration.
-    pub(crate) fn new(num_periods: usize, branch_count: usize) -> Self {
+    /// Create a scenario configuration over `num_periods` periods (at least
+    /// one) with default factor, prepayment, default and recovery specs.
+    pub(crate) fn new(num_periods: usize) -> Self {
         Self {
             num_periods: num_periods.max(1),
-            branch_count: branch_count.max(2),
             factor_spec: LatentFactorSpec::default(),
             prepay_spec: StochasticPrepaySpec::default(),
             default_spec: StochasticDefaultSpec::default(),
@@ -61,30 +57,6 @@ impl ScenarioTreeConfig {
             asset_correlation_override: None,
         }
     }
-
-    /// Return the capped number of terminal paths for `num_periods`.
-    pub(crate) fn terminal_path_count(&self, num_periods: usize) -> usize {
-        capped_pow(self.branch_count, num_periods)
-    }
-}
-
-fn capped_pow(base: usize, exp: usize) -> usize {
-    if base == 0 {
-        return 0;
-    }
-    let mut result = 1usize;
-    for _ in 0..exp {
-        match result.checked_mul(base) {
-            Some(value) => {
-                result = value;
-                if result >= MAX_TERMINAL_PATHS {
-                    return MAX_TERMINAL_PATHS;
-                }
-            }
-            None => return MAX_TERMINAL_PATHS,
-        }
-    }
-    result
 }
 
 #[cfg(test)]
@@ -92,20 +64,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn fixed_branching_is_clamped_and_counted() {
-        let config = ScenarioTreeConfig::new(5, 1);
-
-        assert_eq!(config.branch_count, 2);
-        assert_eq!(config.terminal_path_count(5), 32);
-    }
-
-    #[test]
-    fn terminal_path_count_saturates_at_the_capacity_guard() {
-        let config = ScenarioTreeConfig::new(usize::MAX, 3);
-
-        assert_eq!(
-            config.terminal_path_count(config.num_periods),
-            MAX_TERMINAL_PATHS
-        );
+    fn num_periods_is_clamped_to_at_least_one() {
+        assert_eq!(ScenarioTreeConfig::new(0).num_periods, 1);
+        assert_eq!(ScenarioTreeConfig::new(5).num_periods, 5);
     }
 }

@@ -1,11 +1,10 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
-use super::config::{CdsTranchePricer, ElWdPoint, PoolExposure};
+use super::config::{CdsTranchePricer, ElWdPoint, PoolExposure, INTEGRATION_TOLERANCE};
 use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_models::correlation::recovery::{RecoveryModel, RecoverySpec};
 
 /// Pre-computed invariants for EL fraction evaluation (hoisted out of the date loop).
 struct ElInvariants {
@@ -270,7 +269,7 @@ impl CdsTranchePricer {
         date: Date,
     ) -> Result<f64> {
         let diff = el_to_detach - el_to_attach;
-        let error_budget = 2.0 * self.config.integration_tolerance
+        let error_budget = 2.0 * INTEGRATION_TOLERANCE
             + 16.0 * f64::EPSILON * (el_to_detach.abs() + el_to_attach.abs());
         if !diff.is_finite() {
             return Err(Error::Validation(
@@ -290,25 +289,6 @@ impl CdsTranchePricer {
                  curve is not arbitrage-free at these detachment points; pricing this tranche \
                  would assign it negative protection. Recalibrate with nonnegative tranche-loss constraints."
         )))
-    }
-
-    /// Build the expected loss curve for all payment dates.
-    ///
-    /// Returns a vector of (Date, EL_fraction) pairs where EL_fraction
-    /// is the cumulative expected loss as a fraction of tranche notional.
-    /// Loss-only view of [`Self::build_el_wd_curve`], kept for the public
-    /// expected-loss-curve accessor and diagnostics.
-    pub(super) fn build_el_curve(
-        &self,
-        tranche: &CdsTranche,
-        index_data: &CreditIndexData,
-        dates: &[Date],
-    ) -> Result<Vec<(Date, f64)>> {
-        Ok(self
-            .build_el_wd_curve(tranche, index_data, dates)?
-            .into_iter()
-            .map(|p| (p.date, p.el_fraction))
-            .collect())
     }
 
     /// Build the expected loss AND senior-side recovery-writedown curve for
@@ -357,7 +337,6 @@ impl CdsTranchePricer {
             wd_fraction = wd_fraction.min(1.0 - el_fraction);
 
             curve.push(ElWdPoint {
-                date,
                 el_fraction,
                 wd_fraction,
             });
@@ -430,8 +409,8 @@ impl CdsTranchePricer {
         maturity: Date,
         exposure: PoolExposure,
     ) -> Result<f64> {
-        // Heterogeneous path if enabled and issuer curves present
-        if self.config.use_issuer_curves && index_data.has_issuer_curves() {
+        // Heterogeneous path whenever issuer curves are present
+        if index_data.has_issuer_curves() {
             self.calculate_equity_tranche_capped_hetero(
                 cap_pct,
                 correlation,
@@ -452,7 +431,7 @@ impl CdsTranchePricer {
         }
     }
 
-    /// Shared uniform-pool engine, including a configured recovery specification.
+    /// Shared uniform-pool engine with a constant recovery rate.
     pub(super) fn homogeneous_capped_expectation(
         &self,
         cap: f64,
@@ -462,56 +441,27 @@ impl CdsTranchePricer {
         correlation: f64,
         exposure: PoolExposure,
     ) -> Result<f64> {
-        let recovery_model: Option<Box<dyn RecoveryModel>> = self
-            .config
-            .stochastic_recovery_spec
-            .as_ref()
-            .map(|spec| spec.build());
-        let exposure_of = |recovery: f64| match exposure {
-            PoolExposure::Loss => 1.0 - recovery,
-            PoolExposure::Recovery => recovery,
-        };
-        let exposure_at = |factors: &[f64]| {
-            exposure_of(recovery_model.as_ref().map_or(base_recovery, |model| {
-                model.conditional_recovery(self.recovery_driver_for_factors(factors))
-            }))
+        let exposure = match exposure {
+            PoolExposure::Loss => 1.0 - base_recovery,
+            PoolExposure::Recovery => base_recovery,
         };
         let threshold = self.default_threshold_for_copula(default_prob);
         let conditional_p = |factors: &[f64]| {
-            if self.config.copula_spec.is_gaussian() {
+            if self.copula_spec.is_gaussian() {
                 self.conditional_default_probability_enhanced(threshold, correlation, factors[0])
             } else {
                 self.conditional_default_prob_copula(self.copula(), threshold, factors, correlation)
             }
         };
-        let scale = if recovery_model
-            .as_ref()
-            .is_some_and(|model| model.is_stochastic())
-        {
-            let model_exposure = self
-                .integrate_factors(&|factors| Ok(conditional_p(factors) * exposure_at(factors)))?;
-            stochastic_recovery_exposure_scale(
-                default_prob * exposure_of(base_recovery),
-                model_exposure,
-            )
-        } else {
-            1.0
-        };
         self.integrate_factors(&|factors| {
-            self.conditional_equity_tranche_capped(
-                count,
-                cap,
-                conditional_p(factors),
-                scale * exposure_at(factors),
-            )
+            self.conditional_equity_tranche_capped(count, cap, conditional_p(factors), exposure)
         })
     }
 
     /// Loss and recovery capped expectations at one correlation.
     ///
-    /// Constant-recovery homogeneous pools share one conditional default
-    /// distribution. Stochastic recovery or issuer-curve paths keep two
-    /// independent integrals.
+    /// Homogeneous pools share one conditional default distribution.
+    /// Issuer-curve paths keep two independent integrals.
     fn calculate_equity_tranche_capped_pair(
         &self,
         loss_cap_pct: f64,
@@ -520,11 +470,7 @@ impl CdsTranchePricer {
         index_data: &CreditIndexData,
         date: Date,
     ) -> Result<(f64, f64)> {
-        let stochastic = matches!(
-            self.config.stochastic_recovery_spec,
-            Some(RecoverySpec::MarketCorrelated { .. })
-        );
-        if stochastic || (self.config.use_issuer_curves && index_data.has_issuer_curves()) {
+        if index_data.has_issuer_curves() {
             return Ok((
                 self.calculate_equity_tranche_loss(loss_cap_pct, correlation, index_data, date)?,
                 self.calculate_equity_tranche_recovery(
@@ -558,7 +504,7 @@ impl CdsTranchePricer {
     ) -> Result<(f64, f64)> {
         let threshold = self.default_threshold_for_copula(default_prob);
         let conditional_p = |factors: &[f64]| {
-            if self.config.copula_spec.is_gaussian() {
+            if self.copula_spec.is_gaussian() {
                 self.conditional_default_probability_enhanced(threshold, correlation, factors[0])
             } else {
                 self.conditional_default_prob_copula(self.copula(), threshold, factors, correlation)
@@ -577,55 +523,24 @@ impl CdsTranchePricer {
     }
 }
 
-/// Renormalization factor that makes a stochastic-recovery override
-/// EL-consistent with the bootstrapped index curve.
-///
-/// The index default probabilities were stripped from index spreads assuming
-/// the flat index recovery, so the index-implied unconditional pool exposure
-/// is `p · e_base` (loss side: `p · (1 − R_base)`; recovery side:
-/// `p · R_base`). With a z-dependent recovery `R(Z)` the model's unconditional
-/// pool exposure becomes `E_Z[p(Z) · e(Z)] ≠ p · e_base` because `p(Z)` and
-/// `e(Z)` are driven by the same factor. Scaling the conditional exposure by
-/// `target / actual` restores `E_Z[p(Z) · scale · e(Z)] = p · e_base`, so the
-/// 0–100% equity tranche reproduces the index expected loss while preserving
-/// the factor-dependence shape of the override.
-pub(super) fn stochastic_recovery_exposure_scale(
-    index_implied_pool_exposure: f64,
-    model_pool_exposure: f64,
-) -> f64 {
-    const MIN_POOL_EXPOSURE: f64 = 1e-14;
-    if model_pool_exposure <= MIN_POOL_EXPOSURE || index_implied_pool_exposure <= 0.0 {
-        // Degenerate inputs (e.g. zero default probability or a recovery
-        // model pinned at 100%): renormalization is meaningless; leave the
-        // override unscaled.
-        return 1.0;
-    }
-    index_implied_pool_exposure / model_pool_exposure
-}
-
 #[cfg(test)]
 mod production_credit_audit {
-    use super::super::config::CdsTranchePricerConfig;
     use super::*;
     use finstack_quant_core::dates::Month;
     #[test]
-    fn base_correlation_clamps_only_configured_numerical_budget() {
+    fn base_correlation_clamps_only_numerical_budget() {
         let date = Date::from_calendar_date(2030, Month::January, 1).expect("date");
-        for tolerance in [1e-8, 1e-10, 1e-12] {
-            let pricer = CdsTranchePricer::with_config(
-                CdsTranchePricerConfig::default().with_integration_tolerance(tolerance),
-            )
-            .expect("pricer");
-            assert_eq!(
-                pricer
-                    .resolve_tranchelet_difference(0.01 - tolerance, 0.01, 3.0, 7.0, date)
-                    .expect("noise"),
-                0.0
-            );
-            let error = pricer
-                .resolve_tranchelet_difference(0.01 - 4.0 * tolerance, 0.01, 3.0, 7.0, date)
-                .expect_err("materially negative loss");
-            assert!(error.to_string().contains("integration budget"));
-        }
+        let tolerance = INTEGRATION_TOLERANCE;
+        let pricer = CdsTranchePricer::new();
+        assert_eq!(
+            pricer
+                .resolve_tranchelet_difference(0.01 - tolerance, 0.01, 3.0, 7.0, date)
+                .expect("noise"),
+            0.0
+        );
+        let error = pricer
+            .resolve_tranchelet_difference(0.01 - 4.0 * tolerance, 0.01, 3.0, 7.0, date)
+            .expect_err("materially negative loss");
+        assert!(error.to_string().contains("integration budget"));
     }
 }

@@ -147,83 +147,14 @@
 //!   grid decomposition and the out-of-benchmark fallback convention used
 //!   above. `docs/REFERENCES.md#dynkin-hyman-vankudre-1998`
 
-use crate::brinson::{carino_link_effects, CarinoPeriod};
+use crate::brinson::{
+    carino_link_effects, check_active_return_identity, check_net_weight, check_weights_sum,
+    CarinoPeriod, ScaledL1Norm,
+};
 use crate::error::{Error, Result};
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-
-/// Tolerance for the requirement that weights sum to 1.0 on each side.
-const WEIGHT_TOLERANCE: f64 = 1e-6;
-
-/// Relative tolerance on the ratio `|net weight| / gross weight` below which
-/// a bucket's per-unit rate is treated as too poorly conditioned to
-/// attribute, in [`check_zero_net_weight`].
-///
-/// A bucket's rate is `weighted_return / weight` (see [`BucketAgg::rate`]).
-/// At exact cancellation (`weight == 0.0` with `abs_weight > 0.0`) that rate
-/// is undefined; arbitrarily close to exact cancellation it is *defined* but
-/// numerically explosive — as `weight -> 0` for a roughly fixed
-/// `weighted_return`, the rate, and every curve/sector/selection effect
-/// derived from it, grows without bound. An exact-equality-only guard misses
-/// this: a benchmark bucket of `+0.5` and `-(0.5 - 1e-8)` in the same cell
-/// nets to `1e-8`, not `0.0`, yet produces a curve effect on the order of
-/// `2.5e5` against a realistic sub-1% active return.
-///
-/// # What this bound does, and does not, guarantee
-///
-/// This bound exists to cap how *explosive* an accepted bucket's rate can
-/// become; it is not, and cannot be made to be, a promise that the
-/// reconstructed `total_curve + total_sector + total_selection` reconciles
-/// to `active_return` within any particular tolerance — see the module-level
-/// "Telescoping identity" section for measured reconciliation residuals as
-/// large as `~5.7e-8` (on a ~1% return spread) or `~8.6e-6` (on a ~100%
-/// spread) for an *accepted*, in-bound bucket sitting right at this
-/// tolerance. Tightening this constant would shrink those residuals, but at
-/// a real cost: reaching a `1e-12`-tight reconciliation guarantee across
-/// realistic return spreads would require a bound near `1e-3`, which would
-/// reject a bucket netting to 0.1% of its own gross weight — an entirely
-/// plausible near-hedge in a long/short credit portfolio, not a numerical
-/// artifact to be filtered out. `1e-6` is therefore a deliberate trade-off,
-/// reusing [`WEIGHT_TOLERANCE`]'s existing precision floor for the whole
-/// module: it closes the catastrophic case this bound was added for (silent,
-/// unbounded rates from near-cancellation) without rejecting legitimate
-/// hedged positions this module must still be able to attribute. Callers
-/// needing a tight reconciliation tolerance must additionally check how
-/// close their own buckets' net weights sit to this boundary, not merely
-/// that [`grid_attribution()`] returned `Ok`.
-const NET_WEIGHT_RELATIVE_TOLERANCE: f64 = 1e-6;
-
-/// Relative reconciliation tolerance for inbound linked-period effects.
-///
-/// The floor is `1e-10` in ordinary return space. For near-cancelling,
-/// long/short-generated effects whose gross magnitude is much larger than
-/// their net active return, it scales with an overflow-safe L1 effect norm so
-/// valid outputs from [`grid_attribution`] are not rejected solely because
-/// cancellation amplified floating-point noise.
-const LINK_RECONCILIATION_RELATIVE_TOLERANCE: f64 = 1e-10;
-
-/// Compute a relative tolerance from an L1 norm without forming an
-/// overflow-prone sum of absolute values.
-fn scaled_l1_tolerance(values: &[f64]) -> (f64, f64, f64) {
-    let scale = values
-        .iter()
-        .map(|value| value.abs())
-        .fold(0.0_f64, f64::max);
-    if scale == 0.0 {
-        return (LINK_RECONCILIATION_RELATIVE_TOLERANCE, 0.0, 0.0);
-    }
-
-    let normalized_sum: f64 = values.iter().map(|value| value.abs() / scale).sum();
-    let scaled_relative = LINK_RECONCILIATION_RELATIVE_TOLERANCE * scale;
-    let tolerance = if normalized_sum > f64::MAX / scaled_relative {
-        f64::MAX
-    } else {
-        scaled_relative * normalized_sum
-    }
-    .max(LINK_RECONCILIATION_RELATIVE_TOLERANCE);
-    (tolerance, scale, normalized_sum)
-}
 
 /// One position (or pre-aggregated bucket) in a duration-cell x sector grid,
 /// for one period and one side (portfolio or benchmark).
@@ -314,9 +245,9 @@ pub struct GridAttributionResult {
 /// `weight` is the *net* bucket weight (long minus short) and `abs_weight`
 /// the gross weight; the pair distinguishes "bucket absent from this side"
 /// (`abs_weight == 0`) from "bucket present with offsetting positions"
-/// (`abs_weight > 0`, `weight` zero or, per [`NET_WEIGHT_RELATIVE_TOLERANCE`],
+/// (`abs_weight > 0`, `weight` zero or, per `NET_WEIGHT_RELATIVE_TOLERANCE`,
 /// numerically near zero relative to `abs_weight`), which
-/// [`check_zero_net_weight`] rejects.
+/// [`check_net_weight`] rejects.
 #[derive(Clone, Copy, Default)]
 struct BucketAgg {
     weight: f64,
@@ -336,7 +267,7 @@ impl BucketAgg {
     ///
     /// Returns `0.0` only when the bucket carries no net weight, i.e. it is
     /// either absent from this side or was rejected by
-    /// [`check_zero_net_weight`] before this is ever consulted for a real
+    /// [`check_net_weight`] before this is ever consulted for a real
     /// contribution. The bare (non-`.abs()`) comparison against `weight`
     /// elsewhere in this module is intentional: net-short buckets
     /// (`weight < 0`) are legal and must still divide through.
@@ -363,40 +294,6 @@ fn validate_position(p: &GridPosition, side: &str) -> Result<()> {
                 p.cell, p.sector
             )));
         }
-    }
-    Ok(())
-}
-
-/// Fail closed on a bucket that is present on a side but nets to zero, or to
-/// a weight that is numerically near zero *relative to its own gross
-/// weight* (a long/short pair, a hedge against a cash position in the same
-/// bucket, that exactly or nearly offsets).
-///
-/// Such a bucket still contributes `Σ_j w_j r_j ≠ 0` to the side total. At
-/// exact cancellation its per-unit rate `weighted_return / weight` is
-/// undefined (`0 / 0`); at near-cancellation the rate is *defined* but grows
-/// without bound as the net weight shrinks toward zero, so every effect
-/// derived from it can blow up to a numerically meaningless magnitude while
-/// `active_return` still ties out against performance data, silently
-/// breaking the telescoping identity (see the module docs) without ever
-/// producing a `NaN` or infinity that a finiteness check would catch. An
-/// exact-equality check (`agg.weight == 0.0`) misses this near-cancellation
-/// regime entirely, so this compares the ratio `|weight| / abs_weight`
-/// against [`NET_WEIGHT_RELATIVE_TOLERANCE`] instead — a relative bound so
-/// rescaling all weights uniformly (e.g. percent vs. decimal) does not
-/// change whether it fires.
-fn check_zero_net_weight(bucket: &str, agg: &BucketAgg, side_name: &str) -> Result<()> {
-    if agg.abs_weight > 0.0 && agg.weight.abs() <= NET_WEIGHT_RELATIVE_TOLERANCE * agg.abs_weight {
-        return Err(Error::invalid_input(format!(
-            "{side_name} bucket '{bucket}' has offsetting positions netting to a weight \
-             ({}) that is zero, or numerically near zero, relative to its gross weight ({}): \
-             a bucket whose |net weight| does not exceed {NET_WEIGHT_RELATIVE_TOLERANCE} times \
-             its gross weight cannot be attributed because its per-unit rate (weighted return \
-             / weight) is undefined or numerically explosive. Split the offsetting positions \
-             into distinct buckets, or net them into a single position with a net weight well \
-             clear of that relative bound.",
-            agg.weight, agg.abs_weight
-        )));
     }
     Ok(())
 }
@@ -434,11 +331,7 @@ fn aggregate_side(
     }
 
     let total_w = sum_w.total();
-    if (total_w - 1.0).abs() > WEIGHT_TOLERANCE {
-        return Err(Error::invalid_input(format!(
-            "{side_name} weights must sum to 1.0 (got {total_w})"
-        )));
-    }
+    check_weights_sum(side_name, total_w)?;
 
     Ok(sum_r.total())
 }
@@ -530,14 +423,14 @@ pub fn grid_attribution(
     // Fail closed on zero-net-weight buckets before computing any effects,
     // at both the cell level and the (cell, sector) level.
     for (cell, (p, b)) in &cell_totals {
-        check_zero_net_weight(cell, p, "Portfolio")?;
-        check_zero_net_weight(cell, b, "Benchmark")?;
+        check_net_weight("bucket", cell, p.weight, p.abs_weight, "Portfolio")?;
+        check_net_weight("bucket", cell, b.weight, b.abs_weight, "Benchmark")?;
     }
     for (cell, sector_map) in &cells {
         for (sector, (sp, sb)) in sector_map {
             let bucket = format!("{cell}/{sector}");
-            check_zero_net_weight(&bucket, sp, "Portfolio")?;
-            check_zero_net_weight(&bucket, sb, "Benchmark")?;
+            check_net_weight("bucket", &bucket, sp.weight, sp.abs_weight, "Portfolio")?;
+            check_net_weight("bucket", &bucket, sb.weight, sb.abs_weight, "Benchmark")?;
         }
     }
 
@@ -675,44 +568,26 @@ fn validate_grid_link_period(period: &GridAttributionResult, index: usize) -> Re
         }
     }
 
-    let expected_active = period.portfolio_return - period.benchmark_return;
-    if !expected_active.is_finite() {
-        return Err(Error::invalid_input(format!(
-            "Grid Carino period[{index}] portfolio_return - benchmark_return must be finite"
-        )));
-    }
-    let return_scale = period
-        .portfolio_return
-        .abs()
-        .max(period.benchmark_return.abs())
-        .max(period.active_return.abs())
-        .max(1.0);
-    let return_tolerance = 1e-12 * return_scale;
-    let active_residual = period.active_return - expected_active;
-    if !active_residual.is_finite() {
-        return Err(Error::invalid_input(format!(
-            "Grid Carino period[{index}] active-return residual must be finite"
-        )));
-    }
-    if active_residual.abs() > return_tolerance {
-        return Err(Error::invalid_input(format!(
-            "Grid Carino period[{index}].active_return ({}) does not agree with \
-             portfolio_return - benchmark_return ({expected_active}) within return-scale \
-             tolerance {return_tolerance}",
-            period.active_return
-        )));
-    }
+    check_active_return_identity(
+        "Grid",
+        index,
+        period.portfolio_return,
+        period.benchmark_return,
+        period.active_return,
+    )?;
 
     let effect_values = [
         period.total_curve,
         period.total_sector,
         period.total_selection,
     ];
-    let (tolerance, effect_scale, normalized_l1) = scaled_l1_tolerance(&effect_values);
+    let mut effect_l1 = ScaledL1Norm::default();
     let mut effects = NeumaierAccumulator::new();
     for value in effect_values {
+        effect_l1.add(value);
         effects.add(value);
     }
+    let tolerance = effect_l1.tolerance();
     let effect_total = effects.total();
     let reconciliation_residual = effect_total - period.active_return;
     if !reconciliation_residual.is_finite() {
@@ -724,8 +599,8 @@ fn validate_grid_link_period(period: &GridAttributionResult, index: usize) -> Re
         return Err(Error::invalid_input(format!(
             "Grid Carino period[{index}] effect totals sum to {effect_total}, which does not \
              reconcile to active_return {} within scale-aware tolerance {tolerance} \
-             (scaled L1 effect scale {effect_scale}, normalized L1 sum {normalized_l1})",
-            period.active_return
+             (scaled L1 effect scale {}, normalized L1 sum {})",
+            period.active_return, effect_l1.scale, effect_l1.normalized_sum
         )));
     }
 

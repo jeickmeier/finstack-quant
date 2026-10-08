@@ -8,11 +8,11 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::book::{Book, BookId};
-use finstack_quant_portfolio::builder::PortfolioBuilder;
 use finstack_quant_portfolio::grouping::aggregate_by_book;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::valuation::value_portfolio;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use std::sync::Arc;
 use time::macros::date;
@@ -138,7 +138,7 @@ fn test_book_hierarchy_three_levels() {
     let ig = Book::new("ig", Some("Investment Grade".to_string())).with_parent("credit");
 
     // Build portfolio with books
-    let portfolio = PortfolioBuilder::new("TEST_PORTFOLIO")
+    let portfolio = Portfolio::builder("TEST_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENTITY_A"))
@@ -272,7 +272,7 @@ fn test_book_hierarchy_multiple_root_books() {
     let asia = Book::new("asia", Some("Asia".to_string()));
 
     // Build portfolio
-    let portfolio = PortfolioBuilder::new("TEST_PORTFOLIO")
+    let portfolio = Portfolio::builder("TEST_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENTITY_A"))
@@ -342,7 +342,7 @@ fn test_position_without_book() {
     .expect("position should build");
 
     // Build portfolio without assigning position to any book
-    let portfolio = PortfolioBuilder::new("TEST_PORTFOLIO")
+    let portfolio = Portfolio::builder("TEST_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENTITY_A"))
@@ -386,7 +386,7 @@ fn test_book_hierarchy_is_order_independent() {
     let credit = Book::new("credit", Some("Credit".to_string())).with_parent("americas");
     let ig = Book::new("ig", Some("Investment Grade".to_string())).with_parent("credit");
 
-    let portfolio = PortfolioBuilder::new("TEST_PORTFOLIO")
+    let portfolio = Portfolio::builder("TEST_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENTITY_A"))
@@ -439,7 +439,7 @@ fn test_reassigning_position_between_books_removes_stale_membership() {
     )
     .expect("position should build");
 
-    let portfolio = PortfolioBuilder::new("TEST_PORTFOLIO")
+    let portfolio = Portfolio::builder("TEST_PORTFOLIO")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("ENTITY_A"))

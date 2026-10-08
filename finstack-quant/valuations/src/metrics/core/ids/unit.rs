@@ -30,8 +30,8 @@ pub enum MetricUnit {
     /// Years (durations, WAL/WAM, time to maturity, calendar-day counts
     /// expressed in years).
     Years,
-    /// Percent or percentage-point value (`5.0` = 5%), including prices quoted
-    /// as a percentage of par and speeds quoted as `% PSA`/`% SDA`.
+    /// Percent or percentage-point value (`5.0` = 5%), such as a price quoted
+    /// as a percentage of par.
     Percent,
     /// Pure number: ratios, multiples, counts, discount factors, flags, epoch
     /// days, index levels, and FX rates.
@@ -103,7 +103,6 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "z_spread"
         | "oas"
         | "i_spread"
-        | "g_spread"
         | "asw_par"
         | "asw_market"
         | "discount_margin"
@@ -112,12 +111,8 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "quote_rate"
         | "implied_forward"
         | "convexity_adjustment"
-        | "default_probability"
         | "cpr"
-        | "smm"
         | "cdr"
-        | "loss_severity"
-        | "pool_factor"
         | "real_yield"
         | "breakeven_inflation"
         | "lp_irr"
@@ -127,18 +122,11 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "equity_dividend_yield"
         | "implied_vol"
         | "variance_strike_vol"
-        | "clo_recovery_rate"
         | "abs_delinquency"
         | "abs_charge_off"
         | "abs_excess_spread"
         | "abs_ce_level"
-        | "cmbs_ce_level"
-        | "cmbs_waltv"
-        | "rmbs_waltv"
         | "expense_ratio"
-        | "tracking_error"
-        | "utilization"
-        | "premium_discount"
         | "variance_expected"
         | "variance_realized" => Decimal,
         // Basis points.
@@ -158,8 +146,6 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "variance_time_to_maturity"
         | "expected_exercise_time"
         | "yf" => Years,
-        // Percent.
-        "rmbs_psa_speed" | "rmbs_sda_speed" => Percent,
         // Pure numbers.
         "convexity"
         | "conversion_factor"
@@ -181,21 +167,8 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "index_ratio"
         | "constituent_count"
         | "equity_shares"
-        | "fixed_leg_payment_count"
-        | "floating_leg_payment_count"
-        | "fixed_first_payment_date"
-        | "fixed_last_payment_date"
-        | "floating_first_payment_date"
-        | "floating_last_payment_date"
-        | "fixed_first_accrual_factor"
-        | "floating_first_accrual_factor"
-        | "expected_maturity"
         | "clo_warf"
-        | "clo_diversity"
-        | "clo_oc_ratio"
-        | "clo_ic_ratio"
         | "cmbs_dscr"
-        | "rmbs_wafico"
         | "collateral_coverage"
         | "variance_notional"
         | "theta_period_days"
@@ -225,7 +198,6 @@ mod tests {
         assert_eq!(MetricId::Convexity.unit(), MetricUnit::Dimensionless);
         assert_eq!(MetricId::CleanPrice.unit(), MetricUnit::Currency);
         assert_eq!(MetricId::Accrued.unit(), MetricUnit::Currency);
-        assert_eq!(MetricId::RmbsPsaSpeed.unit(), MetricUnit::Percent);
         assert_eq!(MetricId::IrConvexity.unit(), MetricUnit::Unknown);
     }
 

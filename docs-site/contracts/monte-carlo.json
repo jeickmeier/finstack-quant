@@ -246,16 +246,12 @@
       "finstack_quant.models.correlation.LatentSingleFactor",
       "finstack_quant.models.correlation.PortfolioLossConfig",
       "finstack_quant.models.correlation.simulate_portfolio_loss",
-      "finstack_quant.valuations.callable_range_accrual_accrued",
       "finstack_quant.valuations.instruments.price_instrument",
       "finstack_quant.valuations.instruments.structured_credit_tranche_breakeven_cdr",
       "finstack_quant.valuations.instruments.structured_credit_tranche_discount_margin",
       "finstack_quant.valuations.instruments.structured_credit_tranche_metrics",
       "finstack_quant.valuations.instruments.structured_credit_tranche_oas",
-      "finstack_quant.valuations.instruments.structured_credit_tranche_scenario_table",
-      "finstack_quant.valuations.inverse_floater_coupon_profile",
-      "finstack_quant.valuations.snowball_coupon_profile",
-      "finstack_quant.valuations.tarn_coupon_profile"
+      "finstack_quant.valuations.instruments.structured_credit_tranche_scenario_table"
     ],
     "models": [
       "monte_carlo_gbm",

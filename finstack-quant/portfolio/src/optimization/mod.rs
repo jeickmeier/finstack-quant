@@ -9,7 +9,7 @@
 //!
 //! - [`crate::optimization::PortfolioOptimizationProblem`] for declaring the
 //!   optimization objective, weighting scheme, trade universe, and constraints
-//! - [`crate::optimization::DefaultLpOptimizer`] for solving the resulting
+//! - [`crate::optimization::optimize`] for solving the resulting
 //!   linear program
 //! - [`crate::optimization::PortfolioOptimizationResult`] for inspecting
 //!   optimal weights, implied quantities, and trade lists
@@ -28,7 +28,7 @@
 //!   linearization would otherwise be ambiguous.
 //! - The current optimizer is linear-program based. Covariance-driven or other
 //!   quadratic risk constraints are intentionally out of scope for
-//!   [`crate::optimization::DefaultLpOptimizer`].
+//!   [`crate::optimization::optimize`].
 //!
 //! # Workflow
 //!
@@ -37,7 +37,7 @@
 //! 2. Define a [`crate::optimization::PortfolioOptimizationProblem`] with an
 //!    [`crate::optimization::Objective`] and any
 //!    [`crate::optimization::Constraint`] values.
-//! 3. Solve with [`crate::optimization::DefaultLpOptimizer`].
+//! 3. Solve with [`crate::optimization::optimize`].
 //! 4. Inspect [`crate::optimization::PortfolioOptimizationResult::to_trade_list`]
 //!    or rebuild a portfolio with
 //!    [`crate::optimization::PortfolioOptimizationResult::to_rebalanced_portfolio`].
@@ -51,20 +51,20 @@
 
 mod constraints;
 mod decision;
-mod helpers;
 mod lp_solver;
 mod problem;
 mod result;
+mod spec;
 mod types;
 mod universe;
 
 pub use constraints::{Constraint, Inequality};
-pub use helpers::{optimize_from_spec, rebalance_from_spec, PortfolioOptimizationSpec};
-pub use lp_solver::DefaultLpOptimizer;
+pub use lp_solver::optimize;
 pub use problem::PortfolioOptimizationProblem;
 pub use result::{
     OptimizationStatus, PortfolioOptimizationResult, PortfolioOptimizationResultWire,
     TradeDirection, TradeSpec, TradeType,
 };
+pub use spec::{optimize_from_spec, rebalance_from_spec, PortfolioOptimizationSpec};
 pub use types::{MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric, WeightingScheme};
 pub use universe::{CandidatePosition, PositionFilter, TradeUniverse};

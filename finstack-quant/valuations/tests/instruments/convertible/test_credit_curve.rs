@@ -8,13 +8,10 @@
 //! - DV01 and CS01 are distinct (one bumps risk-free, the other bumps credit)
 
 use super::fixtures::*;
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    price_convertible_bond, ConvertibleTreeType,
-};
+use finstack_quant_valuations::instruments::fixed_income::convertible::price_convertible_bond;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 
-const TREE: ConvertibleTreeType = ConvertibleTreeType::Binomial;
 const TREE_STEPS: usize = 100;
 
 #[test]
@@ -29,14 +26,12 @@ fn test_credit_spread_reduces_price() {
     let price_with_credit = price_convertible_bond(
         &with_tree_steps(&bond, TREE_STEPS),
         &market_with_credit,
-        TREE,
         dates::base_date(),
     )
     .expect("should price with credit curve");
     let price_no_credit = price_convertible_bond(
         &with_tree_steps(&bond_no_credit, TREE_STEPS),
         &market_no_credit,
-        TREE,
         dates::base_date(),
     )
     .expect("should price without credit curve");
@@ -63,14 +58,12 @@ fn test_wider_credit_spread_reduces_price_further() {
     let price_100bp = price_convertible_bond(
         &with_tree_steps(&bond, TREE_STEPS),
         &market_100bp,
-        TREE,
         dates::base_date(),
     )
     .expect("should price at 100bp spread");
     let price_300bp = price_convertible_bond(
         &with_tree_steps(&bond, TREE_STEPS),
         &market_300bp,
-        TREE,
         dates::base_date(),
     )
     .expect("should price at 300bp spread");
@@ -131,14 +124,12 @@ fn test_credit_spread_effect_larger_for_otm() {
     let otm_price_no_credit = price_convertible_bond(
         &with_tree_steps(&bond_no_credit, TREE_STEPS),
         &otm_no_spread,
-        TREE,
         dates::base_date(),
     )
     .expect("should price OTM no credit");
     let otm_price_with_credit = price_convertible_bond(
         &with_tree_steps(&bond, TREE_STEPS),
         &otm_with_spread,
-        TREE,
         dates::base_date(),
     )
     .expect("should price OTM with credit");
@@ -153,14 +144,12 @@ fn test_credit_spread_effect_larger_for_otm() {
     let itm_price_no_credit = price_convertible_bond(
         &with_tree_steps(&bond_no_credit, TREE_STEPS),
         &itm_no_spread,
-        TREE,
         dates::base_date(),
     )
     .expect("should price ITM no credit");
     let itm_price_with_credit = price_convertible_bond(
         &with_tree_steps(&bond, TREE_STEPS),
         &itm_with_spread,
-        TREE,
         dates::base_date(),
     )
     .expect("should price ITM with credit");
@@ -340,7 +329,6 @@ fn test_recovery_rate_increases_price() {
     let price_zero = price_convertible_bond(
         &with_tree_steps(&bond_zero_recovery, TREE_STEPS),
         &market,
-        TREE,
         dates::base_date(),
     )
     .expect("should price zero recovery");
@@ -348,7 +336,6 @@ fn test_recovery_rate_increases_price() {
     let price_40 = price_convertible_bond(
         &with_tree_steps(&bond_40pct_recovery, TREE_STEPS),
         &market,
-        TREE,
         dates::base_date(),
     )
     .expect("should price 40% recovery");
@@ -372,18 +359,13 @@ fn test_recovery_rate_100_pct_equals_no_credit() {
     let market_with_credit = create_market_context_with_credit(200.0);
     let market_no_credit = create_market_context();
 
-    let price_full_recovery = price_convertible_bond(
-        &bond_full_recovery,
-        &market_with_credit,
-        TREE,
-        dates::base_date(),
-    )
-    .expect("should price full recovery");
+    let price_full_recovery =
+        price_convertible_bond(&bond_full_recovery, &market_with_credit, dates::base_date())
+            .expect("should price full recovery");
 
     let price_no_credit = price_convertible_bond(
         &with_tree_steps(&bond_no_credit, TREE_STEPS),
         &market_no_credit,
-        TREE,
         dates::base_date(),
     )
     .expect("should price no credit");
@@ -415,7 +397,6 @@ fn test_recovery_rate_monotonic() {
         let price = price_convertible_bond(
             &with_tree_steps(&bond, TREE_STEPS),
             &market,
-            TREE,
             dates::base_date(),
         )
         .expect("should price")

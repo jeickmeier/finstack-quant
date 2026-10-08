@@ -96,9 +96,6 @@ impl MetricId {
     /// Discount margin for floating-rate bonds (decimal; 0.01 = 100 bp)
     pub const DiscountMargin: Self = Self(Cow::Borrowed("discount_margin"));
 
-    /// G-spread - Govvie spread
-    pub const GSpread: Self = Self(Cow::Borrowed("g_spread"));
-
     /// Par asset swap spread (market-standard ASW quote)
     pub const ASWPar: Self = Self(Cow::Borrowed("asw_par"));
 
@@ -107,26 +104,11 @@ impl MetricId {
 
     // Basket/ETF Metrics
 
-    /// Net Asset Value per share
-    pub const Nav: Self = Self(Cow::Borrowed("nav"));
-
-    /// Total basket value
-    pub const BasketValue: Self = Self(Cow::Borrowed("basket_value"));
-
     /// Number of constituents in the basket
     pub const ConstituentCount: Self = Self(Cow::Borrowed("constituent_count"));
 
     /// Expense ratio as percentage
     pub const ExpenseRatio: Self = Self(Cow::Borrowed("expense_ratio"));
-
-    /// Tracking error vs benchmark
-    pub const TrackingError: Self = Self(Cow::Borrowed("tracking_error"));
-
-    /// Utilization vs creation unit size
-    pub const Utilization: Self = Self(Cow::Borrowed("utilization"));
-
-    /// Premium/discount to NAV
-    pub const PremiumDiscount: Self = Self(Cow::Borrowed("premium_discount"));
 
     // Inflation-Linked Bond Metrics
 
@@ -189,9 +171,6 @@ impl MetricId {
     pub const TerminalValuePV: Self = Self(Cow::Borrowed("terminal_value_pv"));
 
     // VaR Metrics
-
-    /// Conditional second-order theta (gamma of theta)
-    pub const ThetaGamma: Self = Self(Cow::Borrowed("theta_gamma"));
 
     /// Historical Value-at-Risk (95% confidence by default)
     pub const HVar: Self = Self(Cow::Borrowed("hvar"));

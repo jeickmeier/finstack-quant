@@ -341,9 +341,11 @@ fn test_realistic_ust_10y_future_full_workflow() {
     );
 
     // Test 2: Model Price Calculation (carry-adjusted to the delivery date)
-    let model_price =
-        BondFuturePricer::fair_price(ctd_bond, ctd_cf, &market, as_of, future.delivery_start)
-            .expect("Model price calculation should succeed");
+    let mut future_with_ctd = future.clone();
+    future_with_ctd.ctd_bond = Some(ctd_bond.clone());
+    let model_price = future_with_ctd
+        .fair_price(&market, as_of)
+        .expect("Model price calculation should succeed");
 
     // Model price should be a reasonable value (80-150 range for UST futures)
     assert!(
@@ -1174,99 +1176,6 @@ fn test_bond_future_dv01_sign_convention() {
 }
 
 #[test]
-fn test_invoice_price() {
-    // Test the invoice_price() method with realistic UST 10Y contract
-    let market = create_realistic_market();
-    let (bonds, mut deliverable_bonds) = create_deliverable_basket();
-    let as_of = date!(2025 - 01 - 15);
-
-    // Calculate conversion factors
-    let specs = BondFutureSpecs::ust_10y();
-
-    for (i, bond) in bonds.iter().enumerate() {
-        let cf = BondFuturePricer::calculate_conversion_factor(bond, &specs, as_of)
-            .expect("Failed to calculate conversion factor");
-        deliverable_bonds[i].conversion_factor = cf;
-        println!(
-            "Bond {} ({}): CF = {:.4}",
-            i + 1,
-            deliverable_bonds[i].bond_id.as_str(),
-            cf
-        );
-    }
-
-    // Create a UST 10Y future
-    let entry_price = 125.50; // e.g., 125-16/32
-    let expiry = date!(2025 - 03 - 20);
-    let delivery_start = date!(2025 - 03 - 21);
-    let last_delivery_date = date!(2025 - 03 - 31);
-
-    let future = create_ust_10y_future(TestBondFutureConfig {
-        id: "TYH5",
-        notional: 1_000_000.0, // 10 contracts
-        last_trading_date: expiry,
-        delivery_start,
-        settlement_date: last_delivery_date,
-        entry_price,
-        position: Position::Long,
-        deliverable_basket: deliverable_bonds.clone(),
-        ctd_bond_id: "US912828XG33", // First bond as CTD
-        discount_curve_id: "USD-TREASURY",
-    });
-
-    // Calculate invoice price for settlement (T+2 after expiry)
-    let settlement_date = date!(2025 - 03 - 23);
-    let ctd_bond = &bonds[0]; // First bond is the CTD
-
-    let invoice = future
-        .invoice_price(ctd_bond, entry_price, &market, settlement_date)
-        .expect("Failed to calculate invoice price");
-
-    println!("Futures quoted price: {:.2}", entry_price);
-    println!(
-        "CTD bond conversion factor: {:.4}",
-        deliverable_bonds[0].conversion_factor
-    );
-    println!("Settlement date: {}", settlement_date);
-    println!("Invoice price: {}", invoice);
-
-    // Verify invoice price components
-    // Invoice = (Futures_Price × CF) + Accrued
-    let cf = deliverable_bonds[0].conversion_factor;
-
-    // Invoice should be positive and reasonable
-    assert!(invoice.amount() > 0.0, "Invoice price should be positive");
-
-    // For a 125.50 futures price with CF ~0.8, invoice should be ~103 per $100 face
-    // For 10 contracts ($1M notional), total should be ~$1,030,000
-    let expected_per_100 = entry_price * cf;
-    let expected_total = future.terms.contracts * future.terms.multiplier * expected_per_100;
-
-    // Allow for accrued interest variation (within ±5% of expected)
-    let tolerance = expected_total * 0.05;
-    let diff = (invoice.amount() - expected_total).abs();
-
-    println!("Expected invoice (without accrued): ${:.2}", expected_total);
-    println!("Actual invoice (with accrued): ${:.2}", invoice.amount());
-    println!("Difference: ${:.2}", diff);
-
-    assert!(
-        diff < tolerance,
-        "Invoice price should be within 5% of expected: expected=${:.2}, actual=${:.2}, diff=${:.2}",
-        expected_total,
-        invoice.amount(),
-        diff
-    );
-
-    // Verify currency matches
-    assert_eq!(
-        invoice.currency(),
-        Currency::USD,
-        "Invoice should be in USD"
-    );
-}
-
-#[test]
 fn test_bucketed_dv01_registration() {
     // Verify that BucketedDv01 metric is correctly registered for BondFuture
     //
@@ -1302,85 +1211,11 @@ fn test_bucketed_dv01_registration() {
     println!("  - Conversion factor scaling is automatic via pricing formula");
 }
 
-/// Helper: build a UST 10Y future over a fixed two-bond basket with explicit
-/// conversion factors and quoted price, for exercising `determine_ctd`.
-fn ctd_test_future(entry_price: f64) -> BondFuture {
-    create_ust_10y_future(TestBondFutureConfig {
-        id: "TY-CTD",
-        notional: 1_000_000.0,
-        last_trading_date: date!(2025 - 03 - 20),
-        delivery_start: date!(2025 - 03 - 21),
-        settlement_date: date!(2025 - 03 - 31),
-        entry_price,
-        position: Position::Long,
-        deliverable_basket: vec![
-            DeliverableBond {
-                bond_id: InstrumentId::new("BOND-A"),
-                conversion_factor: 0.90,
-            },
-            DeliverableBond {
-                bond_id: InstrumentId::new("BOND-B"),
-                conversion_factor: 0.95,
-            },
-        ],
-        ctd_bond_id: "BOND-A",
-        discount_curve_id: "USD-TREASURY",
-    })
-}
-
-/// `determine_ctd` selects the bond with the lowest gross basis
-/// (clean − quoted×CF). This is core CTD logic and was previously untested
-/// (only the implied-repo path was exercised).
-#[test]
-fn test_determine_ctd_picks_lowest_gross_basis() {
-    let future = ctd_test_future(110.0);
-
-    // Same clean price for both; the higher conversion factor (BOND-B, 0.95)
-    // yields the lower gross basis: 100 − 110×0.95 = −4.5 vs 100 − 110×0.90 = 1.0.
-    let prices = vec![
-        (InstrumentId::new("BOND-A"), 100.0),
-        (InstrumentId::new("BOND-B"), 100.0),
-    ];
-    let (ctd_id, gross_basis) = future
-        .determine_ctd(110.0, &prices)
-        .expect("CTD determination should succeed");
-
-    assert_eq!(
-        ctd_id.as_str(),
-        "BOND-B",
-        "CTD should be the lowest-gross-basis bond"
-    );
-    assert!(
-        (gross_basis - (100.0 - 110.0 * 0.95)).abs() < 1e-9,
-        "CTD gross basis should be 100 − 110×0.95 = −4.5, got {gross_basis}"
-    );
-}
-
-/// With no usable prices (empty, or all non-positive), `determine_ctd` must
-/// return a validation error rather than a bogus CTD.
-#[test]
-fn test_determine_ctd_errors_without_valid_prices() {
-    let future = ctd_test_future(110.0);
-
-    assert!(
-        future.determine_ctd(110.0, &[]).is_err(),
-        "empty price set should yield an error"
-    );
-    let non_positive = vec![
-        (InstrumentId::new("BOND-A"), 0.0),
-        (InstrumentId::new("BOND-B"), -1.0),
-    ];
-    assert!(
-        future.determine_ctd(110.0, &non_positive).is_err(),
-        "all non-positive prices should yield an error"
-    );
-}
-
 /// The registered `FuturesPrice` and `ConversionFactor` metrics dispatch through
 /// the registry but were previously only exercised via the direct pricer
 /// methods. These confirm the registry path returns exactly the direct-call
 /// values: `ConversionFactor` == the CTD's basket CF, and `FuturesPrice` ==
-/// `BondFuturePricer::fair_price` for the embedded CTD.
+/// `BondFuture::fair_price` for the embedded CTD.
 #[test]
 fn test_futures_price_and_conversion_factor_metrics_match_pricer() {
     use finstack_quant_valuations::instruments::Instrument;
@@ -1411,14 +1246,15 @@ fn test_futures_price_and_conversion_factor_metrics_match_pricer() {
             ctd_bond_id: "US912828XG33",
             discount_curve_id: "USD-TREASURY",
         },
-        ctd_bond.clone(),
+        ctd_bond,
     );
 
-    // Direct model price (same CTD, CF, market, valuation + delivery date the
-    // metric calculator uses) — computed before `future`/`market` are moved.
-    let direct =
-        BondFuturePricer::fair_price(&ctd_bond, ctd_cf, &market, as_of, future.delivery_start)
-            .expect("direct model price");
+    // Direct model price (same embedded CTD, market, valuation + delivery
+    // date the metric calculator uses) — computed before `future`/`market`
+    // are moved.
+    let direct = future
+        .fair_price(&market, as_of)
+        .expect("direct model price");
 
     let pv = future.value(&market, as_of).expect("future should value");
     let mut ctx = MetricContext::new(

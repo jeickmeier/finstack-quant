@@ -13,7 +13,6 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::explain::ExplanationTrace;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use std::collections::BTreeMap;
@@ -609,8 +608,6 @@ pub struct WaterfallDistribution {
     pub principal_used_for_interest: Money,
     /// Whether any diversions occurred
     pub had_diversions: bool,
-    /// Diversion reason if applicable
-    pub diversion_reason: Option<String>,
     /// Detailed diverted payment records.
     #[serde(default)]
     pub diverted_amounts: Vec<DiversionRecord>,
@@ -619,10 +616,6 @@ pub struct WaterfallDistribution {
     /// Tracked separately from principal collections for trustee report reconciliation.
     #[serde(default = "WaterfallDistribution::zero_usd")]
     pub recovery_proceeds: Money,
-
-    /// Optional explanation trace (enabled via ExplainOpts)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub explanation: Option<ExplanationTrace>,
 }
 
 impl WaterfallDistribution {

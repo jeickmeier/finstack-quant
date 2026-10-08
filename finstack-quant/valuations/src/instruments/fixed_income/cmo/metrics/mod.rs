@@ -43,12 +43,8 @@ pub(crate) fn register_cmo_metrics(
         instrument: InstrumentType::AgencyCmo,
         metrics: [
             (ZSpread, ZSpreadCalculator),
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::AgencyCmo,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::AgencyCmo,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
     Ok(())

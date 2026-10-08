@@ -413,7 +413,7 @@ enum Cs01Curves {
 ///
 /// Returns [`Cs01Curves::NoCreditCurve`] when no credit curve is declared so the
 /// caller can decide whether that is a hard error or a graceful `0.0`.
-fn resolve_cs01_curves<I: Instrument>(instrument: &I) -> finstack_quant_core::Result<Cs01Curves> {
+fn resolve_cs01_curves(instrument: &dyn Instrument) -> finstack_quant_core::Result<Cs01Curves> {
     let curves = instrument.market_dependencies()?.curves;
     let Some(hazard_id) = curves.credit_curves.first().cloned() else {
         return Ok(Cs01Curves::NoCreditCurve);
@@ -424,8 +424,8 @@ fn resolve_cs01_curves<I: Instrument>(instrument: &I) -> finstack_quant_core::Re
 
 /// Build the validation error raised when a CS01 calculator that requires a
 /// credit curve is applied to an instrument that declares none.
-fn missing_credit_curve_error<I: Instrument>(
-    instrument: &I,
+fn missing_credit_curve_error(
+    instrument: &dyn Instrument,
     metric_name: &str,
 ) -> finstack_quant_core::Error {
     finstack_quant_core::Error::Validation(format!(
@@ -435,8 +435,8 @@ fn missing_credit_curve_error<I: Instrument>(
     ))
 }
 
-pub(crate) fn resolve_optional_cs01_curves<I: Instrument>(
-    instrument: &I,
+pub(crate) fn resolve_optional_cs01_curves(
+    instrument: &dyn Instrument,
     empty_credit_curve_zero: bool,
     metric_name: &str,
 ) -> finstack_quant_core::Result<Option<(CurveId, Option<CurveId>)>> {
@@ -447,39 +447,27 @@ pub(crate) fn resolve_optional_cs01_curves<I: Instrument>(
     }
 }
 
-/// Generic BucketedCs01 calculator that works for any instrument implementing
-/// the required traits.
-pub(crate) struct GenericBucketedCs01<I> {
-    _phantom: PhantomData<I>,
-}
+/// Generic BucketedCs01 calculator for any instrument that declares a credit
+/// curve dependency.
+#[derive(Default)]
+pub(crate) struct GenericBucketedCs01;
 
 /// Generic parallel CS01 calculator that returns a scalar (not bucketed).
 ///
 /// Computes CS01 by applying a parallel bump to the entire hazard curve.
-pub(crate) struct GenericParallelCs01<I> {
-    _phantom: PhantomData<I>,
-}
+#[derive(Default)]
+pub(crate) struct GenericParallelCs01;
 
-impl<I> Default for GenericParallelCs01<I> {
-    fn default() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> MetricCalculator for GenericParallelCs01<I>
-where
-    I: Instrument + 'static,
-{
+impl MetricCalculator for GenericParallelCs01 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let instrument: &I = context.instrument_as()?;
-        let (hazard_id, discount_id) = resolve_optional_cs01_curves(instrument, false, "CS01")?
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "CS01 requires a credit curve identifier".into(),
-                )
-            })?;
+        let (hazard_id, discount_id) = resolve_optional_cs01_curves(
+            context.instrument.as_ref(),
+            false,
+            "CS01",
+        )?
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation("CS01 requires a credit curve identifier".into())
+        })?;
 
         let bump_bp = sens_config::from_context_or_default(
             context.get_config(),
@@ -507,26 +495,16 @@ where
     }
 }
 
-impl<I> Default for GenericBucketedCs01<I> {
-    fn default() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> MetricCalculator for GenericBucketedCs01<I>
-where
-    I: Instrument + 'static,
-{
+impl MetricCalculator for GenericBucketedCs01 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let instrument: &I = context.instrument_as()?;
-        let (hazard_id, discount_id) = resolve_optional_cs01_curves(instrument, false, "CS01")?
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "CS01 requires a credit curve identifier".into(),
-                )
-            })?;
+        let (hazard_id, discount_id) = resolve_optional_cs01_curves(
+            context.instrument.as_ref(),
+            false,
+            "CS01",
+        )?
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation("CS01 requires a credit curve identifier".into())
+        })?;
 
         let defaults = sens_config::from_context_or_default(
             context.get_config(),

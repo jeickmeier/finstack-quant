@@ -98,7 +98,7 @@ VarResult = _valuations.instruments.VarResult
 Waterfall = _valuations.instruments.Waterfall
 bond_from_cashflows_json = _valuations.instruments.bond_from_cashflows_json
 calculate_pool_stats = _valuations.instruments.calculate_pool_stats
-calculate_var_with_pricing = _valuations.instruments.calculate_var_with_pricing
+calculate_var = _valuations.instruments.calculate_var
 instrument_cashflows = _valuations.instruments.instrument_cashflows
 instrument_envelope_from_spec = _valuations.instruments.instrument_envelope_from_spec
 list_models = _valuations.instruments.list_models
@@ -201,7 +201,7 @@ __all__: list[str] = [
     "Waterfall",
     "bond_from_cashflows_json",
     "calculate_pool_stats",
-    "calculate_var_with_pricing",
+    "calculate_var",
     "instrument_cashflows",
     "instrument_envelope_from_spec",
     "list_models",

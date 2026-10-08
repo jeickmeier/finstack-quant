@@ -6,9 +6,7 @@
 
 use crate::instruments::commodity::commodity_option::CommodityOption;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
+use crate::pricer::{expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError};
 use crate::results::ValuationResult;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -58,9 +56,7 @@ impl Pricer for CommodityOptionMcPricer {
             }
         }
 
-        let (pv, diagnostics) = option
-            .price_mc(&mc_params, market, as_of)
-            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
+        let (pv, diagnostics) = option.price_mc(&mc_params, market, as_of)?;
 
         let result = ValuationResult::stamped(option.id(), as_of, pv);
         Ok(match diagnostics {

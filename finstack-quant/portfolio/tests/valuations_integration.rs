@@ -6,7 +6,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::PortfolioBuilder;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::Bond;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::InstrumentJson;
@@ -44,7 +44,7 @@ fn bond_position_from_json_spec_matches_typed_pricing() {
     })
     .expect("position from spec");
 
-    let portfolio = PortfolioBuilder::new("PF")
+    let portfolio = Portfolio::builder("PF")
         .base_currency(finstack_quant_core::currency::Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E1"))
@@ -95,7 +95,7 @@ fn portfolio_valuation_stamps_caller_config() {
         PositionUnit::Units,
     )
     .expect("position");
-    let portfolio = PortfolioBuilder::new("PF_CONFIG")
+    let portfolio = Portfolio::builder("PF_CONFIG")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E_CONFIG"))

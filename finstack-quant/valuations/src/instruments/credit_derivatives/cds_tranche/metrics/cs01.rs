@@ -13,7 +13,7 @@ impl MetricCalculator for CdsTrancheCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let tranche = context.instrument_as::<CdsTranche>()?.clone();
         let index = context.curves.get_credit_index(&tranche.credit_index_id)?;
-        let hazards = active_hazards(&index, true);
+        let hazards = active_hazards(&index);
         let bump = sens_config::from_context_or_default(
             context.get_config(),
             context.get_metric_pricing_overrides(),
@@ -66,7 +66,7 @@ impl MetricCalculator for CdsTrancheBucketedCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let tranche = context.instrument_as::<CdsTranche>()?.clone();
         let index = context.curves.get_credit_index(&tranche.credit_index_id)?;
-        let hazards = active_hazards(&index, true);
+        let hazards = active_hazards(&index);
         let bump = sens_config::from_context_or_default(
             context.get_config(),
             context.get_metric_pricing_overrides(),

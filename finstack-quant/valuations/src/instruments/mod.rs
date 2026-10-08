@@ -287,7 +287,4 @@ pub use pricing_overrides::{
 
 pub mod json_loader;
 
-pub use json_loader::{
-    cashflow_provider_from_value, registry_tags, InstrumentEnvelope, InstrumentJson,
-    INSTRUMENT_CONTRACT,
-};
+pub use json_loader::{registry_tags, InstrumentEnvelope, InstrumentJson, INSTRUMENT_CONTRACT};

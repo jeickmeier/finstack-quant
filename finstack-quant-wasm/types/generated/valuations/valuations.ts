@@ -3830,62 +3830,6 @@ export type ModelKey =
   | "pde_adi_2d"
   | "bloomberg_cdso";
 /**
- * Pricing mode selection.
- *
- * Choose based on horizon × dimensionality: `Tree` for SHORT-horizon
- * non-recombining stochastic deals (deterministic, low variance),
- * `MonteCarlo` for long-horizon or high-dimensional pools, `Hybrid` to
- * front-load tree precision and tail with MC.
- *
- * # Tree mode is bounded by construction — read this before selecting it
- *
- * Path-preserving tree pricing keeps `3^n` terminal nodes for `n`
- * periods, checked against `max_tree_paths` (default 100,000). `3^11 =
- * 177,147`, so **Tree hard-errors for any deal with more than ten periods
- * remaining** — which is essentially every real deal, since
- * `build_scenario_tree_config` sets `num_periods` to months-to-maturity.
- *
- * The default is [`StructuredCreditPricingMode::MonteCarlo`] — the mode that can price the
- * deals this module is built for at realistic horizons (the public
- * `price_stochastic` entry point also selects Monte Carlo). Tree remains
- * available and correct for genuinely short horizons; select it explicitly.
- *
- * Test coverage:
- * - **Tree**: `tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`, at horizons within the node bound.
- * - **MonteCarlo**: the same suites plus the convergence tests.
- * - **Hybrid**: structured-credit pricer integration tests.
- */
-export type StructuredCreditPricingMode =
-  | "tree"
-  | {
-      monte_carlo: {
-        /**
-         * Pair each estimator's path with its sign-flipped mirror.
-         */
-        antithetic: boolean;
-        /**
-         * Number of independent estimators; must be at least two to estimate
-         * sampling uncertainty. With `antithetic` each estimator averages a
-         * `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
-         * Sample standard error and the Student-t interval use this estimator
-         * count, with `num_paths - 1` degrees of freedom.
-         */
-        num_paths: number;
-      };
-    }
-  | {
-      hybrid: {
-        /**
-         * Monte Carlo continuation paths per tree prefix
-         */
-        num_paths: number;
-        /**
-         * Tree periods before switching to MC
-         */
-        tree_periods: number;
-      };
-    };
-/**
  * Domain-specific trace entry types.
  *
  * Each variant captures relevant details for different types of computations:
@@ -11232,9 +11176,9 @@ export interface CmsOption {
  * - `calendar_id`: Holiday calendar identifier for business day logic (e.g., "nyse", "target")
  *
  * `start_date` is always the accrual start (spot) date. Callers holding a
- * trade date compute the spot date before building (see
- * [`Deposit::from_conventions`]). When `calendar_id` is set, `start_date` and
- * `maturity` are adjusted by the business day convention.
+ * trade date compute the spot date before building. When `calendar_id` is
+ * set, `start_date` and `maturity` are adjusted by the business day
+ * convention.
  */
 export interface Deposit {
   /**
@@ -16316,11 +16260,9 @@ export interface RangeAccrualTerms {
  * - **Conversion factors**: Supplied per deliverable, preferably from the exchange.
  * - **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,
  *   then the sole basket member. A larger basket requires an explicit or embedded CTD.
- * - **CTD analysis**: The `determine_ctd*` helpers return ranked candidates but
- *   do not mutate the selected CTD. [`crate::instruments::Instrument::value`]
- *   marks the caller-supplied CTD only; refresh it daily with
- *   [`Self::determine_ctd_by_implied_repo`] when the basket can switch.
- * - **Invoice price**: `(Futures Price × Conversion Factor) + Accrued Interest`.
+ * - **CTD analysis**: [`crate::instruments::Instrument::value`] marks the
+ *   caller-supplied CTD only; it does not rank the basket. Refresh the CTD
+ *   selection daily when the basket can switch.
  */
 export interface BondFuture {
   /**
@@ -16346,11 +16288,6 @@ export interface BondFuture {
    * followed by `ctd_bond.id`, then the sole basket member. A larger basket
    * with neither form of selection fails validation. The resolved identifier
    * must be in `deliverable_basket`; an embedded bond must have the same ID.
-   *
-   * [`Self::determine_ctd`] ranks clean prices by gross basis;
-   * [`Self::determine_ctd_by_implied_repo`] ranks by highest implied
-   * repo after coupon income and time to delivery. These helpers return a
-   * candidate and do not update this field.
    */
   ctd_bond_id?: Id | null;
   /**
@@ -16416,8 +16353,8 @@ export interface BondFuture {
  * $100,000 UST 10Y contract).
  *
  * Delivery timing is carried by the future's explicit `delivery_start` /
- * `terms.settlement_date` and the caller-supplied invoice settlement date, so
- * the spec holds no settlement lag or holiday calendar.
+ * `terms.settlement_date`, so the spec holds no settlement lag or holiday
+ * calendar.
  */
 export interface BondFutureSpecs {
   /**
@@ -16450,7 +16387,7 @@ export interface DeliverableBond {
    */
   bond_id: Id;
   /**
-   * Positive conversion factor consumed by invoice, basis, and pricing calculations.
+   * Positive conversion factor consumed by the model-price calculation.
    */
   conversion_factor: PositiveF64Wire;
 }
@@ -18299,8 +18236,8 @@ export interface StochasticPricingResult {
    */
   npv: Money;
   /**
-   * Number of simulated scenario paths (`2 × pricing_mode.num_paths` for
-   * antithetic Monte Carlo, prefixes × suffixes for Hybrid).
+   * Number of simulated scenario paths (`2 × pricing_mode.num_paths` with
+   * antithetic pairing, `pricing_mode.num_paths` without).
    */
   num_paths: number;
   /**
@@ -18338,6 +18275,35 @@ export interface StochasticPricingResult {
    */
   unfunded_draw_path_fraction?: number;
   [k: string]: unknown;
+}
+/**
+ * Stochastic pricing mode.
+ *
+ * Monte Carlo is the only engine: each scenario path draws its monthly
+ * systematic factors from a seeded Philox substream and runs the full deal
+ * waterfall. The mode is echoed on
+ * [`StochasticPricingResult::pricing_mode`](super::StochasticPricingResult)
+ * so a result records the estimator count it was produced with.
+ *
+ * Test coverage:
+ * `tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`
+ * plus the convergence tests.
+ */
+export interface StructuredCreditPricingMode {
+  monte_carlo: {
+    /**
+     * Pair each estimator's path with its sign-flipped mirror.
+     */
+    antithetic: boolean;
+    /**
+     * Number of independent estimators; must be at least two to estimate
+     * sampling uncertainty. With `antithetic` each estimator averages a
+     * `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
+     * Sample standard error and the Student-t interval use this estimator
+     * count, with `num_paths - 1` degrees of freedom.
+     */
+    num_paths: number;
+  };
 }
 /**
  * Tranche-level pricing result.

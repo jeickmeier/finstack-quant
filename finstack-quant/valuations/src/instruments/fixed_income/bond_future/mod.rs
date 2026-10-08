@@ -18,6 +18,4 @@ pub(crate) mod pricer;
 pub(crate) mod types;
 
 pub use pricer::BondFuturePricer;
-pub use types::{
-    BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond, DeliverableQuote,
-};
+pub use types::{BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond};

@@ -6,7 +6,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::PortfolioBuilder;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use std::sync::Arc;
 use time::Duration;
@@ -31,7 +31,7 @@ fn dataframe_exports_have_expected_columns() {
 
     let p = Position::new("P", "E", "D", Arc::new(dep), 1.0, PositionUnit::Units).unwrap();
 
-    let portfolio = PortfolioBuilder::new("P")
+    let portfolio = Portfolio::builder("P")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E"))

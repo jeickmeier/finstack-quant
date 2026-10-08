@@ -15,6 +15,14 @@
 - Rust `ATTRIBUTION_SCHEMA`, `schema::ATTRIBUTION_SCHEMA_BASE`, `AttributionSchema::CURRENT` (use `AttributionSchema::Attribution`) and `Display for AttributionFactor` (it printed the `Debug` name; `as_str` is the wire name).
 - The attribution crate's direct `rayon` dependency; its parallel maps go through `finstack_quant_core::parallel`.
 
+## [0.10.0] - 2026-10-06
+
+### Dependencies
+
+#### Removed
+
+- Unused `indexmap` dependency from `finstack-quant-models`.
+
 ### Models API simplification
 
 #### Added

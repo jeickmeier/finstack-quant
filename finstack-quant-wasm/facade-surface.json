@@ -4718,16 +4718,11 @@
   "valuations": {
     "kind": "namespace",
     "keys": [
-      "callableRangeAccrualAccrued",
-      "cmsSpreadOptionIntrinsic",
       "composite",
       "fx",
       "instruments",
-      "inverseFloaterCouponProfile",
       "market",
       "schema",
-      "snowballCouponProfile",
-      "tarnCouponProfile",
       "valuationResultAllCovenantsPassed",
       "valuationResultFailedCovenants",
       "valuationResultGetMetric",
@@ -5101,7 +5096,7 @@
       "assetPoolWithReserve",
       "bondFromCashflowsJson",
       "calculatePoolStats",
-      "calculateVarWithPricing",
+      "calculateVar",
       "cdsIndexParamsCdxNaHy",
       "cdsIndexParamsCdxNaIg",
       "cdsIndexParamsItraxxEurope",
@@ -5341,7 +5336,7 @@
   "valuations.instruments.instrumentCashflowsWithMarket": {
     "kind": "function"
   },
-  "valuations.instruments.calculateVarWithPricing": {
+  "valuations.instruments.calculateVar": {
     "kind": "function"
   },
   "valuations.instruments.listModels": {
@@ -6409,21 +6404,6 @@
     "kind": "function"
   },
   "valuations.valuationResultMetricSeries": {
-    "kind": "function"
-  },
-  "valuations.tarnCouponProfile": {
-    "kind": "function"
-  },
-  "valuations.snowballCouponProfile": {
-    "kind": "function"
-  },
-  "valuations.inverseFloaterCouponProfile": {
-    "kind": "function"
-  },
-  "valuations.cmsSpreadOptionIntrinsic": {
-    "kind": "function"
-  },
-  "valuations.callableRangeAccrualAccrued": {
     "kind": "function"
   },
   "valuations.valuationResultPriceDecimal": {

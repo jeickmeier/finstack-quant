@@ -72,15 +72,11 @@ pub(crate) fn register_fx_option_metrics(
             (Delta, crate::metrics::OptionGreekCalculator::<crate::instruments::FxOption>::delta()),
             (Gamma, crate::metrics::OptionGreekCalculator::<crate::instruments::FxOption>::gamma()),
             (Vega, crate::metrics::OptionGreekCalculator::<crate::instruments::FxOption>::vega()),
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::FxOption,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
             // Override universal theta (carry) with model theta for FX options.
             (Theta, crate::metrics::OptionGreekCalculator::<crate::instruments::FxOption>::theta()),
             (ImpliedVol, implied_vol::ImpliedVolCalculator),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::FxOption,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
             (Vanna, crate::metrics::OptionGreekCalculator::<crate::instruments::FxOption>::vanna()),
             (Volga, crate::metrics::OptionGreekCalculator::<crate::instruments::FxOption>::volga()),
         ]

@@ -18,7 +18,7 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    price_convertible_bond, ConvertibleBond, ConvertibleTreeType,
+    price_convertible_bond, ConvertibleBond,
 };
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
@@ -81,14 +81,9 @@ fn convertible_hazard_equals_equivalent_risky_curve() {
     for (spot, recovery, pv_bits, cs01_bits) in RISKY_DISCOUNT_PINS {
         let bond = credit_bond(recovery);
         let market = hazard_market(spot);
-        let pv = price_convertible_bond(
-            &bond,
-            &market,
-            ConvertibleTreeType::Binomial,
-            dates::base_date(),
-        )
-        .unwrap()
-        .amount();
+        let pv = price_convertible_bond(&bond, &market, dates::base_date())
+            .unwrap()
+            .amount();
         // The per-step risky forwards agree to float rounding (a product of
         // two exponentials vs one), so the lattice value agrees to ~1e-14
         // relative; 1e-10 relative on a ~1e3 PV leaves ample room without
@@ -126,25 +121,15 @@ fn convertible_hazard_equals_equivalent_risky_curve() {
 fn full_recovery_convertible_equals_risk_free() {
     for spot in [150.0, 50.0] {
         let market = hazard_market(spot);
-        let with_credit = price_convertible_bond(
-            &credit_bond(1.0),
-            &market,
-            ConvertibleTreeType::Binomial,
-            dates::base_date(),
-        )
-        .unwrap()
-        .amount();
+        let with_credit = price_convertible_bond(&credit_bond(1.0), &market, dates::base_date())
+            .unwrap()
+            .amount();
         let mut risk_free = credit_bond(0.0);
         risk_free.credit_curve_id = None;
         risk_free.recovery_rate = None;
-        let without_credit = price_convertible_bond(
-            &risk_free,
-            &market,
-            ConvertibleTreeType::Binomial,
-            dates::base_date(),
-        )
-        .unwrap()
-        .amount();
+        let without_credit = price_convertible_bond(&risk_free, &market, dates::base_date())
+            .unwrap()
+            .amount();
         // R = 1 blends to exactly the risk-free forward at every step.
         assert!(
             (with_credit - without_credit).abs() <= 1e-12 * without_credit.abs(),
@@ -222,14 +207,9 @@ fn deep_otm_zero_recovery_convertible_matches_hazard_bond() {
     // errors: 2.25e-3 (250 steps), 5.36e-4 (1000 steps) and 2.3e-12 (2000
     // steps, when every coupon date lands on a node).
     for (steps, tolerance) in [(250_usize, 5e-3), (1000, 1e-3), (2000, 1e-9)] {
-        let pv = price_convertible_bond(
-            &deep_otm_convertible(steps),
-            &market,
-            ConvertibleTreeType::Binomial,
-            as_of,
-        )
-        .unwrap()
-        .amount();
+        let pv = price_convertible_bond(&deep_otm_convertible(steps), &market, as_of)
+            .unwrap()
+            .amount();
         assert!(
             (pv - QUANTLIB_HAZARD_BOND_NPV).abs() <= tolerance,
             "steps={steps}: {pv} vs QuantLib {QUANTLIB_HAZARD_BOND_NPV}"

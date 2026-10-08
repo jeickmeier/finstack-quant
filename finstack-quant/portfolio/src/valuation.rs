@@ -496,7 +496,7 @@ pub fn revalue_affected(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::PortfolioBuilder;
+
     use crate::position::{Position, PositionUnit};
     use crate::test_utils::build_test_market;
     use crate::types::{Entity, DUMMY_ENTITY_ID};
@@ -588,7 +588,7 @@ mod tests {
             PositionUnit::Units,
         )
         .expect("valid position");
-        let portfolio = PortfolioBuilder::new("TEST")
+        let portfolio = Portfolio::builder("TEST")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .position(position)
@@ -657,7 +657,7 @@ mod tests {
         )
         .expect("test should succeed");
 
-        let portfolio = PortfolioBuilder::new("TEST")
+        let portfolio = Portfolio::builder("TEST")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .position(position)
@@ -725,7 +725,7 @@ mod tests {
         )
         .expect("test should succeed");
 
-        let portfolio = PortfolioBuilder::new("TEST")
+        let portfolio = Portfolio::builder("TEST")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))

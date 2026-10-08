@@ -4,7 +4,6 @@ use crate::bindings::pandas_utils::ColumnSchema;
 use crate::bindings::pandas_utils::{
     labeled_values_to_series, serde_rows_to_dataframe_with_schema,
 };
-use crate::errors::display_to_py;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use serde::Serialize;
@@ -34,6 +33,12 @@ struct PnlRow<'a> {
 pub struct PyScenarioPnl {
     pub(crate) inner: finstack_quant_portfolio::scenarios::ScenarioPnl,
 }
+
+crate::bindings::macros::wire_methods!(
+    PyScenarioPnl,
+    finstack_quant_portfolio::scenarios::ScenarioPnl,
+    "ScenarioPnl"
+);
 
 impl PyScenarioPnl {
     fn rows(&self) -> Vec<PnlRow<'_>> {
@@ -100,26 +105,6 @@ impl PyScenarioPnl {
         labeled_values_to_series(py, &labels, values, "pnl")
     }
 
-    /// Serialize to a compact JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Deserialize from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::scenarios::ScenarioPnl =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -161,6 +146,12 @@ struct BatchPnlRow<'a> {
 pub struct PyScenarioPnlBatchItem {
     pub(crate) inner: finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem,
 }
+
+crate::bindings::macros::wire_methods!(
+    PyScenarioPnlBatchItem,
+    finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem,
+    "ScenarioPnlBatchItem"
+);
 
 impl PyScenarioPnlBatchItem {
     fn rows(&self) -> Vec<BatchPnlRow<'_>> {
@@ -208,31 +199,11 @@ impl PyScenarioPnlBatchItem {
         serde_rows_to_dataframe_with_schema(py, &self.rows(), BATCH_PNL_ROW_COLUMNS)
     }
 
-    /// Serialize to a compact JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Deserialize from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "ScenarioPnlBatchItem(scenario_id={:?}, positions={})",
             self.inner.scenario_id,
             self.inner.pnl.by_position.len(),
         )
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }

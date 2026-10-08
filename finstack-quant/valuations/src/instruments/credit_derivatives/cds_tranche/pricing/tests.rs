@@ -1,6 +1,6 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
-use super::config::{DiscountAt, DEFAULT_INTEGRATION_TOLERANCE};
+use super::config::{DiscountAt, CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORRELATION};
 use super::*;
 use crate::cashflow::primitives::CFKind;
 use crate::instruments::credit_derivatives::cds_tranche::parameters::CdsTrancheParams;
@@ -75,85 +75,6 @@ fn sample_market_context() -> MarketContext {
         .expect("Credit index dependencies should be registered")
 }
 
-fn sample_market_context_with_issuers(n: usize) -> MarketContext {
-    let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-
-    let discount_curve = DiscountCurve::builder("USD-OIS")
-        .base_date(base_date)
-        .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.84), (10.0, 0.68)])
-        .build()
-        .expect("Curve builder should succeed with valid test data");
-
-    let index_curve = HazardCurve::builder("CDX.NA.IG.42")
-        .base_date(base_date)
-        .recovery_rate(0.40)
-        .knots(vec![
-            (1.0, 0.012),
-            (3.0, 0.017),
-            (5.0, 0.022),
-            (10.0, 0.028),
-        ])
-        .par_spreads(vec![(1.0, 65.0), (3.0, 85.0), (5.0, 105.0), (10.0, 145.0)])
-        .build()
-        .expect("Curve builder should succeed with valid test data");
-
-    // Gentle, arbitrage-free base-correlation slope (see
-    // `sample_market_context` for the rationale).
-    let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
-        .knots(vec![
-            (3.0, 0.25),
-            (7.0, 0.30),
-            (10.0, 0.34),
-            (15.0, 0.40),
-            (30.0, 0.50),
-        ])
-        .build()
-        .expect("Curve builder should succeed with valid test data");
-
-    let mut issuer_curves = finstack_quant_core::HashMap::default();
-    for i in 0..n {
-        let id = format!("ISSUER-{:03}", i + 1);
-        let bump = (i as f64) * 0.001;
-        let hz = HazardCurve::builder(id.as_str())
-            .base_date(base_date)
-            .recovery_rate(0.40)
-            .knots(vec![
-                (1.0, (0.012 + bump).min(0.2)),
-                (3.0, (0.017 + bump).min(0.2)),
-                (5.0, (0.022 + bump).min(0.2)),
-                (10.0, (0.028 + bump).min(0.2)),
-            ])
-            .build()
-            .expect("HazardCurve builder should succeed with valid test data");
-        issuer_curves.insert(id, Arc::new(hz));
-    }
-
-    let index = CreditIndexData::builder()
-        .num_constituents(n as u16)
-        .recovery_rate(0.40)
-        .index_credit_curve(Arc::new(index_curve))
-        .base_correlation_curve(Arc::new(base_corr_curve))
-        .issuer_curves(issuer_curves)
-        .build()
-        .expect("Curve builder should succeed with valid test data");
-
-    let mut market = MarketContext::new()
-        .insert(discount_curve)
-        .insert(Arc::clone(&index.index_credit_curve))
-        .insert(Arc::clone(&index.base_correlation_curve));
-    for curve in index
-        .issuer_credit_curves
-        .as_ref()
-        .expect("Issuer curves should exist")
-        .values()
-    {
-        market.insert_mut(Arc::clone(curve));
-    }
-    market
-        .insert_credit_index("CDX.NA.IG.42", index)
-        .expect("Credit index dependencies should be registered")
-}
-
 fn sample_tranche() -> CdsTranche {
     let _issue_date = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
@@ -186,11 +107,17 @@ fn sample_tranche() -> CdsTranche {
 #[test]
 fn test_model_creation() {
     let model = CdsTranchePricer::new();
-    assert_eq!(
-        model.config.integration_tolerance,
-        DEFAULT_INTEGRATION_TOLERANCE
-    );
-    assert!(model.config.use_issuer_curves);
+    assert_eq!(*model.get_copula_spec(), CopulaSpec::Gaussian);
+}
+
+#[test]
+fn with_copula_rejects_invalid_student_t_degrees_of_freedom() {
+    let error = CdsTranchePricer::with_copula(CopulaSpec::StudentT {
+        degrees_of_freedom: 2.0,
+    })
+    .err()
+    .expect("invalid Student-t df must fail");
+    assert!(error.to_string().contains("degrees of freedom"));
 }
 
 #[test]
@@ -398,7 +325,7 @@ fn test_equity_helper_matches_explicit_params_pv() {
 }
 
 #[test]
-fn test_hetero_spa_matches_homogeneous_when_issuers_equal() {
+fn test_hetero_matches_homogeneous_when_issuers_equal() {
     let ctx_base = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let mut tranche = sample_tranche();
@@ -422,160 +349,31 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_equal() {
         .build()
         .expect("Curve builder should succeed with valid test data");
     let ctx = ctx_base
+        .clone()
         .insert_credit_index("CDX.NA.IG.42", hetero_index)
         .expect("Credit index dependencies should be registered");
+    // Same ten-name pool without issuer curves: the homogeneous path.
+    let homo_index = CreditIndexData::builder()
+        .num_constituents(10)
+        .recovery_rate(index_data.recovery_rate)
+        .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
+        .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
+        .build()
+        .expect("Curve builder should succeed with valid test data");
+    let ctx_homo = ctx_base
+        .insert_credit_index("CDX.NA.IG.42", homo_index)
+        .expect("Credit index dependencies should be registered");
 
-    let mut homo = CdsTranchePricer::new();
-    homo.config.use_issuer_curves = false;
-    let mut hetero = CdsTranchePricer::new();
-    hetero.config.use_issuer_curves = true;
-    hetero.config.hetero_method = HeteroMethod::NormalApprox;
-
-    let pv_homo = homo
-        .price_tranche(&tranche, &ctx, as_of)
+    let pricer = CdsTranchePricer::new();
+    let pv_homo = pricer
+        .price_tranche(&tranche, &ctx_homo, as_of)
         .expect("Tranche pricing should succeed in test")
         .amount();
-    let pv_hetero = hetero
+    let pv_hetero = pricer
         .price_tranche(&tranche, &ctx, as_of)
         .expect("Tranche pricing should succeed in test")
         .amount();
     assert!((pv_homo - pv_hetero).abs() < 1e-2 * pv_homo.abs().max(1.0));
-}
-
-#[test]
-fn test_hetero_spa_vs_exact_convolution_small_pool() {
-    let ctx = sample_market_context_with_issuers(8);
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let tranche_params = CdsTrancheParams::new(
-        "CDX.NA.IG.42",
-        42,
-        3.0,
-        7.0,
-        Money::from((10_000_000_i64, Currency::USD)),
-        as_of.add_months(60).expect("valid fixture date"),
-        0.0,
-    );
-    let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-    let tranche = CdsTranche::new(
-        "CDX_IG42_3_7_5Y",
-        &tranche_params,
-        &schedule_params,
-        finstack_quant_core::types::CurveId::from("USD-OIS"),
-        finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        PayReceive::Receive,
-    )
-    .expect("Valid tranche parameters");
-
-    let mut spa = CdsTranchePricer::new();
-    spa.config.use_issuer_curves = true;
-    spa.config.hetero_method = HeteroMethod::NormalApprox;
-    let mut exact = CdsTranchePricer::new();
-    exact.config.use_issuer_curves = true;
-    exact.config.hetero_method = HeteroMethod::ExactConvolution;
-    exact.config.grid_step = 0.002;
-
-    let pv_spa = spa
-        .price_tranche(&tranche, &ctx, as_of)
-        .expect("Tranche pricing should succeed in test")
-        .amount();
-    let pv_exact = exact
-        .price_tranche(&tranche, &ctx, as_of)
-        .expect("Tranche pricing should succeed in test")
-        .amount();
-    assert!((pv_spa - pv_exact).abs() < 0.02 * pv_exact.abs().max(1.0));
-}
-
-/// Helper for the audit-M2 regression tests below: price one tranche under a
-/// given pricer configuration.
-fn price_hetero_tranche(
-    ctx: &MarketContext,
-    as_of: Date,
-    attach: f64,
-    detach: f64,
-    configure: impl FnOnce(&mut CdsTranchePricer),
-) -> f64 {
-    let tranche_params = CdsTrancheParams::new(
-        "CDX.NA.IG.42",
-        42,
-        attach,
-        detach,
-        Money::from((10000000_i64, Currency::USD)),
-        as_of.add_months(60).expect("valid fixture date"),
-        0.0,
-    );
-    let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-    let tranche = CdsTranche::new(
-        "AUDIT_M2_TRANCHE",
-        &tranche_params,
-        &schedule_params,
-        finstack_quant_core::types::CurveId::from("USD-OIS"),
-        finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        PayReceive::Receive,
-    )
-    .expect("Valid tranche parameters");
-    let mut pricer = CdsTranchePricer::new();
-    pricer.config.use_issuer_curves = true;
-    configure(&mut pricer);
-    pricer
-        .price_tranche(&tranche, ctx, as_of)
-        .expect("Tranche pricing should succeed in test")
-        .amount()
-}
-
-/// Regression (2026-07 credit-derivatives audit M2): the moment-matched
-/// normal approximation mis-prices bespoke pools below
-/// `SMALL_POOL_THRESHOLD` (64) by >1% of PV at junior strikes (measured:
-/// 1.55% at 24 names on the [3,7] tranche). Such pools must be routed to
-/// exact convolution regardless of the configured `hetero_method`, so the
-/// default configuration must reproduce the exact-convolution PV to
-/// within grid/quadrature noise.
-#[test]
-fn test_hetero_default_routes_small_pools_to_exact_convolution() {
-    let ctx = sample_market_context_with_issuers(24);
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-
-    for (attach, detach) in [(3.0, 7.0), (15.0, 30.0)] {
-        // hetero_method deliberately left at its default.
-        let pv_default = price_hetero_tranche(&ctx, as_of, attach, detach, |_| {});
-        let pv_exact = price_hetero_tranche(&ctx, as_of, attach, detach, |p| {
-            p.config.hetero_method = HeteroMethod::ExactConvolution;
-        });
-
-        // Same method, same grid → agreement to numerical noise. The old
-        // normal-approx path differed by 1.55% ($72k) at [3,7].
-        let tol = 1e-6 * pv_exact.abs().max(1.0);
-        assert!(
-            (pv_default - pv_exact).abs() < tol,
-            "default config must route a 24-name pool to exact convolution \
-             at [{attach},{detach}]: default={pv_default:.2}, exact={pv_exact:.2}"
-        );
-    }
-}
-
-/// Pin the measured accuracy of the normal (CLT) approximation on the pools
-/// it still prices (> `SMALL_POOL_THRESHOLD` names): the audit bias study
-/// found 0.03% at 125 names on the junior [3,7] tranche. Allow 0.2% so the
-/// pin is robust to fixture drift while still catching a regression to the
-/// small-pool bias regime (>1%).
-#[test]
-fn test_hetero_normal_approx_bias_bound_large_pool() {
-    let ctx = sample_market_context_with_issuers(125);
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-
-    let pv_normal = price_hetero_tranche(&ctx, as_of, 3.0, 7.0, |p| {
-        p.config.hetero_method = HeteroMethod::NormalApprox;
-    });
-    let pv_exact = price_hetero_tranche(&ctx, as_of, 3.0, 7.0, |p| {
-        p.config.hetero_method = HeteroMethod::ExactConvolution;
-    });
-
-    let rel = (pv_normal - pv_exact).abs() / pv_exact.abs().max(1.0);
-    assert!(
-        rel < 0.002,
-        "normal-approximation bias on a 125-name pool must stay within the \
-         measured bound: normal={pv_normal:.2}, exact={pv_exact:.2}, rel={:.4}%",
-        rel * 100.0
-    );
 }
 
 fn concentration_test_index(count: usize, first_weight: f64) -> CreditIndexData {
@@ -641,76 +439,18 @@ fn heterogeneous_one_name_limit_ignores_zero_weight_constituents() {
     let one = concentration_test_index(1, 1.0);
     let padded = concentration_test_index(80, 1.0);
     let expected = 1.0 - (-0.05_f64).exp();
-    for method in [HeteroMethod::ExactConvolution, HeteroMethod::NormalApprox] {
-        let pricer = CdsTranchePricer::with_config(CdsTranchePricerConfig {
-            hetero_method: method,
-            ..Default::default()
-        })
-        .expect("config");
-        let actual = concentration_test_loss(&pricer, &padded);
-        assert!((actual - expected).abs() < 1e-8, "{method:?}: {actual}");
-        assert!((actual - concentration_test_loss(&pricer, &one)).abs() < 1e-12);
-    }
+    let pricer = CdsTranchePricer::new();
+    let actual = concentration_test_loss(&pricer, &padded);
+    assert!((actual - expected).abs() < 1e-8, "{actual}");
+    assert!((actual - concentration_test_loss(&pricer, &one)).abs() < 1e-12);
 }
 
 #[test]
-fn heterogeneous_concentrated_large_pool_defaults_to_convolution() {
-    let index = concentration_test_index(80, 0.8);
-    let default_loss = concentration_test_loss(&CdsTranchePricer::new(), &index);
-    let exact = CdsTranchePricer::with_config(CdsTranchePricerConfig {
-        hetero_method: HeteroMethod::ExactConvolution,
-        ..Default::default()
-    })
-    .expect("config");
-    assert!((default_loss - concentration_test_loss(&exact, &index)).abs() < 1e-12);
-    let fine = CdsTranchePricer::with_config(CdsTranchePricerConfig {
-        grid_step: 0.0005,
-        ..Default::default()
-    })
-    .expect("config");
-    let finer = CdsTranchePricer::with_config(CdsTranchePricerConfig {
-        grid_step: 0.00025,
-        ..Default::default()
-    })
-    .expect("config");
-    let fine_loss = concentration_test_loss(&fine, &index);
-    let finer_loss = concentration_test_loss(&finer, &index);
-    // This is a grid convergence control, separate from the exact one-name
-    // oracle. The budget is in tranche-notional fractions, not factor error.
-    assert!((fine_loss - finer_loss).abs() < 1e-4);
-    assert!((default_loss - finer_loss).abs() < 5e-4);
-}
-
-#[test]
-fn heterogeneous_exact_grid_limit_errors_instead_of_switching_method() {
-    let index = concentration_test_index(80, 0.8);
-    let pricer = CdsTranchePricer::with_config(CdsTranchePricerConfig {
-        grid_step: 1e-6,
-        ..Default::default()
-    })
-    .expect("config");
-    let error = pricer
-        .calculate_equity_tranche_capped_hetero(
-            7.0,
-            0.3,
-            &index,
-            Date::from_calendar_date(2026, Month::January, 1).expect("date"),
-            super::config::PoolExposure::Loss,
-        )
-        .expect_err("grid cap must not select a different model");
-    assert!(error.to_string().contains("exceeding the limit"));
-}
-
-#[test]
-fn heterogeneous_work_limit_preflights_stochastic_recovery() {
+fn heterogeneous_work_limit_preflights_large_pools() {
     // Creating 3,000 shared curve handles is cheap; evaluating their factor
     // integrals is deliberately avoided by the resource preflight.
     let index = concentration_test_index(3_000, 0.8);
-    let config = CdsTranchePricerConfig {
-        integration_max_depth: 0,
-        ..CdsTranchePricerConfig::default().with_stochastic_recovery()
-    };
-    let pricer = CdsTranchePricer::with_config(config).expect("config");
+    let pricer = CdsTranchePricer::new();
     let error = pricer
         .calculate_equity_tranche_capped_hetero(
             7.0,
@@ -830,9 +570,7 @@ fn homogeneity_detection_uses_consistent_tolerance() {
     )
     .expect("Valid tranche parameters");
 
-    let mut pricer = CdsTranchePricer::new();
-    pricer.config.use_issuer_curves = true;
-    pricer.config.hetero_method = HeteroMethod::NormalApprox;
+    let pricer = CdsTranchePricer::new();
 
     // Exactly homogeneous (shift 0): all PD/LGD/weight identical.
     let pv_exact_homo = pricer
@@ -854,50 +592,6 @@ fn homogeneity_detection_uses_consistent_tolerance() {
         "a sub-tolerance PD perturbation must not cause a discontinuous \
          model-branch switch: pv(shift=0)={pv_exact_homo}, pv(shift=1e-11)={pv_sub_tol}"
     );
-}
-
-#[test]
-fn test_grid_step_refines_exact_convolution() {
-    let ctx = sample_market_context_with_issuers(10);
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let tranche_params = CdsTrancheParams::new(
-        "CDX.NA.IG.42",
-        42,
-        0.0,
-        3.0,
-        Money::from((10_000_000_i64, Currency::USD)),
-        as_of.add_months(60).expect("valid fixture date"),
-        0.0,
-    );
-    let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-    let tranche = CdsTranche::new(
-        "CDX_IG42_0_3_5Y",
-        &tranche_params,
-        &schedule_params,
-        finstack_quant_core::types::CurveId::from("USD-OIS"),
-        finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        PayReceive::Receive,
-    )
-    .expect("Valid tranche parameters");
-
-    let mut exact_coarse = CdsTranchePricer::new();
-    exact_coarse.config.use_issuer_curves = true;
-    exact_coarse.config.hetero_method = HeteroMethod::ExactConvolution;
-    exact_coarse.config.grid_step = 0.005;
-
-    let mut exact_fine = CdsTranchePricer::new();
-    exact_fine.config = exact_coarse.config.clone();
-    exact_fine.config.grid_step = 0.001;
-
-    let p_coarse = exact_coarse
-        .price_tranche(&tranche, &ctx, as_of)
-        .expect("Tranche pricing should succeed in test")
-        .amount();
-    let p_fine = exact_fine
-        .price_tranche(&tranche, &ctx, as_of)
-        .expect("Tranche pricing should succeed in test")
-        .amount();
-    assert!((p_coarse - p_fine).abs() < 0.02 * p_fine.abs().max(1.0));
 }
 
 #[test]
@@ -1096,17 +790,21 @@ fn test_el_curve_monotonicity() {
     let index_data_arc = market_ctx
         .get_credit_index(&tranche.credit_index_id)
         .expect("Credit index should exist in test context");
-    let el_curve = model.build_el_curve(&tranche, &index_data_arc, &schedule);
+    let el_curve = model.build_el_wd_curve(&tranche, &index_data_arc, &schedule);
 
     assert!(el_curve.is_ok());
-    let curve = el_curve.expect("EL curve building should succeed in test");
+    let curve: Vec<f64> = el_curve
+        .expect("EL curve building should succeed in test")
+        .iter()
+        .map(|point| point.el_fraction)
+        .collect();
 
     // EL should be non-decreasing and bounded [0,1]
     // Allow for small numerical deviations due to base correlation model limitations
     // The base correlation model can have inconsistencies at knot points
     const NUMERICAL_TOLERANCE: f64 = 0.01; // Allow up to 1% EL fraction decrease
 
-    for (i, &(_, el_fraction)) in curve.iter().enumerate() {
+    for (i, &el_fraction) in curve.iter().enumerate() {
         assert!(
             (0.0..=1.0).contains(&el_fraction),
             "EL fraction {} at index {} out of bounds",
@@ -1115,11 +813,11 @@ fn test_el_curve_monotonicity() {
         );
 
         if i > 0 {
-            let decrease = curve[i - 1].1 - el_fraction;
+            let decrease = curve[i - 1] - el_fraction;
             assert!(
                 decrease <= NUMERICAL_TOLERANCE,
                 "EL fraction decreased significantly from {} to {} (decrease: {})",
-                curve[i - 1].1,
+                curve[i - 1],
                 el_fraction,
                 decrease
             );
@@ -1323,12 +1021,7 @@ fn test_smooth_correlation_boundary_transitions() {
 #[test]
 fn test_smooth_correlation_boundary_c1_at_seams() {
     let model = CdsTranchePricer::new();
-    let cfg = model.get_config();
-    let (min_c, max_c, w) = (
-        cfg.min_correlation,
-        cfg.max_correlation,
-        cfg.corr_boundary_width,
-    );
+    let (min_c, max_c, w) = (MIN_CORRELATION, MAX_CORRELATION, CORR_BOUNDARY_WIDTH);
 
     for seam in [min_c + w, max_c - w] {
         // Value continuity: at the seam the map must equal the identity.
@@ -1549,36 +1242,6 @@ fn test_nearly_wiped_tranche() {
     let pv_amount = pv.expect("PV should be Ok").amount();
     assert!(pv_amount.is_finite(), "PV should be finite");
     // Should be much smaller than full notional tranche
-}
-
-#[test]
-fn test_jtd_detail_consistency() {
-    // Test that JTD detail is consistent with simple JTD
-    let model = CdsTranchePricer::new();
-    let tranche = sample_tranche();
-    let market_ctx = sample_market_context();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-
-    let simple_jtd = model.calculate_jump_to_default(&tranche, &market_ctx, as_of);
-    let detail_jtd = model.calculate_jump_to_default_detail(&tranche, &market_ctx);
-
-    assert!(simple_jtd.is_ok());
-    assert!(detail_jtd.is_ok());
-
-    let simple = simple_jtd.expect("Simple JTD should be Ok");
-    let detail = detail_jtd.expect("Detail JTD should be Ok");
-
-    // Simple JTD should equal the average from detail
-    assert!(
-        (simple - detail.average).abs() < 1e-10,
-        "Simple JTD {} should equal detail average {}",
-        simple,
-        detail.average
-    );
-
-    // Min <= average <= max
-    assert!(detail.min <= detail.average);
-    assert!(detail.average <= detail.max);
 }
 
 #[test]
@@ -1855,30 +1518,6 @@ fn test_settlement_date_weekday() {
 }
 
 #[test]
-fn test_accrued_premium_calculation() {
-    // Test accrued premium calculation
-    let model = CdsTranchePricer::new();
-    let mut tranche = sample_tranche();
-    let market_ctx = sample_market_context();
-
-    // At inception, accrued should be minimal
-    let inception = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    tranche.start_date = Some(inception);
-    let accrued_at_inception = model.calculate_accrued_premium(&tranche, &market_ctx, inception);
-    assert!(accrued_at_inception.is_ok());
-
-    // Mid-quarter, accrued should be positive
-    let mid_quarter = Date::from_calendar_date(2025, Month::February, 15).expect("Valid test date");
-    let accrued_mid = model.calculate_accrued_premium(&tranche, &market_ctx, mid_quarter);
-    assert!(accrued_mid.is_ok());
-    let accrued = accrued_mid.expect("Accrued premium should be Ok");
-    assert!(
-        accrued > 0.0,
-        "Accrued premium should be positive mid-period"
-    );
-}
-
-#[test]
 fn test_par_spread_missing_credit_index_errors() {
     let model = CdsTranchePricer::new();
     let tranche = sample_tranche();
@@ -1897,81 +1536,6 @@ fn test_par_spread_missing_credit_index_errors() {
     assert!(
         err.to_string().contains("CDX.NA.IG.42"),
         "expected missing credit index context, got: {err}"
-    );
-}
-
-#[test]
-fn test_stochastic_recovery_impacts_equity_tranche() {
-    let market_ctx = sample_market_context();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
-
-    // Create equity tranche (0-3%) which is most sensitive to stochastic recovery
-    let tranche_params = CdsTrancheParams::new(
-        "CDX.NA.IG.42",
-        42,
-        0.0, // attach at 0%
-        3.0, // detach at 3%
-        Money::from((10_000_000_i64, Currency::USD)),
-        maturity,
-        500.0, // 5% running coupon
-    );
-    let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
-    let tranche = CdsTranche::new(
-        "CDX_IG42_0_3_5Y",
-        &tranche_params,
-        &schedule_params,
-        finstack_quant_core::types::CurveId::from("USD-OIS"),
-        finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
-        PayReceive::Receive,
-    )
-    .expect("Valid tranche parameters");
-
-    // Constant recovery (default)
-    let pricer_const = CdsTranchePricer::new();
-    let pv_const = pricer_const
-        .price_tranche(&tranche, &market_ctx, as_of)
-        .expect("Constant recovery pricing should succeed")
-        .amount();
-
-    // Stochastic recovery (market-correlated)
-    let pricer_stoch =
-        CdsTranchePricer::with_config(CdsTranchePricerConfig::default().with_stochastic_recovery())
-            .expect("valid tranche pricer config");
-    let pv_stoch = pricer_stoch
-        .price_tranche(&tranche, &market_ctx, as_of)
-        .expect("Stochastic recovery pricing should succeed")
-        .amount();
-
-    // Both should be finite
-    assert!(
-        pv_const.is_finite(),
-        "Constant recovery PV should be finite"
-    );
-    assert!(
-        pv_stoch.is_finite(),
-        "Stochastic recovery PV should be finite"
-    );
-
-    // PVs should differ - stochastic recovery impacts equity tranche
-    // Note: The exact magnitude depends on the market-standard stochastic recovery calibration
-    // (mean=40%, vol=25%, corr=-40%), but we expect at least some difference
-    let pv_diff = (pv_stoch - pv_const).abs();
-    assert!(
-        pv_diff > 0.0,
-        "Stochastic recovery should change PV; const={}, stoch={}",
-        pv_const,
-        pv_stoch
-    );
-}
-
-#[test]
-fn test_stochastic_recovery_default_is_deterministic() {
-    // Verify that default configuration uses deterministic (constant) recovery
-    let pricer = CdsTranchePricer::new();
-    assert!(
-        pricer.get_config().stochastic_recovery_spec.is_none(),
-        "Default stochastic_recovery_spec should be None (deterministic)"
     );
 }
 
@@ -2301,11 +1865,9 @@ fn homogeneous_path_boundary_default_prob_does_not_panic() {
     // ⇒  default_prob = 0.0  ⇒  without clamp: standard_normal_inv_cdf(0.0) = −∞.
     let maturity = base_date;
 
-    // Drive the homogeneous Gaussian branch directly (disable issuer-curve path).
+    // Drive the homogeneous Gaussian branch directly (no issuer curves).
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let mut p = CdsTranchePricer::new();
-        p.config.use_issuer_curves = false;
-        p.calculate_equity_tranche_loss(7.0, 0.30, &index_data, maturity)
+        CdsTranchePricer::new().calculate_equity_tranche_loss(7.0, 0.30, &index_data, maturity)
     }));
 
     // `Err` here is a `catch_unwind` panic payload, not a domain error.
@@ -2502,39 +2064,6 @@ fn premium_leg_pv(pricer: &CdsTranchePricer, tranche: &CdsTranche, ctx: &MarketC
         .expect("premium PV")
 }
 
-/// the accrual-on-default adjustment must be the COMPLEMENT
-/// of the survival-weighted default fraction. A name defaulting at fraction
-/// `f` of the period pays accrued `f·Δ`, so the premium notional lost on the
-/// defaulted slice is `(1−f)·ΔEL` when AoD is enabled and the full `ΔEL`
-/// when disabled (defaulted names pay nothing for the period).
-///
-/// Pins the ordering: premium(AoD enabled) > premium(AoD disabled), because
-/// the AoD credit recovers the `f·Δ` accrued by defaulters.
-#[test]
-fn aod_enabled_premium_exceeds_disabled_premium() {
-    let market_ctx = sample_market_context();
-    let tranche = sample_tranche(); // sell protection, 500bp coupon
-
-    let mut enabled = CdsTranchePricer::new();
-    enabled.config.include_accrual_on_default = true;
-    let mut disabled = CdsTranchePricer::new();
-    disabled.config.include_accrual_on_default = false;
-
-    let pv_enabled = premium_leg_pv(&enabled, &tranche, &market_ctx);
-    let pv_disabled = premium_leg_pv(&disabled, &tranche, &market_ctx);
-
-    assert!(
-        pv_enabled > 0.0 && pv_disabled > 0.0,
-        "sell-protection premium legs must be positive: enabled={pv_enabled}, \
-         disabled={pv_disabled}"
-    );
-    assert!(
-        pv_enabled > pv_disabled,
-        "AoD-enabled premium must exceed AoD-disabled premium (defaulters pay \
-         partial accrual): enabled={pv_enabled}, disabled={pv_disabled}"
-    );
-}
-
 /// rising index hazard must LOWER the premium-leg PV — more
 /// defaults mean less premium notional. Before the fix the complement-swapped
 /// adjustment under-reduced (AoD on) or never reduced (AoD off) the premium,
@@ -2588,18 +2117,13 @@ fn rising_hazard_lowers_premium_leg_pv() {
             .expect("Credit index dependencies should be registered")
     };
 
-    for aod_enabled in [true, false] {
-        let mut pricer = CdsTranchePricer::new();
-        pricer.config.include_accrual_on_default = aod_enabled;
-
-        let pv_low = premium_leg_pv(&pricer, &tranche, &build_ctx(1.0));
-        let pv_high = premium_leg_pv(&pricer, &tranche, &build_ctx(3.0));
-        assert!(
-            pv_high < pv_low,
-            "rising hazard must lower premium PV (aod_enabled={aod_enabled}): \
-             low-hazard={pv_low}, high-hazard={pv_high}"
-        );
-    }
+    let pricer = CdsTranchePricer::new();
+    let pv_low = premium_leg_pv(&pricer, &tranche, &build_ctx(1.0));
+    let pv_high = premium_leg_pv(&pricer, &tranche, &build_ctx(3.0));
+    assert!(
+        pv_high < pv_low,
+        "rising hazard must lower premium PV: low-hazard={pv_low}, high-hazard={pv_high}"
+    );
 }
 
 /// Helper: market context with configurable index recovery
@@ -2688,12 +2212,11 @@ fn zero_recovery_has_no_senior_writedown() {
     let curve = pricer
         .build_el_wd_curve(&tranche, &index_data, &dates)
         .expect("EL/WD curve");
-    for p in &curve {
+    for (index, p) in curve.iter().enumerate() {
         assert!(
             p.wd_fraction.abs() < 1e-15,
-            "R=0 must produce zero senior writedown, got {} at {:?}",
-            p.wd_fraction,
-            p.date
+            "R=0 must produce zero senior writedown, got {} at period {index}",
+            p.wd_fraction
         );
     }
 
@@ -2791,48 +2314,6 @@ fn seasoned_recovery_writedown_matches_hand_computation() {
     );
 }
 
-/// Item 6: with `mid_period_protection`, raising the index hazard moves the
-/// survival-weighted default time earlier within each period, so the
-/// within-period loss is discounted at an earlier (higher-DF) point. This
-/// pins that the protection-leg discounting responds to default timing
-/// rather than always using the flat period midpoint.
-#[test]
-fn mid_period_protection_uses_survival_weighted_timing() {
-    let market_ctx = sample_market_context();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-
-    // Sell-protection, zero coupon: PV is the (signed) protection leg only.
-    let mut tranche = sample_tranche();
-    tranche.coupon_bp = 0.0;
-
-    let mut with_mid = CdsTranchePricer::new();
-    with_mid.config.mid_period_protection = true;
-    let mut without_mid = CdsTranchePricer::new();
-    without_mid.config.mid_period_protection = false;
-
-    let pv_mid = with_mid
-        .price_tranche(&tranche, &market_ctx, as_of)
-        .expect("mid-period pricing")
-        .amount();
-    let pv_end = without_mid
-        .price_tranche(&tranche, &market_ctx, as_of)
-        .expect("end-of-period pricing")
-        .amount();
-
-    // Discounting within-period losses earlier (mid-period) vs at period end
-    // must change the protection-leg PV: earlier discounting => larger
-    // |protection PV| because the loss cashflow is less discounted.
-    assert!(
-        (pv_mid - pv_end).abs() > 0.0,
-        "mid-period vs end-of-period protection timing must change PV: \
-         mid={pv_mid}, end={pv_end}"
-    );
-    assert!(
-        pv_mid.is_finite() && pv_end.is_finite(),
-        "both protection-timing PVs must be finite"
-    );
-}
-
 #[test]
 fn seasoned_first_period_default_timing_starts_at_valuation_date() {
     let market_ctx = sample_market_context();
@@ -2874,86 +2355,6 @@ fn seasoned_first_period_default_timing_starts_at_valuation_date() {
     );
 }
 
-#[test]
-fn student_t_recovery_driver_uses_scaled_market_factor() {
-    let student_t = CdsTranchePricer::with_config(
-        CdsTranchePricerConfig::default()
-            .with_student_t_copula(5.0)
-            .expect("valid Student-t copula"),
-    )
-    .expect("valid tranche pricer config");
-    let gaussian = CdsTranchePricer::new();
-
-    assert_eq!(
-        student_t.config.copula_spec,
-        CopulaSpec::student_t(5.0).expect("valid")
-    );
-    assert!(
-        (student_t.recovery_driver_for_factors(&[2.0, 4.0]) - 1.0).abs() < 1e-12,
-        "Student-t recovery driver must use Z/sqrt(W)"
-    );
-    assert!(
-        (gaussian.recovery_driver_for_factors(&[2.0, 4.0]) - 2.0).abs() < 1e-12,
-        "Gaussian recovery driver must remain the first factor"
-    );
-}
-
-/// EL-consistency of the stochastic-recovery override with the bootstrapped
-/// index curve: the 0–100% equity tranche must reproduce the index expected
-/// loss `p · (1 − R_base)` even when recovery varies with the systematic
-/// factor. Without renormalization, the factor-dependence of `R(Z)` makes
-/// `E_Z[p(Z)·(1−R(Z))] ≠ p·(1−R_base)` and the sum of all tranches drifts
-/// away from the index.
-#[test]
-fn test_stochastic_recovery_full_pool_el_matches_index() {
-    let market_ctx = sample_market_context();
-    let index_data = market_ctx
-        .get_credit_index("CDX.NA.IG.42")
-        .expect("test index data");
-    let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
-
-    let pricer_stoch =
-        CdsTranchePricer::with_config(CdsTranchePricerConfig::default().with_stochastic_recovery())
-            .expect("valid tranche pricer config");
-
-    // Index-implied expected loss with the flat bootstrapped recovery.
-    let t = pricer_stoch
-        .years_from_base(&index_data, maturity)
-        .expect("year fraction");
-    let p = pricer_stoch
-        .get_default_probability(&index_data, t)
-        .expect("default probability");
-    let index_el = p * (1.0 - index_data.recovery_rate);
-
-    // 0–100% equity tranche: cap never binds, so this is the full pool EL.
-    let full_pool_el = pricer_stoch
-        .calculate_equity_tranche_loss(100.0, 0.30, &index_data, maturity)
-        .expect("full-pool equity tranche EL");
-
-    let rel_err = (full_pool_el - index_el).abs() / index_el;
-    assert!(
-        rel_err < 1e-6,
-        "0–100% tranche EL with stochastic recovery must match the index EL: \
-         tranche={full_pool_el}, index={index_el}, rel_err={rel_err}"
-    );
-
-    // The renormalization must not flatten the override into constant
-    // recovery: a strict sub-pool tranche (where the cap binds and the
-    // z-shape matters) must still differ from the constant-recovery pricer.
-    let pricer_const = CdsTranchePricer::new();
-    let equity_stoch = pricer_stoch
-        .calculate_equity_tranche_loss(3.0, 0.25, &index_data, maturity)
-        .expect("stochastic equity EL");
-    let equity_const = pricer_const
-        .calculate_equity_tranche_loss(3.0, 0.25, &index_data, maturity)
-        .expect("constant equity EL");
-    assert!(
-        (equity_stoch - equity_const).abs() > 1e-12,
-        "stochastic recovery should still reshape sub-pool tranche EL: \
-         stoch={equity_stoch}, const={equity_const}"
-    );
-}
-
 mod production_credit_audit {
     use super::*;
 
@@ -2968,18 +2369,20 @@ mod production_credit_audit {
         .expect("reference");
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
-        let pricer = CdsTranchePricer::with_config(CdsTranchePricerConfig {
-            min_correlation: 0.0001,
-            max_correlation: 0.9999,
-            corr_boundary_width: 0.00001,
-            ..Default::default()
-        })
-        .expect("pricer");
+        let pricer = CdsTranchePricer::new();
         let mut compared = 0_usize;
         for row in reference["cases"].as_array().expect("cases") {
             let n = row["n"].as_u64().expect("N") as u16;
             let pd = row["pd"].as_f64().expect("PD");
             let rho = row["correlation"].as_f64().expect("rho");
+            // The soft correlation clamp is the identity only inside
+            // `[MIN + width, MAX - width]`; rows outside it are not priced at
+            // the fixture's exact correlation and are skipped.
+            let identity_band =
+                (MIN_CORRELATION + CORR_BOUNDARY_WIDTH)..=(MAX_CORRELATION - CORR_BOUNDARY_WIDTH);
+            if !identity_band.contains(&rho) {
+                continue;
+            }
             let cap = row["cap"].as_f64().expect("cap");
             let expected = row["expected_loss"].as_f64().expect("EL");
             let hazard = HazardCurve::builder("HZ")
@@ -3014,64 +2417,5 @@ mod production_credit_audit {
             compared > 0,
             "fixture must include at least one finite-n binomial case"
         );
-    }
-
-    #[test]
-    fn dispersed_pool_honors_constant_recovery_override() {
-        let market = sample_market_context_with_issuers(3);
-        let index = market.get_credit_index("CDX.NA.IG.42").expect("index");
-        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
-        let pricer = CdsTranchePricer::with_config(
-            CdsTranchePricerConfig::default().with_constant_recovery(1.0),
-        )
-        .expect("pricer");
-        let loss = pricer
-            .calculate_equity_tranche_loss(100.0, 0.3, &index, maturity)
-            .expect("loss");
-        assert!(
-            loss.abs() < 1e-12,
-            "100% recovery must eliminate loss: {loss}"
-        );
-    }
-
-    #[test]
-    fn dispersed_stochastic_recovery_preserves_full_pool_expected_loss() {
-        let market = sample_market_context_with_issuers(3);
-        let index = market.get_credit_index("CDX.NA.IG.42").expect("index");
-        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
-        let expected: f64 = index
-            .issuer_credit_curves
-            .as_ref()
-            .expect("issuers")
-            .iter()
-            .map(|(id, curve)| {
-                let t = curve
-                    .day_count()
-                    .year_fraction(
-                        curve.base_date(),
-                        maturity,
-                        finstack_quant_core::dates::DayCountContext::default(),
-                    )
-                    .expect("time");
-                index.get_issuer_weight(id)
-                    * (1.0 - curve.sp(t))
-                    * (1.0 - index.get_issuer_recovery(id))
-            })
-            .sum();
-        for tolerance in [1e-8, 1e-10] {
-            let pricer = CdsTranchePricer::with_config(
-                CdsTranchePricerConfig::default()
-                    .with_custom_stochastic_recovery(0.4, 0.1, 0.3)
-                    .with_integration_tolerance(tolerance),
-            )
-            .expect("pricer");
-            let actual = pricer
-                .calculate_equity_tranche_loss(100.0, 0.3, &index, maturity)
-                .expect("loss");
-            assert!(
-                (actual - expected).abs() < 4.0 * tolerance,
-                "full-pool stochastic recovery EL {actual} vs {expected}, tolerance {tolerance}"
-            );
-        }
     }
 }

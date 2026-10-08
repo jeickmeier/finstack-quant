@@ -137,17 +137,10 @@ impl LookbackOptionMcPricer {
 
         // Derive deterministic seed from instrument ID and scenario
 
-        use finstack_quant_models::monte_carlo::seed;
-
-        let seed = if let Some(ref scenario) = inst
+        let seed = inst
             .instrument_pricing_overrides
             .model_config
-            .mc_seed_scenario
-        {
-            seed::derive_seed(&inst.id, scenario)
-        } else {
-            seed::derive_seed(&inst.id, "base")
-        };
+            .mc_seed(&inst.id);
 
         let mut config = base_cfg;
         config.seed = seed;
@@ -238,9 +231,7 @@ impl Pricer for LookbackOptionMcPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let lookback = expect_inst::<LookbackOption>(instrument, InstrumentType::LookbackOption)?;
 
-        let pv = self.price_internal(lookback, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let pv = self.price_internal(lookback, market, as_of)?;
 
         Ok(ValuationResult::stamped(lookback.id(), as_of, pv))
     }
@@ -423,18 +414,8 @@ impl Pricer for LookbackOptionAnalyticalPricer {
         }
 
         if as_of >= lookback.expiry {
-            let spot = terminal_lookback_spot(lookback, market, as_of).map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
-            let payoff = expired_lookback_payoff(lookback, spot).map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+            let spot = terminal_lookback_spot(lookback, market, as_of)?;
+            let payoff = expired_lookback_payoff(lookback, spot)?;
             return Ok(ValuationResult::stamped(
                 lookback.id(),
                 as_of,
@@ -447,21 +428,10 @@ impl Pricer for LookbackOptionAnalyticalPricer {
             ));
         }
 
-        let (spot, r, q, sigma, t) =
-            collect_lookback_inputs(lookback, market, as_of).map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        let (spot, r, q, sigma, t) = collect_lookback_inputs(lookback, market, as_of)?;
 
         if t <= 0.0 {
-            let payoff = expired_lookback_payoff(lookback, spot).map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+            let payoff = expired_lookback_payoff(lookback, spot)?;
             return Ok(ValuationResult::stamped(
                 lookback.id(),
                 as_of,
@@ -539,10 +509,7 @@ impl Pricer for LookbackOptionAnalyticalPricer {
         let price = finstack_quant_models::closed_form::checked_closed_form_value(
             price,
             "lookback closed-form price",
-        )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        )?;
         let pv = Money::new(price * lookback.quantity, currency).map_err(|error| {
             crate::pricer::PricingError::from_core(
                 error,

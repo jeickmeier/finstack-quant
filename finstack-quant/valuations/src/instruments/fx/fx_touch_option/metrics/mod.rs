@@ -20,12 +20,8 @@ pub(crate) fn register_fx_touch_option_metrics(
             (Gamma, crate::metrics::OptionGreekCalculator::<crate::instruments::FxTouchOption>::gamma()),
             (Vega, crate::metrics::OptionGreekCalculator::<crate::instruments::FxTouchOption>::vega()),
             (Rho, crate::metrics::OptionGreekCalculator::<crate::instruments::FxTouchOption>::rho()),
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::FxTouchOption,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::FxTouchOption,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
     Ok(())

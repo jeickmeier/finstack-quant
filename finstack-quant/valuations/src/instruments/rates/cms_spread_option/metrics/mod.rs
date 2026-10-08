@@ -12,7 +12,7 @@ pub(crate) fn register_cms_spread_option_metrics(
 
     registry.register_metric(
         MetricId::Dv01,
-        Arc::new(UnifiedDv01Calculator::<super::CmsSpreadOption>::new(
+        Arc::new(UnifiedDv01Calculator::new(
             Dv01CalculatorConfig::parallel_combined(),
         )),
         &[InstrumentType::CmsSpreadOption],
@@ -22,7 +22,7 @@ pub(crate) fn register_cms_spread_option_metrics(
         registry: registry,
         instrument: InstrumentType::CmsSpreadOption,
         metrics: [
-            (BucketedDv01, UnifiedDv01Calculator::<super::CmsSpreadOption>::new(
+            (BucketedDv01, UnifiedDv01Calculator::new(
                 Dv01CalculatorConfig::triangular_key_rate(),
             )),
         ]

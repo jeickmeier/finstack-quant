@@ -115,9 +115,7 @@ pub(crate) fn register_cds_option_metrics(
             (Theta, theta::ThetaCalculator),
             (ParSpread, par_spread::ParSpreadCalculator),
             (ImpliedVol, implied_vol::ImpliedVolCalculator),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::CdsOption,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
     Ok(())

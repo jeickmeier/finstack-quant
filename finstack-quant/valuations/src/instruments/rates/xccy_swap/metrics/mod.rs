@@ -39,16 +39,10 @@ pub(crate) fn register_xccy_swap_metrics(
             // Combined DV01 sums every rate curve of both currencies, so the
             // two legs' offsetting curve risks net. `Pv01` reports each curve
             // separately as `pv01::{curve}`.
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::XccySwap,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (Pv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::XccySwap,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_per_curve()
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (Pv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_per_curve()
                 .with_series_id(crate::metrics::MetricId::Pv01))),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::XccySwap,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     };
     Ok(())

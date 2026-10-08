@@ -32,7 +32,7 @@ fn selected_equity_greek(kind: OptionGreekKind, context: &mut MetricContext) -> 
         OptionGreekKind::Vanna => GenericFdVanna::<EquityOption>::default().calculate(context),
         OptionGreekKind::Volga => GenericFdVolga::<EquityOption>::default().calculate(context),
         OptionGreekKind::Theta => selected_equity_theta(context),
-        OptionGreekKind::Rho => super::dv01::UnifiedDv01Calculator::<EquityOption>::new(
+        OptionGreekKind::Rho => super::dv01::UnifiedDv01Calculator::new(
             super::dv01::Dv01CalculatorConfig::parallel_discount_only(),
         )
         .calculate(context),

@@ -80,20 +80,6 @@ pub(crate) fn compute_conversion_value(bond: &ConvertibleBond, spot: f64) -> Res
     }
 }
 
-/// Lattice kind for convertible bond pricing.
-///
-/// The number of time steps is not part of the lattice kind: every pricer
-/// reads it from `instrument_pricing_overrides.model_config.tree_steps`
-/// (default [`DEFAULT_CONVERTIBLE_TREE_STEPS`]).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum ConvertibleTreeType {
-    /// Cox-Ross-Rubinstein binomial tree.
-    #[default]
-    Binomial,
-    /// Recombining trinomial tree.
-    Trinomial,
-}
-
 /// Default lattice step count when
 /// `instrument_pricing_overrides.model_config.tree_steps` is unset.
 pub const DEFAULT_CONVERTIBLE_TREE_STEPS: usize = 200;
@@ -295,7 +281,6 @@ fn price_convertible_bond_with_inputs(
     bond: &ConvertibleBond,
     market_context: &MarketContext,
     inputs: &PricingInputs,
-    tree_type: ConvertibleTreeType,
     as_of: Date,
 ) -> Result<Money> {
     if as_of > bond.maturity {
@@ -373,15 +358,12 @@ fn price_convertible_bond_with_inputs(
         time_to_maturity: inputs.time_to_maturity,
     };
 
-    let (pv_amount, _) = engine.price(
-        TzMarketInputs {
-            spot: inputs.spot,
-            volatility: inputs.volatility,
-            risk_free_rate: inputs.risk_free_rate,
-            dividend_yield: inputs.dividend_yield,
-        },
-        tree_type,
-    )?;
+    let (pv_amount, _) = engine.price(TzMarketInputs {
+        spot: inputs.spot,
+        volatility: inputs.volatility,
+        risk_free_rate: inputs.risk_free_rate,
+        dividend_yield: inputs.dividend_yield,
+    })?;
 
     Money::new(pv_amount, bond.notional.currency())
 }
@@ -394,15 +376,15 @@ fn price_convertible_bond_with_inputs(
 ///   required market-data identifiers.
 /// * `market` - Market context supplying discount curve, equity spot,
 ///   volatility, credit, and other pricing inputs.
-/// * `tree_type` - Lattice kind (binomial or trinomial); the step count is
-///   `bond.instrument_pricing_overrides.model_config.tree_steps` (default
-///   [`DEFAULT_CONVERTIBLE_TREE_STEPS`]).
 /// * `as_of` - Valuation date; dates after maturity return zero in the bond's
 ///   notional currency.
+///
+/// The Cox-Ross-Rubinstein binomial lattice step count is
+/// `bond.instrument_pricing_overrides.model_config.tree_steps` (default
+/// [`DEFAULT_CONVERTIBLE_TREE_STEPS`]).
 pub fn price_convertible_bond(
     bond: &ConvertibleBond,
     market: &MarketContext,
-    tree_type: ConvertibleTreeType,
     as_of: Date,
 ) -> Result<Money> {
     bond.validate_for_pricing()?;
@@ -411,7 +393,7 @@ pub fn price_convertible_bond(
         return Ok(Money::from((0_i64, bond.notional.currency())));
     }
     let inputs = prepare_for_pricing(bond, market, as_of)?;
-    price_convertible_bond_with_inputs(bond, market, &inputs, tree_type, as_of)
+    price_convertible_bond_with_inputs(bond, market, &inputs, as_of)
 }
 
 /// Value the straight cash component on the canonical convertible tree grid.
@@ -475,10 +457,9 @@ pub(crate) fn price_bond_floor(
 /// * `bond` - Convertible bond contract with cashflows, conversion terms, and
 ///   required market-data identifiers.
 /// * `market` - Market context supplying baseline curves, equity spot,
-///   volatility, and credit data for full repricing.
-/// * `tree_type` - Lattice kind used consistently for every bumped valuation;
-///   the step count is `model_config.tree_steps` (default
-///   [`DEFAULT_CONVERTIBLE_TREE_STEPS`]).
+///   volatility, and credit data for full repricing. Every bumped valuation
+///   uses the same binomial lattice with `model_config.tree_steps` steps
+///   (default [`DEFAULT_CONVERTIBLE_TREE_STEPS`]).
 /// * `bumps` - Finite-difference bump sizes: relative equity-spot bump for
 ///   delta and gamma, absolute volatility bump for vega and parallel
 ///   risk-free rate bump in bp for rho. Each must be finite and positive;
@@ -487,7 +468,6 @@ pub(crate) fn price_bond_floor(
 pub fn calculate_convertible_greeks(
     bond: &ConvertibleBond,
     market: &MarketContext,
-    tree_type: ConvertibleTreeType,
     bumps: GreekBumps,
     as_of: Date,
 ) -> Result<ConvertibleGreeks> {
@@ -510,7 +490,7 @@ pub fn calculate_convertible_greeks(
     // The base price is computed inline to avoid a second prepare_for_pricing call
     // (which would duplicate cashflow schedule build and market data resolution).
     let inputs = prepare_for_pricing(bond, market, as_of)?;
-    let base_price = price_convertible_bond_with_inputs(bond, market, &inputs, tree_type, as_of)?;
+    let base_price = price_convertible_bond_with_inputs(bond, market, &inputs, as_of)?;
 
     let mut greeks = ConvertibleGreeks {
         price: base_price.amount(),
@@ -542,8 +522,8 @@ pub fn calculate_convertible_greeks(
             bump_scalar(inputs.spot - h_spot)?,
         );
 
-        let price_up = price_convertible_bond(bond, &market_up, tree_type, as_of)?.amount();
-        let price_down = price_convertible_bond(bond, &market_down, tree_type, as_of)?.amount();
+        let price_up = price_convertible_bond(bond, &market_up, as_of)?.amount();
+        let price_down = price_convertible_bond(bond, &market_down, as_of)?.amount();
 
         greeks.delta = (price_up - price_down) / (2.0 * h_spot);
         greeks.gamma = (price_up - 2.0 * greeks.price + price_down) / (h_spot * h_spot);
@@ -565,8 +545,8 @@ pub fn calculate_convertible_greeks(
             .instrument_pricing_overrides
             .market_quotes
             .implied_volatility = Some(vol_down);
-        let price_vol_up = price_convertible_bond(&bond_up, market, tree_type, as_of)?.amount();
-        let price_vol_down = match price_convertible_bond(&bond_down, market, tree_type, as_of) {
+        let price_vol_up = price_convertible_bond(&bond_up, market, as_of)?.amount();
+        let price_vol_down = match price_convertible_bond(&bond_down, market, as_of) {
             Ok(price) => price.amount(),
             Err(Error::Validation(_)) => {
                 // All other inputs already priced successfully. A lower quote
@@ -593,10 +573,8 @@ pub fn calculate_convertible_greeks(
         let market_rate_down =
             bump_discount_curve_parallel(market, &bond.discount_curve_id, -h_rate)?;
 
-        let price_rate_up =
-            price_convertible_bond(bond, &market_rate_up, tree_type, as_of)?.amount();
-        let price_rate_down =
-            price_convertible_bond(bond, &market_rate_down, tree_type, as_of)?.amount();
+        let price_rate_up = price_convertible_bond(bond, &market_rate_up, as_of)?.amount();
+        let price_rate_down = price_convertible_bond(bond, &market_rate_down, as_of)?.amount();
 
         // Rho per 1bp: central difference over the 2·h_rate bp width
         greeks.rho = (price_rate_up - price_rate_down) / (2.0 * h_rate);
@@ -617,7 +595,7 @@ pub fn calculate_convertible_greeks(
                 // after the shift; that error propagates rather than
                 // repricing on a market still anchored at `t`.
                 let rolled_market = market.roll_forward(1)?;
-                let fwd_price = price_convertible_bond(bond, &rolled_market, tree_type, next_day)?;
+                let fwd_price = price_convertible_bond(bond, &rolled_market, next_day)?;
                 // Theta = P(t+1d) - P(t), reported as change per calendar day.
                 greeks.theta = fwd_price.amount() - greeks.price;
             }

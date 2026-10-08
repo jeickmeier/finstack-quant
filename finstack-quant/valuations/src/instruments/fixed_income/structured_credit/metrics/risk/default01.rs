@@ -33,7 +33,7 @@ fn bumped_default_specs(spec: &DefaultModelSpec) -> (DefaultModelSpec, DefaultMo
             // Peak CDR comes from the same registry the curve itself uses
             // (0.60% at 100% SDA with the standard values), so the bump
             // scaling cannot drift from the simulated curve.
-            let sda_peak_cdr = embedded_registry_or_panic().sda_curve().peak_cdr;
+            let sda_peak_cdr = embedded_registry_or_panic().sda_peak_cdr();
             let mult_bump = DEFAULT_BUMP_CDR / sda_peak_cdr;
             let mult_up = speed_multiplier + mult_bump;
             let mult_down = (speed_multiplier - mult_bump).max(0.0);

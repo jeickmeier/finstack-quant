@@ -254,6 +254,20 @@ fn format_context(ctx: &PricingErrorContext) -> String {
 /// | `InvalidInput`        | `Validation`                    | Structured `PricingErrorContext`       |
 /// | `MissingMarketData`   | `Input(NotFound)`               | `PricingErrorContext`                  |
 /// | `ModelFailure`        | `Calibration`                   | `PricingErrorContext`; category fixed  |
+/// Classify a core error with an empty context.
+///
+/// Lookup misses stay [`PricingError::MissingMarketData`], validation failures
+/// become [`PricingError::InvalidInput`] and computation failures become
+/// [`PricingError::ModelFailure`], exactly as [`PricingError::from_core`] with
+/// a default context. The registry fills the instrument, model and curve
+/// identifiers at the dispatch boundary, so pricers propagate core errors
+/// with `?` instead of wrapping them by hand.
+impl From<finstack_quant_core::Error> for PricingError {
+    fn from(err: finstack_quant_core::Error) -> Self {
+        PricingError::from_core(err, PricingErrorContext::default())
+    }
+}
+
 impl From<PricingError> for finstack_quant_core::Error {
     fn from(err: PricingError) -> Self {
         match err {

@@ -22,7 +22,7 @@
 
 use super::assignment::{assign_position_factors, FactorAssignmentReport};
 use super::dependencies::flatten as flatten_dependencies;
-use super::whatif::{StressPnl, StressResult, WhatIfEngine};
+use super::whatif::{StressPnl, StressResult};
 use crate::error::{Error, Result};
 use crate::sensitivity::{
     exact_factor_market_keys, DeltaBasedEngine, FactorSensitivityEngine, SensitivityMatrix,
@@ -549,32 +549,6 @@ impl FactorModel {
         )?)
     }
 
-    /// Create a what-if engine anchored to a base decomposition and sensitivity matrix.
-    ///
-    /// # Arguments
-    ///
-    /// * `base` - Previously computed baseline risk decomposition.
-    /// * `sensitivities` - Baseline sensitivity matrix.
-    /// * `portfolio` - Portfolio associated with the baseline analysis.
-    /// * `market` - Baseline market context.
-    /// * `as_of` - Valuation date associated with the baseline analysis.
-    ///
-    /// # Returns
-    ///
-    /// What-if engine that can evaluate factor changes relative to the supplied
-    /// baseline.
-    #[must_use]
-    pub fn what_if<'a>(
-        &'a self,
-        base: &'a RiskDecomposition,
-        sensitivities: &'a SensitivityMatrix,
-        portfolio: &'a Portfolio,
-        market: &'a MarketContext,
-        as_of: Date,
-    ) -> WhatIfEngine<'a> {
-        WhatIfEngine::new(self, base, sensitivities, portfolio, market, as_of)
-    }
-
     /// Shock configured factors and reprice the portfolio without decomposing
     /// stressed risk.
     ///
@@ -615,9 +589,8 @@ impl FactorModel {
     /// under the stressed market.
     ///
     /// This direct workflow does not compute an unused baseline sensitivity
-    /// matrix. Call [`Self::what_if`] only when a position remove/resize
-    /// scenario also needs the supplied baseline decomposition and
-    /// sensitivities.
+    /// matrix; use [`Self::position_what_if`] for position remove/resize
+    /// scenarios against a baseline decomposition.
     ///
     /// # Arguments
     ///
@@ -651,8 +624,9 @@ impl FactorModel {
     /// Run a position remove/resize what-if against this model's baseline.
     ///
     /// Decomposes the portfolio's baseline risk with
-    /// [`Self::analyze_with_sensitivities`], then applies `changes` through the
-    /// [`WhatIfEngine`](super::WhatIfEngine) built on that baseline.
+    /// [`Self::analyze_with_sensitivities`], then applies `changes` to that
+    /// baseline: a removal zeroes the position's sensitivity row and a resize
+    /// scales it in proportion to the original nonzero quantity.
     ///
     /// # Arguments
     ///
@@ -679,9 +653,7 @@ impl FactorModel {
         as_of: Date,
         changes: &[super::PositionChange],
     ) -> Result<super::WhatIfResult> {
-        let (base, sensitivities) = self.analyze_with_sensitivities(portfolio, market, as_of)?;
-        self.what_if(&base, &sensitivities, portfolio, market, as_of)
-            .position_what_if(changes)
+        super::whatif::position_what_if(self, portfolio, market, as_of, changes)
     }
 
     pub(crate) fn covariance(&self) -> &FactorCovarianceMatrix {

@@ -118,8 +118,7 @@ pub(crate) struct TermLoanParallelDv01Calculator;
 impl MetricCalculator for TermLoanParallelDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         with_term_loan_risk_view(context, |ctx| {
-            UnifiedDv01Calculator::<TermLoan>::new(Dv01CalculatorConfig::parallel_combined())
-                .calculate(ctx)
+            UnifiedDv01Calculator::new(Dv01CalculatorConfig::parallel_combined()).calculate(ctx)
         })
     }
 }
@@ -129,8 +128,7 @@ pub(crate) struct TermLoanBucketedDv01Calculator;
 impl MetricCalculator for TermLoanBucketedDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         with_term_loan_risk_view(context, |ctx| {
-            UnifiedDv01Calculator::<TermLoan>::new(Dv01CalculatorConfig::triangular_key_rate())
-                .calculate(ctx)
+            UnifiedDv01Calculator::new(Dv01CalculatorConfig::triangular_key_rate()).calculate(ctx)
         })
     }
 }
@@ -146,7 +144,7 @@ impl MetricCalculator for TermLoanCs01Calculator {
                 uses_credit_tree(ctx, loan)
             };
             if use_credit_tree {
-                GenericParallelCs01::<TermLoan>::default().calculate(ctx)
+                GenericParallelCs01.calculate(ctx)
             } else {
                 ZSpreadParallelCs01::<TermLoan>::z_spread_only().calculate(ctx)
             }
@@ -165,7 +163,7 @@ impl MetricCalculator for TermLoanBucketedCs01Calculator {
                 uses_credit_tree(ctx, loan)
             };
             if use_credit_tree {
-                GenericBucketedCs01::<TermLoan>::default().calculate(ctx)
+                GenericBucketedCs01.calculate(ctx)
             } else {
                 ZSpreadBucketedCs01::<TermLoan>::z_spread_only().calculate(ctx)
             }

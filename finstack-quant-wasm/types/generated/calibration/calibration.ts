@@ -4363,7 +4363,7 @@ export type VolQuote =
  * Global configuration for the calibration subsystem.
  *
  * This struct consolidates all settings for solvers, validation, and market-regime
- * specific bounds. It is typically derived from a `FinstackConfig` extension section.
+ * specific bounds.
  * Public callers should treat it as the behavioral contract for calibration
  * execution policy: solver choice, convergence settings, validation thresholds,
  * rate-bound policy, and curve-specific numerical guardrails.
@@ -4397,8 +4397,7 @@ export type VolQuote =
  *
  * 1. **Step-level** (`CalibrationStep.params.method`): Per-instrument-type overrides
  * 2. **Plan-level** (`CalibrationPlan.settings`): Plan-wide defaults
- * 3. **Finstack config extensions** (`calibration.config.v1`): application defaults
- * 4. **Global defaults** (`CalibrationConfig::default()`): fallback values
+ * 3. **Global defaults** (`CalibrationConfig::default()`): fallback values
  *
  * Step-level settings always take precedence over plan-level settings.
  * In other words, this struct provides default policy, but explicit plan steps

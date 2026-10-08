@@ -13,11 +13,11 @@ use crate::bindings::core::market_data::scalars::extract_f64;
 use crate::bindings::core::money::{decimal_to_py, money_from_amount};
 use crate::bindings::date_utils::{date_to_py, extract_date_iso};
 use crate::bindings::extract::extract_basis_points;
+use crate::bindings::macros::wire_methods;
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::serde_to_py;
-use crate::bindings::pickle_support::reduce_via_json;
 use crate::bindings::repr_support::repr_from_serde;
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_calibration::api::market_datum::{
     CollateralEntry, DividendScheduleDatum, FxSpotDatum, PriceDatum,
 };
@@ -28,18 +28,6 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
 use serde_json::{Map, Value};
-
-/// Serialize `value` to compact JSON, labelling a failure with `type_name`.
-fn to_json<T: serde::Serialize>(value: &T, type_name: &str) -> PyResult<String> {
-    serde_json::to_string(value)
-        .map_err(|e| serde_json_to_py(e, &format!("failed to serialize {type_name}")))
-}
-
-/// Strictly deserialize `json` into `T`, labelling a failure with `type_name`.
-fn parse_json<T: serde::de::DeserializeOwned>(json: &str, type_name: &str) -> PyResult<T> {
-    serde_json::from_str(json)
-        .map_err(|e| serde_json_to_py(e, &format!("invalid {type_name} JSON")))
-}
 
 /// CDS convention wire object (``{"currency", "doc_clause"}``).
 fn cds_convention(currency: &Bound<'_, PyAny>, doc_clause: &str) -> PyResult<Value> {
@@ -244,39 +232,12 @@ impl PyInflationQuote {
         }
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "InflationQuote")
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed, has unknown fields, or fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: InflationQuote = parse_json(json, "InflationQuote")?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("InflationQuote", &self.inner)
     }
 }
+
+wire_methods!(PyInflationQuote, InflationQuote, "InflationQuote", validate);
 
 /// Cross-currency basis-swap quote for ``xccy_basis`` calibration steps.
 ///
@@ -377,39 +338,12 @@ impl PyXccyQuote {
         self.inner.spot_fx
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "XccyQuote")
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed, has unknown fields, or fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: XccyQuote = parse_json(json, "XccyQuote")?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("XccyQuote", &self.inner)
     }
 }
+
+wire_methods!(PyXccyQuote, XccyQuote, "XccyQuote", validate);
 
 /// CDS index tranche quote for ``base_correlation`` calibration steps.
 ///
@@ -556,39 +490,17 @@ impl PyCdsTrancheQuote {
         serde_to_py(py, &self.inner.convention)
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "CdsTrancheQuote")
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed, has unknown fields, or fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: CdsTrancheQuote = parse_json(json, "CdsTrancheQuote")?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("CdsTrancheQuote", &self.inner)
     }
 }
+
+wire_methods!(
+    PyCdsTrancheQuote,
+    CdsTrancheQuote,
+    "CdsTrancheQuote",
+    validate
+);
 
 /// FX spot rate market datum (``kind == "fx_spot"``).
 ///
@@ -667,37 +579,12 @@ impl PyFxSpotDatum {
         self.inner.rate
     }
 
-    /// Serialize to compact JSON (the datum payload, without ``kind``).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "FxSpotDatum")
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or has unknown fields.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        parse_json(json, "FxSpotDatum").map(|inner| Self { inner })
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("FxSpotDatum", &self.inner)
     }
 }
+
+wire_methods!(PyFxSpotDatum, FxSpotDatum, "FxSpotDatum");
 
 /// Single-asset spot price market datum (``kind == "price"``).
 ///
@@ -783,37 +670,12 @@ impl PyPriceDatum {
         }
     }
 
-    /// Serialize to compact JSON (the datum payload, without ``kind``).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "PriceDatum")
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or has unknown fields.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        parse_json(json, "PriceDatum").map(|inner| Self { inner })
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("PriceDatum", &self.inner)
     }
 }
+
+wire_methods!(PyPriceDatum, PriceDatum, "PriceDatum");
 
 /// Dividend-schedule market datum (``kind == "dividend_schedule"``).
 ///
@@ -871,37 +733,16 @@ impl PyDividendScheduleDatum {
         serde_to_py(py, &self.inner.schedule)
     }
 
-    /// Serialize to compact JSON (the datum payload, without ``kind``).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "DividendScheduleDatum")
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or has unknown fields.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        parse_json(json, "DividendScheduleDatum").map(|inner| Self { inner })
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("DividendScheduleDatum", &self.inner)
     }
 }
+
+wire_methods!(
+    PyDividendScheduleDatum,
+    DividendScheduleDatum,
+    "DividendScheduleDatum"
+);
 
 /// Collateral (CSA) currency mapping market datum (``kind == "collateral"``).
 ///
@@ -960,34 +801,9 @@ impl PyCollateralEntry {
         self.inner.csa_currency.to_string()
     }
 
-    /// Serialize to compact JSON (the datum payload, without ``kind``).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "CollateralEntry")
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or has unknown fields.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        parse_json(json, "CollateralEntry").map(|inner| Self { inner })
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("CollateralEntry", &self.inner)
     }
 }
+
+wire_methods!(PyCollateralEntry, CollateralEntry, "CollateralEntry");

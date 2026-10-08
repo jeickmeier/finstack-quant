@@ -199,54 +199,6 @@ impl VolQuote {
             }
         }
     }
-
-    /// Create a new quote with the volatility bumped by an absolute amount.
-    ///
-    /// # Arguments
-    ///
-    /// * `vol_bump` - The bump amount in volatility terms (e.g., `0.01` for a +1 vol point bump)
-    ///
-    /// # Returns
-    ///
-    /// A new `VolQuote` with the bumped volatility.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_calibration::quotes::vol::VolQuote;
-    /// use finstack_quant_calibration::quotes::ids::QuoteId;
-    /// use finstack_quant_valuations::instruments::OptionType;
-    /// use finstack_quant_core::dates::Date;
-    /// use finstack_quant_core::types::UnderlyingId;
-    ///
-    /// let quote = VolQuote::OptionVol {
-    ///     id: QuoteId::new("SPX-VOL-20241220-4500"),
-    ///     underlying: UnderlyingId::new("SPX"),
-    ///     expiry: Date::from_calendar_date(2024, time::Month::December, 20).unwrap(),
-    ///     strike: 4500.0,
-    ///     vol: 0.20,
-    ///     option_type: OptionType::Call,
-    /// };
-    ///
-    /// // Bump by 1 vol point
-    /// let bumped = quote.bump_vol_absolute(0.01)?;
-    /// # Ok::<(), finstack_quant_core::Error>(())
-    /// ```
-    pub fn bump_vol_absolute(&self, vol_bump: f64) -> Result<Self> {
-        if !vol_bump.is_finite() {
-            return Err(Error::Validation(format!(
-                "volatility bump must be finite, got {vol_bump}"
-            )));
-        }
-        let mut bumped = self.clone();
-        match &mut bumped {
-            Self::OptionVol { vol, .. }
-            | Self::SwaptionVol { vol, .. }
-            | Self::CapFloorVol { vol, .. } => *vol += vol_bump,
-        }
-        bumped.validate()?;
-        Ok(bumped)
-    }
 }
 
 fn validate_volatility(volatility: f64) -> Result<()> {
@@ -256,44 +208,4 @@ fn validate_volatility(volatility: f64) -> Result<()> {
         )));
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use time::macros::date;
-
-    #[test]
-    fn cap_floor_vol_quote_bumps_absolute_vol() {
-        let quote = VolQuote::CapFloorVol {
-            id: QuoteId::new("USD-CAP-VOL-20310506-0.0366561"),
-            expiry: date!(2031 - 05 - 06),
-            strike: 0.0366561,
-            vol: 0.0088,
-            quote_type: VolQuoteType::Normal,
-            is_cap: true,
-        };
-
-        let bumped = quote
-            .bump_vol_absolute(0.0001)
-            .expect("valid volatility bump");
-
-        let VolQuote::CapFloorVol { vol, .. } = bumped else {
-            unreachable!("bumping a cap/floor quote should retain its variant");
-        };
-        assert!((vol - 0.0089).abs() < 1e-12);
-    }
-
-    #[test]
-    fn volatility_quote_rejects_negative_bumped_value() {
-        let quote = VolQuote::CapFloorVol {
-            id: QuoteId::new("USD-CAP-VOL"),
-            expiry: date!(2031 - 05 - 06),
-            strike: 0.03,
-            vol: 0.01,
-            quote_type: VolQuoteType::Normal,
-            is_cap: true,
-        };
-        assert!(quote.bump_vol_absolute(-0.02).is_err());
-    }
 }

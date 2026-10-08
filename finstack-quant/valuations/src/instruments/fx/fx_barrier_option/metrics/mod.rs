@@ -19,12 +19,8 @@ pub(crate) fn register_fx_barrier_option_metrics(
             (Gamma, crate::metrics::OptionGreekCalculator::<crate::instruments::FxBarrierOption>::gamma()),
             (Vega, crate::metrics::OptionGreekCalculator::<crate::instruments::FxBarrierOption>::vega()),
             (Rho, crate::metrics::OptionGreekCalculator::<crate::instruments::FxBarrierOption>::rho()),
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::FxBarrierOption,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::FxBarrierOption,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
             (Vanna, crate::metrics::OptionGreekCalculator::<crate::instruments::FxBarrierOption>::vanna()),
             (Volga, crate::metrics::OptionGreekCalculator::<crate::instruments::FxBarrierOption>::volga()),
         ]

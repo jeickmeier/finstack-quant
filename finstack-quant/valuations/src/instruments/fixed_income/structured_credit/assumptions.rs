@@ -28,10 +28,7 @@ pub(crate) struct StructuredCreditAssumptionRegistry {
     market_conditions: MarketConditionsRecord,
     credit_model_defaults: CreditModelDefaultsRecord,
     cmo_collateral_defaults: CmoCollateralDefaultsRecord,
-    scenario_grids: ScenarioGridsRecord,
     simulation: SimulationRecord,
-    concentration_limits: ConcentrationLimitsRecord,
-    prepayment_models: PrepaymentModelsRecord,
     default_models: DefaultModelsRecord,
     stochastic_calibrations: StochasticCalibrationsRecord,
     deal_profiles: Vec<DealProfileRecord>,
@@ -67,55 +64,13 @@ impl StructuredCreditAssumptionRegistry {
         }
     }
 
-    pub(crate) fn psa_curve(&self) -> PsaCurveDefaults {
-        PsaCurveDefaults {
-            ramp_months: self.prepayment_models.psa.ramp_months,
-            terminal_cpr: self.prepayment_models.psa.terminal_cpr,
-        }
-    }
-
-    pub(crate) fn sda_curve(&self) -> SdaCurveDefaults {
-        SdaCurveDefaults {
-            peak_month: self.default_models.sda.peak_month,
-            peak_cdr: self.default_models.sda.peak_cdr,
-            terminal_cdr: self.default_models.sda.terminal_cdr,
-        }
+    /// Peak annual CDR of the registry SDA curve at 100% speed.
+    pub(crate) fn sda_peak_cdr(&self) -> f64 {
+        self.default_models.sda.peak_cdr
     }
 
     pub(crate) fn pool_balance_cleanup_threshold(&self) -> f64 {
         self.simulation.pool_balance_cleanup_threshold
-    }
-
-    pub(crate) fn standard_psa_speeds(&self) -> &[f64] {
-        &self.scenario_grids.psa_speeds
-    }
-
-    pub(crate) fn standard_cdr_rates(&self) -> &[f64] {
-        &self.scenario_grids.cdr_rates
-    }
-
-    pub(crate) fn standard_severity_rates(&self) -> &[f64] {
-        &self.scenario_grids.severity_rates
-    }
-
-    pub(crate) fn simulation_defaults(&self) -> SimulationDefaults {
-        SimulationDefaults {
-            pool_balance_cleanup_threshold: self.simulation.pool_balance_cleanup_threshold,
-            resolution_lag_months: self.simulation.resolution_lag_months,
-            burnout_threshold_months: self.simulation.burnout_threshold_months,
-            baseline_unemployment_rate: self.simulation.baseline_unemployment_rate,
-        }
-    }
-
-    pub(crate) fn concentration_limits(&self) -> ConcentrationLimits {
-        ConcentrationLimits {
-            max_obligor_concentration: self.concentration_limits.max_obligor_concentration,
-            max_top5_concentration: self.concentration_limits.max_top5_concentration,
-            max_top10_concentration: self.concentration_limits.max_top10_concentration,
-            max_second_lien: self.concentration_limits.max_second_lien,
-            max_cov_lite: self.concentration_limits.max_cov_lite,
-            max_dip: self.concentration_limits.max_dip,
-        }
     }
 
     pub(crate) fn rmbs_stochastic_calibration(&self, id: &str) -> Result<RmbsCalibration> {
@@ -202,15 +157,6 @@ impl StructuredCreditAssumptionRegistry {
         })
     }
 
-    pub(crate) fn standard_rates(&self, id: &str) -> Result<StandardRates> {
-        let profile = self.deal_profile(id)?;
-        Ok(StandardRates {
-            prepayment_rate: profile.constructor.prepayment.rate,
-            cdr: profile.constructor.default_cdr,
-            recovery_rate: profile.constructor.recovery_rate,
-        })
-    }
-
     fn deal_profile(&self, id: &str) -> Result<&DealProfileRecord> {
         self.deal_profiles
             .iter()
@@ -265,24 +211,6 @@ impl StructuredCreditAssumptionRegistry {
             self.simulation.pool_balance_cleanup_threshold,
             "pool balance cleanup threshold",
         )?;
-        finstack_quant_core::validation::validate_f64_unit_interval(
-            self.simulation.baseline_unemployment_rate,
-            "baseline unemployment rate",
-        )?;
-        validate_concentration_limits(&self.concentration_limits)?;
-        validate_nonzero_u32(
-            self.simulation.resolution_lag_months,
-            "resolution lag months",
-        )?;
-        validate_nonzero_u32(
-            self.simulation.burnout_threshold_months,
-            "burnout threshold months",
-        )?;
-        validate_nonzero_u32(self.prepayment_models.psa.ramp_months, "PSA ramp months")?;
-        finstack_quant_core::validation::validate_f64_unit_interval(
-            self.prepayment_models.psa.terminal_cpr,
-            "PSA terminal CPR",
-        )?;
         validate_nonzero_u32(self.default_models.sda.peak_month, "SDA peak month")?;
         finstack_quant_core::validation::validate_f64_unit_interval(
             self.default_models.sda.peak_cdr,
@@ -291,12 +219,6 @@ impl StructuredCreditAssumptionRegistry {
         finstack_quant_core::validation::validate_f64_unit_interval(
             self.default_models.sda.terminal_cdr,
             "SDA terminal CDR",
-        )?;
-        validate_grid("standard PSA speed", &self.scenario_grids.psa_speeds)?;
-        validate_grid("standard CDR rate", &self.scenario_grids.cdr_rates)?;
-        validate_grid(
-            "standard severity rate",
-            &self.scenario_grids.severity_rates,
         )?;
         finstack_quant_core::validation::validate_unique_ids(
             "structured-credit assumptions registry",
@@ -354,50 +276,6 @@ pub(crate) struct ConstructorDefaults {
     pub(crate) recovery_spec: RecoveryModelSpec,
 }
 
-/// Headline rates of a deal profile's constructor record, as exposed by the
-/// deal-type constants (`clo_standard_cdr`, `rmbs_standard_psa`, ...).
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct StandardRates {
-    /// Prepayment speed in the profile's own unit: annual CPR for CLO and
-    /// CMBS, PSA multiplier for RMBS, monthly ABS speed for auto ABS.
-    pub(crate) prepayment_rate: f64,
-    /// Annual constant default rate.
-    pub(crate) cdr: f64,
-    /// Recovery rate as a decimal fraction of defaulted par.
-    pub(crate) recovery_rate: f64,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct PsaCurveDefaults {
-    pub(crate) ramp_months: u32,
-    pub(crate) terminal_cpr: f64,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct SdaCurveDefaults {
-    pub(crate) peak_month: u32,
-    pub(crate) peak_cdr: f64,
-    pub(crate) terminal_cdr: f64,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct SimulationDefaults {
-    pub(crate) pool_balance_cleanup_threshold: f64,
-    pub(crate) resolution_lag_months: u32,
-    pub(crate) burnout_threshold_months: u32,
-    pub(crate) baseline_unemployment_rate: f64,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct ConcentrationLimits {
-    pub(crate) max_obligor_concentration: f64,
-    pub(crate) max_top5_concentration: f64,
-    pub(crate) max_top10_concentration: f64,
-    pub(crate) max_second_lien: f64,
-    pub(crate) max_cov_lite: f64,
-    pub(crate) max_dip: f64,
-}
-
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct CmoCollateralDefaults {
     pub(crate) wac: f64,
@@ -434,43 +312,8 @@ struct CmoCollateralDefaultsRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ScenarioGridsRecord {
-    psa_speeds: Vec<f64>,
-    cdr_rates: Vec<f64>,
-    severity_rates: Vec<f64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct SimulationRecord {
     pool_balance_cleanup_threshold: f64,
-    resolution_lag_months: u32,
-    burnout_threshold_months: u32,
-    baseline_unemployment_rate: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ConcentrationLimitsRecord {
-    max_obligor_concentration: f64,
-    max_top5_concentration: f64,
-    max_top10_concentration: f64,
-    max_second_lien: f64,
-    max_cov_lite: f64,
-    max_dip: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PrepaymentModelsRecord {
-    psa: PsaRecord,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PsaRecord {
-    ramp_months: u32,
-    terminal_cpr: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -736,33 +579,6 @@ fn validate_cmbs_stochastic_record(record: &CmbsStochasticRecord) -> Result<()> 
     )
 }
 
-fn validate_concentration_limits(record: &ConcentrationLimitsRecord) -> Result<()> {
-    finstack_quant_core::validation::validate_f64_unit_interval(
-        record.max_obligor_concentration,
-        "maximum obligor concentration",
-    )?;
-    finstack_quant_core::validation::validate_f64_unit_interval(
-        record.max_top5_concentration,
-        "maximum top 5 concentration",
-    )?;
-    finstack_quant_core::validation::validate_f64_unit_interval(
-        record.max_top10_concentration,
-        "maximum top 10 concentration",
-    )?;
-    finstack_quant_core::validation::validate_f64_unit_interval(
-        record.max_second_lien,
-        "maximum second lien concentration",
-    )?;
-    finstack_quant_core::validation::validate_f64_unit_interval(
-        record.max_cov_lite,
-        "maximum covenant-lite concentration",
-    )?;
-    finstack_quant_core::validation::validate_f64_unit_interval(
-        record.max_dip,
-        "maximum DIP concentration",
-    )
-}
-
 fn validate_fee_record(record: &FeeRecord) -> Result<()> {
     validate_nonnegative_finite(record.trustee_fee, "trustee fee")?;
     validate_nonnegative_finite(record.senior_mgmt_fee_bp, "senior management fee bp")?;
@@ -809,18 +625,6 @@ fn validate_constructor_record(record: &ConstructorRecord) -> Result<()> {
         record.recovery_rate,
         "constructor recovery rate",
     )?;
-    Ok(())
-}
-
-fn validate_grid(label: &str, values: &[f64]) -> Result<()> {
-    if values.is_empty() {
-        return Err(Error::Validation(format!(
-            "structured-credit assumptions registry {label} grid is empty"
-        )));
-    }
-    for value in values {
-        validate_nonnegative_finite(*value, label)?;
-    }
     Ok(())
 }
 

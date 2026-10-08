@@ -56,16 +56,6 @@ impl MetricId {
     /// Units: currency.
     pub const ExpectedLoss: Self = Self(Cow::Borrowed("expected_loss"));
 
-    /// Default probability over the documented horizon.
-    ///
-    /// Units: decimal probability in `[0, 1]`.
-    ///
-    /// # Note
-    ///
-    /// The horizon is instrument-specific and should be interpreted together
-    /// with the API producing the measure.
-    pub const DefaultProbability: Self = Self(Cow::Borrowed("default_probability"));
-
     /// PV change per +1% (0.01 absolute) recovery-rate move.
     ///
     /// Units: currency.
@@ -83,43 +73,20 @@ impl MetricId {
     /// Units: years.
     pub const WAM: Self = Self(Cow::Borrowed("wam"));
 
-    /// Expected final payment date under base assumptions
-    pub const ExpectedMaturity: Self = Self(Cow::Borrowed("expected_maturity"));
-
-    /// Percentage of original pool balance remaining.
-    ///
-    /// Units: decimal fraction of original balance (`0.65 = 65%` remaining).
-    pub const PoolFactor: Self = Self(Cow::Borrowed("pool_factor"));
-
     /// Constant Prepayment Rate (CPR), annualized.
     ///
     /// Units: decimal annual prepayment rate.
     pub const CPR: Self = Self(Cow::Borrowed("cpr"));
-
-    /// Single Monthly Mortality (SMM), monthly prepayment rate.
-    ///
-    /// Units: decimal monthly rate.
-    pub const SMM: Self = Self(Cow::Borrowed("smm"));
 
     /// Constant Default Rate (CDR), annualized.
     ///
     /// Units: decimal annual default rate.
     pub const CDR: Self = Self(Cow::Borrowed("cdr"));
 
-    /// Loss severity, usually `1 - recovery_rate`.
-    ///
-    /// Units: decimal loss fraction.
-    pub const LossSeverity: Self = Self(Cow::Borrowed("loss_severity"));
-
     /// Spread duration, a time-weighted sensitivity to spread changes.
     ///
     /// Units: years.
     pub const SpreadDuration: Self = Self(Cow::Borrowed("spread_duration"));
-
-    /// DM01, discount-margin sensitivity for floating-rate structured credit.
-    ///
-    /// Units: currency per 1bp discount-margin move.
-    pub const Dm01: Self = Self(Cow::Borrowed("dm01"));
 
     // ABS-specific Metrics
 
@@ -146,28 +113,10 @@ impl MetricId {
     /// Weighted average spread of the performing collateral, in basis points.
     pub const CloWas: Self = Self(Cow::Borrowed("clo_was"));
 
-    /// Portfolio diversity score
-    pub const CloDiversity: Self = Self(Cow::Borrowed("clo_diversity"));
-
-    /// Overcollateralization ratio
-    pub const CloOcRatio: Self = Self(Cow::Borrowed("clo_oc_ratio"));
-
-    /// Interest coverage ratio
-    pub const CloIcRatio: Self = Self(Cow::Borrowed("clo_ic_ratio"));
-
-    /// Average recovery rate on defaults
-    pub const CloRecoveryRate: Self = Self(Cow::Borrowed("clo_recovery_rate"));
-
     // CMBS-specific Metrics
 
     /// Debt Service Coverage Ratio
     pub const CmbsDscr: Self = Self(Cow::Borrowed("cmbs_dscr"));
-
-    /// Weighted Average Loan-to-Value
-    pub const CmbsWaltv: Self = Self(Cow::Borrowed("cmbs_waltv"));
-
-    /// Credit Enhancement Level
-    pub const CmbsCreditEnhancement: Self = Self(Cow::Borrowed("cmbs_ce_level"));
 
     // Asset-backed facility metrics
 
@@ -185,18 +134,4 @@ impl MetricId {
 
     /// Residual IRR of the synthetic deal (annual decimal)
     pub const AbfResidualIrr: Self = Self(Cow::Borrowed("abf_residual_irr"));
-
-    // RMBS-specific Metrics
-
-    /// PSA prepayment speed (e.g., 100% PSA)
-    pub const RmbsPsaSpeed: Self = Self(Cow::Borrowed("rmbs_psa_speed"));
-
-    /// SDA default speed
-    pub const RmbsSdaSpeed: Self = Self(Cow::Borrowed("rmbs_sda_speed"));
-
-    /// Weighted Average LTV for RMBS
-    pub const RmbsWaltv: Self = Self(Cow::Borrowed("rmbs_waltv"));
-
-    /// Weighted Average FICO score
-    pub const RmbsWafico: Self = Self(Cow::Borrowed("rmbs_wafico"));
 }

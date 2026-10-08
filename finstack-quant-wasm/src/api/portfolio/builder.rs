@@ -34,7 +34,7 @@ impl JsPortfolioBuilder {
                 .map_err(to_js_err)?;
         let as_of = parse_iso_date(&js_string(as_of, "asOf")?)?;
         Ok(Self {
-            inner: PortfolioBuilder::new(id)
+            inner: finstack_quant_portfolio::Portfolio::builder(id)
                 .base_currency(base_currency)
                 .as_of(as_of),
         })

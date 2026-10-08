@@ -60,12 +60,8 @@ pub(crate) fn register_dollar_roll_metrics(
         registry: registry,
         instrument: InstrumentType::DollarRoll,
         metrics: [
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::DollarRoll,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::DollarRoll,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
             (ImpliedFinancingRate, ImpliedFinancingRateCalculator),
             (RollSpecialness, RollSpecialnessCalculator)
         ]

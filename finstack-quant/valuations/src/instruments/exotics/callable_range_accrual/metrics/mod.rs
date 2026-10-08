@@ -12,7 +12,7 @@ pub(crate) fn register_callable_range_accrual_metrics(
 
     registry.register_metric(
         MetricId::Dv01,
-        Arc::new(UnifiedDv01Calculator::<super::CallableRangeAccrual>::new(
+        Arc::new(UnifiedDv01Calculator::new(
             Dv01CalculatorConfig::parallel_combined(),
         )),
         &[InstrumentType::CallableRangeAccrual],
@@ -22,7 +22,7 @@ pub(crate) fn register_callable_range_accrual_metrics(
         registry: registry,
         instrument: InstrumentType::CallableRangeAccrual,
         metrics: [
-            (BucketedDv01, UnifiedDv01Calculator::<super::CallableRangeAccrual>::new(
+            (BucketedDv01, UnifiedDv01Calculator::new(
                 Dv01CalculatorConfig::triangular_key_rate(),
             )),
         ]

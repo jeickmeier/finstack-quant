@@ -966,7 +966,7 @@ impl ConvertibleBond {
         Ok(bond_price / conversion_value - 1.0)
     }
 
-    /// Calculate Greeks by repricing the selected convertible lattice.
+    /// Calculate Greeks by repricing the convertible binomial lattice.
     ///
     /// # Arguments
     ///
@@ -974,10 +974,10 @@ impl ConvertibleBond {
     ///   volatility, plus forward curves and realized fixings for floating
     ///   coupons. An instrument volatility override takes precedence; surface
     ///   lookup otherwise uses the contractual conversion strike.
-    /// * `tree_type` - Optional binomial/trinomial lattice kind; `None` uses the
-    ///   binomial tree. The step count is always
-    ///   `instrument_pricing_overrides.model_config.tree_steps` (default 200).
     /// * `as_of` - Valuation date and origin of the ACT/365F equity model clock.
+    ///
+    /// The binomial lattice step count is
+    /// `instrument_pricing_overrides.model_config.tree_steps` (default 200).
     ///
     /// Bump sizes come from `metric_pricing_overrides.bump_config`
     /// (`spot_bump_decimal`, `vol_bump_decimal`, `rate_bump_bp`), defaulting to 1%,
@@ -985,7 +985,6 @@ impl ConvertibleBond {
     pub fn greeks(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
-        tree_type: Option<pricing::ConvertibleTreeType>,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<ConvertibleGreeks> {
         let bumps = crate::metrics::sensitivities::config::from_context_or_default(
@@ -995,60 +994,9 @@ impl ConvertibleBond {
         pricing::calculate_convertible_greeks(
             self,
             market,
-            tree_type.unwrap_or_default(),
             crate::instruments::GreekBumps::from(&bumps),
             as_of,
         )
-    }
-
-    /// Calculate delta of this convertible bond
-    pub fn delta(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(market, None, as_of)?;
-        Ok(greeks.delta)
-    }
-
-    /// Calculate gamma of this convertible bond
-    pub fn gamma(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(market, None, as_of)?;
-        Ok(greeks.gamma)
-    }
-
-    /// Calculate vega of this convertible bond
-    pub fn vega(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(market, None, as_of)?;
-        Ok(greeks.vega)
-    }
-
-    /// Calculate rho of this convertible bond
-    pub fn rho(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(market, None, as_of)?;
-        Ok(greeks.rho)
-    }
-
-    /// Calculate theta of this convertible bond
-    pub fn theta(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(market, None, as_of)?;
-        Ok(greeks.theta)
     }
 }
 
@@ -1115,16 +1063,7 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
         if let Some(ref trigger) = self.soft_call_trigger {
             trigger.validate("soft_call_trigger")?;
         }
-        pricing::price_convertible_bond(
-            self,
-            curves,
-            pricing::ConvertibleTreeType::default(),
-            as_of,
-        )
-    }
-
-    fn effective_start_date(&self) -> Option<Date> {
-        Some(self.issue_date)
+        pricing::price_convertible_bond(self, curves, as_of)
     }
 
     fn model_params_snapshot(&self) -> ModelParamsSnapshot {

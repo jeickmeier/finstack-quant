@@ -228,10 +228,6 @@ impl Instrument for PrivateMarketsFund {
         pricer::compute_pv(self, curves, as_of)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        None
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

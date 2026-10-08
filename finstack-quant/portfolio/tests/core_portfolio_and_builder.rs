@@ -7,7 +7,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::{AttributeValue, Entity, DUMMY_ENTITY_ID};
 use finstack_quant_portfolio::valuation::value_portfolio;
-use finstack_quant_portfolio::{Error, Portfolio, PortfolioBuilder};
+use finstack_quant_portfolio::{Error, Portfolio};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use std::sync::Arc;
 
@@ -30,7 +30,7 @@ fn getters_and_tag_filters() {
         .unwrap()
         .with_text_attribute("sector", "Tech");
 
-    let portfolio = PortfolioBuilder::new("P")
+    let portfolio = Portfolio::builder("P")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E"))
@@ -188,15 +188,15 @@ fn builder_required_fields_and_dummy_auto_create() {
     .unwrap();
 
     // Missing base_currency
-    assert!(PortfolioBuilder::new("P").as_of(as_of).build().is_err());
+    assert!(Portfolio::builder("P").as_of(as_of).build().is_err());
     // Missing as_of
-    assert!(PortfolioBuilder::new("P")
+    assert!(Portfolio::builder("P")
         .base_currency(Currency::USD)
         .build()
         .is_err());
 
     // Dummy should be auto-created because position references it
-    let portfolio = PortfolioBuilder::new("P")
+    let portfolio = Portfolio::builder("P")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .position(p)
@@ -244,7 +244,7 @@ fn notional_two_lot_deposit_native_pv_is_twice_one_lot() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("P")
+    let portfolio = Portfolio::builder("P")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(Entity::new("E"))

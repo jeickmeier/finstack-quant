@@ -758,10 +758,6 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSwap {
         Ok(deps)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        self.fixing_dates.first().copied()
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

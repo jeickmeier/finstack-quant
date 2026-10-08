@@ -500,10 +500,6 @@ impl Instrument for AssetBackedFacility {
         flows.npv(disc.as_ref(), as_of)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        Some(self.closing_date)
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

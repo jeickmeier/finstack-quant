@@ -162,31 +162,6 @@ pub mod credit {
     /// If the risky annuity (denominator) is below this, par spread is undefined.
     pub const PAR_SPREAD_DENOM_TOLERANCE: f64 = 1e-12;
 
-    /// Small-pool override when normal approximation is explicitly requested
-    /// for heterogeneous CDS-tranche pricing.
-    ///
-    /// Portfolios with this many or fewer positive-weight constituents still
-    /// use exact convolution. Exact convolution is also the default above this
-    /// threshold; larger pools use normal approximation only by explicit choice.
-    ///
-    /// The threshold is set from a measured bias study (2026-07
-    /// credit-derivatives audit, junior \[3,7\] tranche on dispersed-hazard
-    /// pools, normal approx vs exact-convolution PV):
-    ///
-    /// | Pool size | Relative PV bias |
-    /// |-----------|------------------|
-    /// | 24        | 1.55%            |
-    /// | 40        | 1.22%            |
-    /// | 64        | 0.20%            |
-    /// | 100       | 0.11%            |
-    /// | 125       | 0.03%            |
-    ///
-    /// These measurements describe the study's equally weighted fixtures,
-    /// not an accuracy guarantee for other attachments, hazards or exposure
-    /// concentrations. Name count alone cannot bound normal-approximation error.
-    /// Exact convolution costs O(n · loss-buckets) per quadrature node.
-    pub const SMALL_POOL_THRESHOLD: usize = 64;
-
     /// Calendar days per year for settlement delay calculations.
     ///
     /// Re-exported from `finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR` (ACT/365 Fixed).

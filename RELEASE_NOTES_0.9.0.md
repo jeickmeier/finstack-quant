@@ -3,7 +3,7 @@
 **Release Date**: 2026-10-02
 
 **Bump type**: minor (pre-1.0; intentional breaking Rust, Python, WASM, and JSON changes, plus pricing changes)
-**Status**: Prepared, not yet tagged (`v0.7.0` is the latest git tag; `v0.8.0` was never created)
+**Status**: Not tagged. Superseded by 0.10.0 on this tree. `v0.7.0` is still the latest git tag; `v0.8.0` and `v0.9.0` were never created.
 
 ## Executive Summary
 
@@ -184,8 +184,8 @@ pin, not a library pricing change.
 - The CDX IG 46 index-option NPV is not reconciled to Bloomberg CDSO
   (forward-spread convention and variance clock). The difference is recorded,
   not closed.
-- `v0.8.0` was never tagged. Publishing 0.9.0 from this tree is the first
-  tag after `v0.7.0`.
+- `v0.8.0` and `v0.9.0` were never tagged. The next tag from this tree is
+  `v0.10.0`.
 - `cargo semver-checks check-release` against `v0.7.0` skips 0.x API-diff
   lints once the minor bump is already applied (`no semver update required`,
   253 checks skipped on core). A forced patch check reports removed features

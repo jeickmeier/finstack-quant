@@ -32,14 +32,10 @@ pub(crate) fn register_cms_option_metrics(
             (Delta, DeltaCalculator),
             (Vega, VegaCalculator),
             (Rho, RhoCalculator),
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::CmsOption,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
             (Vanna, VannaCalculator),
             (Volga, VolgaCalculator),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::CmsOption,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
 

@@ -105,18 +105,6 @@ impl CompositeSpec {
         }
     }
 
-    /// Replace scenario-selection attributes.
-    ///
-    /// # Arguments
-    ///
-    /// * `attributes` - Tags and metadata copied onto the unresolved
-    ///   specification and retained on every resolved instrument.
-    #[must_use]
-    pub fn with_attributes(mut self, attributes: Attributes) -> Self {
-        self.attributes = attributes;
-        self
-    }
-
     /// Validate the complete embedded instrument tree and weighting policy.
     ///
     /// # Errors

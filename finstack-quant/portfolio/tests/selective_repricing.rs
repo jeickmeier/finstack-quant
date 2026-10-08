@@ -17,7 +17,7 @@ use finstack_quant_portfolio::valuation::{
     revalue_affected, value_portfolio, PortfolioValuationOptions,
 };
 use finstack_quant_portfolio::MarketFactorKey;
-use finstack_quant_portfolio::{Portfolio, PortfolioBuilder};
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::{
     Attributes, Instrument, MarketDependencies, PricingOptions, RatesCurveKind,
@@ -146,7 +146,7 @@ fn build_two_curve_portfolio() -> Portfolio {
     )
     .unwrap();
 
-    PortfolioBuilder::new("TEST")
+    Portfolio::builder("TEST")
         .base_currency(Currency::USD)
         .as_of(base_date())
         .entity(Entity::new("ENTITY_A"))
@@ -419,7 +419,7 @@ fn selective_reprice_fx_change_reprices_native_non_base_positions() {
         PositionUnit::Units,
     )
     .unwrap();
-    let portfolio = PortfolioBuilder::new("TEST")
+    let portfolio = Portfolio::builder("TEST")
         .base_currency(Currency::USD)
         .as_of(base_date())
         .entity(Entity::new("ENTITY_A"))
@@ -553,7 +553,7 @@ fn unresolved_positions_always_included_in_affected() {
     )
     .unwrap();
 
-    let portfolio = PortfolioBuilder::new("TEST")
+    let portfolio = Portfolio::builder("TEST")
         .base_currency(Currency::USD)
         .as_of(base_date())
         .entity(Entity::new("ENTITY_A"))
@@ -593,7 +593,7 @@ fn empty_dependencies_are_resolved_and_never_affected() {
         PositionUnit::Units,
     )
     .unwrap();
-    let portfolio = PortfolioBuilder::new("DEFAULT_DEPS")
+    let portfolio = Portfolio::builder("DEFAULT_DEPS")
         .base_currency(Currency::USD)
         .as_of(base_date())
         .entity(Entity::new("ENTITY_A"))
@@ -775,7 +775,7 @@ fn dependency_probe_instrument(
 }
 
 fn build_dependency_probe_portfolio(position_count: usize) -> (Portfolio, Vec<DependencyProbe>) {
-    let mut builder = PortfolioBuilder::new(format!("SELECTIVE_{position_count}"))
+    let mut builder = Portfolio::builder(format!("SELECTIVE_{position_count}"))
         .base_currency(Currency::USD)
         .as_of(base_date())
         .entity(Entity::new("ENTITY_A"));
@@ -1011,7 +1011,7 @@ fn selective_instrument_replacement_with_same_position_id_forces_reprice() {
         None,
         None,
     );
-    let base_portfolio = PortfolioBuilder::new("BASE")
+    let base_portfolio = Portfolio::builder("BASE")
         .base_currency(Currency::USD)
         .as_of(base_date())
         .entity(Entity::new("ENTITY_A"))
@@ -1038,7 +1038,7 @@ fn selective_instrument_replacement_with_same_position_id_forces_reprice() {
         None,
         None,
     );
-    let replacement_portfolio = PortfolioBuilder::new("REPLACEMENT")
+    let replacement_portfolio = Portfolio::builder("REPLACEMENT")
         .base_currency(Currency::USD)
         .as_of(base_date())
         .entity(Entity::new("ENTITY_A"))
@@ -1136,7 +1136,7 @@ fn selective_fx_change_reprices_only_fx_dependent_instrument_and_refreshes_all_c
         Some((Currency::EUR, Currency::JPY)),
         Some((Currency::EUR, Currency::JPY)),
     );
-    let portfolio = PortfolioBuilder::new("FX_SELECTIVE")
+    let portfolio = Portfolio::builder("FX_SELECTIVE")
         .base_currency(Currency::USD)
         .as_of(base_date())
         .entity(Entity::new("ENTITY_A"))

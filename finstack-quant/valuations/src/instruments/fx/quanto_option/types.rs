@@ -702,10 +702,6 @@ impl crate::instruments::common_impl::traits::Instrument for QuantoOption {
         Ok(result.value)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        None
-    }
-
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.expiry)
     }

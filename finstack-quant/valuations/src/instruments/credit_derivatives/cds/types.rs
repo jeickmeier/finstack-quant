@@ -804,10 +804,6 @@ impl crate::instruments::common_impl::traits::Instrument for CreditDefaultSwap {
         Some(self.premium_leg.end)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.premium_leg.start)
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

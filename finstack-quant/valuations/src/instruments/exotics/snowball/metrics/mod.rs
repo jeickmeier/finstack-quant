@@ -12,7 +12,7 @@ pub(crate) fn register_snowball_metrics(
 
     registry.register_metric(
         MetricId::Dv01,
-        Arc::new(UnifiedDv01Calculator::<super::Snowball>::new(
+        Arc::new(UnifiedDv01Calculator::new(
             Dv01CalculatorConfig::parallel_combined(),
         )),
         &[InstrumentType::Snowball],
@@ -22,7 +22,7 @@ pub(crate) fn register_snowball_metrics(
         registry: registry,
         instrument: InstrumentType::Snowball,
         metrics: [
-            (BucketedDv01, UnifiedDv01Calculator::<super::Snowball>::new(
+            (BucketedDv01, UnifiedDv01Calculator::new(
                 Dv01CalculatorConfig::triangular_key_rate(),
             )),
         ]

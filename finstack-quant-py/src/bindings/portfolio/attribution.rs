@@ -28,6 +28,12 @@ pub(crate) struct PyReconciliationReport {
     pub(crate) inner: finstack_quant_portfolio::attribution::ReconciliationReport,
 }
 
+crate::bindings::macros::wire_methods!(
+    PyReconciliationReport,
+    finstack_quant_portfolio::attribution::ReconciliationReport,
+    "ReconciliationReport"
+);
+
 #[pymethods]
 impl PyReconciliationReport {
     /// Unexplained base-currency amount after all buckets are summed.
@@ -58,26 +64,6 @@ impl PyReconciliationReport {
             &self.inner,
             &["total_residual", "is_reconciled", "tolerance"],
         )
-    }
-
-    /// Serialize to a compact JSON string.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Deserialize from JSON produced by :meth:`to_json`.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Support `pickle` via the same serde round-trip as ``to_json``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
     fn __repr__(&self) -> String {
@@ -111,6 +97,12 @@ pub(crate) struct PyPortfolioAttribution {
     inner: finstack_quant_portfolio::attribution::PortfolioAttribution,
 }
 
+crate::bindings::macros::wire_methods!(
+    PyPortfolioAttribution,
+    finstack_quant_portfolio::attribution::PortfolioAttribution,
+    "PortfolioAttribution"
+);
+
 impl PyPortfolioAttribution {
     fn from_inner(inner: finstack_quant_portfolio::attribution::PortfolioAttribution) -> Self {
         Self { inner }
@@ -119,13 +111,6 @@ impl PyPortfolioAttribution {
 
 #[pymethods]
 impl PyPortfolioAttribution {
-    /// Serialize the complete canonical attribution payload to compact JSON.
-    fn to_json(&self, py: Python<'_>) -> PyResult<String> {
-        let attribution = &self.inner;
-        py.detach(|| serde_json::to_string(attribution))
-            .map_err(display_to_py)
-    }
-
     /// Serialize the position-native nested attribution map to compact JSON.
     ///
     /// Position keys retain the canonical Rust ``IndexMap`` insertion order.
@@ -397,23 +382,6 @@ impl PyPortfolioAttribution {
     fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
         let frame = self.to_dataframe(py).ok()?;
         frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
-
-    /// Deserialize from JSON produced by `to_json`.
-    ///
-    /// Completes the wire round-trip, which is also what makes this type
-    /// picklable (see `__reduce__`).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::attribution::PortfolioAttribution =
-            serde_json::from_str(json).map_err(crate::errors::display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json(py)?)
     }
 }
 

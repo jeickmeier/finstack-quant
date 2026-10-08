@@ -8,7 +8,6 @@
 //! Convergence properties tested:
 //! - Error decreases as step count increases (monotonic convergence)
 //! - Final price stabilizes within tolerance (asymptotic stability)
-//! - Trinomial tree achieves similar convergence behavior
 //! - Richardson extrapolation test for O(1/N) convergence rate
 
 use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec};
@@ -18,16 +17,13 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    price_convertible_bond, ConvertibleTreeType,
-};
+use finstack_quant_valuations::instruments::fixed_income::convertible::price_convertible_bond;
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
 };
 use time::Month;
 
 use super::fixtures::with_tree_steps;
-use crate::instruments::common::test_helpers::tolerances;
 
 /// Create a simple convertible bond for convergence testing.
 ///
@@ -125,32 +121,17 @@ fn test_tree_convergence_binomial() {
     let market = create_test_market(as_of);
 
     // Price with increasing tree steps
-    let price_100 = price_convertible_bond(
-        &with_tree_steps(&bond, 100),
-        &market,
-        ConvertibleTreeType::Binomial,
-        as_of,
-    )
-    .expect("pricing should succeed")
-    .amount();
+    let price_100 = price_convertible_bond(&with_tree_steps(&bond, 100), &market, as_of)
+        .expect("pricing should succeed")
+        .amount();
 
-    let price_500 = price_convertible_bond(
-        &with_tree_steps(&bond, 500),
-        &market,
-        ConvertibleTreeType::Binomial,
-        as_of,
-    )
-    .expect("pricing should succeed")
-    .amount();
+    let price_500 = price_convertible_bond(&with_tree_steps(&bond, 500), &market, as_of)
+        .expect("pricing should succeed")
+        .amount();
 
-    let price_1000 = price_convertible_bond(
-        &with_tree_steps(&bond, 1000),
-        &market,
-        ConvertibleTreeType::Binomial,
-        as_of,
-    )
-    .expect("pricing should succeed")
-    .amount();
+    let price_1000 = price_convertible_bond(&with_tree_steps(&bond, 1000), &market, as_of)
+        .expect("pricing should succeed")
+        .amount();
 
     // Verify all prices are finite and positive
     assert!(
@@ -187,105 +168,6 @@ fn test_tree_convergence_binomial() {
 }
 
 #[test]
-fn test_tree_convergence_trinomial() {
-    let bond = create_test_convertible();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-    let market = create_test_market(as_of);
-
-    // Price with increasing tree steps
-    let price_50 = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Trinomial,
-        as_of,
-    )
-    .expect("pricing should succeed")
-    .amount();
-
-    let price_200 = price_convertible_bond(&bond, &market, ConvertibleTreeType::Trinomial, as_of)
-        .expect("pricing should succeed")
-        .amount();
-
-    let price_500 = price_convertible_bond(
-        &with_tree_steps(&bond, 500),
-        &market,
-        ConvertibleTreeType::Trinomial,
-        as_of,
-    )
-    .expect("pricing should succeed")
-    .amount();
-
-    // Verify all prices are finite and positive
-    assert!(
-        price_50.is_finite() && price_50 > 0.0,
-        "N=50 price should be finite positive"
-    );
-    assert!(
-        price_200.is_finite() && price_200 > 0.0,
-        "N=200 price should be finite positive"
-    );
-    assert!(
-        price_500.is_finite() && price_500 > 0.0,
-        "N=500 price should be finite positive"
-    );
-
-    // Convergence error should decrease
-    let error_50_200 = (price_200 - price_50).abs();
-    let error_200_500 = (price_500 - price_200).abs();
-
-    assert!(
-        error_200_500 < error_50_200,
-        "Trinomial convergence error should decrease: err(50→200)={:.4}, err(200→500)={:.4}",
-        error_50_200,
-        error_200_500
-    );
-
-    // Final price should be stable
-    let stability = (price_500 - price_200).abs() / price_500;
-    assert!(
-        stability < 0.005, // 0.5% for trinomial (fewer steps tested)
-        "Trinomial price should stabilize: relative change={:.4}%",
-        stability * 100.0
-    );
-}
-
-#[test]
-fn test_binomial_trinomial_consistency() {
-    let bond = create_test_convertible();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-    let market = create_test_market(as_of);
-
-    // Price with high step count for both tree types
-    let price_binomial = price_convertible_bond(
-        &with_tree_steps(&bond, 500),
-        &market,
-        ConvertibleTreeType::Binomial,
-        as_of,
-    )
-    .expect("binomial pricing should succeed")
-    .amount();
-
-    let price_trinomial = price_convertible_bond(
-        &with_tree_steps(&bond, 500),
-        &market,
-        ConvertibleTreeType::Trinomial,
-        as_of,
-    )
-    .expect("trinomial pricing should succeed")
-    .amount();
-
-    // Both trees should converge to similar values (within 1%)
-    let relative_diff = (price_binomial - price_trinomial).abs() / price_binomial;
-    assert!(
-        relative_diff < tolerances::STATISTICAL, // 1%
-        "Binomial ({:.2}) and Trinomial ({:.2}) should agree within 1%, diff={:.2}%",
-        price_binomial,
-        price_trinomial,
-        relative_diff * 100.0
-    );
-}
-
-#[test]
 fn test_convergence_rate_order_one() {
     // Richardson extrapolation test: For binomial trees, convergence is O(1/N).
     // Error(N) ≈ C/N, so Error(N)/Error(2N) ≈ 2
@@ -293,27 +175,17 @@ fn test_convergence_rate_order_one() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let market = create_test_market(as_of);
 
-    let price_100 = price_convertible_bond(
-        &with_tree_steps(&bond, 100),
-        &market,
-        ConvertibleTreeType::Binomial,
-        as_of,
-    )
-    .expect("pricing should succeed")
-    .amount();
-
-    let price_200 = price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial, as_of)
+    let price_100 = price_convertible_bond(&with_tree_steps(&bond, 100), &market, as_of)
         .expect("pricing should succeed")
         .amount();
 
-    let price_400 = price_convertible_bond(
-        &with_tree_steps(&bond, 400),
-        &market,
-        ConvertibleTreeType::Binomial,
-        as_of,
-    )
-    .expect("pricing should succeed")
-    .amount();
+    let price_200 = price_convertible_bond(&bond, &market, as_of)
+        .expect("pricing should succeed")
+        .amount();
+
+    let price_400 = price_convertible_bond(&with_tree_steps(&bond, 400), &market, as_of)
+        .expect("pricing should succeed")
+        .amount();
 
     // Use price_400 as reference for true value
     let error_100 = (price_100 - price_400).abs();
@@ -341,7 +213,7 @@ fn test_price_bounds_validity() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let market = create_test_market(as_of);
 
-    let price = price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial, as_of)
+    let price = price_convertible_bond(&bond, &market, as_of)
         .expect("pricing should succeed")
         .amount();
 

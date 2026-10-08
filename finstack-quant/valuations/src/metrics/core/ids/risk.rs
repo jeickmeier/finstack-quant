@@ -161,9 +161,6 @@ impl MetricId {
     /// basis point.
     pub const Fx01: Self = Self(Cow::Borrowed("fx01"));
 
-    /// NPV sensitivity per basis point (inflation swaps)
-    pub const Npv01: Self = Self(Cow::Borrowed("npv01"));
-
     /// Running coupon sensitivity per basis point (CDS Tranche)
     pub const SpreadDv01: Self = Self(Cow::Borrowed("spread_dv01"));
 

@@ -24,7 +24,9 @@ use super::super::convert::{
 use super::super::instruments::{
     enum_from_str, serialize_typed_instrument_json, stub_kind_from_py,
 };
-use super::super::typed_fx::{instrument_envelope_methods, instrument_pricing_methods};
+use super::super::typed_macros::{
+    builder_set, instrument_envelope_methods, instrument_pricing_methods,
+};
 use crate::bindings::valuations::convert::take_builder;
 
 type CdsTrancheBuilderInner =
@@ -665,16 +667,6 @@ crate::bindings::valuations::pricing::pricing_override_methods!(
     fields
 );
 
-/// Apply one consuming Rust setter and record the field for ``__repr__``.
-macro_rules! tranche_set {
-    ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{
-        let b = take_builder(&mut $slf.inner)?;
-        $slf.inner = Some($apply(b));
-        $slf.fields.push((stringify!($field), $repr));
-        Ok($slf)
-    }};
-}
-
 #[pymethods]
 impl PyCdsTrancheBuilder {
     /// Set the instrument identifier.
@@ -690,7 +682,7 @@ impl PyCdsTrancheBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        tranche_set!(
+        builder_set!(
             slf,
             id,
             format!("{value:?}"),
@@ -711,7 +703,7 @@ impl PyCdsTrancheBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn index_name<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        tranche_set!(
+        builder_set!(
             slf,
             index_name,
             format!("{value:?}"),
@@ -732,7 +724,7 @@ impl PyCdsTrancheBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn series<'py>(mut slf: PyRefMut<'py, Self>, value: u16) -> PyResult<PyRefMut<'py, Self>> {
-        tranche_set!(
+        builder_set!(
             slf,
             series,
             value.to_string(),
@@ -754,7 +746,7 @@ impl PyCdsTrancheBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn attach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        tranche_set!(
+        builder_set!(
             slf,
             attach_pct,
             float_repr(value),
@@ -776,7 +768,7 @@ impl PyCdsTrancheBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn detach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        tranche_set!(
+        builder_set!(
             slf,
             detach_pct,
             float_repr(value),
@@ -801,7 +793,7 @@ impl PyCdsTrancheBuilder {
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = value.inner;
-        tranche_set!(
+        builder_set!(
             slf,
             notional,
             money_repr(money),
@@ -826,7 +818,7 @@ impl PyCdsTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let maturity = py_to_date(value)?;
-        tranche_set!(
+        builder_set!(
             slf,
             maturity,
             date_repr(maturity),
@@ -856,7 +848,7 @@ impl PyCdsTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let bp = bps_from_py(value, "coupon_bp")?;
-        tranche_set!(
+        builder_set!(
             slf,
             coupon_bp,
             float_repr(bp),
@@ -886,7 +878,7 @@ impl PyCdsTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let tenor = tenor_from_py(value, "frequency")?;
-        tranche_set!(
+        builder_set!(
             slf,
             frequency,
             format!("Tenor({:?})", tenor.to_string()),
@@ -916,7 +908,7 @@ impl PyCdsTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let day_count = day_count_from_py(value, "day_count")?;
-        tranche_set!(
+        builder_set!(
             slf,
             day_count,
             format!("DayCount('{day_count}')"),
@@ -947,7 +939,7 @@ impl PyCdsTrancheBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let convention = bdc_from_py(value, "business_day_convention")?;
         let shown = enum_to_py_string(&convention).map(|s| format!("{s:?}"))?;
-        tranche_set!(
+        builder_set!(
             slf,
             business_day_convention,
             shown,
@@ -971,7 +963,7 @@ impl PyCdsTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        tranche_set!(
+        builder_set!(
             slf,
             calendar_id,
             format!("{value:?}"),
@@ -995,7 +987,7 @@ impl PyCdsTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        tranche_set!(
+        builder_set!(
             slf,
             discount_curve_id,
             format!("{value:?}"),
@@ -1019,7 +1011,7 @@ impl PyCdsTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        tranche_set!(
+        builder_set!(
             slf,
             credit_index_id,
             format!("{value:?}"),
@@ -1046,7 +1038,7 @@ impl PyCdsTrancheBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side: PayReceive = enum_from_str(value, "side")?;
-        tranche_set!(
+        builder_set!(
             slf,
             side,
             format!("{value:?}"),
@@ -1072,7 +1064,7 @@ impl PyCdsTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let start_date = py_to_date(value)?;
-        tranche_set!(
+        builder_set!(
             slf,
             start_date,
             date_repr(start_date),
@@ -1097,7 +1089,7 @@ impl PyCdsTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        tranche_set!(
+        builder_set!(
             slf,
             realized_loss,
             float_repr(value),
@@ -1125,7 +1117,7 @@ impl PyCdsTrancheBuilder {
         value: PyRef<'_, PyRollRule>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let rule = value.inner;
-        tranche_set!(
+        builder_set!(
             slf,
             roll_rule,
             format!("{rule:?}"),
@@ -1156,7 +1148,7 @@ impl PyCdsTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let stub = stub_kind_from_py(Some(value), "stub")?;
-        tranche_set!(
+        builder_set!(
             slf,
             stub,
             format!("{stub:?}"),
@@ -1188,7 +1180,7 @@ impl PyCdsTrancheBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let (date, money) = dated_money_from_py(value, None, "upfront")?;
         let shown = format!("({}, {})", date_repr(date), money_repr(money));
-        tranche_set!(slf, upfront, shown, |b: CdsTrancheBuilderInner| b
+        builder_set!(slf, upfront, shown, |b: CdsTrancheBuilderInner| b
             .upfront((date, money)))
     }
 
@@ -1219,7 +1211,7 @@ impl PyCdsTrancheBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        tranche_set!(slf, attributes, shown, |b: CdsTrancheBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: CdsTrancheBuilderInner| b
             .attributes(attrs))
     }
 

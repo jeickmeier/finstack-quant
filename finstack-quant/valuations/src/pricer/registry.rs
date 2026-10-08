@@ -139,8 +139,8 @@ impl PricingDispatch {
 
     /// Select the dispatch for a host-supplied model key.
     ///
-    /// This is the model argument of the host `calculate_var_with_pricing`
-    /// entry points: `"default"` keeps each instrument's canonical default
+    /// This is the model argument of the host historical-VaR entry points
+    /// (Rust `metrics::risk::calculate_var`): `"default"` keeps each instrument's canonical default
     /// path, any other key reprices every instrument through that model in the
     /// shared standard pricer registry.
     ///

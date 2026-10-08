@@ -13,7 +13,6 @@ use crate::instruments::fixed_income::structured_credit::types::{
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-use finstack_quant_core::explain::{ExplainOpts, ExplanationTrace, TraceEntry};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Error as CoreError;
@@ -171,26 +170,6 @@ pub fn execute_waterfall(
     pool: &AssetPool,
     context: WaterfallContext,
 ) -> Result<WaterfallDistribution> {
-    execute_waterfall_with_explanation(waterfall, tranches, pool, context, ExplainOpts::disabled())
-}
-
-/// Execute waterfall with optional explanation trace.
-///
-/// # Arguments
-///
-/// * `waterfall` - Ordered payment rules, base currency, and diversion logic.
-/// * `tranches` - Tranche structure receiving the calculated distributions.
-/// * `pool` - Asset pool supplying collateral and coverage-test data.
-/// * `context` - Period cash, dates, market data, and dynamic balance state.
-/// * `explain` - Trace configuration; disabled tracing leaves the economic
-///   allocations unchanged while avoiding explanation records.
-pub fn execute_waterfall_with_explanation(
-    waterfall: &Waterfall,
-    tranches: &TrancheStructure,
-    pool: &AssetPool,
-    context: WaterfallContext,
-    explain: ExplainOpts,
-) -> Result<WaterfallDistribution> {
     let mut tiers: Vec<_> = waterfall.tiers.iter().collect();
     tiers.sort_by_key(|tier| tier.priority);
     for pair in tiers.windows(2) {
@@ -321,7 +300,7 @@ pub fn execute_waterfall_with_explanation(
         .iter()
         .map(|t| t.recipients.len())
         .sum::<usize>();
-    let mut allocation_output = AllocationOutput::with_capacity(estimated_recipients, &explain);
+    let mut allocation_output = AllocationOutput::with_capacity(estimated_recipients);
 
     // Cash allocated per tier, in execution order.
     let mut tier_allocations = Vec::with_capacity(waterfall.tiers.len());
@@ -394,7 +373,6 @@ pub fn execute_waterfall_with_explanation(
                             context.period_start,
                             true,
                             &mut allocation_output,
-                            &explain,
                             &mut principal_paid_in_period,
                         )?,
                         _ => Money::from((0_i64, waterfall.currency)),
@@ -443,7 +421,6 @@ pub fn execute_waterfall_with_explanation(
                 context.period_start,
                 false,
                 &mut allocation_output,
-                &explain,
                 &mut principal_paid_in_period,
             )?,
             AllocationMode::ProRata => allocate_pro_rata(
@@ -454,7 +431,6 @@ pub fn execute_waterfall_with_explanation(
                 context.period_start,
                 false,
                 &mut allocation_output,
-                &explain,
                 &mut principal_paid_in_period,
             )?,
         };
@@ -529,10 +505,8 @@ pub fn execute_waterfall_with_explanation(
         remaining_principal: principal_remaining,
         principal_used_for_interest,
         had_diversions,
-        diversion_reason,
         diverted_amounts,
         recovery_proceeds: context.recovery_proceeds,
-        explanation: allocation_output.trace,
     })
 }
 
@@ -582,24 +556,17 @@ pub(crate) struct AllocationOutput {
     pub(crate) principal_distributions: HashMap<RecipientType, Money>,
     /// Payment records for audit trail
     pub(crate) payment_records: Vec<PaymentRecord>,
-    /// Optional explanation trace
-    pub(crate) trace: Option<ExplanationTrace>,
 }
 
 impl AllocationOutput {
     /// Create new allocation state with pre-allocated capacity.
-    pub(crate) fn with_capacity(estimated_recipients: usize, explain: &ExplainOpts) -> Self {
+    pub(crate) fn with_capacity(estimated_recipients: usize) -> Self {
         let mut distributions = HashMap::default();
         distributions.reserve(estimated_recipients);
         Self {
             distributions,
             principal_distributions: HashMap::default(),
             payment_records: Vec::with_capacity(estimated_recipients),
-            trace: if explain.enabled {
-                Some(ExplanationTrace::new("waterfall"))
-            } else {
-                None
-            },
         }
     }
 }
@@ -614,7 +581,6 @@ fn allocate_sequential(
     period_start: Date,
     diverted: bool,
     output: &mut AllocationOutput,
-    explain: &ExplainOpts,
     principal_paid_in_period: &mut HashMap<String, Money>,
 ) -> Result<Money> {
     let currency = ctx.currency;
@@ -707,33 +673,6 @@ fn allocate_sequential(
             diverted,
         });
 
-        if let Some(ref mut t) = output.trace {
-            t.push(
-                TraceEntry::WaterfallStep {
-                    period: 0,
-                    step_name: format!(
-                        "{}/{} - {:?}",
-                        tier.id, recipient.id, recipient.recipient_type
-                    ),
-                    cash_in_amount: requested.amount(),
-                    cash_in_currency: requested.currency().to_string(),
-                    cash_out_amount: paid.amount(),
-                    cash_out_currency: paid.currency().to_string(),
-                    shortfall_amount: if shortfall.amount() > 0.0 {
-                        Some(shortfall.amount())
-                    } else {
-                        None
-                    },
-                    shortfall_currency: if shortfall.amount() > 0.0 {
-                        Some(shortfall.currency().to_string())
-                    } else {
-                        None
-                    },
-                },
-                explain.max_entries,
-            );
-        }
-
         tier_total = tier_total.checked_add(paid)?;
         available = available.checked_sub(paid)?;
     }
@@ -751,7 +690,6 @@ fn allocate_pro_rata(
     period_start: Date,
     diverted: bool,
     output: &mut AllocationOutput,
-    explain: &ExplainOpts,
     principal_paid_in_period: &mut HashMap<String, Money>,
 ) -> Result<Money> {
     let currency = ctx.currency;
@@ -791,8 +729,6 @@ fn allocate_pro_rata(
         total_requested = total_requested.checked_add(requested)?;
         recipient_requests.push((recipient, requested));
     }
-
-    let total_weight: f64 = recipients.iter().map(|r| r.weight.unwrap_or(1.0)).sum();
 
     let tier_available = if total_requested.amount() <= available.amount() {
         total_requested
@@ -874,13 +810,6 @@ fn allocate_pro_rata(
             }
         }
 
-        let weight = recipient.weight.unwrap_or(1.0);
-        let pro_rata_share = if total_weight > 0.0 {
-            weight / total_weight
-        } else {
-            1.0 / recipients.len() as f64
-        };
-
         output.payment_records.push(PaymentRecord {
             tier_id: tier.id.clone(),
             recipient_id: recipient.id.clone(),
@@ -891,36 +820,6 @@ fn allocate_pro_rata(
             shortfall,
             diverted,
         });
-
-        if let Some(ref mut t) = output.trace {
-            t.push(
-                TraceEntry::WaterfallStep {
-                    period: 0,
-                    step_name: format!(
-                        "{}/{} - {:?} (pro-rata {:.1}%)",
-                        tier.id,
-                        recipient.id,
-                        recipient.recipient_type,
-                        pro_rata_share * 100.0
-                    ),
-                    cash_in_amount: requested.amount(),
-                    cash_in_currency: requested.currency().to_string(),
-                    cash_out_amount: paid.amount(),
-                    cash_out_currency: paid.currency().to_string(),
-                    shortfall_amount: if shortfall.amount() > 0.0 {
-                        Some(shortfall.amount())
-                    } else {
-                        None
-                    },
-                    shortfall_currency: if shortfall.amount() > 0.0 {
-                        Some(shortfall.currency().to_string())
-                    } else {
-                        None
-                    },
-                },
-                explain.max_entries,
-            );
-        }
 
         tier_total = tier_total.checked_add(paid)?;
     }

@@ -66,13 +66,16 @@ impl MetricCalculator for ImpliedVolCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::rates::swaption::SwaptionParams;
+    use crate::instruments::rates::irs::{FixedLegSpec, FloatLegSpec, FloatingLegCompounding};
+    use crate::instruments::rates::swaption::CashSettlementMethod;
+    use crate::instruments::{OptionType, SettlementType, VolatilityModel};
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{Date, DayCount, Tenor};
+    use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::{CurveId, InstrumentId};
     use std::sync::Arc;
     use time::macros::date;
 
@@ -109,26 +112,55 @@ mod tests {
             .insert_surface(surface)
     }
 
+    /// 1Y-into-5Y payer swaption on USD_OIS / USD_LIBOR_3M with the standard
+    /// semi-annual 30/360 versus quarterly ACT/360 vanilla legs.
     fn payer_swaption(strike: f64) -> Swaption {
-        let params = SwaptionParams::payer(
-            Money::from((1_000_000_i64, Currency::USD)),
-            strike,
-            date!(2025 - 01 - 01),
-            date!(2025 - 01 - 01),
-            date!(2030 - 01 - 01),
-        )
-        .expect("valid swaption params")
-        .with_fixed_frequency(Tenor::semi_annual())
-        .with_float_frequency(Tenor::quarterly())
-        .with_fixed_day_count(DayCount::Thirty360)
-        .with_float_day_count(DayCount::Act360);
-        Swaption::new(
-            "SWAPTION_IV_TEST",
-            &params,
-            "USD_OIS",
-            "USD_LIBOR_3M",
-            "USD_SWAPTION_VOL",
-        )
+        let start = date!(2025 - 01 - 01);
+        let end = date!(2030 - 01 - 01);
+        let fixed = FixedLegSpec {
+            discount_curve_id: CurveId::new("USD_OIS"),
+            rate: rust_decimal::Decimal::try_from(strike).expect("strike"),
+            frequency: Tenor::semi_annual(),
+            day_count: DayCount::Thirty360,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            calendar_id: None,
+            stub: StubKind::None,
+            start,
+            end,
+            par_method: None,
+            payment_lag_days: 0,
+            end_of_month: false,
+        };
+        let float = FloatLegSpec {
+            discount_curve_id: CurveId::new("USD_OIS"),
+            forward_curve_id: CurveId::new("USD_LIBOR_3M"),
+            spread_bp: rust_decimal::Decimal::ZERO,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            calendar_id: None,
+            stub: StubKind::None,
+            reset_lag_days: 0,
+            fixing_calendar_id: None,
+            start,
+            end,
+            compounding: FloatingLegCompounding::Simple,
+            payment_lag_days: 0,
+            end_of_month: false,
+        };
+        Swaption::builder()
+            .id(InstrumentId::new("SWAPTION_IV_TEST"))
+            .option_type(OptionType::Call)
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .expiry(start)
+            .settlement(SettlementType::Physical)
+            .cash_settlement_method(CashSettlementMethod::default())
+            .vol_model(VolatilityModel::Black)
+            .vol_surface_id(CurveId::new("USD_SWAPTION_VOL"))
+            .underlying_fixed_leg(fixed)
+            .underlying_float_leg(float)
+            .build()
+            .expect("valid swaption")
     }
 
     fn context_with_target(target_pv: f64, strike: f64) -> MetricContext {
