@@ -34,7 +34,7 @@ use crate::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOve
 use crate::build::BuildCtx;
 use crate::config::CalibrationConfig;
 use crate::quotes::market_quote::MarketQuote;
-use crate::solver::helpers::bracket_solve_1d_nearest_first_with_diagnostics;
+use crate::solver::helpers::{bracket_solve_1d, ScanStrategy};
 use crate::CalibrationReport;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -261,12 +261,13 @@ impl StudentTTarget {
             (initial_df, 1usize, residual0)
         } else {
             let scan = self.build_scan_grid(df_lo, df_hi, initial_df);
-            let (root, diagnostics) = bracket_solve_1d_nearest_first_with_diagnostics(
+            let (root, diagnostics) = bracket_solve_1d(
                 &price_residual,
                 initial_df,
                 &scan,
                 acceptance_tolerance,
                 max_iters,
+                ScanStrategy::NearestFirst,
             )?;
             match root {
                 Some(df) if df.is_finite() && (df_lo..=df_hi).contains(&df) => {

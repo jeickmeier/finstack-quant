@@ -148,45 +148,6 @@ impl InflationQuote {
             }
         }
     }
-
-    /// Create a new quote with the inflation rate bumped by a decimal amount.
-    ///
-    /// # Arguments
-    ///
-    /// * `rate_bump` - The bump amount in decimal terms (e.g., `0.0001` for 1 basis point)
-    ///
-    /// # Returns
-    ///
-    /// A new `InflationQuote` with the bumped rate.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_calibration::quotes::inflation::InflationQuote;
-    /// use finstack_quant_calibration::quotes::ids::QuoteId;
-    /// use finstack_quant_valuations::market::conventions::ids::InflationSwapConventionId;
-    /// use finstack_quant_core::dates::Date;
-    ///
-    /// let quote = InflationQuote::InflationSwap {
-    ///     id: QuoteId::new("USA-CPI-U-ZCIS-5Y"),
-    ///     maturity: Date::from_calendar_date(2029, time::Month::June, 20).unwrap(),
-    ///     rate: 0.025,
-    ///     index: "US-CPI-U".to_string(),
-    ///     convention: InflationSwapConventionId::new("USD-CPI"),
-    /// };
-    ///
-    /// // Bump by 1 basis point
-    /// let bumped = quote.bump_rate_decimal(0.0001);
-    /// ```
-    pub fn bump_rate_decimal(&self, rate_bump: f64) -> Self {
-        let mut quote = self.clone();
-        match &mut quote {
-            Self::InflationSwap { rate, .. } | Self::YoYInflationSwap { rate, .. } => {
-                *rate += rate_bump;
-            }
-        }
-        quote
-    }
 }
 
 #[cfg(test)]

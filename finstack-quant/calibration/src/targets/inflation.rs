@@ -9,7 +9,9 @@ use crate::quotes::market_quote::{ExtractQuotes, MarketQuote};
 use crate::solver::bootstrap::SequentialBootstrapper;
 use crate::solver::global::GlobalFitOptimizer;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
-use crate::targets::util::{scheme_factor, sorted_knot_grid, ContextScratch};
+use crate::targets::util::{
+    scheme_factor, sorted_knot_grid, validate_global_knot_grid, ContextScratch,
+};
 use crate::CalibrationReport;
 
 use crate::build::prepared::PreparedQuote;
@@ -253,6 +255,17 @@ impl InflationCurveTarget {
         )
     }
 
+    /// Build the CPI curve from knots that already include the `(0, base_cpi)` point.
+    fn curve_from_knots(&self, base_cpi: f64, knots: Vec<(f64, f64)>) -> Result<InflationCurve> {
+        InflationCurve::builder(self.params.curve_id.to_string())
+            .base_cpi(base_cpi)
+            .base_date(self.reference_date()?)
+            .indexation_lag_months(self.indexation_lag_months()?)
+            .knots(knots)
+            .interp(self.params.interpolation)
+            .build()
+    }
+
     /// Resolve the effective base CPI level (from index or params).
     fn effective_base_cpi(&self) -> Result<f64> {
         if let Ok(index) = self
@@ -395,7 +408,7 @@ impl BootstrapTarget for InflationCurveTarget {
         Ok(quote.pillar_time())
     }
 
-    fn build_curve(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
+    fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
         // knots are (time, cpi)
         // Ensure base point (0.0, base_cpi) is included or added
         let base_cpi = self.effective_base_cpi()?;
@@ -407,13 +420,7 @@ impl BootstrapTarget for InflationCurveTarget {
         full_knots.push((0.0, base_cpi));
         full_knots.sort_by(|a, b| a.0.total_cmp(&b.0));
 
-        InflationCurve::builder(self.params.curve_id.to_string())
-            .base_cpi(base_cpi)
-            .base_date(self.reference_date()?)
-            .indexation_lag_months(self.indexation_lag_months()?)
-            .knots(full_knots)
-            .interp(self.params.interpolation)
-            .build()
+        self.curve_from_knots(base_cpi, full_knots)
     }
 
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
@@ -483,45 +490,18 @@ impl GlobalSolveTarget for InflationCurveTarget {
     }
 
     fn build_curve_from_params(&self, times: &[f64], params: &[f64]) -> Result<Self::Curve> {
-        if times.len() != params.len() {
-            return Err(finstack_quant_core::Error::Calibration {
-                message: format!(
-                    "Global solve dimension mismatch: {} times vs {} params",
-                    times.len(),
-                    params.len()
-                ),
-                category: "global_solve".to_string(),
-            });
-        }
+        validate_global_knot_grid(times, params, "inflation ")?;
 
         let base_cpi = self.effective_base_cpi()?;
         let mut knots = Vec::with_capacity(times.len() + 1);
         knots.push((0.0, base_cpi));
 
-        let mut last_t = 0.0;
         for (&t, &cpi) in times.iter().zip(params.iter()) {
-            if t <= last_t {
-                return Err(finstack_quant_core::Error::Calibration {
-                    message: format!(
-                        "Non-increasing inflation knot time {:.10} detected (previous {:.10}). \
-Global solve requires strictly increasing times.",
-                        t, last_t
-                    ),
-                    category: "global_solve".to_string(),
-                });
-            }
             self.validate_cpi_knot(t, cpi)?;
-            last_t = t;
             knots.push((t, cpi));
         }
 
-        InflationCurve::builder(self.params.curve_id.to_string())
-            .base_cpi(base_cpi)
-            .base_date(self.reference_date()?)
-            .indexation_lag_months(self.indexation_lag_months()?)
-            .knots(knots)
-            .interp(self.params.interpolation)
-            .build()
+        self.curve_from_knots(base_cpi, knots)
     }
 
     fn calculate_residuals(

@@ -147,7 +147,7 @@
               },
               "version": 1
             },
-            "version": "0.9.0"
+            "version": "0.10.0"
           },
           "description": "Results metadata (timestamp, software version, etc.)."
         },
@@ -3281,7 +3281,7 @@
               },
               "version": 1
             },
-            "version": "0.9.0"
+            "version": "0.10.0"
           },
           "rmse": 0.0,
           "rmse_ratio": 0.0,
@@ -3305,7 +3305,7 @@
             },
             "version": 1
           },
-          "version": "0.9.0"
+          "version": "0.10.0"
         },
         "step_reports": {}
       },

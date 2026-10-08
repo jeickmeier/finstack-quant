@@ -10,7 +10,9 @@ use crate::quotes::market_quote::{ExtractQuotes, MarketQuote};
 use crate::solver::bootstrap::SequentialBootstrapper;
 use crate::solver::global::GlobalFitOptimizer;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
-use crate::targets::util::{scheme_factor, sorted_knot_grid, ContextScratch};
+use crate::targets::util::{
+    scheme_factor, sorted_knot_grid, validate_global_knot_grid, ContextScratch,
+};
 use crate::CalibrationReport;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
@@ -585,7 +587,7 @@ impl BootstrapTarget for HazardCurveTarget {
         }
     }
 
-    fn build_curve(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
+    fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
         HazardCurve::builder(self.params.curve_id.to_string())
             .base_date(self.params.base_date)
             .day_count(self.cds_conventions.day_count)
@@ -727,33 +729,12 @@ impl GlobalSolveTarget for HazardCurveTarget {
     }
 
     fn build_curve_from_params(&self, times: &[f64], params: &[f64]) -> Result<Self::Curve> {
-        if times.len() != params.len() {
-            return Err(finstack_quant_core::Error::Calibration {
-                message: format!(
-                    "Global solve dimension mismatch: {} times vs {} params",
-                    times.len(),
-                    params.len()
-                ),
-                category: "global_solve".to_string(),
-            });
-        }
+        validate_global_knot_grid(times, params, "hazard ")?;
 
         let mut knots = Vec::with_capacity(times.len());
-        let mut last_t = 0.0;
 
         for (&t, &lambda) in times.iter().zip(params.iter()) {
-            if t <= last_t {
-                return Err(finstack_quant_core::Error::Calibration {
-                    message: format!(
-                        "Non-increasing hazard knot time {:.10} detected (previous {:.10}). \
-Global solve requires strictly increasing times.",
-                        t, last_t
-                    ),
-                    category: "global_solve".to_string(),
-                });
-            }
             self.validate_knot(t, lambda)?;
-            last_t = t;
             knots.push((t, lambda));
         }
 
@@ -935,7 +916,7 @@ mod tests {
         .expect("target");
 
         let curve = target
-            .build_curve(&[(1.0, 0.02), (5.0, 0.03)])
+            .build_curve_for_solver(&[(1.0, 0.02), (5.0, 0.03)])
             .expect("curve build should succeed");
         assert_eq!(curve.par_interp(), ParInterp::LogLinear);
 

@@ -1091,7 +1091,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
-      "bytes": 60306,
+      "bytes": 60308,
       "kind": "output",
       "path": "schemas/results/1/valuation_result.schema.json",
       "summary": "PV plus requested measures, with rounding and FX policy stamps.",

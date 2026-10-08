@@ -3,7 +3,6 @@
 use crate::api::schema::ForwardCurveParams;
 use crate::config::CalibrationConfig;
 use crate::config::CalibrationMethod;
-use crate::constants::WEIGHT_MIN_FLOOR;
 use crate::quotes::market_quote::ExtractQuotes;
 use crate::quotes::market_quote::MarketQuote;
 use crate::quotes::rates::RateQuote;
@@ -11,8 +10,8 @@ use crate::solver::global::GlobalFitOptimizer;
 use crate::solver::traits::GlobalSolveTarget;
 use crate::targets::rate_recipe::recipe_ois_compounding;
 use crate::targets::util::{
-    discount_and_forward_curve_ids, prepare_rate_calibration_quotes_with_ois_override,
-    quote_annuity_proxy, scheme_factor, ContextScratch,
+    discount_and_forward_curve_ids, prepare_rate_calibration_quotes, pv01_residual_weight,
+    ContextScratch,
 };
 use crate::CalibrationReport;
 use finstack_quant_core::currency::Currency;
@@ -91,7 +90,7 @@ impl ForwardCurveTarget {
         // Forward-curve preflight: prepare quotes; both the discount curve (already in
         // `context`) and the forward curve being built are registered so projected legs
         // price against the right curves.
-        let prepared = prepare_rate_calibration_quotes_with_ois_override(
+        let prepared = prepare_rate_calibration_quotes(
             quotes,
             params.base_date,
             discount_and_forward_curve_ids(
@@ -685,15 +684,11 @@ impl GlobalSolveTarget for ForwardCurveTarget {
                     )));
                 }
             };
-            let annuity = quote_annuity_proxy(quote, time);
-            let pv01_inverse_sq = 1.0 / (annuity * annuity);
-            let weight_value = pv01_inverse_sq
-                * scheme_factor(&self.params.config.forward_curve.weighting_scheme, time);
-            *weight = if weight_value.is_finite() {
-                weight_value.max(WEIGHT_MIN_FLOOR)
-            } else {
-                WEIGHT_MIN_FLOOR
-            };
+            *weight = pv01_residual_weight(
+                quote,
+                time,
+                &self.params.config.forward_curve.weighting_scheme,
+            );
         }
         Ok(())
     }
@@ -719,11 +714,13 @@ impl GlobalSolveTarget for ForwardCurveTarget {
 mod tests {
     use super::*;
     use crate::build::prepared::PreparedQuote;
+    use crate::constants::WEIGHT_MIN_FLOOR;
     use crate::prepared::CalibrationQuote;
     use crate::quotes::ids::{Pillar, QuoteId};
     use crate::quotes::market_quote::MarketQuote;
     use crate::quotes::rates::RateQuote;
     use crate::solver::traits::GlobalSolveTarget;
+    use crate::targets::util::quote_annuity_proxy;
     use crate::{RateBounds, ResidualWeightingScheme};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::BusinessDayConvention;
@@ -1281,7 +1278,7 @@ mod tests {
                 )
                 .expect("future calibration");
                 assert!(report.success, "{}", report.convergence_reason);
-                let prepared = prepare_rate_calibration_quotes_with_ois_override(
+                let prepared = prepare_rate_calibration_quotes(
                     std::slice::from_ref(&quote),
                     base_date,
                     discount_and_forward_curve_ids("USD-OIS", "USD-FWD"),

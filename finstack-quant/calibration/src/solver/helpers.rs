@@ -1,7 +1,4 @@
 //! Solver helpers and common penalty/diagnostics utilities for calibration.
-//!
-//! This module intentionally contains the implementation logic that `calibration/mod.rs`
-//! re-exports. Keeping it here allows `mod.rs` to stay export-only.
 
 use crate::constants::OBJECTIVE_VALID_ABS_MAX;
 use crate::CalibrationConfig;
@@ -230,54 +227,21 @@ fn refine_domain_boundaries(
 /// error rather than a debug assertion.
 const MIN_SCAN_GRID_LEN: usize = 8;
 
-/// Like `bracket_solve_1d` but also returns diagnostics for error reporting.
-pub(crate) fn bracket_solve_1d_with_diagnostics(
-    objective: &dyn Fn(f64) -> f64,
-    initial: f64,
-    scan_points: &[f64],
-    tol: f64,
-    max_iters: usize,
-) -> Result<(Option<f64>, BracketDiagnostics)> {
-    bracket_solve_1d_impl(
-        objective,
-        initial,
-        scan_points,
-        tol,
-        max_iters,
-        ScanStrategy::Exhaustive,
-    )
-}
-
-/// Solve using scan points ordered by distance from the initial guess.
-///
-/// The scan stops as soon as the evaluated points contain a sign-changing
-/// bracket. If no bracket is found, every point is still evaluated and the
-/// same no-bracket fallback as the exhaustive solver is used. Callers must
-/// restrict this path to objectives known to be monotone in the solved knot.
-pub(crate) fn bracket_solve_1d_nearest_first_with_diagnostics(
-    objective: &dyn Fn(f64) -> f64,
-    initial: f64,
-    scan_points: &[f64],
-    tol: f64,
-    max_iters: usize,
-) -> Result<(Option<f64>, BracketDiagnostics)> {
-    bracket_solve_1d_impl(
-        objective,
-        initial,
-        scan_points,
-        tol,
-        max_iters,
-        ScanStrategy::NearestFirst,
-    )
-}
-
+/// Order in which the bracket solver evaluates its scan grid.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ScanStrategy {
+pub(crate) enum ScanStrategy {
+    /// Evaluate every scan point and pick the sign-changing bracket closest to
+    /// the initial guess. Safe for non-monotone objectives.
     Exhaustive,
+    /// Evaluate scan points by distance from the initial guess and stop at the
+    /// first sign-changing bracket. Valid only for objectives monotone in the
+    /// solved knot; falls back to the exhaustive result when no bracket is found.
     NearestFirst,
 }
 
-fn bracket_solve_1d_impl(
+/// Bracket and solve a 1-D root on a caller-supplied scan grid, returning the
+/// root (if any) together with diagnostics for error reporting.
+pub(crate) fn bracket_solve_1d(
     objective: &dyn Fn(f64) -> f64,
     initial: f64,
     scan_points: &[f64],
@@ -290,7 +254,7 @@ fn bracket_solve_1d_impl(
     // a checked error when a narrow floating-point domain cannot supply it.
     if scan_points.len() < MIN_SCAN_GRID_LEN {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "bracket_solve_1d_with_diagnostics: scan grid has {} points (< {}); \
+            "bracket_solve_1d: scan grid has {} points (< {}); \
              supply a grid that spans the feasible region",
             scan_points.len(),
             MIN_SCAN_GRID_LEN
@@ -663,8 +627,8 @@ mod tests {
         // f(x) = x - 0.5 has root at 0.5
         let f = |x: f64| x - 0.5;
         let scan = dense_scan(-1.0, 1.0, &[0.25, 0.75]);
-        let (root, _) =
-            bracket_solve_1d_with_diagnostics(&f, 0.0, &scan, 1e-12, 100).expect("solver error");
+        let (root, _) = bracket_solve_1d(&f, 0.0, &scan, 1e-12, 100, ScanStrategy::Exhaustive)
+            .expect("solver error");
         let r = root.expect("root should be Some");
         assert!((r - 0.5).abs() < 1e-9, "root inaccurate: {}", r);
     }
@@ -674,8 +638,8 @@ mod tests {
         // f(x) = x - 0.5 has root at 0.5
         let f = |x: f64| x - 0.5;
         let scan = dense_scan(0.0, 1.0, &[0.5]);
-        let (root, diag) =
-            bracket_solve_1d_with_diagnostics(&f, 0.3, &scan, 1e-12, 100).expect("solver error");
+        let (root, diag) = bracket_solve_1d(&f, 0.3, &scan, 1e-12, 100, ScanStrategy::Exhaustive)
+            .expect("solver error");
 
         assert!(root.is_some());
         assert!(diag.bracket_found);
@@ -710,8 +674,8 @@ mod tests {
             s.sort_by(|a, b| a.total_cmp(b));
             s
         };
-        let (root, diag) =
-            bracket_solve_1d_with_diagnostics(&f, 0.49, &scan, 1e-12, 100).expect("solver error");
+        let (root, diag) = bracket_solve_1d(&f, 0.49, &scan, 1e-12, 100, ScanStrategy::Exhaustive)
+            .expect("solver error");
 
         let r = root.expect("root should be found");
         assert!((r - 0.5).abs() < 1e-9, "incorrect root: {}", r);
@@ -742,7 +706,7 @@ mod tests {
         };
         let scan = dense_scan(-10.0, 10.0, &[0.49, 0.50, 0.51]);
         let (root, diag) =
-            bracket_solve_1d_nearest_first_with_diagnostics(&f, 0.49, &scan, 1e-12, 100)
+            bracket_solve_1d(&f, 0.49, &scan, 1e-12, 100, ScanStrategy::NearestFirst)
                 .expect("solver error");
 
         let root = root.expect("root should be found");
@@ -761,9 +725,8 @@ mod tests {
     fn nearest_first_no_bracket_still_exhausts_scan() {
         let f = |x: f64| x * x + 1.0;
         let scan = dense_scan(-2.0, 2.0, &[0.0]);
-        let (root, diag) =
-            bracket_solve_1d_nearest_first_with_diagnostics(&f, 0.0, &scan, 1e-12, 100)
-                .expect("solver error");
+        let (root, diag) = bracket_solve_1d(&f, 0.0, &scan, 1e-12, 100, ScanStrategy::NearestFirst)
+            .expect("solver error");
 
         assert!(root.is_none());
         assert!(
@@ -784,8 +747,8 @@ mod tests {
                                                     // Points that bracket the root at x=1 only via Newton-fallback secant.
         let scan: Vec<f64> = (0..8).map(|i| -2.0 + 0.5 * (i as f64)).collect();
         // = [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5]
-        let (root, _diag) =
-            bracket_solve_1d_with_diagnostics(&f, 0.95, &scan, 1e-9, 100).expect("solver error");
+        let (root, _diag) = bracket_solve_1d(&f, 0.95, &scan, 1e-9, 100, ScanStrategy::Exhaustive)
+            .expect("solver error");
         if let Some(r) = root {
             // Must be near a real root; never far from one.
             let d_to_real_roots = [1.0_f64, 0.6180339887, -1.6180339887]
@@ -814,8 +777,8 @@ mod tests {
         let initial = 0.3;
         // Grid contains the initial guess exactly, as normalize_scan_points produces.
         let scan = dense_scan(0.0, 1.0, &[initial]);
-        let (root, _) =
-            bracket_solve_1d_with_diagnostics(&f, initial, &scan, 1e-12, 100).expect("solver");
+        let (root, _) = bracket_solve_1d(&f, initial, &scan, 1e-12, 100, ScanStrategy::Exhaustive)
+            .expect("solver");
         assert!(root.is_some());
 
         let initial_evals = evals
@@ -850,7 +813,7 @@ mod tests {
             let initial = if mirrored { 0.75 } else { 0.25 };
             for strategy in [ScanStrategy::Exhaustive, ScanStrategy::NearestFirst] {
                 let (root, diagnostics) =
-                    bracket_solve_1d_impl(&objective, initial, &scan, 1e-12, 100, strategy)
+                    bracket_solve_1d(&objective, initial, &scan, 1e-12, 100, strategy)
                         .expect("bounded domain refinement");
                 let expected = if mirrored { 0.65 } else { 0.35 };
                 assert!((root.expect("reachable root") - expected).abs() < 1e-10);
@@ -869,9 +832,15 @@ mod tests {
                 PENALTY
             }
         };
-        let (root, diagnostics) =
-            bracket_solve_1d_nearest_first_with_diagnostics(&objective, 0.25, &scan, 1e-12, 100)
-                .expect("bounded search");
+        let (root, diagnostics) = bracket_solve_1d(
+            &objective,
+            0.25,
+            &scan,
+            1e-12,
+            100,
+            ScanStrategy::NearestFirst,
+        )
+        .expect("bounded search");
         assert!(root.is_none());
         assert!(!diagnostics.is_sign_change_bracket);
         assert!(diagnostics.best_value.expect("valid observations") >= 0.049 - 1e-15);
@@ -882,8 +851,8 @@ mod tests {
         // f(x) = x^2 + 1 has no real root
         let f = |x: f64| x * x + 1.0;
         let scan = dense_scan(0.0, 2.0, &[0.5, 1.0, 1.5]);
-        let (root, diag) =
-            bracket_solve_1d_with_diagnostics(&f, 1.0, &scan, 1e-12, 100).expect("solver error");
+        let (root, diag) = bracket_solve_1d(&f, 1.0, &scan, 1e-12, 100, ScanStrategy::Exhaustive)
+            .expect("solver error");
 
         assert!(root.is_none());
         assert!(!diag.bracket_found);
@@ -899,8 +868,8 @@ mod tests {
         // f(x) returns PENALTY for x < 0.5, otherwise x - 0.5
         let f = |x: f64| if x < 0.5 { PENALTY } else { x - 0.75 };
         let scan = dense_scan(0.0, 1.0, &[0.5, 0.75]);
-        let (root, diag) =
-            bracket_solve_1d_with_diagnostics(&f, 0.5, &scan, 1e-12, 100).expect("solver error");
+        let (root, diag) = bracket_solve_1d(&f, 0.5, &scan, 1e-12, 100, ScanStrategy::Exhaustive)
+            .expect("solver error");
 
         // Should find root at 0.75
         assert!(root.is_some());
@@ -918,8 +887,8 @@ mod tests {
             }
         };
         let scan = dense_scan(0.0, 1.0, &[0.0, 0.15, 0.25, 0.75, 0.9, 1.0]);
-        let (root, diag) =
-            bracket_solve_1d_with_diagnostics(&f, 0.8, &scan, 1e-12, 100).expect("solver error");
+        let (root, diag) = bracket_solve_1d(&f, 0.8, &scan, 1e-12, 100, ScanStrategy::Exhaustive)
+            .expect("solver error");
 
         let root = root.expect("bounded fallback should recover the bracketed root");
         assert!(
@@ -969,8 +938,8 @@ mod tests {
         // f(x) ≡ 0 but with a sign bit flip at x = 0.5.
         let f = |x: f64| if x < 0.5 { -0.0_f64 } else { 0.0_f64 };
         let scan = dense_scan(0.0, 1.0, &[0.25, 0.5, 0.75]);
-        let (_root, diag) =
-            bracket_solve_1d_with_diagnostics(&f, 0.3, &scan, 0.0, 100).expect("solver error");
+        let (_root, diag) = bracket_solve_1d(&f, 0.3, &scan, 0.0, 100, ScanStrategy::Exhaustive)
+            .expect("solver error");
         assert!(
             !diag.is_sign_change_bracket,
             "an identically-zero objective has NO sign-change bracket; \
@@ -993,7 +962,8 @@ mod tests {
         // re-bootstrap-under-bump pattern, e.g. dv01 curve rebuilds).
         let initial = 0.5 + 1e-14;
         let (root, diag) =
-            bracket_solve_1d_with_diagnostics(&f, initial, &scan, 1e-12, 100).expect("solver");
+            bracket_solve_1d(&f, initial, &scan, 1e-12, 100, ScanStrategy::Exhaustive)
+                .expect("solver");
         let r = root.expect("converged root must be returned");
         assert!((r - 0.5).abs() < 1e-9, "unexpected root {r}");
         assert!(
@@ -1025,7 +995,8 @@ mod tests {
         let scan = vec![0.45, 0.55, 0.7, 0.85, 1.0, 1.15, 1.3, 1.45, 1.6, 2.0];
         let initial = 0.5 + 1e-14;
         let (root, diag) =
-            bracket_solve_1d_with_diagnostics(&f, initial, &scan, 1e-12, 100).expect("solver");
+            bracket_solve_1d(&f, initial, &scan, 1e-12, 100, ScanStrategy::Exhaustive)
+                .expect("solver");
         assert!(root.is_some(), "below-tolerance plateau root returned");
         assert!(
             diag.is_sign_change_bracket,
@@ -1040,7 +1011,7 @@ mod tests {
         let f = |x: f64| (x - 0.5) * (x - 0.5) + 1e-9;
         let scan = dense_scan(0.0, 1.0, &[0.5]);
         let (root, diag) =
-            bracket_solve_1d_with_diagnostics(&f, 0.5, &scan, 1e-3, 100).expect("solver");
+            bracket_solve_1d(&f, 0.5, &scan, 1e-3, 100, ScanStrategy::Exhaustive).expect("solver");
         assert!(root.is_some(), "below-tolerance minimum is still returned");
         assert!(
             !diag.is_sign_change_bracket,
@@ -1056,7 +1027,7 @@ mod tests {
             x - 0.5
         };
         let scan = [0.0, 1.0]; // only 2 points
-        let error = bracket_solve_1d_with_diagnostics(&f, 0.5, &scan, 1e-12, 100)
+        let error = bracket_solve_1d(&f, 0.5, &scan, 1e-12, 100, ScanStrategy::Exhaustive)
             .expect_err("insufficient scan grid must return a checked error");
         assert!(error.to_string().contains("scan grid has 2 points"));
         assert_eq!(calls.get(), 0);
@@ -1075,12 +1046,13 @@ mod production_credit_solver_audit {
             calls.set(calls.get() + 1);
             x - 6.0
         };
-        let (root, diagnostics) = bracket_solve_1d_with_diagnostics(
+        let (root, diagnostics) = bracket_solve_1d(
             &objective,
             6.0,
             &[2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0],
             1e-10,
             100,
+            ScanStrategy::Exhaustive,
         )
         .expect("exact initial root");
         assert_eq!(root, Some(6.0));
