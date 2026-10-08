@@ -87,6 +87,11 @@ fn test_capital_structure_cashflows_serialization() {
             finstack_quant_core::currency::Currency::USD,
         )
         .expect("valid money fixture"),
+        opening_balance: None,
+        scheduled_principal: None,
+        mandatory_prepayment: None,
+        sweep_prepayment: None,
+        voluntary_prepayment: None,
     };
 
     let mut period_map = IndexMap::new();
@@ -506,6 +511,11 @@ fn test_capital_structure_json_roundtrip() {
             finstack_quant_core::currency::Currency::USD,
         )
         .expect("valid money fixture"),
+        opening_balance: None,
+        scheduled_principal: None,
+        mandatory_prepayment: None,
+        sweep_prepayment: None,
+        voluntary_prepayment: None,
     };
 
     let json = serde_json::to_string(&breakdown).expect("Failed to serialize");

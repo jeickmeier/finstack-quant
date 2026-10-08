@@ -455,3 +455,95 @@ def test_return_contribution_dataframe_keeps_missing_benchmarks_absent() -> None
     result = attribute_return_contribution(frame, as_of="2026-01-02")
     assert result.portfolio_return == pytest.approx(0.02)
     assert result.benchmark_relative is None
+
+
+def test_waterfall_steps_chain_from_pv_t0_and_rebuild_buckets() -> None:
+    """The exported step chain reproduces every waterfall bucket."""
+    attr = attribute_pnl(
+        _bond_json(),
+        _market_json(AS_OF_T0),
+        _market_json(AS_OF_T1, shift=0.002),
+        AS_OF_T0,
+        AS_OF_T1,
+        {"waterfall": ["carry", "rates_curves"]},
+    )
+    assert attr.pv_t0 is not None
+    assert attr.pv_t1 is not None
+    assert attr.pv_t1 - attr.pv_t0 == pytest.approx(attr.mark_to_market_pnl, abs=1e-8)
+    cash = attr.total_pnl - attr.mark_to_market_pnl
+
+    steps = attr.to_waterfall_steps_dataframe()
+    assert list(steps.columns) == ["step_index", "factor", "pv_before", "pv_after", "step_pnl", "currency"]
+    assert list(steps["factor"]) == ["carry", "rates_curves"]
+    assert list(steps["step_index"]) == [0, 1]
+    assert steps["pv_before"].iloc[0] == pytest.approx(attr.pv_t0, abs=1e-8)
+    assert steps["pv_after"].iloc[0] == pytest.approx(steps["pv_before"].iloc[1], abs=1e-8)
+    assert (steps["pv_after"] - steps["pv_before"]).to_numpy() == pytest.approx(steps["step_pnl"].to_numpy(), abs=1e-8)
+    assert steps["step_pnl"].iloc[0] + cash == pytest.approx(attr.carry, abs=1e-8)
+    assert steps["step_pnl"].iloc[1] == pytest.approx(attr.rates_curves_pnl, abs=1e-8)
+    assert steps["pv_after"].iloc[1] + attr.residual == pytest.approx(attr.pv_t1, abs=1e-6)
+
+    raw = attr.waterfall_steps
+    assert [step["factor"] for step in raw] == ["carry", "rates_curves"]
+    assert float(raw[1]["step_pnl"]["amount"]) == pytest.approx(attr.rates_curves_pnl, abs=1e-8)
+    assert attr.sensitivity_steps == []
+    assert attr.to_sensitivity_steps_dataframe().empty
+
+    wide = attr.to_dataframe()
+    assert wide["pv_t0"].iloc[0] == pytest.approx(attr.pv_t0)
+    assert wide["pv_t1"].iloc[0] == pytest.approx(attr.pv_t1)
+
+    restored = PnlAttribution.from_json(attr.to_json())
+    assert restored.waterfall_steps == raw
+    assert restored.pv_t0 == attr.pv_t0
+
+
+def test_taylor_sensitivity_steps_rebuild_rates_bucket() -> None:
+    """Per-tenor sensitivity × observed move reproduces the Taylor rates P&L."""
+    attr = attribute_pnl(
+        _bond_json(),
+        _market_json(AS_OF_T0),
+        _market_json(AS_OF_T1, shift=0.002),
+        AS_OF_T0,
+        AS_OF_T1,
+        {"taylor": {"include_gamma": True}},
+    )
+    assert attr.waterfall_steps == []
+    assert attr.to_waterfall_steps_dataframe().empty
+
+    frame = attr.to_sensitivity_steps_dataframe()
+    assert list(frame.columns) == [
+        "step_index",
+        "factor",
+        "tenor_years",
+        "move_unit",
+        "sensitivity",
+        "market_move",
+        "explained_pnl",
+        "gamma_pnl",
+        "repriced_pv",
+        "currency",
+    ]
+    rates = frame[frame["factor"].str.startswith("Rates:")]
+    factor_rows = rates[rates["tenor_years"].isna()]
+    bucket_rows = rates[rates["tenor_years"].notna()]
+    assert len(factor_rows) == 1
+    assert len(bucket_rows) == 11
+    assert set(bucket_rows["move_unit"]) == {"basis_point"}
+    explained = factor_rows["explained_pnl"].iloc[0]
+    gamma = factor_rows["gamma_pnl"].iloc[0]
+    assert (bucket_rows["sensitivity"] * bucket_rows["market_move"]).sum() == pytest.approx(explained, rel=1e-9)
+    assert bucket_rows["explained_pnl"].isna().all()
+    assert explained + gamma == pytest.approx(attr.rates_curves_pnl, rel=1e-9, abs=1e-8)
+
+    # Theta is isolated by a reprice at the T1 date on the T0 market.
+    theta = frame[frame["factor"] == "Theta"].iloc[0]
+    cash = attr.total_pnl - attr.mark_to_market_pnl
+    assert theta["repriced_pv"] - attr.pv_t0 + cash == pytest.approx(theta["explained_pnl"], abs=1e-6)
+    assert theta["explained_pnl"] == pytest.approx(attr.carry, abs=1e-8)
+
+    raw = attr.sensitivity_steps
+    rates_raw = next(step for step in raw if step["factor"].startswith("Rates:"))
+    assert rates_raw["move_unit"] == "basis_point"
+    assert len(rates_raw["buckets"]) == 11
+    assert PnlAttribution.from_json(attr.to_json()).sensitivity_steps == raw

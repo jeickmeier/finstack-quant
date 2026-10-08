@@ -277,6 +277,7 @@ pub(crate) fn attribute_pnl_waterfall(
     );
     // Policy-visibility invariant: stamp the execution policy the
     // attribution ran under (workspace rule: results carry the parallel flag).
+    stamp_endpoints(&mut attribution, val_t0, val_t1);
     attribution.meta.execution_policy = Some(ExecutionPolicy::Serial);
     // Waterfall factor P&Ls are path-dependent; stamp the executed order.
     attribution.meta.notes.push(format!(
@@ -324,16 +325,28 @@ pub(crate) fn attribute_pnl_waterfall(
         recalibration_provider: Arc::new(CachedRecalibrationProvider::new()),
     };
 
-    for factor in factor_order {
-        if matches!(factor, AttributionFactor::CreditCurves) {
-            if let Some(c) = &cascade {
-                let total = ctx.apply_credit_cascade(c, &mut credit_step_pnls)?;
-                attribution.credit_curves_pnl = total;
-                continue;
-            }
+    for (step_index, factor) in factor_order.into_iter().enumerate() {
+        // The running value before and after each step is the audit trail of
+        // the waterfall: `step_pnl == pv_after − pv_before` by construction.
+        let pv_before = ctx.current_val;
+        let cascade_step = cascade
+            .as_ref()
+            .filter(|_| matches!(factor, AttributionFactor::CreditCurves));
+        let factor_pnl = match cascade_step {
+            Some(c) => ctx.apply_credit_cascade(c, &mut credit_step_pnls)?,
+            None => ctx.apply_factor(&factor)?,
+        };
+        attribution.waterfall_steps.push(WaterfallStep {
+            step_index,
+            factor: factor.clone(),
+            pv_before,
+            pv_after: ctx.current_val,
+            step_pnl: factor_pnl,
+        });
+        if cascade_step.is_some() {
+            attribution.credit_curves_pnl = factor_pnl;
+            continue;
         }
-
-        let factor_pnl = ctx.apply_factor(&factor)?;
 
         match factor {
             AttributionFactor::Carry => {

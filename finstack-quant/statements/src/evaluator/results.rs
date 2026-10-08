@@ -72,6 +72,22 @@ pub struct StatementResult {
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub node_value_types: IndexMap<String, NodeValueType>,
 
+    /// Map of node_id → (period_id → [`CellSource`]): which layer of the
+    /// `Value > Forecast > Formula` precedence produced each cell of `nodes`.
+    ///
+    /// Populated for every cell by [`Evaluator`](crate::evaluator::Evaluator)
+    /// (with or without market context / capital structure). The model spec
+    /// alone does not determine it: an as-of visibility cutoff can hide an
+    /// explicit value so that the forecast or formula fires instead. Empty
+    /// only for results that were not produced by the evaluator (hand-built)
+    /// or were serialized before this field existed.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "IndexMap<String, IndexMap<String, CellSource>>")
+    )]
+    pub node_sources: IndexMap<String, IndexMap<PeriodId, CellSource>>,
+
     /// Capital structure cashflows (populated when model has a capital_structure)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cs_cashflows: Option<crate::capital_structure::CapitalStructureCashflows>,
@@ -82,6 +98,42 @@ pub struct StatementResult {
 
     /// Metadata about the evaluation
     pub meta: EvalStats,
+}
+
+/// Which evaluation layer produced a statement cell (one node in one period).
+///
+/// The evaluator resolves every cell by the precedence
+/// `Value > Forecast > Formula`, after the node's optional `where` mask. The
+/// winning layer is recorded per cell in [`StatementResult::node_sources`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum CellSource {
+    /// The explicit value stored on the node for this period (and visible
+    /// under the active as-of policy).
+    Value,
+    /// The node's forecast method (forecast periods only).
+    Forecast,
+    /// The node's formula.
+    Formula,
+    /// The node's `where` clause evaluated to false (or `NaN`) for this
+    /// period, so the cell was set to `0.0` without consulting the value,
+    /// forecast or formula.
+    WhereMasked,
+}
+
+impl CellSource {
+    /// Stable snake_case label, identical to the serde wire form
+    /// (`"value"`, `"forecast"`, `"formula"`, `"where_masked"`).
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Value => "value",
+            Self::Forecast => "forecast",
+            Self::Formula => "formula",
+            Self::WhereMasked => "where_masked",
+        }
+    }
 }
 
 /// Execution statistics for a statement-model evaluation.
@@ -150,6 +202,7 @@ impl Default for StatementResult {
             nodes: IndexMap::new(),
             monetary_nodes: IndexMap::new(),
             node_value_types: IndexMap::new(),
+            node_sources: IndexMap::new(),
             cs_cashflows: None,
             check_report: None,
             meta: EvalStats::default(),
@@ -176,6 +229,22 @@ impl StatementResult {
     /// `Some(value)` if the datapoint exists, otherwise `None`.
     pub fn get(&self, node_id: &str, period_id: &PeriodId) -> Option<f64> {
         self.nodes
+            .get(node_id)
+            .and_then(|period_map| period_map.get(period_id).copied())
+    }
+
+    /// Get the evaluation layer that produced a node's value in a period.
+    ///
+    /// # Arguments
+    /// * `node_id` - Identifier of the node (e.g., `"revenue"`)
+    /// * `period_id` - Period key returned by the evaluator or builder
+    ///
+    /// # Returns
+    /// `Some(source)` when the evaluator recorded how the cell was produced,
+    /// otherwise `None` (unknown node or period, or a result that carries no
+    /// [`node_sources`](Self::node_sources)).
+    pub fn get_source(&self, node_id: &str, period_id: &PeriodId) -> Option<CellSource> {
+        self.node_sources
             .get(node_id)
             .and_then(|period_map| period_map.get(period_id).copied())
     }
@@ -238,6 +307,20 @@ impl StatementResult {
         self.get(node_id, period).unwrap_or(default)
     }
 
+    /// Record the evaluation layer of every cell evaluated for `period_id`.
+    pub(crate) fn record_sources(
+        &mut self,
+        period_id: PeriodId,
+        sources: IndexMap<String, CellSource>,
+    ) {
+        for (node_id, source) in sources {
+            self.node_sources
+                .entry(node_id)
+                .or_default()
+                .insert(period_id, source);
+        }
+    }
+
     /// Populate monetary maps using the plan's validated and inferred units.
     ///
     /// # Arguments
@@ -263,16 +346,18 @@ impl StatementResult {
 
     /// Export to a long-format table.
     ///
-    /// Schema: `(node_id, period_id, value, value_money, currency, value_type)`.
+    /// Schema: `(node_id, period_id, value, value_money, currency, value_type, source)`.
     /// Rows preserve the result's node and period declaration order. Monetary
     /// nodes duplicate their numerical value in `value_money` and set
-    /// `currency`; scalar nodes leave those two fields null.
+    /// `currency`; scalar nodes leave those two fields null. `source` is the
+    /// cell's [`CellSource`] label (`value`, `forecast`, `formula`,
+    /// `where_masked`), or null when the result records no source for it.
     ///
     /// # Errors
     ///
     /// Returns a table-construction error if the result cannot be represented
     /// as a valid [`finstack_quant_core::table::TableEnvelope`]. Empty results
-    /// are valid and produce an empty table with the full six-column schema.
+    /// are valid and produce an empty table with the full seven-column schema.
     pub fn to_table_long(&self) -> Result<finstack_quant_core::table::TableEnvelope> {
         super::export::to_table_long(self)
     }

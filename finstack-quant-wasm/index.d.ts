@@ -92,8 +92,10 @@ import type {
   StrictLoadDiagnostic,
 } from './types/generated/calibration/index.js';
 import type {
+  HazardCalibrationRecipe,
   MarketScalar,
   PeriodPlan,
+  RateCalibrationRecipe,
   SabrParameterData,
   ScheduleSpec,
   ScheduleWarning,
@@ -251,8 +253,10 @@ import type {
   GridCarinoLinkedResult,
   LinkedReturn,
   MaterializationReport,
+  NettingSetMargin,
   PortfolioAttribution,
   PortfolioCashflows,
+  PortfolioMarginResult,
   PortfolioMetrics,
   PortfolioPrimitiveExposureReport,
   PositionChange,
@@ -487,8 +491,10 @@ export type {
   GridCarinoLinkedResult,
   LinkedReturn,
   MaterializationReport,
+  NettingSetMargin,
   PortfolioAttribution,
   PortfolioCashflows,
+  PortfolioMarginResult,
   PortfolioMetrics,
   PortfolioPrimitiveExposureReport,
   PositionChange,
@@ -798,6 +804,7 @@ export type {
   PeriodDecomposition,
   Portfolio,
   PortfolioBuilder,
+  PortfolioMarginAggregator,
 };
 
 // --- core -----------------------------------------------------------------
@@ -878,6 +885,12 @@ interface Portfolio extends WasmOwned {}
  * calls.
  */
 interface FactorModel extends WasmOwned {}
+/**
+ * Portfolio margin aggregator built once from a `Portfolio` and reused across
+ * market snapshots; `calculate` returns netting-set initial and variation
+ * margin as a plain `PortfolioMarginResult`.
+ */
+interface PortfolioMarginAggregator extends WasmOwned {}
 
 /**
  * ISO-4217 currency code wrapper for JavaScript.
@@ -3231,6 +3244,17 @@ export interface DiscountCurve extends WasmOwned {
    */
   readonly extrapolation: string;
   /**
+   * Calibration recipe stamped on this curve by the calibration engine.
+   *
+   * The same object found under `rate_calibration` in `toJson()`: currency,
+   * method, curve day count, OIS compounding, curve role and the complete
+   * typed quote set (rates and spreads as decimals, futures as prices).
+   *
+   * @returns The `RateCalibrationRecipe` object, or `undefined` for a curve that was built directly rather than produced by a calibration step.
+   * @throws FinstackError - If the recipe cannot be converted to a JavaScript object.
+   */
+  readonly rateCalibration: RateCalibrationRecipe | undefined;
+  /**
    * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
    *
    * @returns Compact JSON text.
@@ -3460,6 +3484,18 @@ export interface HazardCurve extends WasmOwned {
    * Par-spread readout interpolation label (`"linear"` or `"log_linear"`).
    */
   readonly parInterp: string;
+  /**
+   * Calibration recipe stamped on this curve by the calibration engine.
+   *
+   * The same object found under `hazard_calibration` in `toJson()`: the
+   * serialized hazard-curve parameters, the calibration and spread-risk
+   * quote inputs with their pillar dates and times, and the calibration
+   * configuration used for the original solve.
+   *
+   * @returns The `HazardCalibrationRecipe` object, or `undefined` for a curve that was built directly rather than produced by a calibration step.
+   * @throws FinstackError - If the recipe cannot be converted to a JavaScript object.
+   */
+  readonly hazardCalibration: HazardCalibrationRecipe | undefined;
   /**
    * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
    *
@@ -3710,6 +3746,17 @@ export interface ForwardCurve extends WasmOwned {
    * Extrapolation policy label (e.g. `"flat_forward"`).
    */
   readonly extrapolation: string;
+  /**
+   * Calibration recipe stamped on this curve by the calibration engine.
+   *
+   * The same object found under `rate_calibration` in `toJson()`: currency,
+   * method, curve day count, OIS compounding, curve role and the complete
+   * typed quote set (rates and spreads as decimals, futures as prices).
+   *
+   * @returns The `RateCalibrationRecipe` object, or `undefined` for a curve that was built directly rather than produced by a calibration step.
+   * @throws FinstackError - If the recipe cannot be converted to a JavaScript object.
+   */
+  readonly rateCalibration: RateCalibrationRecipe | undefined;
   /**
    * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
    *
@@ -35459,6 +35506,61 @@ declare class FactorModel {
 }
 
 /**
+ * Aggregates margin requirements across a portfolio by netting set (Rust
+ * `PortfolioMarginAggregator`). Build one with `fromPortfolio`, then call
+ * `calculate` for each market snapshot.
+ * @example
+ * ```typescript
+ * import init, { core, portfolio } from "finstack-quant-wasm";
+ * await init();
+ * const book = portfolio.Portfolio.builder("book", "USD", "2025-01-01").build();
+ * const market = new core.MarketContext();
+ * const aggregator = portfolio.PortfolioMarginAggregator.fromPortfolio(book);
+ * const margin = aggregator.calculate(book, market, "2025-01-01");
+ * console.log(margin.total_initial_margin.amount, margin.netting_sets.length);
+ * aggregator.free();
+ * market.free();
+ * book.free();
+ * ```
+ */
+declare class PortfolioMarginAggregator {
+  private constructor();
+  /**
+   * Create an aggregator from a portfolio.
+   * @param portfolio - Built portfolio whose positions carrying margin metadata seed the netting sets; its base currency is the reporting currency.
+   * @returns A reusable `PortfolioMarginAggregator` handle.
+   * @throws Error - Throws a `FinstackError` (kind `validation`) if positions in one netting set carry conflicting margin specifications.
+   */
+  static fromPortfolio(portfolio: Portfolio): PortfolioMarginAggregator;
+  /**
+   * Calculate margin requirements for the portfolio.
+   *
+   * Returns the `PortfolioMarginResult`: base-currency totals
+   * (`total_initial_margin`, signed `total_variation_margin`,
+   * `total_margin`), the one-way IM accounts `by_csa`, and `netting_sets`
+   * in ascending identifier order. Each netting set carries the netted SIMM
+   * `sensitivities` its initial margin was computed from and the
+   * per-risk-class `im_breakdown`.
+   * @param portfolio - Built portfolio used for mark-to-market and sensitivity lookups; normally the one passed to `fromPortfolio`.
+   * @param market - `core.MarketContext` handle supplying curves and quotes for VM and SIMM sensitivities, and the FX matrix for base-currency reporting.
+   * @param asOf - ISO-8601 valuation date of the margin run.
+   * @param currentImCollateral - Optional one-way IM balances already held, as an object (or JSON) keyed by CSA id with `Money` values (`{ amount, currency }`) in that CSA's currency. Omitted, `undefined`, `null` or a missing key means zero.
+   * @returns The `PortfolioMarginResult` as a plain object.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string or `currentImCollateral` is not a JSON string or plain object, and a `FinstackError` if `asOf` is not an ISO date, `currentImCollateral` does not match the schema or names an unknown CSA id, or a required FX rate is unavailable.
+   */
+  calculate(
+    portfolio: Portfolio,
+    market: MarketContext,
+    asOf: string,
+    currentImCollateral?: Record<string, MoneyValue> | string | null
+  ): PortfolioMarginResult;
+  /**
+   * Release the underlying wasm heap allocation. Do not use this handle after calling `free()`.
+   */
+  free(): void;
+}
+
+/**
  * Namespaced TypeScript entry points for portfolio calculations and types.
  * @example
  * ```typescript
@@ -35486,6 +35588,10 @@ export interface PortfolioNamespace {
    * Stateful portfolio factor-risk model handle built from a `FactorModelConfig`.
    */
   FactorModel: typeof FactorModel;
+  /**
+   * Stateful portfolio margin aggregator: netting-set initial and variation margin.
+   */
+  PortfolioMarginAggregator: typeof PortfolioMarginAggregator;
   /**
    * Parse and validate a portfolio specification from JSON.
    *

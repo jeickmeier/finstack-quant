@@ -581,6 +581,10 @@ impl GlobalSolveTarget for ForwardCurveTarget {
         self.build_curve_with_projection_grid(&control_knots, projection_grid)
     }
 
+    fn residual_units(&self) -> crate::report::ResidualUnits {
+        crate::report::ResidualUnits::PvPerUnitNotional
+    }
+
     fn calculate_residuals(
         &self,
         curve: &Self::Curve,

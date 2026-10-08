@@ -32,6 +32,7 @@ const EXPORTED_KEYS = [
   'InstrumentArtifactCache',
   'Portfolio',
   'PortfolioBuilder',
+  'PortfolioMarginAggregator',
   'aggregateFullCashflows',
   'aggregateMetrics',
   'allocateWeights',
@@ -1287,4 +1288,40 @@ test('standalone sensitivity outputs require and retain the reporting currency',
       'INVALID'
     )
   );
+});
+
+test('portfolio.PortfolioMarginAggregator returns a plain PortfolioMarginResult', () => {
+  const book = portfolio.Portfolio.fromSpec(EMPTY_SPEC);
+  const market = portfolioCore.MarketContext.fromJson(EMPTY_MARKET);
+  const aggregator = portfolio.PortfolioMarginAggregator.fromPortfolio(book);
+  try {
+    const result = aggregator.calculate(book, market, '2025-01-15');
+    assert.equal(result.as_of, '2025-01-15');
+    assert.equal(result.base_currency, 'USD');
+    assert.deepEqual(result.netting_sets, []);
+    assert.deepEqual(result.by_csa, {});
+    assert.equal(result.total_positions, 0);
+    assert.equal(result.total_initial_margin.currency, 'USD');
+    assert.equal(Number(result.total_initial_margin.amount), 0);
+    // The handle is reusable; an explicit empty balance map is the same as none.
+    assert.deepEqual(aggregator.calculate(book, market, '2025-01-15', {}), result);
+    assert.deepEqual(aggregator.calculate(book, market, '2025-01-15', null), result);
+    // Collateral for a CSA the portfolio does not have is rejected, and the
+    // date is type-checked rather than coerced.
+    assert.throws(
+      () =>
+        aggregator.calculate(book, market, '2025-01-15', {
+          'NO-SUCH-CSA': { amount: '1', currency: 'USD' },
+        }),
+      (error) => error.name === 'FinstackError' && error.kind === 'validation'
+    );
+    assert.throws(
+      () => aggregator.calculate(book, market, 20250115),
+      (error) => error instanceof TypeError && error.kind === 'invalid_type'
+    );
+  } finally {
+    aggregator.free();
+    market.free();
+    book.free();
+  }
 });

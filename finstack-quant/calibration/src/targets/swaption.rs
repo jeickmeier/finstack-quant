@@ -502,7 +502,9 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
             residuals,
             total_iterations,
             vol_tolerance,
-        );
+        )
+        .with_solver_method(crate::report::SolverMethod::PerSliceLeastSquares)
+        .with_residual_units(crate::report::ResidualUnits::QuotedVolatility);
         report.update_metadata(
             "sabr_extrapolation_policy",
             match extrap_policy {

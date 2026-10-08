@@ -963,7 +963,7 @@ impl JsPerformance {
     /// # Errors
     ///
     /// Rejects if the beta results cannot be serialized to JavaScript.
-    /// @returns Per-ticker `{ beta, std_err, ci_lower, ci_upper }` objects in `tickerNames()` order.
+    /// @returns Per-ticker `{ beta, std_err, ci_lower, ci_upper, n_obs, confidence_level }` objects in `tickerNames()` order; `n_obs` is the paired-observation count and `confidence_level` the decimal level (0.95) of the bounds.
     pub fn beta(&self) -> Result<JsValue, JsValue> {
         to_js_rows_numeric(&self.inner.beta())
     }
@@ -974,7 +974,7 @@ impl JsPerformance {
     ///
     /// Rejects if the regression results cannot be serialized to JavaScript.
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
-    /// @returns Per-ticker `{ alpha, beta, r_squared, adjusted_r_squared }` objects in `tickerNames()` order.
+    /// @returns Per-ticker `{ alpha, beta, r_squared, adjusted_r_squared, n_obs }` objects in `tickerNames()` order; `n_obs` is the paired-observation count.
     pub fn greeks(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         to_js_rows_numeric(
@@ -1170,7 +1170,7 @@ impl JsPerformance {
     /// @param factor_returns - Matrix of aligned already-excess decimal factor-return series, one row per factor.
     /// @param return_kind - `"excess"` or `"total"`; defaults to `"excess"`.
     /// @param risk_free_rate - Annualized decimal risk-free rate, used only when `returnKind` is `"total"`; defaults to 0.0 and must be 0.0 for `"excess"`.
-    /// @returns `{ alpha, betas, r_squared, adjusted_r_squared, residual_vol }` for the selected ticker.
+    /// @returns `{ alpha, betas, r_squared, adjusted_r_squared, residual_vol, n_obs }` for the selected ticker; `n_obs` is the observation count.
     #[wasm_bindgen(js_name = multiFactorGreeks)]
     pub fn multi_factor_greeks(
         &self,

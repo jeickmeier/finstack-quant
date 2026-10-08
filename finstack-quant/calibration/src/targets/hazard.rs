@@ -606,6 +606,10 @@ impl BootstrapTarget for HazardCurveTarget {
             .build()
     }
 
+    fn residual_units(&self) -> crate::report::ResidualUnits {
+        crate::report::ResidualUnits::PvPerUnitNotional
+    }
+
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
         let crate::prepared::CalibrationQuote::Cds(pq) = quote else {
             return Err(finstack_quant_core::Error::Input(
@@ -762,6 +766,10 @@ Global solve requires strictly increasing times.",
         }
 
         self.build_curve_for_solver(&knots)
+    }
+
+    fn residual_units(&self) -> crate::report::ResidualUnits {
+        crate::report::ResidualUnits::PvPerUnitNotional
     }
 
     fn calculate_residuals(

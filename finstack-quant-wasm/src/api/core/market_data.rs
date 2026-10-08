@@ -494,6 +494,22 @@ impl JsDiscountCurve {
     pub fn extrapolation(&self) -> String {
         self.inner.extrapolation().to_string()
     }
+
+    /// Calibration recipe stamped on this curve by the calibration engine.
+    ///
+    /// The same object found under `rate_calibration` in `toJson()`: currency,
+    /// method, curve day count, OIS compounding, curve role and the complete
+    /// typed quote set (rates and spreads as decimals, futures as prices).
+    ///
+    /// @returns The `RateCalibrationRecipe` object, or `undefined` for a curve that was built directly rather than produced by a calibration step.
+    /// @throws FinstackError - If the recipe cannot be converted to a JavaScript object.
+    #[wasm_bindgen(getter, js_name = rateCalibration)]
+    pub fn rate_calibration(&self) -> Result<JsValue, JsValue> {
+        match self.inner.rate_calibration() {
+            Some(recipe) => crate::utils::to_js_value(recipe),
+            None => Ok(JsValue::UNDEFINED),
+        }
+    }
 }
 
 /// Parse an optional compounding name; omitted means continuous.
@@ -919,6 +935,23 @@ impl JsHazardCurve {
     pub fn par_interp(&self) -> Result<String, JsValue> {
         serde_label(&self.inner.par_interp()).map_err(to_js_err)
     }
+
+    /// Calibration recipe stamped on this curve by the calibration engine.
+    ///
+    /// The same object found under `hazard_calibration` in `toJson()`: the
+    /// serialized hazard-curve parameters, the calibration and spread-risk
+    /// quote inputs with their pillar dates and times, and the calibration
+    /// configuration used for the original solve.
+    ///
+    /// @returns The `HazardCalibrationRecipe` object, or `undefined` for a curve that was built directly rather than produced by a calibration step.
+    /// @throws FinstackError - If the recipe cannot be converted to a JavaScript object.
+    #[wasm_bindgen(getter, js_name = hazardCalibration)]
+    pub fn hazard_calibration(&self) -> Result<JsValue, JsValue> {
+        match self.inner.hazard_calibration() {
+            Some(recipe) => crate::utils::to_js_value(recipe),
+            None => Ok(JsValue::UNDEFINED),
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -1197,6 +1230,22 @@ impl JsForwardCurve {
     #[wasm_bindgen(getter, js_name = extrapolation)]
     pub fn extrapolation(&self) -> String {
         self.inner.extrapolation().to_string()
+    }
+
+    /// Calibration recipe stamped on this curve by the calibration engine.
+    ///
+    /// The same object found under `rate_calibration` in `toJson()`: currency,
+    /// method, curve day count, OIS compounding, curve role and the complete
+    /// typed quote set (rates and spreads as decimals, futures as prices).
+    ///
+    /// @returns The `RateCalibrationRecipe` object, or `undefined` for a curve that was built directly rather than produced by a calibration step.
+    /// @throws FinstackError - If the recipe cannot be converted to a JavaScript object.
+    #[wasm_bindgen(getter, js_name = rateCalibration)]
+    pub fn rate_calibration(&self) -> Result<JsValue, JsValue> {
+        match self.inner.rate_calibration() {
+            Some(recipe) => crate::utils::to_js_value(recipe),
+            None => Ok(JsValue::UNDEFINED),
+        }
     }
 }
 

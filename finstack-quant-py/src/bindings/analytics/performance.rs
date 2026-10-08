@@ -1472,8 +1472,9 @@ impl PyPerformance {
     /// pandas ``DataFrame`` indexed by ticker.
     ///
     /// Columns: ``beta``, ``std_err``, ``ci_lower``, ``ci_upper`` (95%
-    /// confidence bounds). Undefined estimates remain ``NaN`` in numeric
-    /// ``float64`` columns.
+    /// confidence bounds), ``n_obs`` (``int64`` observation count) and
+    /// ``confidence_level`` (decimal level of the bounds). Undefined
+    /// estimates remain ``NaN`` in numeric ``float64`` columns.
     fn to_beta_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let frame = beta_to_dataframe(
             py,
@@ -1486,7 +1487,7 @@ impl PyPerformance {
 
     /// Single-index greeks (annualized Jensen alpha, beta, R², adjusted R²)
     /// for every ticker vs the benchmark as a pandas ``DataFrame`` indexed by
-    /// ticker.
+    /// ticker, plus the ``n_obs`` (``int64``) observation count of each fit.
     ///
     /// Parameters
     /// ----------

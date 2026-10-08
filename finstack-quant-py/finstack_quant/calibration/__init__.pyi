@@ -3752,8 +3752,8 @@ class CalibrationDiagnostics:
     --------
     >>> from finstack_quant.calibration import CalibrationDiagnostics
     >>> d = CalibrationDiagnostics.from_json(
-    ...     '{"per_quote":[],"condition_number":null,"singular_values":null,'
-    ...     '"max_residual":0.0,"rms_residual":0.0,"r_squared":null}'
+    ...     '{"per_quote":[],"condition_number":null,"jacobian":null,'
+    ...     '"max_residual":0.0,"rms_residual":0.0}'
     ... )
     >>> d.max_residual
     0.0
@@ -3787,16 +3787,26 @@ class CalibrationDiagnostics:
         """
 
     @property
-    def singular_values(self) -> list[float] | None:
+    def jacobian(self) -> list[list[float]] | None:
         """
-        Singular values of the Jacobian, or None when not computed.
+        Finite-difference Jacobian of the residuals at the solution.
+
+        ``jacobian[i][j]`` is the derivative of the residual of quote ``i``
+        (in ``per_quote`` order) with respect to solved parameter ``j`` (the
+        knot values in increasing knot-time order), in the report's residual
+        units per unit of the parameter. The entries are unweighted;
+        ``condition_number`` is computed from this matrix with the residual
+        weights applied, and ``per_quote[i].sensitivity`` equals
+        ``max(abs(v) for v in jacobian[i])``.
 
         This property does not raise.
 
         Returns
         -------
-        list[float] | None
-            Singular values of the Jacobian, or None when not computed.
+        list[list[float]] | None
+            One row per quote and one column per solved parameter. ``None``
+            for sequential bootstraps, which build no full Jacobian, and when
+            a parameter bump could not be priced.
         """
 
     @property
@@ -3823,19 +3833,6 @@ class CalibrationDiagnostics:
         -------
         float
             Root-mean-square residual across quotes, in the target's own units.
-        """
-
-    @property
-    def r_squared(self) -> float | None:
-        """
-        Coefficient of determination of the fit, or None when not computed.
-
-        This property does not raise.
-
-        Returns
-        -------
-        float | None
-            Coefficient of determination of the fit, or None when not computed.
         """
 
     def to_dataframe(self) -> pd.DataFrame:
@@ -4148,6 +4145,85 @@ class CalibrationReport:
         -------
         float | None
             Tolerance used for the success decision, or None.
+        """
+
+    @property
+    def solver_method(self) -> str | None:
+        """
+        Numerical procedure that produced this report, as its wire name.
+
+        One of ``"sequential_bootstrap"`` (knots solved one at a time by a
+        bracketed root find), ``"global_fit_lm_weighted_lsq"`` (all parameters
+        solved together by weighted Levenberg-Marquardt),
+        ``"per_slice_least_squares"`` (one SABR or SVI smile fit per expiry or
+        expiry/tenor bucket), ``"scalar_root_find"``, ``"scalar_minimization"``
+        or ``"plan_execution"`` (the plan-level aggregate; no solver ran).
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            Wire name of the solver method. ``None`` only for a report rebuilt
+            from JSON written before the field existed.
+        """
+
+    @property
+    def residual_units(self) -> str | None:
+        """
+        Units of ``residuals``, ``max_residual`` and ``rmse``, as a wire name.
+
+        ``"pv_per_unit_notional"`` is the calibration instrument's present
+        value divided by the residual notional (``1e-4`` is one basis point of
+        notional); ``"quoted_volatility"`` is model minus quoted volatility in
+        the quote's own convention, as a decimal;
+        ``"discounted_upfront_fraction"`` is the discounted tranche value as a
+        fraction of tranche notional; and
+        ``"absolute_residual_over_step_tolerance"`` is the dimensionless
+        ``|residual| / step_tolerance`` used by the plan-level report. The same
+        string is mirrored in ``metadata["residual_units"]``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            Wire name of the residual units. ``None`` only for a report rebuilt
+            from JSON written before the field existed.
+        """
+
+    @property
+    def fitted_slices(self) -> list[dict[str, Any]]:
+        """
+        Smile parameters fitted per quoted expiry, in increasing expiry order.
+
+        The equity SABR (``vol_surface``) and SVI (``svi_surface``) steps fit
+        one smile per quoted expiry and then sample the smiles onto the target
+        grid; the gridded surface keeps only the sampled volatilities, so the
+        fitted parameters are reported here. Each dict has:
+
+        - ``expiry``: quoted expiry as an Act/365F year fraction from the
+          calibration base date (not necessarily a target-grid expiry).
+        - ``parameters``: ``{"sabr": {"alpha", "beta", "nu", "rho", "shift"}}``
+          or ``{"svi": {"a", "b", "rho", "m", "sigma"}}`` (raw SVI total
+          variance in log-moneyness ``ln(K / F)``).
+        - ``iterations``: solver iterations spent on the slice; the slices sum
+          to ``iterations`` of the report.
+        - ``max_relative_quote_error``: largest ``|model - market| / market``
+          volatility error of the fitted smile over the slice's quotes, as a
+          decimal. Present for SABR slices only.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One dict per quoted expiry. Empty for every other step kind,
+            including the swaption SABR cube, whose node parameters are stored
+            on the cube itself.
+
+        Raises
+        ------
+        ValueError
+            If the slices cannot be converted to Python objects.
         """
 
     @property

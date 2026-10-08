@@ -13,6 +13,7 @@ mod factor_brinson;
 pub(crate) mod factor_model;
 mod fi_attribution;
 mod grid_attribution;
+mod margin;
 mod materialization;
 mod optimization_spec;
 mod performance;
@@ -84,6 +85,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     excess_return::register(py, &m)?;
     grid_attribution::register(py, &m)?;
     factor_brinson::register(py, &m)?;
+    margin::register(py, &m)?;
 
     let exports = vec![
         "FinstackError",
@@ -189,6 +191,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "TradeSpec",
         "PortfolioOptimizationSpec",
         "PortfolioOptimizationResult",
+        // portfolio margin aggregation
+        "NettingSetMargin",
+        "PortfolioMarginAggregator",
+        "PortfolioMarginResult",
         "schema",
     ];
 

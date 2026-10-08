@@ -796,6 +796,19 @@ fn breakdown_flows(
         ("debt_balance", breakdown.debt_balance),
         ("accrued_interest", breakdown.accrued_interest),
     ]);
+    // Opening balance and the sources of `principal_payment`; absent on
+    // breakdowns that do not record them.
+    flows.extend(
+        [
+            ("opening_balance", breakdown.opening_balance),
+            ("scheduled_principal", breakdown.scheduled_principal),
+            ("mandatory_prepayment", breakdown.mandatory_prepayment),
+            ("sweep_prepayment", breakdown.sweep_prepayment),
+            ("voluntary_prepayment", breakdown.voluntary_prepayment),
+        ]
+        .into_iter()
+        .filter_map(|(flow_type, money)| money.map(|money| (flow_type, money))),
+    );
     flows
 }
 
@@ -1196,14 +1209,44 @@ impl PyCapitalStructureCashflows {
         Ok(dict)
     }
 
+    /// Cash available to the waterfall per period.
+    ///
+    /// The value of the waterfall's ``available_cash_node`` floored at zero,
+    /// in the waterfall's currency. It reconciles the period's uses:
+    /// ``fees + cash interest + principal_payment + equity_distribution ==
+    /// available_cash``.
+    ///
+    /// Returns
+    /// -------
+    /// dict[str, Money]
+    ///     Period id to ``Money``; empty unless a waterfall ran.
+    ///
+    /// This property does not raise.
+    #[getter]
+    fn available_cash<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let dict = PyDict::new(py);
+        for (period, money) in &self.inner.available_cash {
+            dict.set_item(period.to_string(), PyMoney { inner: *money })?;
+        }
+        Ok(dict)
+    }
+
     /// Export per-instrument cashflows as a long pandas ``DataFrame``.
     ///
     /// Columns: ``instrument``, ``period`` (period id string),
     /// ``flow_type`` (``interest_expense_cash``, ``interest_income_cash``
     /// when present, ``interest_expense_pik``, ``principal_payment``,
-    /// ``fees``, ``debt_balance``, ``accrued_interest``), ``amount``
-    /// (float64, positive debt-service magnitude) and ``currency`` (ISO
-    /// code of that instrument). Rows follow instrument then period order.
+    /// ``fees``, ``debt_balance``, ``accrued_interest``, then — on
+    /// evaluator-produced cashflows — ``opening_balance`` and the four
+    /// sources of ``principal_payment``: ``scheduled_principal``,
+    /// ``mandatory_prepayment``, ``sweep_prepayment``,
+    /// ``voluntary_prepayment``), ``amount`` (float64, positive debt-service
+    /// magnitude) and ``currency`` (ISO code of that instrument). Rows follow
+    /// instrument then period order.
+    ///
+    /// ``principal_payment`` equals the sum of its four source rows, so do
+    /// not add them together; ``opening_balance`` is the debt balance at
+    /// period start and ``debt_balance`` the balance at period end.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let mut rows = Vec::new();

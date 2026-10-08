@@ -112,7 +112,17 @@ const EXIT_MULTIPLE = { type: 'exit_multiple', terminal_metric: 999.0, multiple:
 
 test('goalSeek returns the Rust GoalSeekResult with the model as an object', () => {
   const updated = sa.goalSeek(goalSeekModel(), 'profit', '2025Q1', 60, 'revenue', '2025Q1', true);
-  assert.deepEqual(Object.keys(updated).sort(), ['model', 'solved_value']);
+  assert.deepEqual(Object.keys(updated).sort(), [
+    'converged',
+    'evaluations',
+    'model',
+    'residual',
+    'solved_value',
+    'tolerance',
+  ]);
+  assert.equal(updated.converged, true);
+  assert.ok(Math.abs(updated.residual) <= updated.tolerance);
+  assert.ok(updated.evaluations > 0);
   assert.ok(Math.abs(updated.solved_value - 120) < 1e-6);
   assert.equal(typeof updated.model, 'object');
   assert.ok(Math.abs(updated.model.nodes.revenue.values['2025Q1'] - 120) < 1e-6);

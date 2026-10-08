@@ -32,6 +32,26 @@ pub struct PositionValue {
     /// Value converted to portfolio base currency
     pub value_base: Money,
 
+    /// Spot FX rate applied to collapse [`value_native`](Self::value_native)
+    /// into [`value_base`](Self::value_base): units of the portfolio base
+    /// currency per one unit of the native currency, observed at the
+    /// valuation date, so `value_native × fx_rate = value_base` (up to the
+    /// base currency's `Money` rounding).
+    ///
+    /// Absent when the native currency is the base currency (no FX lookup is
+    /// made), and on values deserialized from JSON written before this field
+    /// existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fx_rate: Option<f64>,
+
+    /// Whether [`fx_rate`](Self::fx_rate) was built by triangulating through
+    /// the FX matrix's pivot currency (`true`) or read from a direct or
+    /// inverse quote (`false`).
+    ///
+    /// Absent exactly when `fx_rate` is absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fx_triangulated: Option<bool>,
+
     /// Linear scaling factor to apply to summable risk measures.
     ///
     /// This mirrors the economic position size and sign used for PV scaling,
@@ -745,5 +765,158 @@ mod tests {
         assert_eq!(valuation.by_entity.len(), 2);
         assert!(valuation.get_entity_value("ENTITY_A").is_some());
         assert!(valuation.get_entity_value("ENTITY_B").is_some());
+    }
+
+    /// One USD deposit position in a portfolio reporting in `base`.
+    fn usd_deposit_portfolio(base: Currency) -> Portfolio {
+        let as_of = date!(2024 - 01 - 01);
+        let position = Position::new(
+            "POS_USD",
+            DUMMY_ENTITY_ID,
+            "DEP_USD",
+            Arc::new(one_month_deposit("DEP_USD", as_of)),
+            1.0,
+            PositionUnit::Units,
+        )
+        .expect("valid position");
+        PortfolioBuilder::new("TEST")
+            .base_currency(base)
+            .as_of(as_of)
+            .position(position)
+            .build()
+            .expect("valid portfolio")
+    }
+
+    fn fx_matrix(
+        pivot: Currency,
+        quotes: &[(Currency, Currency, f64)],
+    ) -> finstack_quant_core::money::fx::FxMatrix {
+        use finstack_quant_core::money::fx::{FxConfig, FxMatrix, SimpleFxProvider};
+        let fx = FxMatrix::try_with_config(
+            Arc::new(SimpleFxProvider::new()),
+            FxConfig {
+                pivot_currency: pivot,
+                enable_triangulation: true,
+                cache_capacity: 32,
+            },
+        )
+        .expect("valid fx config");
+        fx.set_quotes(quotes).expect("quotes should seed");
+        fx
+    }
+
+    /// The exported FX rate reproduces the base-currency value from the
+    /// native one, and is absent when no conversion happened.
+    #[test]
+    fn position_value_records_the_fx_rate_applied() {
+        let config = FinstackConfig::default();
+        let options = PortfolioValuationOptions::default();
+
+        let same = value_portfolio(
+            &usd_deposit_portfolio(Currency::USD),
+            &build_test_market(),
+            &config,
+            &options,
+        )
+        .expect("same-currency valuation");
+        let same = &same.position_values["POS_USD"];
+        assert_eq!(same.fx_rate, None);
+        assert_eq!(same.fx_triangulated, None);
+        assert_eq!(same.value_native, same.value_base);
+        let json = serde_json::to_value(same).expect("serializes");
+        assert!(json.get("fx_rate").is_none() && json.get("fx_triangulated").is_none());
+
+        let direct_market = build_test_market().insert_fx(fx_matrix(
+            Currency::USD,
+            &[(Currency::USD, Currency::EUR, 0.92)],
+        ));
+        let direct = value_portfolio(
+            &usd_deposit_portfolio(Currency::EUR),
+            &direct_market,
+            &config,
+            &options,
+        )
+        .expect("cross-currency valuation");
+        let direct = &direct.position_values["POS_USD"];
+        let rate = direct
+            .fx_rate
+            .expect("cross-currency position records its rate");
+        assert!((rate - 0.92).abs() < 1e-15, "{rate}");
+        assert_eq!(direct.fx_triangulated, Some(false));
+        assert_eq!(direct.value_native.currency(), Currency::USD);
+        assert_eq!(
+            Money::new(direct.value_native.amount() * rate, Currency::EUR).expect("valid money"),
+            direct.value_base
+        );
+
+        // The fields survive the wire round-trip.
+        let reparsed: PositionValue =
+            serde_json::from_str(&serde_json::to_string(direct).expect("serializes"))
+                .expect("round-trips");
+        assert_eq!(reparsed.fx_rate, direct.fx_rate);
+        assert_eq!(reparsed.fx_triangulated, Some(false));
+    }
+
+    /// A rate built through the pivot currency is flagged as triangulated.
+    #[test]
+    fn position_value_flags_a_triangulated_fx_rate() {
+        let market = build_test_market().insert_fx(fx_matrix(
+            Currency::EUR,
+            &[
+                (Currency::USD, Currency::EUR, 0.92),
+                (Currency::EUR, Currency::GBP, 0.85),
+            ],
+        ));
+        let valuation = value_portfolio(
+            &usd_deposit_portfolio(Currency::GBP),
+            &market,
+            &FinstackConfig::default(),
+            &PortfolioValuationOptions::default(),
+        )
+        .expect("triangulated valuation");
+        let value = &valuation.position_values["POS_USD"];
+        let rate = value.fx_rate.expect("rate recorded");
+        assert!((rate - 0.92 * 0.85).abs() < 1e-12, "{rate}");
+        assert_eq!(value.fx_triangulated, Some(true));
+        assert_eq!(
+            Money::new(value.value_native.amount() * rate, Currency::GBP).expect("valid money"),
+            value.value_base
+        );
+    }
+
+    /// Selective revaluation after an FX move refreshes the recorded rate
+    /// together with the base-currency value of reused positions.
+    #[test]
+    fn revalue_affected_refreshes_the_recorded_fx_rate() {
+        let portfolio = usd_deposit_portfolio(Currency::EUR);
+        let config = FinstackConfig::default();
+        let options = PortfolioValuationOptions::default();
+        let market_at = |rate: f64| {
+            build_test_market().insert_fx(fx_matrix(
+                Currency::USD,
+                &[(Currency::USD, Currency::EUR, rate)],
+            ))
+        };
+        let prior = value_portfolio(&portfolio, &market_at(0.92), &config, &options)
+            .expect("prior valuation");
+        let moved = market_at(0.80);
+        let patched = revalue_affected(
+            &portfolio,
+            &moved,
+            &config,
+            &options,
+            &prior,
+            &[crate::dependencies::MarketFactorKey::fx(
+                Currency::USD,
+                Currency::EUR,
+            )],
+        )
+        .expect("selective revaluation");
+        let full = value_portfolio(&portfolio, &moved, &config, &options).expect("full valuation");
+        let patched = &patched.position_values["POS_USD"];
+        let full = &full.position_values["POS_USD"];
+        assert_eq!(patched.fx_rate, full.fx_rate);
+        assert_eq!(patched.value_base, full.value_base);
+        assert!((patched.fx_rate.expect("rate recorded") - 0.80).abs() < 1e-15);
     }
 }

@@ -266,12 +266,18 @@ test('VM validation and desk direction retain settlement metadata', () => {
   const collect = new margin.VmCalculator(csa).calculate(1e6, 0, 'USD', '2025-01-10');
   // Canonical Rust `VmResult` serde: Money amounts are exact decimal strings.
   assert.deepEqual(Object.keys(collect).sort(), [
+    'collateral_balance',
     'collect_amount',
     'date',
     'gross_exposure',
+    'independent_amount',
+    'mta',
     'net_exposure',
     'post_amount',
+    'rounding_increment',
     'settlement_date',
+    'threshold',
+    'unrounded_call',
   ]);
   assert.deepEqual(collect.collect_amount, { amount: '1000000', currency: 'USD' });
   assert.equal(Number(collect.post_amount.amount), 0);

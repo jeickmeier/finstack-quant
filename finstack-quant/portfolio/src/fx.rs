@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::money::fx::FxQuery;
+use finstack_quant_core::money::fx::{FxQuery, FxRateResult};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 
@@ -84,12 +84,38 @@ pub fn spot_rate_to_base(
         return Ok(1.0);
     }
 
+    spot_fx_to_base(from_currency, as_of, market, base_currency).map(|result| result.rate)
+}
+
+/// Look up the spot FX matrix result from `from_currency` into `base_currency`.
+///
+/// Unlike [`spot_rate_to_base`], this keeps the matrix's `triangulated` flag
+/// and does not short-circuit a same-currency pair; callers handle that case.
+///
+/// # Arguments
+///
+/// * `from_currency` - Native currency whose units the rate converts.
+/// * `as_of` - Date used for the FX matrix lookup.
+/// * `market` - Market context supplying the FX matrix.
+/// * `base_currency` - Target reporting currency; the returned rate is units
+///   of this currency per one unit of `from_currency`.
+///
+/// # Errors
+///
+/// * [`Error::MissingMarketData`] - The market context has no FX matrix.
+/// * [`Error::FxConversionFailed`] - The requested currency pair is not
+///   available in the FX matrix.
+pub(crate) fn spot_fx_to_base(
+    from_currency: Currency,
+    as_of: Date,
+    market: &MarketContext,
+    base_currency: Currency,
+) -> Result<FxRateResult> {
     let fx_matrix = market
         .fx()
         .ok_or_else(|| Error::MissingMarketData("FX matrix not available".to_string()))?;
     fx_matrix
         .rate(FxQuery::new(from_currency, base_currency, as_of))
-        .map(|result| result.rate)
         .map_err(|_| Error::FxConversionFailed {
             from: from_currency,
             to: base_currency,

@@ -262,6 +262,24 @@ pub struct BetaResult {
         schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
     )]
     pub ci_upper: f64,
+    /// Number of paired observations the regression used: the overlap after
+    /// truncating both series to the shorter length. Reported even when the
+    /// estimates are [`f64::NAN`]. `0` when deserialized from JSON written
+    /// before this field existed.
+    #[serde(default)]
+    pub n_obs: usize,
+    /// Two-sided confidence level of `ci_lower`/`ci_upper` as a decimal
+    /// probability (`0.95` = 95%). The interval is
+    /// `beta ± t_{n_obs − 2, (1 + confidence_level) / 2} × std_err`.
+    #[serde(default = "default_beta_confidence_level")]
+    pub confidence_level: f64,
+}
+
+/// Two-sided confidence level of the [`BetaResult`] interval (95%).
+pub(crate) const BETA_CONFIDENCE_LEVEL: f64 = 0.95;
+
+fn default_beta_confidence_level() -> f64 {
+    BETA_CONFIDENCE_LEVEL
 }
 
 impl NonFiniteFields for BetaResult {
@@ -321,6 +339,8 @@ pub fn beta(portfolio: &[f64], benchmark: &[f64]) -> BetaResult {
             std_err: f64::NAN,
             ci_lower: f64::NAN,
             ci_upper: f64::NAN,
+            n_obs: n,
+            confidence_level: BETA_CONFIDENCE_LEVEL,
         };
     }
     // A zero-variance benchmark cannot identify a slope: surface NaN
@@ -362,6 +382,8 @@ pub fn beta(portfolio: &[f64], benchmark: &[f64]) -> BetaResult {
         std_err: se,
         ci_lower: beta - critical_value * se,
         ci_upper: beta + critical_value * se,
+        n_obs: n,
+        confidence_level: BETA_CONFIDENCE_LEVEL,
     }
 }
 
@@ -435,6 +457,12 @@ pub struct GreeksResult {
         schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
     )]
     pub adjusted_r_squared: f64,
+    /// Number of paired observations the regression used: the overlap after
+    /// truncating both series to the shorter length. Reported even when the
+    /// estimates are [`f64::NAN`]. `0` when deserialized from JSON written
+    /// before this field existed.
+    #[serde(default)]
+    pub n_obs: usize,
 }
 
 impl NonFiniteFields for GreeksResult {
@@ -483,6 +511,7 @@ pub(crate) fn greeks(
             beta: f64::NAN,
             r_squared: f64::NAN,
             adjusted_r_squared: f64::NAN,
+            n_obs: n,
         };
     }
     let beta = if covariance.variance_y() == 0.0 {
@@ -513,6 +542,7 @@ pub(crate) fn greeks(
         beta,
         r_squared,
         adjusted_r_squared,
+        n_obs: n,
     }
 }
 
@@ -899,6 +929,12 @@ pub struct MultiFactorResult {
     pub adjusted_r_squared: f64,
     /// Annualized residual volatility.
     pub residual_vol: f64,
+    /// Number of observations the regression used: the common length of the
+    /// dependent series and every factor series. Residual degrees of freedom
+    /// are `n_obs − betas.len() − 1`. `0` when deserialized from JSON written
+    /// before this field existed.
+    #[serde(default)]
+    pub n_obs: usize,
 }
 
 impl NonFiniteFields for MultiFactorResult {
@@ -1155,6 +1191,7 @@ pub(crate) fn multi_factor_greeks(
         r_squared: r_sq,
         adjusted_r_squared,
         residual_vol,
+        n_obs: n,
     })
 }
 
@@ -1168,6 +1205,8 @@ mod tests {
             std_err: f64::NAN,
             ci_lower: f64::NAN,
             ci_upper: f64::NAN,
+            n_obs: 0,
+            confidence_level: BETA_CONFIDENCE_LEVEL,
         };
         assert_non_finite_fields(&beta);
         let greeks = GreeksResult {
@@ -1175,6 +1214,7 @@ mod tests {
             beta: f64::NAN,
             r_squared: f64::NAN,
             adjusted_r_squared: f64::NAN,
+            n_obs: 0,
         };
         assert_non_finite_fields(&greeks);
         let multi = MultiFactorResult {
@@ -1183,8 +1223,60 @@ mod tests {
             r_squared: f64::NAN,
             adjusted_r_squared: f64::NAN,
             residual_vol: f64::NAN,
+            n_obs: 0,
         };
         assert_non_finite_fields(&multi);
+    }
+
+    #[test]
+    fn regression_results_report_the_aligned_sample_size() {
+        // Mismatched lengths: the regression uses the 5-observation overlap.
+        let port = [0.020, 0.042, 0.058, 0.081, 0.099, 0.5, 0.7];
+        let bench = [0.010, 0.020, 0.030, 0.040, 0.050];
+
+        let fit = beta(&port, &bench);
+        assert_eq!(fit.n_obs, 5);
+        assert_eq!(fit.confidence_level, 0.95);
+        // The interval is re-derivable from the exported fields alone.
+        let critical =
+            student_t_inv_cdf(0.5 * (1.0 + fit.confidence_level), (fit.n_obs - 2) as f64)
+                .expect("t quantile");
+        assert!((fit.ci_lower - (fit.beta - critical * fit.std_err)).abs() < 1e-12);
+        assert!((fit.ci_upper - (fit.beta + critical * fit.std_err)).abs() < 1e-12);
+
+        let g = greeks(&port, &bench, 252.0, 0.0);
+        assert_eq!(g.n_obs, 5);
+        let expected_adj =
+            1.0 - (1.0 - g.r_squared) * (g.n_obs as f64 - 1.0) / (g.n_obs as f64 - 2.0);
+        assert_eq!(g.adjusted_r_squared, expected_adj);
+
+        // Too-short samples still report how many pairs were seen.
+        let short = beta(&port[..2], &bench);
+        assert_eq!(short.n_obs, 2);
+        assert!(short.beta.is_nan());
+        assert_eq!(greeks(&port[..1], &bench, 252.0, 0.0).n_obs, 1);
+
+        let y = [0.011, 0.019, 0.032, 0.038, 0.052, 0.049];
+        let f1 = [0.010, 0.020, 0.030, 0.040, 0.050, 0.045];
+        let f2 = [0.003, -0.002, 0.004, -0.001, 0.002, 0.006];
+        let multi = multi_factor_greeks(&y, &[&f1, &f2], 252.0, ReturnKind::Excess)
+            .expect("multi-factor fit");
+        assert_eq!(multi.n_obs, y.len());
+        let dof = (multi.n_obs - multi.betas.len() - 1) as f64;
+        assert_eq!(
+            multi.adjusted_r_squared,
+            1.0 - (1.0 - multi.r_squared) * (multi.n_obs as f64 - 1.0) / dof
+        );
+    }
+
+    #[test]
+    fn pre_change_json_deserializes_with_documented_defaults() {
+        let old: BetaResult = serde_json::from_str(
+            r#"{"beta": 1.0, "std_err": 0.1, "ci_lower": 0.8, "ci_upper": 1.2}"#,
+        )
+        .expect("old BetaResult JSON");
+        assert_eq!(old.n_obs, 0);
+        assert_eq!(old.confidence_level, 0.95);
     }
 
     #[test]

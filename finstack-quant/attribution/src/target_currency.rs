@@ -73,6 +73,10 @@ use crate::types::PnlAttribution;
 ///   `cross_factor_detail`, `model_params_detail`, `scalars_detail`) are
 ///   translated the same way so callers cannot mix native and reporting
 ///   currency when summing per-curve or per-pair leaves.
+/// - `pv_t0` and `pv_t1`, when present, become the opening value at T0 FX and
+///   the closing value at T1 FX, so `mark_to_market_pnl == pv_t1 − pv_t0`
+///   still holds. `waterfall_steps` and `sensitivity_steps` amounts are
+///   converted at T1 FX like the factor fields they explain.
 /// - The `meta.fx_policy` is stamped with `target_currency` and a note describing
 ///   the translation.
 ///
@@ -127,6 +131,11 @@ pub fn translate_to_target_currency(
 
     if translated.mark_to_market_pnl.is_some() {
         translated.mark_to_market_pnl = Some(translated_mtm);
+    }
+    // Endpoints travel at their own date's FX, matching the MTM rebuilt above.
+    if translated.pv_t0.is_some() && translated.pv_t1.is_some() {
+        translated.pv_t0 = Some(val_t0_at_t0);
+        translated.pv_t1 = Some(val_t1_at_t1);
     }
 
     translated.meta.fx_policy = Some(FxPolicyMeta {
@@ -282,6 +291,27 @@ mod tests {
         attr.total_pnl = Money::from((130_i64, Currency::EUR));
         attr.carry = Money::from((50_i64, Currency::EUR));
         attr.rates_curves_pnl = Money::from((80_i64, Currency::EUR));
+        // Endpoints and a two-step waterfall trail behind the same numbers:
+        // carry step 1000 → 1020 (theta 20), rates step 1020 → 1100.
+        attr.pv_t0 = Some(val_t0_native);
+        attr.pv_t1 = Some(Money::from((1100_i64, Currency::EUR)));
+        let eur = |amount: i64| Money::from((amount, Currency::EUR));
+        attr.waterfall_steps = vec![
+            crate::WaterfallStep {
+                step_index: 0,
+                factor: crate::AttributionFactor::Carry,
+                pv_before: eur(1000),
+                pv_after: eur(1020),
+                step_pnl: eur(20),
+            },
+            crate::WaterfallStep {
+                step_index: 1,
+                factor: crate::AttributionFactor::RatesCurves,
+                pv_before: eur(1020),
+                pv_after: eur(1100),
+                step_pnl: eur(80),
+            },
+        ];
         attr.compute_residual().expect("residual");
         assert!(
             attr.residual.amount().abs() < 1e-12,
@@ -312,6 +342,21 @@ mod tests {
             (attr.mark_to_market_pnl.expect("mtm").amount() - 220.0).abs() < 1e-9,
             "mark_to_market_pnl must stay the raw translated MTM"
         );
+        // Endpoints travel at their own date's FX: 1000×1.10 and 1100×1.20,
+        // so their difference is still the translated mark-to-market P&L.
+        let pv_t0 = attr.pv_t0.expect("pv_t0").amount();
+        let pv_t1 = attr.pv_t1.expect("pv_t1").amount();
+        assert!((pv_t0 - 1100.0).abs() < 1e-9, "pv_t0 at T0 FX, got {pv_t0}");
+        assert!((pv_t1 - 1320.0).abs() < 1e-9, "pv_t1 at T1 FX, got {pv_t1}");
+        // Step values travel at T1 FX with the factor P&L they explain, so the
+        // chain starts at pv_t0 + fx_translation_pnl and still ends at pv_t1.
+        let first = &attr.waterfall_steps[0];
+        let last = &attr.waterfall_steps[1];
+        assert!(
+            (first.pv_before.amount() - (pv_t0 + attr.fx_translation_pnl.amount())).abs() < 1e-9
+        );
+        assert!((last.pv_after.amount() - pv_t1).abs() < 1e-9);
+        assert!((last.step_pnl.amount() - attr.rates_curves_pnl.amount()).abs() < 1e-9);
         // carry 50×1.2 = 60, rates 80×1.2 = 96, fx_translation 1000×0.1 = 100
         // → attributed 256 = total: residual must remain ~0, not −coupon×fx1.
         assert!(

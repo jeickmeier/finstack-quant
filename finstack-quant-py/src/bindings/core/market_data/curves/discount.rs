@@ -546,6 +546,25 @@ impl PyDiscountCurve {
         self.inner.extrapolation().to_string()
     }
 
+    /// Calibration recipe stamped on this curve, as a dict.
+    ///
+    /// The serde form of the Rust ``RateCalibrationRecipe``: ``currency``,
+    /// ``method``, ``curve_day_count``, ``ois_compounding``, ``role`` and the
+    /// complete ``quotes`` set needed to replay the calibration. ``None`` for a
+    /// curve that was not produced by a calibration step.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the recipe cannot be converted to Python objects.
+    #[getter]
+    fn rate_calibration<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .rate_calibration()
+            .map(|recipe| crate::bindings::pandas_utils::serde_to_py(py, recipe))
+            .transpose()
+    }
+
     fn __repr__(&self) -> String {
         format!(
             "DiscountCurve(id='{}', base_date='{}', knots={}, day_count='{}')",

@@ -1100,6 +1100,8 @@ mod tests {
             entity_id: crate::types::EntityId::from("ENTITY_A"),
             value_native: value,
             value_base: value,
+            fx_rate: None,
+            fx_triangulated: None,
             metric_scale: 1.0,
             risk_metrics_complete: true,
             risk_error: None,

@@ -93,6 +93,7 @@ impl Check for GrowthRateConsistency {
                             reference_label: format!("prior_{}", node.as_str()),
                         }),
                         nodes: vec![node.clone()],
+                        comparison: None,
                     });
                 }
             }
@@ -106,6 +107,7 @@ impl Check for GrowthRateConsistency {
             category: self.category(),
             passed,
             findings,
+            comparisons: Vec::new(),
         })
     }
 }

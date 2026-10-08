@@ -82,6 +82,7 @@ impl Check for LeverageRangeCheck {
                         reference_label: "ttm_ebitda".to_string(),
                     }),
                     nodes: vec![self.debt_node.clone(), self.ebitda_node.clone()],
+                    comparison: None,
                 });
                 continue;
             }
@@ -127,6 +128,7 @@ impl Check for LeverageRangeCheck {
                         reference_label: "ttm_ebitda".to_string(),
                     }),
                     nodes: vec![self.debt_node.clone(), self.ebitda_node.clone()],
+                    comparison: None,
                 });
             }
         }
@@ -139,6 +141,7 @@ impl Check for LeverageRangeCheck {
             category: self.category(),
             passed,
             findings,
+            comparisons: Vec::new(),
         })
     }
 }

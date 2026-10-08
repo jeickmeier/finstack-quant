@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use super::{get_finite_node_value, sum_nodes};
 use crate::checks::types::effective_tolerance;
 use crate::checks::{
-    Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
+    Check, CheckCategory, CheckComparison, CheckContext, CheckFinding, CheckResult, Materiality,
+    Severity,
 };
 use crate::error::Error;
 use crate::types::NodeId;
@@ -71,6 +72,7 @@ impl Check for BalanceSheetArticulation {
         }
 
         let mut findings = Vec::new();
+        let mut comparisons = Vec::new();
 
         for period in &context.model.periods {
             let pid = &period.id;
@@ -108,6 +110,7 @@ impl Check for BalanceSheetArticulation {
                         .chain(&self.equity_nodes)
                         .cloned()
                         .collect(),
+                    comparison: None,
                 });
                 continue;
             }
@@ -117,6 +120,14 @@ impl Check for BalanceSheetArticulation {
             let equity = sum_nodes(context.results, &self.equity_nodes, pid);
             let imbalance = assets - (liabilities + equity);
             let tolerance = effective_tolerance(&context.config, self.tolerance, assets);
+            let comparison = CheckComparison {
+                identity: "balance_sheet_articulation".to_string(),
+                period: Some(*pid),
+                actual: assets,
+                expected: liabilities + equity,
+                tolerance,
+            };
+            comparisons.push(comparison.clone());
 
             if imbalance.abs() > tolerance {
                 let relative = if assets.abs() > f64::EPSILON {
@@ -147,6 +158,7 @@ impl Check for BalanceSheetArticulation {
                         .chain(&self.equity_nodes)
                         .cloned()
                         .collect(),
+                    comparison: Some(comparison),
                 });
             }
         }
@@ -159,6 +171,7 @@ impl Check for BalanceSheetArticulation {
             category: self.category(),
             passed,
             findings,
+            comparisons,
         })
     }
 }

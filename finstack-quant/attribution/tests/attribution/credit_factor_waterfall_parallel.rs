@@ -245,6 +245,9 @@ fn waterfall_credit_factor_detail_reconciles_to_credit_curves_pnl() {
         .expect("waterfall attribution should succeed");
     let attribution = result.result.attribution;
 
+    // The cascade is one CreditCurves row in the exported step chain.
+    super::audit_steps::assert_waterfall_steps_reconcile(&attribution);
+
     let detail = attribution
         .credit_factor_detail
         .as_ref()
@@ -482,6 +485,8 @@ fn waterfall_no_model_keeps_default_credit_step() {
         .execute()
         .expect("waterfall attribution should succeed");
     let attribution = result.result.attribution;
+
+    super::audit_steps::assert_waterfall_steps_reconcile(&attribution);
 
     // No credit factor detail when no model.
     assert!(attribution.credit_factor_detail.is_none());

@@ -156,6 +156,7 @@ impl VolSurfaceTarget {
         let mut sabr_winning_iterations = Vec::new();
         let mut sabr_residual_evaluations = Vec::new();
         let mut sabr_bound_hits = Vec::new();
+        let mut fitted_slices = Vec::new();
         let mut total_iterations = 0;
 
         for (t_key, expiry_quotes) in &quotes_by_expiry {
@@ -207,6 +208,12 @@ impl VolSurfaceTarget {
                 ));
             }
             let p = outcome.parameters;
+            fitted_slices.push(crate::report::FittedSlice {
+                expiry: t,
+                parameters: crate::report::FittedSliceParameters::Sabr(p.clone()),
+                iterations: outcome.total_iterations,
+                max_relative_quote_error: Some(outcome.max_relative_quote_error),
+            });
             sabr_params_by_expiry.insert(*t_key, p);
         }
 
@@ -276,7 +283,10 @@ impl VolSurfaceTarget {
             residuals,
             total_iterations,
             config.vol_surface.validation_tolerance,
-        );
+        )
+        .with_solver_method(crate::report::SolverMethod::PerSliceLeastSquares)
+        .with_residual_units(crate::report::ResidualUnits::QuotedVolatility)
+        .with_fitted_slices(fitted_slices);
         report.update_metadata(
             "expiry_extrapolation_policy",
             match params.expiry_extrapolation {

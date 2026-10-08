@@ -5,7 +5,9 @@ use std::sync::Arc;
 use finstack_quant_core::dates::PeriodId;
 use indexmap::IndexMap;
 
-use super::{Check, CheckContext, CheckFinding, CheckResult, FormulaCheckSpec, Severity};
+use super::{
+    Check, CheckComparison, CheckContext, CheckFinding, CheckResult, FormulaCheckSpec, Severity,
+};
 use crate::evaluator::{
     formula::evaluate_formula, EvaluationContext, PeriodHistory, StatementResult,
 };
@@ -64,6 +66,7 @@ impl Check for FormulaCheckSpec {
                 .collect(),
         );
         let mut findings = Vec::new();
+        let mut comparisons = Vec::new();
 
         for period in &context.model.periods {
             let mut evaluation = EvaluationContext::new_with_history(
@@ -93,6 +96,22 @@ impl Check for FormulaCheckSpec {
                 value != 0.0
             };
 
+            // A tolerance turns the formula into a numeric comparison against
+            // zero; without one it is a boolean test with nothing to compare.
+            // A non-finite value always fails and is not a comparable number
+            // (it would not survive a JSON round trip), so it is not recorded.
+            let comparison = self
+                .tolerance
+                .filter(|_| value.is_finite())
+                .map(|tolerance| CheckComparison {
+                    identity: self.id.clone(),
+                    period: Some(period.id),
+                    actual: value,
+                    expected: 0.0,
+                    tolerance,
+                });
+            comparisons.extend(comparison.clone());
+
             if !passes {
                 findings.push(CheckFinding {
                     check_id: self.id.clone(),
@@ -103,6 +122,7 @@ impl Check for FormulaCheckSpec {
                     period: Some(period.id),
                     materiality: None,
                     nodes: vec![],
+                    comparison,
                 });
             }
         }
@@ -117,6 +137,7 @@ impl Check for FormulaCheckSpec {
             category: self.category,
             passed,
             findings,
+            comparisons,
         })
     }
 }

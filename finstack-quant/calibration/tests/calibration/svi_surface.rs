@@ -236,6 +236,33 @@ fn svi_surface_grid_is_calendar_monotone_under_nonflat_curve() {
         "iteration count must report solver work rather than expiry slice count"
     );
 
+    // The per-expiry SVI parameters behind the gridded surface are exported
+    // on the report: one slice per quoted expiry, accounting for every solver
+    // iteration, each reproducing the smile its quotes were generated from.
+    let slices = &report.fitted_slices;
+    assert_eq!(slices.len(), true_slices().len());
+    assert_eq!(
+        slices.iter().map(|slice| slice.iterations).sum::<usize>(),
+        report.iterations
+    );
+    for (slice, (expiry_years, truth)) in slices.iter().zip(true_slices()) {
+        assert!((slice.expiry - expiry_years).abs() < 1.0 / 365.0);
+        assert!(slice.max_relative_quote_error.is_none());
+        let finstack_quant_calibration::FittedSliceParameters::Svi(fitted) = &slice.parameters
+        else {
+            panic!("SVI surface slices are SVI fits");
+        };
+        let fitted_vol = fitted
+            .implied_vol(0.0, slice.expiry)
+            .expect("fitted ATM vol");
+        let true_vol = truth.implied_vol(0.0, expiry_years).expect("true ATM vol");
+        assert!(
+            (fitted_vol - true_vol).abs() < 1e-3,
+            "fitted SVI slice at T={expiry_years} must reproduce the quoted smile: \
+             {fitted_vol} vs {true_vol}"
+        );
+    }
+
     let context =
         MarketContext::try_from(result.result.final_market).expect("restore market context");
     let surface = context

@@ -82,6 +82,7 @@ impl Check for TrendCheck {
                         period: Some(*curr_pid),
                         materiality: None,
                         nodes: vec![self.node.clone()],
+                        comparison: None,
                     });
                 }
                 consecutive_bad = 0;
@@ -111,6 +112,7 @@ impl Check for TrendCheck {
                     period: Some(*curr_pid),
                     materiality: None,
                     nodes: vec![self.node.clone()],
+                    comparison: None,
                 });
             }
         }
@@ -123,6 +125,7 @@ impl Check for TrendCheck {
             category: self.category(),
             passed,
             findings,
+            comparisons: Vec::new(),
         })
     }
 }

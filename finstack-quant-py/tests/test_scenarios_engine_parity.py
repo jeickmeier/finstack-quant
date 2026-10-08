@@ -202,8 +202,10 @@ def test_report_exposes_structured_warnings_and_counters() -> None:
         "warning_count",
         "as_of_changed",
         "all_dirty",
+        "shock_count",
     ]
     assert int(frame.loc[0, "warning_count"]) == 1
+    assert int(frame.loc[0, "shock_count"]) == len(report.applied_shocks) == 0
     assert list(result.to_dataframe().columns) == list(frame.columns)
 
 
@@ -212,6 +214,25 @@ def test_changes_to_dataframe_lists_resolved_targets() -> None:
     changes = result.report.changes_to_dataframe()
     assert list(changes.columns) == ["kind", "id", "curve_kind"]
     assert changes.to_dict("records") == [{"kind": "curve", "id": "USD-OIS", "curve_kind": "discount"}]
+
+
+def test_applied_shocks_report_the_size_of_each_change() -> None:
+    """The manifest names the target; ``applied_shocks`` says by how much."""
+    report = apply_scenario(_up_25(), _market(), AS_OF).report
+    target = {"kind": "curve", "curve_kind": "discount", "curve_id": "USD-OIS"}
+    assert report.changes["market_targets"] == [target]
+    assert len(report.applied_shocks) == 1
+    shock = report.applied_shocks[0]
+    assert shock["applies_to"] == {"scope": "market", "target": target}
+    assert shock["shock"]["kind"] == "uniform"
+    assert shock["shock"]["unit"] == "bp"
+    assert "level_change" not in shock
+    # The recorded size is the operation's own request.
+    assert shock["shock"]["value"] == 25.0
+
+    # Nothing applied -> nothing listed.
+    missing = ScenarioSpec("eq", [OperationSpec.equity_price_pct(["MISSING"], -10.0)])
+    assert apply_scenario(missing, _market(), AS_OF).report.applied_shocks == []
 
 
 def test_application_result_json_roundtrip_and_pickle() -> None:

@@ -99,6 +99,7 @@ impl Check for LiquidityRunwayCheck {
                         reference_label: "cash_burn".to_string(),
                     }),
                     nodes: vec![self.cash_node.clone(), self.cash_burn_node.clone()],
+                    comparison: None,
                 });
             }
         }
@@ -111,6 +112,7 @@ impl Check for LiquidityRunwayCheck {
             category: self.category(),
             passed,
             findings,
+            comparisons: Vec::new(),
         })
     }
 }

@@ -186,6 +186,25 @@ fn explanation_is_present_when_enabled() {
     let rows = step.quote_rows();
     let quoted: Vec<_> = rows.iter().map(|row| row.quote_value).collect();
     assert_eq!(quoted, [Some(0.045), Some(0.046)]);
+
+    // The exported Jacobian has one row per quote and one column per solved
+    // parameter, and reproduces each quote's reported sensitivity.
+    let diagnostics = step.diagnostics.as_ref().expect("diagnostics");
+    let jacobian = diagnostics
+        .jacobian
+        .as_ref()
+        .expect("a global solve exports its Jacobian");
+    let n_params = metadata["solved_params"]
+        .as_array()
+        .expect("solved parameters")
+        .len();
+    assert_eq!(jacobian.len(), diagnostics.per_quote.len());
+    for (row, quote) in jacobian.iter().zip(&diagnostics.per_quote) {
+        assert_eq!(row.len(), n_params);
+        let max_abs = row.iter().map(|value| value.abs()).fold(0.0_f64, f64::max);
+        assert!(max_abs > 0.0);
+        assert_eq!(quote.sensitivity, max_abs);
+    }
 }
 
 #[test]

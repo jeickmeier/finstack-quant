@@ -721,10 +721,29 @@ impl DiscountedCashFlow {
         self.flows
             .iter()
             .map(|(date, amount)| {
-                let years = self.discount_years(self.valuation_date, *date);
+                let years = self.explicit_flow_discount_years(*date);
                 amount / (1.0 + self.wacc).powf(years)
             })
             .sum()
+    }
+
+    /// Discounting tenor, in years, that
+    /// [`calculate_pv_explicit_flows`](Self::calculate_pv_explicit_flows)
+    /// applies to an explicit flow dated `date`.
+    ///
+    /// The tenor is ACT/365.25 from
+    /// [`valuation_date`](Self::valuation_date), less the mid-year shift (half
+    /// the average flow spacing, floored at zero) when
+    /// [`mid_year_convention`](Self::mid_year_convention) is set. A flow of
+    /// `amount` contributes `amount / (1 + wacc)^years` to the explicit-period
+    /// present value.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Date of the explicit flow, normally one of the dates in
+    ///   [`flows`](Self::flows).
+    pub fn explicit_flow_discount_years(&self, date: Date) -> f64 {
+        self.discount_years(self.valuation_date, date)
     }
 
     /// Calculate terminal value (undiscounted).
@@ -868,7 +887,7 @@ impl DiscountedCashFlow {
     /// (flow-stream proxies). See [`Self::discount_terminal_value`].
     ///
     /// Returns `Err` if flows are empty.
-    pub(crate) fn terminal_discount_years(&self) -> finstack_quant_core::Result<f64> {
+    pub fn terminal_discount_years(&self) -> finstack_quant_core::Result<f64> {
         let (terminal_date, _) = self.flows.last().ok_or_else(|| {
             CoreError::Validation(
                 "DCF has no explicit flows; cannot discount terminal value".into(),

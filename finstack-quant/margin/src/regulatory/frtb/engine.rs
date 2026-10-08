@@ -9,7 +9,9 @@ use super::curvature::curvature_charge;
 use super::delta::delta_charge;
 use super::drc::drc_charge;
 use super::rrao::rrao_charge;
-use super::types::{CorrelationScenario, FrtbRiskClass, FrtbSbaResult, FrtbSensitivities};
+use super::types::{
+    CorrelationScenario, FrtbRiskClass, FrtbSbaResult, FrtbScenarioCharges, FrtbSensitivities,
+};
 use super::vega::vega_charge;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
@@ -112,6 +114,7 @@ impl FrtbSbaEngine {
     pub fn calculate(&self, sensitivities: &FrtbSensitivities) -> Result<FrtbSbaResult> {
         sensitivities.validate()?;
         let mut scenario_charges: HashMap<CorrelationScenario, f64> = HashMap::default();
+        let mut scenario_breakdown = std::collections::BTreeMap::new();
         let mut best_scenario = CorrelationScenario::Medium;
         let mut max_sba_charge = f64::NEG_INFINITY;
 
@@ -143,6 +146,17 @@ impl FrtbSbaEngine {
 
             let sba_agg = aggregate_sba(&delta_charges, &vega_charges, &curvature_charges);
             scenario_charges.insert(scenario, sba_agg);
+            scenario_breakdown.insert(
+                scenario,
+                FrtbScenarioCharges {
+                    delta_by_risk_class: delta_charges.iter().map(|(k, v)| (*k, *v)).collect(),
+                    vega_by_risk_class: vega_charges.iter().map(|(k, v)| (*k, *v)).collect(),
+                    curvature_by_risk_class: curvature_charges
+                        .iter()
+                        .map(|(k, v)| (*k, *v))
+                        .collect(),
+                },
+            );
 
             if sba_agg > max_sba_charge {
                 max_sba_charge = sba_agg;
@@ -169,6 +183,7 @@ impl FrtbSbaEngine {
             rrao,
             binding_scenario: best_scenario,
             scenario_charges: scenario_charges.into_iter().collect(),
+            scenario_breakdown,
             meta: finstack_quant_core::config::results_meta(
                 &finstack_quant_core::config::FinstackConfig::default(),
             ),
@@ -700,6 +715,51 @@ mod tests {
         assert_eq!(engine.risk_classes(), FrtbRiskClass::ALL);
 
         assert!(FrtbSbaEngine::with_selection(Some(Vec::new()), None).is_err());
+    }
+
+    #[test]
+    fn scenario_breakdown_reconciles_with_scenario_charges() {
+        let mut sens = FrtbSensitivities::new(Currency::USD);
+        sens.add_girr_delta(Currency::USD, "5Y", 1_000_000.0);
+        sens.add_girr_delta(Currency::USD, "10Y", -600_000.0);
+        sens.add_girr_delta(Currency::EUR, "5Y", 400_000.0);
+        sens.add_equity_delta("AAPL", 1, 250_000.0);
+        sens.add_equity_delta("MSFT", 1, -150_000.0);
+        sens.add_girr_vega(Currency::USD, "1Y", "5Y", 500_000.0);
+        sens.add_girr_curvature(Currency::USD, 50_000.0, 30_000.0);
+
+        let result = FrtbSbaEngine::default().calculate(&sens).expect("engine");
+
+        assert_eq!(result.scenario_breakdown.len(), 3);
+        for (scenario, total) in &result.scenario_charges {
+            let rows = &result.scenario_breakdown[scenario];
+            let replayed: f64 = rows.delta_by_risk_class.values().sum::<f64>()
+                + rows.vega_by_risk_class.values().sum::<f64>()
+                + rows.curvature_by_risk_class.values().sum::<f64>();
+            assert!(
+                (replayed - total).abs() <= 1e-12 * total.abs().max(1.0),
+                "{scenario:?}: breakdown {replayed} != scenario charge {total}"
+            );
+        }
+        let binding = &result.scenario_breakdown[&result.binding_scenario];
+        assert_eq!(binding.delta_by_risk_class, result.delta_by_risk_class);
+        assert_eq!(binding.vega_by_risk_class, result.vega_by_risk_class);
+        assert_eq!(
+            binding.curvature_by_risk_class,
+            result.curvature_by_risk_class
+        );
+        // The scenarios genuinely differ, so the non-binding rows are new information.
+        assert_ne!(
+            result.scenario_breakdown[&CorrelationScenario::Low].delta_by_risk_class,
+            result.scenario_breakdown[&CorrelationScenario::High].delta_by_risk_class
+        );
+
+        let json = serde_json::to_string(&result).expect("serialize");
+        let back: FrtbSbaResult = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(
+            back.scenario_breakdown.keys().collect::<Vec<_>>(),
+            result.scenario_breakdown.keys().collect::<Vec<_>>()
+        );
     }
 
     #[test]

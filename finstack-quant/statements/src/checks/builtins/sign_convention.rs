@@ -53,6 +53,7 @@ impl Check for SignConventionCheck {
             period: Some(pid),
             materiality: None,
             nodes: vec![node.clone()],
+            comparison: None,
         };
 
         for period in &context.model.periods {
@@ -74,6 +75,7 @@ impl Check for SignConventionCheck {
                             period: Some(*pid),
                             materiality: None,
                             nodes: vec![node.clone()],
+                            comparison: None,
                         });
                     }
                 }
@@ -95,6 +97,7 @@ impl Check for SignConventionCheck {
                             period: Some(*pid),
                             materiality: None,
                             nodes: vec![node.clone()],
+                            comparison: None,
                         });
                     }
                 }
@@ -109,6 +112,7 @@ impl Check for SignConventionCheck {
             category: self.category(),
             passed,
             findings,
+            comparisons: Vec::new(),
         })
     }
 }

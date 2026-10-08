@@ -2641,18 +2641,164 @@ class VmResult:
         """
         ...
 
+    @property
+    def threshold(self) -> float:
+        """
+        CSA threshold applied symmetrically to ``abs(gross_exposure)``.
+
+        Returns
+        -------
+        float
+            Non-negative threshold in the CSA base currency. Exposure inside
+            the threshold needs no collateral.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+
+        Examples
+        --------
+        >>> r = VmCalculator(CsaSpec.usd_regulatory()).calculate(1e6, 0.0, "USD", "2024-06-15")
+        >>> r.threshold >= 0
+        True
+        """
+        ...
+
+    @property
+    def independent_amount(self) -> float:
+        """
+        CSA independent amount added to the threshold-adjusted exposure.
+
+        Returns
+        -------
+        float
+            Independent amount in the CSA base currency;
+            ``net_exposure`` is the threshold-adjusted exposure plus this.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+
+        Examples
+        --------
+        >>> r = VmCalculator(CsaSpec.usd_regulatory()).calculate(1e6, 0.0, "USD", "2024-06-15")
+        >>> r.independent_amount >= 0
+        True
+        """
+        ...
+
+    @property
+    def collateral_balance(self) -> float:
+        """
+        Signed collateral balance netted against ``net_exposure``.
+
+        Returns
+        -------
+        float
+            The balance passed to the calculator, in the CSA base currency:
+            positive when we hold collateral, negative when we have posted it.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+
+        Examples
+        --------
+        >>> r = VmCalculator(CsaSpec.usd_regulatory()).calculate(1e6, 0.0, "USD", "2024-06-15")
+        >>> r.collateral_balance
+        0.0
+        """
+        ...
+
+    @property
+    def unrounded_call(self) -> float:
+        """
+        Signed call before the minimum-transfer test and rounding.
+
+        Returns
+        -------
+        float
+            ``net_exposure - collateral_balance`` in the CSA base currency;
+            positive means collect, negative means we pay (post or return).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+
+        Examples
+        --------
+        >>> r = VmCalculator(CsaSpec.usd_regulatory()).calculate(1e6, 0.0, "USD", "2024-06-15")
+        >>> r.unrounded_call == r.net_exposure - r.collateral_balance
+        True
+        """
+        ...
+
+    @property
+    def mta(self) -> float:
+        """
+        CSA minimum transfer amount.
+
+        Returns
+        -------
+        float
+            Minimum transfer amount in the CSA base currency. When
+            ``abs(unrounded_call) < mta`` no transfer is made.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+
+        Examples
+        --------
+        >>> r = VmCalculator(CsaSpec.usd_regulatory()).calculate(1e6, 0.0, "USD", "2024-06-15")
+        >>> r.mta >= 0
+        True
+        """
+        ...
+
+    @property
+    def rounding_increment(self) -> float:
+        """
+        CSA rounding increment applied to the transfer.
+
+        Returns
+        -------
+        float
+            Increment in the CSA base currency. A transfer that passes the MTA
+            test is rounded to a multiple of it: up for a delivery, down for
+            a return. Zero disables rounding.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+
+        Examples
+        --------
+        >>> r = VmCalculator(CsaSpec.usd_regulatory()).calculate(1e6, 0.0, "USD", "2024-06-15")
+        >>> r.rounding_increment >= 0
+        True
+        """
+        ...
+
     def __repr__(self) -> str: ...
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export the result as a single-row pandas ``DataFrame``.
 
         Columns: ``date``, ``settlement_date`` (ISO 8601 strings),
-        ``gross_exposure``, ``net_exposure``, ``post_amount``,
-        ``collect_amount``, ``net_margin``, ``requires_call``, ``currency``.
+        ``gross_exposure``, ``threshold``, ``independent_amount``,
+        ``net_exposure``, ``collateral_balance``, ``unrounded_call``, ``mta``,
+        ``rounding_increment``, ``post_amount``, ``collect_amount``,
+        ``net_margin``, ``requires_call``, ``currency``.
 
         All amount columns are floats in the single CSA currency reported by
         ``currency``; positive ``post_amount`` means we post margin and
-        positive ``collect_amount`` means cash received by the desk.
+        positive ``collect_amount`` means cash received by the desk. The
+        columns from ``gross_exposure`` to ``rounding_increment`` are in
+        calculation order: threshold and independent amount turn the gross
+        exposure into ``net_exposure``, subtracting ``collateral_balance``
+        gives ``unrounded_call``, and the MTA test and rounding give the
+        transfer.
 
         Returns
         -------
@@ -3039,6 +3185,38 @@ class ImResult:
         >>> calc = ScheduleImCalculator.bcbs_standard()
         >>> calc.calculate_for_notional(1_000_000, "USD", "interest_rate", 5.0, "2025-01-15").as_of
         datetime.date(2025, 1, 15)
+        """
+        ...
+
+    @property
+    def simm_detail(self) -> dict[str, Any] | None:
+        """
+        SIMM aggregation detail behind ``breakdown_amount`` and ``amount``.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``None`` unless the result came from the SIMM calculator. Otherwise
+            ``components`` (one per breakdown key, each with ``component``,
+            ``risk_class``, ``historical_volatility_ratio``, ``margin`` and
+            ``buckets``), ``risk_class_margins`` and ``mpor_scale``. A bucket
+            has ``bucket``, ``k``, ``signed_sum`` and
+            ``weighted_sensitivities`` rows with ``risk_factor``, ``tenor``,
+            ``sensitivity``, ``risk_weight``, ``concentration_factor`` and
+            ``weighted_sensitivity``. Margins are in the result currency
+            before the MPOR scale: ``margin * mpor_scale`` is the breakdown
+            amount.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+
+        Examples
+        --------
+        >>> calc = ScheduleImCalculator.bcbs_standard()
+        >>> im = calc.calculate_for_notional(1_000_000, "USD", "interest_rate", 5.0, "2025-01-15")
+        >>> im.simm_detail is None
+        True
         """
         ...
 
@@ -5530,6 +5708,104 @@ class XvaResult:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def cva_rows(self) -> list[dict[str, float]]:
+        """
+        Per-time-bucket terms of the CVA sum.
+
+        Returns
+        -------
+        list[dict[str, float]]
+            One dict per exposure-profile node, in time order, with ``time``
+            (years), ``discount_factor``, ``survival_probability`` (of the
+            counterparty), ``marginal_default_probability``, ``exposure_mid``
+            (bucket-average EPE), ``discount_factor_mid``, ``survival_weight``
+            (bucket-average own survival; ``1.0`` when unilateral),
+            ``loss_given_default`` and ``contribution``. Each contribution is
+            ``loss_given_default * exposure_mid * marginal_default_probability
+            * discount_factor_mid * survival_weight``; the contributions sum
+            to ``cva``. Empty only for a result parsed from JSON written
+            before the field existed.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+
+        Examples
+        --------
+        >>> doc = (
+        ...     '{"cva":1.0,"total_xva":1.0,"epe_profile":[[0.0,2.0]],'
+        ...     '"ene_profile":[[0.0,0.0]],"max_epe":2.0,'
+        ...     '"effective_epe_profile":[[0.0,2.0]],"effective_epe":2.0}'
+        ... )
+        >>> XvaResult.from_json(doc).cva_rows
+        []
+        """
+        ...
+
+    @property
+    def dva_rows(self) -> list[dict[str, float]] | None:
+        """
+        Per-time-bucket terms of the DVA sum.
+
+        Returns
+        -------
+        list[dict[str, float]] | None
+            ``None`` when ``dva`` is ``None``. Otherwise rows with the same keys
+            as ``cva_rows``, where the defaulting party is the institution,
+            ``exposure_mid`` is the bucket-average ENE net of posted initial
+            margin and ``survival_weight`` is the counterparty's bucket-average
+            survival. The contributions sum to ``dva``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+
+        Examples
+        --------
+        >>> doc = (
+        ...     '{"cva":1.0,"total_xva":1.0,"epe_profile":[[0.0,2.0]],'
+        ...     '"ene_profile":[[0.0,0.0]],"max_epe":2.0,'
+        ...     '"effective_epe_profile":[[0.0,2.0]],"effective_epe":2.0}'
+        ... )
+        >>> XvaResult.from_json(doc).dva_rows is None
+        True
+        """
+        ...
+
+    @property
+    def fva_rows(self) -> list[dict[str, float]] | None:
+        """
+        Per-time-bucket terms of the FVA sum.
+
+        Returns
+        -------
+        list[dict[str, float]] | None
+            ``None`` when ``fva`` is ``None``. Otherwise rows with ``time`` and
+            ``dt`` (years), ``discount_factor``, ``epe_mid``, ``ene_mid``,
+            ``discount_factor_mid``, ``joint_survival_mid``,
+            ``funding_spread`` and ``funding_benefit_spread`` (decimal per
+            year) and ``contribution`` =
+            ``(epe_mid * funding_spread - ene_mid * funding_benefit_spread)
+            * discount_factor_mid * dt * joint_survival_mid``. The
+            contributions sum to ``fva``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+
+        Examples
+        --------
+        >>> doc = (
+        ...     '{"cva":1.0,"total_xva":1.0,"epe_profile":[[0.0,2.0]],'
+        ...     '"ene_profile":[[0.0,0.0]],"max_epe":2.0,'
+        ...     '"effective_epe_profile":[[0.0,2.0]],"effective_epe":2.0}'
+        ... )
+        >>> XvaResult.from_json(doc).fva_rows is None
+        True
         """
         ...
 
@@ -8318,6 +8594,35 @@ class FrtbSbaResult:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def scenario_breakdown(self) -> dict[str, dict[str, dict[str, float]]]:
+        """
+        Per-risk-class charges under every evaluated correlation scenario.
+
+        Returns
+        -------
+        dict[str, dict[str, dict[str, float]]]
+            Keyed by scenario (``"low"``, ``"medium"``, ``"high"``); each value
+            has ``delta_by_risk_class``, ``vega_by_risk_class`` and
+            ``curvature_by_risk_class`` maps keyed by risk-class wire label.
+            A scenario's maps sum to its ``scenario_charges`` entry, and the
+            binding scenario's maps equal the top-level ``*_by_risk_class``
+            properties.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+
+        Examples
+        --------
+        >>> sens = FrtbSensitivities("USD")
+        >>> sens.add_girr_delta("USD", "5Y", 1.0)
+        >>> result = frtb_sba_charge(sens)
+        >>> sorted(result.scenario_breakdown) == sorted(result.scenario_charges)
+        True
         """
         ...
 

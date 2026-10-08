@@ -272,6 +272,48 @@ class PnlAttribution:
         ...
 
     @property
+    def pv_t0(self) -> float | None:
+        """
+        Present value at T₀ on the T₀ market: the opening endpoint.
+
+        ``mark_to_market_pnl == pv_t1 - pv_t0``, and ``total_pnl`` adds the
+        period cash receipts. After a target-currency translation this is the
+        opening value converted at T₀ FX.
+
+        Returns
+        -------
+        float or None
+            Opening present value in :attr:`currency`, or ``None`` when the
+            result was not produced from two endpoint valuations in that
+            currency (for example a payload written before the field existed).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def pv_t1(self) -> float | None:
+        """
+        Present value at T₁ on the T₁ market: the closing endpoint.
+
+        After a target-currency translation this is the closing value
+        converted at T₁ FX.
+
+        Returns
+        -------
+        float or None
+            Closing present value in :attr:`currency`, or ``None`` under the
+            same conditions as :attr:`pv_t0`.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
     def carry(self) -> float:
         """
         Carry (theta + accruals) P&L amount.
@@ -723,6 +765,80 @@ class PnlAttribution:
         ...
 
     @property
+    def waterfall_steps(self) -> list[dict[str, Any]]:
+        """
+        Ordered waterfall repricing steps, in the order the factors were applied.
+
+        Each step holds the running present value before and after one factor
+        moved from its T₀ to its T₁ state, so ``step_pnl == pv_after -
+        pv_before``, the first ``pv_before`` is :attr:`pv_t0` and each
+        ``pv_after`` is the next step's ``pv_before``. Every factor bucket
+        equals its step's ``step_pnl`` except :attr:`carry`, which adds the
+        period cash receipts (``total_pnl - mark_to_market_pnl``). A credit
+        hierarchy cascade is one ``credit_curves`` step; its sub-steps are in
+        :attr:`credit_factor_detail`. After a target-currency translation the
+        step values are converted at T₁ FX, so the first ``pv_before`` is
+        ``pv_t0 + fx_translation_pnl``.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            Serde-shaped ``WaterfallStep`` rows with ``step_index``,
+            ``factor`` (snake-case factor name), ``pv_before``, ``pv_after``
+            and ``step_pnl``; money values are ``{"amount", "currency"}``
+            dicts with a decimal-string amount. Empty unless the waterfall
+            method produced the result.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be converted to Python objects.
+        """
+        ...
+
+    @property
+    def sensitivity_steps(self) -> list[dict[str, Any]]:
+        """
+        The working behind each Taylor or metrics-based factor, in the order computed.
+
+        A row's contribution to its factor bucket is ``explained_pnl +
+        gamma_pnl``. A scalar row has ``sensitivity`` and ``market_move`` with
+        ``explained_pnl = sensitivity * market_move``; a key-rate row has
+        ``buckets`` whose ``sensitivity * market_move`` products sum to
+        ``explained_pnl``; a second-order-only row (metrics-based convexity,
+        gamma or volga) has ``market_move`` and ``gamma_pnl`` with a zero
+        ``explained_pnl``; a repriced row has ``repriced_pv``, where
+        ``explained_pnl = pv_t1 - repriced_pv`` (for the Taylor ``Theta`` row,
+        ``repriced_pv - pv_t0`` plus the period cash receipts; after a
+        target-currency translation use ``pv_t0 + fx_translation_pnl`` in
+        place of ``pv_t0``, because row amounts are converted at T₁ FX).
+
+        ``move_unit`` is ``"basis_point"`` for rates, credit, dividend-yield
+        and inflation rows, ``"vol_point"`` (0.01 of absolute volatility) for
+        volatility rows, ``"percent"`` for the metrics-based FX row and
+        ``"price_unit"`` for spot rows; sensitivities are currency amounts per
+        one such unit. Metrics-based carry and cross-factor P&L have no rows
+        (see :attr:`carry_detail` and :attr:`cross_factor_detail`).
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            Serde-shaped ``SensitivityStep`` rows with ``factor`` and
+            ``explained_pnl`` and, where they apply, ``move_unit``,
+            ``sensitivity``, ``market_move``, ``buckets`` (``tenor_years``,
+            ``sensitivity``, ``market_move``), ``repriced_pv`` and
+            ``gamma_pnl``; money values are ``{"amount", "currency"}`` dicts
+            with a decimal-string amount. Empty for the parallel and waterfall
+            methods.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be converted to Python objects.
+        """
+        ...
+
+    @property
     def carry_detail(self) -> dict[str, Any] | None:
         """
         Gross carry decomposition detail payload; funding is a separate financing overlay.
@@ -1039,7 +1155,8 @@ class PnlAttribution:
         Export attribution as a single-row pandas DataFrame.
 
         Columns include ``instrument_id``, ``method``, ``t0``, ``t1``,
-        ``currency``, ``total_pnl``, ``mark_to_market_pnl`` (nullable), all
+        ``currency``, ``total_pnl``, ``mark_to_market_pnl`` (nullable),
+        ``pv_t0`` and ``pv_t1`` (the endpoint present values, nullable), all
         factor P&L amounts, ``residual``, ``residual_pct``,
         ``num_repricings``, and ``result_invalid``.
 
@@ -1098,6 +1215,61 @@ class PnlAttribution:
         Notes
         -----
         This accessor does not raise; it returns the stored or derived value.
+        """
+        ...
+
+    def to_waterfall_steps_dataframe(self) -> pd.DataFrame:
+        """
+        Export the waterfall step chain, one row per step in the order applied.
+
+        Columns: ``step_index``, ``factor`` (snake-case factor name such as
+        ``"rates_curves"``), ``pv_before``, ``pv_after``, ``step_pnl``
+        (``pv_after - pv_before``) and ``currency``. The first ``pv_before``
+        is :attr:`pv_t0` and each ``pv_after`` is the next row's
+        ``pv_before``. :attr:`carry` is the carry row's ``step_pnl`` plus the
+        period cash (``total_pnl - mark_to_market_pnl``); every other factor
+        bucket equals its row's ``step_pnl``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per waterfall step with float amounts; zero rows (schema
+            columns present) unless the waterfall method produced the result.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized into a pandas object.
+        """
+        ...
+
+    def to_sensitivity_steps_dataframe(self) -> pd.DataFrame:
+        """
+        Export the working behind each Taylor or metrics-based factor.
+
+        Columns: ``step_index``, ``factor``, ``tenor_years``, ``move_unit``
+        (``"basis_point"``, ``"vol_point"``, ``"percent"`` or
+        ``"price_unit"``), ``sensitivity`` (currency per one ``move_unit``),
+        ``market_move``, ``explained_pnl``, ``gamma_pnl``, ``repriced_pv`` and
+        ``currency``.
+
+        Each factor has one factor-level row (``tenor_years`` null) carrying
+        its P&L, followed by one row per key-rate bucket (``tenor_years`` set)
+        carrying only that bucket's ``sensitivity`` and ``market_move``. P&L
+        columns are null on bucket rows, so column sums do not double count.
+        ``sensitivity * market_move`` reproduces ``explained_pnl`` on a scalar
+        row and, summed over a factor's bucket rows, on a key-rate factor.
+
+        Returns
+        -------
+        pd.DataFrame
+            Factor and bucket rows with float amounts; zero rows (schema
+            columns present) for the parallel and waterfall methods.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized into a pandas object.
         """
         ...
 

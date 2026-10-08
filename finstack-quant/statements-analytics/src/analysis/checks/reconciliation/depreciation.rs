@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use super::super::get_finite_node_value;
 use finstack_quant_statements::checks::{
-    Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
-    SignConventionPolicy,
+    Check, CheckCategory, CheckComparison, CheckContext, CheckFinding, CheckResult, Materiality,
+    Severity, SignConventionPolicy,
 };
 use finstack_quant_statements::types::NodeId;
 use finstack_quant_statements::Result;
@@ -57,6 +57,7 @@ impl Check for DepreciationReconciliation {
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         let tolerance = self.tolerance.unwrap_or(context.config.default_tolerance);
         let mut findings = Vec::new();
+        let mut comparisons = Vec::new();
         let periods = &context.model.periods;
 
         for i in 1..periods.len() {
@@ -118,6 +119,14 @@ impl Check for DepreciationReconciliation {
 
             let expected = ppe_prev + capex - da - disposals;
             let diff = ppe_curr - expected;
+            let comparison = CheckComparison {
+                identity: "ppe_roll_forward".to_string(),
+                period: Some(*curr_pid),
+                actual: ppe_curr,
+                expected,
+                tolerance,
+            };
+            comparisons.push(comparison.clone());
 
             if diff.abs() > tolerance {
                 let reference = ppe_prev.abs().max(1.0);
@@ -149,6 +158,7 @@ impl Check for DepreciationReconciliation {
                         reference_label: "prior_ppe".to_string(),
                     }),
                     nodes,
+                    comparison: Some(comparison),
                 });
             }
         }
@@ -161,6 +171,7 @@ impl Check for DepreciationReconciliation {
             category: self.category(),
             passed,
             findings,
+            comparisons,
         })
     }
 }

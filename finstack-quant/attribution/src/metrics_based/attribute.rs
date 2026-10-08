@@ -137,6 +137,8 @@ pub fn attribute_pnl_metrics_based(
         None,
     );
 
+    stamp_endpoints(&mut attribution, val_t0.value, val_t1.value);
+
     // Track whether any non-finite factor P&L was encountered. Invalidating
     // the result prevents residual tolerance from reporting a clean result.
     let mut non_finite_detected = false;

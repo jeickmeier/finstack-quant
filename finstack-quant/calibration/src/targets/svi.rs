@@ -204,6 +204,7 @@ impl SviSurfaceTarget {
             .with_tolerance(global_config.solver.tolerance())
             .with_max_iterations(global_config.solver.max_iterations());
         let mut solver_iterations = 0;
+        let mut fitted_slices = Vec::new();
 
         for (&expiry_key, expiry_quotes) in &quotes_by_expiry {
             if expiry_quotes.len() < 5 {
@@ -225,6 +226,12 @@ impl SviSurfaceTarget {
                     &strikes, &vols, forward, expiry, &solver,
                 )?;
             solver_iterations += iterations;
+            fitted_slices.push(crate::report::FittedSlice {
+                expiry,
+                parameters: crate::report::FittedSliceParameters::Svi(svi_params),
+                iterations,
+                max_relative_quote_error: None,
+            });
 
             params_by_expiry.insert(expiry_key, svi_params);
         }
@@ -310,7 +317,10 @@ impl SviSurfaceTarget {
             solver_iterations,
             global_config.vol_surface.validation_tolerance,
         )
-        .with_model_version(crate::versions::SVI_SURFACE);
+        .with_model_version(crate::versions::SVI_SURFACE)
+        .with_solver_method(crate::report::SolverMethod::PerSliceLeastSquares)
+        .with_residual_units(crate::report::ResidualUnits::QuotedVolatility)
+        .with_fitted_slices(fitted_slices);
         report.update_solver_config(global_config.solver.clone());
 
         let strict_failures: Vec<String> = [calendar_arbitrage, slice_butterfly_arbitrage]

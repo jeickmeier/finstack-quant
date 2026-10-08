@@ -18,7 +18,7 @@ const CHECK_RESULT_COLUMNS: [ColumnSchema<'static>; 5] = [
 ];
 
 /// Columns emitted by [`PyCheckReport::to_findings_dataframe`].
-const CHECK_FINDING_COLUMNS: [ColumnSchema<'static>; 11] = [
+const CHECK_FINDING_COLUMNS: [ColumnSchema<'static>; 14] = [
     ("check_id", "str"),
     ("check_name", "str"),
     ("category", "str"),
@@ -30,6 +30,23 @@ const CHECK_FINDING_COLUMNS: [ColumnSchema<'static>; 11] = [
     ("materiality_relative_pct", "float64"),
     ("materiality_reference_value", "float64"),
     ("materiality_reference_label", "str"),
+    ("comparison_actual", "float64"),
+    ("comparison_expected", "float64"),
+    ("comparison_tolerance", "float64"),
+];
+
+/// Columns emitted by [`PyCheckReport::to_comparisons_dataframe`].
+const CHECK_COMPARISON_COLUMNS: [ColumnSchema<'static>; 10] = [
+    ("check_id", "str"),
+    ("check_name", "str"),
+    ("category", "str"),
+    ("identity", "str"),
+    ("period", "str"),
+    ("actual", "float64"),
+    ("expected", "float64"),
+    ("difference", "float64"),
+    ("tolerance", "float64"),
+    ("within_tolerance", "bool"),
 ];
 
 /// Parse a severity discriminant (``"info"`` / ``"warning"`` / ``"error"``).
@@ -645,6 +662,36 @@ impl PyCheckFinding {
             .map(|m| m.reference_label.clone())
     }
 
+    /// The failed numeric comparison behind this finding.
+    ///
+    /// Returns
+    /// -------
+    /// dict | None
+    ///     ``{"identity", "period", "actual", "expected", "tolerance"}``:
+    ///     ``identity`` names the tested identity (e.g.
+    ///     ``"balance_sheet_articulation"``), ``period`` is the period id
+    ///     (omitted when not period-specific), ``actual`` and ``expected``
+    ///     are the two compared values and ``tolerance`` is the absolute
+    ///     tolerance applied to ``|actual - expected|`` — all three in the
+    ///     compared nodes' own units (currency amounts for monetary nodes).
+    ///     ``None`` for findings that do not compare two numbers (skipped
+    ///     periods, missing or non-finite inputs, sign-convention warnings,
+    ///     formula checks without a tolerance) and for findings serialized
+    ///     before the comparison was recorded.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the comparison cannot be converted to Python objects.
+    #[getter]
+    fn comparison<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .comparison
+            .as_ref()
+            .map(|comparison| serde_to_py(py, comparison))
+            .transpose()
+    }
+
     /// Return ``CheckFinding(check_id=..., severity=..., period=..., message=...)``.
     fn __repr__(&self) -> String {
         format!(
@@ -856,12 +903,16 @@ impl PyCheckReport {
     /// ``materiality_relative_pct`` (that discrepancy as a **percentage** of
     /// the reference value, i.e. already multiplied by 100, unlike the
     /// decimal-fraction rates used elsewhere in this module),
-    /// ``materiality_reference_value`` (the denominator used) and
+    /// ``materiality_reference_value`` (the denominator used),
     /// ``materiality_reference_label`` (what that denominator is, e.g.
-    /// ``total_assets``).
+    /// ``total_assets``), and ``comparison_actual``, ``comparison_expected``,
+    /// ``comparison_tolerance`` (the two values the check compared and the
+    /// absolute tolerance it allowed on their difference, all in the
+    /// compared nodes' own units).
     ///
     /// The four materiality columns are ``None`` for findings that carry no
-    /// materiality context. The row count equals :attr:`total_findings`; a
+    /// materiality context, and the three comparison columns are ``None``
+    /// for findings that do not compare two numbers. The row count equals :attr:`total_findings`; a
     /// report with no findings still yields the documented columns with zero
     /// rows.
     #[pyo3(text_signature = "($self)")]
@@ -873,6 +924,7 @@ impl PyCheckReport {
             .flat_map(|result| {
                 result.findings.iter().map(move |finding| {
                     let materiality = finding.materiality.as_ref();
+                    let comparison = finding.comparison.as_ref();
                     serde_json::json!({
                         "check_id": finding.check_id,
                         "check_name": result.check_name,
@@ -891,11 +943,62 @@ impl PyCheckReport {
                         "materiality_reference_value": materiality.map(|m| m.reference_value),
                         "materiality_reference_label": materiality
                             .map(|m| m.reference_label.clone()),
+                        "comparison_actual": comparison.map(|c| c.actual),
+                        "comparison_expected": comparison.map(|c| c.expected),
+                        "comparison_tolerance": comparison.map(|c| c.tolerance),
                     })
                 })
             })
             .collect();
         serde_rows_to_dataframe_with_schema(py, &rows, &CHECK_FINDING_COLUMNS)
+    }
+
+    /// Export one row per numeric comparison as a pandas ``DataFrame``.
+    ///
+    /// Lists every comparison the checks evaluated — passing and failing
+    /// alike — so a passing check still shows the numbers it was judged on.
+    /// Unlike :meth:`to_findings_dataframe`, rows are not reduced by the
+    /// suite's ``min_severity`` / ``materiality_threshold`` filters.
+    ///
+    /// Columns: ``check_id``, ``check_name``, ``category`` (as in
+    /// :meth:`to_dataframe`), ``identity`` (snake_case name of the tested
+    /// identity, e.g. ``balance_sheet_articulation``, ``cash_roll_forward``,
+    /// ``cash_flow_components``), ``period`` (period identifier string,
+    /// ``None`` when not period-specific), ``actual`` (observed value),
+    /// ``expected`` (value the identity requires), ``difference``
+    /// (``actual - expected``), ``tolerance`` (absolute tolerance applied to
+    /// ``|difference|``) and ``within_tolerance`` (``True`` when
+    /// ``|difference| <= tolerance``). ``actual``, ``expected``,
+    /// ``difference`` and ``tolerance`` are in the compared nodes' own units
+    /// (currency amounts for monetary nodes).
+    ///
+    /// Checks that do not compare two numbers, and periods a check skipped
+    /// for missing inputs, contribute no rows. A report with no comparisons
+    /// still yields the documented columns with zero rows.
+    #[pyo3(text_signature = "($self)")]
+    fn to_comparisons_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let rows: Vec<serde_json::Value> = self
+            .inner
+            .results
+            .iter()
+            .flat_map(|result| {
+                result.comparisons.iter().map(move |comparison| {
+                    serde_json::json!({
+                        "check_id": result.check_id,
+                        "check_name": result.check_name,
+                        "category": result.category,
+                        "identity": comparison.identity,
+                        "period": comparison.period.map(|p| p.to_string()),
+                        "actual": comparison.actual,
+                        "expected": comparison.expected,
+                        "difference": comparison.difference(),
+                        "tolerance": comparison.tolerance,
+                        "within_tolerance": comparison.within_tolerance(),
+                    })
+                })
+            })
+            .collect();
+        serde_rows_to_dataframe_with_schema(py, &rows, &CHECK_COMPARISON_COLUMNS)
     }
 
     /// Return the representation with check, error and warning counts.

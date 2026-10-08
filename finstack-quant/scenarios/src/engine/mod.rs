@@ -14,8 +14,9 @@ mod tests;
 
 pub(crate) use types::HazardApplyEnv;
 pub use types::{
-    instrument_envelopes, ApplicationEnvelope, ApplicationReport, ExecutionContext,
-    RollForwardReport, ScenarioChangeManifest, ScenarioMarketTarget,
+    instrument_envelopes, ApplicationEnvelope, ApplicationReport, AppliedShock, AppliedShockTarget,
+    ExecutionContext, LevelChange, RollForwardReport, ScenarioChangeManifest, ScenarioMarketTarget,
+    ShockMagnitude, ShockNode, ShockUnit,
 };
 
 use crate::adapters::traits::ScenarioEffect;
@@ -349,6 +350,7 @@ impl ScenarioEngine {
                     user_operations,
                     expanded_operations,
                     changes,
+                    applied_shocks: Vec::new(),
                     warnings,
                     meta: Some(finstack_quant_core::config::results_meta(&self.config)),
                     time_roll: Some(roll_report),
@@ -362,6 +364,7 @@ impl ScenarioEngine {
         let has_rate_bindings = ctx.rate_bindings.is_some();
         let mut deferred_stmts = Vec::new();
         let mut pending_bumps: Vec<MarketBump> = Vec::new();
+        let mut applied_shocks: Vec<AppliedShock> = Vec::new();
 
         // Retain each hazard's calibration market until that curve is rebuilt.
         let initial_market = Arc::new(ctx.market.clone());
@@ -385,6 +388,7 @@ impl ScenarioEngine {
                 warnings: &mut warnings,
                 applied: &mut applied,
                 changes: &mut changes,
+                applied_shocks: &mut applied_shocks,
             };
             let mut idx = 0;
             while idx < expanded_ops.len() {
@@ -516,6 +520,7 @@ impl ScenarioEngine {
             user_operations,
             expanded_operations,
             changes,
+            applied_shocks,
             warnings,
             meta: Some(finstack_quant_core::config::results_meta(&self.config)),
             time_roll,

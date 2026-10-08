@@ -550,7 +550,7 @@ impl JsSimmCalculator {
     /// @param sensitivities - Sensitivity set to aggregate; validated first, so an unknown tenor or commodity bucket throws instead of pricing to zero.
     /// @param currency - Reporting currency; must be `"USD"` and match the sensitivities' base currency (concentration thresholds are in USD).
     /// @param as_of - ISO-8601 calculation date stamped on the result.
-    /// @returns The `ImResult` as a plain object: `amount` (Money), `methodology`, `mpor_days`, `as_of`, `approximation` and the SIMM component `breakdown`.
+    /// @returns The `ImResult` as a plain object: `amount` (Money), `methodology`, `mpor_days`, `as_of`, `approximation`, the SIMM component `breakdown`, and `simm_detail` (per-component buckets with weighted sensitivities, concentration factors and bucket `k`, plus `risk_class_margins` and `mpor_scale`).
     ///
     /// # Errors
     ///

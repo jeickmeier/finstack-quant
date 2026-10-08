@@ -10,7 +10,7 @@ use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::neumaier_sum;
-use finstack_quant_core::money::fx::FxConversionPolicy;
+use finstack_quant_core::money::fx::{FxConversionPolicy, FxRateResult};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
@@ -352,13 +352,15 @@ fn value_position(input: &EvaluationInput<'_>, position: &Position) -> Result<Po
         };
 
     let value_native = position.scale_value(valuation_result.value)?;
-    let value_base = collapse_to_base(input, value_native)?;
+    let (value_base, fx) = collapse_to_base(input, value_native)?;
 
     Ok(PositionValue {
         position_id: position.position_id.clone(),
         entity_id: position.entity_id.clone(),
         value_native,
         value_base,
+        fx_rate: fx.as_ref().map(|fx| fx.rate),
+        fx_triangulated: fx.map(|fx| fx.triangulated),
         metric_scale: position.scale_factor(),
         risk_metrics_complete,
         risk_error,
@@ -496,18 +498,40 @@ fn reuse_position(
 
     let mut reused = prior.clone();
     if seed.refresh_base_currency {
-        reused.value_base = collapse_to_base(input, reused.value_native)?;
+        let (value_base, fx) = collapse_to_base(input, reused.value_native)?;
+        reused.value_base = value_base;
+        reused.fx_rate = fx.as_ref().map(|fx| fx.rate);
+        reused.fx_triangulated = fx.map(|fx| fx.triangulated);
     }
     Ok(reused)
 }
 
-fn collapse_to_base(input: &EvaluationInput<'_>, value_native: Money) -> Result<Money> {
-    crate::fx::convert_to_base(
-        value_native,
+/// Collapse a native-currency value into the portfolio base currency.
+///
+/// Returns the converted amount together with the FX matrix result that was
+/// applied; the latter is `None` when the value is already in the base
+/// currency and no lookup is made. The arithmetic is that of
+/// [`crate::fx::convert_to_base`].
+fn collapse_to_base(
+    input: &EvaluationInput<'_>,
+    value_native: Money,
+) -> Result<(Money, Option<FxRateResult>)> {
+    let base_currency = input.portfolio.base_currency;
+    if value_native.currency() == base_currency {
+        let value_base =
+            crate::fx::convert_to_base(value_native, input.as_of, input.market, base_currency)?;
+        return Ok((value_base, None));
+    }
+    let fx = crate::fx::spot_fx_to_base(
+        value_native.currency(),
         input.as_of,
         input.market,
-        input.portfolio.base_currency,
-    )
+        base_currency,
+    )?;
+    Ok((
+        Money::new(value_native.amount() * fx.rate, base_currency)?,
+        Some(fx),
+    ))
 }
 
 fn assemble_valuation(

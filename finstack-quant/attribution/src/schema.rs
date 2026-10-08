@@ -35,6 +35,8 @@ fn attribution_result_examples() -> finstack_quant_core::Result<Vec<serde_json::
     let attribution = crate::PnlAttribution {
         total_pnl: Money::from((12500_i64, Currency::USD)),
         mark_to_market_pnl: None,
+        pv_t0: None,
+        pv_t1: None,
         carry: Money::from((12500_i64, Currency::USD)),
         rates_curves_pnl: zero,
         credit_curves_pnl: zero,
@@ -59,6 +61,8 @@ fn attribution_result_examples() -> finstack_quant_core::Result<Vec<serde_json::
         scalars_detail: None,
         credit_factor_detail: None,
         credit_carry_decomposition: None,
+        waterfall_steps: Vec::new(),
+        sensitivity_steps: Vec::new(),
         meta: crate::AttributionMeta {
             t0: as_of_t0,
             t1: as_of_t1,

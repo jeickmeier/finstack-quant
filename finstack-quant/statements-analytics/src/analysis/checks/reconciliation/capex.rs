@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use super::super::get_finite_node_value;
 use finstack_quant_statements::checks::{
-    Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
-    SignConventionPolicy,
+    Check, CheckCategory, CheckComparison, CheckContext, CheckFinding, CheckResult, Materiality,
+    Severity, SignConventionPolicy,
 };
 use finstack_quant_statements::types::NodeId;
 use finstack_quant_statements::Result;
@@ -57,6 +57,7 @@ impl Check for CapexReconciliation {
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         let tolerance = self.tolerance.unwrap_or(context.config.default_tolerance);
         let mut findings = Vec::new();
+        let mut comparisons = Vec::new();
 
         let has_components =
             self.ppe_additions_node.is_some() || self.intangible_additions_node.is_some();
@@ -67,6 +68,7 @@ impl Check for CapexReconciliation {
                 category: self.category(),
                 passed: true,
                 findings,
+                comparisons: Vec::new(),
             });
         }
 
@@ -125,6 +127,14 @@ impl Check for CapexReconciliation {
 
             let expected = ppe_add + intangible_add;
             let diff = capex_cf - expected;
+            let comparison = CheckComparison {
+                identity: "capex_reconciliation".to_string(),
+                period: Some(*pid),
+                actual: capex_cf,
+                expected,
+                tolerance,
+            };
+            comparisons.push(comparison.clone());
 
             if diff.abs() > tolerance {
                 let reference = expected.abs().max(1.0);
@@ -154,6 +164,7 @@ impl Check for CapexReconciliation {
                         reference_label: "balance_sheet_additions".to_string(),
                     }),
                     nodes,
+                    comparison: Some(comparison),
                 });
             }
         }
@@ -166,6 +177,7 @@ impl Check for CapexReconciliation {
             category: self.category(),
             passed,
             findings,
+            comparisons,
         })
     }
 }

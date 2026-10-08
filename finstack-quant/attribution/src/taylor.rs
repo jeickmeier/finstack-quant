@@ -189,6 +189,8 @@ pub(crate) struct TaylorFactorResult {
     /// Second-order P&L if requested. Key-rate curve factors measure curvature
     /// along the observed bucket moves, including cross-bucket effects.
     pub gamma_pnl: Option<f64>,
+    /// Sensitivities and moves (or the repriced value) behind `explained_pnl`.
+    pub working: FactorWorking,
 }
 
 /// Complete result of Taylor-based attribution.
@@ -776,6 +778,7 @@ pub(crate) fn attribute_pnl_taylor(
     );
     // Policy-visibility invariant: stamp the execution policy the
     // attribution ran under (workspace rule: results carry the parallel flag).
+    stamp_endpoints(&mut attribution, taylor.pv_t0, taylor.pv_t1);
     attribution.meta.execution_policy = Some(execution.policy);
 
     // Surface the factor-level diagnostics collected during computation
@@ -801,6 +804,16 @@ pub(crate) fn attribute_pnl_taylor(
             &mut attribution.meta.notes,
             &mut non_finite_detected,
         );
+        // Expose the working behind this factor. A non-finite component is
+        // already flagged through `factor_money` above.
+        let step = sensitivity_step(
+            &factor.factor_name,
+            factor.working.clone(),
+            money_or_zero(factor.explained_pnl, ccy),
+            factor.gamma_pnl.map(|gamma| money_or_zero(gamma, ccy)),
+            &mut attribution.meta.notes,
+        );
+        attribution.sensitivity_steps.push(step);
 
         // Route accumulation through Money::checked_add so a currency
         // mismatch surfaces as an error instead of being silently coerced into
@@ -1091,6 +1104,14 @@ fn compute_curve_factor(
 
         explained_pnl: explained,
         gamma_pnl,
+        working: FactorWorking::KeyRate {
+            unit: MoveUnit::BasisPoint,
+            buckets: KEY_RATE_BUCKETS_YEARS
+                .iter()
+                .zip(&buckets)
+                .map(|(&tenor_years, bucket)| (tenor_years, bucket.dv01, bucket.move_bp))
+                .collect(),
+        },
     })
 }
 
@@ -1250,6 +1271,13 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
 
             explained_pnl: explained,
             gamma_pnl,
+            working: FactorWorking::KeyRate {
+                unit: MoveUnit::BasisPoint,
+                buckets: buckets
+                    .iter()
+                    .map(|bucket| (bucket.tenor_years, bucket.sensitivity, bucket.move_bp))
+                    .collect(),
+            },
         });
     }
 
@@ -1297,6 +1325,11 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
 
         explained_pnl: explained,
         gamma_pnl,
+        working: FactorWorking::Scalar {
+            unit: MoveUnit::BasisPoint,
+            sensitivity: cs01,
+            market_move: spread_move_bp,
+        },
     })
 }
 
@@ -1372,6 +1405,11 @@ fn compute_vol_factor(
 
         explained_pnl: explained,
         gamma_pnl,
+        working: FactorWorking::Scalar {
+            unit: MoveUnit::VolPoint,
+            sensitivity: vega_per_point,
+            market_move: vol_move,
+        },
     })
 }
 
@@ -1409,6 +1447,7 @@ fn compute_fx_factor(
 
         explained_pnl: explained,
         gamma_pnl: None,
+        working: FactorWorking::Repriced { pv: pv_with_t0_fx },
     })
 }
 
@@ -1449,6 +1488,7 @@ fn compute_restored_family_factor(
         factor_name: factor_name.to_string(),
         explained_pnl: explained,
         gamma_pnl: None,
+        working: FactorWorking::Repriced { pv: pv_with_t0 },
     })
 }
 
@@ -1514,6 +1554,7 @@ fn compute_model_params_factor(
         factor_name: "ModelParameters".to_string(),
         explained_pnl: explained,
         gamma_pnl: None,
+        working: FactorWorking::Repriced { pv: pv_with_t0 },
     })
 }
 
@@ -1561,6 +1602,7 @@ fn compute_theta_factor(
             factor_name: "Theta".to_string(),
             explained_pnl: theta_pnl,
             gamma_pnl: None,
+            working: FactorWorking::Repriced { pv: pv_t0_at_t1 },
         },
         coupon_income,
         cash_paid,
@@ -1952,6 +1994,23 @@ mod tests {
             "residual should be ~0 once FX P&L is bucketed, got {}",
             attribution.residual
         );
+
+        // The exported Fx row carries the repriced value behind the bucket:
+        // fx_pnl = pv_t1 − (T1 value with the T0 FX matrix restored).
+        let fx_row = attribution
+            .sensitivity_steps
+            .iter()
+            .find(|step| step.factor == "Fx")
+            .expect("exported Fx row");
+        let repriced = fx_row.repriced_pv.expect("repriced value").amount();
+        assert!(
+            (repriced - 1_100_000.0).abs() < 1e-6,
+            "repriced = {repriced}"
+        );
+        let pv_t1 = attribution.pv_t1.expect("pv_t1").amount();
+        assert!((pv_t1 - repriced - attribution.fx_pnl.amount()).abs() < 1e-6);
+        assert_eq!(fx_row.explained_pnl, attribution.fx_pnl);
+        assert!(fx_row.sensitivity.is_none() && fx_row.buckets.is_empty());
 
         // The internal Taylor factor decomposition should also expose an "Fx" factor.
         let taylor = compute_taylor_result(

@@ -2,6 +2,7 @@
 //!
 //! ## Test Modules
 //!
+//! - `audit_steps`: Exported endpoints and step rows rebuild the reported buckets
 //! - `bond_attribution`: Basic bond P&L attribution tests
 //! - `fx_attribution`: FX translation and waterfall attribution tests
 //! - `invariants`: Mathematical invariants (sign conventions, scaling, edge cases)
@@ -15,6 +16,7 @@
 //! - `rounding_policy`: Rounding policy stamping tests
 
 mod analytical_self_consistency;
+mod audit_steps;
 mod bond_attribution;
 mod carry_credit_factor;
 mod carry_decomposition_window;

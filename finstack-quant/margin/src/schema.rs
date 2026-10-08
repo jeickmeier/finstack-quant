@@ -393,7 +393,13 @@ mod examples {
             "net_exposure": {"amount": "1250000", "currency": "USD"},
             "post_amount": {"amount": "0", "currency": "USD"},
             "collect_amount": {"amount": "1250000", "currency": "USD"},
-            "settlement_date": "2025-01-16"
+            "settlement_date": "2025-01-16",
+            "threshold": {"amount": "500000", "currency": "USD"},
+            "independent_amount": {"amount": "0", "currency": "USD"},
+            "collateral_balance": {"amount": "0", "currency": "USD"},
+            "unrounded_call": {"amount": "1250000", "currency": "USD"},
+            "mta": {"amount": "250000", "currency": "USD"},
+            "rounding_increment": {"amount": "10000", "currency": "USD"}
         }))
     }
 

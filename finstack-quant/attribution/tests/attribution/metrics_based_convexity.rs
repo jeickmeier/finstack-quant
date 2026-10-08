@@ -105,6 +105,25 @@ fn test_default_metrics_attribute_long_bond_curve_twist() {
     assert!(!attribution.result_invalid);
     assert!((attribution.total_pnl.amount() - actual_pnl).abs() < 1e-6);
     assert_eq!(attribution.carry.amount(), 0.0);
+    // The per-tenor DV01s and measured moves behind the rates bucket are
+    // exported and rebuild it.
+    super::audit_steps::assert_sensitivity_steps_reconcile(&attribution);
+    let rates_row = attribution
+        .sensitivity_steps
+        .iter()
+        .find(|step| step.factor == "Rates:USD-OIS")
+        .expect("key-rate rates row");
+    assert!(
+        rates_row
+            .buckets
+            .iter()
+            .any(|bucket| bucket.market_move < 0.0)
+            && rates_row
+                .buckets
+                .iter()
+                .any(|bucket| bucket.market_move > 0.0),
+        "the twist must be visible per tenor"
+    );
     assert_eq!(attribution.credit_curves_pnl.amount(), 0.0);
     let rates_pnl = attribution.rates_curves_pnl.amount();
     assert!(
@@ -381,6 +400,16 @@ fn test_metrics_based_convexity_reduces_residual() {
         as_of_t1,
     )
     .unwrap();
+
+    // Aggregate DV01 × average move, plus the convexity term on its own row.
+    super::audit_steps::assert_sensitivity_steps_reconcile(&attr_first);
+    super::audit_steps::assert_sensitivity_steps_reconcile(&attr_second);
+    let labels: Vec<&str> = attr_second
+        .sensitivity_steps
+        .iter()
+        .map(|step| step.factor.as_str())
+        .collect();
+    assert_eq!(labels, ["Rates", "RatesConvexity"]);
 
     let residual_first = attr_first.residual.amount().abs();
     let residual_second = attr_second.residual.amount().abs();

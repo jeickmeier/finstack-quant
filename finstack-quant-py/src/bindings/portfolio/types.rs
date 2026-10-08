@@ -558,6 +558,24 @@ impl PyPositionValue {
         PyMoney::from_inner(self.inner.value_base)
     }
 
+    /// Spot FX rate applied to convert ``value_native`` into ``value_base``:
+    /// base-currency units per one unit of the native currency, so
+    /// ``value_native.amount * fx_rate == value_base.amount`` up to base
+    /// currency rounding. ``None`` when the native currency is the base
+    /// currency (no FX lookup is made).
+    #[getter]
+    fn fx_rate(&self) -> Option<f64> {
+        self.inner.fx_rate
+    }
+
+    /// Whether ``fx_rate`` was triangulated through the FX matrix's pivot
+    /// currency (``True``) or read from a direct or inverse quote (``False``).
+    /// ``None`` exactly when ``fx_rate`` is ``None``.
+    #[getter]
+    fn fx_triangulated(&self) -> Option<bool> {
+        self.inner.fx_triangulated
+    }
+
     /// Linear scale applied to summable risk metrics (position size and sign).
     #[getter]
     fn metric_scale(&self) -> f64 {
@@ -788,7 +806,10 @@ impl PyPortfolioValuation {
     /// plus the per-position risk diagnostics.
     ///
     /// Columns: ``position_id``, ``entity_id``, ``value_native``,
-    /// ``value_base``, ``currency_native``, ``currency_base``,
+    /// ``value_base``, ``currency_native``, ``currency_base``, ``fx_rate``
+    /// (base-currency units per native unit applied to the row; missing when
+    /// the native currency is the base currency), ``fx_triangulated``
+    /// (``True``/``False`` for a converted row, else ``None``),
     /// ``risk_metrics_complete`` (bool), ``risk_error`` (``None`` unless the
     /// position degraded to PV-only). Values are floats and the currency codes
     /// are strings; use :meth:`to_arrow_positions` when a zero-copy handoff
@@ -813,7 +834,28 @@ impl PyPortfolioValuation {
         // `assign` returns a new frame. Appending with `set_item` instead trips
         // pandas' copy-on-write heuristic (PyO3 holds an extra reference, so the
         // refcount check reads as chained assignment) and warns on every call.
+        let fx_rates: Vec<Option<f64>> = self
+            .inner
+            .position_values
+            .values()
+            .map(|v| v.fx_rate)
+            .collect();
+        let fx_triangulated: Vec<Option<bool>> = self
+            .inner
+            .position_values
+            .values()
+            .map(|v| v.fx_triangulated)
+            .collect();
         let columns = PyDict::new(py);
+        // A float Series keeps the column float64 (missing as NaN) even when
+        // every row is same-currency; a bare list of `None` would be object.
+        let fx_rate_column = py.import("pandas")?.getattr("Series")?.call1((
+            fx_rates,
+            frame.getattr("index")?,
+            "float64",
+        ))?;
+        columns.set_item("fx_rate", fx_rate_column)?;
+        columns.set_item("fx_triangulated", fx_triangulated)?;
         columns.set_item("risk_metrics_complete", complete)?;
         columns.set_item("risk_error", errors)?;
         frame.call_method("assign", (), Some(&columns))

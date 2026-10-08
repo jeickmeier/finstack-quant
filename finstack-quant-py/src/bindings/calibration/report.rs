@@ -120,7 +120,7 @@ impl PyQuoteQuality {
 /// Examples
 /// --------
 /// >>> from finstack_quant.calibration import CalibrationDiagnostics
-/// >>> d = CalibrationDiagnostics.from_json('{"per_quote": [], "condition_number": null, "singular_values": null, "max_residual": 0.0, "rms_residual": 0.0, "r_squared": null}')
+/// >>> d = CalibrationDiagnostics.from_json('{"per_quote": [], "condition_number": null, "jacobian": null, "max_residual": 0.0, "rms_residual": 0.0}')
 /// >>> d.max_residual
 /// 0.0
 #[pyclass(
@@ -159,10 +159,15 @@ impl PyCalibrationDiagnostics {
         self.inner.condition_number
     }
 
-    /// Jacobian singular values (descending), when available.
+    /// Finite-difference Jacobian of the residuals at the solution.
+    ///
+    /// ``jacobian[i][j]`` is the derivative of the residual of quote ``i``
+    /// (``per_quote`` order) with respect to solved parameter ``j`` (knot
+    /// order), unweighted. ``None`` for sequential bootstraps and when a
+    /// parameter bump could not be priced.
     #[getter]
-    fn singular_values(&self) -> Option<Vec<f64>> {
-        self.inner.singular_values.clone()
+    fn jacobian(&self) -> Option<Vec<Vec<f64>>> {
+        self.inner.jacobian.clone()
     }
 
     /// Maximum absolute per-quote residual.
@@ -175,12 +180,6 @@ impl PyCalibrationDiagnostics {
     #[getter]
     fn rms_residual(&self) -> f64 {
         self.inner.rms_residual
-    }
-
-    /// Coefficient of determination of the fit, when available.
-    #[getter]
-    fn r_squared(&self) -> Option<f64> {
-        self.inner.r_squared
     }
 
     /// Per-quote diagnostics as a pandas ``DataFrame``.
@@ -370,7 +369,7 @@ impl PyCalibrationReport {
         self.inner.convergence_reason.clone()
     }
 
-    /// Domain metadata (``type``, ``method``, ``residual_units``, ...).
+    /// Domain metadata (``type``, ``residual_units``, solver statistics, ...).
     #[getter]
     fn metadata<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
@@ -414,6 +413,44 @@ impl PyCalibrationReport {
     #[getter]
     fn success_tolerance(&self) -> Option<f64> {
         self.inner.success_tolerance
+    }
+
+    /// Numerical procedure that produced this report, as its wire name.
+    ///
+    /// One of ``"sequential_bootstrap"``, ``"global_fit_lm_weighted_lsq"``,
+    /// ``"per_slice_least_squares"``, ``"scalar_root_find"``,
+    /// ``"scalar_minimization"`` or ``"plan_execution"``. ``None`` only for a
+    /// report rebuilt from JSON written before the field existed.
+    #[getter]
+    fn solver_method(&self) -> Option<&'static str> {
+        self.inner.solver_method.map(|method| method.as_str())
+    }
+
+    /// Units of ``residuals``, ``max_residual`` and ``rmse``, as a wire name.
+    ///
+    /// One of ``"pv_per_unit_notional"``, ``"quoted_volatility"``,
+    /// ``"discounted_upfront_fraction"`` or
+    /// ``"absolute_residual_over_step_tolerance"``. ``None`` only for a report
+    /// rebuilt from JSON written before the field existed.
+    #[getter]
+    fn residual_units(&self) -> Option<&'static str> {
+        self.inner.residual_units.map(|units| units.as_str())
+    }
+
+    /// Smile parameters fitted per quoted expiry, as a list of dicts.
+    ///
+    /// Each dict has ``expiry`` (Act/365F years from the base date),
+    /// ``parameters`` (``{"sabr": {...}}`` or ``{"svi": {...}}``),
+    /// ``iterations`` and, for SABR slices, ``max_relative_quote_error``.
+    /// Empty except for equity SABR and SVI surface steps.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the slices cannot be converted to Python objects.
+    #[getter]
+    fn fitted_slices<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.fitted_slices)
     }
 
     /// Per-quote diagnostics, when ``compute_diagnostics`` was enabled.

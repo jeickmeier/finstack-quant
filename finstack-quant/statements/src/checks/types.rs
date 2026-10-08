@@ -83,6 +83,7 @@ impl SignConventionPolicy {
                         period,
                         materiality: None,
                         nodes: Vec::new(),
+                        comparison: None,
                     })
                 } else {
                     None
@@ -157,6 +158,53 @@ pub struct Materiality {
     pub reference_label: String,
 }
 
+/// The two numbers a check compared, and the tolerance it allowed.
+///
+/// Recorded for every numeric comparison a check performs — whether it passed
+/// or failed — so the verdict can be reconstructed from exported data:
+/// the comparison fails exactly when `|actual - expected| > tolerance`.
+///
+/// `actual`, `expected` and `tolerance` are all in the units of the compared
+/// nodes (currency units for monetary nodes, the same units as
+/// [`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not
+/// a fraction or percentage.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct CheckComparison {
+    /// Stable snake_case name of the identity that was tested (for example
+    /// `"balance_sheet_articulation"` or `"cash_flow_components"`); a check
+    /// that tests several identities per period uses a distinct label for each.
+    pub identity: String,
+    /// Period the comparison was evaluated for, if it is period-specific.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "Option<String>"))]
+    pub period: Option<PeriodId>,
+    /// Observed (left-hand) value, in the compared nodes' units.
+    pub actual: f64,
+    /// Value the identity requires (right-hand side), in the same units.
+    pub expected: f64,
+    /// Absolute tolerance applied to `|actual - expected|`, in the same units.
+    /// This is the effective tolerance: the per-check override when one is
+    /// configured, otherwise
+    /// `max(default_tolerance, default_relative_tolerance * |reference|)`.
+    pub tolerance: f64,
+}
+
+impl CheckComparison {
+    /// Signed difference `actual - expected`, in the compared nodes' units.
+    #[must_use]
+    pub fn difference(&self) -> f64 {
+        self.actual - self.expected
+    }
+
+    /// True when `|actual - expected| <= tolerance`, i.e. the comparison
+    /// passed. A non-finite difference is never within tolerance.
+    #[must_use]
+    pub fn within_tolerance(&self) -> bool {
+        self.difference().abs() <= self.tolerance
+    }
+}
+
 /// A single finding produced by a check for a specific period or node.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -177,6 +225,13 @@ pub struct CheckFinding {
     /// Node identifiers involved in the finding.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nodes: Vec<NodeId>,
+    /// The failed numeric comparison behind this finding (actual, expected and
+    /// tolerance). `None` for findings that do not compare two numbers:
+    /// skipped periods, missing or non-finite inputs, sign-convention
+    /// warnings, and formula checks without a tolerance (a formula check
+    /// with a tolerance compares its value against zero).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comparison: Option<CheckComparison>,
 }
 
 /// Outcome of a single check execution.
@@ -193,6 +248,15 @@ pub struct CheckResult {
     pub passed: bool,
     /// Individual findings produced by the check.
     pub findings: Vec<CheckFinding>,
+    /// Every numeric comparison the check evaluated, passing and failing
+    /// alike, in evaluation order. A passing check therefore still reports
+    /// the actual value, expected value and tolerance it was judged on.
+    /// Unlike `findings`, this list is not reduced by the suite's
+    /// `min_severity` / `materiality_threshold` reporting filters. Empty for
+    /// checks that do not compare two numbers, for periods a check skipped,
+    /// and for reports serialized before this field existed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub comparisons: Vec<CheckComparison>,
 }
 
 fn default_check_tolerance() -> f64 {

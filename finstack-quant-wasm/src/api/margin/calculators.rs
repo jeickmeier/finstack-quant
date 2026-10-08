@@ -113,7 +113,7 @@ impl JsVmCalculator {
     /// @param posted_collateral - Signed collateral balance in `currency`: positive held, negative posted, including pending agreed calls.
     /// @param currency - ISO-4217 code; must equal the CSA base currency.
     /// @param as_of - ISO-8601 calculation date; the settlement date is derived from it on the CSA calendar.
-    /// @returns The `VmResult` as a plain object: `date`, `gross_exposure`, `net_exposure`, `post_amount`, `collect_amount` (Money) and `settlement_date`.
+    /// @returns The `VmResult` as a plain object: `date`, `settlement_date`, and Money amounts `gross_exposure`, `threshold`, `independent_amount`, `net_exposure`, `collateral_balance`, `unrounded_call`, `mta`, `rounding_increment`, `post_amount` and `collect_amount`.
     ///
     /// # Errors
     ///

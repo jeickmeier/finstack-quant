@@ -150,8 +150,9 @@ pub use credit_factor::CreditFactorDetailOptions;
 pub use types::detail::{
     CarryDetail, CorrelationsAttribution, CreditCarryByLevel, CreditCarryDecomposition,
     CreditCurvesAttribution, CreditFactorAttribution, CrossFactorDetail, FxAttribution,
-    InflationCurvesAttribution, LevelCarry, LevelPnl, ModelParamsAttribution,
-    RatesCurvesAttribution, ScalarsAttribution, SourceLine, VolAttribution,
+    InflationCurvesAttribution, LevelCarry, LevelPnl, ModelParamsAttribution, MoveUnit,
+    RatesCurvesAttribution, ScalarsAttribution, SensitivityBucket, SensitivityStep, SourceLine,
+    VolAttribution, WaterfallStep,
 };
 pub use types::result::{
     AttributionFactor, AttributionMeta, AttributionMethod, ExecutionPolicy, PnlAttribution,
@@ -162,6 +163,7 @@ pub use types::result::{
 pub use factors::{MarketRestoreFlags, MarketSnapshot};
 pub use long_rows::{
     pnl_attribution_carry_rows, pnl_attribution_credit_factor_rows, pnl_attribution_long_rows,
+    pnl_attribution_sensitivity_step_rows, pnl_attribution_waterfall_step_rows,
     pnl_attribution_wide_row,
 };
 pub use metrics_based::attribute_pnl_metrics_based;

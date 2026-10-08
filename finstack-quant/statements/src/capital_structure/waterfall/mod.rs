@@ -60,7 +60,7 @@ mod payment_in_kind;
 mod payment_stack;
 mod period_close;
 
-use crate::capital_structure::cashflows::CashflowBreakdown;
+use crate::capital_structure::cashflows::{add_optional_money, CashflowBreakdown};
 use crate::capital_structure::state::CapitalStructureState;
 use crate::capital_structure::waterfall_spec::{PaymentPriority, WaterfallSpec};
 use crate::error::Result;
@@ -73,7 +73,8 @@ use indexmap::IndexMap;
 use std::collections::HashSet;
 
 use cash_distribution::{
-    allocate_by_class, apply_cash_cap_to_category, apply_prepayment, StagedInstrumentFlow,
+    allocate_by_class, apply_cash_cap_to_category, apply_prepayment, PrincipalComponent,
+    StagedInstrumentFlow,
 };
 use excess_cash_flow::{calculate_ecf_sweep, EcfDeductions};
 use payment_in_kind::{apply_pik_transitions, evaluate_pik_toggle, is_pik_enabled};
@@ -104,6 +105,13 @@ pub struct WaterfallPeriodResult {
     /// `None` only when the period had no contractual flows at all, in which
     /// case no waterfall ran and there is no currency to denominate it in.
     pub equity_distribution: Option<Money>,
+    /// Cash the waterfall allocated from: the `available_cash_node` value
+    /// floored at zero, in the waterfall's currency. With the allocations in
+    /// `flows` it satisfies
+    /// `fees + cash interest + principal + equity == available cash`.
+    /// `None` only when the period had no contractual flows, as for
+    /// `equity_distribution`.
+    pub available_cash: Option<Money>,
 }
 
 /// Evaluate a node reference or inline DSL expression against the current context.
@@ -199,19 +207,23 @@ fn class_rank_for(spec: &WaterfallSpec, instrument_id: &str) -> Result<u32> {
 }
 
 /// Apply a named mandatory/voluntary prepayment at its priority rung.
+///
+/// `component` selects the principal component of the breakdown that records
+/// the cash paid at this rung.
 fn apply_named_prepay(
     context: &EvaluationContext,
     node: Option<&str>,
     staged: &mut [StagedInstrumentFlow],
     remaining_cash: &mut Money,
     warnings: &mut Vec<EvalWarning>,
+    component: PrincipalComponent,
 ) -> Result<()> {
     let Some(expr) = node.filter(|n| !n.trim().is_empty()) else {
         return Ok(());
     };
     let amount = eval_value_or_formula(context, expr, warnings)?.max(0.0);
     let requested = money_from_expr(amount, remaining_cash.currency(), expr)?;
-    apply_prepayment(staged, remaining_cash, requested, None)
+    apply_prepayment(staged, remaining_cash, requested, None, component)
 }
 
 /// Execute waterfall logic for a single period.
@@ -274,6 +286,7 @@ pub fn execute_waterfall(
             flows: IndexMap::new(),
             warnings: Vec::new(),
             equity_distribution: None,
+            available_cash: None,
         });
     }
 
@@ -429,7 +442,21 @@ pub fn execute_waterfall(
             }
         }
         let scheduled_principal = principal.get_scheduled_capacity()?;
-        staged_breakdown.principal_payment = Money::from((0_i64, currency));
+        let zero = Money::from((0_i64, currency));
+        staged_breakdown.principal_payment = zero;
+        // Principal is re-allocated rung by rung below; each rung records its
+        // share so the components always sum to `principal_payment`.
+        staged_breakdown.scheduled_principal = Some(zero);
+        staged_breakdown.mandatory_prepayment = Some(zero);
+        staged_breakdown.sweep_prepayment = Some(zero);
+        staged_breakdown.voluntary_prepayment = Some(zero);
+        // The opening balance the principal allocation above was staged from.
+        let opening = state.get_opening_balance(instrument_id, currency);
+        staged_breakdown.opening_balance = Some(if opening.currency() == currency {
+            opening
+        } else {
+            zero
+        });
         let class_rank = class_rank_for(waterfall_spec, instrument_id)?;
         staged.push(StagedInstrumentFlow {
             instrument_id: instrument_id.clone(),
@@ -524,6 +551,10 @@ pub fn execute_waterfall(
                             .breakdown
                             .principal_payment
                             .checked_add(s.scheduled_principal)?;
+                        add_optional_money(
+                            &mut s.breakdown.scheduled_principal,
+                            Some(s.scheduled_principal),
+                        )?;
                     }
                     paid.scheduled_principal =
                         staged.iter().map(|s| s.scheduled_principal.amount()).sum();
@@ -535,6 +566,7 @@ pub fn execute_waterfall(
                         &mut staged,
                         &mut remaining_cash,
                         &mut warnings,
+                        |b| &mut b.mandatory_prepayment,
                     )?;
                 }
                 PaymentPriority::Sweep => {
@@ -551,6 +583,7 @@ pub fn execute_waterfall(
                             &mut remaining_cash,
                             sweep,
                             spec.target_instrument_id.as_deref(),
+                            |b| &mut b.sweep_prepayment,
                         )?;
                     }
                 }
@@ -561,6 +594,7 @@ pub fn execute_waterfall(
                         &mut staged,
                         &mut remaining_cash,
                         &mut warnings,
+                        |b| &mut b.voluntary_prepayment,
                     )?;
                 }
                 PaymentPriority::Equity => {}
@@ -754,6 +788,7 @@ pub fn execute_waterfall(
         flows: result,
         warnings,
         equity_distribution,
+        available_cash: Some(available_cash),
     })
 }
 
@@ -2630,5 +2665,133 @@ mod tests {
             "mandatory 200k + sweep 300k should both apply, got {}",
             tl.principal_payment.amount()
         );
+    }
+
+    /// Scheduled amortization, a mandatory prepayment, the ECF sweep and a
+    /// voluntary prepayment all land in `principal_payment`; the breakdown
+    /// keeps each source separately and they add back to the total.
+    #[test]
+    fn principal_components_sum_to_principal_payment() {
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let context = build_context(
+            period,
+            &[
+                ("ebitda", 300_000.0),
+                ("mandatory", 200_000.0),
+                ("voluntary", 50_000.0),
+                ("cash_available", 1_000_000.0),
+            ],
+        );
+
+        let mut contractual = CashflowBreakdown::with_currency(Currency::USD);
+        contractual.interest_expense_cash = Money::from((80_000_i64, Currency::USD));
+        contractual.fees = Money::from((5_000_i64, Currency::USD));
+        contractual.principal_payment = Money::from((100_000_i64, Currency::USD));
+        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
+        contractual_flows.insert("TL-1".to_string(), contractual);
+
+        let mut state = CapitalStructureState::new();
+        state.opening_balances.insert(
+            "TL-1".to_string(),
+            Money::from((10_000_000_i64, Currency::USD)),
+        );
+
+        let waterfall = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::MandatoryPrepayment,
+                PaymentPriority::Sweep,
+                PaymentPriority::VoluntaryPrepayment,
+                PaymentPriority::Equity,
+            ],
+            available_cash_node: "cash_available".into(),
+            mandatory_prepay_node: Some("mandatory".into()),
+            voluntary_prepay_node: Some("voluntary".into()),
+            ecf_sweep: Some(EcfSweepSpec {
+                ebitda_node: "ebitda".into(),
+                taxes_node: None,
+                capex_node: None,
+                working_capital_node: None,
+                cash_interest_node: None,
+                sweep_percentage: 1.0,
+                target_instrument_id: Some("TL-1".into()),
+            }),
+            pik_toggle: None,
+            ..Default::default()
+        };
+
+        let results = execute_waterfall(
+            &period,
+            &context,
+            &waterfall,
+            &mut state,
+            &contractual_flows,
+        )
+        .expect("waterfall should execute");
+
+        let tl = results.flows.get("TL-1").expect("TL-1");
+        let amount = |money: Option<Money>| money.expect("recorded by the waterfall").amount();
+        let scheduled = amount(tl.scheduled_principal);
+        let mandatory = amount(tl.mandatory_prepayment);
+        let sweep = amount(tl.sweep_prepayment);
+        let voluntary = amount(tl.voluntary_prepayment);
+
+        assert_eq!(scheduled, 100_000.0);
+        assert_eq!(mandatory, 200_000.0);
+        // ECF = EBITDA 300k - interest 80k - fees 5k - scheduled principal 100k.
+        assert_eq!(sweep, 115_000.0);
+        assert_eq!(voluntary, 50_000.0);
+        assert_eq!(
+            scheduled + mandatory + sweep + voluntary,
+            tl.principal_payment.amount()
+        );
+        assert_eq!(tl.principal_payment.amount(), 465_000.0);
+
+        // Opening balance less principal paid is the closing balance here
+        // (no draws, no PIK).
+        assert_eq!(amount(tl.opening_balance), 10_000_000.0);
+        assert_eq!(
+            amount(tl.opening_balance) - tl.principal_payment.amount(),
+            tl.debt_balance.amount()
+        );
+
+        // Sources and uses of cash for the period reconcile.
+        let available = results.available_cash.expect("waterfall ran").amount();
+        let equity = results.equity_distribution.expect("residual").amount();
+        assert_eq!(available, 1_000_000.0);
+        assert_eq!(
+            tl.fees.amount()
+                + tl.interest_expense_cash.amount()
+                + tl.principal_payment.amount()
+                + equity,
+            available
+        );
+        tl.validate_currency_invariant()
+            .expect("components share the breakdown currency");
+    }
+
+    /// A breakdown written before the principal components existed still
+    /// deserializes, with the components unrecorded.
+    #[test]
+    fn breakdown_without_principal_components_deserializes() {
+        let breakdown = CashflowBreakdown::with_currency(Currency::USD);
+        let json = serde_json::to_value(&breakdown).expect("serialize");
+        for field in [
+            "opening_balance",
+            "scheduled_principal",
+            "mandatory_prepayment",
+            "sweep_prepayment",
+            "voluntary_prepayment",
+        ] {
+            assert!(
+                json.get(field).is_none(),
+                "{field} is skipped when unrecorded"
+            );
+        }
+        let back: CashflowBreakdown = serde_json::from_value(json).expect("deserialize");
+        assert!(back.scheduled_principal.is_none());
+        assert!(back.opening_balance.is_none());
     }
 }

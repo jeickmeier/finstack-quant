@@ -163,7 +163,10 @@ pub use solver::SolverConfig;
 pub use validation::{RateBounds, RateBoundsPolicy, ValidationConfig, ValidationMode};
 
 /// Calibration diagnostics and results.
-pub use report::{CalibrationDiagnostics, CalibrationReport, QuoteQuality};
+pub use report::{
+    CalibrationDiagnostics, CalibrationReport, FittedSlice, FittedSliceParameters, QuoteQuality,
+    ResidualUnits, SolverMethod,
+};
 
 // Internal/advanced re-exports (not part of typical usage)
 #[doc(hidden)]

@@ -120,7 +120,8 @@ pub mod warning;
 pub use adapters::time_roll::apply_time_roll_forward;
 pub use adapters::vol::ArbitrageViolation;
 pub use engine::{
-    ApplicationEnvelope, ApplicationReport, ExecutionContext, RollForwardReport, ScenarioEngine,
+    ApplicationEnvelope, ApplicationReport, AppliedShock, AppliedShockTarget, ExecutionContext,
+    LevelChange, RollForwardReport, ScenarioEngine, ShockMagnitude, ShockNode, ShockUnit,
 };
 pub use envelope::ScenarioEnvelope;
 pub use error::{Error, Result};

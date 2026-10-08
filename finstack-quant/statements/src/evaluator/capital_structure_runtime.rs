@@ -20,6 +20,7 @@ type DynamicPeriodEvaluation = (
     Vec<Option<f64>>,
     Vec<EvalWarning>,
     crate::capital_structure::CapitalStructureCashflows,
+    IndexMap<String, crate::evaluator::CellSource>,
 );
 
 impl Evaluator {
@@ -118,6 +119,9 @@ impl Evaluator {
                 if let Some(equity) = waterfall_result.equity_distribution {
                     cs_cashflows.equity_distribution.insert(period_id, equity);
                 }
+                if let Some(cash) = waterfall_result.available_cash {
+                    cs_cashflows.available_cash.insert(period_id, cash);
+                }
                 contractual_warnings.extend(waterfall_result.warnings);
                 context.set_capital_structure_cashflows(cs_cashflows);
             }
@@ -143,6 +147,7 @@ impl Evaluator {
             .take()
             .unwrap_or_default();
         let row = context.current_values.clone();
+        let sources = context.cell_sources();
         let (values, mut warnings) = context.into_results();
         // The second `evaluate_nodes_in_order` pass re-evaluates cs-affected
         // nodes into the same context, so node-level warnings (e.g.
@@ -151,7 +156,7 @@ impl Evaluator {
         let mut seen: HashSet<String> = HashSet::with_capacity(warnings.len());
         warnings.retain(|w| seen.insert(format!("{w:?}")));
         warnings.append(&mut contractual_warnings);
-        Ok((values, row, warnings, period_cs_cashflows))
+        Ok((values, row, warnings, period_cs_cashflows, sources))
     }
 }
 
@@ -389,6 +394,13 @@ fn recompute_cs_totals(
         let mut income = entry.interest_income_cash_or_zero();
         income += breakdown.interest_income_cash_or_zero();
         entry.interest_income_cash = Some(income);
+        for (total, part) in entry
+            .audit_detail_mut()
+            .into_iter()
+            .zip(breakdown.audit_detail())
+        {
+            crate::capital_structure::add_optional_money(total, part)?;
+        }
     }
 
     for (currency, breakdown) in &totals_by_currency {
@@ -437,8 +449,35 @@ fn recompute_cs_totals(
                         Err(e) => return Err(e),
                     }
                 }
+                // Opening balance and principal components convert like the
+                // fields above; a component the breakdown does not record
+                // stays unrecorded.
+                let mut converted_detail = [None; 5];
+                for (slot, money) in converted_detail.iter_mut().zip(breakdown.audit_detail()) {
+                    let Some(money) = money else { continue };
+                    match convert_to_reporting(
+                        money,
+                        ctx.snapshot_date,
+                        Some(rc),
+                        ctx.fx_matrix,
+                        ctx.fx_policy,
+                    )? {
+                        Some(m) => *slot = Some(m),
+                        None => {
+                            all_converted = false;
+                            break;
+                        }
+                    }
+                }
                 if !all_converted {
                     break;
+                }
+                for (total, part) in converted_total
+                    .audit_detail_mut()
+                    .into_iter()
+                    .zip(converted_detail)
+                {
+                    crate::capital_structure::add_optional_money(total, part)?;
                 }
                 converted_total.interest_expense_cash += converted_fields[0];
                 converted_total.interest_expense_pik += converted_fields[1];

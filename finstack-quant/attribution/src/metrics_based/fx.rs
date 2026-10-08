@@ -17,6 +17,16 @@ pub(super) fn apply(
         // FX01 × spot change (FX01 is typically per 1% move)
         if let Some(fx_shift) = inputs.shifts.fx_shift_pct {
             let fx_amount = fx01 * fx_shift;
+            push_first_order_step(
+                attribution,
+                "Fx",
+                FactorWorking::Scalar {
+                    unit: MoveUnit::Percent,
+                    sensitivity: *fx01,
+                    market_move: fx_shift,
+                },
+                fx_amount,
+            );
             attribution.fx_pnl = factor_money_or_invalid(
                 fx_amount,
                 inputs.val_t1.value.currency(),

@@ -144,6 +144,11 @@ fn test_context_get_cs_value_interest_total() {
             finstack_quant_core::currency::Currency::USD,
         )
         .expect("valid money fixture"),
+        opening_balance: None,
+        scheduled_principal: None,
+        mandatory_prepayment: None,
+        sweep_prepayment: None,
+        voluntary_prepayment: None,
     };
     cs_cashflows.totals.insert(period_id, breakdown);
 
@@ -553,6 +558,11 @@ fn test_capital_structure_cashflows_accessors() {
             finstack_quant_core::currency::Currency::USD,
         )
         .expect("valid money fixture"),
+        opening_balance: None,
+        scheduled_principal: None,
+        mandatory_prepayment: None,
+        sweep_prepayment: None,
+        voluntary_prepayment: None,
     };
 
     let mut instrument_map = indexmap::IndexMap::new();

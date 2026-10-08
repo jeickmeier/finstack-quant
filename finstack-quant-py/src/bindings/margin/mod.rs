@@ -5,12 +5,12 @@
 
 mod calculators;
 mod frame;
-mod im;
+pub(crate) mod im;
 mod im_curvature;
 mod metrics;
 mod regulatory;
 mod schema;
-mod types;
+pub(crate) mod types;
 mod xva;
 
 use pyo3::prelude::*;

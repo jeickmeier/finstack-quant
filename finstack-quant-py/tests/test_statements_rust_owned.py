@@ -32,6 +32,7 @@ from finstack_quant.statements_analytics import (
     backtest_forecast,
     compute_multiple,
     dcf_sensitivity,
+    evaluate_dcf,
     evaluate_lbo,
     explain_formula,
     goal_seek,
@@ -134,7 +135,23 @@ def test_goal_seek_returns_the_rust_result_with_one_update_model_owner() -> None
     assert updated.solved_value == pytest.approx(120.0)
     assert updated.model is not None
     wire = json.loads(updated.to_json())
-    assert sorted(wire) == ["model", "solved_value"]
+    assert sorted(wire) == ["converged", "evaluations", "model", "residual", "solved_value", "tolerance"]
+    # Solve diagnostics: the residual of the reported driver, its tolerance and the evaluation count.
+    assert updated.converged is True
+    assert updated.tolerance == pytest.approx(1e-9 * 60.0)
+    assert abs(updated.residual) <= updated.tolerance
+    assert updated.evaluations >= 3
+    solved = Evaluator().evaluate(updated.model)
+    assert solved.get("profit", "2025Q1") - 60.0 == pytest.approx(updated.residual, abs=1e-12)
+    restored = GoalSeekResult.from_json(updated.to_json())
+    assert (restored.residual, restored.evaluations, restored.converged) == (
+        updated.residual,
+        updated.evaluations,
+        True,
+    )
+    # JSON written before the diagnostics existed still loads, flagged by evaluations == 0.
+    legacy = GoalSeekResult.from_json('{"solved_value": 2.5, "model": null}')
+    assert (legacy.evaluations, legacy.converged) == (0, False)
     assert wire["model"]["nodes"]["revenue"]["values"]["2025Q1"] == pytest.approx(120.0)
     assert GoalSeekResult.from_json(updated.to_json()).solved_value == pytest.approx(120.0)
     assert pickle.loads(pickle.dumps(updated)).solved_value == pytest.approx(120.0)  # noqa: S301 - trusted in-process round trip
@@ -185,6 +202,84 @@ def test_dcf_sensitivity_takes_the_rust_dcf_options() -> None:
     assert relative.entries
     with pytest.raises(ValueError, match="exit_multiple"):
         dcf_sensitivity(dcf_model(), 0.1, EXIT_MULTIPLE, "ufcf", 0.0, {"exit_multiple": 1})
+
+
+def test_evaluate_dcf_exports_the_working_behind_enterprise_value() -> None:
+    result = evaluate_dcf(dcf_model(), 0.1, EXIT_MULTIPLE, "ufcf", 25.0)
+    assert result.wacc == 0.1
+    rows = result.periods
+    assert [row["period_id"] for row in rows] == ["2025", "2026"]
+    assert [row["date"] for row in rows] == ["2025-12-31", "2026-12-31"]
+    assert [row["free_cash_flow"] for row in rows] == [100.0, 110.0]
+    for row in rows:
+        assert row["discount_factor"] == pytest.approx(1.1 ** -row["discount_years"], rel=1e-14)
+        assert row["present_value"] == pytest.approx(row["free_cash_flow"] * row["discount_factor"], rel=1e-14)
+    # Rows sum to the explicit PV; explicit PV plus terminal PV is enterprise value.
+    explicit = sum(row["present_value"] for row in rows)
+    assert result.pv_explicit.amount == pytest.approx(explicit, abs=0.01)
+    assert explicit + result.terminal_value_pv.amount == pytest.approx(result.enterprise_value.amount, abs=0.02)
+    # The undiscounted terminal value (multiple x metric) discounts to its PV.
+    assert result.terminal_value.amount == pytest.approx(8.0 * 999.0)
+    assert result.terminal_value.amount / 1.1**result.terminal_discount_years == pytest.approx(
+        result.terminal_value_pv.amount, abs=0.01
+    )
+    # Gross debt and cash are reported separately and net to net debt.
+    bridge = result.equity_bridge
+    assert (bridge.total_debt, bridge.cash) == (25.0, 0.0)
+    assert bridge.total_debt - bridge.cash == pytest.approx(result.net_debt.amount)
+
+    frame = result.to_dataframe()
+    assert list(frame.columns[-6:]) == [
+        "wacc",
+        "pv_explicit",
+        "terminal_value",
+        "total_debt",
+        "cash",
+        "terminal_discount_years",
+    ]
+    assert frame["pv_explicit"].iloc[0] == pytest.approx(explicit, abs=0.01)
+    restored = type(result).from_json(result.to_json())
+    assert [row["period_id"] for row in restored.periods] == ["2025", "2026"]
+    assert [row["present_value"] for row in restored.periods] == pytest.approx([row["present_value"] for row in rows])
+    assert restored.equity_bridge.total_debt == 25.0
+
+
+def test_explain_formula_reports_the_cell_source() -> None:
+    model = json.dumps({
+        "id": "explain",
+        "schema_version": 1,
+        "periods": [{**quarter(1), "is_actual": True}, quarter(2)],
+        "nodes": {
+            "revenue": {
+                "node_id": "revenue",
+                "node_type": "mixed",
+                "values": {"2025Q1": 100},
+                "forecast": {"method": "growth_pct", "params": {"rate": 0.05}},
+            },
+            "cogs": {"node_id": "cogs", "node_type": "calculated", "formula_text": "revenue * 0.4"},
+            "gross_profit": {"node_id": "gross_profit", "node_type": "calculated", "formula_text": "revenue - cogs"},
+        },
+    })
+    results = Evaluator().evaluate(FinancialModelSpec.from_json(model))
+
+    actual = explain_formula(model, results, "revenue", "2025Q1")
+    assert (actual.source, actual.forecast, actual.breakdown) == ("value", None, [])
+
+    forecast = explain_formula(model, results, "revenue", "2025Q2")
+    assert forecast.final_value == pytest.approx(105.0)
+    assert forecast.source == "forecast"
+    assert forecast.forecast == {"method": "growth_pct", "params": {"rate": 0.05}}
+    assert "Source: forecast" in forecast.to_text()
+
+    # A sum/difference formula is a signed step trace that reconciles to the value.
+    profit = explain_formula(model, results, "gross_profit", "2025Q2")
+    assert profit.source == "formula"
+    assert [(step.component, step.operation) for step in profit.breakdown] == [("revenue", "+"), ("cogs", "-")]
+    signed = sum(step.value if step.operation == "+" else -step.value for step in profit.breakdown)
+    assert signed == pytest.approx(profit.final_value)
+    # Any other formula lists its components without an operation.
+    cogs = explain_formula(model, results, "cogs", "2025Q2")
+    assert [(step.component, step.operation) for step in cogs.breakdown] == [("revenue", None)]
 
 
 def test_model_ingest_is_rust_from_json() -> None:

@@ -63,6 +63,7 @@ fn application_envelope_examples() -> finstack_quant_core::Result<Vec<serde_json
             user_operations: 1,
             expanded_operations: 1,
             changes: Default::default(),
+            applied_shocks: Vec::new(),
             warnings: Vec::new(),
             meta: Some(finstack_quant_core::config::results_meta(
                 &finstack_quant_core::config::FinstackConfig::default(),
@@ -102,6 +103,7 @@ fn horizon_result_example() -> finstack_quant_core::Result<crate::HorizonResult>
             user_operations: 1,
             expanded_operations: 1,
             changes: Default::default(),
+            applied_shocks: Vec::new(),
             warnings: Vec::new(),
             meta: None,
             time_roll: None,

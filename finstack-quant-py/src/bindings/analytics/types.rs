@@ -269,10 +269,21 @@ impl PyBetaResult {
     fn ci_upper(&self) -> f64 {
         self.inner.ci_upper
     }
+    /// Number of paired observations the regression used.
+    #[getter]
+    fn n_obs(&self) -> usize {
+        self.inner.n_obs
+    }
+    /// Two-sided confidence level of the interval as a decimal (0.95 = 95%).
+    #[getter]
+    fn confidence_level(&self) -> f64 {
+        self.inner.confidence_level
+    }
 
     /// Export as a single-row pandas ``DataFrame``.
     ///
-    /// Columns: ``beta``, ``std_err``, ``ci_lower``, ``ci_upper``.
+    /// Columns: ``beta``, ``std_err``, ``ci_lower``, ``ci_upper``, ``n_obs``
+    /// (``int64``), ``confidence_level``.
     ///
     /// One flat record describes one regression, so a one-row frame is the
     /// right shape: ``pd.concat([r.to_dataframe() for r in results])`` stacks
@@ -354,10 +365,16 @@ impl PyGreeksResult {
     fn adjusted_r_squared(&self) -> f64 {
         self.inner.adjusted_r_squared
     }
+    /// Number of paired observations the regression used.
+    #[getter]
+    fn n_obs(&self) -> usize {
+        self.inner.n_obs
+    }
 
     /// Export as a single-row pandas ``DataFrame``.
     ///
-    /// Columns: ``alpha``, ``beta``, ``r_squared``, ``adjusted_r_squared``.
+    /// Columns: ``alpha``, ``beta``, ``r_squared``, ``adjusted_r_squared``,
+    /// ``n_obs`` (``int64``).
     ///
     /// One flat record describes one regression, so a one-row frame is the
     /// right shape: ``pd.concat([r.to_dataframe() for r in results])`` stacks
@@ -525,13 +542,18 @@ impl PyMultiFactorResult {
     fn residual_vol(&self) -> f64 {
         self.inner.residual_vol
     }
+    /// Number of observations the regression used.
+    #[getter]
+    fn n_obs(&self) -> usize {
+        self.inner.n_obs
+    }
 
     /// Export the factor loadings as a pandas ``DataFrame``, one row per factor.
     ///
     /// Columns: ``factor``, ``beta``, ``alpha``, ``r_squared``,
-    /// ``adjusted_r_squared``, ``residual_vol``.
+    /// ``adjusted_r_squared``, ``residual_vol``, ``n_obs`` (``int64``).
     ///
-    /// The loadings are the per-row payload; the four regression-level
+    /// The loadings are the per-row payload; the five regression-level
     /// statistics repeat on every row so a single row carries its own fit
     /// context after ``pd.concat`` across tickers or ``groupby("factor")``.
     ///
@@ -595,6 +617,10 @@ impl PyMultiFactorResult {
         data.set_item(
             "residual_vol",
             PyArray1::from_vec(py, vec![self.inner.residual_vol; betas.len()]),
+        )?;
+        data.set_item(
+            "n_obs",
+            PyArray1::from_vec(py, vec![self.inner.n_obs as i64; betas.len()]),
         )?;
         dict_to_dataframe(py, &data, None)
     }
@@ -914,6 +940,14 @@ pub(super) fn beta_to_dataframe<'py>(
         "ci_upper",
         PyArray1::from_vec(py, rows.iter().map(|r| r.ci_upper).collect()),
     )?;
+    data.set_item(
+        "n_obs",
+        PyArray1::from_vec(py, rows.iter().map(|r| r.n_obs as i64).collect()),
+    )?;
+    data.set_item(
+        "confidence_level",
+        PyArray1::from_vec(py, rows.iter().map(|r| r.confidence_level).collect()),
+    )?;
     dict_to_dataframe(py, &data, index)
 }
 
@@ -944,6 +978,10 @@ pub(super) fn greeks_to_dataframe<'py>(
     data.set_item(
         "adjusted_r_squared",
         PyArray1::from_vec(py, rows.iter().map(|r| r.adjusted_r_squared).collect()),
+    )?;
+    data.set_item(
+        "n_obs",
+        PyArray1::from_vec(py, rows.iter().map(|r| r.n_obs as i64).collect()),
     )?;
     dict_to_dataframe(py, &data, index)
 }

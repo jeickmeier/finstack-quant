@@ -33,6 +33,36 @@ pub struct VmResult {
     /// Settlement date for the margin transfer
     #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
     pub settlement_date: Date,
+
+    /// CSA threshold applied symmetrically to `|gross_exposure|`, in the CSA
+    /// base currency (non-negative).
+    pub threshold: Money,
+
+    /// CSA independent amount added to the threshold-adjusted exposure to
+    /// give `net_exposure`, in the CSA base currency.
+    pub independent_amount: Money,
+
+    /// Signed collateral balance netted against `net_exposure`, exactly as
+    /// passed to the calculator: positive when the desk holds collateral,
+    /// negative when the desk has posted it.
+    pub collateral_balance: Money,
+
+    /// Signed credit support amount before the minimum-transfer test and
+    /// rounding: `net_exposure − collateral_balance`. Positive means collect
+    /// from the counterparty, negative means the desk pays (post or return).
+    pub unrounded_call: Money,
+
+    /// CSA minimum transfer amount in the CSA base currency. When
+    /// `|unrounded_call| < mta`, no transfer is made and both `post_amount`
+    /// and `collect_amount` are zero.
+    pub mta: Money,
+
+    /// CSA rounding increment in the CSA base currency. A transfer that
+    /// passes the MTA test has its magnitude rounded to a multiple of this
+    /// increment: up when `unrounded_call` has the same sign as
+    /// `net_exposure` (a delivery), down otherwise (a return). Zero disables
+    /// rounding.
+    pub rounding_increment: Money,
 }
 
 impl VmResult {
@@ -169,8 +199,8 @@ impl VmCalculator {
         }
 
         let vm_params = &self.csa.vm_params;
-        let net_exposure_money = vm_params.required_credit_support(exposure)?;
-        let net_call = vm_params.calculate_margin_call(exposure, posted_collateral)?;
+        let steps = vm_params.margin_call_steps(exposure, posted_collateral)?;
+        let net_call = steps.call;
         let post = Money::new((-net_call.amount()).max(0.0), currency)?;
         let collect = Money::new(net_call.amount().max(0.0), currency)?;
 
@@ -179,10 +209,16 @@ impl VmCalculator {
         Ok(VmResult {
             date: as_of,
             gross_exposure: exposure,
-            net_exposure: net_exposure_money,
+            net_exposure: steps.required,
             post_amount: post,
             collect_amount: collect,
             settlement_date,
+            threshold: vm_params.threshold,
+            independent_amount: vm_params.independent_amount,
+            collateral_balance: posted_collateral,
+            unrounded_call: steps.unrounded,
+            mta: vm_params.mta,
+            rounding_increment: vm_params.rounding,
         })
     }
 
@@ -444,6 +480,59 @@ mod tests {
             result.post_amount,
             Money::new(params_call.amount().abs(), Currency::USD).expect("valid money fixture")
         );
+    }
+
+    #[test]
+    fn vm_result_steps_replay_the_call() {
+        let mut csa = CsaSpec::usd_regulatory().expect("registry should load");
+        csa.vm_params.threshold = Money::from((1_000_000_i64, Currency::USD));
+        csa.vm_params.independent_amount = Money::from((250_000_i64, Currency::USD));
+        csa.vm_params.mta = Money::from((500_000_i64, Currency::USD));
+        csa.vm_params.rounding = Money::from((100_000_i64, Currency::USD));
+        let calc = VmCalculator::new(csa.clone());
+        let as_of = test_date(2025, 1, 15);
+
+        for (exposure, collateral) in [
+            (5_234_567.0, 1_000_000.0),   // delivery, rounded up
+            (1_500_000.0, 3_034_567.0),   // return, rounded down
+            (1_600_000.0, 600_000.0),     // below MTA
+            (-4_321_000.0, -1_000_000.0), // desk posts
+        ] {
+            let exposure = Money::new(exposure, Currency::USD).expect("money");
+            let collateral = Money::new(collateral, Currency::USD).expect("money");
+            let r = calc.calculate(exposure, collateral, as_of).expect("calc");
+
+            assert_eq!(r.threshold, csa.vm_params.threshold);
+            assert_eq!(r.independent_amount, csa.vm_params.independent_amount);
+            assert_eq!(r.mta, csa.vm_params.mta);
+            assert_eq!(r.rounding_increment, csa.vm_params.rounding);
+            assert_eq!(r.collateral_balance, collateral);
+
+            // gross -> threshold + IA -> net exposure
+            let gross = r.gross_exposure.amount();
+            let excess = (gross.abs() - r.threshold.amount()).max(0.0) * gross.signum();
+            assert_eq!(
+                r.net_exposure.amount(),
+                excess + r.independent_amount.amount()
+            );
+            // net exposure -> collateral -> unrounded call
+            let unrounded = r.net_exposure.amount() - r.collateral_balance.amount();
+            assert_eq!(r.unrounded_call.amount(), unrounded);
+            // MTA -> rounding -> call
+            let signed_call = r.collect_amount.amount() - r.post_amount.amount();
+            let expected = if unrounded.abs() < r.mta.amount() {
+                0.0
+            } else {
+                let units = unrounded.abs() / r.rounding_increment.amount();
+                let units = if unrounded * r.net_exposure.amount() > 0.0 {
+                    units.ceil()
+                } else {
+                    units.floor()
+                };
+                unrounded.signum() * units * r.rounding_increment.amount()
+            };
+            assert_eq!(signed_call, expected);
+        }
     }
 
     #[test]

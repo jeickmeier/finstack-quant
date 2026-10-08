@@ -396,9 +396,11 @@ pub fn wacc(
 
 /// Find the driver value that makes a target node reach a target value.
 ///
-/// Returns the serde form of the Rust `GoalSeekResult`: `solved_value` plus
-/// `model`, the input model with the solved driver written in when
-/// `update_model` is `true` and `null` otherwise. The input model is never
+/// Returns the serde form of the Rust `GoalSeekResult`: `solved_value`, the
+/// solve diagnostics (`residual` and `tolerance` in the target node's units,
+/// `evaluations`, `converged`) and `model`, the input model with the solved
+/// driver written in when `update_model` is `true` and `null` otherwise. The
+/// input model is never
 /// modified; pass `model` straight back as the `modelJson` of another call.
 ///
 /// # Errors
@@ -458,7 +460,11 @@ pub fn goal_seek(
 /// Explain a formula for a specific node and period (JSON in, structured
 /// object out).
 ///
-/// Returns the Rust `Explanation` as a structured object; a non-finite
+/// Returns the Rust `Explanation` as a structured object: `source` names the
+/// layer that produced the value (`value`, `forecast`, `formula` or
+/// `where_masked`), `forecast` carries the node's forecast spec for a
+/// forecast cell, and `breakdown` lists the formula's components (including
+/// `cs.*` references) when the formula produced the value. A non-finite
 /// `final_value` or breakdown `value` (for example a `lag` node at the first
 /// period) is the JavaScript number `NaN` or `±Infinity`. The Rust JSON form
 /// writes it as the string `"nan"`, `"inf"` or `"-inf"`.

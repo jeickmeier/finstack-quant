@@ -33,6 +33,16 @@ pub(super) fn apply(
         if let Some(vol_shift) = inputs.shifts.avg_vol_shift_abs {
             // vol_shift is already in percentage points
             let vol_amount = vega * vol_shift;
+            push_first_order_step(
+                attribution,
+                "Vol",
+                FactorWorking::Scalar {
+                    unit: MoveUnit::VolPoint,
+                    sensitivity: *vega,
+                    market_move: vol_shift,
+                },
+                vol_amount,
+            );
             attribution.vol_pnl = factor_money_or_invalid(
                 vol_amount,
                 inputs.val_t1.value.currency(),
@@ -45,6 +55,13 @@ pub(super) fn apply(
             if let Some(volga) = inputs.val_t0.measures.get(MetricId::Volga.as_str()) {
                 // Volga term: ½ × Volga × (Δσ)²
                 let volga_pnl = 0.5 * volga * vol_shift * vol_shift;
+                push_second_order_step(
+                    attribution,
+                    "Volga",
+                    MoveUnit::VolPoint,
+                    vol_shift,
+                    volga_pnl,
+                );
 
                 attribution.vol_pnl = factor_money_or_invalid(
                     attribution.vol_pnl.amount() + volga_pnl,

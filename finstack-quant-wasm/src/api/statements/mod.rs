@@ -287,7 +287,7 @@ pub fn monte_carlo_percentile_by_period(
 /// (Rust `StatementResult::to_table_long`): one row per `(node, period)` in
 /// the result's node and period declaration order.
 /// @param result_json - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
-/// @returns `TableEnvelope` with columns `node_id`, `period_id`, `value`, `value_money`, `currency`, `value_type`; monetary nodes repeat their value in `value_money` and set `currency`, scalar nodes leave both null.
+/// @returns `TableEnvelope` with columns `node_id`, `period_id`, `value`, `value_money`, `currency`, `value_type`, `source`; monetary nodes repeat their value in `value_money` and set `currency`, scalar nodes leave both null; `source` is the evaluation layer that produced the cell (`value`, `forecast`, `formula` or `where_masked`), null when the result records none.
 ///
 /// # Errors
 ///

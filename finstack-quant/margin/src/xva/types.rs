@@ -266,11 +266,118 @@ pub struct XvaResult {
     ///   counterparty credit risk exposures." `docs/REFERENCES.md#bcbs-279-saccr`
     pub effective_epe: f64,
 
+    /// Per-time-bucket terms of the CVA sum, one row per exposure-profile
+    /// node, in time order. Summing `contribution` in row order reproduces
+    /// `cva`. Empty only when deserialized from JSON written before this
+    /// field existed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cva_rows: Vec<CreditXvaRow>,
+
+    /// Per-time-bucket terms of the DVA sum, in time order; `contribution`
+    /// sums to `dva`. `Some` exactly when `dva` is `Some` (bilateral XVA).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dva_rows: Option<Vec<CreditXvaRow>>,
+
+    /// Per-time-bucket terms of the FVA sum, in time order; `contribution`
+    /// sums to `fva`. `Some` exactly when `fva` is `Some` (bilateral XVA with
+    /// a funding configuration).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fva_rows: Option<Vec<FundingXvaRow>>,
+
     /// Policy metadata stamped by the computing layer: numeric mode, active
     /// rounding context, any applied FX policy, and the parallel-execution
     /// flag.
     #[serde(default)]
     pub meta: finstack_quant_core::config::ResultsMeta,
+}
+
+/// One time bucket of a CVA or DVA sum.
+///
+/// The bucket ends at `time` and starts at the previous row's `time` (the
+/// first bucket starts at the valuation date, where survival and the discount
+/// factor are `1` and the exposure is held flat at the first profile node).
+/// The row records the factors exactly as multiplied:
+///
+/// ```text
+/// contribution = loss_given_default × exposure_mid
+///              × marginal_default_probability × discount_factor_mid
+///              × survival_weight
+/// ```
+///
+/// For CVA the defaulting party is the counterparty and the exposure is EPE;
+/// for DVA the defaulting party is the institution and the exposure is ENE
+/// net of any posted initial margin, floored at zero.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CreditXvaRow {
+    /// Bucket end in years from the valuation date.
+    pub time: f64,
+    /// Discount factor `DF(time)` read from the discount curve.
+    pub discount_factor: f64,
+    /// Survival probability `S(time)` of the defaulting party read from its
+    /// hazard curve, in `[0, 1]`.
+    pub survival_probability: f64,
+    /// Probability that the defaulting party defaults inside the bucket:
+    /// `max(S(previous time) − S(time), 0)`.
+    pub marginal_default_probability: f64,
+    /// Average of the exposure at the bucket start and end, in the exposure
+    /// profile's currency (non-negative).
+    pub exposure_mid: f64,
+    /// Average of the discount factors at the bucket start and end.
+    pub discount_factor_mid: f64,
+    /// Average over the bucket of the *other* party's survival probability
+    /// (first-to-default weighting): the institution's for CVA, the
+    /// counterparty's for DVA. Exactly `1` for a unilateral adjustment.
+    pub survival_weight: f64,
+    /// Loss given default `1 − recovery rate` of the defaulting party, as a
+    /// decimal fraction; identical on every row.
+    pub loss_given_default: f64,
+    /// This bucket's term of the adjustment, in the exposure profile's
+    /// currency (non-negative).
+    pub contribution: f64,
+}
+
+/// One time bucket of an FVA sum.
+///
+/// The bucket ends at `time` and starts at the previous row's `time` (the
+/// first bucket starts at the valuation date). The row records the factors
+/// exactly as multiplied:
+///
+/// ```text
+/// contribution = (epe_mid × funding_spread − ene_mid × funding_benefit_spread)
+///              × discount_factor_mid × dt × joint_survival_mid
+/// ```
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct FundingXvaRow {
+    /// Bucket end in years from the valuation date.
+    pub time: f64,
+    /// Bucket length in years: `time` minus the previous row's `time`.
+    pub dt: f64,
+    /// Discount factor `DF(time)` read from the discount curve.
+    pub discount_factor: f64,
+    /// Average expected positive exposure over the bucket, in the exposure
+    /// profile's currency.
+    pub epe_mid: f64,
+    /// Average expected negative exposure over the bucket, in the exposure
+    /// profile's currency (non-negative magnitude).
+    pub ene_mid: f64,
+    /// Average of the discount factors at the bucket start and end.
+    pub discount_factor_mid: f64,
+    /// Product of the bucket-average counterparty and own survival
+    /// probabilities. Exactly `1` when no hazard curves are applied.
+    pub joint_survival_mid: f64,
+    /// Funding cost spread applied to `epe_mid`, as a decimal fraction per
+    /// year (basis points / 10 000); identical on every row.
+    pub funding_spread: f64,
+    /// Funding benefit spread applied to `ene_mid`, as a decimal fraction per
+    /// year (basis points / 10 000); identical on every row.
+    pub funding_benefit_spread: f64,
+    /// This bucket's term of the FVA, in the exposure profile's currency
+    /// (positive = funding cost).
+    pub contribution: f64,
 }
 
 /// Diagnostics from exposure simulation capturing data quality metrics.

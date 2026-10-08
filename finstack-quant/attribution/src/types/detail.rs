@@ -12,6 +12,8 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+use super::result::AttributionFactor;
+
 /// Per-(curve, tenor) P&L map: keyed by `(curve_id, tenor_label)`.
 type CurveTenorPnlMap = IndexMap<(CurveId, String), Money>;
 
@@ -552,4 +554,173 @@ pub struct ScalarsAttribution {
     /// Commodity price changes.
     #[serde(default)]
     pub commodity_prices: IndexMap<CurveId, Money>,
+}
+
+/// One sequential repricing step of a waterfall attribution.
+///
+/// Rows are stored on [`crate::PnlAttribution::waterfall_steps`] in the order
+/// the waterfall applied them, so the present values chain:
+/// `steps[0].pv_before` is the opening value, each `pv_after` is the next
+/// row's `pv_before`, and the last `pv_after` is the value with every listed
+/// factor moved to T₁.
+///
+/// `step_pnl == pv_after − pv_before` for every row. The factor bucket on
+/// [`crate::PnlAttribution`] equals `step_pnl`, except
+/// [`AttributionFactor::Carry`]: the `carry` bucket is the carry row's
+/// `step_pnl` plus the period cash receipts (`total_pnl −
+/// mark_to_market_pnl`).
+///
+/// A factor the instrument does not use is not repriced and appears with
+/// `pv_after == pv_before`. When a credit-factor model replaces the single
+/// credit step with a hierarchy cascade, the cascade is one
+/// [`AttributionFactor::CreditCurves`] row spanning all of its sub-steps; the
+/// per-level amounts are in `credit_factor_detail`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct WaterfallStep {
+    /// Zero-based position of this step in the applied factor order.
+    pub step_index: usize,
+    /// Factor moved from its T₀ state to its T₁ state in this step.
+    pub factor: AttributionFactor,
+    /// Running present value before this step, in the attribution currency.
+    pub pv_before: Money,
+    /// Running present value after this step, in the attribution currency.
+    pub pv_after: Money,
+    /// P&L of this step, `pv_after − pv_before`, in the attribution currency.
+    pub step_pnl: Money,
+}
+
+/// Unit of a [`SensitivityStep`] market move; the sensitivity is a currency
+/// amount per one such unit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum MoveUnit {
+    /// One basis point (0.01%) of rate, spread or yield.
+    BasisPoint,
+    /// One volatility point (0.01 of absolute implied volatility).
+    VolPoint,
+    /// One percent relative change of the quoted level (1.0 = 1%).
+    Percent,
+    /// One unit of the quoted price or level (absolute change).
+    PriceUnit,
+}
+
+impl MoveUnit {
+    /// Return the canonical snake-case serde value for this unit.
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::BasisPoint => "basis_point",
+            Self::VolPoint => "vol_point",
+            Self::Percent => "percent",
+            Self::PriceUnit => "price_unit",
+        }
+    }
+}
+
+/// One tenor bucket of a key-rate [`SensitivityStep`].
+///
+/// The bucket's first-order P&L is `sensitivity × market_move`; the bucket
+/// products of one step sum to that step's `explained_pnl`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct SensitivityBucket {
+    /// Bucket tenor in years from the T₀ curve base date.
+    pub tenor_years: f64,
+    /// Bucket sensitivity: currency amount per one unit of the step's
+    /// `move_unit` (per basis point for key-rate DV01 / CS01).
+    pub sensitivity: Money,
+    /// Observed T₀ → T₁ market move at this tenor, in the step's `move_unit`.
+    pub market_move: f64,
+}
+
+/// The working behind one factor of a sensitivity-based (Taylor or
+/// metrics-based) attribution.
+///
+/// Rows are stored on [`crate::PnlAttribution::sensitivity_steps`] in the
+/// order the method computed them. A row's contribution to its factor bucket
+/// is `explained_pnl + gamma_pnl`. Exactly one of four shapes applies:
+///
+/// - **Scalar** (`sensitivity` and `market_move` present, `buckets` empty):
+///   `explained_pnl = sensitivity × market_move`.
+/// - **Key-rate** (`buckets` non-empty): `explained_pnl = Σ bucket
+///   sensitivity × bucket market_move`.
+/// - **Second-order only** (`market_move` present, no `sensitivity`, no
+///   `buckets`): `explained_pnl` is zero and `gamma_pnl` is the second-order
+///   term the metrics-based method computed from the T₀ convexity / gamma
+///   metric of the supplied valuation and this `market_move`.
+/// - **Repriced** (`repriced_pv` present): the factor was isolated by a full
+///   reprice instead of a sensitivity. For the Taylor `Theta` row
+///   `repriced_pv` is the value at the T₁ date on the T₀ market and
+///   `explained_pnl = (repriced_pv − pv_t0) + period cash receipts`. For every
+///   other repriced row `repriced_pv` is the T₁ value with that factor
+///   restored to its T₀ state and `explained_pnl = pv_t1 − repriced_pv`.
+///
+/// When a sensitivity or move is not finite the working is omitted (the row
+/// keeps only `factor`, `explained_pnl` and `gamma_pnl`), a note records it
+/// and the attribution is flagged invalid.
+///
+/// After a target-currency translation every amount on a row is converted at
+/// T₁ FX, so these identities still hold with one substitution: in the
+/// `Theta` identity `pv_t0 + fx_translation_pnl` stands in for `pv_t0`
+/// (which is converted at T₀ FX).
+///
+/// # Factor labels
+///
+/// | Method | Labels | Bucket |
+/// |---|---|---|
+/// | Taylor | `Rates:{curve}`, `Forward:{curve}` | `rates_curves_pnl` |
+/// | Taylor | `Credit:{curve}` | `credit_curves_pnl` |
+/// | Taylor | `Vol:{surface}`, `Vol:scalars` | `vol_pnl` |
+/// | Taylor | `Fx`, `Inflation`, `Correlations`, `MarketScalars`, `ModelParameters` | the bucket of the same name |
+/// | Taylor | `Theta` | `carry` |
+/// | Metrics-based | `Rates:{curve}`, `Rates`, `RatesConvexity` | `rates_curves_pnl` |
+/// | Metrics-based | `Credit:{curve}`, `Credit`, `CreditGamma` | `credit_curves_pnl` |
+/// | Metrics-based | `Vol`, `Volga` | `vol_pnl` |
+/// | Metrics-based | `Fx` | `fx_pnl` |
+/// | Metrics-based | `Spot`, `SpotGamma`, `Dividend` | `market_scalars_pnl` |
+/// | Metrics-based | `Inflation`, `InflationConvexity` | `inflation_curves_pnl` |
+/// | Metrics-based | `ModelParameters` | `model_params_pnl` |
+///
+/// A label without a curve id (`Rates`, `Credit`) is the aggregate fallback:
+/// one parallel sensitivity times the average move across the instrument's
+/// curves.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct SensitivityStep {
+    /// Factor label, including its market-data id where one applies
+    /// (`"Rates:USD-OIS"`, `"Credit:ACME-HZD"`, `"Vol:SPX"`, `"Fx"`,
+    /// `"Theta"`).
+    pub factor: String,
+    /// Unit of `market_move` and of the sensitivity denominator: basis points
+    /// for rates, credit, dividend-yield and inflation rows, volatility points
+    /// for volatility rows, percent for the metrics-based `Fx` row and price
+    /// units for `Spot` rows. Absent for repriced rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub move_unit: Option<MoveUnit>,
+    /// Scalar sensitivity: currency amount per one `move_unit`. Absent for
+    /// key-rate and repriced rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sensitivity: Option<Money>,
+    /// Observed T₀ → T₁ market move in `move_unit`. For a second-order-only
+    /// row this is the (averaged) move the convexity term was applied to.
+    /// Absent for key-rate and repriced rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub market_move: Option<f64>,
+    /// Per-tenor sensitivities and moves for key-rate factors; empty
+    /// otherwise.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub buckets: Vec<SensitivityBucket>,
+    /// Repriced present value used to isolate this factor, in the attribution
+    /// currency. Absent for sensitivity rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repriced_pv: Option<Money>,
+    /// First-order (or fully repriced) P&L of this factor, in the attribution
+    /// currency.
+    pub explained_pnl: Money,
+    /// Second-order (gamma / convexity / volga) P&L of this factor, in the
+    /// attribution currency. Absent when no second-order term was computed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gamma_pnl: Option<Money>,
 }

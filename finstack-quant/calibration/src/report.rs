@@ -11,6 +11,138 @@ fn default_true() -> bool {
     true
 }
 
+/// Numerical procedure that produced a [`CalibrationReport`].
+///
+/// The wire form is the snake_case variant name (for example
+/// `"sequential_bootstrap"`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum SolverMethod {
+    /// Knots solved one at a time in maturity order, each by a bracketed
+    /// one-dimensional root find on its own quote (curve bootstraps and the
+    /// piecewise Hull-White volatility bootstrap).
+    SequentialBootstrap,
+    /// All parameters solved simultaneously by weighted Levenberg-Marquardt
+    /// least squares over every quote.
+    GlobalFitLmWeightedLsq,
+    /// One independent least-squares smile fit per expiry (or per
+    /// expiry/tenor bucket), as used by the SABR and SVI surface calibrators.
+    PerSliceLeastSquares,
+    /// A single scalar parameter solved by a bracketed one-dimensional root
+    /// find (Student-t degrees of freedom).
+    ScalarRootFind,
+    /// A single scalar parameter solved by one-dimensional minimisation of
+    /// the sum of squared pricing errors (Hull-White volatility at a fixed
+    /// mean reversion).
+    ScalarMinimization,
+    /// Aggregation of the step reports of a calibration plan; no solver ran
+    /// at this level.
+    PlanExecution,
+}
+
+impl SolverMethod {
+    /// Wire name of this method, identical to its serde representation.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::SequentialBootstrap => "sequential_bootstrap",
+            Self::GlobalFitLmWeightedLsq => "global_fit_lm_weighted_lsq",
+            Self::PerSliceLeastSquares => "per_slice_least_squares",
+            Self::ScalarRootFind => "scalar_root_find",
+            Self::ScalarMinimization => "scalar_minimization",
+            Self::PlanExecution => "plan_execution",
+        }
+    }
+}
+
+/// Units of the residuals in [`CalibrationReport::residuals`],
+/// [`CalibrationReport::max_residual`] and [`CalibrationReport::rmse`].
+///
+/// The wire form is the snake_case variant name (for example
+/// `"pv_per_unit_notional"`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum ResidualUnits {
+    /// Present value of the quote's calibration instrument on the calibrated
+    /// curve, divided by the target's residual notional: a dimensionless
+    /// fraction of notional (`1e-4` is one basis point of notional). Used by
+    /// the discount, forward, hazard, inflation, cross-currency basis and
+    /// parametric curve targets.
+    PvPerUnitNotional,
+    /// Model-implied volatility minus quoted volatility, in the quote's own
+    /// volatility convention and decimal units (`0.01` is one volatility
+    /// point for lognormal quotes; normal quotes are in rate units).
+    QuotedVolatility,
+    /// Discounted tranche present value divided by the tranche notional: the
+    /// upfront error as a decimal fraction of tranche notional.
+    DiscountedUpfrontFraction,
+    /// `|residual| / step_tolerance`, dimensionless. Used by the plan-level
+    /// report, whose residual map pools steps with different native units.
+    AbsoluteResidualOverStepTolerance,
+}
+
+impl ResidualUnits {
+    /// Wire name of these units, identical to the serde representation.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::PvPerUnitNotional => "pv_per_unit_notional",
+            Self::QuotedVolatility => "quoted_volatility",
+            Self::DiscountedUpfrontFraction => "discounted_upfront_fraction",
+            Self::AbsoluteResidualOverStepTolerance => "absolute_residual_over_step_tolerance",
+        }
+    }
+}
+
+/// Smile-model parameters fitted to one expiry slice of a volatility surface.
+///
+/// The wire form is externally tagged by model: `{"sabr": {...}}` or
+/// `{"svi": {...}}`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum FittedSliceParameters {
+    /// SABR parameters (`alpha`, `beta`, `nu`, `rho` and the optional
+    /// displacement `shift`).
+    Sabr(finstack_quant_models::volatility::sabr::SabrParameters),
+    /// Raw SVI total-variance parameters (`a`, `b`, `rho`, `m`, `sigma`) in
+    /// log-moneyness `ln(K / F)`.
+    Svi(finstack_quant_models::volatility::svi::SviParams),
+}
+
+/// Parameters a surface calibrator fitted to the quotes of one expiry.
+///
+/// The SABR and SVI surface calibrators fit one smile per quoted expiry and
+/// then sample those smiles onto the surface's target grid. The gridded
+/// surface keeps only the sampled volatilities, so the fitted parameters are
+/// recorded here, one entry per quoted expiry in increasing expiry order.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct FittedSlice {
+    /// Expiry of the quotes this slice was fitted to, as an Act/365F year
+    /// fraction from the calibration base date. This is a quoted expiry, not
+    /// necessarily a node of the surface's target expiry grid.
+    pub expiry: f64,
+    /// Fitted model parameters for this expiry.
+    pub parameters: FittedSliceParameters,
+    /// Solver iterations spent on this slice (all attempted starts for SABR).
+    /// The slice iterations sum to [`CalibrationReport::iterations`].
+    pub iterations: usize,
+    /// Largest `|model − market| / market` volatility error of the fitted
+    /// smile over this slice's quotes, as a decimal fraction of the quoted
+    /// volatility (`1e-4` is 0.01%). It measures the smile fit itself; the
+    /// report's residuals measure the gridded surface instead.
+    ///
+    /// Present for SABR slices. Absent for SVI slices, whose fit reports no
+    /// per-slice error.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_relative_quote_error: Option<f64>,
+}
+
 /// Per-quote quality metrics from a calibration run.
 ///
 /// Captures the market quote, the residual left after calibration and a local
@@ -58,29 +190,33 @@ pub struct CalibrationDiagnostics {
     /// large changes in calibrated parameters.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub condition_number: Option<f64>,
-    /// Singular values of the Jacobian matrix (if computed).
+    /// Finite-difference Jacobian of the residuals at the solution.
     ///
-    /// Useful for diagnosing rank deficiency and understanding which
-    /// parameter directions are well-determined vs poorly-determined.
+    /// `jacobian[i][j]` is the derivative of the residual of quote `i` with
+    /// respect to solved parameter `j`: rows follow [`Self::per_quote`] order,
+    /// columns follow the solved parameters in knot order (for curve targets,
+    /// the knot values at increasing knot times). Entries are in the report's
+    /// residual units per unit of the solved parameter, and are unweighted;
+    /// [`Self::condition_number`] is computed from this matrix with the
+    /// residual weights applied. `per_quote[i].sensitivity` equals
+    /// `max_j |jacobian[i][j]|`.
+    ///
+    /// Present only for global (simultaneous) solves in which every parameter
+    /// bump could be priced. Absent for sequential bootstraps, which solve one
+    /// knot per quote and build no full Jacobian.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub singular_values: Option<Vec<f64>>,
+    pub jacobian: Option<Vec<Vec<f64>>>,
     /// Maximum absolute residual across all quotes.
     pub max_residual: f64,
     /// Root mean square residual across all quotes.
     pub rms_residual: f64,
-    /// Coefficient of determination (R-squared) for the fit.
-    ///
-    /// Values close to 1.0 indicate a good fit. Only meaningful when
-    /// target values have meaningful variance.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub r_squared: Option<f64>,
 }
 
 impl CalibrationDiagnostics {
     /// Compute basic diagnostics from a vector of residuals.
     ///
     /// This is a lightweight computation that does not require the Jacobian.
-    /// Condition number and singular values are left as `None`.
+    /// The condition number and the Jacobian are left as `None`.
     pub fn from_residuals(residuals: &[f64]) -> Self {
         let n = residuals.len();
         let max_residual = residuals.iter().map(|r| r.abs()).fold(0.0_f64, f64::max);
@@ -93,10 +229,9 @@ impl CalibrationDiagnostics {
         Self {
             per_quote: Vec::new(),
             condition_number: None,
-            singular_values: None,
+            jacobian: None,
             max_residual,
             rms_residual,
-            r_squared: None,
         }
     }
 }
@@ -305,6 +440,33 @@ pub struct CalibrationReport {
     /// when the numerical root-finder stops.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub success_tolerance: Option<f64>,
+
+    /// Numerical procedure that produced this report.
+    ///
+    /// Set by every calibrator in this crate. `None` only on reports built
+    /// directly through [`Self::new`] or [`Self::for_type_with_tolerance`]
+    /// without a solver, and on JSON written before this field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub solver_method: Option<SolverMethod>,
+
+    /// Units of [`Self::residuals`], [`Self::max_residual`] and [`Self::rmse`].
+    ///
+    /// Set by every calibrator in this crate and mirrored as the
+    /// `residual_units` entry of [`Self::metadata`]. `None` only on reports
+    /// built directly through [`Self::new`] or
+    /// [`Self::for_type_with_tolerance`] without a solver, and on JSON
+    /// written before this field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub residual_units: Option<ResidualUnits>,
+
+    /// Smile parameters fitted per quoted expiry, in increasing expiry order.
+    ///
+    /// Populated by the equity SABR (`vol_surface`) and SVI (`svi_surface`)
+    /// surface calibrators, whose gridded output surface does not retain the
+    /// fitted parameters. Empty for every other calibrator, including the
+    /// swaption SABR cube, which stores its node parameters on the cube.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fitted_slices: Vec<FittedSlice>,
 }
 
 impl CalibrationReport {
@@ -381,6 +543,9 @@ impl CalibrationReport {
             worst_quote_id,
             worst_quote_residual,
             success_tolerance: None,
+            solver_method: None,
+            residual_units: None,
+            fitted_slices: Vec::new(),
         }
     }
 
@@ -458,6 +623,47 @@ impl CalibrationReport {
     /// Update metadata key-value pair on an existing report.
     pub fn update_metadata(&mut self, key: impl Into<String>, value: impl Into<String>) {
         self.metadata.insert(key.into(), value.into());
+    }
+
+    /// Attach the smile parameters fitted per quoted expiry.
+    ///
+    /// # Arguments
+    ///
+    /// * `fitted_slices` - One entry per quoted expiry, in increasing expiry
+    ///   order; stored in [`Self::fitted_slices`].
+    #[must_use]
+    pub fn with_fitted_slices(mut self, fitted_slices: Vec<FittedSlice>) -> Self {
+        self.fitted_slices = fitted_slices;
+        self
+    }
+
+    /// Record the numerical procedure that produced this report.
+    ///
+    /// # Arguments
+    ///
+    /// * `method` - Solver procedure stored in [`Self::solver_method`].
+    #[must_use]
+    pub fn with_solver_method(mut self, method: SolverMethod) -> Self {
+        self.solver_method = Some(method);
+        self
+    }
+
+    /// Record the units of this report's residuals.
+    ///
+    /// Sets [`Self::residual_units`] and mirrors the wire name into the
+    /// `residual_units` metadata entry so the typed field and the metadata
+    /// cannot disagree.
+    ///
+    /// # Arguments
+    ///
+    /// * `units` - Units of [`Self::residuals`], [`Self::max_residual`] and
+    ///   [`Self::rmse`].
+    #[must_use]
+    pub fn with_residual_units(mut self, units: ResidualUnits) -> Self {
+        self.residual_units = Some(units);
+        self.metadata
+            .insert("residual_units".to_string(), units.as_str().to_string());
+        self
     }
 
     /// Attach the typed success-gate tolerance used to determine [`Self::success`].
@@ -690,10 +896,9 @@ mod tests {
         report.diagnostics = Some(CalibrationDiagnostics {
             per_quote: vec![measured],
             condition_number: None,
-            singular_values: None,
+            jacobian: None,
             max_residual: 1e-6,
             rms_residual: 1e-6,
-            r_squared: None,
         });
         let rows = report.quote_rows();
         assert_eq!(rows.len(), 1);
@@ -845,10 +1050,9 @@ mod tests {
                 },
             ],
             condition_number: Some(1234.5),
-            singular_values: Some(vec![100.0, 50.0, 0.1]),
+            jacobian: Some(vec![vec![5.2, 0.1], vec![0.0, 8.3]]),
             max_residual: 2e-7,
             rms_residual: 1.58e-7,
-            r_squared: Some(0.9999),
         };
 
         let json = serde_json::to_string(&diagnostics).expect("Serialization should succeed");
@@ -862,16 +1066,11 @@ mod tests {
         assert!((deser.per_quote[1].sensitivity - 8.3).abs() < 1e-10);
         assert!((deser.condition_number.expect("condition_number") - 1234.5).abs() < 1e-10);
         assert_eq!(
-            deser
-                .singular_values
-                .as_ref()
-                .expect("singular_values")
-                .len(),
-            3
+            deser.jacobian.as_ref().expect("jacobian"),
+            &vec![vec![5.2, 0.1], vec![0.0, 8.3]]
         );
         assert!((deser.max_residual - 2e-7).abs() < 1e-15);
         assert!((deser.rms_residual - 1.58e-7).abs() < 1e-15);
-        assert!((deser.r_squared.expect("r_squared") - 0.9999).abs() < 1e-10);
     }
 
     #[test]
@@ -879,23 +1078,20 @@ mod tests {
         let diagnostics = CalibrationDiagnostics {
             per_quote: vec![],
             condition_number: None,
-            singular_values: None,
+            jacobian: None,
             max_residual: 0.0,
             rms_residual: 0.0,
-            r_squared: None,
         };
 
         let json = serde_json::to_string(&diagnostics).expect("Serialization should succeed");
         // Verify that None fields are skipped in JSON.
         assert!(!json.contains("condition_number"));
-        assert!(!json.contains("singular_values"));
-        assert!(!json.contains("r_squared"));
+        assert!(!json.contains("jacobian"));
 
         let deser: CalibrationDiagnostics =
             serde_json::from_str(&json).expect("Deserialization should succeed");
         assert!(deser.condition_number.is_none());
-        assert!(deser.singular_values.is_none());
-        assert!(deser.r_squared.is_none());
+        assert!(deser.jacobian.is_none());
     }
 
     #[test]
@@ -965,10 +1161,9 @@ mod tests {
                 sensitivity: 1.0,
             }],
             condition_number: Some(42.0),
-            singular_values: None,
+            jacobian: None,
             max_residual: 1e-10,
             rms_residual: 1e-10,
-            r_squared: None,
         };
 
         let report =
@@ -1130,5 +1325,63 @@ mod tests {
             report.metadata.get("type"),
             Some(&"yield_curve".to_string())
         );
+    }
+
+    #[test]
+    fn solver_method_and_residual_units_wire_names_match_serde() {
+        for method in [
+            SolverMethod::SequentialBootstrap,
+            SolverMethod::GlobalFitLmWeightedLsq,
+            SolverMethod::PerSliceLeastSquares,
+            SolverMethod::ScalarRootFind,
+            SolverMethod::ScalarMinimization,
+            SolverMethod::PlanExecution,
+        ] {
+            let json = serde_json::to_string(&method).expect("serialize method");
+            assert_eq!(json, format!("\"{}\"", method.as_str()));
+        }
+        for units in [
+            ResidualUnits::PvPerUnitNotional,
+            ResidualUnits::QuotedVolatility,
+            ResidualUnits::DiscountedUpfrontFraction,
+            ResidualUnits::AbsoluteResidualOverStepTolerance,
+        ] {
+            let json = serde_json::to_string(&units).expect("serialize units");
+            assert_eq!(json, format!("\"{}\"", units.as_str()));
+        }
+    }
+
+    #[test]
+    fn typed_method_and_units_round_trip_and_mirror_metadata() {
+        let residuals = BTreeMap::from([("Q1".to_string(), 1e-10)]);
+        let report = CalibrationReport::for_type_with_tolerance("yield_curve", residuals, 3, 1e-8)
+            .with_solver_method(SolverMethod::SequentialBootstrap)
+            .with_residual_units(ResidualUnits::PvPerUnitNotional);
+        assert_eq!(
+            report.metadata.get("residual_units").map(String::as_str),
+            Some("pv_per_unit_notional")
+        );
+
+        let json = serde_json::to_value(&report).expect("serialize report");
+        assert_eq!(json["solver_method"], "sequential_bootstrap");
+        assert_eq!(json["residual_units"], "pv_per_unit_notional");
+        let restored: CalibrationReport = serde_json::from_value(json).expect("deserialize");
+        assert_eq!(
+            restored.solver_method,
+            Some(SolverMethod::SequentialBootstrap)
+        );
+        assert_eq!(
+            restored.residual_units,
+            Some(ResidualUnits::PvPerUnitNotional)
+        );
+
+        // Reports written before the typed fields existed still deserialize.
+        let mut legacy = serde_json::to_value(&report).expect("serialize report");
+        let object = legacy.as_object_mut().expect("report object");
+        object.remove("solver_method");
+        object.remove("residual_units");
+        let restored: CalibrationReport = serde_json::from_value(legacy).expect("legacy report");
+        assert!(restored.solver_method.is_none());
+        assert!(restored.residual_units.is_none());
     }
 }

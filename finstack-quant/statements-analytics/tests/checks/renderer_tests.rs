@@ -30,7 +30,9 @@ fn sample_report() -> CheckReport {
                 NodeId::new("total_assets"),
                 NodeId::new("total_liabilities"),
             ],
+            comparison: None,
         }],
+        comparisons: Vec::new(),
     };
 
     let warning_result = CheckResult {
@@ -45,7 +47,9 @@ fn sample_report() -> CheckReport {
             period: Some(PeriodId::quarter(2025, 2).expect("valid period fixture")),
             materiality: None,
             nodes: vec![NodeId::new("debt"), NodeId::new("ebitda")],
+            comparison: None,
         }],
+        comparisons: Vec::new(),
     };
 
     let passing_result = CheckResult {
@@ -54,6 +58,7 @@ fn sample_report() -> CheckReport {
         category: CheckCategory::DataQuality,
         passed: true,
         findings: vec![],
+        comparisons: Vec::new(),
     };
 
     CheckReport {

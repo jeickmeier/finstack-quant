@@ -288,6 +288,10 @@ impl BootstrapTarget for XccyBasisTarget {
             .build_for_solver()
     }
 
+    fn residual_units(&self) -> crate::report::ResidualUnits {
+        crate::report::ResidualUnits::PvPerUnitNotional
+    }
+
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
         // Normalize the instrument PV to a per-unit-notional residual.
         self.scratch.with_curve(curve, |ctx| {

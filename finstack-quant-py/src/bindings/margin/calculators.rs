@@ -3,7 +3,7 @@
 use super::types::{PyCsaSpec, PyImMethodology};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::{
-    dict_to_dataframe, serde_rows_to_dataframe_with_schema, ColumnSchema,
+    dict_to_dataframe, serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
 };
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_core::currency::Currency;
@@ -92,6 +92,46 @@ impl PyVmResult {
         self.inner.net_margin().amount()
     }
 
+    /// CSA threshold applied symmetrically to ``|gross_exposure|``.
+    #[getter]
+    fn threshold(&self) -> f64 {
+        self.inner.threshold.amount()
+    }
+
+    /// CSA independent amount added to the threshold-adjusted exposure.
+    #[getter]
+    fn independent_amount(&self) -> f64 {
+        self.inner.independent_amount.amount()
+    }
+
+    /// Signed collateral balance netted against ``net_exposure`` (positive =
+    /// held by us, negative = posted by us).
+    #[getter]
+    fn collateral_balance(&self) -> f64 {
+        self.inner.collateral_balance.amount()
+    }
+
+    /// Signed call before the MTA test and rounding:
+    /// ``net_exposure - collateral_balance`` (positive = collect).
+    #[getter]
+    fn unrounded_call(&self) -> f64 {
+        self.inner.unrounded_call.amount()
+    }
+
+    /// CSA minimum transfer amount; no transfer when
+    /// ``abs(unrounded_call) < mta``.
+    #[getter]
+    fn mta(&self) -> f64 {
+        self.inner.mta.amount()
+    }
+
+    /// CSA rounding increment applied to a transfer that passes the MTA test
+    /// (up for a delivery, down for a return; zero disables rounding).
+    #[getter]
+    fn rounding_increment(&self) -> f64 {
+        self.inner.rounding_increment.amount()
+    }
+
     /// CSA base currency of every amount.
     #[getter]
     fn currency(&self) -> String {
@@ -107,12 +147,18 @@ impl PyVmResult {
     /// Export the result as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``date``, ``settlement_date`` (ISO 8601 strings),
-    /// ``gross_exposure``, ``net_exposure``, ``post_amount``,
-    /// ``collect_amount``, ``net_margin``, ``requires_call``, ``currency``.
+    /// ``gross_exposure``, ``threshold``, ``independent_amount``,
+    /// ``net_exposure``, ``collateral_balance``, ``unrounded_call``, ``mta``,
+    /// ``rounding_increment``, ``post_amount``, ``collect_amount``,
+    /// ``net_margin``, ``requires_call``, ``currency``.
     ///
     /// All amount columns are floats in the single CSA currency reported by
     /// ``currency``; positive ``post_amount`` means we post margin and
-    /// positive ``collect_amount`` means we receive margin back.
+    /// positive ``collect_amount`` means we receive margin back. The columns
+    /// from ``gross_exposure`` to ``rounding_increment`` are in calculation
+    /// order: threshold and independent amount turn the gross exposure into
+    /// ``net_exposure``, subtracting ``collateral_balance`` gives
+    /// ``unrounded_call``, and the MTA test and rounding give the transfer.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         data.set_item("date", vec![self.inner.date.to_string()])?;
@@ -121,7 +167,22 @@ impl PyVmResult {
             vec![self.inner.settlement_date.to_string()],
         )?;
         data.set_item("gross_exposure", vec![self.inner.gross_exposure.amount()])?;
+        data.set_item("threshold", vec![self.inner.threshold.amount()])?;
+        data.set_item(
+            "independent_amount",
+            vec![self.inner.independent_amount.amount()],
+        )?;
         data.set_item("net_exposure", vec![self.inner.net_exposure.amount()])?;
+        data.set_item(
+            "collateral_balance",
+            vec![self.inner.collateral_balance.amount()],
+        )?;
+        data.set_item("unrounded_call", vec![self.inner.unrounded_call.amount()])?;
+        data.set_item("mta", vec![self.inner.mta.amount()])?;
+        data.set_item(
+            "rounding_increment",
+            vec![self.inner.rounding_increment.amount()],
+        )?;
         data.set_item("post_amount", vec![self.inner.post_amount.amount()])?;
         data.set_item("collect_amount", vec![self.inner.collect_amount.amount()])?;
         data.set_item("net_margin", vec![self.inner.net_margin().amount()])?;
@@ -443,6 +504,21 @@ impl PyImResult {
     #[getter]
     fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.as_of)
+    }
+
+    /// SIMM aggregation detail as a nested dict, or ``None`` for results not
+    /// produced by the SIMM calculator.
+    ///
+    /// Keys: ``components`` (one per breakdown key, each with ``component``,
+    /// ``risk_class``, ``historical_volatility_ratio``, ``margin`` and
+    /// ``buckets``; a bucket has ``bucket``, ``k``, ``signed_sum`` and
+    /// ``weighted_sensitivities`` rows of ``risk_factor``, ``tenor``,
+    /// ``sensitivity``, ``risk_weight``, ``concentration_factor``,
+    /// ``weighted_sensitivity``), ``risk_class_margins`` and ``mpor_scale``.
+    /// Margins are before the MPOR scale.
+    #[getter]
+    fn simm_detail<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.simm_detail)
     }
 
     /// Breakdown component labels present (see the class docstring for the

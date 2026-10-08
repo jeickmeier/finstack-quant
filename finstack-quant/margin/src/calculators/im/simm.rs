@@ -45,7 +45,10 @@
 
 mod curvature;
 
-use crate::calculators::traits::{ImCalculator, ImResult};
+use crate::calculators::traits::{
+    ImCalculator, ImResult, SimmBucketDetail, SimmComponentDetail, SimmDetail,
+    SimmWeightedSensitivity,
+};
 use crate::registry::{
     embedded_registry, margin_registry_from_config, validate_simm_params, MarginRegistry,
     SimmParams,
@@ -166,6 +169,102 @@ fn fx_category(currency: Currency) -> &'static str {
 
 fn concentration(raw_sensitivity: f64, threshold: f64) -> f64 {
     (raw_sensitivity.abs() / threshold).sqrt().max(1.0)
+}
+
+/// Optional collector for per-bucket aggregation detail. `None` on the
+/// margin-only paths, so they build no detail rows.
+type BucketSink<'a> = Option<&'a mut Vec<SimmBucketDetail>>;
+
+/// Serde label of a credit sector, used as its bucket label.
+fn sector_label(sector: SimmCreditSector) -> String {
+    finstack_quant_core::wire::serde_label(&sector).unwrap_or_else(|_| format!("{sector:?}"))
+}
+
+/// Accumulates [`SimmComponentDetail`] rows while the margin is aggregated.
+struct DetailCollector {
+    enabled: bool,
+    /// Buckets of the component currently being aggregated.
+    scratch: Vec<SimmBucketDetail>,
+    components: Vec<SimmComponentDetail>,
+    curvature: Vec<SimmComponentDetail>,
+}
+
+impl DetailCollector {
+    fn new(enabled: bool) -> Self {
+        Self {
+            enabled,
+            scratch: Vec::new(),
+            components: Vec::new(),
+            curvature: Vec::new(),
+        }
+    }
+
+    /// Bucket sink for the next delta or vega component, or `None` when off.
+    fn sink(&mut self) -> BucketSink<'_> {
+        self.enabled.then_some(&mut self.scratch)
+    }
+
+    /// Component sink for the curvature pass, or `None` when off.
+    fn curvature_sink(&mut self) -> Option<&mut Vec<SimmComponentDetail>> {
+        self.enabled.then_some(&mut self.curvature)
+    }
+
+    /// Close the component whose buckets were just written to [`Self::sink`].
+    /// Components with no positive margin are dropped, matching `breakdown`.
+    fn record(
+        &mut self,
+        component: &str,
+        risk_class: SimmRiskClass,
+        historical_volatility_ratio: f64,
+        margin: f64,
+    ) {
+        let buckets = std::mem::take(&mut self.scratch);
+        if self.enabled && margin > 0.0 {
+            self.components.push(SimmComponentDetail {
+                component: component.to_owned(),
+                risk_class,
+                historical_volatility_ratio,
+                buckets,
+                margin,
+            });
+        }
+    }
+
+    fn finish(
+        mut self,
+        risk_class_margins: &HashMap<SimmRiskClass, f64>,
+        mpor_scale: f64,
+    ) -> Option<SimmDetail> {
+        if !self.enabled {
+            return None;
+        }
+        self.curvature.retain(|component| component.margin > 0.0);
+        self.curvature.sort_by_key(|component| component.risk_class);
+        self.components.append(&mut self.curvature);
+        Some(SimmDetail {
+            components: self.components,
+            risk_class_margins: risk_class_margins.iter().map(|(k, v)| (*k, *v)).collect(),
+            mpor_scale,
+        })
+    }
+}
+
+/// Single-bucket detail: `K_b` is the component margin itself.
+fn single_bucket(
+    bucket: &str,
+    weighted_sensitivities: Vec<SimmWeightedSensitivity>,
+    k: f64,
+) -> SimmBucketDetail {
+    let sum: f64 = weighted_sensitivities
+        .iter()
+        .map(|row| row.weighted_sensitivity)
+        .sum();
+    SimmBucketDetail {
+        bucket: bucket.to_owned(),
+        weighted_sensitivities,
+        k,
+        signed_sum: sum.clamp(-k, k),
+    }
 }
 
 // Lookup helpers for SimmParams fields.
@@ -432,11 +531,17 @@ impl SimmCalculator {
     fn calculate_ir_delta_multi_currency(
         &self,
         ir_delta: &HashMap<(Currency, String), f64>,
+        detail: BucketSink<'_>,
     ) -> f64 {
-        self.aggregate_ir(ir_delta, false)
+        self.aggregate_ir(ir_delta, false, detail)
     }
 
-    fn aggregate_ir(&self, sensitivities: &HashMap<(Currency, String), f64>, vega: bool) -> f64 {
+    fn aggregate_ir(
+        &self,
+        sensitivities: &HashMap<(Currency, String), f64>,
+        vega: bool,
+        mut detail: BucketSink<'_>,
+    ) -> f64 {
         let mut by_currency: std::collections::BTreeMap<Currency, Vec<(&str, f64)>> =
             std::collections::BTreeMap::new();
         for ((currency, tenor), amount) in sensitivities {
@@ -461,7 +566,7 @@ impl SimmCalculator {
                     "high" => &self.params.ir_delta_weights_high,
                     _ => &self.params.ir_delta_weights,
                 };
-                let weighted: Vec<_> = entries
+                let rows: Vec<(usize, &str, f64, f64)> = entries
                     .iter()
                     .filter_map(|(tenor, amount)| {
                         let index = *self.ir_corr_matrix.tenor_to_idx.get(*tenor)?;
@@ -470,11 +575,36 @@ impl SimmCalculator {
                         } else {
                             weights[*tenor]
                         };
-                        Some((index, amount * weight * cf))
+                        Some((index, *tenor, *amount, weight))
                     })
+                    .collect();
+                let weighted: Vec<_> = rows
+                    .iter()
+                    .map(|(index, _, amount, weight)| (*index, amount * weight * cf))
                     .collect();
                 let k = self.ir_tenor_norm(&weighted);
                 let signed = weighted.iter().map(|(_, ws)| ws).sum::<f64>().clamp(-k, k);
+                if let Some(sink) = detail.as_deref_mut() {
+                    sink.push(SimmBucketDetail {
+                        bucket: currency.to_string(),
+                        weighted_sensitivities: rows
+                            .iter()
+                            .zip(&weighted)
+                            .map(
+                                |((_, tenor, amount, weight), (_, ws))| SimmWeightedSensitivity {
+                                    risk_factor: currency.to_string(),
+                                    tenor: Some((*tenor).to_owned()),
+                                    sensitivity: *amount,
+                                    risk_weight: *weight,
+                                    concentration_factor: cf,
+                                    weighted_sensitivity: *ws,
+                                },
+                            )
+                            .collect(),
+                        k,
+                        signed_sum: signed,
+                    });
+                }
                 (k, signed, cf)
             })
             .collect();
@@ -514,8 +644,12 @@ impl SimmCalculator {
     /// # Arguments
     ///
     /// * `ir_vega` - Map of (currency, tenor) to signed IR vega sensitivity.
-    fn calculate_ir_vega_multi_currency(&self, ir_vega: &HashMap<(Currency, String), f64>) -> f64 {
-        self.aggregate_ir(ir_vega, true)
+    fn calculate_ir_vega_multi_currency(
+        &self,
+        ir_vega: &HashMap<(Currency, String), f64>,
+        detail: BucketSink<'_>,
+    ) -> f64 {
+        self.aggregate_ir(ir_vega, true, detail)
     }
 
     /// Calculate credit qualifying delta margin with bucket-level aggregation.
@@ -547,11 +681,13 @@ impl SimmCalculator {
     fn calculate_credit_qualifying_delta(
         &self,
         bucketed_delta: &HashMap<(SimmCreditSector, String, String), f64>,
+        detail: BucketSink<'_>,
     ) -> f64 {
         self.aggregate_credit_qualifying(
             bucketed_delta,
             |sector| self.params.cq_bucket_weight(sector),
             true,
+            detail,
         )
     }
 
@@ -575,9 +711,10 @@ impl SimmCalculator {
     fn calculate_credit_qualifying_vega(
         &self,
         bucketed_vega: &HashMap<(SimmCreditSector, String, String), f64>,
+        detail: BucketSink<'_>,
     ) -> f64 {
         let weight = self.params.cq_vega_weight;
-        self.aggregate_credit_qualifying(bucketed_vega, |_| weight, false)
+        self.aggregate_credit_qualifying(bucketed_vega, |_| weight, false, detail)
     }
 
     /// Credit aggregation with concentration netted by issuer before weighting.
@@ -586,6 +723,7 @@ impl SimmCalculator {
         bucketed: &HashMap<(SimmCreditSector, String, String), f64>,
         weight_for: impl Fn(SimmCreditSector) -> f64,
         delta: bool,
+        detail: BucketSink<'_>,
     ) -> f64 {
         let mut by_sector: HashMap<SimmCreditSector, Vec<(&str, &str, f64)>> = HashMap::default();
         for ((sector, issuer, tenor), amount) in bucketed {
@@ -596,6 +734,7 @@ impl SimmCalculator {
         }
         let mut buckets = Vec::new();
         let mut residual = 0.0;
+        let mut bucket_details: Vec<(SimmCreditSector, SimmBucketDetail)> = Vec::new();
         for (sector, mut entries) in by_sector {
             entries.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
             let mut raw_by_name: HashMap<&str, f64> = HashMap::default();
@@ -626,11 +765,38 @@ impl SimmCalculator {
                 };
                 rho * factors[i].min(factors[j]) / factors[i].max(factors[j])
             });
+            let signed = ws.iter().sum::<f64>().clamp(-k, k);
+            if detail.is_some() {
+                bucket_details.push((
+                    sector,
+                    SimmBucketDetail {
+                        bucket: sector_label(sector),
+                        weighted_sensitivities: entries
+                            .iter()
+                            .zip(factors.iter().zip(&ws))
+                            .map(|((name, tenor, raw), (cf, ws))| SimmWeightedSensitivity {
+                                risk_factor: (*name).to_owned(),
+                                tenor: Some((*tenor).to_owned()),
+                                sensitivity: *raw,
+                                risk_weight: weight_for(sector),
+                                concentration_factor: *cf,
+                                weighted_sensitivity: *ws,
+                            })
+                            .collect(),
+                        k,
+                        signed_sum: signed,
+                    },
+                ));
+            }
             if sector == SimmCreditSector::Residual {
                 residual = k;
             } else {
-                buckets.push((sector, k, ws.iter().sum::<f64>().clamp(-k, k)));
+                buckets.push((sector, k, signed));
             }
+        }
+        if let Some(sink) = detail {
+            bucket_details.sort_by_key(|(sector, _)| *sector as u8);
+            sink.extend(bucket_details.into_iter().map(|(_, bucket)| bucket));
         }
         buckets.sort_by_key(|(sector, _, _)| *sector as u8);
         let values: Vec<_> = buckets.iter().map(|(_, k, s)| (*k, *s)).collect();
@@ -650,11 +816,60 @@ impl SimmCalculator {
     /// # Returns
     ///
     /// The weighted equity delta margin contribution.
-    fn calculate_equity_delta(&self, equity_delta: f64) -> f64 {
-        (equity_delta
-            * self.params.equity_delta_weight
-            * self.concentration_factor(SimmRiskClass::Equity, equity_delta))
-        .abs()
+    fn calculate_equity_delta(&self, equity_delta: f64) -> (f64, f64, f64) {
+        let weight = self.params.equity_delta_weight;
+        let cf = self.concentration_factor(SimmRiskClass::Equity, equity_delta);
+        (weight, cf, equity_delta * weight * cf)
+    }
+
+    /// Equity delta or vega margin across names (zero inter-name correlation).
+    ///
+    /// Each name's margin is the absolute value of its weighted sensitivity;
+    /// the margins are summed in ascending order so the result does not
+    /// depend on map iteration order.
+    fn equity_margin(
+        &self,
+        by_name: &HashMap<String, f64>,
+        vega: bool,
+        detail: BucketSink<'_>,
+    ) -> f64 {
+        let mut rows: Vec<(&str, f64, (f64, f64, f64))> = by_name
+            .iter()
+            .map(|(name, amount)| {
+                let weighted = if vega {
+                    self.calculate_equity_vega(*amount)
+                } else {
+                    self.calculate_equity_delta(*amount)
+                };
+                (name.as_str(), *amount, weighted)
+            })
+            .collect();
+        rows.sort_by(|a, b| {
+            a.2 .2
+                .abs()
+                .total_cmp(&b.2 .2.abs())
+                .then_with(|| a.0.cmp(b.0))
+        });
+        let margins: Vec<f64> = rows.iter().map(|(_, _, (_, _, ws))| ws.abs()).collect();
+        if let Some(sink) = detail {
+            sink.extend(
+                rows.iter()
+                    .map(|(name, amount, (weight, cf, ws))| SimmBucketDetail {
+                        bucket: (*name).to_owned(),
+                        weighted_sensitivities: vec![SimmWeightedSensitivity {
+                            risk_factor: (*name).to_owned(),
+                            tenor: None,
+                            sensitivity: *amount,
+                            risk_weight: *weight,
+                            concentration_factor: *cf,
+                            weighted_sensitivity: *ws,
+                        }],
+                        k: ws.abs(),
+                        signed_sum: *ws,
+                    }),
+            );
+        }
+        correlated_norm(&margins, |_, _| 0.0)
     }
 
     /// Calculate FX delta margin across currency risk factors.
@@ -663,7 +878,11 @@ impl SimmCalculator {
     /// independently, then aggregated with the SIMM FX intra-bucket correlation
     /// between distinct currency risk factors. This prevents opposite-signed
     /// currency deltas from receiving full rho=1 offset.
-    fn calculate_fx_delta_bucketed(&self, fx_delta: &HashMap<Currency, f64>) -> f64 {
+    fn calculate_fx_delta_bucketed(
+        &self,
+        fx_delta: &HashMap<Currency, f64>,
+        detail: BucketSink<'_>,
+    ) -> f64 {
         let mut entries: Vec<_> = fx_delta
             .iter()
             .filter(|(currency, _)| **currency != Currency::USD)
@@ -677,12 +896,12 @@ impl SimmCalculator {
                     *raw,
                     self.params.fx_delta_concentration_thresholds[fx_category(*currency)],
                 );
-                (*currency, raw * weight * cf, cf)
+                (*currency, raw * weight * cf, cf, *raw, weight)
             })
             .collect();
-        entries.sort_by_key(|(currency, _, _)| *currency);
-        let ws: Vec<_> = entries.iter().map(|(_, ws, _)| *ws).collect();
-        correlated_norm(&ws, |i, j| {
+        entries.sort_by_key(|(currency, ..)| *currency);
+        let ws: Vec<_> = entries.iter().map(|(_, ws, ..)| *ws).collect();
+        let margin = correlated_norm(&ws, |i, j| {
             let rho = match (
                 fx_high_volatility(entries[i].0),
                 fx_high_volatility(entries[j].0),
@@ -692,7 +911,22 @@ impl SimmCalculator {
                 _ => self.params.fx_regular_high_correlation,
             };
             rho * entries[i].2.min(entries[j].2) / entries[i].2.max(entries[j].2)
-        })
+        });
+        if let Some(sink) = detail {
+            let rows = entries
+                .iter()
+                .map(|(currency, ws, cf, raw, weight)| SimmWeightedSensitivity {
+                    risk_factor: currency.to_string(),
+                    tenor: None,
+                    sensitivity: *raw,
+                    risk_weight: *weight,
+                    concentration_factor: *cf,
+                    weighted_sensitivity: *ws,
+                })
+                .collect();
+            sink.push(single_bucket("fx", rows, margin));
+        }
+        margin
     }
 
     /// Calculate commodity delta margin using SIMM bucket risk weights.
@@ -704,8 +938,12 @@ impl SimmCalculator {
     /// # Returns
     ///
     /// The commodity delta margin contribution after bucket weighting and inter-bucket correlation.
-    fn calculate_commodity_delta(&self, delta_by_bucket: &HashMap<String, f64>) -> f64 {
-        self.aggregate_commodity(delta_by_bucket, false)
+    fn calculate_commodity_delta(
+        &self,
+        delta_by_bucket: &HashMap<String, f64>,
+        detail: BucketSink<'_>,
+    ) -> f64 {
+        self.aggregate_commodity(delta_by_bucket, false, detail)
     }
 
     /// Calculate commodity vega margin using the SIMM commodity bucket structure.
@@ -722,15 +960,24 @@ impl SimmCalculator {
     /// # Returns
     ///
     /// The commodity vega margin contribution after inter-bucket correlation.
-    fn calculate_commodity_vega(&self, vega_by_bucket: &HashMap<String, f64>) -> f64 {
-        self.aggregate_commodity(vega_by_bucket, true)
+    fn calculate_commodity_vega(
+        &self,
+        vega_by_bucket: &HashMap<String, f64>,
+        detail: BucketSink<'_>,
+    ) -> f64 {
+        self.aggregate_commodity(vega_by_bucket, true, detail)
     }
 
     /// Shared commodity bucket aggregation for the delta and vega risk classes.
     ///
     /// Buckets whose label does not resolve to a SIMM commodity bucket id are
     /// dropped, matching the delta behaviour prior to this refactor.
-    fn aggregate_commodity(&self, by_bucket: &HashMap<String, f64>, vega: bool) -> f64 {
+    fn aggregate_commodity(
+        &self,
+        by_bucket: &HashMap<String, f64>,
+        vega: bool,
+        detail: BucketSink<'_>,
+    ) -> f64 {
         let mut canonical: std::collections::BTreeMap<u8, Vec<f64>> =
             std::collections::BTreeMap::new();
         for (bucket, amount) in by_bucket {
@@ -743,7 +990,8 @@ impl SimmCalculator {
             .map(|(bucket, mut amounts)| {
                 amounts.sort_by(f64::total_cmp);
                 let key = bucket.to_string();
-                let raw = amounts.iter().sum::<f64>()
+                let net = amounts.iter().sum::<f64>();
+                let raw = net
                     * if vega {
                         self.params.commodity_historical_volatility_ratio
                     } else {
@@ -759,28 +1007,53 @@ impl SimmCalculator {
                 } else {
                     self.params.commodity_bucket_weights[&key]
                 };
-                (bucket, raw * weight * concentration(raw, threshold))
+                let cf = concentration(raw, threshold);
+                (bucket, raw * weight * cf, net, weight, cf)
             })
             .collect();
-        let ws: Vec<_> = entries.iter().map(|(_, ws)| *ws).collect();
+        let ws: Vec<_> = entries.iter().map(|(_, ws, ..)| *ws).collect();
+        if let Some(sink) = detail {
+            sink.extend(
+                entries
+                    .iter()
+                    .map(|(bucket, ws, net, weight, cf)| SimmBucketDetail {
+                        bucket: bucket.to_string(),
+                        weighted_sensitivities: vec![SimmWeightedSensitivity {
+                            risk_factor: bucket.to_string(),
+                            tenor: None,
+                            sensitivity: *net,
+                            risk_weight: *weight,
+                            concentration_factor: *cf,
+                            weighted_sensitivity: *ws,
+                        }],
+                        k: ws.abs(),
+                        signed_sum: *ws,
+                    }),
+            );
+        }
         correlated_norm(&ws, |i, j| {
             self.params
                 .commodity_inter_bucket_correlation(entries[i].0, entries[j].0)
         })
     }
 
-    /// Calculate equity vega margin from a signed currency vega amount.
-    fn calculate_equity_vega(&self, total_vega: f64) -> f64 {
+    /// Weighted equity vega sensitivity from a signed currency vega amount,
+    /// as `(risk weight, concentration factor, weighted sensitivity)`.
+    fn calculate_equity_vega(&self, total_vega: f64) -> (f64, f64, f64) {
         let raw = total_vega * self.params.equity_historical_volatility_ratio;
-        (raw * self.params.equity_vega_weight
-            * concentration(
-                raw,
-                self.params.vega_concentration_thresholds[&SimmRiskClass::Equity],
-            ))
-        .abs()
+        let weight = self.params.equity_vega_weight;
+        let cf = concentration(
+            raw,
+            self.params.vega_concentration_thresholds[&SimmRiskClass::Equity],
+        );
+        (weight, cf, raw * weight * cf)
     }
 
-    fn fx_vega_bucketed(&self, inputs: &HashMap<(Currency, Currency), f64>) -> f64 {
+    fn fx_vega_bucketed(
+        &self,
+        inputs: &HashMap<(Currency, Currency), f64>,
+        detail: BucketSink<'_>,
+    ) -> f64 {
         let mut pairs: std::collections::BTreeMap<(Currency, Currency), Vec<f64>> =
             std::collections::BTreeMap::new();
         for ((a, b), value) in inputs {
@@ -793,20 +1066,41 @@ impl SimmCalculator {
             .into_iter()
             .map(|((a, b), mut amounts)| {
                 amounts.sort_by(f64::total_cmp);
-                let raw = amounts.iter().sum::<f64>() * self.params.fx_historical_volatility_ratio;
-                let (a, b) = (fx_category(a), fx_category(b));
-                let key = format!("{}_{}", a.min(b), a.max(b));
+                let net = amounts.iter().sum::<f64>();
+                let raw = net * self.params.fx_historical_volatility_ratio;
+                let (cat_a, cat_b) = (fx_category(a), fx_category(b));
+                let key = format!("{}_{}", cat_a.min(cat_b), cat_a.max(cat_b));
                 let cf = concentration(raw, self.params.fx_vega_concentration_thresholds[&key]);
-                (raw * self.params.fx_vega_weight * cf, cf)
+                (raw * self.params.fx_vega_weight * cf, cf, (a, b), net)
             })
             .collect();
-        let ws: Vec<_> = entries.iter().map(|(ws, _)| *ws).collect();
-        correlated_norm(&ws, |i, j| {
+        let ws: Vec<_> = entries.iter().map(|(ws, ..)| *ws).collect();
+        let margin = correlated_norm(&ws, |i, j| {
             0.5 * entries[i].1.min(entries[j].1) / entries[i].1.max(entries[j].1)
-        })
+        });
+        if let Some(sink) = detail {
+            let rows = entries
+                .iter()
+                .map(|(ws, cf, (a, b), net)| SimmWeightedSensitivity {
+                    risk_factor: format!("{a}/{b}"),
+                    tenor: None,
+                    sensitivity: *net,
+                    risk_weight: self.params.fx_vega_weight,
+                    concentration_factor: *cf,
+                    weighted_sensitivity: *ws,
+                })
+                .collect();
+            sink.push(single_bucket("fx", rows, margin));
+        }
+        margin
     }
 
-    fn non_qualifying_margin(&self, inputs: &HashMap<(String, String), f64>, vega: bool) -> f64 {
+    fn non_qualifying_margin(
+        &self,
+        inputs: &HashMap<(String, String), f64>,
+        vega: bool,
+        detail: BucketSink<'_>,
+    ) -> f64 {
         let mut entries: Vec<_> = inputs.iter().collect();
         entries.sort_by(|a, b| a.0.cmp(b.0));
         let mut raw_by_name: HashMap<&str, f64> = HashMap::default();
@@ -832,9 +1126,25 @@ impl SimmCalculator {
             .zip(&cf)
             .map(|((_, raw), cf)| **raw * weight * cf)
             .collect();
-        correlated_norm(&ws, |i, j| {
+        let margin = correlated_norm(&ws, |i, j| {
             self.params.credit_residual_correlation * cf[i].min(cf[j]) / cf[i].max(cf[j])
-        })
+        });
+        if let Some(sink) = detail {
+            let rows = entries
+                .iter()
+                .zip(cf.iter().zip(&ws))
+                .map(|(((name, tenor), raw), (cf, ws))| SimmWeightedSensitivity {
+                    risk_factor: name.clone(),
+                    tenor: Some(tenor.clone()),
+                    sensitivity: **raw,
+                    risk_weight: weight,
+                    concentration_factor: *cf,
+                    weighted_sensitivity: *ws,
+                })
+                .collect();
+            sink.push(single_bucket("residual", rows, margin));
+        }
+        margin
     }
 
     /// Calculate concentration add-on for a risk class.
@@ -911,6 +1221,20 @@ impl SimmCalculator {
         sensitivities: &SimmSensitivities,
         currency: Currency,
     ) -> finstack_quant_core::Result<(f64, HashMap<String, Money>)> {
+        let (total_im, breakdown, _) = self.calculate_detailed(sensitivities, currency, false)?;
+        Ok((total_im, breakdown))
+    }
+
+    /// Shared SIMM aggregation behind both public entry points.
+    ///
+    /// `want_detail` selects whether the per-bucket aggregation detail is
+    /// recorded; the margin arithmetic is identical either way.
+    fn calculate_detailed(
+        &self,
+        sensitivities: &SimmSensitivities,
+        currency: Currency,
+        want_detail: bool,
+    ) -> finstack_quant_core::Result<(f64, HashMap<String, Money>, Option<SimmDetail>)> {
         sensitivities.validate()?;
         if currency != sensitivities.base_currency || currency != Currency::USD {
             return Err(finstack_quant_core::Error::Validation(
@@ -919,10 +1243,13 @@ impl SimmCalculator {
         }
         let mut breakdown = HashMap::default();
         let mut risk_class_margins = HashMap::default();
+        let mut detail = DetailCollector::new(want_detail);
 
         // IR Delta — per-currency calculation with inter-currency aggregation
         if !sensitivities.ir_delta.is_empty() {
-            let ir_margin = self.calculate_ir_delta_multi_currency(&sensitivities.ir_delta);
+            let ir_margin =
+                self.calculate_ir_delta_multi_currency(&sensitivities.ir_delta, detail.sink());
+            detail.record("IR_Delta", SimmRiskClass::InterestRate, 1.0, ir_margin);
             if ir_margin > 0.0 {
                 breakdown.insert("IR_Delta".to_string(), Money::new(ir_margin, currency)?);
                 risk_class_margins.insert(SimmRiskClass::InterestRate, ir_margin);
@@ -931,7 +1258,9 @@ impl SimmCalculator {
 
         // IR Vega
         if !sensitivities.ir_vega.is_empty() {
-            let ir_vega_margin = self.calculate_ir_vega_multi_currency(&sensitivities.ir_vega);
+            let ir_vega_margin =
+                self.calculate_ir_vega_multi_currency(&sensitivities.ir_vega, detail.sink());
+            detail.record("IR_Vega", SimmRiskClass::InterestRate, 1.0, ir_vega_margin);
             if ir_vega_margin > 0.0 {
                 breakdown.insert("IR_Vega".to_string(), Money::new(ir_vega_margin, currency)?);
                 *risk_class_margins
@@ -942,8 +1271,16 @@ impl SimmCalculator {
 
         // Credit Delta (Qualifying): mandatory ISDA SIMM sector aggregation.
         if !sensitivities.credit_qualifying_delta.is_empty() {
-            let credit_margin =
-                self.calculate_credit_qualifying_delta(&sensitivities.credit_qualifying_delta);
+            let credit_margin = self.calculate_credit_qualifying_delta(
+                &sensitivities.credit_qualifying_delta,
+                detail.sink(),
+            );
+            detail.record(
+                "Credit_Qualifying_Delta",
+                SimmRiskClass::CreditQualifying,
+                1.0,
+                credit_margin,
+            );
             if credit_margin > 0.0 {
                 breakdown.insert(
                     "Credit_Qualifying_Delta".to_string(),
@@ -955,8 +1292,16 @@ impl SimmCalculator {
 
         // Credit Vega (Qualifying): same sector buckets as the delta path.
         if !sensitivities.credit_qualifying_vega.is_empty() {
-            let credit_vega_margin =
-                self.calculate_credit_qualifying_vega(&sensitivities.credit_qualifying_vega);
+            let credit_vega_margin = self.calculate_credit_qualifying_vega(
+                &sensitivities.credit_qualifying_vega,
+                detail.sink(),
+            );
+            detail.record(
+                "Credit_Qualifying_Vega",
+                SimmRiskClass::CreditQualifying,
+                1.0,
+                credit_vega_margin,
+            );
             if credit_vega_margin > 0.0 {
                 breakdown.insert(
                     "Credit_Qualifying_Vega".to_string(),
@@ -969,21 +1314,46 @@ impl SimmCalculator {
         }
 
         // Names without classification use the official residual buckets.
-        let cnq_delta =
-            self.non_qualifying_margin(&sensitivities.credit_non_qualifying_delta, false);
-        let cnq_vega = self.non_qualifying_margin(&sensitivities.credit_non_qualifying_vega, true);
-        let mut equity_deltas: Vec<_> = sensitivities
-            .equity_delta
-            .values()
-            .map(|v| self.calculate_equity_delta(*v))
-            .collect();
-        let mut equity_vegas: Vec<_> = sensitivities
-            .equity_vega
-            .values()
-            .map(|v| self.calculate_equity_vega(*v))
-            .collect();
-        equity_deltas.sort_by(f64::total_cmp);
-        equity_vegas.sort_by(f64::total_cmp);
+        let cnq_delta = self.non_qualifying_margin(
+            &sensitivities.credit_non_qualifying_delta,
+            false,
+            detail.sink(),
+        );
+        detail.record(
+            "Credit_NonQualifying_Delta",
+            SimmRiskClass::CreditNonQualifying,
+            1.0,
+            cnq_delta,
+        );
+        let cnq_vega = self.non_qualifying_margin(
+            &sensitivities.credit_non_qualifying_vega,
+            true,
+            detail.sink(),
+        );
+        detail.record(
+            "Credit_NonQualifying_Vega",
+            SimmRiskClass::CreditNonQualifying,
+            1.0,
+            cnq_vega,
+        );
+        let equity_delta = self.equity_margin(&sensitivities.equity_delta, false, detail.sink());
+        detail.record("Equity_Delta", SimmRiskClass::Equity, 1.0, equity_delta);
+        let equity_vega = self.equity_margin(&sensitivities.equity_vega, true, detail.sink());
+        detail.record(
+            "Equity_Vega",
+            SimmRiskClass::Equity,
+            self.params.equity_historical_volatility_ratio,
+            equity_vega,
+        );
+        let fx_delta = self.calculate_fx_delta_bucketed(&sensitivities.fx_delta, detail.sink());
+        detail.record("FX_Delta", SimmRiskClass::Fx, 1.0, fx_delta);
+        let fx_vega = self.fx_vega_bucketed(&sensitivities.fx_vega, detail.sink());
+        detail.record(
+            "FX_Vega",
+            SimmRiskClass::Fx,
+            self.params.fx_historical_volatility_ratio,
+            fx_vega,
+        );
         for (class, label, margin) in [
             (
                 SimmRiskClass::CreditNonQualifying,
@@ -995,26 +1365,10 @@ impl SimmCalculator {
                 "Credit_NonQualifying_Vega",
                 cnq_vega,
             ),
-            (
-                SimmRiskClass::Equity,
-                "Equity_Delta",
-                correlated_norm(&equity_deltas, |_, _| 0.0),
-            ),
-            (
-                SimmRiskClass::Equity,
-                "Equity_Vega",
-                correlated_norm(&equity_vegas, |_, _| 0.0),
-            ),
-            (
-                SimmRiskClass::Fx,
-                "FX_Delta",
-                self.calculate_fx_delta_bucketed(&sensitivities.fx_delta),
-            ),
-            (
-                SimmRiskClass::Fx,
-                "FX_Vega",
-                self.fx_vega_bucketed(&sensitivities.fx_vega),
-            ),
+            (SimmRiskClass::Equity, "Equity_Delta", equity_delta),
+            (SimmRiskClass::Equity, "Equity_Vega", equity_vega),
+            (SimmRiskClass::Fx, "FX_Delta", fx_delta),
+            (SimmRiskClass::Fx, "FX_Vega", fx_vega),
         ] {
             if margin > 0.0 {
                 breakdown.insert(label.to_owned(), Money::new(margin, currency)?);
@@ -1024,7 +1378,14 @@ impl SimmCalculator {
 
         // Commodity Delta
         if !sensitivities.commodity_delta.is_empty() {
-            let commodity_margin = self.calculate_commodity_delta(&sensitivities.commodity_delta);
+            let commodity_margin =
+                self.calculate_commodity_delta(&sensitivities.commodity_delta, detail.sink());
+            detail.record(
+                "Commodity_Delta",
+                SimmRiskClass::Commodity,
+                1.0,
+                commodity_margin,
+            );
             if commodity_margin > 0.0 {
                 breakdown.insert(
                     "Commodity_Delta".to_string(),
@@ -1037,7 +1398,13 @@ impl SimmCalculator {
         // Commodity Vega
         if !sensitivities.commodity_vega.is_empty() {
             let commodity_vega_margin =
-                self.calculate_commodity_vega(&sensitivities.commodity_vega);
+                self.calculate_commodity_vega(&sensitivities.commodity_vega, detail.sink());
+            detail.record(
+                "Commodity_Vega",
+                SimmRiskClass::Commodity,
+                self.params.commodity_historical_volatility_ratio,
+                commodity_vega_margin,
+            );
             if commodity_vega_margin > 0.0 {
                 breakdown.insert(
                     "Commodity_Vega".to_string(),
@@ -1050,7 +1417,9 @@ impl SimmCalculator {
         }
 
         // Curvature contributes within each risk class before class correlation.
-        for (class, margin) in self.curvature_by_risk_class(&sensitivities.curvature)? {
+        for (class, margin) in
+            self.curvature_by_risk_class(&sensitivities.curvature, detail.curvature_sink())?
+        {
             if margin > 0.0 {
                 breakdown.insert(format!("{class}_Curvature"), Money::new(margin, currency)?);
                 *risk_class_margins.entry(class).or_insert(0.0) += margin;
@@ -1067,7 +1436,8 @@ impl SimmCalculator {
             *value = value.checked_mul_f64(mpor_scale)?;
         }
 
-        Ok((total_im, breakdown))
+        let detail = detail.finish(&risk_class_margins, mpor_scale);
+        Ok((total_im, breakdown, detail))
     }
 
     /// Calculate indicative historical SIMM v2.6 from explicit sensitivities.
@@ -1101,8 +1471,7 @@ impl SimmCalculator {
         currency: Currency,
         as_of: Date,
     ) -> Result<ImResult> {
-        let (amount, breakdown) =
-            self.calculate_from_sensitivities_parts(sensitivities, currency)?;
+        let (amount, breakdown, detail) = self.calculate_detailed(sensitivities, currency, true)?;
         let mut result = ImResult::with_breakdown(
             Money::new(amount, currency)?,
             ImMethodology::Simm,
@@ -1111,6 +1480,7 @@ impl SimmCalculator {
             breakdown,
         );
         result.approximation = true;
+        result.simm_detail = detail;
         Ok(result)
     }
 
@@ -1223,7 +1593,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        let ir_margin = calc.calculate_ir_delta_multi_currency(&usd_tenors(&dv01_by_tenor));
+        let ir_margin = calc.calculate_ir_delta_multi_currency(&usd_tenors(&dv01_by_tenor), None);
 
         // ISDA SIMM v2.6 D.1 p14: regular-currency 5Y weight is 60bp.
         assert!((ir_margin - 100_000.0 * 60.0).abs() < 1.0);
@@ -1234,7 +1604,7 @@ mod tests {
         let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry should load");
 
         let cs01 = 50_000.0;
-        let cnq_margin = calc.non_qualifying_margin(&single_credit(cs01), false);
+        let cnq_margin = calc.non_qualifying_margin(&single_credit(cs01), false, None);
 
         // ISDA SIMM v2.6 F.1 p18: unclassified non-qualifying credit
         // uses the 1300bp residual weight, below the USD500K/bp threshold.
@@ -1248,7 +1618,7 @@ mod tests {
         fx_delta.insert(Currency::EUR, 100.0);
         fx_delta.insert(Currency::JPY, -100.0);
 
-        let actual = calc.calculate_fx_delta_bucketed(&fx_delta);
+        let actual = calc.calculate_fx_delta_bucketed(&fx_delta, None);
         let expected = 100.0 * calc.params.fx_delta_weight;
 
         assert!(
@@ -1324,7 +1694,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        let ir_margin = calc.calculate_ir_delta_multi_currency(&usd_tenors(&dv01_by_tenor));
+        let ir_margin = calc.calculate_ir_delta_multi_currency(&usd_tenors(&dv01_by_tenor), None);
 
         // ws_5y = 100K*51 = 5.1M, ws_10y = -80K*51 = -4.08M
         // With high tenor correlation (~0.96), the hedge offsets most of the risk
@@ -1340,7 +1710,8 @@ mod tests {
         let vega_by_tenor: HashMap<String, f64> =
             [("5Y".to_string(), 500_000.0)].into_iter().collect();
 
-        let ir_vega_margin = calc.calculate_ir_vega_multi_currency(&usd_tenors(&vega_by_tenor));
+        let ir_vega_margin =
+            calc.calculate_ir_vega_multi_currency(&usd_tenors(&vega_by_tenor), None);
         // D.1 paragraph 35: single tenor uses VRW 0.23; no IR vega HVR.
         assert!((ir_vega_margin - 115_000.0).abs() < 1.0);
     }
@@ -1360,9 +1731,10 @@ mod tests {
             .expect("M-15: IR vega margin should be present")
             .amount();
 
-        let single_currency_margin = calc.calculate_ir_vega_multi_currency(&usd_tenors(
-            &[("5Y".to_string(), 500_000.0)].into_iter().collect(),
-        ));
+        let single_currency_margin = calc.calculate_ir_vega_multi_currency(
+            &usd_tenors(&[("5Y".to_string(), 500_000.0)].into_iter().collect()),
+            None,
+        );
         assert!(
             ir_vega_margin > single_currency_margin,
             "M-15: same-tenor multi-currency IR vega must not collapse to one exposure"
@@ -1394,8 +1766,11 @@ mod tests {
         let ir = 500.0 * z2 / 0.47_f64.powi(2);
         let equity = 250.0 * z2;
         let expected = (ir * ir + equity * equity + 2.0 * 0.07 * ir * equity).sqrt();
-        let actual =
-            calc.aggregate_risk_classes(&calc.curvature_by_risk_class(&inputs).expect("curvature"));
+        let actual = calc.aggregate_risk_classes(
+            &calc
+                .curvature_by_risk_class(&inputs, None)
+                .expect("curvature"),
+        );
         assert!((actual - expected).abs() < 1e-9, "{actual} != {expected}");
     }
 
@@ -1407,7 +1782,7 @@ mod tests {
                 .into_iter()
                 .collect();
 
-        let actual = calc.calculate_commodity_delta(&delta_by_bucket);
+        let actual = calc.calculate_commodity_delta(&delta_by_bucket, None);
         let bucket_2 = 100_000.0 * calc.params.commodity_bucket_weights["2"];
         let bucket_3 = -100_000.0 * calc.params.commodity_bucket_weights["3"];
         let rho_23 = 0.92_f64;
@@ -1529,7 +1904,7 @@ mod tests {
         // Bucketed path: single name in one bucket.
         let mut bucketed: HashMap<(SimmCreditSector, String, String), f64> = HashMap::default();
         bucketed.insert((sector, "ISSUER_A".to_string(), "5Y".to_string()), cs01);
-        let bucketed_margin = calc.calculate_credit_qualifying_delta(&bucketed);
+        let bucketed_margin = calc.calculate_credit_qualifying_delta(&bucketed, None);
 
         let expected = (raw_ws * cf).abs();
         assert!(
@@ -1581,7 +1956,7 @@ mod tests {
             ),
             cs01_per_name,
         );
-        let bucketed_margin = calc.calculate_credit_qualifying_delta(&bucketed);
+        let bucketed_margin = calc.calculate_credit_qualifying_delta(&bucketed, None);
         let gross_weighted: f64 = bucketed
             .iter()
             .map(|((sector, _, _), cs01)| (cs01 * calc.params.cq_bucket_weight(*sector)).abs())
@@ -1629,7 +2004,7 @@ mod tests {
         let mut bucketed: HashMap<(SimmCreditSector, String, String), f64> = HashMap::default();
         bucketed.insert((sector_a, "GOVT_A".to_string(), "5Y".to_string()), cs01_a);
         bucketed.insert((sector_b, "BANK_A".to_string(), "5Y".to_string()), cs01_b);
-        let actual = calc.calculate_credit_qualifying_delta(&bucketed);
+        let actual = calc.calculate_credit_qualifying_delta(&bucketed, None);
 
         assert!(
             (actual - expected).abs() < 1.0,
@@ -1664,7 +2039,7 @@ mod tests {
         let mut bucketed: HashMap<(SimmCreditSector, String, String), f64> = HashMap::default();
         bucketed.insert((sector, "BANK_A".to_string(), "5Y".to_string()), cs01_1);
         bucketed.insert((sector, "BANK_B".to_string(), "5Y".to_string()), cs01_2);
-        let actual = calc.calculate_credit_qualifying_delta(&bucketed);
+        let actual = calc.calculate_credit_qualifying_delta(&bucketed, None);
 
         assert!(
             (actual - expected).abs() < 1.0,
@@ -1690,7 +2065,7 @@ mod tests {
         );
 
         // The bucketed margin should match the direct bucketed calculation.
-        let expected = calc.calculate_credit_qualifying_delta(&sens.credit_qualifying_delta);
+        let expected = calc.calculate_credit_qualifying_delta(&sens.credit_qualifying_delta, None);
         let actual = breakdown
             .get("Credit_Qualifying_Delta")
             .expect("CQ delta breakdown entry")
@@ -1851,11 +2226,17 @@ mod tests {
         assert!(!breakdown.contains_key("Commodity_Vega"));
 
         assert_eq!(
-            calc.calculate_credit_qualifying_vega(&HashMap::default()),
+            calc.calculate_credit_qualifying_vega(&HashMap::default(), None),
             0.0
         );
-        assert_eq!(calc.non_qualifying_margin(&single_credit(0.0), true), 0.0);
-        assert_eq!(calc.calculate_commodity_vega(&HashMap::default()), 0.0);
+        assert_eq!(
+            calc.non_qualifying_margin(&single_credit(0.0), true, None),
+            0.0
+        );
+        assert_eq!(
+            calc.calculate_commodity_vega(&HashMap::default(), None),
+            0.0
+        );
     }
 
     /// A single name / single bucket reduces to `|vega * VRW|` for each of the
@@ -1874,15 +2255,16 @@ mod tests {
             25_000.0,
         );
         let expected_cq = 25_000.0 * calc.params.cq_vega_weight;
-        assert!((calc.calculate_credit_qualifying_vega(&cq) - expected_cq).abs() < 1e-6);
+        assert!((calc.calculate_credit_qualifying_vega(&cq, None) - expected_cq).abs() < 1e-6);
 
         let expected_cnq = 15_000.0 * calc.params.cnq_vega_weight;
         assert!(
-            (calc.non_qualifying_margin(&single_credit(15_000.0), true) - expected_cnq).abs()
+            (calc.non_qualifying_margin(&single_credit(15_000.0), true, None) - expected_cnq).abs()
                 < 1e-6
         );
         assert!(
-            (calc.non_qualifying_margin(&single_credit(-15_000.0), true) - expected_cnq).abs()
+            (calc.non_qualifying_margin(&single_credit(-15_000.0), true, None) - expected_cnq)
+                .abs()
                 < 1e-6,
             "vega margin is sign-insensitive, matching the delta path"
         );
@@ -1890,7 +2272,9 @@ mod tests {
         let mut commodity: HashMap<String, f64> = HashMap::default();
         commodity.insert("Crude".to_string(), 20_000.0);
         let expected_commodity = 20_000.0 * 0.74 * calc.params.commodity_vega_weight;
-        assert!((calc.calculate_commodity_vega(&commodity) - expected_commodity).abs() < 1e-6);
+        assert!(
+            (calc.calculate_commodity_vega(&commodity, None) - expected_commodity).abs() < 1e-6
+        );
     }
 
     #[test]
@@ -1940,5 +2324,270 @@ mod tests {
                 .collect::<std::collections::BTreeMap<_, _>>(),
             result.breakdown
         );
+    }
+
+    fn detail_fixture() -> SimmSensitivities {
+        let mut sens = SimmSensitivities::new(Currency::USD);
+        sens.add_ir_delta(Currency::USD, "2Y", 4.0e9); // breaches the concentration threshold
+        sens.add_ir_delta(Currency::USD, "10Y", -2.5e9);
+        sens.add_ir_delta(Currency::EUR, "5Y", 60_000.0);
+        sens.add_ir_delta(Currency::JPY, "5Y", -45_000.0);
+        sens.add_ir_vega(Currency::USD, "5Y", 500_000.0);
+        sens.add_ir_vega(Currency::EUR, "10Y", -200_000.0);
+        sens.add_credit_qualifying_delta(SimmCreditSector::Financial, "BANK_A", "5Y", 30_000.0);
+        sens.add_credit_qualifying_delta(SimmCreditSector::Financial, "BANK_B", "5Y", -12_000.0);
+        sens.add_credit_qualifying_delta(SimmCreditSector::Sovereign, "SOV_A", "10Y", 9_000.0);
+        sens.add_credit_qualifying_delta(SimmCreditSector::Residual, "UNRATED", "5Y", 2_000.0);
+        sens.add_credit_qualifying_vega(SimmCreditSector::Financial, "BANK_A", "5Y", 7_000.0);
+        sens.add_credit_non_qualifying_delta("RMBS_1", "5Y", 15_000.0);
+        sens.add_credit_non_qualifying_delta("RMBS_2", "5Y", -4_000.0);
+        sens.add_credit_non_qualifying_vega("RMBS_1", "5Y", 3_000.0);
+        sens.add_equity_delta("AAPL", 100_000.0);
+        sens.add_equity_delta("MSFT", -70_000.0);
+        sens.add_equity_vega("AAPL", 40_000.0);
+        sens.add_fx_delta(Currency::EUR, 400_000.0);
+        sens.add_fx_delta(Currency::BRL, -150_000.0);
+        sens.add_fx_vega(Currency::EUR, Currency::USD, 90_000.0);
+        sens.add_fx_vega(Currency::USD, Currency::JPY, -35_000.0);
+        sens.add_commodity_delta("2", 80_000.0);
+        sens.add_commodity_delta("12", -30_000.0);
+        sens.add_commodity_vega("2", 20_000.0);
+        sens.add_curvature(SimmCurvatureSensitivity {
+            risk_class: SimmRiskClass::InterestRate,
+            bucket: "USD".into(),
+            factor: "OIS".into(),
+            risk_tenor: Some("5Y".into()),
+            expiry_tenor: "2W".into(),
+            volatility_weighted_vega: 1000.0,
+        });
+        sens.add_curvature(SimmCurvatureSensitivity {
+            risk_class: SimmRiskClass::Equity,
+            bucket: "residual".into(),
+            factor: "ACME".into(),
+            risk_tenor: None,
+            expiry_tenor: "2W".into(),
+            volatility_weighted_vega: 500.0,
+        });
+        sens
+    }
+
+    fn close(actual: f64, expected: f64) -> bool {
+        (actual - expected).abs() <= 1e-9 * expected.abs().max(1.0)
+    }
+
+    #[test]
+    fn simm_detail_rebuilds_breakdown_and_total() {
+        let calc = SimmCalculator::new(SimmVersion::V2_6)
+            .expect("registry should load")
+            .with_mpor(20);
+        let sens = detail_fixture();
+        let as_of = Date::from_calendar_date(2025, time::Month::January, 15).expect("date");
+        let result = calc
+            .calculate_from_sensitivities(&sens, Currency::USD, as_of)
+            .expect("SIMM");
+        let detail = result.simm_detail.as_ref().expect("SIMM detail");
+
+        // Recording detail does not move any number.
+        let (total, breakdown) = calc
+            .calculate_from_sensitivities_parts(&sens, Currency::USD)
+            .expect("parts");
+        assert_eq!(
+            result.amount,
+            Money::new(total, Currency::USD).expect("money")
+        );
+        assert_eq!(
+            result.breakdown,
+            breakdown
+                .into_iter()
+                .collect::<std::collections::BTreeMap<_, _>>()
+        );
+
+        // One component per breakdown key; margin × MPOR scale is the breakdown amount.
+        assert!(close(detail.mpor_scale, 2.0_f64.sqrt()));
+        let mut labels: Vec<&str> = detail
+            .components
+            .iter()
+            .map(|c| c.component.as_str())
+            .collect();
+        labels.sort_unstable();
+        assert_eq!(
+            labels,
+            result
+                .breakdown
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            labels.len(),
+            14,
+            "every delta, vega and curvature component"
+        );
+        let mut by_class: std::collections::BTreeMap<SimmRiskClass, f64> =
+            std::collections::BTreeMap::new();
+        for component in &detail.components {
+            assert!(close(
+                component.margin * detail.mpor_scale,
+                result.breakdown[&component.component].amount()
+            ));
+            *by_class.entry(component.risk_class).or_insert(0.0) += component.margin;
+
+            // Weighted sensitivities replay from their recorded inputs.
+            for bucket in &component.buckets {
+                let mut sum = 0.0;
+                for row in &bucket.weighted_sensitivities {
+                    let hvr = if component.component.ends_with("_Curvature") {
+                        1.0
+                    } else {
+                        component.historical_volatility_ratio
+                    };
+                    assert!(close(
+                        row.weighted_sensitivity,
+                        row.sensitivity * hvr * row.risk_weight * row.concentration_factor
+                    ));
+                    assert!(row.concentration_factor >= 1.0);
+                    sum += row.weighted_sensitivity;
+                }
+                assert!(close(bucket.signed_sum, sum.clamp(-bucket.k, bucket.k)));
+            }
+        }
+
+        // Risk-class margins are the component sums; the total is their correlated norm.
+        assert_eq!(
+            by_class.keys().collect::<Vec<_>>(),
+            detail.risk_class_margins.keys().collect::<Vec<_>>()
+        );
+        for (class, margin) in &detail.risk_class_margins {
+            assert!(close(*margin, by_class[class]));
+        }
+        let classes: Vec<(SimmRiskClass, f64)> = detail
+            .risk_class_margins
+            .iter()
+            .map(|(class, margin)| (*class, *margin))
+            .collect();
+        let mut variance = 0.0;
+        for (a, k_a) in &classes {
+            for (b, k_b) in &classes {
+                variance += calc.params.correlation(*a, *b) * k_a * k_b;
+            }
+        }
+        assert!(close(
+            variance.sqrt() * detail.mpor_scale,
+            result.amount.amount()
+        ));
+
+        let component = |label: &str| {
+            detail
+                .components
+                .iter()
+                .find(|c| c.component == label)
+                .unwrap_or_else(|| panic!("{label} detail"))
+        };
+
+        // IR delta: bucket K from the tenor correlations, then the currency aggregation.
+        let ir = component("IR_Delta");
+        let mut currencies: Vec<&str> = ir.buckets.iter().map(|b| b.bucket.as_str()).collect();
+        currencies.sort_unstable();
+        assert_eq!(currencies, ["EUR", "JPY", "USD"]);
+        let mut ir_buckets = Vec::new();
+        for bucket in &ir.buckets {
+            let rows = &bucket.weighted_sensitivities;
+            let mut k2 = 0.0;
+            for a in rows {
+                for b in rows {
+                    let rho = match (&a.tenor, &b.tenor) {
+                        (Some(x), Some(y)) if x == y => 1.0,
+                        (Some(x), Some(y)) => {
+                            calc.params.ir_tenor_correlations[&ordered_tenor_pair(x, y)]
+                        }
+                        _ => unreachable!("IR rows carry tenors"),
+                    };
+                    k2 += rho * a.weighted_sensitivity * b.weighted_sensitivity;
+                }
+            }
+            assert!(close(bucket.k, k2.sqrt()));
+            ir_buckets.push((bucket.k, bucket.signed_sum, rows[0].concentration_factor));
+        }
+        assert!(close(ir.margin, calc.aggregate_ir_currencies(&ir_buckets)));
+        let usd = ir
+            .buckets
+            .iter()
+            .find(|b| b.bucket == "USD")
+            .expect("USD bucket");
+        assert!(
+            usd.weighted_sensitivities[0].concentration_factor > 1.0,
+            "the USD position breaches its concentration threshold"
+        );
+
+        // Equity delta: one bucket per name, no correlation between names.
+        let equity = component("Equity_Delta");
+        assert_eq!(equity.buckets.len(), 2);
+        let equity_k2: f64 = equity.buckets.iter().map(|b| b.k * b.k).sum();
+        assert!(close(equity.margin, equity_k2.sqrt()));
+
+        // Commodity delta: one net factor per bucket, correlated across buckets.
+        let commodity = component("Commodity_Delta");
+        let mut commodity_k2 = 0.0;
+        for a in &commodity.buckets {
+            for b in &commodity.buckets {
+                let rho = if a.bucket == b.bucket {
+                    1.0
+                } else {
+                    calc.params.commodity_inter_bucket_correlation(
+                        a.bucket.parse().expect("bucket id"),
+                        b.bucket.parse().expect("bucket id"),
+                    )
+                };
+                commodity_k2 += rho * a.signed_sum * b.signed_sum;
+            }
+        }
+        assert!(close(commodity.margin, commodity_k2.sqrt()));
+
+        // Credit qualifying: sector buckets plus the residual bucket added outside the norm.
+        let cq = component("Credit_Qualifying_Delta");
+        assert_eq!(
+            cq.buckets
+                .iter()
+                .map(|b| b.bucket.as_str())
+                .collect::<Vec<_>>(),
+            ["sovereign", "financial", "residual"]
+        );
+        let (sov, fin, residual) = (&cq.buckets[0], &cq.buckets[1], &cq.buckets[2]);
+        let gamma = calc
+            .params
+            .cq_inter_bucket_correlation(SimmCreditSector::Sovereign, SimmCreditSector::Financial);
+        let cq_expected = residual.k
+            + (sov.k * sov.k + fin.k * fin.k + 2.0 * gamma * sov.signed_sum * fin.signed_sum)
+                .sqrt();
+        assert!(close(cq.margin, cq_expected));
+
+        // Single-bucket components: the bucket K is the component margin.
+        for label in [
+            "Credit_NonQualifying_Delta",
+            "Credit_NonQualifying_Vega",
+            "FX_Delta",
+            "FX_Vega",
+        ] {
+            let single = component(label);
+            assert_eq!(single.buckets.len(), 1);
+            assert_eq!(single.buckets[0].k, single.margin);
+        }
+        assert_eq!(
+            component("FX_Vega").historical_volatility_ratio,
+            calc.params.fx_historical_volatility_ratio
+        );
+
+        // The detail survives the wire and is absent for other methodologies.
+        let json = serde_json::to_string(&result).expect("serialize");
+        let back: ImResult = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(
+            back.simm_detail.map(|d| d.components.len()),
+            Some(detail.components.len())
+        );
+        let schedule = ImResult::simple(result.amount, ImMethodology::Schedule, as_of, 10);
+        assert!(schedule.simm_detail.is_none());
+        assert!(!serde_json::to_string(&schedule)
+            .expect("serialize")
+            .contains("simm_detail"));
     }
 }

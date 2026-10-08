@@ -67,6 +67,7 @@ impl Check for MissingValueCheck {
                         period: Some(period.id),
                         materiality: None,
                         nodes: vec![node.clone()],
+                        comparison: None,
                     });
                 }
             }
@@ -80,6 +81,7 @@ impl Check for MissingValueCheck {
             category: self.category(),
             passed,
             findings,
+            comparisons: Vec::new(),
         })
     }
 }

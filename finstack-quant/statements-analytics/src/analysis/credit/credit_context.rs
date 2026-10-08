@@ -152,6 +152,11 @@ pub struct CreditNumeratorNodes<'a> {
 ///             fees: Money::from((0_i64, Currency::USD)),
 ///             debt_balance: Money::from((4_000_000_i64, Currency::USD)),
 ///             accrued_interest: Money::from((0_i64, Currency::USD)),
+///             opening_balance: None,
+///             scheduled_principal: None,
+///             mandatory_prepayment: None,
+///             sweep_prepayment: None,
+///             voluntary_prepayment: None,
 ///         },
 ///     )]),
 /// );
@@ -514,6 +519,11 @@ mod tests {
                     fees: Money::from((0_i64, Currency::USD)),
                     debt_balance: Money::from((4_000_000_i64, Currency::USD)),
                     accrued_interest: Money::from((0_i64, Currency::USD)),
+                    opening_balance: None,
+                    scheduled_principal: None,
+                    mandatory_prepayment: None,
+                    sweep_prepayment: None,
+                    voluntary_prepayment: None,
                 },
             );
         }

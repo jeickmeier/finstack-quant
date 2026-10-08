@@ -158,6 +158,7 @@ fn taylor_vol_factor_matches_full_revaluation() {
         },
     )
     .expect("Taylor attribution must succeed");
+    super::audit_steps::assert_sensitivity_steps_reconcile(&result);
     let explained = result.vol_pnl.amount();
 
     eprintln!(
@@ -253,6 +254,7 @@ fn taylor_vol_factor_gamma_matches_full_revaluation() {
         },
     )
     .expect("Taylor attribution with gamma must succeed");
+    super::audit_steps::assert_sensitivity_steps_reconcile(&result);
     let combined = result.vol_pnl.amount();
 
     eprintln!(

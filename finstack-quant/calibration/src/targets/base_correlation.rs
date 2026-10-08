@@ -314,7 +314,6 @@ impl BaseCorrelationTarget {
             success_tolerance,
         )?;
 
-        report = report.with_metadata("residual_units", "discounted_upfront_fraction");
         report.update_solver_config(global_config.solver.clone());
 
         let index_update = context
@@ -407,6 +406,10 @@ impl BootstrapTarget for BaseCorrelationTarget {
             )));
         }
         Ok(curve)
+    }
+
+    fn residual_units(&self) -> crate::report::ResidualUnits {
+        crate::report::ResidualUnits::DiscountedUpfrontFraction
     }
 
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {

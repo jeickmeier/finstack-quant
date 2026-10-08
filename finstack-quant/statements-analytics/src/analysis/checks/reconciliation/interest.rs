@@ -83,6 +83,7 @@ impl Check for InterestExpenseReconciliation {
                             reference_label: "cs_interest".to_string(),
                         }),
                         nodes: vec![self.interest_expense_node.clone(), cs_node.clone()],
+                        comparison: None,
                     });
                 }
                 continue;
@@ -157,6 +158,7 @@ impl Check for InterestExpenseReconciliation {
                             reference_label: "implied_interest".to_string(),
                         }),
                         nodes,
+                        comparison: None,
                     });
                 }
             }
@@ -170,6 +172,7 @@ impl Check for InterestExpenseReconciliation {
             category: self.category(),
             passed,
             findings,
+            comparisons: Vec::new(),
         })
     }
 }

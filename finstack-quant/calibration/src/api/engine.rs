@@ -506,12 +506,13 @@ fn aggregate_plan_report(
         report.update_metadata("market_snapshot_timestamp", timestamp);
     }
     report.update_metadata("type", "plan_execution");
-    report.update_metadata("method", "plan_execution");
     report.update_metadata(
         "solver_tolerance",
         format!("{:.2e}", config.solver.tolerance()),
     );
-    report.update_metadata("residual_units", "absolute_residual_over_step_tolerance");
+    report = report
+        .with_solver_method(crate::report::SolverMethod::PlanExecution)
+        .with_residual_units(crate::report::ResidualUnits::AbsoluteResidualOverStepTolerance);
     report.update_metadata("raw_residuals", "retained_in_step_reports");
 
     if !all_steps_validation_passed {
@@ -940,6 +941,14 @@ mod tests {
         assert_eq!(
             report.metadata.get("residual_units").map(String::as_str),
             Some("absolute_residual_over_step_tolerance")
+        );
+        assert_eq!(
+            report.residual_units,
+            Some(crate::ResidualUnits::AbsoluteResidualOverStepTolerance)
+        );
+        assert_eq!(
+            report.solver_method,
+            Some(crate::SolverMethod::PlanExecution)
         );
         assert!(report
             .residuals

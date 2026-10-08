@@ -181,6 +181,11 @@ fn representative_statement_result() -> StatementResult {
         fees: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         debt_balance: Money::new(990_000.0, Currency::USD).expect("valid money fixture"),
         accrued_interest: Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        opening_balance: None,
+        scheduled_principal: None,
+        mandatory_prepayment: None,
+        sweep_prepayment: None,
+        voluntary_prepayment: None,
     };
     let mut cashflows = CapitalStructureCashflows::new();
     cashflows.by_instrument.insert(
@@ -213,7 +218,9 @@ fn representative_statement_result() -> StatementResult {
                     reference_label: "total_assets".to_string(),
                 }),
                 nodes: vec!["total_assets".into(), "total_liabilities".into()],
+                comparison: None,
             }],
+            comparisons: Vec::new(),
         }],
         summary: CheckSummary {
             total_checks: 1,

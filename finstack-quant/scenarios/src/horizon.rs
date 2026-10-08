@@ -925,6 +925,7 @@ mod tests {
             user_operations: 0,
             expanded_operations: 0,
             changes: Default::default(),
+            applied_shocks: Vec::new(),
             warnings: vec![],
             meta: None,
             time_roll: None,

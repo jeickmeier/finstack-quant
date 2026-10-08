@@ -17,7 +17,7 @@ use pyo3::prelude::*;
 )]
 #[derive(Clone)]
 pub struct PyImCollateralResult {
-    pub(super) inner: fm::ImCollateralResult,
+    pub(crate) inner: fm::ImCollateralResult,
 }
 
 #[pymethods]
@@ -69,7 +69,7 @@ impl PyImCollateralResult {
 )]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PyImMethodology {
-    pub(super) inner: fm::ImMethodology,
+    pub(crate) inner: fm::ImMethodology,
 }
 
 #[pymethods]
@@ -481,7 +481,7 @@ pub(super) fn extract_asset_class(obj: &Bound<'_, PyAny>) -> PyResult<fm::Collat
 )]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PyNettingSetId {
-    pub(super) inner: fm::NettingSetId,
+    pub(crate) inner: fm::NettingSetId,
 }
 
 #[pymethods]

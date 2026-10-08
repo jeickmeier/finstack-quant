@@ -68,14 +68,25 @@ pub(super) fn apply(
             let Some(buckets) = keyrate_dv01.get(curve_id) else {
                 continue;
             };
+            let mut curve_acc = NeumaierAccumulator::new();
             for (_, dv01, shift) in buckets {
                 rates_acc.add(dv01 * shift);
+                curve_acc.add(dv01 * shift);
                 shift_acc.add(*shift);
                 weighted_shift_acc.add(dv01.abs() * shift);
                 weight_acc.add(dv01.abs());
                 shift_terms += 1;
             }
             curves_with_data += 1;
+            push_first_order_step(
+                attribution,
+                &format!("Rates:{curve_id}"),
+                FactorWorking::KeyRate {
+                    unit: MoveUnit::BasisPoint,
+                    buckets: buckets.clone(),
+                },
+                curve_acc.total(),
+            );
         }
         let rates_pnl = rates_acc.total();
         attribution.rates_curves_pnl = factor_money_or_invalid(
@@ -121,6 +132,16 @@ pub(super) fn apply(
         };
         let rates_pnl = dv01 * avg_shift;
         convexity_avg_shift_bp = inputs.shifts.avg_rate_shift_bp;
+        push_first_order_step(
+            attribution,
+            "Rates",
+            FactorWorking::Scalar {
+                unit: MoveUnit::BasisPoint,
+                sensitivity: *dv01,
+                market_move: avg_shift,
+            },
+            rates_pnl,
+        );
 
         attribution.rates_curves_pnl = factor_money_or_invalid(
             rates_pnl,
@@ -221,6 +242,13 @@ pub(super) fn apply(
         };
 
         if let Some(convexity_pnl) = convexity_pnl_opt {
+            push_second_order_step(
+                attribution,
+                "RatesConvexity",
+                MoveUnit::BasisPoint,
+                avg_shift,
+                convexity_pnl,
+            );
             attribution.rates_curves_pnl = factor_money_or_invalid(
                 attribution.rates_curves_pnl.amount() + convexity_pnl,
                 inputs.val_t1.value.currency(),

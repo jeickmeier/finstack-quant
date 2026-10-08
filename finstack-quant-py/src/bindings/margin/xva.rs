@@ -507,6 +507,33 @@ impl PyXvaResult {
         self.inner.effective_epe_profile.clone()
     }
 
+    /// Per-time-bucket terms of the CVA sum as a list of dicts with keys
+    /// ``time``, ``discount_factor``, ``survival_probability``,
+    /// ``marginal_default_probability``, ``exposure_mid``,
+    /// ``discount_factor_mid``, ``survival_weight``, ``loss_given_default``
+    /// and ``contribution``; the contributions sum to ``cva``.
+    #[getter]
+    fn cva_rows<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.cva_rows)
+    }
+
+    /// Per-time-bucket terms of the DVA sum (same keys as ``cva_rows``), or
+    /// ``None`` when DVA was not computed.
+    #[getter]
+    fn dva_rows<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.dva_rows)
+    }
+
+    /// Per-time-bucket terms of the FVA sum as a list of dicts with keys
+    /// ``time``, ``dt``, ``discount_factor``, ``epe_mid``, ``ene_mid``,
+    /// ``discount_factor_mid``, ``joint_survival_mid``, ``funding_spread``,
+    /// ``funding_benefit_spread`` and ``contribution``, or ``None`` when FVA
+    /// was not computed.
+    #[getter]
+    fn fva_rows<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.fva_rows)
+    }
+
     /// Policy metadata stamped by the computing layer as a dict: numeric
     /// mode, active rounding context, any applied FX policy and the
     /// parallel-execution flag.

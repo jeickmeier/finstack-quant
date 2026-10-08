@@ -8,6 +8,7 @@ use crate::bindings::pandas_utils::{
 use crate::errors::{display_to_py, serde_json_to_py};
 use finstack_quant_attribution::{
     pnl_attribution_carry_rows, pnl_attribution_credit_factor_rows, pnl_attribution_long_rows,
+    pnl_attribution_sensitivity_step_rows, pnl_attribution_waterfall_step_rows,
     pnl_attribution_wide_row,
 };
 use pyo3::prelude::*;
@@ -23,9 +24,33 @@ const LONG_DETAIL_COLUMNS: [ColumnSchema<'static>; 7] = [
     ("currency", "str"),
 ];
 
+/// Column schema of the waterfall step export.
+const WATERFALL_STEP_COLUMNS: [ColumnSchema<'static>; 6] = [
+    ("step_index", "int64"),
+    ("factor", "str"),
+    ("pv_before", "float64"),
+    ("pv_after", "float64"),
+    ("step_pnl", "float64"),
+    ("currency", "str"),
+];
+
+/// Column schema of the sensitivity step export.
+const SENSITIVITY_STEP_COLUMNS: [ColumnSchema<'static>; 10] = [
+    ("step_index", "int64"),
+    ("factor", "str"),
+    ("tenor_years", "float64"),
+    ("move_unit", "str"),
+    ("sensitivity", "float64"),
+    ("market_move", "float64"),
+    ("explained_pnl", "float64"),
+    ("gamma_pnl", "float64"),
+    ("repriced_pv", "float64"),
+    ("currency", "str"),
+];
+
 /// Column schema of the wide single-row export (`to_dataframe`) and of the
 /// batch table returned by `attribute_pnl_many`.
-pub(crate) const WIDE_COLUMNS: [ColumnSchema<'static>; 22] = [
+pub(crate) const WIDE_COLUMNS: [ColumnSchema<'static>; 24] = [
     ("instrument_id", "str"),
     ("method", "str"),
     ("t0", "str"),
@@ -33,6 +58,8 @@ pub(crate) const WIDE_COLUMNS: [ColumnSchema<'static>; 22] = [
     ("currency", "str"),
     ("total_pnl", "float64"),
     ("mark_to_market_pnl", "float64"),
+    ("pv_t0", "float64"),
+    ("pv_t1", "float64"),
     ("carry", "float64"),
     ("rates_curves_pnl", "float64"),
     ("credit_curves_pnl", "float64"),
@@ -130,6 +157,27 @@ impl PyPnlAttribution {
     #[getter]
     fn mark_to_market_pnl(&self) -> Option<f64> {
         self.inner.mark_to_market_pnl.map(|m| m.amount())
+    }
+
+    /// Present value at T₀ on the T₀ market: the opening endpoint.
+    ///
+    /// ``mark_to_market_pnl == pv_t1 - pv_t0``. After a target-currency
+    /// translation this is the opening value at T₀ FX. Returns ``None`` when
+    /// the result was not produced from two endpoint valuations in
+    /// ``currency`` (a composite built without endpoints, or a payload written
+    /// before the field existed).
+    #[getter]
+    fn pv_t0(&self) -> Option<f64> {
+        self.inner.pv_t0.map(|m| m.amount())
+    }
+
+    /// Present value at T₁ on the T₁ market: the closing endpoint.
+    ///
+    /// After a target-currency translation this is the closing value at T₁
+    /// FX. Returns ``None`` under the same conditions as ``pv_t0``.
+    #[getter]
+    fn pv_t1(&self) -> Option<f64> {
+        self.inner.pv_t1.map(|m| m.amount())
     }
 
     /// Carry (theta + accruals) P&L amount.
@@ -320,6 +368,32 @@ impl PyPnlAttribution {
         serde_to_py(py, &self.inner.meta.execution_policy)
     }
 
+    /// Ordered waterfall repricing steps as serde-shaped dicts.
+    ///
+    /// One dict per applied factor with ``step_index``, ``factor``,
+    /// ``pv_before``, ``pv_after`` and ``step_pnl`` (money values are
+    /// ``{"amount", "currency"}`` dicts). ``step_pnl == pv_after - pv_before``
+    /// and each ``pv_after`` is the next step's ``pv_before``. Empty unless
+    /// the waterfall method produced the result. Use
+    /// ``to_waterfall_steps_dataframe`` for float columns.
+    #[getter]
+    fn waterfall_steps<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.waterfall_steps)
+    }
+
+    /// The working behind each Taylor or metrics-based factor, as
+    /// serde-shaped dicts.
+    ///
+    /// One dict per factor with ``factor``, ``explained_pnl`` and, where they
+    /// apply, ``move_unit``, ``sensitivity``, ``market_move``, ``buckets``
+    /// (``tenor_years``, ``sensitivity``, ``market_move``), ``repriced_pv`` and
+    /// ``gamma_pnl``. Empty for the parallel and waterfall methods. Use
+    /// ``to_sensitivity_steps_dataframe`` for float columns.
+    #[getter]
+    fn sensitivity_steps<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.sensitivity_steps)
+    }
+
     /// Carry decomposition detail as a serde-shaped dict, or ``None`` when not
     /// populated. Gross carry equals net CarryTotal plus FundingCost on the metrics path. Keys mirror the Rust ``CarryDetail`` wire schema (``total``,
     /// ``coupon_income``, ``pull_to_par``, ``roll_down``, ``funding_cost``).
@@ -497,7 +571,8 @@ impl PyPnlAttribution {
     /// ``total_pnl``, ``mark_to_market_pnl`` (``None`` when unavailable;
     /// the column dtype is then ``object``, so coerce with ``pd.to_numeric``
     /// before concatenating frames with different value availability),
-    /// ``carry``,
+    /// ``pv_t0`` and ``pv_t1`` (the endpoint present values, ``None`` when the
+    /// result carries no endpoints), ``carry``,
     /// ``rates_curves_pnl``, ``credit_curves_pnl``, ``inflation_curves_pnl``,
     /// ``correlations_pnl``, ``fx_pnl``, ``fx_translation_pnl``, ``vol_pnl``,
     /// ``cross_factor_pnl``,
@@ -545,6 +620,46 @@ impl PyPnlAttribution {
     fn to_long_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows = pnl_attribution_long_rows(&self.inner);
         serde_rows_to_dataframe_with_schema(py, &rows, &LONG_DETAIL_COLUMNS)
+    }
+
+    /// Export the waterfall step chain as a DataFrame, one row per step in
+    /// the order applied.
+    ///
+    /// Columns: ``step_index``, ``factor`` (snake-case factor name such as
+    /// ``"rates_curves"``), ``pv_before``, ``pv_after``, ``step_pnl``
+    /// (``pv_after - pv_before``), ``currency``. The first ``pv_before`` is
+    /// ``pv_t0`` and each ``pv_after`` is the next row's ``pv_before``. The
+    /// ``carry`` bucket is the carry row's ``step_pnl`` plus the period cash
+    /// (``total_pnl - mark_to_market_pnl``); every other bucket equals its
+    /// row's ``step_pnl``.
+    ///
+    /// Returns an empty DataFrame (zero rows, schema columns present) unless
+    /// the waterfall method produced the result.
+    fn to_waterfall_steps_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let rows = pnl_attribution_waterfall_step_rows(&self.inner);
+        serde_rows_to_dataframe_with_schema(py, &rows, &WATERFALL_STEP_COLUMNS)
+    }
+
+    /// Export the working behind each Taylor or metrics-based factor as a
+    /// DataFrame.
+    ///
+    /// Columns: ``step_index``, ``factor``, ``tenor_years``, ``move_unit``
+    /// (``"basis_point"``, ``"vol_point"``, ``"percent"``, ``"price_unit"``),
+    /// ``sensitivity`` (currency per one ``move_unit``), ``market_move``,
+    /// ``explained_pnl``, ``gamma_pnl``, ``repriced_pv``, ``currency``.
+    ///
+    /// Each factor has one factor-level row (``tenor_years`` null) carrying
+    /// its P&L, followed by one row per key-rate bucket (``tenor_years`` set)
+    /// carrying only that bucket's ``sensitivity`` and ``market_move``. P&L
+    /// columns are null on bucket rows, so column sums do not double count.
+    /// ``sensitivity * market_move`` reproduces ``explained_pnl`` on scalar
+    /// rows, and summed over a factor's bucket rows on key-rate factors.
+    ///
+    /// Returns an empty DataFrame (zero rows, schema columns present) for the
+    /// parallel and waterfall methods.
+    fn to_sensitivity_steps_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let rows = pnl_attribution_sensitivity_step_rows(&self.inner);
+        serde_rows_to_dataframe_with_schema(py, &rows, &SENSITIVITY_STEP_COLUMNS)
     }
 
     /// Export the carry decomposition as a long-format DataFrame.

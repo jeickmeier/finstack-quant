@@ -40,7 +40,7 @@ fn parse_periods(periods: &JsValue) -> Result<Vec<PeriodId>, JsValue> {
 /// @param options - Optional Rust `DcfOptions`; every field is optional and a missing one takes its Rust default (`mid_year_convention`, `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `exit_multiple_metric_node`, ...). Unknown keys are rejected (object or JSON).
 /// @param market - Optional `MarketContext` state used for statement evaluation, not for WACC discounting (object or JSON).
 /// @param as_of - Optional ISO 8601 valuation date; required when `market` is supplied.
-/// @returns `CorporateValuationResult`: enterprise value, terminal-value PV, net debt and equity value as `Money` wire objects, plus per-share value when shares are supplied.
+/// @returns `CorporateValuationResult`: enterprise value, terminal-value PV, net debt and equity value as `Money` wire objects, plus per-share value when shares are supplied, and the DCF working: `wacc`, per-period `periods` rows (flow, discount factor, present value), `pv_explicit`, the undiscounted `terminal_value` with its `terminal_discount_years`, and the `equity_bridge` (gross debt and cash separately).
 ///
 /// # Errors
 ///

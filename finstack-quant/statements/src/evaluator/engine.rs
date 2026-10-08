@@ -10,7 +10,7 @@ use crate::evaluator::monte_carlo::{
     MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults, PathResult,
 };
 use crate::evaluator::precedence::{resolve_node_value_with_policy, NodeValueSource};
-use crate::evaluator::results::{EvalStats, EvalWarning, StatementResult};
+use crate::evaluator::results::{CellSource, EvalStats, EvalWarning, StatementResult};
 use crate::evaluator::{
     capital_structure_runtime, capital_structure_runtime::dependent_closure, PeriodHistory,
 };
@@ -22,7 +22,12 @@ use std::collections::HashSet;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
-type PeriodEvaluation = (IndexMap<String, f64>, Vec<Option<f64>>, Vec<EvalWarning>);
+type PeriodEvaluation = (
+    IndexMap<String, f64>,
+    Vec<Option<f64>>,
+    Vec<EvalWarning>,
+    IndexMap<String, CellSource>,
+);
 
 /// Per-path cache of Monte Carlo z-scores, keyed by node then period.
 type McZCache = IndexMap<NodeId, IndexMap<PeriodId, f64>>;
@@ -324,11 +329,11 @@ impl Evaluator {
         let mut has_cs = false;
 
         for period in &model.periods {
-            let (period_results, period_row, period_warnings) =
+            let (period_results, period_row, period_warnings, period_sources) =
                 if let (Some(market_ctx), Some(as_of), Some(ref mut state), Some(insts)) =
                     (market_ctx, as_of, cs_state.as_mut(), instruments.as_ref())
                 {
-                    let (vals, row, warns, period_cs) = self.evaluate_period_dynamic(
+                    let (vals, row, warns, period_cs, sources) = self.evaluate_period_dynamic(
                         model,
                         period,
                         period.is_actual,
@@ -345,7 +350,7 @@ impl Evaluator {
                     cs_cashflows_accum.set_period(period_cs);
                     has_cs = true;
 
-                    (vals, row, warns)
+                    (vals, row, warns, sources)
                 } else {
                     self.evaluate_period(
                         model,
@@ -367,6 +372,7 @@ impl Evaluator {
                     .or_default()
                     .insert(period.id, *value);
             }
+            results.record_sources(period.id, period_sources);
 
             // Add to historical context for next period (move, not clone)
             std::sync::Arc::make_mut(&mut historical).push_row(period.id, period_row);
@@ -584,15 +590,16 @@ impl Evaluator {
         let mut results = StatementResult::new();
 
         for period in &model.periods {
-            let (period_results, period_row, period_warnings) = self.evaluate_period(
-                model,
-                &period.id,
-                period.is_actual,
-                &prepared.eval_order,
-                &historical,
-                &historical_cs,
-                None,
-            )?;
+            let (period_results, period_row, period_warnings, period_sources) = self
+                .evaluate_period(
+                    model,
+                    &period.id,
+                    period.is_actual,
+                    &prepared.eval_order,
+                    &historical,
+                    &historical_cs,
+                    None,
+                )?;
             all_warnings.extend(period_warnings);
             for (node_id, value) in &period_results {
                 results
@@ -601,6 +608,7 @@ impl Evaluator {
                     .or_default()
                     .insert(period.id, *value);
             }
+            results.record_sources(period.id, period_sources);
             std::sync::Arc::make_mut(&mut historical).push_row(period.id, period_row);
         }
 
@@ -713,7 +721,7 @@ impl Evaluator {
             let mut all_warnings = Vec::new();
 
             for period in &model.periods {
-                let (_period_results, period_row, warnings) = path_eval.evaluate_period(
+                let (_period_results, period_row, warnings, _sources) = path_eval.evaluate_period(
                     model,
                     &period.id,
                     period.is_actual,
@@ -887,19 +895,25 @@ impl Evaluator {
                         evaluate_formula(where_expr, context, Some(node_id.as_str()))?;
                     if !is_truthy(where_result) {
                         context.set_value(node_id.as_str(), 0.0)?;
+                        context.set_source(node_id.as_str(), CellSource::WhereMasked);
                         continue;
                     }
                 }
             }
             let explicit_value_is_visible =
                 !period.is_actual || node_spec.explicit_value_is_visible(period, visibility_cutoff);
+            let source = resolve_node_value_with_policy(
+                node_spec,
+                period_id,
+                is_actual && explicit_value_is_visible,
+                explicit_value_is_visible,
+            )?;
+            let cell_source = match source {
+                NodeValueSource::Value(_) => CellSource::Value,
+                NodeValueSource::Forecast => CellSource::Forecast,
+                NodeValueSource::Formula => CellSource::Formula,
+            };
             let value = {
-                let source = resolve_node_value_with_policy(
-                    node_spec,
-                    period_id,
-                    is_actual && explicit_value_is_visible,
-                    explicit_value_is_visible,
-                )?;
                 let mut mc_z_wrapper: Option<&mut McZCache> = mc_z_cache.as_deref_mut();
                 match source {
                     NodeValueSource::Value(v) => Ok(v),
@@ -932,6 +946,7 @@ impl Evaluator {
             })?;
 
             context.set_value(node_id.as_str(), value)?;
+            context.set_source(node_id.as_str(), cell_source);
         }
 
         Ok(())
@@ -976,8 +991,9 @@ impl Evaluator {
         )?;
 
         let row = context.current_values.clone();
+        let sources = context.cell_sources();
         let (results, warnings) = context.into_results();
-        Ok((results, row, warnings))
+        Ok((results, row, warnings, sources))
     }
 }
 
@@ -1066,6 +1082,117 @@ mod tests {
         assert_eq!(results.get("scaled", &period), Some(200.0));
     }
 
+    /// One node resolved by a different layer in each period, plus a masked
+    /// node: the result records which layer produced every cell.
+    #[test]
+    fn node_sources_record_value_formula_forecast_and_where_mask() {
+        use crate::types::ForecastSpec;
+
+        let q = |quarter| PeriodId::quarter(2025, quarter).expect("valid period fixture");
+        // Q1 and Q2 are actuals, Q3 is a forecast period.
+        let periods = finstack_quant_core::dates::build_periods("2025Q1..Q3", Some("2025Q2"))
+            .expect("periods")
+            .periods;
+        let mut model = FinancialModelSpec::new("cell-sources", periods);
+        model.add_node(
+            NodeSpec::new("revenue", NodeType::Mixed)
+                .with_values(IndexMap::from([(q(1), AmountOrScalar::scalar(100.0))]))
+                .with_forecast(ForecastSpec::growth(0.10))
+                .with_formula("123"),
+        );
+        let mut masked = NodeSpec::new("masked", NodeType::Calculated).with_formula("42");
+        masked.where_text = Some("0".to_string());
+        model.add_node(masked);
+
+        let results = Evaluator::new().evaluate(&model).expect("evaluation");
+
+        // Explicit value wins in Q1; Q2 is an actual with no value, so the
+        // formula fires (forecasts never run in actuals); Q3 is forecast.
+        assert_eq!(results.get("revenue", &q(1)), Some(100.0));
+        assert_eq!(
+            results.get_source("revenue", &q(1)),
+            Some(CellSource::Value)
+        );
+        assert_eq!(results.get("revenue", &q(2)), Some(123.0));
+        assert_eq!(
+            results.get_source("revenue", &q(2)),
+            Some(CellSource::Formula)
+        );
+        assert_eq!(
+            results.get_source("revenue", &q(3)),
+            Some(CellSource::Forecast)
+        );
+        for quarter in 1..=3 {
+            assert_eq!(results.get("masked", &q(quarter)), Some(0.0));
+            assert_eq!(
+                results.get_source("masked", &q(quarter)),
+                Some(CellSource::WhereMasked)
+            );
+        }
+
+        // Every value cell has a source, and nothing else does.
+        for (node_id, values) in &results.nodes {
+            let sources = &results.node_sources[node_id];
+            assert_eq!(
+                values.keys().collect::<Vec<_>>(),
+                sources.keys().collect::<Vec<_>>()
+            );
+        }
+        assert_eq!(results.nodes.len(), results.node_sources.len());
+
+        // The sources survive the wire format and reach the long table.
+        let json = serde_json::to_value(&results).expect("serialize");
+        assert_eq!(json["node_sources"]["revenue"]["2025Q3"], "forecast");
+        assert_eq!(json["node_sources"]["masked"]["2025Q1"], "where_masked");
+        let back: StatementResult = serde_json::from_value(json).expect("deserialize");
+        assert_eq!(back.node_sources, results.node_sources);
+
+        let table = results.to_table_long().expect("long table");
+        let source_column = table
+            .columns
+            .iter()
+            .find(|column| column.name == "source")
+            .expect("source column");
+        let finstack_quant_core::table::TableColumnData::NullableString(labels) =
+            &source_column.data
+        else {
+            panic!("source column must be a nullable string column");
+        };
+        // Rows follow the result's node order, so pair each label with its
+        // node and period rather than relying on that order.
+        let finstack_quant_core::table::TableColumnData::String(node_ids) = &table.columns[0].data
+        else {
+            panic!("node_id column must be a string column");
+        };
+        let mut expected: Vec<Option<String>> = Vec::new();
+        for (node_id, values) in &results.nodes {
+            for period in values.keys() {
+                expected.push(
+                    results
+                        .get_source(node_id, period)
+                        .map(|source| source.as_str().to_string()),
+                );
+            }
+        }
+        assert_eq!(labels, &expected);
+        assert_eq!(labels.len(), node_ids.len());
+        assert!(labels.contains(&Some("forecast".to_string())));
+        assert!(labels.contains(&Some("where_masked".to_string())));
+    }
+
+    /// A result serialized before `node_sources` existed still deserializes,
+    /// with no sources recorded.
+    #[test]
+    fn statement_result_without_node_sources_deserializes() {
+        let mut json = serde_json::to_value(StatementResult::new()).expect("serialize");
+        assert!(json.get("node_sources").is_none(), "empty map is skipped");
+        json["nodes"] = serde_json::json!({ "revenue": { "2025Q1": 1.0 } });
+        let back: StatementResult = serde_json::from_value(json).expect("deserialize");
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        assert_eq!(back.get("revenue", &period), Some(1.0));
+        assert_eq!(back.get_source("revenue", &period), None);
+    }
+
     #[test]
     fn as_of_hides_future_actual_values() {
         let periods = finstack_quant_core::dates::build_periods("2025Q1..Q2", Some("2025Q2"))
@@ -1110,6 +1237,22 @@ mod tests {
                 &PeriodId::quarter(2025, 2).expect("valid period fixture")
             ),
             Some(123.0)
+        );
+        // The Q2 value exists in the spec but is hidden by the as-of cutoff,
+        // so the recorded source is the formula that actually fired.
+        assert_eq!(
+            results.get_source(
+                "revenue",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            ),
+            Some(CellSource::Value)
+        );
+        assert_eq!(
+            results.get_source(
+                "revenue",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            ),
+            Some(CellSource::Formula)
         );
     }
 }

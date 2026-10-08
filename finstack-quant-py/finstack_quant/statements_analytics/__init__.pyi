@@ -4149,6 +4149,106 @@ class CorporateValuationResult:
         float | None
             Diluted share count, or ``None`` without ``shares_outstanding``.
         """
+    @property
+    def wacc(self) -> float | None:
+        """
+        Discount rate (WACC) applied to every explicit flow and to the terminal
+        value, as an annually compounded decimal (``0.10`` = 10%).
+
+        This property does not raise.
+
+        Returns
+        -------
+        float | None
+            The WACC, or ``None`` only for a result loaded from JSON written before the DCF working was recorded.
+        """
+    @property
+    def periods(self) -> list[dict[str, Any]]:
+        """
+        Explicit forecast periods that were discounted, in date order.
+
+        Each row is a dict with ``period_id`` (str), ``date`` (ISO date string,
+        the last day of the period), ``free_cash_flow``, ``discount_years``
+        (ACT/365.25 from the valuation date, less the mid-year shift when the
+        mid-year convention is on), ``discount_factor``
+        (``(1 + wacc) ** -discount_years``) and ``present_value``
+        (``free_cash_flow / (1 + wacc) ** discount_years``). Amounts are
+        unrounded floats in the model currency. The ``present_value`` column
+        sums to ``pv_explicit``, and that sum plus ``terminal_value_pv`` is
+        ``enterprise_value`` (to within one minor currency unit, because the
+        ``Money`` totals are rounded).
+
+        This property does not raise.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One dict per explicit period; empty only for a result loaded from JSON written before the DCF working was recorded.
+        """
+    @property
+    def pv_explicit(self) -> Money | None:
+        """
+        Present value of the explicit forecast flows: the sum of the
+        ``present_value`` of ``periods``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        Money | None
+            Explicit-period present value in the model currency, or ``None`` only for a result loaded from JSON written before the DCF working was recorded.
+        """
+    @property
+    def terminal_value(self) -> Money | None:
+        """
+        Terminal value at the horizon date, before discounting.
+
+        ``terminal_value / (1 + wacc) ** terminal_discount_years`` equals
+        ``terminal_value_pv``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        Money | None
+            Undiscounted terminal value in the model currency, or ``None`` only for a result loaded from JSON written before the DCF working was recorded.
+        """
+    @property
+    def terminal_discount_years(self) -> float | None:
+        """
+        Discounting tenor of the terminal value in years (ACT/365.25 from the
+        valuation date to the last explicit flow date).
+
+        An exit-multiple terminal value uses the full tenor; a
+        growth-perpetuity terminal value uses the mid-year-adjusted tenor when
+        the mid-year convention is on.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float | None
+            Tenor in years, or ``None`` only for a result loaded from JSON written before the DCF working was recorded.
+        """
+    @property
+    def equity_bridge(self) -> EquityBridge | None:
+        """
+        EV-to-equity bridge whose net adjustment is ``net_debt``: gross debt
+        (``total_debt``) and ``cash`` separately, plus preferred equity,
+        minority interest, non-operating assets and other adjustments, in the
+        model currency.
+
+        ``total_debt - cash`` equals ``net_debt`` unless the ``equity_bridge``
+        option supplied further components. A flat ``net_debt_override`` is
+        reported as ``total_debt`` with ``cash`` zero.
+
+        This property does not raise.
+
+        Returns
+        -------
+        EquityBridge | None
+            The bridge, or ``None`` only for a result loaded from JSON written before the DCF working was recorded.
+        """
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export as a single-row pandas ``DataFrame``.
@@ -4156,12 +4256,16 @@ class CorporateValuationResult:
         Columns: ``currency``, ``equity_value``, ``enterprise_value``,
         ``net_debt``, ``valuation_discount``, ``terminal_value_pv`` (float
         amounts in ``currency``), ``equity_value_per_share``,
-        ``diluted_shares`` (``None`` when absent).
+        ``diluted_shares`` (``None`` when absent), then the DCF working:
+        ``wacc`` (decimal), ``pv_explicit``, ``terminal_value``,
+        ``total_debt``, ``cash`` (float amounts in ``currency``) and
+        ``terminal_discount_years``; these six are ``None`` for a result
+        loaded from JSON written before they were recorded.
 
         Returns
         -------
         pd.DataFrame
-            Export as a single-row pandas ``DataFrame``. Columns: ``currency``, ``equity_value``, ``enterprise_value``, ``net_debt``, ``valuation_discount``, ``terminal_value_pv`` (float amounts in ``currency``), ``equity_value_per_share``, ``diluted_shares`` (``None`` when absent).
+            One row with columns ``currency``, ``equity_value``, ``enterprise_value``, ``net_debt``, ``valuation_discount``, ``terminal_value_pv``, ``equity_value_per_share``, ``diluted_shares``, ``wacc``, ``pv_explicit``, ``terminal_value``, ``total_debt``, ``cash``, ``terminal_discount_years``.
 
         Raises
         ------
@@ -5306,6 +5410,36 @@ class Explanation:
             Node type serde name (e.g. ``"calculated"``, ``"input"``).
         """
     @property
+    def source(self) -> str | None:
+        """
+        Evaluation layer that produced the value under the
+        ``Value > Forecast > Formula`` precedence: ``"value"`` (the explicit
+        value stored on the node), ``"forecast"``, ``"formula"`` or
+        ``"where_masked"`` (the node's ``where`` clause zeroed the cell).
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            The source label, or ``None`` when the results carry no source for the cell (hand-built results, or JSON written before sources were recorded).
+        """
+    @property
+    def forecast(self) -> dict[str, Any] | None:
+        """
+        The node's forecast specification when ``source`` is ``"forecast"``.
+
+        The dict is the serde form ``{"method": ..., "params": {...}}``, for
+        example ``{"method": "growth_pct", "params": {"rate": 0.05}}``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            The forecast spec, or ``None`` for every other source.
+        """
+    @property
     def formula_text(self) -> str | None:
         """
         Formula text, or ``None`` for non-formula nodes.
@@ -5320,14 +5454,24 @@ class Explanation:
     @property
     def breakdown(self) -> list[ExplanationStep]:
         """
-        Component breakdown in evaluation order.
+        Formula components with the values they resolved to at the period,
+        including ``cs.<component>.<instrument_or_total>`` capital-structure
+        references.
+
+        Populated only when the formula produced the value (``source`` is
+        ``"formula"`` or ``None``); empty when ``source`` is ``"value"``,
+        ``"forecast"`` or ``"where_masked"``. When the formula is a pure
+        sum/difference of references there is one step per term in formula
+        order, each with ``operation`` ``"+"`` or ``"-"``, and the signed
+        values sum to ``final_value``; for any other formula each referenced
+        component is listed once with ``operation`` ``None``.
 
         This property does not raise.
 
         Returns
         -------
         list[ExplanationStep]
-            Component breakdown in evaluation order.
+            Formula components in formula order; empty when the value did not come from the formula.
         """
     def to_text(self) -> str:
         """
@@ -5442,14 +5586,18 @@ class ExplanationStep:
     @property
     def operation(self) -> str | None:
         """
-        Operation applied to the component (``"+"``, ``"*"``, ...), or ``None``.
+        Sign with which the component enters the formula.
+
+        Set to ``"+"`` or ``"-"`` only when the formula is a pure
+        sum/difference of references, in which case the signed step values sum
+        to the explained value.
 
         This property does not raise.
 
         Returns
         -------
         str | None
-            Operation applied to the component (``"+"``, ``"*"``, ...), or ``None``.
+            ``"+"`` or ``"-"``, or ``None`` for any other formula.
         """
 
 class Exposure:
@@ -5969,8 +6117,9 @@ class GoalSeekResult:
     """
     Result of a goal-seek solve (the Rust ``GoalSeekResult``).
 
-    Its JSON form ``{"solved_value", "model"}`` is the WASM ``goalSeek``
-    result; ``model`` is ``null`` when it was not requested.
+    Its JSON form ``{"solved_value", "model", "residual", "tolerance",
+    "evaluations", "converged"}`` is the WASM ``goalSeek`` result; ``model``
+    is ``null`` when it was not requested.
 
     Examples
     --------
@@ -5985,6 +6134,8 @@ class GoalSeekResult:
     (120.0, False)
     >>> round(GoalSeekResult.from_json(result.to_json()).solved_value, 6)
     120.0
+    >>> result.converged, abs(result.residual) <= result.tolerance, result.evaluations > 0
+    (True, True, True)
     """
     @property
     def solved_value(self) -> float:
@@ -6010,6 +6161,64 @@ class GoalSeekResult:
         FinancialModelSpec | None
             The updated model, or ``None`` when ``update_model=False``.
         """
+    @property
+    def residual(self) -> float:
+        """
+        Signed residual at ``solved_value``: the target node's value in the
+        target period minus the requested target, in the target node's units.
+
+        It is re-evaluated on the model after the solver returned, so it is
+        the residual of the reported driver value.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            The residual; ``0.0`` for a result loaded from JSON written before diagnostics were recorded (``evaluations == 0``).
+        """
+    @property
+    def tolerance(self) -> float:
+        """
+        Absolute acceptance tolerance on ``residual``, in the target node's
+        units: ``1e-9 * max(abs(target_value), 1)``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            The tolerance; ``0.0`` for a result loaded from JSON written before diagnostics were recorded.
+        """
+    @property
+    def evaluations(self) -> int:
+        """
+        Number of model evaluations the solve used: every objective probe by
+        the root finder (bracket search and Brent iterations, including a
+        widened second attempt) plus the final residual check.
+
+        This property does not raise.
+
+        Returns
+        -------
+        int
+            Evaluation count; ``0`` only for a result loaded from JSON written before diagnostics were recorded.
+        """
+    @property
+    def converged(self) -> bool:
+        """
+        Whether ``abs(residual) <= tolerance``.
+
+        ``goal_seek`` raises instead of returning when the residual check
+        fails, so every result it returns has ``converged`` ``True``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        bool
+            ``True`` for a result returned by ``goal_seek``; ``False`` only for a result loaded from JSON written before diagnostics were recorded.
+        """
     def to_json(self) -> str:
         """
         Serialize to canonical JSON.
@@ -6017,9 +6226,10 @@ class GoalSeekResult:
         Returns
         -------
         str
-            ``{"solved_value": ..., "model": ...}`` with ``model`` ``null``
-            when it was not requested; identical to the WASM ``goalSeek``
-            result and accepted by :meth:`from_json`.
+            ``{"solved_value": ..., "model": ..., "residual": ...,
+            "tolerance": ..., "evaluations": ..., "converged": ...}`` with
+            ``model`` ``null`` when it was not requested; identical to the
+            WASM ``goalSeek`` result and accepted by :meth:`from_json`.
 
         Raises
         ------
@@ -10637,7 +10847,9 @@ def evaluate_dcf(
     -------
     CorporateValuationResult
         ``equity_value``, ``enterprise_value``, ``net_debt`` and
-        ``terminal_value_pv`` as ``Money``; per-share values as floats.
+        ``terminal_value_pv`` as ``Money``; per-share values as floats; and
+        the DCF working (``wacc``, ``periods``, ``pv_explicit``,
+        ``terminal_value``, ``terminal_discount_years``, ``equity_bridge``).
 
     Raises
     ------
@@ -10781,7 +10993,8 @@ def explain_formula(model: Any, results: Any, node_id: str, period: str) -> Expl
     Returns
     -------
     Explanation
-        Typed explanation with ``breakdown`` steps, ``to_text()`` and
+        Typed explanation with the cell ``source``, the ``forecast`` spec of a
+        forecast cell, ``breakdown`` steps, ``to_text()`` and
         ``to_dataframe()``; ``to_json()`` matches the WASM ``explainFormula``.
 
     Raises
@@ -10922,8 +11135,9 @@ def goal_seek(
     -------
     GoalSeekResult
         ``solved_value`` plus ``model`` (the updated ``FinancialModelSpec`` or
-        ``None``). ``float(result)`` yields the solved value. The input model
-        is never modified.
+        ``None``) and the solve diagnostics ``residual``, ``tolerance``,
+        ``evaluations`` and ``converged``. ``float(result)`` yields the solved
+        value. The input model is never modified.
 
     Raises
     ------

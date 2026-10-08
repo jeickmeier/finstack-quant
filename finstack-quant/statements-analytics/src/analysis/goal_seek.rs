@@ -49,13 +49,17 @@ use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{
     AmountOrScalar, FinancialModelSpec, NodeSpec, NodeValueType,
 };
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 /// Outcome of a [`goal_seek`] solve.
 ///
 /// The serde form is `{"solved_value": <number>, "model": <FinancialModelSpec
-/// or null>}`; `model` is always present and is `null` unless the solve was
-/// asked to return the updated model.
+/// or null>, "residual": <number>, "tolerance": <number>, "evaluations":
+/// <integer>, "converged": <bool>}`; `model` is always present and is `null`
+/// unless the solve was asked to return the updated model. The four
+/// diagnostic fields are always written; a document written before they
+/// existed reads back with `evaluations == 0`, `converged == false` and a zero
+/// `residual` and `tolerance`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -68,6 +72,32 @@ pub struct GoalSeekResult {
     /// node at the driver period, re-validated; `None` when `update_model`
     /// was `false`.
     pub model: Option<FinancialModelSpec>,
+    /// Signed residual at `solved_value`: the target node's value in the
+    /// target period minus the requested target, in the target node's units.
+    ///
+    /// Re-evaluated on the model after the solver returned, so it is the
+    /// residual of the reported driver value, not the solver's last iterate.
+    #[serde(default)]
+    pub residual: f64,
+    /// Absolute acceptance tolerance on `residual`, in the target node's
+    /// units: `1e-9 * max(|target_value|, 1)`.
+    #[serde(default)]
+    pub tolerance: f64,
+    /// Number of model evaluations the solve used: every objective probe by
+    /// the root finder (bracket search and Brent iterations, including a
+    /// widened second attempt when the sign-constrained one fails) plus the
+    /// final residual check. Zero only for a result read from JSON written
+    /// before this field existed.
+    #[serde(default)]
+    pub evaluations: usize,
+    /// Whether `|residual| <= tolerance`.
+    ///
+    /// [`goal_seek`] returns an error instead of a result when the residual
+    /// check fails, so every result it produces has `converged == true`;
+    /// `false` only for a result read from JSON written before this field
+    /// existed.
+    #[serde(default)]
+    pub converged: bool,
 }
 
 impl GoalSeekResult {
@@ -79,7 +109,9 @@ impl GoalSeekResult {
     ///
     /// # Arguments
     ///
-    /// * `json` - The serde form `{"solved_value": <number>, "model": <model or null>}`.
+    /// * `json` - The serde form `{"solved_value": <number>, "model": <model or
+    ///   null>}` plus the optional diagnostics `residual`, `tolerance`,
+    ///   `evaluations` and `converged`.
     ///
     /// # Errors
     ///
@@ -92,12 +124,24 @@ impl GoalSeekResult {
         struct Wire {
             solved_value: f64,
             model: Option<serde_json::Value>,
+            #[serde(default)]
+            residual: f64,
+            #[serde(default)]
+            tolerance: f64,
+            #[serde(default)]
+            evaluations: usize,
+            #[serde(default)]
+            converged: bool,
         }
         let wire: Wire = serde_json::from_str(json)
             .map_err(|e| Error::Serde(format!("invalid GoalSeekResult JSON: {e}")))?;
         Ok(Self {
             solved_value: wire.solved_value,
             model: wire.model.map(FinancialModelSpec::from_value).transpose()?,
+            residual: wire.residual,
+            tolerance: wire.tolerance,
+            evaluations: wire.evaluations,
+            converged: wire.converged,
         })
     }
 }
@@ -255,7 +299,11 @@ pub fn goal_seek(
     // target node, etc.) instead of reporting an opaque "no solution".
     let last_error: RefCell<Option<String>> = RefCell::new(None);
 
+    // Counts every model evaluation, reported as `GoalSeekResult::evaluations`.
+    let evaluations = Cell::new(0_usize);
+
     let objective = |driver_value: f64| -> f64 {
+        evaluations.set(evaluations.get() + 1);
         let mut borrow = eval_cell.borrow_mut();
         let (ref mut eval, ref mut temp_model) = *borrow;
 
@@ -300,6 +348,19 @@ pub fn goal_seek(
         }
     };
 
+    // Check the residual of the proposed driver, then assemble the result.
+    let finish = |solution: f64| -> Result<GoalSeekResult> {
+        let (residual, tolerance) = validate_target_residual(&objective, solution, target_value)?;
+        Ok(GoalSeekResult {
+            solved_value: solution,
+            model: solved_model(model, driver_node, driver_period, update_model, solution)?,
+            residual,
+            tolerance,
+            evaluations: evaluations.get(),
+            converged: true,
+        })
+    };
+
     if let Some((lower, upper)) = bounds {
         let solution = solve_with_bounds(&objective, lower, upper).map_err(|e| {
             describe_failure(format!(
@@ -308,8 +369,7 @@ pub fn goal_seek(
                  driver_node='{driver_node}'. {e}"
             ))
         })?;
-        validate_target_residual(&objective, solution, target_value)?;
-        return apply_solution(model, driver_node, driver_period, update_model, solution);
+        return finish(solution);
     }
 
     // Pick an initial bracket size scaled to the guess magnitude, then let
@@ -354,15 +414,16 @@ pub fn goal_seek(
         }
     };
 
-    validate_target_residual(&objective, solution, target_value)?;
-    apply_solution(model, driver_node, driver_period, update_model, solution)
+    finish(solution)
 }
 
+/// Evaluate the objective at `solution` and return `(residual, tolerance)`,
+/// or an error when the residual is not within tolerance.
 fn validate_target_residual(
     objective: &impl Fn(f64) -> f64,
     solution: f64,
     target: f64,
-) -> Result<()> {
+) -> Result<(f64, f64)> {
     let residual = objective(solution);
     let tolerance = 1e-9 * target.abs().max(1.0);
     if !solution.is_finite() || !residual.is_finite() || residual.abs() > tolerance {
@@ -370,7 +431,7 @@ fn validate_target_residual(
             "Goal-seek target residual {residual} exceeds tolerance {tolerance} at proposed driver {solution}; model unchanged"
         )));
     }
-    Ok(())
+    Ok((residual, tolerance))
 }
 
 fn amount_for_node(node: &NodeSpec, value: f64) -> Result<AmountOrScalar> {
@@ -380,14 +441,15 @@ fn amount_for_node(node: &NodeSpec, value: f64) -> Result<AmountOrScalar> {
     }
 }
 
-fn apply_solution(
+/// Copy of `model` with `value` written into the driver cell, when requested.
+fn solved_model(
     model: &FinancialModelSpec,
     driver_node: &str,
     driver_period: PeriodId,
     update_model: bool,
     value: f64,
-) -> Result<GoalSeekResult> {
-    let model = if update_model {
+) -> Result<Option<FinancialModelSpec>> {
+    Ok(if update_model {
         let mut solved = model.clone();
         if let Some(node) = solved.nodes.get_mut(driver_node) {
             let mut values = node.values.clone().unwrap_or_default();
@@ -398,10 +460,6 @@ fn apply_solution(
         Some(solved)
     } else {
         None
-    };
-    Ok(GoalSeekResult {
-        solved_value: value,
-        model,
     })
 }
 
@@ -469,6 +527,19 @@ mod tests {
             .expect("a result without a model");
         assert_eq!(without_model.solved_value, 2.5);
         assert!(without_model.model.is_none());
+        // A document written before the diagnostics existed carries none.
+        assert_eq!(without_model.evaluations, 0);
+        assert!(!without_model.converged);
+
+        let with_diagnostics = GoalSeekResult::from_json(
+            r#"{"solved_value": 2.5, "model": null, "residual": 1e-12, "tolerance": 1e-9,
+                "evaluations": 7, "converged": true}"#,
+        )
+        .expect("a result with diagnostics");
+        assert_eq!(with_diagnostics.residual, 1e-12);
+        assert_eq!(with_diagnostics.tolerance, 1e-9);
+        assert_eq!(with_diagnostics.evaluations, 7);
+        assert!(with_diagnostics.converged);
 
         assert!(
             GoalSeekResult::from_json(r#"{"solved_value": 1.0, "model": null, "x": 1}"#).is_err()

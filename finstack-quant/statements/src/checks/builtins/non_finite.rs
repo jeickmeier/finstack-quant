@@ -49,6 +49,7 @@ impl Check for NonFiniteCheck {
                             period: Some(*period_id),
                             materiality: None,
                             nodes: vec![NodeId::new(node_id)],
+                            comparison: None,
                         });
                     }
                 }
@@ -69,6 +70,7 @@ impl Check for NonFiniteCheck {
                                 period: Some(*period_id),
                                 materiality: None,
                                 nodes: vec![node.clone()],
+                                comparison: None,
                             });
                         }
                     }
@@ -84,6 +86,7 @@ impl Check for NonFiniteCheck {
             category: self.category(),
             passed,
             findings,
+            comparisons: Vec::new(),
         })
     }
 }

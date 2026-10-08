@@ -145,6 +145,7 @@ fn check_finding_serde_roundtrip() {
             NodeId::new("total_assets"),
             NodeId::new("total_liabilities"),
         ],
+        comparison: None,
     };
     let json = serde_json::to_string(&finding).unwrap();
     let back: CheckFinding = serde_json::from_str(&json).unwrap();
@@ -160,6 +161,7 @@ fn check_finding_optional_fields_omitted() {
         period: None,
         materiality: None,
         nodes: vec![],
+        comparison: None,
     };
     let json = serde_json::to_string(&finding).unwrap();
     assert!(!json.contains("period"));
@@ -177,6 +179,7 @@ fn check_result_passed_true_when_no_findings() {
         category: CheckCategory::AccountingIdentity,
         passed: true,
         findings: vec![],
+        comparisons: Vec::new(),
     };
     assert!(result.passed);
 }
@@ -195,7 +198,9 @@ fn check_result_passed_false_with_error_findings() {
             period: None,
             materiality: None,
             nodes: vec![],
+            comparison: None,
         }],
+        comparisons: Vec::new(),
     };
     assert!(!result.passed);
 }
@@ -235,6 +240,7 @@ fn sample_report() -> CheckReport {
             reference_label: "total_assets".into(),
         }),
         nodes: vec![NodeId::new("total_assets")],
+        comparison: None,
     };
     let warning_finding = CheckFinding {
         check_id: "ratio".into(),
@@ -248,6 +254,7 @@ fn sample_report() -> CheckReport {
             reference_label: "total_debt".into(),
         }),
         nodes: vec![NodeId::new("debt_ratio")],
+        comparison: None,
     };
     let info_finding = CheckFinding {
         check_id: "completeness".into(),
@@ -256,6 +263,7 @@ fn sample_report() -> CheckReport {
         period: None,
         materiality: None,
         nodes: vec![],
+        comparison: None,
     };
 
     CheckReport {
@@ -266,6 +274,7 @@ fn sample_report() -> CheckReport {
                 category: CheckCategory::AccountingIdentity,
                 passed: false,
                 findings: vec![error_finding],
+                comparisons: Vec::new(),
             },
             CheckResult {
                 check_id: "ratio".into(),
@@ -273,6 +282,7 @@ fn sample_report() -> CheckReport {
                 category: CheckCategory::CreditReasonableness,
                 passed: true,
                 findings: vec![warning_finding],
+                comparisons: Vec::new(),
             },
             CheckResult {
                 check_id: "completeness".into(),
@@ -280,6 +290,7 @@ fn sample_report() -> CheckReport {
                 category: CheckCategory::DataQuality,
                 passed: true,
                 findings: vec![info_finding],
+                comparisons: Vec::new(),
             },
         ],
         summary: CheckSummary {

@@ -524,6 +524,25 @@ impl PyHazardCurve {
         par_interp_name(self.inner.par_interp())
     }
 
+    /// Calibration recipe stamped on this curve, as a dict.
+    ///
+    /// The serde form of the Rust ``HazardCalibrationRecipe``:
+    /// ``hazard_params``, ``calibration_inputs``, ``spread_risk_inputs`` and
+    /// ``calibration_config``. ``None`` for a curve that was not produced by a
+    /// calibration step.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the recipe cannot be converted to Python objects.
+    #[getter]
+    fn hazard_calibration<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .hazard_calibration()
+            .map(|recipe| crate::bindings::pandas_utils::serde_to_py(py, recipe))
+            .transpose()
+    }
+
     fn __repr__(&self) -> String {
         format!(
             "HazardCurve(id='{}', base_date='{}', knots={}, recovery_rate={})",

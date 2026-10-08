@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use super::get_finite_node_value;
 use crate::checks::types::effective_tolerance;
 use crate::checks::{
-    Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
+    Check, CheckCategory, CheckComparison, CheckContext, CheckFinding, CheckResult, Materiality,
+    Severity,
 };
 use crate::types::NodeId;
 use crate::Result;
@@ -63,6 +64,7 @@ impl Check for CashReconciliation {
                 .chain(self.cff_node.iter()),
         )?;
         let mut findings = Vec::new();
+        let mut comparisons = Vec::new();
         let periods = &context.model.periods;
 
         // The component identity needs all three of CFO/CFI/CFF; configuring
@@ -87,6 +89,7 @@ impl Check for CashReconciliation {
                     .iter()
                     .filter_map(|node| (*node).clone())
                     .collect(),
+                comparison: None,
             });
         }
 
@@ -117,6 +120,7 @@ impl Check for CashReconciliation {
                         self.cash_balance_node.clone(),
                         self.total_cash_flow_node.clone(),
                     ],
+                    comparison: None,
                 });
                 continue;
             }
@@ -159,6 +163,7 @@ impl Check for CashReconciliation {
                             self.cash_balance_node.clone(),
                             self.total_cash_flow_node.clone(),
                         ],
+                        comparison: None,
                     });
                     continue;
                 }
@@ -168,6 +173,14 @@ impl Check for CashReconciliation {
             let diff = cash_curr - expected_cash;
             let reference = cash_prev.abs().max(1.0);
             let tolerance = effective_tolerance(&context.config, self.tolerance, reference);
+            let comparison = CheckComparison {
+                identity: "cash_roll_forward".to_string(),
+                period: Some(*curr_pid),
+                actual: cash_curr,
+                expected: expected_cash,
+                tolerance,
+            };
+            comparisons.push(comparison.clone());
 
             if diff.abs() > tolerance {
                 let relative = (diff / reference).abs() * 100.0;
@@ -191,6 +204,7 @@ impl Check for CashReconciliation {
                         self.cash_balance_node.clone(),
                         self.total_cash_flow_node.clone(),
                     ],
+                    comparison: Some(comparison),
                 });
             }
         }
@@ -235,6 +249,7 @@ impl Check for CashReconciliation {
                         period: Some(*curr_pid),
                         materiality: None,
                         nodes: vec![cfo_node.clone(), cfi_node.clone(), cff_node.clone()],
+                        comparison: None,
                     });
                 }
 
@@ -246,6 +261,14 @@ impl Check for CashReconciliation {
                     let reference = total_cf.abs().max(1.0);
                     let component_tolerance =
                         effective_tolerance(&context.config, self.tolerance, reference);
+                    let comparison = CheckComparison {
+                        identity: "cash_flow_components".to_string(),
+                        period: Some(*curr_pid),
+                        actual: total_cf,
+                        expected: component_sum,
+                        tolerance: component_tolerance,
+                    };
+                    comparisons.push(comparison.clone());
 
                     if component_diff.abs() > component_tolerance {
                         let relative = (component_diff / reference).abs() * 100.0;
@@ -272,6 +295,7 @@ impl Check for CashReconciliation {
                                 cfi_node.clone(),
                                 cff_node.clone(),
                             ],
+                            comparison: Some(comparison),
                         });
                     }
                 }
@@ -286,6 +310,7 @@ impl Check for CashReconciliation {
             category: self.category(),
             passed,
             findings,
+            comparisons,
         })
     }
 }

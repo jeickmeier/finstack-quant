@@ -280,6 +280,7 @@ fn application_report_requires_change_manifest() {
         user_operations: 0,
         expanded_operations: 0,
         changes: ScenarioChangeManifest::default(),
+        applied_shocks: Vec::new(),
         warnings: vec![],
         meta: None,
         time_roll: None,
@@ -287,6 +288,186 @@ fn application_report_requires_change_manifest() {
     let encoded = serde_json::to_value(&report).expect("report should serialize");
     assert_eq!(encoded["changes"]["market_targets"], serde_json::json!([]));
     assert_eq!(encoded["changes"]["all_dirty"], serde_json::json!(false));
+    // An empty shock list is omitted, and a report written before the field
+    // existed still deserializes.
+    assert!(encoded.get("applied_shocks").is_none());
+    let reparsed: ApplicationReport =
+        serde_json::from_value(encoded).expect("report without applied_shocks parses");
+    assert!(reparsed.applied_shocks.is_empty());
+}
+
+/// Every market shock is reported with its size and unit, in application
+/// order, and reconciles with the change manifest.
+#[test]
+fn application_report_records_the_size_of_each_market_shock() {
+    use crate::spec::{CurveKind, TenorMatchMode};
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::scalars::MarketScalar;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
+
+    let as_of = date!(2025 - 01 - 01);
+    let knots = [(0.0, 1.0), (1.0, 0.97), (5.0, 0.85), (10.0, 0.70)];
+    let curve = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .knots(knots)
+        .build()
+        .expect("discount curve should build");
+    let provider = std::sync::Arc::new(SimpleFxProvider::new());
+    provider
+        .set_quote(Currency::EUR, Currency::USD, 1.10)
+        .expect("quote should set");
+    let mut market = MarketContext::new()
+        .insert(curve)
+        .insert_fx(FxMatrix::new(provider))
+        .insert_price("AAPL", MarketScalar::Unitless(200.0));
+
+    let scenario = ScenarioSpec {
+        id: "sized".into(),
+        name: None,
+        description: None,
+        operations: vec![
+            OperationSpec::CurveParallelBp {
+                curve_kind: CurveKind::Discount,
+                curve_id: "USD-OIS".into(),
+                discount_curve_id: None,
+                bp: 25.0,
+            },
+            OperationSpec::EquityPricePct {
+                ids: vec!["AAPL".into()],
+                pct: -10.0,
+            },
+            OperationSpec::MarketFxPct {
+                base: Currency::EUR,
+                quote: Currency::USD,
+                pct: 5.0,
+            },
+            OperationSpec::CurveNodeBp {
+                curve_kind: CurveKind::Discount,
+                curve_id: "USD-OIS".into(),
+                discount_curve_id: None,
+                nodes: vec![("3Y".into(), 10.0)],
+                match_mode: TenorMatchMode::Interpolate,
+            },
+        ],
+        priority: 0,
+        resolution_mode: Default::default(),
+        hazard_bump_mode: Default::default(),
+    };
+    let mut ctx = ExecutionContext {
+        market: &mut market,
+        model: None,
+        instruments: None,
+        rate_bindings: None,
+        calendar: None,
+        as_of,
+    };
+    let report = ScenarioEngine::new()
+        .apply(&scenario, &mut ctx)
+        .expect("scenario should apply");
+
+    let curve_target = ScenarioMarketTarget::Curve {
+        curve_kind: CurveKind::Discount,
+        curve_id: "USD-OIS".into(),
+    };
+    let market = |target: &ScenarioMarketTarget| AppliedShockTarget::Market {
+        target: target.clone(),
+    };
+    let shocks = &report.applied_shocks;
+    assert_eq!(shocks.len(), report.operations_applied);
+
+    assert_eq!(
+        shocks[0],
+        AppliedShock {
+            applies_to: market(&curve_target),
+            shock: ShockMagnitude::Uniform {
+                value: 25.0,
+                unit: ShockUnit::Bp
+            },
+            level_change: None,
+        }
+    );
+
+    let equity = &shocks[1];
+    assert_eq!(
+        equity.applies_to,
+        market(&ScenarioMarketTarget::EquityPrice {
+            spot_id: "AAPL".into()
+        })
+    );
+    assert_eq!(
+        equity.shock,
+        ShockMagnitude::Uniform {
+            value: -10.0,
+            unit: ShockUnit::Percent
+        }
+    );
+    let level = equity.level_change.expect("scalar levels are recorded");
+    assert_eq!(level.before, 200.0);
+    assert!((level.after - level.before * (1.0 + -10.0 / 100.0)).abs() < 1e-12);
+    let MarketScalar::Unitless(stored) = ctx.market.get_price("AAPL").expect("price") else {
+        panic!("AAPL stays unitless");
+    };
+    assert_eq!(level.after, *stored);
+
+    assert_eq!(
+        shocks[2],
+        AppliedShock {
+            applies_to: market(&ScenarioMarketTarget::Fx {
+                base: Currency::EUR,
+                quote: Currency::USD
+            }),
+            shock: ShockMagnitude::Uniform {
+                value: 5.0,
+                unit: ShockUnit::Percent
+            },
+            level_change: None,
+        }
+    );
+
+    // The off-knot 3Y node is delivered as key-rate bumps on the curve's own
+    // knots: one entry per bump, each naming its knot.
+    let key_rates = &shocks[3..];
+    assert!(!key_rates.is_empty());
+    for shock in key_rates {
+        assert_eq!(shock.applies_to, market(&curve_target));
+        let ShockMagnitude::KeyRate {
+            time_years,
+            value,
+            unit,
+        } = shock.shock
+        else {
+            panic!("node shock on a discount curve is a key-rate bump: {shock:?}");
+        };
+        assert_eq!(unit, ShockUnit::Bp);
+        assert!(value.is_finite() && value != 0.0);
+        assert!(knots.iter().any(|(knot, _)| *knot == time_years));
+    }
+
+    // Every manifest target has at least one sized entry, and vice versa.
+    for target in &report.changes.market_targets {
+        assert!(shocks.iter().any(|s| s.applies_to == market(target)));
+    }
+    for shock in shocks {
+        let AppliedShockTarget::Market { target } = &shock.applies_to else {
+            panic!("no instrument shock was requested");
+        };
+        assert!(report.changes.market_targets.contains(target));
+    }
+
+    let json = serde_json::to_value(&report).expect("report serializes");
+    assert_eq!(
+        json["applied_shocks"][0],
+        serde_json::json!({
+            "applies_to": {
+                "scope": "market",
+                "target": {"kind": "curve", "curve_kind": "discount", "curve_id": "USD-OIS"}
+            },
+            "shock": {"kind": "uniform", "value": 25.0, "unit": "bp"}
+        })
+    );
+    let reparsed: ApplicationReport = serde_json::from_value(json).expect("report round-trips");
+    assert_eq!(&reparsed.applied_shocks, shocks);
 }
 
 #[test]
@@ -495,11 +676,27 @@ fn correlation_shocks_update_inventory_and_report_clamping() {
             calendar: None,
             as_of: date!(2025 - 01 - 01),
         };
+        let (OperationSpec::AssetCorrelationPts { delta_pts }
+        | OperationSpec::PrepayDefaultCorrelationPts { delta_pts }) = operation
+        else {
+            panic!("fixture lists correlation operations only");
+        };
         let report = ScenarioEngine::default()
             .apply(&single_op_spec("correlation", operation), &mut ctx)
             .expect("apply");
         assert_eq!(report.operations_applied, 1);
         assert_eq!(report.changes.changed_instrument_indices, vec![0]);
+        assert_eq!(
+            report.applied_shocks,
+            vec![AppliedShock {
+                applies_to: AppliedShockTarget::Instruments { indices: vec![0] },
+                shock: ShockMagnitude::Uniform {
+                    value: delta_pts,
+                    unit: ShockUnit::Absolute
+                },
+                level_change: None,
+            }]
+        );
         assert_eq!(
             report
                 .warnings

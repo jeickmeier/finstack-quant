@@ -1,9 +1,10 @@
 //! Model introspection: dependency tracing, formula explanation, and tree visualization.
 
 use finstack_quant_core::dates::PeriodId;
+use finstack_quant_statements::dsl::{BinOp, StmtExpr};
 use finstack_quant_statements::error::{Error, Result};
-use finstack_quant_statements::evaluator::{DependencyGraph, StatementResult};
-use finstack_quant_statements::types::{FinancialModelSpec, NodeType};
+use finstack_quant_statements::evaluator::{CellSource, DependencyGraph, StatementResult};
+use finstack_quant_statements::types::{FinancialModelSpec, ForecastSpec, NodeType};
 use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 
@@ -536,46 +537,117 @@ impl<'a> FormulaExplainer<'a> {
             ))
         })?;
 
-        let breakdown = self.build_breakdown(node_id, period, &node_spec.formula_text)?;
+        let source = self.results.get_source(node_id, period);
+        // The formula's components explain the value only when the formula
+        // produced it. A result without a source map (hand-built, or
+        // serialized before sources were recorded) is explained from the
+        // formula, as before.
+        let breakdown = match (source, &node_spec.formula_text) {
+            (Some(CellSource::Formula) | None, Some(formula)) => {
+                self.build_breakdown(period, formula)?
+            }
+            _ => Vec::new(),
+        };
+        let forecast = match source {
+            Some(CellSource::Forecast) => node_spec.forecast.clone(),
+            _ => None,
+        };
 
         Ok(Explanation {
             node_id: node_id.to_string(),
             period_id: *period,
             final_value,
             node_type: node_spec.node_type,
+            source,
+            forecast,
             formula_text: node_spec.formula_text.clone(),
             breakdown,
         })
     }
 
-    fn build_breakdown(
-        &self,
-        _node_id: &str,
-        period: &PeriodId,
-        formula: &Option<String>,
-    ) -> Result<Vec<ExplanationStep>> {
-        let mut breakdown = Vec::new();
+    /// Value a formula reference resolved to in `period`: a node value, or a
+    /// `cs.<component>.<instrument_or_total>` capital-structure component.
+    fn component_value(&self, identifier: &str, period: &PeriodId) -> Option<f64> {
+        let Some(reference) = identifier.strip_prefix("cs.") else {
+            return self.results.get(identifier, period);
+        };
+        let (component, instrument_or_total) = reference.split_once('.')?;
+        self.results
+            .cs_cashflows
+            .as_ref()?
+            .get_component(component, instrument_or_total, period)
+            .ok()
+    }
 
-        if let Some(formula_text) = formula {
-            let identifiers =
-                finstack_quant_statements::formula::extract_all_identifiers(formula_text)?;
-
-            for identifier in identifiers {
-                if identifier.starts_with("cs.") {
-                    continue;
-                }
-
-                if let Some(value) = self.results.get(&identifier, period) {
-                    breakdown.push(ExplanationStep {
-                        component: identifier.clone(),
+    fn build_breakdown(&self, period: &PeriodId, formula: &str) -> Result<Vec<ExplanationStep>> {
+        // A pure sum/difference of references is a complete step trace: one
+        // signed step per term, in formula order.
+        let ast = finstack_quant_statements::dsl::parse_formula(formula)?;
+        let mut terms = Vec::new();
+        if collect_additive_terms(&ast, true, &mut terms) {
+            let steps: Option<Vec<ExplanationStep>> = terms
+                .into_iter()
+                .map(|(component, positive)| {
+                    let value = self.component_value(&component, period)?;
+                    Some(ExplanationStep {
+                        component,
                         value,
-                        operation: None,
-                    });
-                }
+                        operation: Some(if positive { "+" } else { "-" }.to_string()),
+                    })
+                })
+                .collect();
+            if let Some(steps) = steps {
+                return Ok(steps);
             }
         }
 
-        Ok(breakdown)
+        // Otherwise list each referenced component once, without an operation.
+        let identifiers = finstack_quant_statements::formula::extract_all_identifiers(formula)?;
+        Ok(identifiers
+            .into_iter()
+            .filter_map(|component| {
+                let value = self.component_value(&component, period)?;
+                Some(ExplanationStep {
+                    component,
+                    value,
+                    operation: None,
+                })
+            })
+            .collect())
+    }
+}
+
+/// Flatten `expr` into signed reference terms when it is built only from `+`,
+/// `-` and node / capital-structure references.
+///
+/// Returns `false` (leaving `terms` unspecified) for any other expression.
+fn collect_additive_terms(
+    expr: &StmtExpr,
+    positive: bool,
+    terms: &mut Vec<(String, bool)>,
+) -> bool {
+    match expr {
+        StmtExpr::NodeRef(name) => {
+            terms.push((name.as_str().to_string(), positive));
+            true
+        }
+        StmtExpr::CsRef {
+            component,
+            instrument_or_total,
+        } => {
+            terms.push((format!("cs.{component}.{instrument_or_total}"), positive));
+            true
+        }
+        StmtExpr::BinOp {
+            op: op @ (BinOp::Add | BinOp::Sub),
+            left,
+            right,
+        } => {
+            let right_positive = positive == matches!(op, BinOp::Add);
+            collect_additive_terms(left, positive, terms)
+                && collect_additive_terms(right, right_positive, terms)
+        }
+        _ => false,
     }
 }
 
@@ -601,10 +673,39 @@ pub struct Explanation {
     /// Type of node (Value, Calculated, etc.)
     pub node_type: NodeType,
 
-    /// Formula text (if calculated)
+    /// Evaluation layer that produced `final_value` under the
+    /// `Value > Forecast > Formula` precedence: `value` (the explicit value
+    /// stored on the node), `forecast`, `formula`, or `where_masked` (the
+    /// node's `where` clause zeroed the cell).
+    ///
+    /// Read from [`StatementResult::node_sources`]; `None` when the results
+    /// carry no source for the cell (hand-built results, or results or
+    /// explanations serialized before sources were recorded).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<CellSource>,
+
+    /// The node's forecast specification (method and parameters) when
+    /// `source` is `forecast`; `None` for every other source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forecast: Option<ForecastSpec>,
+
+    /// Formula text (if calculated). Present whenever the node has a
+    /// formula, including when `source` shows that an explicit value or a
+    /// forecast took precedence over it.
     pub formula_text: Option<String>,
 
-    /// Breakdown of calculation components
+    /// Components of the formula with the values they resolved to in this
+    /// period, including `cs.<component>.<instrument_or_total>`
+    /// capital-structure references.
+    ///
+    /// Populated only when the formula produced the value (`source` is
+    /// `formula`, or unknown). Empty when `source` is `value`, `forecast` or
+    /// `where_masked`: the formula was not evaluated, and `source` /
+    /// `forecast` describe where the value came from. When the formula is a
+    /// pure sum/difference of references there is one step per term, in
+    /// formula order, each with `operation` `"+"` or `"-"`, and the signed
+    /// values sum to `final_value`. For any other formula each referenced
+    /// component is listed once with `operation` unset.
     pub breakdown: Vec<ExplanationStep>,
 }
 
@@ -632,10 +733,34 @@ impl Explanation {
 
         output.push_str(&format!("Type: {:?}\n", self.node_type));
 
+        if let Some(source) = self.source {
+            output.push_str(&format!("Source: {}\n", source.as_str()));
+        }
+        if let Some(forecast) = &self.forecast {
+            output.push_str(&format!("Forecast: {:?}", forecast.method));
+            if !forecast.params.is_empty() {
+                let params: Vec<String> = forecast
+                    .params
+                    .iter()
+                    .map(|(name, value)| format!("{name}={value}"))
+                    .collect();
+                output.push_str(&format!(" ({})", params.join(", ")));
+            }
+            output.push('\n');
+        }
+
         if !self.breakdown.is_empty() {
             output.push_str("\nComponents:\n");
             for step in &self.breakdown {
-                output.push_str(&format!("  {} = {:.2}\n", step.component, step.value));
+                match &step.operation {
+                    Some(operation) => output.push_str(&format!(
+                        "  {} {} = {:.2}\n",
+                        operation, step.component, step.value
+                    )),
+                    None => {
+                        output.push_str(&format!("  {} = {:.2}\n", step.component, step.value));
+                    }
+                }
             }
         }
 
@@ -659,8 +784,12 @@ pub struct ExplanationStep {
     )]
     pub value: f64,
 
-    /// Operation applied (e.g., "+", "-", "*", "/")
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Sign with which the component enters the formula: `"+"` or `"-"`.
+    ///
+    /// Set only when the formula is a pure sum/difference of references, in
+    /// which case the signed step values sum to the explained value; unset
+    /// for any other formula.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operation: Option<String>,
 }
 
@@ -703,6 +832,8 @@ mod tests {
             period_id: "2025Q1".parse().expect("period"),
             final_value: f64::NAN,
             node_type: NodeType::Calculated,
+            source: None,
+            forecast: None,
             formula_text: None,
             breakdown: vec![step.clone()],
         };
@@ -983,6 +1114,178 @@ mod tests {
         assert!(matches!(explanation.node_type, NodeType::Value));
         assert!(explanation.formula_text.is_none());
         assert!(explanation.breakdown.is_empty());
+        // The explanation says where the number came from.
+        assert_eq!(explanation.source, Some(CellSource::Value));
+        assert!(explanation.forecast.is_none());
+        assert!(explanation.to_string_detailed().contains("Source: value"));
+    }
+
+    /// A forecast cell is explained by its source and forecast spec.
+    #[test]
+    fn test_explain_forecast_cell() {
+        use finstack_quant_statements::types::{ForecastMethod, ForecastSpec};
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+        let model = ModelBuilder::new("test")
+            .periods("2025Q1..Q2", Some("2025Q1"))
+            .expect("test should succeed")
+            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
+            .forecast("revenue", ForecastSpec::growth(0.05))
+            .build()
+            .expect("test should succeed");
+        let results = Evaluator::new()
+            .evaluate(&model)
+            .expect("test should succeed");
+        let explainer = FormulaExplainer::new(&model, &results);
+
+        let actual = explainer.explain("revenue", &period).expect("actual");
+        assert_eq!(actual.source, Some(CellSource::Value));
+        assert!(actual.forecast.is_none());
+
+        let forecast = explainer.explain("revenue", &period2).expect("forecast");
+        assert!((forecast.final_value - 105.0).abs() < 1e-9);
+        assert_eq!(forecast.source, Some(CellSource::Forecast));
+        let spec = forecast.forecast.as_ref().expect("forecast spec");
+        assert_eq!(spec.method, ForecastMethod::GrowthPct);
+        assert_eq!(spec.params["rate"], serde_json::json!(0.05));
+        let text = forecast.to_string_detailed();
+        assert!(text.contains("Source: forecast"), "{text}");
+        assert!(
+            text.contains("GrowthPct") && text.contains("rate=0.05"),
+            "{text}"
+        );
+
+        let json = serde_json::to_value(&forecast).expect("serialize");
+        assert_eq!(json["source"], serde_json::json!("forecast"));
+        let back: Explanation = serde_json::from_value(json).expect("round trip");
+        assert_eq!(back.forecast, forecast.forecast);
+    }
+
+    /// `cs.*` references are resolved from the result's capital-structure
+    /// cashflows and appear as steps.
+    #[test]
+    fn test_explain_includes_capital_structure_references() {
+        use finstack_quant_core::currency::Currency;
+        use finstack_quant_core::money::Money;
+        use finstack_quant_statements::capital_structure::{
+            CapitalStructureCashflows, CashflowBreakdown,
+        };
+
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let model = ModelBuilder::new("test")
+            .periods("2025Q1..Q1", None)
+            .expect("test should succeed")
+            .value("ebit", &[(period, AmountOrScalar::scalar(100.0))])
+            .compute("pretax", "ebit - cs.interest_expense.TL")
+            .expect("test should succeed")
+            .build()
+            .expect("test should succeed");
+
+        let mut cashflows = CapitalStructureCashflows::new();
+        cashflows.by_instrument.insert(
+            "TL".into(),
+            [(
+                period,
+                CashflowBreakdown {
+                    interest_expense_cash: Money::from((30_i64, Currency::USD)),
+                    ..CashflowBreakdown::with_currency(Currency::USD)
+                },
+            )]
+            .into_iter()
+            .collect(),
+        );
+        let mut results = StatementResult::default();
+        results
+            .nodes
+            .insert("ebit".into(), [(period, 100.0)].into_iter().collect());
+        results
+            .nodes
+            .insert("pretax".into(), [(period, 70.0)].into_iter().collect());
+        results.cs_cashflows = Some(cashflows);
+
+        let explanation = FormulaExplainer::new(&model, &results)
+            .explain("pretax", &period)
+            .expect("explanation");
+        // Hand-built results carry no cell source; the formula is explained.
+        assert_eq!(explanation.source, None);
+        let steps: Vec<(&str, f64, Option<&str>)> = explanation
+            .breakdown
+            .iter()
+            .map(|step| {
+                (
+                    step.component.as_str(),
+                    step.value,
+                    step.operation.as_deref(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            steps,
+            [
+                ("ebit", 100.0, Some("+")),
+                ("cs.interest_expense.TL", 30.0, Some("-"))
+            ]
+        );
+    }
+
+    /// A sum/difference formula yields a signed step per term that reconciles
+    /// to the value; any other formula lists components without an operation.
+    #[test]
+    fn test_explain_operations_reconcile_for_additive_formulas() {
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let model = ModelBuilder::new("test")
+            .periods("2025Q1..Q1", None)
+            .expect("test should succeed")
+            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
+            .value("cogs", &[(period, AmountOrScalar::scalar(40.0))])
+            .value("opex", &[(period, AmountOrScalar::scalar(25.0))])
+            .value("other", &[(period, AmountOrScalar::scalar(5.0))])
+            .compute("ebit", "revenue - (cogs + opex) + other")
+            .expect("test should succeed")
+            .compute("margin", "ebit / revenue")
+            .expect("test should succeed")
+            .build()
+            .expect("test should succeed");
+        let results = Evaluator::new()
+            .evaluate(&model)
+            .expect("test should succeed");
+        let explainer = FormulaExplainer::new(&model, &results);
+
+        let ebit = explainer.explain("ebit", &period).expect("ebit");
+        assert_eq!(ebit.source, Some(CellSource::Formula));
+        let signed: Vec<(&str, &str)> = ebit
+            .breakdown
+            .iter()
+            .map(|step| {
+                (
+                    step.component.as_str(),
+                    step.operation.as_deref().expect("operation"),
+                )
+            })
+            .collect();
+        assert_eq!(
+            signed,
+            [
+                ("revenue", "+"),
+                ("cogs", "-"),
+                ("opex", "-"),
+                ("other", "+")
+            ]
+        );
+        let total: f64 = ebit
+            .breakdown
+            .iter()
+            .map(|step| match step.operation.as_deref() {
+                Some("-") => -step.value,
+                _ => step.value,
+            })
+            .sum();
+        assert_eq!(total, ebit.final_value);
+        assert_eq!(ebit.final_value, 40.0);
+
+        let margin = explainer.explain("margin", &period).expect("margin");
+        assert_eq!(margin.breakdown.len(), 2);
+        assert!(margin.breakdown.iter().all(|step| step.operation.is_none()));
     }
 
     #[test]

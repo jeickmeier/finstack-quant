@@ -98,7 +98,7 @@ a submodule.
 
 | Area | Key exports |
 |------|-------------|
-| Valuation | `CorporateAnalysisBuilder`, `CorporateAnalysis`, `CorporateValuationResult`, `evaluate_dcf_with_market`, `DcfOptions`, `dcf_sensitivity`, `DcfSensitivityResult`, `ExitMultipleBump`, `wacc` |
+| Valuation | `CorporateAnalysisBuilder`, `CorporateAnalysis`, `CorporateValuationResult`, `DcfPeriodRow`, `evaluate_dcf_with_market`, `DcfOptions`, `dcf_sensitivity`, `DcfSensitivityResult`, `ExitMultipleBump`, `wacc` |
 | LBO | `evaluate_lbo`, `LboConfig`, `LboResult`, `LboTranche`, `LboCheckMappings` |
 | Scenarios | `ScenarioSet`, `ScenarioDefinition`, `ScenarioResults`, `ScenarioDiff` |
 | Sensitivity | `SensitivityAnalyzer`, `SensitivityConfig`, `SensitivityMode`, `SensitivityResult`, `ParameterSpec`, `TornadoEntry`, `generate_tornado_entries` |

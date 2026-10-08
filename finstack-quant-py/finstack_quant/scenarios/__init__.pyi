@@ -902,6 +902,53 @@ class ApplicationReport:
         ...
 
     @property
+    def applied_shocks(self) -> list[dict[str, Any]]:
+        """
+        Size of every market and instrument shock applied, in application order.
+
+        ``changes`` names which targets changed (deduplicated); this lists by
+        how much, with one entry per accepted effect, so a target shocked
+        several times appears several times.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One dict per applied shock with these keys:
+
+            - ``applies_to``: ``{"scope": "market", "target": {...}}`` with the
+              same resolved target dict that ``changes["market_targets"]``
+              carries, or ``{"scope": "instruments", "indices": [...]}`` with
+              the zero-based inventory indices the shock changed.
+            - ``shock``: a dict tagged by ``kind``. ``uniform`` (``value``,
+              ``unit``) is one size for the whole target: a parallel curve or
+              surface shift, or the shock to a price, an FX rate or
+              instruments. ``key_rate`` (``time_years``, ``value``, ``unit``)
+              is a triangular bump centred on one curve knot. ``nodes``
+              (``nodes`` = list of ``{"tenor", "value"}``, ``unit``) lists the
+              requested nodes of a curve rebuilt in one step. ``vol_bucket``
+              (optional ``expiries_years`` and ``strikes``, ``value``,
+              ``unit``) and ``detachment_bucket`` (``detachments_bp``,
+              ``value``, ``unit``) are bucket shocks. ``unit`` is ``"bp"``
+              (additive basis points, 1.0 = 0.0001), ``"percent"`` (relative,
+              5.0 = +5%) or ``"absolute"`` (additive in the target's own quote
+              units: volatility-index points or decimal correlation).
+            - ``level_change``: ``{"before", "after"}`` stored levels around
+              the shock. Present only for ``equity_price`` targets; FX, curve,
+              surface and instrument shocks record their size only.
+
+            Sizes are the shock as requested on the operation; delivery
+            adjustments (interpolation, recalibration, clamping) are reported
+            in ``warnings``. Statement-forecast operations, rate bindings and
+            the time roll are not listed. Empty when no market or instrument
+            shock was applied.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored or derived value.
+        """
+        ...
+
+    @property
     def time_roll(self) -> dict[str, Any] | None:
         """
         Roll-forward report, present only when the scenario contained a
@@ -926,8 +973,9 @@ class ApplicationReport:
         -------
         pd.DataFrame
             One row with columns ``operations_applied``, ``user_operations``,
-            ``expanded_operations``, ``warning_count``, ``as_of_changed`` and
-            ``all_dirty``.
+            ``expanded_operations``, ``warning_count``, ``as_of_changed``,
+            ``all_dirty`` and ``shock_count`` (number of ``applied_shocks``
+            entries).
 
         Raises
         ------

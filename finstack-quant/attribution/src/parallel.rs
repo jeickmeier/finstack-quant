@@ -549,6 +549,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
     );
     // Policy-visibility invariant: stamp the execution policy the
     // attribution ran under (workspace rule: results carry the parallel flag).
+    stamp_endpoints(&mut attribution, val_t0, val_t1);
     attribution.meta.execution_policy = Some(execution_policy);
     let factor_use = InstrumentFactorUse::of(instrument.as_ref());
 

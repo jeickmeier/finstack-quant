@@ -126,6 +126,7 @@ impl Check for WorkingCapitalConsistency {
                         reference_label: "expected_wc_change".to_string(),
                     }),
                     nodes,
+                    comparison: None,
                 });
             }
         }
@@ -138,6 +139,7 @@ impl Check for WorkingCapitalConsistency {
             category: self.category(),
             passed,
             findings,
+            comparisons: Vec::new(),
         })
     }
 }

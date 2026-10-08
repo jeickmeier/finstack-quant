@@ -435,7 +435,9 @@ impl SequentialBootstrapper {
             residuals,
             total_iterations,
             validation_tolerance,
-        );
+        )
+        .with_solver_method(crate::report::SolverMethod::SequentialBootstrap)
+        .with_residual_units(target.residual_units());
 
         // W-40: flag approximate knots in report metadata so callers can
         // distinguish true bracketed roots from accepted local |f|-minima.
@@ -703,6 +705,10 @@ mod tests {
             Ok(DummyCurve(knots.to_vec()))
         }
 
+        fn residual_units(&self) -> crate::report::ResidualUnits {
+            crate::report::ResidualUnits::PvPerUnitNotional
+        }
+
         fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
             let current = curve
                 .0
@@ -777,6 +783,10 @@ mod tests {
             Ok(DummyCurve(knots.to_vec()))
         }
 
+        fn residual_units(&self) -> crate::report::ResidualUnits {
+            crate::report::ResidualUnits::PvPerUnitNotional
+        }
+
         fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
             let value = curve
                 .0
@@ -844,6 +854,7 @@ mod tests {
             assert_eq!(curve.0, vec![(0.0, 0.0), (1.0, 0.0), (2.0, 0.0)]);
             let diagnostics = report.diagnostics.expect("diagnostics enabled");
             assert_eq!(diagnostics.per_quote.len(), 2);
+            assert!(diagnostics.jacobian.is_none());
             for (quality, quote) in diagnostics.per_quote.iter().zip([&short, &long]) {
                 assert_eq!(quality.quote_label, quote.label);
                 assert_eq!(quality.residual, quote.residual);
@@ -914,6 +925,10 @@ mod w40_tests {
                 .ok_or(finstack_quant_core::Error::Input(
                     finstack_quant_core::InputError::TooFewPoints,
                 ))
+        }
+
+        fn residual_units(&self) -> crate::report::ResidualUnits {
+            crate::report::ResidualUnits::PvPerUnitNotional
         }
 
         fn calculate_residual(
@@ -1039,6 +1054,10 @@ mod w40_tests {
                 .ok_or(finstack_quant_core::Error::Input(
                     finstack_quant_core::InputError::TooFewPoints,
                 ))
+        }
+
+        fn residual_units(&self) -> crate::report::ResidualUnits {
+            crate::report::ResidualUnits::PvPerUnitNotional
         }
 
         fn calculate_residual(
@@ -1243,6 +1262,10 @@ mod w40_tests {
             NonMonotoneNoBracketTarget.build_curve(knots)
         }
 
+        fn residual_units(&self) -> crate::report::ResidualUnits {
+            crate::report::ResidualUnits::PvPerUnitNotional
+        }
+
         fn calculate_residual(
             &self,
             curve: &Self::Curve,
@@ -1338,6 +1361,10 @@ mod solver_tests {
 
         fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
             self.build_curve(knots)
+        }
+
+        fn residual_units(&self) -> crate::report::ResidualUnits {
+            crate::report::ResidualUnits::PvPerUnitNotional
         }
 
         fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
@@ -1508,6 +1535,10 @@ mod solver_tests {
                     .last()
                     .map(|(_, v)| *v)
                     .ok_or(Error::Input(finstack_quant_core::InputError::TooFewPoints))
+            }
+
+            fn residual_units(&self) -> crate::report::ResidualUnits {
+                crate::report::ResidualUnits::PvPerUnitNotional
             }
 
             fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {

@@ -67,7 +67,18 @@ def test_beta_result_to_dataframe_is_one_row() -> None:
     df = result.to_dataframe()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
-    assert list(df.columns) == ["beta", "std_err", "ci_lower", "ci_upper"]
+    assert list(df.columns) == [
+        "beta",
+        "std_err",
+        "ci_lower",
+        "ci_upper",
+        "n_obs",
+        "confidence_level",
+    ]
+    assert df["n_obs"].dtype == "int64"
+    # Eight paired return observations feed the regression.
+    assert df["n_obs"].iloc[0] == result.n_obs == 8
+    assert df["confidence_level"].iloc[0] == result.confidence_level == 0.95
     row = df.iloc[0]
     # Each cell against its own accessor, not against a shared constant.
     assert row["beta"] == pytest.approx(result.beta)
@@ -85,7 +96,9 @@ def test_greeks_result_to_dataframe_is_one_row() -> None:
     df = result.to_dataframe()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
-    assert list(df.columns) == ["alpha", "beta", "r_squared", "adjusted_r_squared"]
+    assert list(df.columns) == ["alpha", "beta", "r_squared", "adjusted_r_squared", "n_obs"]
+    assert df["n_obs"].dtype == "int64"
+    assert df["n_obs"].iloc[0] == result.n_obs == 8
     row = df.iloc[0]
     assert row["alpha"] == pytest.approx(result.alpha)
     assert row["beta"] == pytest.approx(result.beta)
@@ -122,7 +135,9 @@ def test_multi_factor_result_to_dataframe_is_one_row_per_factor() -> None:
         "r_squared",
         "adjusted_r_squared",
         "residual_vol",
+        "n_obs",
     ]
+    assert list(df["n_obs"]) == [result.n_obs] * len(df) == [8, 8]
     assert list(df["factor"]) == ["factor_0", "factor_1"]
     assert list(df["beta"]) == pytest.approx(list(result.betas))
     # The two loadings are the two different numbers the regression was built

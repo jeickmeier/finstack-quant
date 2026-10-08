@@ -394,6 +394,53 @@ fn example_08_equity_vol_surface_builds_queryable_surface() {
 }
 
 #[test]
+fn example_08_equity_vol_surface_reports_fitted_sabr_slices() {
+    use finstack_quant_calibration::{FittedSliceParameters, ResidualUnits, SolverMethod};
+
+    let envelope = load_envelope("08_equity_vol_surface.json");
+    let result = engine::calibrate(&envelope).expect("calibration engine succeeded");
+    let report = &result.result.step_reports[&envelope.plan.steps[1].id];
+
+    assert_eq!(
+        report.solver_method,
+        Some(SolverMethod::PerSliceLeastSquares)
+    );
+    assert_eq!(report.residual_units, Some(ResidualUnits::QuotedVolatility));
+
+    // One slice per quoted expiry, in increasing expiry order, accounting for
+    // every solver iteration the step reports.
+    let slices = &report.fitted_slices;
+    assert_eq!(
+        slices.len().to_string(),
+        report.metadata["calibrated_expiry_count"]
+    );
+    assert!(!slices.is_empty());
+    assert!(slices
+        .windows(2)
+        .all(|pair| pair[0].expiry < pair[1].expiry));
+    assert_eq!(
+        slices.iter().map(|slice| slice.iterations).sum::<usize>(),
+        report.iterations
+    );
+    for slice in slices {
+        let FittedSliceParameters::Sabr(params) = &slice.parameters else {
+            panic!("equity vol surface slices are SABR fits");
+        };
+        assert!(params.alpha > 0.0 && params.nu >= 0.0 && params.rho.abs() < 1.0);
+        let error = slice
+            .max_relative_quote_error
+            .expect("SABR slices report their fit error");
+        assert!(error.is_finite() && error >= 0.0);
+    }
+
+    // The slices survive the report's wire form.
+    let json = serde_json::to_string(report).expect("serialize report");
+    let restored: finstack_quant_calibration::CalibrationReport =
+        serde_json::from_str(&json).expect("deserialize report");
+    assert_eq!(restored.fitted_slices.len(), slices.len());
+}
+
+#[test]
 fn example_10_bond_prices_supports_lookup() {
     use finstack_quant_core::market_data::scalars::MarketScalar;
 

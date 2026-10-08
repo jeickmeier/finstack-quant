@@ -56,7 +56,7 @@
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 
 use super::mva;
-use super::types::{ExposureProfile, FundingConfig, XvaResult};
+use super::types::{CreditXvaRow, ExposureProfile, FundingConfig, FundingXvaRow, XvaResult};
 
 fn validate_exposure_profile_lengths(
     exposure_profile: &ExposureProfile,
@@ -112,6 +112,7 @@ fn compute_cva_internal(
     let lgd = 1.0 - recovery_rate;
 
     let mut cva = 0.0;
+    let mut cva_rows = Vec::with_capacity(n);
     let mut epe_profile = Vec::with_capacity(n);
     let mut ene_profile = Vec::with_capacity(n);
     let mut effective_epe_profile = Vec::with_capacity(n);
@@ -163,7 +164,19 @@ fn compute_cva_internal(
         let df_mid = 0.5 * (prev_df + df_t);
         let own_survival_mid = 0.5 * (prev_own_survival + own_survival_t);
 
-        cva += lgd * epe_mid * marginal_pd * df_mid * own_survival_mid;
+        let contribution = lgd * epe_mid * marginal_pd * df_mid * own_survival_mid;
+        cva += contribution;
+        cva_rows.push(CreditXvaRow {
+            time: t,
+            discount_factor: df_t,
+            survival_probability: survival_t,
+            marginal_default_probability: marginal_pd,
+            exposure_mid: epe_mid,
+            discount_factor_mid: df_mid,
+            survival_weight: own_survival_mid,
+            loss_given_default: lgd,
+            contribution,
+        });
 
         effective_epe_running = effective_epe_running.max(epe_t);
 
@@ -203,6 +216,9 @@ fn compute_cva_internal(
         max_epe,
         effective_epe_profile,
         effective_epe,
+        cva_rows,
+        dva_rows: None,
+        fva_rows: None,
         meta: finstack_quant_core::config::results_meta(
             &finstack_quant_core::config::FinstackConfig::default(),
         ),
@@ -216,7 +232,7 @@ fn compute_dva_internal(
     own_recovery_rate: f64,
     counterparty_survival_curve: Option<&HazardCurve>,
     posted_im: Option<&mva::ImProfile>,
-) -> finstack_quant_core::Result<f64> {
+) -> finstack_quant_core::Result<(f64, Vec<CreditXvaRow>)> {
     let n = validate_exposure_profile_lengths(exposure_profile, "DVA")?;
 
     if !(0.0..=1.0).contains(&own_recovery_rate) {
@@ -227,6 +243,7 @@ fn compute_dva_internal(
 
     let lgd_own = 1.0 - own_recovery_rate;
     let mut dva = 0.0;
+    let mut rows = Vec::with_capacity(n);
     let mut prev_survival = 1.0;
     let mut prev_counterparty_survival = 1.0;
     let mut prev_ene =
@@ -270,7 +287,19 @@ fn compute_dva_internal(
         let counterparty_survival_mid =
             0.5 * (prev_counterparty_survival + counterparty_survival_t);
 
-        dva += lgd_own * ene_mid * marginal_pd * df_mid * counterparty_survival_mid;
+        let contribution = lgd_own * ene_mid * marginal_pd * df_mid * counterparty_survival_mid;
+        dva += contribution;
+        rows.push(CreditXvaRow {
+            time: t,
+            discount_factor: df_t,
+            survival_probability: survival_t,
+            marginal_default_probability: marginal_pd,
+            exposure_mid: ene_mid,
+            discount_factor_mid: df_mid,
+            survival_weight: counterparty_survival_mid,
+            loss_given_default: lgd_own,
+            contribution,
+        });
 
         prev_survival = survival_t;
         prev_counterparty_survival = counterparty_survival_t;
@@ -278,7 +307,7 @@ fn compute_dva_internal(
         prev_df = df_t;
     }
 
-    Ok(dva)
+    Ok((dva, rows))
 }
 
 fn compute_fva_internal(
@@ -288,13 +317,14 @@ fn compute_fva_internal(
     funding_benefit_bp: f64,
     counterparty_hazard_curve: Option<&HazardCurve>,
     own_hazard_curve: Option<&HazardCurve>,
-) -> finstack_quant_core::Result<f64> {
+) -> finstack_quant_core::Result<(f64, Vec<FundingXvaRow>)> {
     let n = validate_exposure_profile_lengths(exposure_profile, "FVA")?;
 
     let spread_cost = funding_spread_bp / 10_000.0;
     let spread_benefit = funding_benefit_bp / 10_000.0;
 
     let mut fva = 0.0;
+    let mut rows = Vec::with_capacity(n);
     let mut prev_counterparty_survival = 1.0;
     let mut prev_own_survival = 1.0;
     let mut prev_epe = exposure_profile.epe[0];
@@ -347,8 +377,21 @@ fn compute_fva_internal(
         let own_survival_mid = 0.5 * (prev_own_survival + own_survival_t);
         let joint_survival_mid = counterparty_survival_mid * own_survival_mid;
 
-        fva +=
+        let contribution =
             (epe_mid * spread_cost - ene_mid * spread_benefit) * df_mid * dt * joint_survival_mid;
+        fva += contribution;
+        rows.push(FundingXvaRow {
+            time: t,
+            dt,
+            discount_factor: df_t,
+            epe_mid,
+            ene_mid,
+            discount_factor_mid: df_mid,
+            joint_survival_mid,
+            funding_spread: spread_cost,
+            funding_benefit_spread: spread_benefit,
+            contribution,
+        });
 
         prev_counterparty_survival = counterparty_survival_t;
         prev_own_survival = own_survival_t;
@@ -358,7 +401,7 @@ fn compute_fva_internal(
         prev_t = t;
     }
 
-    Ok(fva)
+    Ok((fva, rows))
 }
 
 /// Compute **unilateral** Credit Valuation Adjustment (CVA).
@@ -508,6 +551,7 @@ pub fn compute_dva(
         None,
         None,
     )
+    .map(|(dva, _)| dva)
 }
 
 /// Compute Funding Valuation Adjustment (FVA).
@@ -572,6 +616,7 @@ pub fn compute_fva(
         None,
         None,
     )
+    .map(|(fva, _)| fva)
 }
 
 /// Compute bilateral XVA: CVA, DVA, FVA, MVA, and the all-in adjustment.
@@ -655,7 +700,7 @@ pub fn compute_bilateral_xva(
         }
     }
 
-    let dva = compute_dva_internal(
+    let (dva, dva_rows) = compute_dva_internal(
         exposure_profile,
         own_hazard_curve,
         discount_curve,
@@ -664,9 +709,10 @@ pub fn compute_bilateral_xva(
         posted_im,
     )?;
     result.dva = Some(dva);
+    result.dva_rows = Some(dva_rows);
 
     let fva = if let Some(fc) = funding {
-        let fva_val = compute_fva_internal(
+        let (fva_val, fva_rows) = compute_fva_internal(
             exposure_profile,
             discount_curve,
             fc.funding_spread_bp,
@@ -675,6 +721,7 @@ pub fn compute_bilateral_xva(
             Some(own_hazard_curve),
         )?;
         result.fva = Some(fva_val);
+        result.fva_rows = Some(fva_rows);
         fva_val
     } else {
         result.fva = None;
@@ -1404,6 +1451,106 @@ mod tests {
 
         // FVA should be positive since EPE > ENE and funding_spread > funding_benefit
         assert!(fva > 0.0, "FVA should be positive, got {fva}");
+    }
+
+    #[test]
+    fn xva_rows_sum_and_replay_to_the_reported_legs() {
+        let counterparty_hazard = flat_hazard_curve(0.02);
+        let own_hazard = flat_hazard_curve(0.03);
+        let discount = flat_discount_curve(0.04);
+        let times: Vec<f64> = (1..=20).map(|i| i as f64 * 0.5).collect();
+        let profile = ExposureProfile {
+            times: times.clone(),
+            mtm_values: times.iter().map(|t| 500_000.0 - 20_000.0 * t).collect(),
+            epe: times.iter().map(|t| 800_000.0 - 30_000.0 * t).collect(),
+            ene: times.iter().map(|t| 300_000.0 + 10_000.0 * t).collect(),
+            diagnostics: None,
+        };
+        let funding = FundingConfig {
+            funding_spread_bp: 50.0,
+            funding_benefit_bp: Some(30.0),
+            ..Default::default()
+        };
+
+        // Unilateral CVA: rows only for the CVA leg, unit survival weight.
+        let unilateral = compute_cva(&profile, &counterparty_hazard, &discount, 0.40)
+            .expect("CVA should compute");
+        assert_eq!(unilateral.cva_rows.len(), times.len());
+        assert!(unilateral.dva_rows.is_none() && unilateral.fva_rows.is_none());
+        assert!(unilateral.cva_rows.iter().all(|r| r.survival_weight == 1.0));
+        let sum: f64 = unilateral.cva_rows.iter().map(|r| r.contribution).sum();
+        assert_eq!(sum, unilateral.cva);
+
+        let result = compute_bilateral_xva(
+            &profile,
+            &counterparty_hazard,
+            &own_hazard,
+            &discount,
+            0.40,
+            0.35,
+            Some(&funding),
+        )
+        .expect("bilateral XVA should compute");
+
+        let credit_legs = [
+            (&result.cva_rows, result.cva, &counterparty_hazard, 0.60),
+            (
+                result.dva_rows.as_ref().expect("DVA rows"),
+                result.dva.expect("DVA"),
+                &own_hazard,
+                0.65,
+            ),
+        ];
+        for (rows, reported, hazard, lgd) in credit_legs {
+            assert_eq!(rows.len(), times.len());
+            let mut total = 0.0;
+            let mut prev_survival = 1.0;
+            for (row, t) in rows.iter().zip(&times) {
+                assert_eq!(row.time, *t);
+                assert_eq!(row.discount_factor, discount.df(*t));
+                assert_eq!(row.survival_probability, hazard.sp(*t));
+                assert_eq!(
+                    row.marginal_default_probability,
+                    (prev_survival - row.survival_probability).max(0.0)
+                );
+                assert!((row.loss_given_default - lgd).abs() < 1e-15);
+                assert!(row.survival_weight < 1.0);
+                assert_eq!(
+                    row.contribution,
+                    row.loss_given_default
+                        * row.exposure_mid
+                        * row.marginal_default_probability
+                        * row.discount_factor_mid
+                        * row.survival_weight
+                );
+                total += row.contribution;
+                prev_survival = row.survival_probability;
+            }
+            assert_eq!(total, reported);
+        }
+
+        let fva_rows = result.fva_rows.as_ref().expect("FVA rows");
+        assert_eq!(fva_rows.len(), times.len());
+        let mut total = 0.0;
+        for row in fva_rows {
+            assert_eq!(row.funding_spread, 0.005);
+            assert_eq!(row.funding_benefit_spread, 0.003);
+            assert_eq!(
+                row.contribution,
+                (row.epe_mid * row.funding_spread - row.ene_mid * row.funding_benefit_spread)
+                    * row.discount_factor_mid
+                    * row.dt
+                    * row.joint_survival_mid
+            );
+            total += row.contribution;
+        }
+        assert_eq!(total, result.fva.expect("FVA"));
+
+        let json = serde_json::to_string(&result).expect("serialize");
+        let back: XvaResult = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back.cva_rows.len(), times.len());
+        assert_eq!(back.dva_rows.map(|rows| rows.len()), Some(times.len()));
+        assert_eq!(back.fva_rows.map(|rows| rows.len()), Some(times.len()));
     }
 
     #[test]

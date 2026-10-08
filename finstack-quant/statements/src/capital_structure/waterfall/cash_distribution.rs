@@ -1,7 +1,7 @@
 //! Sweep capacity, pro-rata allocation, available-cash caps, and
 //! the [`StagedInstrumentFlow`] working struct.
 
-use crate::capital_structure::cashflows::CashflowBreakdown;
+use crate::capital_structure::cashflows::{add_optional_money, CashflowBreakdown};
 use crate::capital_structure::principal::PrincipalAllocation;
 use crate::error::Result;
 use crate::evaluator::{CapitalStructureClaimCategory, CapitalStructureWarning, EvalWarning};
@@ -28,6 +28,11 @@ pub(super) struct StagedInstrumentFlow {
     pub toggled_pik_moved: Money,
 }
 
+/// Selects the principal component of a [`CashflowBreakdown`]
+/// (`scheduled_principal`, `mandatory_prepayment`, `sweep_prepayment` or
+/// `voluntary_prepayment`) that a payment rung records its cash in.
+pub(super) type PrincipalComponent = fn(&mut CashflowBreakdown) -> &mut Option<Money>;
+
 /// Apply a prepayment at its position in the priority stack.
 ///
 /// Earlier payments consume principal capacity; later scheduled claims and
@@ -38,6 +43,7 @@ pub(super) fn apply_prepayment(
     remaining_cash: &mut Money,
     requested: Money,
     target: Option<&str>,
+    component: PrincipalComponent,
 ) -> Result<()> {
     let budget = Money::new(
         requested.amount().min(remaining_cash.amount()).max(0.0),
@@ -55,6 +61,7 @@ pub(super) fn apply_prepayment(
         let payment = Money::new(allocated, remaining_cash.currency())?;
         s.principal.pay_prepayment(payment)?;
         s.breakdown.principal_payment = s.breakdown.principal_payment.checked_add(payment)?;
+        add_optional_money(component(&mut s.breakdown), Some(payment))?;
     }
     Ok(())
 }

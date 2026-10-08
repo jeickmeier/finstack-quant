@@ -17,9 +17,10 @@ fn table_metadata(layout: &str) -> IndexMap<String, serde_json::Value> {
 
 /// Export results to a long-format table.
 ///
-/// Schema: `(node_id, period_id, value, value_money, currency, value_type)`.
+/// Schema: `(node_id, period_id, value, value_money, currency, value_type, source)`.
 /// Monetary nodes populate both `value` and `value_money`; scalar nodes leave
-/// `value_money` and `currency` null.
+/// `value_money` and `currency` null. `source` is the cell's
+/// [`CellSource`](super::CellSource) label, null when none was recorded.
 pub(crate) fn to_table_long(results: &StatementResult) -> Result<TableEnvelope> {
     let mut node_ids = Vec::new();
     let mut period_ids = Vec::new();
@@ -27,6 +28,7 @@ pub(crate) fn to_table_long(results: &StatementResult) -> Result<TableEnvelope> 
     let mut money_values = Vec::new();
     let mut currencies = Vec::new();
     let mut value_types = Vec::new();
+    let mut sources = Vec::new();
 
     for (node_id, period_map) in &results.nodes {
         let node_value_type = results.node_value_types.get(node_id);
@@ -35,6 +37,11 @@ pub(crate) fn to_table_long(results: &StatementResult) -> Result<TableEnvelope> 
             node_ids.push(node_id.clone());
             period_ids.push(period_id.to_string());
             values.push(*value);
+            sources.push(
+                results
+                    .get_source(node_id, period_id)
+                    .map(|source| source.as_str().to_string()),
+            );
 
             if let Some(NodeValueType::Monetary { currency }) = node_value_type {
                 money_values.push(Some(*value));
@@ -64,6 +71,8 @@ pub(crate) fn to_table_long(results: &StatementResult) -> Result<TableEnvelope> 
             TableColumn::new("currency", TableColumnData::NullableString(currencies))
                 .with_role(TableColumnRole::Attribute),
             TableColumn::new("value_type", TableColumnData::String(value_types))
+                .with_role(TableColumnRole::Attribute),
+            TableColumn::new("source", TableColumnData::NullableString(sources))
                 .with_role(TableColumnRole::Attribute),
         ],
         table_metadata("long"),
@@ -192,7 +201,7 @@ mod tests {
         let table = to_table_long(&results).expect("should convert to table");
 
         assert_eq!(table.row_count, 6); // 3 nodes × 2 periods
-        assert_eq!(table.columns.len(), 6);
+        assert_eq!(table.columns.len(), 7);
 
         let node_ids = string_column(&table, "node_id");
         assert_eq!(node_ids[0], "revenue");
@@ -238,7 +247,7 @@ mod tests {
 
         let table_long = to_table_long(&results).unwrap();
         assert_eq!(table_long.row_count, 0);
-        assert_eq!(table_long.columns.len(), 6);
+        assert_eq!(table_long.columns.len(), 7);
         assert_eq!(nullable_float_column(&table_long, "value_money").len(), 0);
         assert_eq!(nullable_string_column(&table_long, "currency").len(), 0);
 

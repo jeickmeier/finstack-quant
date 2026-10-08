@@ -1,13 +1,17 @@
 //! Operation dispatch, effect processing, and market-bump batching.
 
 use super::instrument_shocks::{apply_correlation_effect, apply_instrument_shock, CorrelationKind};
-use super::{ExecutionContext, HazardApplyEnv, ScenarioChangeManifest, ScenarioMarketTarget};
+use super::{
+    AppliedShock, AppliedShockTarget, ExecutionContext, HazardApplyEnv, LevelChange,
+    ScenarioChangeManifest, ScenarioMarketTarget, ShockMagnitude, ShockNode, ShockUnit,
+};
 use crate::adapters;
 use crate::adapters::traits::ScenarioEffect;
 use crate::error::Result;
 use crate::spec::{CurveKind, OperationSpec};
 use crate::warning::Warning;
-use finstack_quant_core::market_data::bumps::MarketBump;
+use finstack_quant_core::market_data::bumps::{BumpType, MarketBump};
+use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_core::HashSet;
 use finstack_quant_valuations::instruments::Instrument;
@@ -233,6 +237,141 @@ fn market_target_for_curve_update(
     market_target_for_id(op, storage.id())
 }
 
+/// Unit of the sizes on a curve operation: commodity price curves are shocked
+/// in percent of the forward, every other curve kind in basis points.
+fn curve_shock_unit(curve_kind: CurveKind) -> ShockUnit {
+    match curve_kind {
+        CurveKind::Commodity => ShockUnit::Percent,
+        CurveKind::Discount | CurveKind::Forward | CurveKind::ParCDS | CurveKind::Inflation => {
+            ShockUnit::Bp
+        }
+    }
+}
+
+fn node_shock(nodes: &[(String, f64)], unit: ShockUnit) -> ShockMagnitude {
+    ShockMagnitude::Nodes {
+        nodes: nodes
+            .iter()
+            .map(|(tenor, value)| ShockNode {
+                tenor: tenor.clone(),
+                value: *value,
+            })
+            .collect(),
+        unit,
+    }
+}
+
+/// Shock size as requested on a direct operation, in its own quote space.
+///
+/// `None` for operations that shock neither market data nor instruments
+/// (statement forecasts, rate bindings) and for the variants handled upstream
+/// of effect dispatch.
+fn requested_shock(op: &OperationSpec) -> Option<ShockMagnitude> {
+    let uniform = |value: f64, unit: ShockUnit| Some(ShockMagnitude::Uniform { value, unit });
+    match op {
+        OperationSpec::MarketFxPct { pct, .. }
+        | OperationSpec::EquityPricePct { pct, .. }
+        | OperationSpec::VolSurfaceParallelPct { pct, .. }
+        | OperationSpec::InstrumentPricePctByType { pct, .. }
+        | OperationSpec::InstrumentPricePctByAttr { pct, .. } => uniform(*pct, ShockUnit::Percent),
+        OperationSpec::CurveParallelBp { curve_kind, bp, .. } => {
+            uniform(*bp, curve_shock_unit(*curve_kind))
+        }
+        OperationSpec::CurveNodeBp {
+            curve_kind, nodes, ..
+        } => Some(node_shock(nodes, curve_shock_unit(*curve_kind))),
+        OperationSpec::VolIndexParallelPts { points, .. }
+        | OperationSpec::BaseCorrParallelPts { points, .. } => {
+            uniform(*points, ShockUnit::Absolute)
+        }
+        OperationSpec::VolIndexNodePts { nodes, .. } => {
+            Some(node_shock(nodes, ShockUnit::Absolute))
+        }
+        OperationSpec::BaseCorrBucketPts {
+            detachment_bp,
+            points,
+            ..
+        } => match detachment_bp {
+            Some(detachments_bp) => Some(ShockMagnitude::DetachmentBucket {
+                detachments_bp: detachments_bp.clone(),
+                value: *points,
+                unit: ShockUnit::Absolute,
+            }),
+            None => uniform(*points, ShockUnit::Absolute),
+        },
+        OperationSpec::VolSurfaceBucketPct { strikes, pct, .. } => {
+            Some(ShockMagnitude::VolBucket {
+                expiries_years: None,
+                strikes: strikes.clone(),
+                value: *pct,
+                unit: ShockUnit::Percent,
+            })
+        }
+        OperationSpec::InstrumentSpreadBpByType { bp, .. }
+        | OperationSpec::InstrumentSpreadBpByAttr { bp, .. } => uniform(*bp, ShockUnit::Bp),
+        OperationSpec::AssetCorrelationPts { delta_pts }
+        | OperationSpec::PrepayDefaultCorrelationPts { delta_pts } => {
+            uniform(*delta_pts, ShockUnit::Absolute)
+        }
+        OperationSpec::StmtForecastPercent { .. }
+        | OperationSpec::StmtForecastAssign { .. }
+        | OperationSpec::RateBinding { .. }
+        | OperationSpec::HierarchyCurveParallelBp { .. }
+        | OperationSpec::HierarchyVolSurfaceParallelPct { .. }
+        | OperationSpec::HierarchyEquityPricePct { .. }
+        | OperationSpec::HierarchyBaseCorrParallelPts { .. }
+        | OperationSpec::TimeRollForward { .. } => None,
+    }
+}
+
+/// Shock size for one batched market bump.
+///
+/// A bump that carries a resolved location (the knot of a key-rate bump, the
+/// snapped surface expiries of a bucket bump) reports that location; every
+/// other bump reports the operation's request.
+fn shock_for_bump(op: &OperationSpec, bump: &MarketBump) -> Option<ShockMagnitude> {
+    match (op, bump) {
+        (OperationSpec::CurveNodeBp { curve_kind, .. }, MarketBump::Curve { spec, .. }) => {
+            match spec.bump_type {
+                BumpType::TriangularKeyRate { target_bucket, .. } => {
+                    Some(ShockMagnitude::KeyRate {
+                        time_years: target_bucket,
+                        value: spec.value,
+                        unit: curve_shock_unit(*curve_kind),
+                    })
+                }
+                BumpType::Parallel => Some(ShockMagnitude::Uniform {
+                    value: spec.value,
+                    unit: curve_shock_unit(*curve_kind),
+                }),
+            }
+        }
+        (
+            OperationSpec::VolSurfaceBucketPct { .. },
+            MarketBump::VolBucketPct {
+                expiries,
+                strikes,
+                pct,
+                ..
+            },
+        ) => Some(ShockMagnitude::VolBucket {
+            expiries_years: expiries.clone(),
+            strikes: strikes.clone(),
+            value: *pct,
+            unit: ShockUnit::Percent,
+        }),
+        _ => requested_shock(op),
+    }
+}
+
+/// Numeric level of a stored scalar: the value itself, or a price's amount.
+fn scalar_level(scalar: &MarketScalar) -> f64 {
+    match scalar {
+        MarketScalar::Unitless(value) => *value,
+        MarketScalar::Price(money) => money.amount(),
+    }
+}
+
 fn replace_curve_id(op: &OperationSpec) -> Option<&CurveId> {
     match op {
         OperationSpec::CurveParallelBp {
@@ -317,6 +456,46 @@ pub(super) struct EffectSink<'a> {
     pub warnings: &'a mut Vec<Warning>,
     pub applied: &'a mut usize,
     pub changes: &'a mut ScenarioChangeManifest,
+    pub applied_shocks: &'a mut Vec<AppliedShock>,
+}
+
+impl EffectSink<'_> {
+    /// Record a changed market target together with the size of its shock.
+    fn record_market_shock(
+        &mut self,
+        target: ScenarioMarketTarget,
+        shock: Option<ShockMagnitude>,
+        level_change: Option<LevelChange>,
+    ) {
+        if let Some(shock) = shock {
+            self.applied_shocks.push(AppliedShock {
+                applies_to: AppliedShockTarget::Market {
+                    target: target.clone(),
+                },
+                shock,
+                level_change,
+            });
+        }
+        self.changes.record_market_target(target);
+    }
+
+    /// Record instruments mutated in place together with the size of their shock.
+    fn record_instrument_shock(&mut self, op: &OperationSpec, changed_indices: Vec<usize>) {
+        if changed_indices.is_empty() {
+            return;
+        }
+        if let Some(shock) = requested_shock(op) {
+            let mut indices = changed_indices.clone();
+            indices.sort_unstable();
+            indices.dedup();
+            self.applied_shocks.push(AppliedShock {
+                applies_to: AppliedShockTarget::Instruments { indices },
+                shock,
+                level_change: None,
+            });
+        }
+        self.changes.record_instrument_indices(changed_indices);
+    }
 }
 
 pub(super) fn process_effects(
@@ -340,24 +519,37 @@ pub(super) fn apply_generated_effects(
         match effect {
             ScenarioEffect::PriceBump { id, pct } => {
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
+                let before = ctx.market.get_price(id.as_str()).ok().map(scalar_level);
                 ctx.market
                     .apply_price_bump_pct_in_place(id.as_str(), pct / 100.0)?;
-                sink.changes
-                    .record_market_target(ScenarioMarketTarget::EquityPrice {
+                let after = ctx.market.get_price(id.as_str()).ok().map(scalar_level);
+                sink.record_market_shock(
+                    ScenarioMarketTarget::EquityPrice {
                         spot_id: PriceId::new(id.as_str()),
-                    });
+                    },
+                    Some(ShockMagnitude::Uniform {
+                        value: pct,
+                        unit: ShockUnit::Percent,
+                    }),
+                    before
+                        .zip(after)
+                        .map(|(before, after)| LevelChange { before, after }),
+                );
                 *sink.applied += 1;
             }
             ScenarioEffect::SurfaceBump { id, spec } => {
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
                 ctx.market.apply_surface_bump_in_place(id.as_str(), spec)?;
-                sink.changes
-                    .record_market_target(ScenarioMarketTarget::VolSurface { vol_surface_id: id });
+                sink.record_market_shock(
+                    ScenarioMarketTarget::VolSurface { vol_surface_id: id },
+                    requested_shock(op),
+                    None,
+                );
                 *sink.applied += 1;
             }
             ScenarioEffect::MarketBump(b) => {
                 match market_target_for_bump(op, &b) {
-                    Some(target) => sink.changes.record_market_target(target),
+                    Some(target) => sink.record_market_shock(target, shock_for_bump(op, &b), None),
                     None => sink.changes.all_dirty = true,
                 }
                 sink.pending_bumps.push(b);
@@ -367,7 +559,7 @@ pub(super) fn apply_generated_effects(
             ScenarioEffect::UpdateCurve(storage) => {
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
                 match market_target_for_curve_update(op, &storage) {
-                    Some(target) => sink.changes.record_market_target(target),
+                    Some(target) => sink.record_market_shock(target, requested_shock(op), None),
                     None => sink.changes.all_dirty = true,
                 }
                 *ctx.market = std::mem::take(ctx.market).insert(storage);
@@ -384,8 +576,7 @@ pub(super) fn apply_generated_effects(
                     adapters::instruments::apply_instrument_attr_price_shock,
                 );
                 *sink.applied += outcome.count;
-                sink.changes
-                    .record_instrument_indices(outcome.changed_indices);
+                sink.record_instrument_shock(op, outcome.changed_indices);
                 sink.warnings.extend(outcome.warnings);
             }
             ScenarioEffect::InstrumentSpreadShock { types, attrs, bp } => {
@@ -399,8 +590,7 @@ pub(super) fn apply_generated_effects(
                     adapters::instruments::apply_instrument_attr_spread_shock,
                 );
                 *sink.applied += outcome.count;
-                sink.changes
-                    .record_instrument_indices(outcome.changed_indices);
+                sink.record_instrument_shock(op, outcome.changed_indices);
                 sink.warnings.extend(outcome.warnings);
             }
             ScenarioEffect::AssetCorrelationShock { delta_pts } => {
@@ -411,7 +601,7 @@ pub(super) fn apply_generated_effects(
                     inventory(&mut ctx.instruments)?,
                 );
                 *sink.applied += count;
-                sink.changes.record_instrument_indices(indices);
+                sink.record_instrument_shock(op, indices);
                 sink.warnings.extend(ws);
             }
             ScenarioEffect::PrepayDefaultCorrelationShock { delta_pts } => {
@@ -422,7 +612,7 @@ pub(super) fn apply_generated_effects(
                     inventory(&mut ctx.instruments)?,
                 );
                 *sink.applied += count;
-                sink.changes.record_instrument_indices(indices);
+                sink.record_instrument_shock(op, indices);
                 sink.warnings.extend(ws);
             }
             stmt @ (ScenarioEffect::StmtForecastPercent { .. }

@@ -172,7 +172,9 @@ pub fn calibrate_hull_white_to_cap_floors_with_fn(
                 residuals,
                 1,
                 config.fit_tolerance,
-            ),
+            )
+            .with_solver_method(crate::report::SolverMethod::ScalarMinimization)
+            .with_residual_units(crate::report::ResidualUnits::QuotedVolatility),
             fixed,
             sigma,
             quotes.len(),
@@ -722,7 +724,8 @@ pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
     .with_metadata("fixed_kappa", config.fixed_kappa.to_string())
     .with_metadata("volatility_mode", "piecewise".to_string())
     .with_metadata("schedule_source", schedule_source.to_string())
-    .with_metadata("residual_units", "quoted_volatility".to_string());
+    .with_solver_method(crate::report::SolverMethod::SequentialBootstrap)
+    .with_residual_units(crate::report::ResidualUnits::QuotedVolatility);
     Ok((model, report))
 }
 

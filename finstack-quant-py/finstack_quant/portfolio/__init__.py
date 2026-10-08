@@ -162,6 +162,9 @@ PortfolioOptimizationSpec = _portfolio.PortfolioOptimizationSpec
 PortfolioOptimizationResult = _portfolio.PortfolioOptimizationResult
 CandidatePosition = _portfolio.CandidatePosition
 TradeUniverse = _portfolio.TradeUniverse
+NettingSetMargin = _portfolio.NettingSetMargin
+PortfolioMarginAggregator = _portfolio.PortfolioMarginAggregator
+PortfolioMarginResult = _portfolio.PortfolioMarginResult
 schema = _portfolio.schema
 
 __all__ = [
@@ -194,6 +197,7 @@ __all__ = [
     "MetricExpr",
     "MissingContractVersionError",
     "MissingMetricPolicy",
+    "NettingSetMargin",
     "Objective",
     "OptimizationStatus",
     "PerPositionMetric",
@@ -202,6 +206,8 @@ __all__ = [
     "PortfolioBuilder",
     "PortfolioCashflows",
     "PortfolioError",
+    "PortfolioMarginAggregator",
+    "PortfolioMarginResult",
     "PortfolioMetrics",
     "PortfolioOptimizationResult",
     "PortfolioOptimizationSpec",

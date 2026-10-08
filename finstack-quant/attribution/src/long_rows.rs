@@ -43,6 +43,14 @@
 //!   `credit_factor.level.by_bucket`, `credit_factor.adder`,
 //!   `credit_factor.curve_shape`, `credit_factor.adder_by_issuer`
 //!
+//! # Step rows
+//!
+//! The audit trail behind the factor buckets has its own flat projections:
+//! [`pnl_attribution_waterfall_step_rows`] (one row per waterfall step, with
+//! the running present value before and after) and
+//! [`pnl_attribution_sensitivity_step_rows`] (one row per Taylor or
+//! metrics-based factor, plus one row per key-rate bucket).
+//!
 //! # Quick Example
 //!
 //! ```rust
@@ -150,6 +158,10 @@ pub struct PnlAttributionWideRow {
     pub total_pnl: f64,
     /// Raw mark-to-market P&L when the method recorded it.
     pub mark_to_market_pnl: Option<f64>,
+    /// Opening present value (T₀ date, T₀ market) when the method recorded it.
+    pub pv_t0: Option<f64>,
+    /// Closing present value (T₁ date, T₁ market) when the method recorded it.
+    pub pv_t1: Option<f64>,
     /// Carry P&L amount.
     pub carry: f64,
     /// Rates-curves P&L amount.
@@ -203,6 +215,8 @@ pub fn pnl_attribution_wide_row(attribution: &PnlAttribution) -> Result<PnlAttri
         currency: attribution.total_pnl.currency().to_string(),
         total_pnl: attribution.total_pnl.amount(),
         mark_to_market_pnl: attribution.mark_to_market_pnl.map(|m| m.amount()),
+        pv_t0: attribution.pv_t0.map(|m| m.amount()),
+        pv_t1: attribution.pv_t1.map(|m| m.amount()),
         carry: attribution.carry.amount(),
         rates_curves_pnl: attribution.rates_curves_pnl.amount(),
         credit_curves_pnl: attribution.credit_curves_pnl.amount(),
@@ -560,6 +574,130 @@ pub fn pnl_attribution_credit_factor_rows(attribution: &PnlAttribution) -> Vec<L
     rows
 }
 
+/// One flat row of [`PnlAttribution::waterfall_steps`].
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct WaterfallStepRow {
+    /// Zero-based position of the step in the applied factor order.
+    pub step_index: usize,
+    /// Canonical snake-case factor name (e.g. `"rates_curves"`).
+    pub factor: &'static str,
+    /// Running present value before the step.
+    pub pv_before: f64,
+    /// Running present value after the step.
+    pub pv_after: f64,
+    /// Step P&L, `pv_after − pv_before`.
+    pub step_pnl: f64,
+    /// ISO-4217 currency code of the step amounts.
+    pub currency: String,
+}
+
+/// Project the waterfall step chain into flat rows, in applied order.
+///
+/// # Arguments
+///
+/// * `attribution` - Attribution result whose `waterfall_steps` are
+///   flattened; amounts keep the currency they are stored in.
+///
+/// # Returns
+///
+/// One [`WaterfallStepRow`] per step; empty unless the waterfall method
+/// produced the result.
+pub fn pnl_attribution_waterfall_step_rows(attribution: &PnlAttribution) -> Vec<WaterfallStepRow> {
+    attribution
+        .waterfall_steps
+        .iter()
+        .map(|step| WaterfallStepRow {
+            step_index: step.step_index,
+            factor: step.factor.as_str(),
+            pv_before: step.pv_before.amount(),
+            pv_after: step.pv_after.amount(),
+            step_pnl: step.step_pnl.amount(),
+            currency: step.step_pnl.currency().to_string(),
+        })
+        .collect()
+}
+
+/// One flat row of [`PnlAttribution::sensitivity_steps`].
+///
+/// A factor contributes one factor-level row (`tenor_years` empty) carrying
+/// its P&L, followed by one row per key-rate bucket (`tenor_years` set)
+/// carrying only that bucket's sensitivity and move. P&L columns are empty on
+/// bucket rows, so summing `explained_pnl` or `gamma_pnl` never double counts.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SensitivityStepRow {
+    /// Zero-based position of the factor in the computed order.
+    pub step_index: usize,
+    /// Factor label (e.g. `"Rates:USD-OIS"`, `"Vol:SPX"`, `"Theta"`).
+    pub factor: String,
+    /// Bucket tenor in years; empty on factor-level rows.
+    pub tenor_years: Option<f64>,
+    /// Unit of `market_move` (`"basis_point"`, `"vol_point"`, `"percent"`,
+    /// `"price_unit"`); empty for repriced factors.
+    pub move_unit: Option<&'static str>,
+    /// Sensitivity in currency per one `move_unit`; empty for key-rate
+    /// factor-level rows, second-order-only rows and repriced factors.
+    pub sensitivity: Option<f64>,
+    /// Observed market move in `move_unit`; empty for key-rate factor-level
+    /// rows and repriced factors.
+    pub market_move: Option<f64>,
+    /// First-order (or fully repriced) factor P&L; empty on bucket rows.
+    pub explained_pnl: Option<f64>,
+    /// Second-order factor P&L when computed; empty on bucket rows.
+    pub gamma_pnl: Option<f64>,
+    /// Repriced present value for factors isolated by a reprice.
+    pub repriced_pv: Option<f64>,
+    /// ISO-4217 currency code of the row's amounts.
+    pub currency: String,
+}
+
+/// Project the sensitivity factor rows into flat rows, in computed order.
+///
+/// # Arguments
+///
+/// * `attribution` - Attribution result whose `sensitivity_steps` are
+///   flattened; amounts keep the currency they are stored in.
+///
+/// # Returns
+///
+/// One factor-level [`SensitivityStepRow`] per step plus one row per key-rate
+/// bucket; empty unless a Taylor or metrics-based method produced the result.
+pub fn pnl_attribution_sensitivity_step_rows(
+    attribution: &PnlAttribution,
+) -> Vec<SensitivityStepRow> {
+    let mut rows = Vec::new();
+    for (step_index, step) in attribution.sensitivity_steps.iter().enumerate() {
+        let move_unit = step.move_unit.map(|unit| unit.as_str());
+        let currency = step.explained_pnl.currency().to_string();
+        rows.push(SensitivityStepRow {
+            step_index,
+            factor: step.factor.clone(),
+            tenor_years: None,
+            move_unit,
+            sensitivity: step.sensitivity.map(|m| m.amount()),
+            market_move: step.market_move,
+            explained_pnl: Some(step.explained_pnl.amount()),
+            gamma_pnl: step.gamma_pnl.map(|m| m.amount()),
+            repriced_pv: step.repriced_pv.map(|m| m.amount()),
+            currency: currency.clone(),
+        });
+        for bucket in &step.buckets {
+            rows.push(SensitivityStepRow {
+                step_index,
+                factor: step.factor.clone(),
+                tenor_years: Some(bucket.tenor_years),
+                move_unit,
+                sensitivity: Some(bucket.sensitivity.amount()),
+                market_move: Some(bucket.market_move),
+                explained_pnl: None,
+                gamma_pnl: None,
+                repriced_pv: None,
+                currency: currency.clone(),
+            });
+        }
+    }
+    rows
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -586,8 +724,75 @@ mod tests {
     }
 
     #[test]
+    fn step_rows_flatten_factors_and_buckets_without_double_counting() {
+        use crate::{
+            AttributionFactor, MoveUnit, SensitivityBucket, SensitivityStep, WaterfallStep,
+        };
+
+        let mut attribution = base_attribution();
+        attribution.waterfall_steps = vec![WaterfallStep {
+            step_index: 0,
+            factor: AttributionFactor::RatesCurves,
+            pv_before: usd(1000.0),
+            pv_after: usd(1120.0),
+            step_pnl: usd(120.0),
+        }];
+        attribution.sensitivity_steps = vec![SensitivityStep {
+            factor: "Rates:USD-OIS".to_string(),
+            move_unit: Some(MoveUnit::BasisPoint),
+            sensitivity: None,
+            market_move: None,
+            buckets: vec![
+                SensitivityBucket {
+                    tenor_years: 2.0,
+                    sensitivity: usd(-4.0),
+                    market_move: 10.0,
+                },
+                SensitivityBucket {
+                    tenor_years: 5.0,
+                    sensitivity: usd(-8.0),
+                    market_move: -20.0,
+                },
+            ],
+            repriced_pv: None,
+            explained_pnl: usd(120.0),
+            gamma_pnl: Some(usd(1.5)),
+        }];
+
+        let waterfall = pnl_attribution_waterfall_step_rows(&attribution);
+        assert_eq!(
+            waterfall,
+            vec![WaterfallStepRow {
+                step_index: 0,
+                factor: "rates_curves",
+                pv_before: 1000.0,
+                pv_after: 1120.0,
+                step_pnl: 120.0,
+                currency: "USD".to_string(),
+            }]
+        );
+
+        let rows = pnl_attribution_sensitivity_step_rows(&attribution);
+        assert_eq!(rows.len(), 3, "one factor row plus one row per bucket");
+        assert_eq!(rows[0].tenor_years, None);
+        assert_eq!(rows[0].explained_pnl, Some(120.0));
+        assert_eq!(rows[0].gamma_pnl, Some(1.5));
+        assert_eq!(rows[0].move_unit, Some("basis_point"));
+        let explained: f64 = rows.iter().filter_map(|row| row.explained_pnl).sum();
+        assert_eq!(explained, 120.0, "bucket rows carry no P&L");
+        let rebuilt: f64 = rows
+            .iter()
+            .filter(|row| row.tenor_years.is_some())
+            .filter_map(|row| Some(row.sensitivity? * row.market_move?))
+            .sum();
+        assert_eq!(rebuilt, 120.0, "bucket rows rebuild the factor P&L");
+    }
+
+    #[test]
     fn empty_attribution_projects_no_rows() {
         let attribution = base_attribution();
+        assert!(pnl_attribution_waterfall_step_rows(&attribution).is_empty());
+        assert!(pnl_attribution_sensitivity_step_rows(&attribution).is_empty());
         assert!(pnl_attribution_long_rows(&attribution).is_empty());
         assert!(pnl_attribution_carry_rows(&attribution).is_empty());
         assert!(pnl_attribution_credit_factor_rows(&attribution).is_empty());

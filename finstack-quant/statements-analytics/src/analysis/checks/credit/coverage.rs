@@ -80,6 +80,7 @@ impl Check for CoverageFloorCheck {
                         reference_label: "denominator".to_string(),
                     }),
                     nodes: vec![self.numerator_node.clone(), self.denominator_node.clone()],
+                    comparison: None,
                 });
                 continue;
             }
@@ -124,6 +125,7 @@ impl Check for CoverageFloorCheck {
                         reference_label: "denominator".to_string(),
                     }),
                     nodes: vec![self.numerator_node.clone(), self.denominator_node.clone()],
+                    comparison: None,
                 });
             }
         }
@@ -136,6 +138,7 @@ impl Check for CoverageFloorCheck {
             category: self.category(),
             passed,
             findings,
+            comparisons: Vec::new(),
         })
     }
 }

@@ -439,7 +439,8 @@ fn extract_dcf_options(py: Python<'_>, obj: Option<&Bound<'_, PyAny>>) -> PyResu
 /// >>> from finstack_quant.statements_analytics import CorporateValuationResult
 /// >>> r = CorporateValuationResult.from_json(
 /// ...     '{"equity_value":{"amount":"90","currency":"USD"},"enterprise_value":{"amount":"100","currency":"USD"},'
-/// ...     '"net_debt":{"amount":"10","currency":"USD"},"terminal_value_pv":{"amount":"60","currency":"USD"},'
+/// ...     '"net_debt":{"amount":"10","currency":"USD"},"valuation_discount":{"amount":"0","currency":"USD"},'
+/// ...     '"terminal_value_pv":{"amount":"60","currency":"USD"},'
 /// ...     '"equity_value_per_share":null,"diluted_shares":null}')
 /// >>> r.equity_value.amount
 /// 90.0
@@ -500,13 +501,63 @@ impl PyCorporateValuationResult {
         self.inner.diluted_shares
     }
 
+    /// Discount rate (WACC) applied to every flow, as an annually compounded
+    /// decimal; ``None`` only for a result loaded from JSON written before
+    /// the DCF detail was recorded.
+    #[getter]
+    fn wacc(&self) -> Option<f64> {
+        self.inner.wacc
+    }
+
+    /// Explicit forecast periods as a list of dicts with keys ``period_id``,
+    /// ``date``, ``free_cash_flow``, ``discount_years``, ``discount_factor``
+    /// and ``present_value`` (unrounded floats in the model currency).
+    #[getter]
+    fn periods<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.periods)
+    }
+
+    /// Present value of the explicit forecast flows (the sum of the
+    /// ``present_value`` of ``periods``).
+    #[getter]
+    fn pv_explicit(&self) -> Option<PyMoney> {
+        self.inner.pv_explicit.map(PyMoney::from_inner)
+    }
+
+    /// Terminal value at the horizon date, before discounting.
+    #[getter]
+    fn terminal_value(&self) -> Option<PyMoney> {
+        self.inner.terminal_value.map(PyMoney::from_inner)
+    }
+
+    /// Discounting tenor of the terminal value in years (ACT/365.25).
+    #[getter]
+    fn terminal_discount_years(&self) -> Option<f64> {
+        self.inner.terminal_discount_years
+    }
+
+    /// EV-to-equity bridge behind ``net_debt``: gross debt and cash
+    /// separately, plus the other bridge components.
+    #[getter]
+    fn equity_bridge(&self) -> Option<PyEquityBridge> {
+        self.inner
+            .equity_bridge
+            .clone()
+            .map(|inner| PyEquityBridge { inner })
+    }
+
     /// Export as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``currency``, ``equity_value``, ``enterprise_value``,
     /// ``net_debt``, ``valuation_discount``, ``terminal_value_pv`` (float
     /// amounts in ``currency``),
-    /// ``equity_value_per_share``, ``diluted_shares`` (``None`` when absent).
+    /// ``equity_value_per_share``, ``diluted_shares`` (``None`` when absent),
+    /// then the DCF working: ``wacc`` (decimal), ``pv_explicit``,
+    /// ``terminal_value``, ``total_debt``, ``cash`` (float amounts in
+    /// ``currency``) and ``terminal_discount_years``; these six are ``None``
+    /// for a result loaded from JSON written before they were recorded.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let bridge = self.inner.equity_bridge.as_ref();
         let row = serde_json::json!({
             "currency": self.inner.equity_value.currency().to_string(),
             "equity_value": self.inner.equity_value.amount(),
@@ -516,6 +567,12 @@ impl PyCorporateValuationResult {
             "terminal_value_pv": self.inner.terminal_value_pv.amount(),
             "equity_value_per_share": self.inner.equity_value_per_share,
             "diluted_shares": self.inner.diluted_shares,
+            "wacc": self.inner.wacc,
+            "pv_explicit": self.inner.pv_explicit.map(|money| money.amount()),
+            "terminal_value": self.inner.terminal_value.map(|money| money.amount()),
+            "total_debt": bridge.map(|bridge| bridge.total_debt),
+            "cash": bridge.map(|bridge| bridge.cash),
+            "terminal_discount_years": self.inner.terminal_discount_years,
         });
         serde_object_to_single_row_dataframe_with_schema(
             py,
@@ -529,6 +586,12 @@ impl PyCorporateValuationResult {
                 "terminal_value_pv",
                 "equity_value_per_share",
                 "diluted_shares",
+                "wacc",
+                "pv_explicit",
+                "terminal_value",
+                "total_debt",
+                "cash",
+                "terminal_discount_years",
             ],
         )
     }
@@ -1128,7 +1191,9 @@ impl PyCorporateAnalysis {
 /// -------
 /// CorporateValuationResult
 ///     ``equity_value``, ``enterprise_value``, ``net_debt`` and
-///     ``terminal_value_pv`` as ``Money``; per-share values as floats.
+///     ``terminal_value_pv`` as ``Money``; per-share values as floats; and
+///     the DCF working (``wacc``, ``periods``, ``pv_explicit``,
+///     ``terminal_value``, ``terminal_discount_years``, ``equity_bridge``).
 ///
 /// Raises
 /// ------

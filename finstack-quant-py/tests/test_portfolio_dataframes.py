@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from datetime import date
 import json
+import math
 
 import pandas as pd
 import pytest
@@ -1120,12 +1121,54 @@ def test_portfolio_valuation_to_dataframe_matches_arrow_columns() -> None:
         "value_base",
         "currency_native",
         "currency_base",
+        "fx_rate",
+        "fx_triangulated",
         "risk_metrics_complete",
         "risk_error",
     ]
     assert len(df) == len(valuation) == 1
     assert df.iloc[0]["position_id"] == "USD-POS"
     assert df.iloc[0]["currency_base"] == "USD"
+    # Same-currency position: no FX lookup, so no rate is recorded.
+    assert df["fx_rate"].dtype == "float64"
+    assert math.isnan(df.iloc[0]["fx_rate"])
+    assert df.iloc[0]["fx_triangulated"] is None
+    position = valuation.get_position_value("USD-POS")
+    assert position.fx_rate is None
+    assert position.fx_triangulated is None
+
+
+def test_position_value_exports_the_fx_rate_applied() -> None:
+    """``value_native * fx_rate`` reproduces ``value_base`` for a converted position."""
+    context = MarketContext()
+    context.insert(DiscountCurve("EUR-OIS", date.fromisoformat(AS_OF), [(0.0, 1.0), (1.0, 0.97)], day_count="act_365f"))
+    fx = FxMatrix()
+    fx.set_quote("EUR", "USD", 1.10)
+    context.insert_fx(fx)
+    portfolio = Portfolio.from_spec(
+        json.dumps({
+            "id": "DF-FX",
+            "as_of": AS_OF,
+            "base_currency": "USD",
+            "entities": {"FUND": {"id": "FUND"}},
+            "positions": [_deposit_position("EUR-POS", "EUR-DEP", "EUR", "EUR-OIS")],
+        })
+    )
+    valuation = value_portfolio(portfolio, context)
+
+    position = valuation.get_position_value("EUR-POS")
+    assert position.fx_rate == pytest.approx(1.10, abs=1e-12)
+    assert position.fx_triangulated is False
+    assert position.value_native.amount * position.fx_rate == pytest.approx(position.value_base.amount, abs=0.01)
+
+    row = valuation.to_dataframe().iloc[0]
+    assert row["fx_rate"] == pytest.approx(1.10, abs=1e-12)
+    assert bool(row["fx_triangulated"]) is False
+    assert row["value_native"] * row["fx_rate"] == pytest.approx(row["value_base"], abs=0.01)
+
+    reloaded = type(position).from_json(position.to_json())
+    assert reloaded.fx_rate == position.fx_rate
+    assert json.loads(position.to_json())["fx_triangulated"] is False
 
 
 def test_portfolio_cashflows_to_dataframe() -> None:

@@ -630,7 +630,7 @@ test('statementResultToTableLong/Wide export the Rust table envelopes', () => {
   const long = statements.statementResultToTableLong(result);
   assert.deepEqual(
     long.columns.map((column) => column.name),
-    ['node_id', 'period_id', 'value', 'value_money', 'currency', 'value_type']
+    ['node_id', 'period_id', 'value', 'value_money', 'currency', 'value_type', 'source']
   );
   const wide = statements.statementResultToTableWide(JSON.stringify(result));
   assert.deepEqual(

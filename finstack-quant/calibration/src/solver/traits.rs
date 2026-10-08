@@ -1,5 +1,6 @@
 //! Shared runtime types and solver contracts for market calibration.
 //!
+use crate::report::ResidualUnits;
 use finstack_quant_core::Result;
 
 /// Result type for building time grid and initial guesses.
@@ -53,6 +54,10 @@ pub(crate) trait BootstrapTarget {
     /// only requires a signed scalar that crosses zero at the solution, so choose
     /// a consistent unit across all quotes for meaningful tolerances.
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64>;
+
+    /// Units of the residuals returned by [`Self::calculate_residual`],
+    /// stamped on the calibration report.
+    fn residual_units(&self) -> ResidualUnits;
 
     /// Provide an initial guess for the solver for the next knot.
     ///
@@ -204,6 +209,10 @@ pub(crate) trait GlobalSolveTarget {
         quotes: &[Self::Quote],
         residuals: &mut [f64],
     ) -> Result<()>;
+
+    /// Units of the residuals written by [`Self::calculate_residuals`],
+    /// stamped on the calibration report.
+    fn residual_units(&self) -> ResidualUnits;
 
     /// Compute the Jacobian matrix of residuals with respect to curve parameters.
     ///

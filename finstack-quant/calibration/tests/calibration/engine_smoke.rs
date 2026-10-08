@@ -164,8 +164,30 @@ fn test_v2_simple_usd_calibration() {
         .get("step_2")
         .expect("forward step report");
     assert_eq!(
-        forward_report.metadata.get("method").map(String::as_str),
-        Some("global_fit_lm_weighted_lsq")
+        forward_report.solver_method,
+        Some(finstack_quant_calibration::SolverMethod::GlobalFitLmWeightedLsq)
+    );
+    assert_eq!(
+        forward_report.residual_units,
+        Some(finstack_quant_calibration::ResidualUnits::PvPerUnitNotional)
+    );
+    let discount_report = result
+        .result
+        .step_reports
+        .get("step_1")
+        .expect("discount step report");
+    assert!(discount_report.solver_method.is_some());
+    assert_eq!(
+        discount_report.residual_units,
+        Some(finstack_quant_calibration::ResidualUnits::PvPerUnitNotional)
+    );
+    assert_eq!(
+        result.result.report.solver_method,
+        Some(finstack_quant_calibration::SolverMethod::PlanExecution)
+    );
+    assert_eq!(
+        result.result.report.residual_units,
+        Some(finstack_quant_calibration::ResidualUnits::AbsoluteResidualOverStepTolerance)
     );
 
     let context =

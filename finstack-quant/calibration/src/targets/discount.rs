@@ -687,6 +687,10 @@ impl BootstrapTarget for DiscountCurveTarget {
             })
     }
 
+    fn residual_units(&self) -> crate::report::ResidualUnits {
+        crate::report::ResidualUnits::PvPerUnitNotional
+    }
+
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
         self.scratch.with_curve(curve, |ctx| {
             let pv = quote.calibration_value_raw(ctx, self.params.base_date)?;
@@ -812,6 +816,10 @@ impl GlobalSolveTarget for DiscountCurveTarget {
     fn build_curve_final_from_params(&self, times: &[f64], params: &[f64]) -> Result<Self::Curve> {
         let knots = self.knots_from_params(times, params)?;
         self.build_curve_final(&knots)
+    }
+
+    fn residual_units(&self) -> crate::report::ResidualUnits {
+        crate::report::ResidualUnits::PvPerUnitNotional
     }
 
     fn calculate_residuals(

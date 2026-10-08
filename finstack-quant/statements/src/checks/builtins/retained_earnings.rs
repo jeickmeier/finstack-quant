@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use super::{get_finite_node_value, sum_nodes};
 use crate::checks::types::effective_tolerance;
 use crate::checks::{
-    Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
-    SignConventionPolicy,
+    Check, CheckCategory, CheckComparison, CheckContext, CheckFinding, CheckResult, Materiality,
+    Severity, SignConventionPolicy,
 };
 use crate::types::NodeId;
 use crate::Result;
@@ -78,6 +78,7 @@ impl Check for RetainedEarningsReconciliation {
                 .chain(&self.other_adjustments),
         )?;
         let mut findings = Vec::new();
+        let mut comparisons = Vec::new();
         let periods = &context.model.periods;
 
         for i in 1..periods.len() {
@@ -107,6 +108,7 @@ impl Check for RetainedEarningsReconciliation {
                         self.retained_earnings_node.clone(),
                         self.net_income_node.clone(),
                     ],
+                    comparison: None,
                 });
                 continue;
             }
@@ -148,6 +150,7 @@ impl Check for RetainedEarningsReconciliation {
                             self.retained_earnings_node.clone(),
                             self.net_income_node.clone(),
                         ],
+                        comparison: None,
                     });
                     continue;
                 }
@@ -186,6 +189,7 @@ impl Check for RetainedEarningsReconciliation {
                         self.retained_earnings_node.clone(),
                         self.net_income_node.clone(),
                     ],
+                    comparison: None,
                 });
                 continue;
             }
@@ -219,6 +223,14 @@ impl Check for RetainedEarningsReconciliation {
             let diff = re_curr - expected;
             let reference = re_prev.abs().max(1.0);
             let tolerance = effective_tolerance(&context.config, self.tolerance, reference);
+            let comparison = CheckComparison {
+                identity: "retained_earnings_roll_forward".to_string(),
+                period: Some(*curr_pid),
+                actual: re_curr,
+                expected,
+                tolerance,
+            };
+            comparisons.push(comparison.clone());
 
             if diff.abs() > tolerance {
                 let relative = (diff / reference).abs() * 100.0;
@@ -248,6 +260,7 @@ impl Check for RetainedEarningsReconciliation {
                         reference_label: "prior_retained_earnings".to_string(),
                     }),
                     nodes,
+                    comparison: Some(comparison),
                 });
             }
         }
@@ -260,6 +273,7 @@ impl Check for RetainedEarningsReconciliation {
             category: self.category(),
             passed,
             findings,
+            comparisons,
         })
     }
 }

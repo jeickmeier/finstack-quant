@@ -555,8 +555,8 @@ fn forward_curve_future_global_solve_reprices_compounded_settlement_quote() {
         .expect("forward report");
     assert!(report.success, "{}", report.convergence_reason);
     assert_eq!(
-        report.metadata.get("method").map(String::as_str),
-        Some("global_fit_lm_weighted_lsq")
+        report.solver_method,
+        Some(crate::SolverMethod::GlobalFitLmWeightedLsq)
     );
     let context = MarketContext::try_from(output.result.final_market).expect("calibrated context");
     let curve = context.get_forward("USD-SOFR-3M").expect("forward curve");
@@ -623,8 +623,8 @@ fn forward_curve_swap_global_solve_reprices_df_implied_periods() {
         .expect("forward report");
     assert!(report.success, "{}", report.convergence_reason);
     assert_eq!(
-        report.metadata.get("method").map(String::as_str),
-        Some("global_fit_lm_weighted_lsq")
+        report.solver_method,
+        Some(crate::SolverMethod::GlobalFitLmWeightedLsq)
     );
     let context = MarketContext::try_from(output.result.final_market).expect("calibrated context");
     let curve = context.get_forward("USD-LIBOR-3M").expect("forward curve");

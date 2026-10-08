@@ -270,3 +270,98 @@ def test_to_long_dataframe_folds_in_carry_and_credit_factor_rows() -> None:
     comps = df[df["kind"].isin({"carry.coupon_income", "carry.pull_to_par", "carry.roll_down"})]["amount"].sum()
     total = df[df["kind"] == "carry.total"]["amount"].iloc[0]
     assert abs(comps - total) < 1e-6
+
+
+def test_payload_without_audit_fields_reads_as_absent() -> None:
+    """A result written before the endpoint/step fields existed still loads."""
+    attr = PnlAttribution.from_json(json.dumps(_baseline_payload()))
+    assert attr.pv_t0 is None
+    assert attr.pv_t1 is None
+    assert attr.waterfall_steps == []
+    assert attr.sensitivity_steps == []
+
+    wide = attr.to_dataframe()
+    assert {"pv_t0", "pv_t1"} <= set(wide.columns)
+    assert wide["pv_t0"].isna().all()
+
+    steps = attr.to_waterfall_steps_dataframe()
+    assert list(steps.columns) == ["step_index", "factor", "pv_before", "pv_after", "step_pnl", "currency"]
+    assert len(steps) == 0
+    assert len(attr.to_sensitivity_steps_dataframe()) == 0
+
+
+def test_step_dataframes_flatten_injected_rows() -> None:
+    """Endpoint and step fields surface as floats, with bucket rows carrying no P&L."""
+
+    def usd(amount: str) -> dict[str, str]:
+        return {"amount": amount, "currency": "USD"}
+
+    attr = _patch_attribution(
+        pv_t0=usd("99000"),
+        pv_t1=usd("100000"),
+        waterfall_steps=[
+            {
+                "step_index": 0,
+                "factor": "rates_curves",
+                "pv_before": usd("99000"),
+                "pv_after": usd("100000"),
+                "step_pnl": usd("1000"),
+            }
+        ],
+        sensitivity_steps=[
+            {
+                "factor": "Rates:USD-OIS",
+                "move_unit": "basis_point",
+                "buckets": [
+                    {"tenor_years": 2.0, "sensitivity": usd("-20"), "market_move": -10.0},
+                    {"tenor_years": 5.0, "sensitivity": usd("-40"), "market_move": -20.0},
+                ],
+                "explained_pnl": usd("1000"),
+                "gamma_pnl": usd("2.5"),
+            },
+            {
+                "factor": "Vol:SPX",
+                "move_unit": "vol_point",
+                "sensitivity": usd("150"),
+                "market_move": 2.0,
+                "explained_pnl": usd("300"),
+            },
+        ],
+    )
+    assert attr.pv_t0 == 99000.0
+    assert attr.pv_t1 == 100000.0
+    assert attr.pv_t1 - attr.pv_t0 == attr.mark_to_market_pnl
+
+    steps = attr.to_waterfall_steps_dataframe()
+    assert steps.iloc[0].to_dict() == {
+        "step_index": 0,
+        "factor": "rates_curves",
+        "pv_before": 99000.0,
+        "pv_after": 100000.0,
+        "step_pnl": 1000.0,
+        "currency": "USD",
+    }
+
+    frame = attr.to_sensitivity_steps_dataframe()
+    assert len(frame) == 4  # two factor rows plus two rate buckets
+    assert frame["explained_pnl"].sum() == 1300.0
+    buckets = frame[frame["tenor_years"].notna()]
+    assert (buckets["sensitivity"] * buckets["market_move"]).sum() == 1000.0
+    vol = frame[frame["factor"] == "Vol:SPX"].iloc[0]
+    assert vol["sensitivity"] * vol["market_move"] == vol["explained_pnl"]
+    assert vol["move_unit"] == "vol_point"
+
+    # Step amounts are covered by the single-currency guard.
+    mixed = _patch_attribution(
+        waterfall_steps=[
+            {
+                "step_index": 0,
+                "factor": "rates_curves",
+                "pv_before": {"amount": "1", "currency": "EUR"},
+                "pv_after": usd("2"),
+                "step_pnl": usd("1"),
+            }
+        ]
+    )
+    with pytest.raises(ValueError, match="Currency mismatch"):
+        mixed.validate_currencies()

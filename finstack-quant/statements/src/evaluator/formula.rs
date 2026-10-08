@@ -616,6 +616,11 @@ mod tests {
             fees: Money::from((0_i64, Currency::USD)),
             debt_balance: Money::new(debt_balance, Currency::USD).expect("valid money fixture"),
             accrued_interest: Money::from((0_i64, Currency::USD)),
+            opening_balance: None,
+            scheduled_principal: None,
+            mandatory_prepayment: None,
+            sweep_prepayment: None,
+            voluntary_prepayment: None,
         };
         let mut totals = IndexMap::new();
         totals.insert(period, breakdown);

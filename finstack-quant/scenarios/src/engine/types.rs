@@ -165,6 +165,161 @@ impl ScenarioChangeManifest {
     }
 }
 
+/// Unit in which an applied shock's size is expressed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum ShockUnit {
+    /// Additive basis points of a rate or spread (`1.0` = 0.0001 in decimal
+    /// rate space).
+    Bp,
+    /// Relative change in percent of the current level (`5.0` = +5%).
+    Percent,
+    /// Additive change in the target's own quote units: volatility-index
+    /// points for a volatility-index curve, decimal correlation for base
+    /// correlation and structured-credit correlations (`0.02` = +0.02).
+    Absolute,
+}
+
+/// One requested curve-node shock, as written on the operation.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ShockNode {
+    /// Tenor label of the node as supplied on the operation (for example `"5Y"`).
+    pub tenor: String,
+    /// Shock size requested at that tenor, in the enclosing
+    /// [`ShockMagnitude::Nodes`] unit.
+    pub value: f64,
+}
+
+/// Size and shape of one applied shock.
+///
+/// Sizes are the shock as requested on the (hierarchy-expanded) operation, in
+/// that operation's own quote space, with the resolved location where the
+/// engine produced one. Delivery adjustments that change how the request
+/// reaches the market object — interpolation splits across neighbouring
+/// knots, solve-to-par recalibration, first-order hazard shifts, clamping —
+/// are reported in [`ApplicationReport::warnings`], not here.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ShockMagnitude {
+    /// One size applied to the whole target: a parallel curve or surface
+    /// shift, or the shock to a scalar price, an FX rate or a set of
+    /// instruments.
+    Uniform {
+        /// Shock size in `unit`.
+        value: f64,
+        /// Unit of `value`.
+        unit: ShockUnit,
+    },
+    /// Triangular key-rate bump centred on one curve knot, emitted once per
+    /// resolved knot of a discount or inflation curve node shock.
+    KeyRate {
+        /// Knot time the bump is centred on, in years on the curve's own time
+        /// axis.
+        time_years: f64,
+        /// Bump size delivered at that knot, in `unit`. For an off-knot tenor
+        /// matched by interpolation this is the knot's calibrated share of
+        /// the requested shock.
+        value: f64,
+        /// Unit of `value`.
+        unit: ShockUnit,
+    },
+    /// Node shocks delivered by rebuilding the curve in one step (forward,
+    /// par-CDS, commodity and volatility-index node shocks). Lists the nodes
+    /// as requested; the rebuilt curve is not echoed.
+    Nodes {
+        /// Requested `(tenor, size)` nodes in operation order.
+        nodes: Vec<ShockNode>,
+        /// Unit of every node `value`.
+        unit: ShockUnit,
+    },
+    /// Volatility-surface bucket shock.
+    VolBucket {
+        /// Surface grid expiries the shock was restricted to, in years, after
+        /// snapping the requested tenors to the grid. Absent when every
+        /// expiry is shocked.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        expiries_years: Option<Vec<f64>>,
+        /// Strikes the shock was restricted to. Absent when every strike is
+        /// shocked.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        strikes: Option<Vec<f64>>,
+        /// Shock size in `unit`.
+        value: f64,
+        /// Unit of `value`.
+        unit: ShockUnit,
+    },
+    /// Base-correlation shock restricted to detachment points.
+    DetachmentBucket {
+        /// Detachment points the shock was restricted to, in basis points
+        /// (`300` = 3%), as supplied on the operation.
+        detachments_bp: Vec<i32>,
+        /// Shock size in `unit`.
+        value: f64,
+        /// Unit of `value`.
+        unit: ShockUnit,
+    },
+}
+
+/// What one applied shock was applied to.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "scope", rename_all = "snake_case", deny_unknown_fields)]
+pub enum AppliedShockTarget {
+    /// A resolved market-data target; the same value the shock contributed to
+    /// [`ScenarioChangeManifest::market_targets`].
+    Market {
+        /// Concrete market-data target that was shocked.
+        target: ScenarioMarketTarget,
+    },
+    /// Instruments of the supplied inventory mutated in place.
+    Instruments {
+        /// Zero-based inventory indices of the instruments the shock changed,
+        /// ascending.
+        #[serde(with = "finstack_quant_core::wire::counts")]
+        #[cfg_attr(feature = "json-schema", schemars(with = "Vec<u32>"))]
+        indices: Vec<usize>,
+    },
+}
+
+/// Level of a scalar market value immediately before and after a shock.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct LevelChange {
+    /// Stored level before the shock, in the scalar's own units (the amount
+    /// for a monetary price).
+    pub before: f64,
+    /// Stored level after the shock, in the same units.
+    pub after: f64,
+}
+
+/// One shock the engine applied, in application order.
+///
+/// [`ScenarioChangeManifest`] says *which* targets changed (deduplicated, for
+/// cache invalidation); this says *by how much*. A target shocked by several
+/// effects has one entry per effect.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct AppliedShock {
+    /// Market target or instruments the shock was applied to.
+    pub applies_to: AppliedShockTarget,
+    /// Size, unit and shape of the shock.
+    pub shock: ShockMagnitude,
+    /// Stored level before and after the shock.
+    ///
+    /// Present only for scalar price targets
+    /// ([`ScenarioMarketTarget::EquityPrice`]), where both levels are read
+    /// from the market context around the mutation. Absent for FX, curves,
+    /// surfaces and instruments.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level_change: Option<LevelChange>,
+}
+
 /// Report from time roll-forward operation.
 ///
 /// # Examples
@@ -234,6 +389,7 @@ pub struct RollForwardReport {
 ///     user_operations: 1,
 ///     expanded_operations: 3,
 ///     changes: Default::default(),
+///     applied_shocks: vec![],
 ///     warnings: vec![],
 ///     meta: None,
 ///     time_roll: None,
@@ -272,6 +428,19 @@ pub struct ApplicationReport {
 
     /// Authoritative metadata describing the state changed by applied effects.
     pub changes: ScenarioChangeManifest,
+
+    /// Size of every market and instrument shock applied, in application
+    /// order: one entry per accepted effect, so the entries reconcile with
+    /// [`changes`](Self::changes) (every market target named there appears
+    /// here at least once, and the instrument indices here union to
+    /// `changes.changed_instrument_indices`).
+    ///
+    /// Statement-forecast operations, rate bindings and the time roll are not
+    /// listed. Empty when the scenario applied no market or instrument shock,
+    /// and on reports deserialized from JSON written before this field
+    /// existed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub applied_shocks: Vec<AppliedShock>,
 
     /// Structured warnings generated during application (non-fatal).
     pub warnings: Vec<Warning>,

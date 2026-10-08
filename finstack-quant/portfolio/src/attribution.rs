@@ -354,6 +354,8 @@ fn attribute_composite_primitives(
         method.clone(),
     );
     aggregate.mark_to_market_pnl = Some(Money::from((0_i64, reporting_currency)));
+    aggregate.pv_t0 = Some(Money::from((0_i64, reporting_currency)));
+    aggregate.pv_t1 = Some(Money::from((0_i64, reporting_currency)));
     aggregate.residual = Money::from((0_i64, reporting_currency));
 
     for exposure in composite.flatten_primitives().map_err(Error::Core)? {
@@ -480,6 +482,16 @@ fn translate_primitive_attribution(
         attribution.fx_translation_pnl.amount() * rate_t1 + principal_translation,
         reporting_currency,
     )?;
+    // Endpoints travel at their own date's FX, so their difference stays the
+    // translated mark-to-market P&L above.
+    attribution.pv_t0 = attribution
+        .pv_t0
+        .map(|value| translated(value, rate_t0, reporting_currency))
+        .transpose()?;
+    attribution.pv_t1 = attribution
+        .pv_t1
+        .map(|value| translated(value, rate_t1, reporting_currency))
+        .transpose()?;
     attribution.residual = translated(attribution.residual, rate_t1, reporting_currency)?;
     attribution.carry_detail = None;
     attribution.rates_detail = None;
@@ -493,6 +505,10 @@ fn translate_primitive_attribution(
     attribution.scalars_detail = None;
     attribution.credit_factor_detail = None;
     attribution.credit_carry_decomposition = None;
+    // A composite has no single step sequence; primitive step rows are dropped
+    // with the other per-primitive detail.
+    attribution.waterfall_steps.clear();
+    attribution.sensitivity_steps.clear();
     attribution.for_each_money_mut(|money| {
         *money = translated(*money, rate_t1, reporting_currency)?;
         Ok(())
@@ -520,6 +536,15 @@ fn add_primitive_attribution(
     ) {
         (Some(target), Some(source)) => add_money(target, source)?,
         _ => aggregate.mark_to_market_pnl = None,
+    }
+    for (target, source) in [
+        (&mut aggregate.pv_t0, primitive.pv_t0),
+        (&mut aggregate.pv_t1, primitive.pv_t1),
+    ] {
+        match (target.as_mut(), source) {
+            (Some(target), Some(source)) => add_money(target, source)?,
+            _ => *target = None,
+        }
     }
     add_money(&mut aggregate.carry, primitive.carry)?;
     add_money(&mut aggregate.rates_curves_pnl, primitive.rates_curves_pnl)?;
@@ -1288,6 +1313,18 @@ mod tests {
             .by_position
             .get("P-COMPOSITE")
             .ok_or_else(|| Error::validation("missing composite attribution"))?;
+        assert_eq!(position.total_pnl.amount(), 10.0);
+        // Endpoint values are the scaled sum of the primitive paths:
+        // 2 × (100 − 90) at T0 and 2 × (110 − 95) at T1.
+        let pv_t0 = position
+            .pv_t0
+            .ok_or_else(|| Error::validation("missing composite pv_t0"))?;
+        let pv_t1 = position
+            .pv_t1
+            .ok_or_else(|| Error::validation("missing composite pv_t1"))?;
+        assert!((pv_t0.amount() - 20.0).abs() < 1.0e-9);
+        assert!((pv_t1.amount() - 30.0).abs() < 1.0e-9);
+        assert!(position.waterfall_steps.is_empty() && position.sensitivity_steps.is_empty());
         assert_eq!(position.total_pnl.amount(), 10.0);
         assert!(position
             .meta

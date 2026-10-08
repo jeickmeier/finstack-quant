@@ -57,6 +57,17 @@ fn balanced_passes() {
 
     assert!(result.passed);
     assert!(result.findings.is_empty());
+
+    // A passing check still reports what it compared in every period.
+    assert_eq!(result.comparisons.len(), 2);
+    let q1 = &result.comparisons[0];
+    assert_eq!(q1.identity, "balance_sheet_articulation");
+    assert_eq!(q1.period, Some(q(1)));
+    assert_eq!(q1.actual, 1000.0);
+    assert_eq!(q1.expected, 1000.0);
+    // Default tolerance: max(0.01 absolute, 1e-9 * |assets|).
+    assert_eq!(q1.tolerance, 0.01);
+    assert!(result.comparisons.iter().all(|c| c.within_tolerance()));
 }
 
 #[test]
@@ -115,6 +126,36 @@ fn imbalanced_fails_with_materiality() {
     assert!((mat.relative_pct - 10.0).abs() < 0.01); // 100/1000 * 100 = 10%
     assert!((mat.reference_value - 1000.0).abs() < 0.01);
     assert_eq!(mat.reference_label, "total_assets");
+
+    // The finding carries the numbers behind the verdict, and they reconcile
+    // with the reported materiality: |actual - expected| == absolute > tolerance.
+    let comparison = q1_findings[0].comparison.as_ref().unwrap();
+    assert_eq!(comparison.period, Some(q(1)));
+    assert_eq!(comparison.actual, 1000.0);
+    assert_eq!(comparison.expected, 900.0);
+    assert_eq!(comparison.tolerance, 0.01);
+    assert_eq!(comparison.difference().abs(), mat.absolute);
+    assert!(!comparison.within_tolerance());
+
+    // Both periods are listed on the result: Q1 failed, Q2 passed.
+    assert_eq!(result.comparisons.len(), 2);
+    assert_eq!(&result.comparisons[0], comparison);
+    assert_eq!(result.comparisons[1].period, Some(q(2)));
+    assert_eq!(result.comparisons[1].actual, 1100.0);
+    assert_eq!(result.comparisons[1].expected, 1100.0);
+    assert!(result.comparisons[1].within_tolerance());
+
+    // Old reports (no comparison fields) still deserialize.
+    let mut json = serde_json::to_value(&result).unwrap();
+    let object = json.as_object_mut().unwrap();
+    object.remove("comparisons");
+    for finding in object["findings"].as_array_mut().unwrap() {
+        finding.as_object_mut().unwrap().remove("comparison");
+    }
+    let legacy: finstack_quant_statements::checks::CheckResult =
+        serde_json::from_value(json).unwrap();
+    assert!(legacy.comparisons.is_empty());
+    assert!(legacy.findings.iter().all(|f| f.comparison.is_none()));
 }
 
 #[test]

@@ -38,6 +38,16 @@ pub(super) fn apply_spot(
 
         if let Some(spot_shift) = primary_shift {
             let mut total_spot_pnl = delta * spot_shift;
+            push_first_order_step(
+                attribution,
+                "Spot",
+                FactorWorking::Scalar {
+                    unit: MoveUnit::PriceUnit,
+                    sensitivity: delta,
+                    market_move: spot_shift,
+                },
+                total_spot_pnl,
+            );
 
             // Second-order: Gamma applied to the same primary spot move.
             if let Some(&gamma) = gamma_opt {
@@ -45,7 +55,15 @@ pub(super) fn apply_spot(
                     gamma.is_finite(),
                     "Gamma metric must be finite for P&L attribution, got {gamma}"
                 );
-                total_spot_pnl += 0.5 * gamma * spot_shift * spot_shift;
+                let gamma_pnl = 0.5 * gamma * spot_shift * spot_shift;
+                total_spot_pnl += gamma_pnl;
+                push_second_order_step(
+                    attribution,
+                    "SpotGamma",
+                    MoveUnit::PriceUnit,
+                    spot_shift,
+                    gamma_pnl,
+                );
             }
 
             attribution.market_scalars_pnl = factor_money_or_invalid(
@@ -85,6 +103,16 @@ pub(super) fn apply_dividend(
             ) {
                 let div_shift_bp = div_abs_shift * 10_000.0;
                 let div_amount = dividend01 * div_shift_bp;
+                push_first_order_step(
+                    attribution,
+                    "Dividend",
+                    FactorWorking::Scalar {
+                        unit: MoveUnit::BasisPoint,
+                        sensitivity: *dividend01,
+                        market_move: div_shift_bp,
+                    },
+                    div_amount,
+                );
                 attribution.market_scalars_pnl = factor_money_or_invalid(
                     attribution.market_scalars_pnl.amount() + div_amount,
                     inputs.val_t1.value.currency(),
@@ -147,6 +175,16 @@ pub(super) fn apply_inflation(
             0.0
         };
         let inflation_amount = inflation01 * avg_shift;
+        push_first_order_step(
+            attribution,
+            "Inflation",
+            FactorWorking::Scalar {
+                unit: MoveUnit::BasisPoint,
+                sensitivity: *inflation01,
+                market_move: avg_shift,
+            },
+            inflation_amount,
+        );
         attribution.inflation_curves_pnl = factor_money_or_invalid(
             inflation_amount,
             inputs.val_t1.value.currency(),
@@ -166,6 +204,13 @@ pub(super) fn apply_inflation(
             );
             let shift_decimal = avg_shift / 10_000.0;
             let convexity_pnl = 0.5 * inflation_convexity * shift_decimal * shift_decimal;
+            push_second_order_step(
+                attribution,
+                "InflationConvexity",
+                MoveUnit::BasisPoint,
+                avg_shift,
+                convexity_pnl,
+            );
             attribution.inflation_curves_pnl = factor_money_or_invalid(
                 attribution.inflation_curves_pnl.amount() + convexity_pnl,
                 inputs.val_t1.value.currency(),

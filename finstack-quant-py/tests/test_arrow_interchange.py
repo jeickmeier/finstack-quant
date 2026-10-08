@@ -83,6 +83,7 @@ def test_to_arrow_long_returns_arrow_table_with_stream_protocol() -> None:
         "value_money",
         "currency",
         "value_type",
+        "source",
     ]
 
 

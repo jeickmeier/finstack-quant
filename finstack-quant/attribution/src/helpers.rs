@@ -4,7 +4,10 @@
 //! and common `PnlAttribution` assembly. Currency conversion itself lives on
 //! [`MarketContext::convert_money`] — call sites here use it directly.
 
-use super::types::{AttributionFactor, AttributionMethod, CarryDetail, PnlAttribution, SourceLine};
+use super::types::{
+    AttributionFactor, AttributionMethod, CarryDetail, MoveUnit, PnlAttribution, SensitivityBucket,
+    SensitivityStep, SourceLine,
+};
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
@@ -190,6 +193,18 @@ pub(crate) fn init_attribution(
             finstack_quant_core::config::rounding_context_from(config),
         ),
         None => PnlAttribution::new(total_pnl, instrument_id, as_of_t0, as_of_t1, method),
+    }
+}
+
+/// Record the endpoint present values the attribution was computed from.
+///
+/// Both are stored only when they are quoted in the `total_pnl` currency, so
+/// `mark_to_market_pnl == pv_t1 − pv_t0` holds without an FX conversion.
+pub(crate) fn stamp_endpoints(attribution: &mut PnlAttribution, val_t0: Money, val_t1: Money) {
+    let currency = attribution.total_pnl.currency();
+    if val_t0.currency() == currency && val_t1.currency() == currency {
+        attribution.pv_t0 = Some(val_t0);
+        attribution.pv_t1 = Some(val_t1);
     }
 }
 
@@ -617,6 +632,151 @@ pub(crate) fn factor_money_or_invalid(
             Money::from((0_i64, currency))
         }
     }
+}
+
+/// How a sensitivity-based factor's first-order P&L was obtained; the inputs
+/// a reviewer needs to reproduce it.
+#[derive(Debug, Clone)]
+pub(crate) enum FactorWorking {
+    /// One sensitivity (currency per `unit`) times one observed move.
+    Scalar {
+        unit: MoveUnit,
+        sensitivity: f64,
+        market_move: f64,
+    },
+    /// Per-tenor `(tenor_years, sensitivity, market_move)` triples in `unit`.
+    KeyRate {
+        unit: MoveUnit,
+        buckets: Vec<(f64, f64, f64)>,
+    },
+    /// Second-order term only: a convexity/gamma metric applied to one
+    /// observed move. The P&L is the row's `gamma_pnl`.
+    SecondOrder { unit: MoveUnit, market_move: f64 },
+    /// Isolated by a full reprice; `pv` is the repriced value.
+    Repriced { pv: Money },
+}
+
+/// Build the public [`SensitivityStep`] row for one factor.
+///
+/// `explained_pnl` and `gamma_pnl` are the amounts already accumulated into
+/// the factor bucket. If any sensitivity or move is non-finite (the factor
+/// P&L is then already flagged invalid by its caller), the working is omitted
+/// and a note records why.
+pub(crate) fn sensitivity_step(
+    factor: &str,
+    working: FactorWorking,
+    explained_pnl: Money,
+    gamma_pnl: Option<Money>,
+    notes: &mut Vec<String>,
+) -> SensitivityStep {
+    let currency = explained_pnl.currency();
+    let mut step = SensitivityStep {
+        factor: factor.to_string(),
+        move_unit: None,
+        sensitivity: None,
+        market_move: None,
+        buckets: Vec::new(),
+        repriced_pv: None,
+        explained_pnl,
+        gamma_pnl,
+    };
+    match working {
+        FactorWorking::Scalar {
+            unit,
+            sensitivity,
+            market_move,
+        } => match Money::new(sensitivity, currency) {
+            Ok(sensitivity) if market_move.is_finite() => {
+                step.move_unit = Some(unit);
+                step.sensitivity = Some(sensitivity);
+                step.market_move = Some(market_move);
+            }
+            _ => notes.push(format!(
+                "{factor}: sensitivity working omitted (non-finite sensitivity or market move)"
+            )),
+        },
+        FactorWorking::KeyRate { unit, buckets } => {
+            let rows: Option<Vec<SensitivityBucket>> = buckets
+                .into_iter()
+                .map(|(tenor_years, sensitivity, market_move)| {
+                    let sensitivity = Money::new(sensitivity, currency).ok()?;
+                    (tenor_years.is_finite() && market_move.is_finite()).then_some(
+                        SensitivityBucket {
+                            tenor_years,
+                            sensitivity,
+                            market_move,
+                        },
+                    )
+                })
+                .collect();
+            match rows {
+                Some(rows) => {
+                    step.move_unit = Some(unit);
+                    step.buckets = rows;
+                }
+                None => notes.push(format!(
+                    "{factor}: sensitivity working omitted (non-finite bucket sensitivity or \
+                     market move)"
+                )),
+            }
+        }
+        FactorWorking::SecondOrder { unit, market_move } => {
+            if market_move.is_finite() {
+                step.move_unit = Some(unit);
+                step.market_move = Some(market_move);
+            } else {
+                notes.push(format!(
+                    "{factor}: sensitivity working omitted (non-finite market move)"
+                ));
+            }
+        }
+        FactorWorking::Repriced { pv } => step.repriced_pv = Some(pv),
+    }
+    step
+}
+
+/// Append a second-order-only row: `gamma_pnl` from a convexity/gamma metric
+/// applied to `market_move` (in `unit`); the first-order amount is zero.
+pub(crate) fn push_second_order_step(
+    attribution: &mut PnlAttribution,
+    factor: &str,
+    unit: MoveUnit,
+    market_move: f64,
+    gamma_pnl: f64,
+) {
+    let currency = attribution.total_pnl.currency();
+    let step = sensitivity_step(
+        factor,
+        FactorWorking::SecondOrder { unit, market_move },
+        Money::from((0_i64, currency)),
+        Some(money_or_zero(gamma_pnl, currency)),
+        &mut attribution.meta.notes,
+    );
+    attribution.sensitivity_steps.push(step);
+}
+
+/// Append a first-order row for `factor` whose P&L is `explained_pnl`.
+pub(crate) fn push_first_order_step(
+    attribution: &mut PnlAttribution,
+    factor: &str,
+    working: FactorWorking,
+    explained_pnl: f64,
+) {
+    let currency = attribution.total_pnl.currency();
+    let step = sensitivity_step(
+        factor,
+        working,
+        money_or_zero(explained_pnl, currency),
+        None,
+        &mut attribution.meta.notes,
+    );
+    attribution.sensitivity_steps.push(step);
+}
+
+/// `Money` for a row component whose non-finite case is already flagged
+/// through the factor total it belongs to; falls back to zero without a note.
+pub(crate) fn money_or_zero(amount: f64, currency: Currency) -> Money {
+    Money::new(amount, currency).unwrap_or_else(|_| Money::from((0_i64, currency)))
 }
 
 /// Validate that the attribution period is well-formed: `as_of_t1 >= as_of_t0`.

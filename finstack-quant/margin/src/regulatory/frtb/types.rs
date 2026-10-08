@@ -1035,6 +1035,23 @@ impl FrtbSensitivities {
     }
 }
 
+/// Delta, vega and curvature charges by risk class under one correlation scenario.
+///
+/// Risk classes whose charge is zero are omitted, as in the top-level
+/// [`FrtbSbaResult`] maps. Amounts are in the reporting currency of the
+/// sensitivities.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct FrtbScenarioCharges {
+    /// Delta risk charge by risk class under this scenario.
+    pub delta_by_risk_class: BTreeMap<FrtbRiskClass, f64>,
+    /// Vega risk charge by risk class under this scenario.
+    pub vega_by_risk_class: BTreeMap<FrtbRiskClass, f64>,
+    /// Curvature risk charge by risk class under this scenario.
+    pub curvature_by_risk_class: BTreeMap<FrtbRiskClass, f64>,
+}
+
 /// Complete FRTB SBA capital charge result.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -1055,6 +1072,16 @@ pub struct FrtbSbaResult {
     pub binding_scenario: CorrelationScenario,
     /// Delta+Vega+Curvature charge under each scenario (for transparency).
     pub scenario_charges: BTreeMap<CorrelationScenario, f64>,
+    /// Per-risk-class delta, vega and curvature charges under every evaluated
+    /// correlation scenario, in the reporting currency.
+    ///
+    /// Has one entry per key of `scenario_charges`; the three maps of an
+    /// entry sum to that scenario's `scenario_charges` value, and the entry
+    /// for `binding_scenario` equals `delta_by_risk_class`,
+    /// `vega_by_risk_class` and `curvature_by_risk_class`. Empty only when
+    /// deserialized from JSON written before this field existed.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub scenario_breakdown: BTreeMap<CorrelationScenario, FrtbScenarioCharges>,
     /// Policy metadata stamped by the computing layer: numeric mode, active
     /// rounding context, any applied FX policy, and the parallel-execution
     /// flag.

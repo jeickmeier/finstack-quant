@@ -45,6 +45,9 @@ CHECK_FINDING_COLUMNS = [
     "materiality_relative_pct",
     "materiality_reference_value",
     "materiality_reference_label",
+    "comparison_actual",
+    "comparison_expected",
+    "comparison_tolerance",
 ]
 
 PATH_COLUMNS = ["path_id", "period", "metric", "value"]

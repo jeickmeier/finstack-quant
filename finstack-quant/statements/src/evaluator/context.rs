@@ -44,6 +44,11 @@ pub struct EvaluationContext {
     /// Uses `Option<f64>` to distinguish between "not yet evaluated" (`None`) and "evaluated to NaN" (`Some(NaN)`).
     pub current_values: Vec<Option<f64>>,
 
+    /// Evaluation layer that produced each current-period value, in the same
+    /// column layout as `current_values`. `None` for values set outside the
+    /// evaluator's precedence loop.
+    pub(crate) current_sources: Vec<Option<super::CellSource>>,
+
     /// Track value types for each node (monetary vs scalar).
     /// Wrapped in `Arc` so that per-period context copies are O(1).
     pub node_value_types: Arc<IndexMap<String, NodeValueType>>,
@@ -130,6 +135,7 @@ impl EvaluationContext {
             history,
             historical_capital_structure_cashflows,
             current_values: vec![None; num_nodes],
+            current_sources: vec![None; num_nodes],
             node_value_types: Arc::new(IndexMap::new()),
             capital_structure_cashflows: None,
             warnings: Vec::new(),
@@ -306,61 +312,6 @@ impl EvaluationContext {
         self.history.get_value(node_id, period_id)
     }
 
-    /// Shared diagnostic listing the `cs.*` component vocabulary.
-    ///
-    /// Kept in one place so the total and per-instrument arms cannot drift
-    /// apart as components are added.
-    fn unknown_component_message(component: &str) -> String {
-        format!(
-            "Unknown capital structure component: {component}. Expected: interest_expense, \
-             interest_expense_cash, interest_expense_pik, interest_income, principal_payment, \
-             debt_balance, fees, or accrued_interest"
-        )
-    }
-
-    fn lookup_cs_value(
-        cashflows: &crate::capital_structure::CapitalStructureCashflows,
-        period_id: &PeriodId,
-        component: &str,
-        instrument_or_total: &str,
-    ) -> Result<f64> {
-        if instrument_or_total == "total" {
-            match component {
-                "interest_expense" => cashflows.get_total_interest(period_id),
-                "interest_expense_cash" => cashflows.get_total_interest_cash(period_id),
-                "interest_expense_pik" => cashflows.get_total_interest_pik(period_id),
-                "interest_income" => cashflows.get_total_interest_income(period_id),
-                "principal_payment" => cashflows.get_total_principal(period_id),
-                "debt_balance" => cashflows.get_total_debt_balance(period_id),
-                "fees" => cashflows.get_total_fees(period_id),
-                "accrued_interest" => cashflows.get_total_accrued_interest(period_id),
-                _ => Err(Error::capital_structure(Self::unknown_component_message(
-                    component,
-                ))),
-            }
-        } else {
-            match component {
-                "interest_expense" => cashflows.get_interest(instrument_or_total, period_id),
-                "interest_expense_cash" => {
-                    cashflows.get_interest_cash(instrument_or_total, period_id)
-                }
-                "interest_expense_pik" => {
-                    cashflows.get_interest_pik(instrument_or_total, period_id)
-                }
-                "interest_income" => cashflows.get_interest_income(instrument_or_total, period_id),
-                "principal_payment" => cashflows.get_principal(instrument_or_total, period_id),
-                "debt_balance" => cashflows.get_debt_balance(instrument_or_total, period_id),
-                "fees" => cashflows.get_fees(instrument_or_total, period_id),
-                "accrued_interest" => {
-                    cashflows.get_accrued_interest(instrument_or_total, period_id)
-                }
-                _ => Err(Error::capital_structure(Self::unknown_component_message(
-                    component,
-                ))),
-            }
-        }
-    }
-
     /// Get a capital-structure component from one completed period.
     ///
     /// `component` accepts `interest_expense`, `interest_expense_cash`,
@@ -389,7 +340,7 @@ impl EvaluationContext {
                     period_id
                 ))
             })?;
-        Self::lookup_cs_value(cashflows, period_id, component, instrument_or_total)
+        cashflows.get_component(component, instrument_or_total, period_id)
     }
 
     /// Get capital structure value for the current period.
@@ -434,12 +385,26 @@ impl EvaluationContext {
             .capital_structure_cashflows
             .as_ref()
             .ok_or_else(|| Error::capital_structure("No capital structure defined in model"))?;
-        Self::lookup_cs_value(
-            cs_cashflows,
-            &self.period_id,
-            component,
-            instrument_or_total,
-        )
+        cs_cashflows.get_component(component, instrument_or_total, &self.period_id)
+    }
+
+    /// Record which evaluation layer produced the current-period value of
+    /// `node_id`. Unknown nodes are ignored: `set_value` has already rejected
+    /// them by the time the evaluator records a source.
+    pub(crate) fn set_source(&mut self, node_id: &str, source: super::CellSource) {
+        if let Some(idx) = self.node_to_column.get(node_id) {
+            self.current_sources[*idx] = Some(source);
+        }
+    }
+
+    /// Recorded evaluation layers for the current period, keyed by node id.
+    pub(crate) fn cell_sources(&self) -> IndexMap<String, super::CellSource> {
+        self.node_to_column
+            .iter()
+            .filter_map(|(node_id, idx)| {
+                self.current_sources[*idx].map(|source| (node_id.as_str().to_string(), source))
+            })
+            .collect()
     }
 
     /// Get all results as a map.

@@ -406,7 +406,8 @@ impl GlobalFitOptimizer {
         }
 
         report = report
-            .with_metadata("method", "global_fit_lm_weighted_lsq")
+            .with_solver_method(crate::report::SolverMethod::GlobalFitLmWeightedLsq)
+            .with_residual_units(target.residual_units())
             .with_metadata("tolerance_definition", "max_abs_residual")
             .with_metadata(
                 "validation_tolerance",
@@ -1191,6 +1192,9 @@ where
     CalibrationDiagnostics {
         per_quote,
         condition_number,
+        // A partially filled matrix (a bump that could not be priced leaves a
+        // zero column) is not exported.
+        jacobian: jacobian_ok.then_some(jacobian),
         ..CalibrationDiagnostics::from_residuals(resid_values)
     }
 }
@@ -1421,6 +1425,10 @@ mod tests {
 
         fn build_curve_from_params(&self, _times: &[f64], params: &[f64]) -> Result<Self::Curve> {
             Ok(DummyCurve(params.to_vec()))
+        }
+
+        fn residual_units(&self) -> crate::report::ResidualUnits {
+            crate::report::ResidualUnits::PvPerUnitNotional
         }
 
         fn calculate_residuals(
@@ -1833,6 +1841,10 @@ mod tests {
                 self.inner.build_curve_from_params(times, params)
             }
 
+            fn residual_units(&self) -> crate::report::ResidualUnits {
+                crate::report::ResidualUnits::PvPerUnitNotional
+            }
+
             fn calculate_residuals(
                 &self,
                 curve: &Self::Curve,
@@ -1906,6 +1918,10 @@ mod tests {
                 params: &[f64],
             ) -> Result<Self::Curve> {
                 Ok(DummyCurve(params.to_vec()))
+            }
+
+            fn residual_units(&self) -> crate::report::ResidualUnits {
+                crate::report::ResidualUnits::PvPerUnitNotional
             }
 
             fn calculate_residuals(
@@ -2100,6 +2116,8 @@ mod tests {
         assert_eq!(diagnostics.per_quote.len(), 1);
         assert!((diagnostics.max_residual - 0.01).abs() < 1e-12);
         assert!(diagnostics.condition_number.is_none());
+        let jacobian = diagnostics.jacobian.as_ref().expect("jacobian");
+        assert_eq!(jacobian.len(), diagnostics.per_quote.len());
     }
 
     #[test]

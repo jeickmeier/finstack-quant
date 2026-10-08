@@ -76,6 +76,7 @@ impl Check for EffectiveTaxRateCheck {
                         self.tax_expense_node.clone(),
                         self.pretax_income_node.clone(),
                     ],
+                    comparison: None,
                 });
             }
         }
@@ -88,6 +89,7 @@ impl Check for EffectiveTaxRateCheck {
             category: self.category(),
             passed,
             findings,
+            comparisons: Vec::new(),
         })
     }
 }

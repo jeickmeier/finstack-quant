@@ -20,5 +20,8 @@ pub use im::{
     CcpMethodology, ClearingHouseImCalculator, ExternalImSource, HaircutImCalculator,
     ScheduleImCalculator, SimmCalculator,
 };
-pub use traits::{ImCalculator, ImResult};
+pub use traits::{
+    ImCalculator, ImResult, SimmBucketDetail, SimmComponentDetail, SimmDetail,
+    SimmWeightedSensitivity,
+};
 pub use vm::{VmCalculator, VmResult};

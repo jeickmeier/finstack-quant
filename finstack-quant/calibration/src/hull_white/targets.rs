@@ -118,8 +118,8 @@ pub(super) fn quote_fit_report(
     fit.metadata.extend(report.metadata);
     fit.metadata
         .insert("optimizer_termination".into(), report.convergence_reason);
-    fit.metadata
-        .insert("residual_units".into(), "quoted_volatility".into());
+    fit.solver_method = report.solver_method;
+    fit = fit.with_residual_units(crate::report::ResidualUnits::QuotedVolatility);
     fit.metadata.insert(
         "optimizer_objective".into(),
         report.objective_value.to_string(),
@@ -211,6 +211,13 @@ impl<'a> GlobalSolveTarget for HullWhiteSwaptionTarget<'a> {
         let kappa = params[0].exp();
         let sigma = params[1].exp();
         Ok(HullWhiteCalibrationParams { kappa, sigma })
+    }
+
+    // The solver residual is the vega-scaled price error, a first-order
+    // quoted-volatility error; the published report replaces it with the
+    // exact implied-volatility error (see `quote_fit_report`).
+    fn residual_units(&self) -> crate::report::ResidualUnits {
+        crate::report::ResidualUnits::QuotedVolatility
     }
 
     fn calculate_residuals(
@@ -317,6 +324,13 @@ impl<'a> GlobalSolveTarget for HullWhiteCapFloorTarget<'a> {
         let kappa = params[0].exp();
         let sigma = params[1].exp();
         Ok(HullWhiteCalibrationParams { kappa, sigma })
+    }
+
+    // The solver residual is the vega-scaled price error, a first-order
+    // quoted-volatility error; the published report replaces it with the
+    // exact implied-volatility error (see `quote_fit_report`).
+    fn residual_units(&self) -> crate::report::ResidualUnits {
+        crate::report::ResidualUnits::QuotedVolatility
     }
 
     fn calculate_residuals(

@@ -114,11 +114,24 @@ test('non-finite result fields named by Rust NonFiniteFields stay numeric', () =
     'BENCH'
   );
   for (const row of constantBench.beta()) {
-    assert.deepEqual(Object.keys(row).sort(), ['beta', 'ci_lower', 'ci_upper', 'std_err']);
+    assert.deepEqual(Object.keys(row).sort(), [
+      'beta',
+      'ci_lower',
+      'ci_upper',
+      'confidence_level',
+      'n_obs',
+      'std_err',
+    ]);
     assert.ok(Object.values(row).every((v) => typeof v === 'number'));
   }
   for (const row of constantBench.greeks()) {
-    assert.deepEqual(Object.keys(row).sort(), ['adjusted_r_squared', 'alpha', 'beta', 'r_squared']);
+    assert.deepEqual(Object.keys(row).sort(), [
+      'adjusted_r_squared',
+      'alpha',
+      'beta',
+      'n_obs',
+      'r_squared',
+    ]);
     assert.ok(Object.values(row).every((v) => typeof v === 'number'));
   }
 

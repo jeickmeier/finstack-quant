@@ -279,6 +279,16 @@ impl AttributionInputs {
                         instrument_t0.value(market_t1, self.as_of_t1)?;
                     result.model_params_pnl =
                         val_t1.value.checked_sub(closing_value_opening_params)?;
+                    let step = crate::helpers::sensitivity_step(
+                        "ModelParameters",
+                        crate::helpers::FactorWorking::Repriced {
+                            pv: closing_value_opening_params,
+                        },
+                        result.model_params_pnl,
+                        None,
+                        &mut result.meta.notes,
+                    );
+                    result.sensitivity_steps.push(step);
                     result.meta.num_repricings += 1;
                 }
                 result

@@ -506,11 +506,48 @@ class BetaResult:
         This accessor does not raise; it returns the stored value.
         """
 
+    @property
+    def n_obs(self) -> int:
+        """
+        Number of observations the regression used.
+
+        Returns
+        -------
+        int
+            Paired observations after truncating the portfolio and benchmark
+            series to their common length. Reported even when the estimates
+            are ``NaN``; ``0`` only for a value parsed from JSON written
+            before the field existed. The interval uses ``n_obs - 2`` degrees
+            of freedom.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+
+    @property
+    def confidence_level(self) -> float:
+        """
+        Two-sided confidence level of ``ci_lower`` / ``ci_upper``.
+
+        Returns
+        -------
+        float
+            Decimal probability (``0.95`` for the 95% interval). The bounds
+            are ``beta ± t(n_obs - 2, (1 + confidence_level) / 2) * std_err``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export as a single-row pandas DataFrame.
 
-        Columns: ``beta``, ``std_err``, ``ci_lower``, ``ci_upper``.
+        Columns: ``beta``, ``std_err``, ``ci_lower``, ``ci_upper``, ``n_obs``
+        (``int64`` observation count), ``confidence_level`` (decimal level of
+        the bounds).
 
         One flat record describes one regression, so a one-row frame is the
         right shape: ``pd.concat([r.to_dataframe() for r in results])`` stacks
@@ -683,11 +720,31 @@ class GreeksResult:
         This accessor does not raise; it returns the stored value.
         """
 
+    @property
+    def n_obs(self) -> int:
+        """
+        Number of observations the regression used.
+
+        Returns
+        -------
+        int
+            Paired observations after truncating the portfolio and benchmark
+            series to their common length. Reported even when the estimates
+            are ``NaN``; ``0`` only for a value parsed from JSON written
+            before the field existed. Adjusted R² uses ``n_obs - 2`` residual
+            degrees of freedom.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export as a single-row pandas DataFrame.
 
-        Columns: ``alpha``, ``beta``, ``r_squared``, ``adjusted_r_squared``.
+        Columns: ``alpha``, ``beta``, ``r_squared``, ``adjusted_r_squared``,
+        ``n_obs`` (``int64`` observation count).
 
         One flat record describes one regression, so a one-row frame is the
         right shape: ``pd.concat([r.to_dataframe() for r in results])`` stacks
@@ -1028,14 +1085,33 @@ class MultiFactorResult:
         This accessor does not raise; it returns the stored value.
         """
 
+    @property
+    def n_obs(self) -> int:
+        """
+        Number of observations the regression used.
+
+        Returns
+        -------
+        int
+            Common length of the dependent series and every factor series.
+            Residual degrees of freedom are ``n_obs - len(betas) - 1``; ``0``
+            only for a value parsed from JSON written before the field
+            existed.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+
     def to_dataframe(self, factor_names: list[str] | None = None) -> pd.DataFrame:
         """
         Export the factor loadings as a pandas DataFrame, one row per factor.
 
         Columns: ``factor``, ``beta``, ``alpha``, ``r_squared``,
-        ``adjusted_r_squared``, ``residual_vol``.
+        ``adjusted_r_squared``, ``residual_vol``, ``n_obs`` (``int64``
+        observation count).
 
-        The loadings are the per-row payload; the four regression-level
+        The loadings are the per-row payload; the five regression-level
         statistics repeat on every row so a single row carries its own fit
         context after ``pd.concat`` across tickers or ``groupby("factor")``.
 
@@ -3548,8 +3624,10 @@ class Performance:
         -------
         pd.DataFrame
             Indexed by ticker with columns ``beta``, ``std_err``,
-            ``ci_lower``, ``ci_upper`` (95% bounds). Undefined estimates remain
-            ``NaN`` in numeric ``float64`` columns.
+            ``ci_lower``, ``ci_upper`` (95% bounds), ``n_obs`` (``int64``
+            observation count) and ``confidence_level`` (decimal level of the
+            bounds). Undefined estimates remain ``NaN`` in numeric ``float64``
+            columns.
 
         Raises
         ------
@@ -3567,7 +3645,7 @@ class Performance:
         ...     benchmark_ticker="BENCH",
         ... )
         >>> list(perf.to_beta_dataframe().columns)
-        ['beta', 'std_err', 'ci_lower', 'ci_upper']
+        ['beta', 'std_err', 'ci_lower', 'ci_upper', 'n_obs', 'confidence_level']
         """
         ...
 
@@ -3584,7 +3662,8 @@ class Performance:
         -------
         pd.DataFrame
             Indexed by ticker with columns ``alpha`` (annualized Jensen
-            alpha), ``beta``, ``r_squared``, ``adjusted_r_squared``.
+            alpha), ``beta``, ``r_squared``, ``adjusted_r_squared`` and
+            ``n_obs`` (``int64`` observation count).
 
         Raises
         ------

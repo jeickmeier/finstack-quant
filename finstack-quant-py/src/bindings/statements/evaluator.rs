@@ -165,6 +165,38 @@ impl PyStatementResult {
             .collect()
     }
 
+    /// Which evaluation layer produced each cell of the result.
+    ///
+    /// The evaluator resolves every (node, period) cell by the precedence
+    /// **Value > Forecast > Formula**, after the node's optional ``where``
+    /// mask. The model alone does not determine the outcome: an as-of
+    /// visibility cutoff can hide an explicit value so that the forecast or
+    /// formula fires instead.
+    ///
+    /// Returns
+    /// -------
+    /// dict[str, dict[str, str]]
+    ///     Node identifier → period identifier (``"2025Q1"``) → source label:
+    ///     ``"value"`` (explicit value), ``"forecast"`` (forecast method),
+    ///     ``"formula"`` (formula) or ``"where_masked"`` (the ``where``
+    ///     clause was false, so the cell is ``0.0``). Same keys as the
+    ///     evaluated values. Empty for a result that was not produced by an
+    ///     evaluator or was serialized before sources were recorded.
+    ///
+    /// This property does not raise.
+    #[getter]
+    fn node_sources<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let out = PyDict::new(py);
+        for (node_id, by_period) in &self.inner.node_sources {
+            let periods = PyDict::new(py);
+            for (period, source) in by_period {
+                periods.set_item(period.to_string(), source.as_str())?;
+            }
+            out.set_item(node_id, periods)?;
+        }
+        Ok(out)
+    }
+
     /// Check report attached by an evaluator configured with
     /// :meth:`Evaluator.with_checks`, or ``None`` when no suite ran.
     #[getter]
@@ -382,8 +414,8 @@ impl PyStatementResult {
     /// orient : {"long", "wide"}, default "long"
     ///     ``"long"`` yields one row per (node, period) with columns
     ///     ``node_id``, ``period``, ``value``, ``value_money``, ``currency``,
-    ///     ``value_type``. ``"wide"`` yields node identifiers as rows and
-    ///     period identifiers as columns.
+    ///     ``value_type``, ``source``. ``"wide"`` yields node identifiers as
+    ///     rows and period identifiers as columns.
     ///
     /// Notes
     /// -----
@@ -391,7 +423,10 @@ impl PyStatementResult {
     /// nodes and left null for scalar nodes. ``value_money`` is a float64
     /// mirror of the monetary amount, so it carries f64 (not fixed-point
     /// Decimal) precision; use ``to_json()`` or ``get_money()`` when full
-    /// fixed-point precision is required.
+    /// fixed-point precision is required. ``source`` is the evaluation layer
+    /// that produced the cell (``value``, ``forecast``, ``formula`` or
+    /// ``where_masked``, see :attr:`node_sources`); it is null when the
+    /// result records no source for the cell.
     ///
     /// Raises
     /// ------
@@ -413,6 +448,7 @@ impl PyStatementResult {
                         ("value_money", "value_money"),
                         ("currency", "currency"),
                         ("value_type", "value_type"),
+                        ("source", "source"),
                     ],
                 )
             }

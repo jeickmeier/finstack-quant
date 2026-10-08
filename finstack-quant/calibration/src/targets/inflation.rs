@@ -420,6 +420,10 @@ impl BootstrapTarget for InflationCurveTarget {
             .build()
     }
 
+    fn residual_units(&self) -> crate::report::ResidualUnits {
+        crate::report::ResidualUnits::PvPerUnitNotional
+    }
+
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
         let base_date = self.params.base_date;
         // Context needs the curve being calibrated + discount curve
@@ -526,6 +530,10 @@ Global solve requires strictly increasing times.",
             .knots(knots)
             .interp(self.params.interpolation)
             .build()
+    }
+
+    fn residual_units(&self) -> crate::report::ResidualUnits {
+        crate::report::ResidualUnits::PvPerUnitNotional
     }
 
     fn calculate_residuals(

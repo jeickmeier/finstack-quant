@@ -224,6 +224,29 @@ pub struct PnlAttribution {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mark_to_market_pnl: Option<Money>,
 
+    /// Present value at T₀ on the T₀ market: the opening endpoint of the
+    /// attribution, in the `total_pnl` currency.
+    ///
+    /// `mark_to_market_pnl == pv_t1 − pv_t0`, and `total_pnl` adds the period
+    /// cash receipts the method documents. After a target-currency
+    /// translation this is the opening value converted at T₀ FX.
+    ///
+    /// Absent when the result was not produced from two endpoint valuations in
+    /// the `total_pnl` currency: a bare [`Self::new`] result, a payload
+    /// written before this field existed, or an opening value quoted in a
+    /// different currency from the closing value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pv_t0: Option<Money>,
+
+    /// Present value at T₁ on the T₁ market: the closing endpoint of the
+    /// attribution, in the `total_pnl` currency.
+    ///
+    /// After a target-currency translation this is the closing value
+    /// converted at T₁ FX. Absent under the same conditions as
+    /// [`Self::pv_t0`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pv_t1: Option<Money>,
+
     /// Carry P&L (theta + accruals).
     pub carry: Money,
 
@@ -326,6 +349,34 @@ pub struct PnlAttribution {
     /// supplied.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub credit_carry_decomposition: Option<CreditCarryDecomposition>,
+
+    /// Ordered repricing steps of a waterfall attribution: the running
+    /// present value before and after each factor, in the order applied.
+    ///
+    /// The step P&Ls chain from [`Self::pv_t0`] to the fully rolled value and
+    /// sum to `mark_to_market_pnl − residual`. After a target-currency
+    /// translation every step value is converted at T₁ FX, so the first
+    /// `pv_before` equals `pv_t0 + fx_translation_pnl`.
+    ///
+    /// Empty for every other method, for a composite aggregate, and for
+    /// payloads written before this field existed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub waterfall_steps: Vec<WaterfallStep>,
+
+    /// The working behind each factor of a sensitivity-based attribution, in
+    /// the order computed: sensitivity, observed market move, first-order
+    /// P&L and second-order P&L (or the repriced value for factors isolated
+    /// by a reprice).
+    ///
+    /// Populated by the Taylor and metrics-based methods. Each factor bucket
+    /// equals the sum of `explained_pnl + gamma_pnl` over its rows, with two
+    /// metrics-based exceptions that have no rows: `carry` is read directly
+    /// from the T₀ carry metrics (see `carry_detail`), and `cross_factor_pnl`
+    /// is itemized by pair in `cross_factor_detail`. Empty for
+    /// the parallel and waterfall methods, for a composite aggregate, and for
+    /// payloads written before this field existed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sensitivity_steps: Vec<SensitivityStep>,
 
     /// Attribution metadata.
     pub meta: AttributionMeta,
@@ -537,6 +588,24 @@ macro_rules! visit_factor_money {
                 }
             }
         }
+        for step in & $($mutability)? $attribution.waterfall_steps {
+            $visit("waterfall_steps.pv_before", & $($mutability)? step.pv_before)?;
+            $visit("waterfall_steps.pv_after", & $($mutability)? step.pv_after)?;
+            $visit("waterfall_steps.step_pnl", & $($mutability)? step.step_pnl)?;
+        }
+        for step in & $($mutability)? $attribution.sensitivity_steps {
+            $visit("sensitivity_steps.explained_pnl", & $($mutability)? step.explained_pnl)?;
+            for money in [
+                & $($mutability)? step.sensitivity,
+                & $($mutability)? step.repriced_pv,
+                & $($mutability)? step.gamma_pnl,
+            ].into_iter().flatten() {
+                $visit("sensitivity_steps", money)?;
+            }
+            for bucket in & $($mutability)? step.buckets {
+                $visit("sensitivity_steps.buckets", & $($mutability)? bucket.sensitivity)?;
+            }
+        }
         Ok::<(), Error>(())
     }};
 }
@@ -570,6 +639,8 @@ impl PnlAttribution {
             // any total-return adjustment. `apply_total_return_carry` leaves
             // this field untouched when it mutates `total_pnl`.
             mark_to_market_pnl: Some(total_pnl),
+            pv_t0: None,
+            pv_t1: None,
             carry: zero,
             rates_curves_pnl: zero,
             credit_curves_pnl: zero,
@@ -597,6 +668,8 @@ impl PnlAttribution {
             scalars_detail: None,
             credit_factor_detail: None,
             credit_carry_decomposition: None,
+            waterfall_steps: Vec::new(),
+            sensitivity_steps: Vec::new(),
             result_invalid: false,
             meta: AttributionMeta {
                 method,
@@ -646,9 +719,12 @@ impl PnlAttribution {
     /// (`carry` … `market_scalars_pnl`) and every leaf of every populated
     /// detail struct.
     ///
-    /// Deliberately excluded: `total_pnl`, `mark_to_market_pnl`,
-    /// `fx_translation_pnl` and `residual` (callers derive or recompute
-    /// them) and the diagnostic absolute value
+    /// The walk also covers the monetary fields of `waterfall_steps` and
+    /// `sensitivity_steps` (step values, sensitivities and step P&Ls).
+    ///
+    /// Deliberately excluded: `total_pnl`, `mark_to_market_pnl`, `pv_t0`,
+    /// `pv_t1`, `fx_translation_pnl` and `residual` (callers derive or
+    /// recompute them) and the diagnostic absolute value
     /// `credit_factor_detail.adder_magnitude` (must stay non-negative).
     /// [`Self::scale`] and target-currency translation both walk this one
     /// visitor, so a new detail field is added in exactly one place.
@@ -695,7 +771,14 @@ impl PnlAttribution {
         }
         let mut scaled = self.clone();
         scaled.total_pnl = scaled.total_pnl.checked_mul_f64(factor)?;
-        if let Some(money) = &mut scaled.mark_to_market_pnl {
+        for money in [
+            &mut scaled.mark_to_market_pnl,
+            &mut scaled.pv_t0,
+            &mut scaled.pv_t1,
+        ]
+        .into_iter()
+        .flatten()
+        {
             *money = money.checked_mul_f64(factor)?;
         }
         scaled.fx_translation_pnl = scaled.fx_translation_pnl.checked_mul_f64(factor)?;
@@ -740,8 +823,14 @@ impl PnlAttribution {
         };
         visit("residual", &self.residual)?;
         visit("fx_translation", &self.fx_translation_pnl)?;
-        if let Some(money) = &self.mark_to_market_pnl {
-            visit("mark_to_market_pnl", money)?;
+        for (name, money) in [
+            ("mark_to_market_pnl", &self.mark_to_market_pnl),
+            ("pv_t0", &self.pv_t0),
+            ("pv_t1", &self.pv_t1),
+        ] {
+            if let Some(money) = money {
+                visit(name, money)?;
+            }
         }
         if let Some(money) = self
             .credit_factor_detail

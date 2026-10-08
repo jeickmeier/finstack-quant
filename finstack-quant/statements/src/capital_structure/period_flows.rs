@@ -543,6 +543,16 @@ pub fn calculate_period_flows(
     };
     breakdown.accrued_interest = Money::new(accrued_interest, currency)?;
 
+    // Audit detail: every contractual principal flow is scheduled principal.
+    // A zero opening may carry a placeholder currency, so restate it in the
+    // schedule's currency.
+    breakdown.opening_balance = Some(if opening_balance.currency() == currency {
+        opening_balance
+    } else {
+        Money::from((0_i64, currency))
+    });
+    breakdown.mark_principal_as_scheduled();
+
     // `net_new_funding` (draws plus explicit or implicit issuance principal in
     // this period) is returned so the waterfall can recover the payable balance
     // (`opening + funding`) and the draw-aware closing balance; without it the

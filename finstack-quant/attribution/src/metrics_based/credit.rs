@@ -59,12 +59,26 @@ pub(super) fn apply(
             let Some(buckets) = keyrate_cs01.get(curve_id) else {
                 continue;
             };
+            let mut curve_acc = NeumaierAccumulator::new();
             for bucket in buckets {
                 credit_acc.add(bucket.sensitivity * bucket.move_bp);
+                curve_acc.add(bucket.sensitivity * bucket.move_bp);
                 shift_acc.add(bucket.move_bp);
                 shift_terms += 1;
             }
             curves_with_data += 1;
+            push_first_order_step(
+                attribution,
+                &format!("Credit:{curve_id}"),
+                FactorWorking::KeyRate {
+                    unit: MoveUnit::BasisPoint,
+                    buckets: buckets
+                        .iter()
+                        .map(|bucket| (bucket.tenor_years, bucket.sensitivity, bucket.move_bp))
+                        .collect(),
+                },
+                curve_acc.total(),
+            );
         }
         if curves_with_data > 0 {
             attribution.credit_curves_pnl = factor_money_or_invalid(
@@ -105,6 +119,16 @@ pub(super) fn apply(
                 "credit curves P&L",
                 &mut attribution.meta.notes,
                 non_finite_detected,
+            );
+            push_first_order_step(
+                attribution,
+                "Credit",
+                FactorWorking::Scalar {
+                    unit: MoveUnit::BasisPoint,
+                    sensitivity: *cs01,
+                    market_move: avg_shift,
+                },
+                cs01 * avg_shift,
             );
             credit_has_data = true;
             credit_convexity_avg_shift_bp = inputs.shifts.avg_credit_shift_bp;
@@ -154,6 +178,13 @@ pub(super) fn apply(
             if let Some(cs_gamma) = inputs.val_t0.measures.get(MetricId::CsGamma.as_str()) {
                 let shift_decimal = avg_shift / 10_000.0;
                 let gamma_pnl = 0.5 * cs_gamma * shift_decimal * shift_decimal;
+                push_second_order_step(
+                    attribution,
+                    "CreditGamma",
+                    MoveUnit::BasisPoint,
+                    avg_shift,
+                    gamma_pnl,
+                );
                 attribution.credit_curves_pnl = factor_money_or_invalid(
                     attribution.credit_curves_pnl.amount() + gamma_pnl,
                     inputs.val_t1.value.currency(),

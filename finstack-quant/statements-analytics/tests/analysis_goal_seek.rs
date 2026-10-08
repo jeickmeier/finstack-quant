@@ -208,6 +208,62 @@ fn test_goal_seek_with_explicit_bounds() {
     .expect("goal seek should succeed");
 
     assert!((solution.solved_value - 0.75).abs() < 1e-9);
+    // Bounded solves report diagnostics too: two endpoint probes at least.
+    assert!(solution.converged);
+    assert!(solution.residual.abs() <= solution.tolerance);
+    assert!(solution.evaluations >= 3);
+}
+
+/// The diagnostics reproduce the convergence check: the residual is the
+/// target node's value at the solved driver minus the target, it is within
+/// the reported tolerance, and the evaluation count is recorded.
+#[test]
+fn test_goal_seek_reports_residual_and_evaluations() {
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let model = ModelBuilder::new("diagnostics")
+        .periods("2025Q1..Q1", None)
+        .expect("valid period")
+        .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
+        .compute("cogs", "revenue * 0.6")
+        .expect("valid formula")
+        .compute("gross_profit", "revenue - cogs")
+        .expect("valid formula")
+        .build()
+        .expect("valid model");
+    let target = 50_000.0;
+
+    let solved = goal_seek(
+        &model,
+        "gross_profit",
+        period,
+        target,
+        "revenue",
+        period,
+        true,
+        None,
+    )
+    .expect("goal seek should succeed");
+
+    assert!(solved.converged);
+    assert_eq!(solved.tolerance, 1e-9 * target);
+    assert!(solved.residual.abs() <= solved.tolerance);
+    // At least a bracket, one iterate and the final residual check.
+    assert!(solved.evaluations >= 3, "{}", solved.evaluations);
+
+    // The residual is reproducible from the returned model.
+    let solved_model = solved.model.as_ref().expect("updated model");
+    let results = Evaluator::new()
+        .evaluate(solved_model)
+        .expect("solved model evaluates");
+    let actual = results.get("gross_profit", &period).expect("target value");
+    assert_eq!(actual - target, solved.residual);
+
+    let json = serde_json::to_value(&solved).expect("serialize");
+    assert_eq!(json["converged"], serde_json::Value::Bool(true));
+    assert_eq!(
+        json["evaluations"].as_u64(),
+        Some(solved.evaluations as u64)
+    );
 }
 
 /// The result's wire form always carries `model` (`null` when the model was

@@ -71,6 +71,7 @@ use wasm_bindgen::prelude::*;
 
 pub mod builder;
 pub mod factor_model;
+pub mod margin;
 pub mod materialization;
 pub mod primitive;
 pub mod results;

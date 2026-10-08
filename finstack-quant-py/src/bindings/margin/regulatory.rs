@@ -1338,6 +1338,16 @@ impl PyFrtbSbaResult {
             .collect()
     }
 
+    /// Per-risk-class delta, vega and curvature charges under every evaluated
+    /// correlation scenario, as
+    /// ``{scenario: {"delta_by_risk_class": {...}, "vega_by_risk_class":
+    /// {...}, "curvature_by_risk_class": {...}}}`` keyed by wire labels. Each
+    /// scenario's maps sum to its ``scenario_charges`` entry.
+    #[getter]
+    fn scenario_breakdown<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.scenario_breakdown)
+    }
+
     /// Policy metadata stamped by the computing layer as a dict: numeric
     /// mode, active rounding context, any applied FX policy and the
     /// parallel-execution flag.

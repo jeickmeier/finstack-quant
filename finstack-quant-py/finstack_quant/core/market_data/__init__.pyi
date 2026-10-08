@@ -667,6 +667,31 @@ class DiscountCurve:
         """
         ...
 
+    @property
+    def rate_calibration(self) -> Optional[dict[str, Any]]:
+        """
+        Calibration recipe stamped on this curve by the calibration engine.
+
+        The dict is the serde form of the Rust ``RateCalibrationRecipe``, the
+        same object found under ``"rate_calibration"`` in :meth:`to_json`:
+        ``currency``, ``method`` (bootstrap or global solve), ``curve_day_count``,
+        ``ois_compounding``, ``role`` (discount, or projection with its linked
+        discount curve id) and ``quotes``, the complete typed quote set with
+        rates and spreads as decimals and futures as prices.
+
+        Returns
+        -------
+        Optional[dict[str, Any]]
+            The recipe, or ``None`` for a curve that was built directly rather than
+            produced by a calibration step.
+
+        Raises
+        ------
+        ValueError
+            If the recipe cannot be converted to Python objects.
+        """
+        ...
+
     def __eq__(self, other: object) -> bool: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
@@ -1125,6 +1150,31 @@ class ForwardCurve:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def rate_calibration(self) -> Optional[dict[str, Any]]:
+        """
+        Calibration recipe stamped on this curve by the calibration engine.
+
+        The dict is the serde form of the Rust ``RateCalibrationRecipe``, the
+        same object found under ``"rate_calibration"`` in :meth:`to_json`:
+        ``currency``, ``method`` (bootstrap or global solve), ``curve_day_count``,
+        ``ois_compounding``, ``role`` (discount, or projection with its linked
+        discount curve id) and ``quotes``, the complete typed quote set with
+        rates and spreads as decimals and futures as prices.
+
+        Returns
+        -------
+        Optional[dict[str, Any]]
+            The recipe, or ``None`` for a curve that was built directly rather than
+            produced by a calibration step.
+
+        Raises
+        ------
+        ValueError
+            If the recipe cannot be converted to Python objects.
         """
         ...
 
@@ -1696,6 +1746,32 @@ class HazardCurve:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def hazard_calibration(self) -> Optional[dict[str, Any]]:
+        """
+        Calibration recipe stamped on this curve by the calibration engine.
+
+        The dict is the serde form of the Rust ``HazardCalibrationRecipe``, the
+        same object found under ``"hazard_calibration"`` in :meth:`to_json`:
+        ``hazard_params`` (the hazard step parameters), ``calibration_inputs``
+        and ``spread_risk_inputs`` (each entry holds the typed CDS ``quote``
+        with its ``pillar_date`` and year-fraction ``pillar_time``) and
+        ``calibration_config`` (solver and validation policy of the original
+        solve).
+
+        Returns
+        -------
+        Optional[dict[str, Any]]
+            The recipe, or ``None`` for a curve that was built directly rather than
+            produced by a calibration step.
+
+        Raises
+        ------
+        ValueError
+            If the recipe cannot be converted to Python objects.
         """
         ...
 

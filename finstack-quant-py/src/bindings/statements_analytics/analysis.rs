@@ -13,7 +13,7 @@
 
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
 use crate::bindings::pandas_utils::{
-    labeled_values_to_series, serde_rows_to_dataframe_with_schema, ColumnSchema,
+    labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
 };
 use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::statements_analytics::typed::{
@@ -642,9 +642,38 @@ impl PyGoalSeekResult {
             .map(PyFinancialModelSpec::from_inner)
     }
 
-    /// Serialize to canonical JSON (``{"solved_value", "model"}``; ``model``
-    /// is ``null`` when it was not requested), identical to the WASM
-    /// ``goalSeek`` result.
+    /// Signed residual at ``solved_value``: the target node's value minus the
+    /// requested target, in the target node's units.
+    #[getter]
+    fn residual(&self) -> f64 {
+        self.inner.residual
+    }
+
+    /// Absolute acceptance tolerance on ``residual``, in the target node's
+    /// units (``1e-9 * max(abs(target_value), 1)``).
+    #[getter]
+    fn tolerance(&self) -> f64 {
+        self.inner.tolerance
+    }
+
+    /// Number of model evaluations the solve used, including the final
+    /// residual check; ``0`` only for a result loaded from JSON written
+    /// before diagnostics were recorded.
+    #[getter]
+    fn evaluations(&self) -> usize {
+        self.inner.evaluations
+    }
+
+    /// Whether ``abs(residual) <= tolerance``; always ``True`` for a result
+    /// returned by ``goal_seek``.
+    #[getter]
+    fn converged(&self) -> bool {
+        self.inner.converged
+    }
+
+    /// Serialize to canonical JSON (``{"solved_value", "model", "residual",
+    /// "tolerance", "evaluations", "converged"}``; ``model`` is ``null`` when
+    /// it was not requested), identical to the WASM ``goalSeek`` result.
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "GoalSeekResult"))
     }
@@ -676,8 +705,11 @@ impl PyGoalSeekResult {
 
     fn __repr__(&self) -> String {
         format!(
-            "GoalSeekResult(solved_value={}, model={})",
+            "GoalSeekResult(solved_value={}, residual={}, evaluations={}, converged={}, model={})",
             self.inner.solved_value,
+            self.inner.residual,
+            self.inner.evaluations,
+            crate::bindings::statements_analytics::py_bool(self.inner.converged),
             if self.inner.model.is_some() {
                 "FinancialModelSpec(...)"
             } else {
@@ -714,8 +746,9 @@ impl PyGoalSeekResult {
 /// -------
 /// GoalSeekResult
 ///     ``solved_value`` plus ``model`` (the updated ``FinancialModelSpec`` or
-///     ``None``). ``float(result)`` yields the solved value. The input model
-///     is never modified.
+///     ``None``) and the solve diagnostics ``residual``, ``tolerance``,
+///     ``evaluations`` and ``converged``. ``float(result)`` yields the solved
+///     value. The input model is never modified.
 ///
 /// Raises
 /// ------
@@ -1039,7 +1072,8 @@ impl PyExplanationStep {
         self.inner.value
     }
 
-    /// Operation applied to the component (``"+"``, ``"*"``, ...), or ``None``.
+    /// Sign with which the component enters the formula (``"+"`` or ``"-"``)
+    /// when the formula is a pure sum/difference of references, else ``None``.
     #[getter]
     fn operation(&self) -> Option<&str> {
         self.inner.operation.as_deref()
@@ -1095,13 +1129,33 @@ impl PyExplanation {
         finstack_quant_core::wire::serde_label(&self.inner.node_type).map_err(core_to_py)
     }
 
+    /// Evaluation layer that produced the value: ``"value"``, ``"forecast"``,
+    /// ``"formula"`` or ``"where_masked"``; ``None`` when the results carry no
+    /// cell source.
+    #[getter]
+    fn source(&self) -> Option<&'static str> {
+        self.inner.source.map(|source| source.as_str())
+    }
+
+    /// The node's forecast spec as ``{"method": ..., "params": {...}}`` when
+    /// ``source`` is ``"forecast"``, else ``None``.
+    #[getter]
+    fn forecast<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .forecast
+            .as_ref()
+            .map(|forecast| serde_to_py(py, forecast))
+            .transpose()
+    }
+
     /// Formula text, or ``None`` for non-formula nodes.
     #[getter]
     fn formula_text(&self) -> Option<&str> {
         self.inner.formula_text.as_deref()
     }
 
-    /// Component breakdown in evaluation order.
+    /// Formula components with the values they resolved to (formula order);
+    /// empty when the value did not come from the formula.
     #[getter]
     fn breakdown(&self) -> Vec<PyExplanationStep> {
         self.inner
@@ -1190,7 +1244,8 @@ impl PyExplanation {
 /// Returns
 /// -------
 /// Explanation
-///     Typed explanation with ``breakdown`` steps, ``to_text()`` and
+///     Typed explanation with the cell ``source``, the ``forecast`` spec of a
+///     forecast cell, ``breakdown`` steps, ``to_text()`` and
 ///     ``to_dataframe()``; ``to_json()`` matches the WASM ``explainFormula``.
 ///
 /// Raises

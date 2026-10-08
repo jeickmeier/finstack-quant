@@ -7,7 +7,7 @@
 use crate::analysis::scenarios::sensitivity::descending_f64;
 use crate::analysis::scenarios::TornadoEntry;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -46,12 +46,100 @@ pub struct CorporateValuationResult {
     pub equity_value_per_share: Option<f64>,
     /// Diluted share count (if shares_outstanding was provided)
     pub diluted_shares: Option<f64>,
+    /// Discount rate (WACC) applied to every explicit flow and to the
+    /// terminal value, as an annually compounded decimal (`0.10` = 10%).
+    ///
+    /// `None` only for a result deserialized from JSON written before this
+    /// field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wacc: Option<f64>,
+    /// One row per explicit forecast period that was discounted, in date
+    /// order: the free cash flow, its discounting tenor and factor, and its
+    /// present value.
+    ///
+    /// The `present_value` column sums to [`pv_explicit`](Self::pv_explicit),
+    /// and that sum plus [`terminal_value_pv`](Self::terminal_value_pv) is
+    /// [`enterprise_value`](Self::enterprise_value). Rows carry unrounded
+    /// `f64` amounts while the `Money` totals are rounded to the currency's
+    /// minor unit, so the reconciliation holds to within one minor unit.
+    /// Empty only for a result deserialized from JSON written before this
+    /// field existed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub periods: Vec<DcfPeriodRow>,
+    /// Present value of the explicit forecast flows: the sum of
+    /// `periods[i].present_value`.
+    ///
+    /// `None` only for a result deserialized from JSON written before this
+    /// field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pv_explicit: Option<Money>,
+    /// Terminal value at the horizon date, before discounting to the
+    /// valuation date.
+    ///
+    /// `terminal_value / (1 + wacc)^terminal_discount_years` is
+    /// [`terminal_value_pv`](Self::terminal_value_pv). `None` only for a
+    /// result deserialized from JSON written before this field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal_value: Option<Money>,
+    /// Discounting tenor of the terminal value in years (ACT/365.25 from the
+    /// valuation date to the last explicit flow date).
+    ///
+    /// An exit-multiple terminal value always uses the full tenor; a
+    /// growth-perpetuity terminal value uses the mid-year-adjusted tenor when
+    /// `DcfOptions::mid_year_convention` is set. `None` only for a result
+    /// deserialized from JSON written before this field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal_discount_years: Option<f64>,
+    /// EV-to-equity bridge whose net adjustment is
+    /// [`net_debt`](Self::net_debt): gross debt (`total_debt`) and `cash`
+    /// separately, plus preferred equity, minority interest, non-operating
+    /// assets and other adjustments, all in the model currency.
+    ///
+    /// `net_debt = total_debt - cash + preferred_equity + minority_interest -
+    /// non_operating_assets - Σ other_adjustments`, so `total_debt - cash`
+    /// equals `net_debt` whenever the remaining components are zero (always
+    /// the case unless `DcfOptions::equity_bridge` supplies them). Under a
+    /// flat `net_debt_override` the override is reported as `total_debt` with
+    /// `cash` zero. `None` only for a result deserialized from JSON written
+    /// before this field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub equity_bridge: Option<EquityBridge>,
     /// The underlying DCF instrument (for further analysis).
     ///
     /// Not part of the wire form: it is skipped on serialization and
     /// deserializes as `None`.
     #[serde(skip)]
     pub dcf_instrument: Option<DiscountedCashFlow>,
+}
+
+/// One explicit forecast period of a DCF: the flow and how it was discounted.
+///
+/// Amounts are unrounded `f64` values in the model currency of the owning
+/// [`CorporateValuationResult`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct DcfPeriodRow {
+    /// Statement period the flow was read from.
+    pub period_id: PeriodId,
+    /// Date the flow is discounted from: the last day of the period.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub date: Date,
+    /// Unlevered free cash flow of the period, in the model currency.
+    pub free_cash_flow: f64,
+    /// Discounting tenor in years: ACT/365.25 from the valuation date to
+    /// `date`, less half the average flow spacing (floored at zero) under the
+    /// mid-year convention.
+    pub discount_years: f64,
+    /// Discount factor `(1 + wacc)^-discount_years` (unitless).
+    pub discount_factor: f64,
+    /// Present value `free_cash_flow / (1 + wacc)^discount_years`, in the
+    /// model currency.
+    pub present_value: f64,
 }
 
 /// Node id the DCF entry points read unlevered free cash flow from when the
@@ -776,6 +864,7 @@ pub(crate) fn evaluate_dcf_from_results_impl(
     }
 
     let mut flows = Vec::new();
+    let mut flow_periods = Vec::new();
     for period in &model.periods {
         if period.is_actual {
             continue;
@@ -788,6 +877,7 @@ pub(crate) fn evaluate_dcf_from_results_impl(
             date,
             monetary_node_value(results, ufcf_node, &period.id, currency)?,
         ));
+        flow_periods.push(period.id);
     }
 
     if flows.is_empty() {
@@ -959,6 +1049,27 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         .discount_terminal_value(tv)
         .map_err(|e| finstack_quant_statements::error::Error::Eval(e.to_string()))?;
     let enterprise_value = pv_explicit + pv_terminal;
+    let terminal_discount_years = dcf
+        .terminal_discount_years()
+        .map_err(|e| finstack_quant_statements::error::Error::Eval(e.to_string()))?;
+    // Same expression per flow as `calculate_pv_explicit_flows`, so the
+    // `present_value` column sums to `pv_explicit`.
+    let periods = flow_periods
+        .iter()
+        .zip(&dcf.flows)
+        .map(|(period_id, (date, amount))| {
+            let discount_years = dcf.explicit_flow_discount_years(*date);
+            let compounding = (1.0 + dcf.wacc).powf(discount_years);
+            DcfPeriodRow {
+                period_id: *period_id,
+                date: *date,
+                free_cash_flow: *amount,
+                discount_years,
+                discount_factor: 1.0 / compounding,
+                present_value: amount / compounding,
+            }
+        })
+        .collect();
 
     let equity_val = equity_value.amount();
     let equity_value_per_share = dcf.equity_value_per_share(equity_val);
@@ -978,6 +1089,12 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         terminal_value_pv: Money::new(pv_terminal, currency)?,
         equity_value_per_share,
         diluted_shares,
+        wacc: Some(dcf.wacc),
+        periods,
+        pv_explicit: Some(Money::new(pv_explicit, currency)?),
+        terminal_value: Some(Money::new(tv, currency)?),
+        terminal_discount_years: Some(terminal_discount_years),
+        equity_bridge: Some(dcf.equity_bridge.clone()),
         dcf_instrument: Some(dcf),
     })
 }
@@ -1319,6 +1436,101 @@ mod tests {
         assert!((bridge - discounted.equity_value.amount()).abs() < 0.01);
         let pre_discount = discounted.enterprise_value.amount() - discounted.net_debt.amount();
         assert!((discounted.valuation_discount.amount() - 0.25 * pre_discount).abs() < 0.01);
+    }
+
+    /// The exported working reproduces every reported DCF number: rows sum to
+    /// the explicit PV, explicit plus terminal PV is EV, the terminal PV is the
+    /// undiscounted terminal value over its compounding, and the bridge nets
+    /// to net debt.
+    #[test]
+    fn dcf_detail_reconciles_to_enterprise_and_equity_value() {
+        let model = sensitivity_model();
+        for mid_year_convention in [false, true] {
+            let result = evaluate_dcf_with_market(
+                &model,
+                0.10,
+                TerminalValueSpec::GordonGrowth {
+                    stable_growth_rate: 0.02,
+                },
+                "ufcf",
+                Some(200.0),
+                &DcfOptions {
+                    mid_year_convention,
+                    ..DcfOptions::default()
+                },
+                None,
+                None,
+            )
+            .expect("DCF");
+            let wacc = result.wacc.expect("wacc");
+            assert_eq!(wacc, 0.10);
+            let dcf = result.dcf_instrument.as_ref().expect("instrument");
+            assert_eq!(result.periods.len(), dcf.flows.len());
+            for (row, (date, amount)) in result.periods.iter().zip(&dcf.flows) {
+                assert_eq!(row.date, *date);
+                assert_eq!(row.free_cash_flow, *amount);
+                let factor = (1.0 + wacc).powf(-row.discount_years);
+                assert!((row.discount_factor - factor).abs() < 1e-15);
+                assert!(
+                    (row.present_value - row.free_cash_flow * row.discount_factor).abs() < 1e-9
+                );
+            }
+            let rows_pv: f64 = result.periods.iter().map(|row| row.present_value).sum();
+            // Bit-identical to the instrument's own explicit-period PV.
+            assert_eq!(rows_pv, dcf.calculate_pv_explicit_flows());
+            let pv_explicit = result.pv_explicit.expect("pv_explicit").amount();
+            assert!((rows_pv - pv_explicit).abs() < 0.01);
+            assert!(
+                (rows_pv + result.terminal_value_pv.amount() - result.enterprise_value.amount())
+                    .abs()
+                    < 0.02
+            );
+
+            let terminal_value = result.terminal_value.expect("terminal value").amount();
+            let terminal_years = result.terminal_discount_years.expect("terminal tenor");
+            assert!(
+                (terminal_value / (1.0 + wacc).powf(terminal_years)
+                    - result.terminal_value_pv.amount())
+                .abs()
+                    < 0.01
+            );
+            assert!(terminal_value > result.terminal_value_pv.amount());
+
+            // A flat net-debt override is reported as gross debt, zero cash.
+            let bridge = result.equity_bridge.as_ref().expect("bridge");
+            assert_eq!((bridge.total_debt, bridge.cash), (200.0, 0.0));
+            assert!((bridge.total_debt - bridge.cash - result.net_debt.amount()).abs() < 0.01);
+            assert!((bridge.net_adjustment() - result.net_debt.amount()).abs() < 0.01);
+            assert!(
+                (result.enterprise_value.amount()
+                    - bridge.net_adjustment()
+                    - result.equity_value.amount())
+                .abs()
+                    < 0.02
+            );
+
+            // The detail crosses the wire; the instrument does not.
+            let json = serde_json::to_string(&result).expect("serialize");
+            let back: CorporateValuationResult = serde_json::from_str(&json).expect("round trip");
+            assert_eq!(back.periods, result.periods);
+            assert_eq!(back.pv_explicit, result.pv_explicit);
+            assert_eq!(back.terminal_value, result.terminal_value);
+            assert!(back.dcf_instrument.is_none());
+        }
+    }
+
+    /// JSON written before the DCF detail fields existed still loads.
+    #[test]
+    fn corporate_valuation_result_reads_json_without_detail() {
+        let legacy = r#"{"equity_value":{"amount":"90","currency":"USD"},
+            "enterprise_value":{"amount":"100","currency":"USD"},
+            "net_debt":{"amount":"10","currency":"USD"},
+            "valuation_discount":{"amount":"0","currency":"USD"},
+            "terminal_value_pv":{"amount":"60","currency":"USD"},
+            "equity_value_per_share":null,"diluted_shares":null}"#;
+        let result: CorporateValuationResult = serde_json::from_str(legacy).expect("legacy");
+        assert!(result.periods.is_empty());
+        assert!(result.pv_explicit.is_none() && result.equity_bridge.is_none());
     }
 
     fn sensitivity_model() -> FinancialModelSpec {

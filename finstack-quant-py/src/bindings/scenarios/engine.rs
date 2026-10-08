@@ -42,13 +42,14 @@ impl PyApplicationReport {
     }
 }
 
-const REPORT_COLUMNS: [&str; 6] = [
+const REPORT_COLUMNS: [&str; 7] = [
     "operations_applied",
     "user_operations",
     "expanded_operations",
     "warning_count",
     "as_of_changed",
     "all_dirty",
+    "shock_count",
 ];
 
 #[pymethods]
@@ -109,6 +110,20 @@ impl PyApplicationReport {
         serde_to_py(py, &self.inner.changes)
     }
 
+    /// Size of every market and instrument shock applied, in application
+    /// order.
+    ///
+    /// One dict per accepted effect with ``applies_to`` (``scope`` =
+    /// ``"market"`` with the resolved ``target``, or ``"instruments"`` with
+    /// inventory ``indices``), ``shock`` (``kind`` = ``uniform``, ``key_rate``,
+    /// ``nodes``, ``vol_bucket`` or ``detachment_bucket``, with ``value`` and
+    /// ``unit`` = ``bp``, ``percent`` or ``absolute``) and, for scalar price
+    /// targets only, ``level_change`` (``before`` / ``after``).
+    #[getter]
+    fn applied_shocks<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.applied_shocks)
+    }
+
     /// Roll-forward report, present only when the scenario contained a
     /// ``time_roll_forward`` operation.
     #[getter]
@@ -124,8 +139,10 @@ impl PyApplicationReport {
     ///
     /// Columns: ``operations_applied``, ``user_operations``,
     /// ``expanded_operations``, ``warning_count``, ``as_of_changed``,
-    /// ``all_dirty``. Use ``changes_to_dataframe()`` for the per-target
-    /// change manifest and ``carry_to_dataframe()`` for time-roll carry.
+    /// ``all_dirty``, ``shock_count`` (number of ``applied_shocks``
+    /// entries). Use ``changes_to_dataframe()`` for the per-target change
+    /// manifest, ``applied_shocks`` for the size of each shock and
+    /// ``carry_to_dataframe()`` for time-roll carry.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let row = serde_json::json!({
             "operations_applied": self.inner.operations_applied,
@@ -134,6 +151,7 @@ impl PyApplicationReport {
             "warning_count": self.inner.warnings.len(),
             "as_of_changed": self.inner.changes.as_of_changed,
             "all_dirty": self.inner.changes.all_dirty,
+            "shock_count": self.inner.applied_shocks.len(),
         });
         serde_object_to_single_row_dataframe_with_schema(py, &row, &REPORT_COLUMNS)
     }

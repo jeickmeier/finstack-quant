@@ -79,6 +79,7 @@ impl Check for FcfSignCheck {
                     period: Some(*pid),
                     materiality: None,
                     nodes: vec![self.fcf_node.clone()],
+                    comparison: None,
                 });
             }
         }
@@ -91,6 +92,7 @@ impl Check for FcfSignCheck {
             category: self.category(),
             passed,
             findings,
+            comparisons: Vec::new(),
         })
     }
 }

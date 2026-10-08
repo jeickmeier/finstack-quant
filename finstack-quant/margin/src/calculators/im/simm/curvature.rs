@@ -1,6 +1,9 @@
 //! Historical SIMM v2.6 paragraph 11: scale expiries before factor netting.
 
-use super::{correlated_norm, SimmCalculator, SimmCreditSector, SimmRiskClass, SIMM_CURVATURE_Z};
+use super::{
+    correlated_norm, SimmBucketDetail, SimmCalculator, SimmComponentDetail, SimmCreditSector,
+    SimmRiskClass, SimmWeightedSensitivity, SIMM_CURVATURE_Z,
+};
 use crate::types::simm_curvature::{fx_pair, tenor_days};
 use crate::types::{commodity_bucket_id, ordered_tenor_pair, SimmCurvatureSensitivity};
 use finstack_quant_core::{currency::Currency, Error, HashMap, Result};
@@ -35,6 +38,7 @@ impl SimmCalculator {
     pub(super) fn curvature_by_risk_class(
         &self,
         inputs: &[SimmCurvatureSensitivity],
+        mut detail: Option<&mut Vec<SimmComponentDetail>>,
     ) -> Result<HashMap<SimmRiskClass, f64>> {
         let mut by_factor: HashMap<FactorKey, Vec<f64>> = HashMap::default();
         for input in inputs {
@@ -96,6 +100,7 @@ impl SimmCalculator {
             ));
         }
         let mut by_class: HashMap<SimmRiskClass, Vec<BucketMargin>> = HashMap::default();
+        let mut detail_by_class: HashMap<SimmRiskClass, Vec<SimmBucketDetail>> = HashMap::default();
         let mut start = 0;
         while start < factors.len() {
             let first = &factors[start].0;
@@ -110,6 +115,27 @@ impl SimmCalculator {
                 rho * rho
             });
             let sum = amounts.iter().sum::<f64>();
+            if detail.is_some() {
+                detail_by_class
+                    .entry(first.class)
+                    .or_default()
+                    .push(SimmBucketDetail {
+                        bucket: first.bucket.clone(),
+                        weighted_sensitivities: entries
+                            .iter()
+                            .map(|(key, value)| SimmWeightedSensitivity {
+                                risk_factor: key.factor.clone(),
+                                tenor: key.tenor.clone(),
+                                sensitivity: *value,
+                                risk_weight: 1.0,
+                                concentration_factor: 1.0,
+                                weighted_sensitivity: *value,
+                            })
+                            .collect(),
+                        k,
+                        signed_sum: sum.clamp(-k, k),
+                    });
+            }
             by_class.entry(first.class).or_default().push(BucketMargin {
                 bucket: first.bucket.clone(),
                 k,
@@ -146,6 +172,19 @@ impl SimmCalculator {
             }
             if !margin.is_finite() {
                 return Err(Error::Validation("SIMM curvature margin overflowed".into()));
+            }
+            if let Some(sink) = detail.as_deref_mut() {
+                sink.push(SimmComponentDetail {
+                    component: format!("{class}_Curvature"),
+                    risk_class: class,
+                    historical_volatility_ratio: if class == SimmRiskClass::InterestRate {
+                        self.params.ir_historical_volatility_ratio
+                    } else {
+                        1.0
+                    },
+                    buckets: detail_by_class.remove(&class).unwrap_or_default(),
+                    margin,
+                });
             }
             result.insert(class, margin);
         }

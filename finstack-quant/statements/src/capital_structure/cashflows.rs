@@ -41,6 +41,11 @@ use serde::{Deserialize, Serialize};
 ///         fees: Money::from((0_i64, Currency::USD)),
 ///         debt_balance: Money::from((4_900_000_i64, Currency::USD)),
 ///         accrued_interest: Money::from((5_000_i64, Currency::USD)),
+///         opening_balance: None,
+///         scheduled_principal: None,
+///         mandatory_prepayment: None,
+///         sweep_prepayment: None,
+///         voluntary_prepayment: None,
 ///     });
 /// cs.totals.insert(period, CashflowBreakdown {
 ///     interest_expense_cash: Money::from((10_000_i64, Currency::USD)),
@@ -50,6 +55,11 @@ use serde::{Deserialize, Serialize};
 ///     fees: Money::from((0_i64, Currency::USD)),
 ///     debt_balance: Money::from((4_900_000_i64, Currency::USD)),
 ///     accrued_interest: Money::from((5_000_i64, Currency::USD)),
+///     opening_balance: None,
+///     scheduled_principal: None,
+///     mandatory_prepayment: None,
+///     sweep_prepayment: None,
+///     voluntary_prepayment: None,
 /// });
 ///
 /// assert_eq!(cs.get_total_interest(&period).unwrap(), 12_500.0);
@@ -94,6 +104,19 @@ pub struct CapitalStructureCashflows {
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[cfg_attr(feature = "json-schema", schemars(with = "IndexMap<String, Money>"))]
     pub equity_distribution: IndexMap<PeriodId, Money>,
+
+    /// Cash the waterfall had to allocate in each period: the value of
+    /// `WaterfallSpec.available_cash_node`, floored at zero (a negative pool
+    /// is reported as a `NegativeAvailableCashFloored` warning), in the
+    /// waterfall's currency.
+    ///
+    /// Only populated for periods in which a waterfall ran; empty for models
+    /// without a waterfall and for JSON written before this field existed.
+    /// Reconciles the period's uses:
+    /// `fees + cash interest + principal + equity_distribution == available_cash`.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "IndexMap<String, Money>"))]
+    pub available_cash: IndexMap<PeriodId, Money>,
 }
 
 /// Breakdown of cashflows by type for a single period.
@@ -148,6 +171,50 @@ pub struct CashflowBreakdown {
     /// Debt coupon interest accrued but not yet paid (liability).
     /// Hedge-leg accrual valuation is outside the debt-service contract and is zero.
     pub accrued_interest: Money,
+
+    /// Outstanding debt balance at period start, before this period's draws,
+    /// repayments and PIK capitalization. Positive amount in the breakdown's
+    /// currency. On `totals` it is the sum across instruments.
+    ///
+    /// Always `Some` on breakdowns produced by the evaluator. `None` on
+    /// hand-built breakdowns and on JSON written before this field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening_balance: Option<Money>,
+
+    /// Part of `principal_payment` paid against the instrument's own
+    /// contractual schedule: amortization, maturity redemption,
+    /// schedule-embedded prepayments and revolver repayments, including
+    /// scheduled principal carried in arrears from an earlier period. Under a
+    /// waterfall this is the cash allocated at the `Amortization` priority.
+    /// Positive amount in the breakdown's currency.
+    ///
+    /// The four principal components
+    /// (`scheduled_principal`, `mandatory_prepayment`, `sweep_prepayment`,
+    /// `voluntary_prepayment`) sum to `principal_payment`. Always `Some` on
+    /// breakdowns produced by the evaluator or the waterfall; `None` on
+    /// hand-built breakdowns and on JSON written before this field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheduled_principal: Option<Money>,
+
+    /// Part of `principal_payment` paid at the waterfall's
+    /// `MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepay_node`).
+    /// Zero when no waterfall ran. Same sign, currency and absence rule as
+    /// [`Self::scheduled_principal`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mandatory_prepayment: Option<Money>,
+
+    /// Part of `principal_payment` paid by the excess-cash-flow sweep at the
+    /// waterfall's `Sweep` priority. Zero when no waterfall ran. Same sign,
+    /// currency and absence rule as [`Self::scheduled_principal`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sweep_prepayment: Option<Money>,
+
+    /// Part of `principal_payment` paid at the waterfall's
+    /// `VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepay_node`).
+    /// Zero when no waterfall ran. Same sign, currency and absence rule as
+    /// [`Self::scheduled_principal`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voluntary_prepayment: Option<Money>,
 }
 
 impl CashflowBreakdown {
@@ -161,7 +228,48 @@ impl CashflowBreakdown {
             fees: Money::from((0_i64, currency)),
             debt_balance: Money::from((0_i64, currency)),
             accrued_interest: Money::from((0_i64, currency)),
+            opening_balance: None,
+            scheduled_principal: None,
+            mandatory_prepayment: None,
+            sweep_prepayment: None,
+            voluntary_prepayment: None,
         }
+    }
+
+    /// Opening balance and the four principal components, in the fixed order
+    /// `[opening_balance, scheduled_principal, mandatory_prepayment,
+    /// sweep_prepayment, voluntary_prepayment]`.
+    pub(crate) fn audit_detail(&self) -> [Option<Money>; 5] {
+        [
+            self.opening_balance,
+            self.scheduled_principal,
+            self.mandatory_prepayment,
+            self.sweep_prepayment,
+            self.voluntary_prepayment,
+        ]
+    }
+
+    /// Mutable view of the fields returned by [`Self::audit_detail`], in the
+    /// same order.
+    pub(crate) fn audit_detail_mut(&mut self) -> [&mut Option<Money>; 5] {
+        [
+            &mut self.opening_balance,
+            &mut self.scheduled_principal,
+            &mut self.mandatory_prepayment,
+            &mut self.sweep_prepayment,
+            &mut self.voluntary_prepayment,
+        ]
+    }
+
+    /// Record that the contractual schedule is the only source of
+    /// `principal_payment`: all of it is scheduled and the three prepayment
+    /// components are zero.
+    pub(crate) fn mark_principal_as_scheduled(&mut self) {
+        let zero = Money::from((0_i64, self.principal_payment.currency()));
+        self.scheduled_principal = Some(self.principal_payment);
+        self.mandatory_prepayment = Some(zero);
+        self.sweep_prepayment = Some(zero);
+        self.voluntary_prepayment = Some(zero);
     }
 
     /// Net cash interest received this period, resolving `None` to a zero in
@@ -241,6 +349,18 @@ impl CashflowBreakdown {
         if let Some(income) = self.interest_income_cash {
             fields.push(("interest_income_cash", income.currency()));
         }
+        let detail_names = [
+            "opening_balance",
+            "scheduled_principal",
+            "mandatory_prepayment",
+            "sweep_prepayment",
+            "voluntary_prepayment",
+        ];
+        for (name, money) in detail_names.into_iter().zip(self.audit_detail()) {
+            if let Some(money) = money {
+                fields.push((name, money.currency()));
+            }
+        }
         for (name, actual) in fields {
             if actual != expected {
                 return Err(crate::error::Error::capital_structure(format!(
@@ -250,6 +370,18 @@ impl CashflowBreakdown {
         }
         Ok(())
     }
+}
+
+/// Add `part` into `total`, treating an unrecorded (`None`) total as zero. An
+/// unrecorded `part` leaves `total` untouched.
+pub(crate) fn add_optional_money(total: &mut Option<Money>, part: Option<Money>) -> Result<()> {
+    if let Some(part) = part {
+        *total = Some(match *total {
+            Some(current) => current.checked_add(part)?,
+            None => part,
+        });
+    }
+    Ok(())
 }
 
 // NOTE: CashflowBreakdown intentionally does NOT implement Default.
@@ -298,6 +430,9 @@ impl CapitalStructureCashflows {
         if let Some(equity) = self.equity_distribution.get(&period_id) {
             snapshot.equity_distribution.insert(period_id, *equity);
         }
+        if let Some(cash) = self.available_cash.get(&period_id) {
+            snapshot.available_cash.insert(period_id, *cash);
+        }
         snapshot.reporting_currency = self.reporting_currency;
         snapshot
     }
@@ -325,6 +460,9 @@ impl CapitalStructureCashflows {
         }
         for (pid, equity) in period_cs.equity_distribution {
             self.equity_distribution.insert(pid, equity);
+        }
+        for (pid, cash) in period_cs.available_cash {
+            self.available_cash.insert(pid, cash);
         }
         if self.reporting_currency.is_none() {
             self.reporting_currency = period_cs.reporting_currency;
@@ -354,6 +492,67 @@ impl CapitalStructureCashflows {
                     field_name, instrument_id, period_id
                 ))
             })
+    }
+
+    /// Resolve a `cs.<component>.<instrument_or_total>` formula reference for
+    /// one period.
+    ///
+    /// This is the lookup the statement evaluator performs for capital-structure
+    /// references, so a value read here matches what a formula saw.
+    ///
+    /// # Arguments
+    ///
+    /// * `component` - One of `interest_expense`, `interest_expense_cash`,
+    ///   `interest_expense_pik`, `interest_income`, `principal_payment`,
+    ///   `debt_balance`, `fees` or `accrued_interest`.
+    /// * `instrument_or_total` - Instrument identifier for that instrument's
+    ///   native-currency amount, or `total` for the reporting-currency
+    ///   aggregate across instruments.
+    /// * `period_id` - Period whose cashflow component is read.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error if `component` is unknown, the
+    /// instrument or its cashflow for `period_id` is absent, or an aggregate
+    /// cannot be formed under the currency invariant.
+    pub fn get_component(
+        &self,
+        component: &str,
+        instrument_or_total: &str,
+        period_id: &PeriodId,
+    ) -> Result<f64> {
+        let unknown = || {
+            crate::error::Error::capital_structure(format!(
+                "Unknown capital structure component: {component}. Expected: interest_expense, \
+                 interest_expense_cash, interest_expense_pik, interest_income, principal_payment, \
+                 debt_balance, fees, or accrued_interest"
+            ))
+        };
+        if instrument_or_total == "total" {
+            match component {
+                "interest_expense" => self.get_total_interest(period_id),
+                "interest_expense_cash" => self.get_total_interest_cash(period_id),
+                "interest_expense_pik" => self.get_total_interest_pik(period_id),
+                "interest_income" => self.get_total_interest_income(period_id),
+                "principal_payment" => self.get_total_principal(period_id),
+                "debt_balance" => self.get_total_debt_balance(period_id),
+                "fees" => self.get_total_fees(period_id),
+                "accrued_interest" => self.get_total_accrued_interest(period_id),
+                _ => Err(unknown()),
+            }
+        } else {
+            match component {
+                "interest_expense" => self.get_interest(instrument_or_total, period_id),
+                "interest_expense_cash" => self.get_interest_cash(instrument_or_total, period_id),
+                "interest_expense_pik" => self.get_interest_pik(instrument_or_total, period_id),
+                "interest_income" => self.get_interest_income(instrument_or_total, period_id),
+                "principal_payment" => self.get_principal(instrument_or_total, period_id),
+                "debt_balance" => self.get_debt_balance(instrument_or_total, period_id),
+                "fees" => self.get_fees(instrument_or_total, period_id),
+                "accrued_interest" => self.get_accrued_interest(instrument_or_total, period_id),
+                _ => Err(unknown()),
+            }
+        }
     }
 
     /// Get total interest expense (cash + PIK) for a specific instrument and period.
@@ -826,6 +1025,11 @@ mod tests {
             debt_balance: Money::from((1_000_000_i64, Currency::USD)),
             fees: Money::from((0_i64, Currency::USD)),
             accrued_interest: Money::from((2_500_i64, Currency::USD)),
+            opening_balance: None,
+            scheduled_principal: None,
+            mandatory_prepayment: None,
+            sweep_prepayment: None,
+            voluntary_prepayment: None,
         };
 
         let mut period_map = IndexMap::new();

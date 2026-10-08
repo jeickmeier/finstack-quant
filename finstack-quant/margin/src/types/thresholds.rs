@@ -217,6 +217,20 @@ impl VmParameters {
         exposure: Money,
         current_collateral: Money,
     ) -> Result<Money> {
+        Ok(self.margin_call_steps(exposure, current_collateral)?.call)
+    }
+
+    /// Run the CSA margin-call calculation and keep its intermediate amounts.
+    ///
+    /// This is the single implementation behind
+    /// [`Self::calculate_margin_call`]; it also hands the pre-MTA,
+    /// pre-rounding amount to [`crate::calculators::VmCalculator::calculate`]
+    /// so the reported steps are the ones actually used.
+    pub(crate) fn margin_call_steps(
+        &self,
+        exposure: Money,
+        current_collateral: Money,
+    ) -> Result<MarginCallSteps> {
         if current_collateral.currency() != self.threshold.currency() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "VM collateral currency mismatch: expected {}, got {}",
@@ -228,16 +242,22 @@ impl VmParameters {
         let required = self.required_credit_support(exposure)?;
         let currency = required.currency();
         let credit_support_amount = required.amount() - current_collateral.amount();
+        let unrounded = Money::new(credit_support_amount, currency)?;
         let mta_amount = self.mta.amount();
         if credit_support_amount.abs() < mta_amount {
-            return Ok(Money::from((0_i64, currency)));
+            return Ok(MarginCallSteps {
+                required,
+                unrounded,
+                call: Money::from((0_i64, currency)),
+            });
         }
 
-        let rounded = self.round_transfer_amount(
-            Money::new(credit_support_amount, currency)?,
-            required.amount(),
-        )?;
-        Ok(rounded)
+        let call = self.round_transfer_amount(unrounded, required.amount())?;
+        Ok(MarginCallSteps {
+            required,
+            unrounded,
+            call,
+        })
     }
 
     /// Round a transfer amount according to ISDA delivery/return elections.
@@ -269,6 +289,16 @@ impl VmParameters {
     fn from_defaults(currency: Currency, defaults: &crate::registry::VmDefaults) -> Result<Self> {
         defaults.to_vm_params(currency)
     }
+}
+
+/// Intermediate amounts of one CSA margin-call calculation.
+pub(crate) struct MarginCallSteps {
+    /// Required credit support: threshold-adjusted exposure plus independent amount.
+    pub(crate) required: Money,
+    /// Signed `required − current collateral`, before the MTA test and rounding.
+    pub(crate) unrounded: Money,
+    /// Signed transfer amount after the MTA test and rounding.
+    pub(crate) call: Money,
 }
 
 /// Initial margin parameters.

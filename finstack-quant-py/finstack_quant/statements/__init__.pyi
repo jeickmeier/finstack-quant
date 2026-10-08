@@ -3444,6 +3444,31 @@ class StatementResult:
         ...
 
     @property
+    def node_sources(self) -> dict[str, dict[str, str]]:
+        """
+        Which evaluation layer produced each cell of the result.
+
+        The evaluator resolves every (node, period) cell by the precedence
+        **Value > Forecast > Formula**, after the node's optional ``where``
+        mask. The model alone does not determine the outcome: an as-of
+        visibility cutoff can hide an explicit value so that the forecast or
+        formula fires instead.
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, dict[str, str]]
+            Node identifier → period identifier (``"2025Q1"``) → source label:
+            ``"value"`` (explicit value), ``"forecast"`` (forecast method),
+            ``"formula"`` (formula) or ``"where_masked"`` (the ``where`` clause
+            was false, so the cell is ``0.0``). Same keys as the evaluated
+            values. Empty for a result that was not produced by an evaluator
+            or was serialized before sources were recorded.
+        """
+        ...
+
+    @property
     def check_report(self) -> CheckReport | None:
         """
         Check report attached by an evaluator configured with checks.
@@ -3636,8 +3661,8 @@ class StatementResult:
         orient : {"long", "wide"}, default "long"
             ``"long"`` yields one row per (node, period) with columns
             ``node_id``, ``period``, ``value``, ``value_money``, ``currency``,
-            ``value_type``. ``"wide"`` yields node identifiers as rows and
-            period identifiers as columns.
+            ``value_type``, ``source``. ``"wide"`` yields node identifiers as
+            rows and period identifiers as columns.
 
         Notes
         -----
@@ -3645,7 +3670,10 @@ class StatementResult:
         currency information and are otherwise null. ``value_money`` is a
         float64 mirror of the monetary amount (f64, not fixed-point Decimal,
         precision); use ``to_json()`` or ``get_money()`` when full fixed-point
-        precision is required.
+        precision is required. ``source`` is the evaluation layer that
+        produced the cell (``value``, ``forecast``, ``formula`` or
+        ``where_masked``, see :attr:`node_sources`); it is null when the
+        result records no source for the cell.
 
         Returns
         -------
@@ -5092,19 +5120,59 @@ class CheckReport:
         amounts for monetary nodes), ``materiality_relative_pct`` (that
         discrepancy as a **percentage** of the reference value, i.e. already
         multiplied by 100, unlike the decimal-fraction rates used elsewhere in
-        this module), ``materiality_reference_value`` (the denominator used)
-        and ``materiality_reference_label`` (what that denominator is, e.g.
-        ``total_assets``).
+        this module), ``materiality_reference_value`` (the denominator used),
+        ``materiality_reference_label`` (what that denominator is, e.g.
+        ``total_assets``), and ``comparison_actual``, ``comparison_expected``,
+        ``comparison_tolerance`` (the two values the check compared and the
+        absolute tolerance it allowed on their difference, all in the compared
+        nodes' own units).
 
         The four materiality columns are ``None`` for findings that carry no
-        materiality context. The row count equals :attr:`total_findings`; a
-        report with no findings still yields the documented columns with zero
-        rows.
+        materiality context, and the three comparison columns are ``None`` for
+        findings that do not compare two numbers. The row count equals
+        :attr:`total_findings`; a report with no findings still yields the
+        documented columns with zero rows.
 
         Returns
         -------
         pd.DataFrame
             One row per retained finding.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored or derived value.
+        """
+        ...
+
+    def to_comparisons_dataframe(self) -> pd.DataFrame:
+        """
+        Export one row per numeric comparison as a pandas ``DataFrame``.
+
+        Lists every comparison the checks evaluated — passing and failing
+        alike — so a passing check still shows the numbers it was judged on.
+        Unlike :meth:`to_findings_dataframe`, rows are not reduced by the
+        suite's ``min_severity`` / ``materiality_threshold`` filters.
+
+        Columns: ``check_id``, ``check_name``, ``category`` (as in
+        :meth:`to_dataframe`), ``identity`` (snake_case name of the tested
+        identity, e.g. ``balance_sheet_articulation``, ``cash_roll_forward``,
+        ``cash_flow_components``), ``period`` (period identifier string,
+        ``None`` when not period-specific), ``actual`` (observed value),
+        ``expected`` (value the identity requires), ``difference``
+        (``actual - expected``), ``tolerance`` (absolute tolerance applied to
+        ``|difference|``) and ``within_tolerance`` (``True`` when
+        ``|difference| <= tolerance``). ``actual``, ``expected``,
+        ``difference`` and ``tolerance`` are in the compared nodes' own units
+        (currency amounts for monetary nodes).
+
+        Checks that do not compare two numbers, and periods a check skipped
+        for missing inputs, contribute no rows. A report with no comparisons
+        still yields the documented columns with zero rows.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per comparison, in check then evaluation order.
 
         Notes
         -----
@@ -7197,6 +7265,33 @@ class CheckFinding:
         """
         ...
 
+    @property
+    def comparison(self) -> dict[str, Any] | None:
+        """
+        The failed numeric comparison behind this finding, or ``None``.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``{"identity", "period", "actual", "expected", "tolerance"}``:
+            ``identity`` names the tested identity (e.g.
+            ``"balance_sheet_articulation"``), ``period`` is the period id
+            (omitted when not period-specific), ``actual`` and ``expected``
+            are the two compared values and ``tolerance`` is the absolute
+            tolerance applied to ``|actual - expected|`` — all three in the
+            compared nodes' own units (currency amounts for monetary nodes).
+            ``None`` for findings that do not compare two numbers (skipped
+            periods, missing or non-finite inputs, sign-convention warnings,
+            formula checks without a tolerance) and for findings serialized
+            before the comparison was recorded.
+
+        Raises
+        ------
+        ValueError
+            If the comparison cannot be converted to Python objects.
+        """
+        ...
+
     def to_json(self) -> str:
         """Serialize to canonical JSON.
 
@@ -7315,6 +7410,25 @@ class CapitalStructureCashflows:
         -------
         dict[str, float]
             Residual cash to equity, keyed by period id.
+        """
+        ...
+
+    @property
+    def available_cash(self) -> dict[str, Money]:
+        """
+        Cash available to the waterfall, keyed by period id.
+
+        The value of the waterfall's ``available_cash_node`` floored at zero,
+        in the waterfall's currency. It reconciles the period's uses:
+        ``fees + cash interest + principal_payment + equity_distribution ==
+        available_cash``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, Money]
+            Period id to ``Money``; empty unless a waterfall ran.
         """
         ...
 
@@ -7732,8 +7846,17 @@ class CapitalStructureCashflows:
         Returns
         -------
         pandas.DataFrame
-            Columns ``instrument_id``, ``period``, ``flow_type``, ``amount``
-            and ``currency``.
+            Columns ``instrument``, ``period``, ``flow_type``, ``amount``
+            and ``currency``. ``flow_type`` is one of
+            ``interest_expense_cash``, ``interest_income_cash`` (when
+            present), ``interest_expense_pik``, ``principal_payment``,
+            ``fees``, ``debt_balance``, ``accrued_interest`` and — on
+            evaluator-produced cashflows — ``opening_balance`` (debt balance
+            at period start) plus the four sources of ``principal_payment``:
+            ``scheduled_principal``, ``mandatory_prepayment``,
+            ``sweep_prepayment`` and ``voluntary_prepayment``. The four
+            source rows sum to the ``principal_payment`` row, so do not add
+            them together.
 
         Raises
         ------

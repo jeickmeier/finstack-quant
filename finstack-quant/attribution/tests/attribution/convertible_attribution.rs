@@ -153,6 +153,7 @@ fn taylor_explains_convertible_credit_spread_move() {
         },
     )
     .expect("Taylor attribution should succeed");
+    super::audit_steps::assert_sensitivity_steps_reconcile(&attribution);
 
     assert_eq!(attribution.rates_curves_pnl.amount(), 0.0);
     assert!(

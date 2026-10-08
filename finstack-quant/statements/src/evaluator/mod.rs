@@ -50,6 +50,6 @@ pub use engine::{Evaluator, PreparedEvaluation};
 pub use monte_carlo::{MonteCarloConfig, MonteCarloResults, PercentileSeries};
 pub use period_history::PeriodHistory;
 pub use results::{
-    CapitalStructureClaimCategory, CapitalStructureWarning, EvalStats, EvalWarning, NumericMode,
-    StatementResult,
+    CapitalStructureClaimCategory, CapitalStructureWarning, CellSource, EvalStats, EvalWarning,
+    NumericMode, StatementResult,
 };
