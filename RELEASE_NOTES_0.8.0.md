@@ -3,7 +3,7 @@
 **Release Date**: 2026-09-06
 
 **Bump type**: minor (pre-1.0; intentional breaking Rust, Python, WASM, and JSON changes)
-**Status**: Superseded by 0.9.0 on this tree. Do not tag `v0.8.0` from current master; the workspace version is 0.9.0 and `v0.7.0` is still the latest git tag.
+**Status**: Superseded. Do not tag `v0.8.0`. The workspace version is 0.10.0, and `v0.7.0` is still the latest git tag.
 
 ## Executive Summary
 

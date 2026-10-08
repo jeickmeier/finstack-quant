@@ -2,8 +2,8 @@
 
 use super::report::PyCalibrationReport;
 use crate::bindings::core::market_data::curves::PyDiscountCurve;
-use crate::bindings::pickle_support::reduce_via_json;
-use crate::errors::{core_to_py, serde_json_to_py, value_error};
+use crate::bindings::macros::wire_methods;
+use crate::errors::{core_to_py, value_error};
 use finstack_quant_calibration::hull_white::{
     self as rust_hw, CapFloorCalibrationConfig, CapFloorQuote, HullWhiteCalibrationParams,
     HullWhiteParams, PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionQuote,
@@ -111,36 +111,6 @@ impl PySwaptionQuote {
         self.inner.is_normal_vol
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize SwaptionQuote"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or the quote is invalid.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| serde_json_to_py(e, "invalid SwaptionQuote JSON"))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "SwaptionQuote(expiry={}, tenor={}, volatility={}, is_normal_vol={})",
@@ -155,6 +125,8 @@ impl PySwaptionQuote {
         )
     }
 }
+
+wire_methods!(PySwaptionQuote, SwaptionQuote, "SwaptionQuote");
 
 /// Cap or floor volatility quote in year fractions.
 ///
@@ -242,36 +214,6 @@ impl PyCapFloorQuote {
         self.inner.is_normal_vol
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CapFloorQuote"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or the quote is invalid.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| serde_json_to_py(e, "invalid CapFloorQuote JSON"))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CapFloorQuote(maturity={}, strike={}, volatility={}, is_cap={}, is_normal_vol={})",
@@ -287,6 +229,8 @@ impl PyCapFloorQuote {
         )
     }
 }
+
+wire_methods!(PyCapFloorQuote, CapFloorQuote, "CapFloorQuote");
 
 /// Scalar Hull-White one-factor parameters: mean reversion ``kappa`` and volatility ``sigma``.
 ///
@@ -343,36 +287,6 @@ impl PyHullWhiteCalibrationParams {
         self.inner.sigma
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize HullWhiteCalibrationParams"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or the parameters are invalid.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| serde_json_to_py(e, "invalid HullWhiteCalibrationParams JSON"))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "HullWhiteCalibrationParams(kappa={}, sigma={})",
@@ -380,6 +294,12 @@ impl PyHullWhiteCalibrationParams {
         )
     }
 }
+
+wire_methods!(
+    PyHullWhiteCalibrationParams,
+    HullWhiteCalibrationParams,
+    "HullWhiteCalibrationParams"
+);
 
 /// Hull-White parameters with a piecewise-constant sigma term structure.
 ///
@@ -432,36 +352,6 @@ impl PyHullWhiteParams {
         self.inner.volatility.value_at(time)
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize HullWhiteParams"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or the parameters are invalid.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| serde_json_to_py(e, "invalid HullWhiteParams JSON"))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "HullWhiteParams(kappa={}, intervals={})",
@@ -470,6 +360,8 @@ impl PyHullWhiteParams {
         )
     }
 }
+
+wire_methods!(PyHullWhiteParams, HullWhiteParams, "HullWhiteParams");
 
 /// Settings for scalar Hull-White calibration to cap/floor quotes.
 ///

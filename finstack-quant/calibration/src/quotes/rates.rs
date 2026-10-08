@@ -255,16 +255,16 @@ impl RateQuote {
         }
     }
 
-    /// Create a new quote with the underlying *rate* bumped by `rate_bump`.
+    /// Create a new quote with the underlying *rate* bumped by `bump_bp` basis points.
     ///
-    /// For rates (deposit, FRA, swap), `rate_bump` is added to the rate (in decimal
-    /// terms, e.g., `0.0001` for 1 basis point). For futures, the price convention
-    /// is `price = 100·(1 − rate)`, so a `+rate_bump` rate shock *subtracts*
-    /// `100·rate_bump` from the price (e.g. +1bp rate → price −0.01).
+    /// For rates (deposit, FRA, swap), `bump_bp / 10_000` is added to the decimal
+    /// rate. For futures, the price convention is `price = 100·(1 − rate)`, so a
+    /// positive rate shock *lowers* the price (e.g. +1bp rate → price −0.01).
     ///
     /// # Arguments
     ///
-    /// * `rate_bump` - The decimal rate shock applied to the quote's underlying rate
+    /// * `bump_bp` - Rate shock in basis points (`1.0` = 1bp = `0.0001` decimal)
+    ///   applied to the quote's underlying rate
     ///
     /// # Returns
     ///
@@ -286,13 +286,14 @@ impl RateQuote {
     ///     rate: 0.0525,
     /// };
     ///
-    /// // Bump by 1 basis point (0.0001)
-    /// let bumped = quote.bump_rate_decimal(0.0001);
+    /// // Bump by 1 basis point
+    /// let bumped = quote.bump_rate_bp(1.0);
     /// assert_eq!(bumped.value(), 0.0526);
     /// # Ok(())
     /// # }
     /// ```
-    pub fn bump_rate_decimal(&self, rate_bump: f64) -> Self {
+    pub fn bump_rate_bp(&self, bump_bp: f64) -> Self {
+        let rate_bump = bump_bp / 10_000.0;
         let mut quote = self.clone();
         match &mut quote {
             Self::Deposit { rate, .. } | Self::Fra { rate, .. } | Self::Swap { rate, .. } => {
@@ -304,11 +305,6 @@ impl RateQuote {
             }
         }
         quote
-    }
-
-    /// Bump the quote by basis-point units (e.g., `1.0` = 1bp).
-    pub fn bump_rate_bp(&self, bump_bp: f64) -> Self {
-        self.bump_rate_decimal(bump_bp / 10_000.0)
     }
 }
 
@@ -469,7 +465,7 @@ mod tests {
             spread_decimal: Some(0.0010),
         };
 
-        let bumped = quote.bump_rate_decimal(0.0001); // Bump by 1bp
+        let bumped = quote.bump_rate_bp(1.0);
 
         let RateQuote::Swap {
             rate,

@@ -317,7 +317,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/portfolio_ecl_result.schema.json",
-      "bytes": 23913,
+      "bytes": 23916,
       "kind": "output",
       "path": "schemas/statements_analytics/1/portfolio_ecl_result.schema.json",
       "summary": "Portfolio-level ECL result with stage migration and segment breakdown.",

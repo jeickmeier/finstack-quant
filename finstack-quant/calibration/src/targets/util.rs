@@ -3,7 +3,7 @@
 use crate::api::schema::SurfaceExtrapolationPolicy;
 use crate::build::context::BuildCtx;
 use crate::config::ResidualWeightingScheme;
-use crate::constants::{OrderedF64, TOLERANCE_DUP_KNOTS};
+use crate::constants::{OrderedF64, TOLERANCE_DUP_KNOTS, WEIGHT_MIN_FLOOR};
 use crate::prepared::CalibrationQuote;
 use crate::quotes::market_quote::{ExtractQuotes, MarketQuote};
 use crate::quotes::rates::RateQuote;
@@ -21,6 +21,38 @@ use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+
+/// Check the `(times, params)` pair handed to a global-solve curve build:
+/// equal lengths and strictly increasing, strictly positive knot times.
+///
+/// `label` names the curve kind in the error message (`""`, `"hazard "`,
+/// `"inflation "`).
+pub(crate) fn validate_global_knot_grid(times: &[f64], params: &[f64], label: &str) -> Result<()> {
+    if times.len() != params.len() {
+        return Err(finstack_quant_core::Error::Calibration {
+            message: format!(
+                "Global solve dimension mismatch: {} times vs {} params",
+                times.len(),
+                params.len()
+            ),
+            category: "global_solve".to_string(),
+        });
+    }
+    let mut last_t = 0.0;
+    for &t in times {
+        if t <= last_t {
+            return Err(finstack_quant_core::Error::Calibration {
+                message: format!(
+                    "Non-increasing {label}knot time {t:.10} detected (previous {last_t:.10}). \
+Global solve requires strictly increasing times."
+                ),
+                category: "global_solve".to_string(),
+            });
+        }
+        last_t = t;
+    }
+    Ok(())
+}
 
 #[derive(Debug)]
 pub(crate) struct EquityForwardInputs {
@@ -236,28 +268,9 @@ pub(crate) struct PreparedRateQuotes {
 /// Pass `curve_ids` as the role -> id mapping the underlying instruments expect (typically
 /// "discount" and, for projection-aware quotes, "forward"). Pass `explicit_curve_day_count = None`
 /// to derive the curve time-axis day count from the quote indices.
+/// `ois_compounding_override` threads a step-level OIS compounding selection through
+/// `BuildCtx`; pass `None` to use the index conventions.
 pub(crate) fn prepare_rate_calibration_quotes(
-    quotes: &[MarketQuote],
-    base_date: Date,
-    curve_ids: finstack_quant_core::HashMap<String, String>,
-    explicit_curve_day_count: Option<DayCount>,
-    residual_notional: f64,
-) -> Result<PreparedRateQuotes> {
-    prepare_rate_calibration_quotes_with_ois_override(
-        quotes,
-        base_date,
-        curve_ids,
-        explicit_curve_day_count,
-        residual_notional,
-        None,
-    )
-}
-
-/// Variant of [`prepare_rate_calibration_quotes`] that threads an OIS compounding
-/// override through `BuildCtx`. Used by `DiscountCurveTarget` to honour
-/// step-level OIS-compounding selection without forcing every caller to know
-/// about the override.
-pub(crate) fn prepare_rate_calibration_quotes_with_ois_override(
     quotes: &[MarketQuote],
     base_date: Date,
     curve_ids: finstack_quant_core::HashMap<String, String>,
@@ -390,6 +403,34 @@ impl ContextScratch {
         ctx.insert_mut(curve.clone());
         after_insert(&mut ctx)?;
         op(&ctx)
+    }
+}
+
+/// Least-squares weight for a par rate-instrument residual at pillar `t`.
+///
+/// The residual handed to the global solver is `pv / residual_notional`. For a
+/// par instrument `PV(r) ≈ A(t)·(r − r_par)·notional`, so the residual is
+/// `≈ A(t)·Δr` — a PV01-scaled rate error. The solver minimises
+/// `Σ (r_i·√w_i)²`, so recovering a common rate-error scale needs
+/// `w_i ≈ 1/A(t)²`; the scheme factor then applies the relative time emphasis
+/// the user selected on top of that scale.
+///
+/// # Arguments
+///
+/// * `quote` - Prepared quote whose par rate feeds the annuity proxy.
+/// * `t` - Pillar time in years (positive).
+/// * `scheme` - Weighting scheme selected for the curve family being solved.
+pub(crate) fn pv01_residual_weight(
+    quote: &CalibrationQuote,
+    t: f64,
+    scheme: &ResidualWeightingScheme,
+) -> f64 {
+    let annuity = quote_annuity_proxy(quote, t);
+    let weight = 1.0 / (annuity * annuity) * scheme_factor(scheme, t);
+    if weight.is_finite() {
+        weight.max(WEIGHT_MIN_FLOOR)
+    } else {
+        WEIGHT_MIN_FLOOR
     }
 }
 
