@@ -170,14 +170,14 @@ impl JsonTemplateDocument {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub(crate) struct JsonCompositeTemplate {
-    id: String,
+    pub(crate) id: String,
     #[serde(default)]
-    name: Option<String>,
+    pub(crate) name: Option<String>,
     #[serde(default)]
-    description: Option<String>,
+    pub(crate) description: Option<String>,
     #[serde(default)]
-    priority: i32,
-    component_ids: Vec<String>,
+    pub(crate) priority: i32,
+    pub(crate) component_ids: Vec<String>,
 }
 
 impl JsonCompositeTemplate {
@@ -224,36 +224,6 @@ impl JsonCompositeTemplate {
         }
 
         Ok(())
-    }
-
-    /// Return the composite identifier.
-    #[must_use]
-    pub(crate) fn id(&self) -> &str {
-        &self.id
-    }
-
-    /// Return the optional composite display name.
-    #[must_use]
-    pub(crate) fn name(&self) -> Option<&str> {
-        self.name.as_deref()
-    }
-
-    /// Return the optional composite description.
-    #[must_use]
-    pub(crate) fn description(&self) -> Option<&str> {
-        self.description.as_deref()
-    }
-
-    /// Return the composite priority.
-    #[must_use]
-    pub(crate) fn priority(&self) -> i32 {
-        self.priority
-    }
-
-    /// Return the ordered component identifiers referenced by the composite.
-    #[must_use]
-    pub(crate) fn component_ids(&self) -> &[String] {
-        &self.component_ids
     }
 }
 

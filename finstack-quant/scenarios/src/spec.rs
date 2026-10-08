@@ -135,8 +135,7 @@ pub enum HazardBumpMode {
 
 impl HazardBumpMode {
     /// Whether this is the serde-default solve-to-par delivery.
-    #[must_use]
-    pub const fn is_solve_to_par(&self) -> bool {
+    const fn is_solve_to_par(&self) -> bool {
         matches!(self, Self::SolveToPar)
     }
 }
@@ -290,50 +289,6 @@ impl ScenarioSpec {
         self.operations
             .iter()
             .any(OperationSpec::mutates_instruments)
-    }
-
-    /// Override ParCDS hazard delivery for this spec.
-    ///
-    /// # Arguments
-    ///
-    /// * `mode` - Solve-to-par bootstrap or first-order hazard-knot shift
-    ///   applied to every ParCDS operation in this spec.
-    #[must_use]
-    pub fn with_hazard_bump_mode(mut self, mode: HazardBumpMode) -> Self {
-        self.hazard_bump_mode = mode;
-        self
-    }
-
-    /// Expand one parallel basis-point shift into one
-    /// [`OperationSpec::CurveParallelBp`] per curve identifier.
-    ///
-    /// # Arguments
-    ///
-    /// * `curve_kind` - Curve family every generated operation targets.
-    /// * `curve_ids` - Curve identifiers, one operation each, in the given order.
-    /// * `bp` - Additive shift in basis points (1 bp = 1e-4); for
-    ///   [`CurveKind::Commodity`] this is percent of the forward instead.
-    /// * `discount_curve_id` - Optional discount curve used when re-bootstrapping
-    ///   ParCDS quotes; copied onto every generated operation.
-    pub fn parallel_bp_many<I, S>(
-        curve_kind: CurveKind,
-        curve_ids: I,
-        bp: f64,
-        discount_curve_id: Option<CurveId>,
-    ) -> Vec<OperationSpec>
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<CurveId>,
-    {
-        curve_ids
-            .into_iter()
-            .map(|curve_id| OperationSpec::CurveParallelBp {
-                curve_kind,
-                curve_id: curve_id.into(),
-                discount_curve_id: discount_curve_id.clone(),
-                bp,
-            })
-            .collect()
     }
 }
 
@@ -979,6 +934,38 @@ impl OperationSpec {
         }
     }
 
+    /// Expand one parallel basis-point shift into one
+    /// [`OperationSpec::CurveParallelBp`] per curve identifier.
+    ///
+    /// # Arguments
+    ///
+    /// * `curve_kind` - Curve family every generated operation targets.
+    /// * `curve_ids` - Curve identifiers, one operation each, in the given order.
+    /// * `bp` - Additive shift in basis points (1 bp = 1e-4); for
+    ///   [`CurveKind::Commodity`] this is percent of the forward instead.
+    /// * `discount_curve_id` - Optional discount curve used when re-bootstrapping
+    ///   ParCDS quotes; copied onto every generated operation.
+    pub fn parallel_bp_many<I, S>(
+        curve_kind: CurveKind,
+        curve_ids: I,
+        bp: f64,
+        discount_curve_id: Option<CurveId>,
+    ) -> Vec<Self>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<CurveId>,
+    {
+        curve_ids
+            .into_iter()
+            .map(|curve_id| Self::CurveParallelBp {
+                curve_kind,
+                curve_id: curve_id.into(),
+                discount_curve_id: discount_curve_id.clone(),
+                bp,
+            })
+            .collect()
+    }
+
     /// Whether this operation needs instrument access during application.
     ///
     /// # Returns
@@ -986,6 +973,18 @@ impl OperationSpec {
     /// `true` for instrument-mutating operations and time rolls.
     pub fn requires_instruments(&self) -> bool {
         self.mutates_instruments() || matches!(self, Self::TimeRollForward { .. })
+    }
+
+    /// Whether this operation targets the market-data hierarchy and is expanded
+    /// into direct operations before application.
+    pub(crate) fn is_hierarchy(&self) -> bool {
+        matches!(
+            self,
+            Self::HierarchyCurveParallelBp { .. }
+                | Self::HierarchyVolSurfaceParallelPct { .. }
+                | Self::HierarchyEquityPricePct { .. }
+                | Self::HierarchyBaseCorrParallelPts { .. }
+        )
     }
 
     /// Whether this operation can replace or mutate portfolio instruments.

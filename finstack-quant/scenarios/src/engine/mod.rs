@@ -12,13 +12,13 @@ mod types;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use effects::ScenarioEffect;
 pub(crate) use types::HazardApplyEnv;
 pub use types::{
     instrument_envelopes, ApplicationEnvelope, ApplicationReport, ExecutionContext,
     RollForwardReport, ScenarioChangeManifest, ScenarioMarketTarget,
 };
 
-use crate::adapters::traits::ScenarioEffect;
 use crate::error::Result;
 use crate::spec::{NodeId, OperationSpec, RateBindingSpec, ScenarioSpec};
 use crate::warning::Warning;
@@ -63,6 +63,32 @@ fn apply_rate_binding(
                 reason: e.to_string(),
             });
             false
+        }
+    }
+}
+
+/// A statement operation deferred until every market operation has applied.
+enum StatementOp<'a> {
+    /// Percentage forecast adjustment on a statement node.
+    ForecastPercent { node_id: &'a NodeId, pct: f64 },
+    /// Absolute forecast assignment on a statement node.
+    ForecastAssign { node_id: &'a NodeId, value: f64 },
+    /// Statement rate binding applied after market shocks.
+    RateBinding(&'a RateBindingSpec),
+}
+
+impl<'a> StatementOp<'a> {
+    fn from_operation(op: &'a OperationSpec) -> Option<Self> {
+        match op {
+            OperationSpec::StmtForecastPercent { node_id, pct } => {
+                Some(Self::ForecastPercent { node_id, pct: *pct })
+            }
+            OperationSpec::StmtForecastAssign { node_id, value } => Some(Self::ForecastAssign {
+                node_id,
+                value: *value,
+            }),
+            OperationSpec::RateBinding { binding } => Some(Self::RateBinding(binding)),
+            _ => None,
         }
     }
 }
@@ -189,7 +215,7 @@ impl ScenarioEngine {
     /// use finstack_quant_scenarios::ScenarioEngine;
     ///
     /// let engine = ScenarioEngine::new();
-    /// let _provider = engine.recalibration_provider();
+    /// let _provider = engine.get_recalibration_provider();
     /// ```
     #[must_use]
     pub fn new() -> Self {
@@ -232,7 +258,7 @@ impl ScenarioEngine {
     /// [`CachedRecalibrationProvider`] or the one attached with
     /// [`with_recalibration_provider`](Self::with_recalibration_provider).
     #[must_use]
-    pub fn recalibration_provider(&self) -> &Arc<dyn RecalibrationProvider> {
+    pub fn get_recalibration_provider(&self) -> &Arc<dyn RecalibrationProvider> {
         &self.recalibration_provider
     }
 
@@ -327,7 +353,7 @@ impl ScenarioEngine {
                     &[]
                 };
             let hazard_rolls = par_cds_hazard_rolls(credit_ops, ctx.market)?;
-            let roll_report = crate::adapters::time_roll::apply_time_roll_forward_with_credit(
+            let roll_report = crate::adapters::time_roll::apply_time_roll_forward(
                 ctx,
                 period,
                 roll_mode,
@@ -360,7 +386,7 @@ impl ScenarioEngine {
         };
 
         let has_rate_bindings = ctx.rate_bindings.is_some();
-        let mut deferred_stmts = Vec::new();
+        let mut deferred_stmts: Vec<StatementOp<'_>> = Vec::new();
         let mut pending_bumps: Vec<MarketBump> = Vec::new();
 
         // Retain each hazard's calibration market until that curve is rebuilt.
@@ -381,7 +407,6 @@ impl ScenarioEngine {
             let _span = tracing::info_span!("phase_1_market", ops = expanded_operations).entered();
             let mut sink = EffectSink {
                 pending_bumps: &mut pending_bumps,
-                deferred_stmts: &mut deferred_stmts,
                 warnings: &mut warnings,
                 applied: &mut applied,
                 changes: &mut changes,
@@ -389,6 +414,11 @@ impl ScenarioEngine {
             let mut idx = 0;
             while idx < expanded_ops.len() {
                 if let OperationSpec::TimeRollForward { .. } = &expanded_ops[idx] {
+                    idx += 1;
+                    continue;
+                }
+                if let Some(statement_op) = StatementOp::from_operation(&expanded_ops[idx]) {
+                    deferred_stmts.push(statement_op);
                     idx += 1;
                     continue;
                 }
@@ -443,15 +473,15 @@ impl ScenarioEngine {
         let mut applied_stmt_ops = 0usize;
         {
             let _span = tracing::info_span!("phase_3_statements").entered();
-            for effect in deferred_stmts {
-                match effect {
-                    ScenarioEffect::RateBinding { binding } => {
+            for statement_op in deferred_stmts {
+                match statement_op {
+                    StatementOp::RateBinding(binding) => {
                         if let Some(rb) = &mut ctx.rate_bindings {
                             rb.insert(binding.node_id.clone(), binding.clone());
                         }
                         let model = statement_model(&mut ctx.model, "rate binding")?;
                         if apply_rate_binding(
-                            &binding,
+                            binding,
                             model,
                             ctx.market,
                             ctx.calendar,
@@ -461,7 +491,7 @@ impl ScenarioEngine {
                             applied_stmt_ops += 1;
                         }
                     }
-                    ScenarioEffect::StmtForecastPercent { node_id, pct } => {
+                    StatementOp::ForecastPercent { node_id, pct } => {
                         let model = statement_model(&mut ctx.model, "statement forecast percent")?;
                         record_forecast_result(
                             crate::adapters::statements::apply_forecast_percent(
@@ -469,30 +499,28 @@ impl ScenarioEngine {
                                 node_id.as_str(),
                                 pct,
                             ),
-                            &node_id,
+                            node_id,
                             "forecast_percent",
                             &mut applied,
                             &mut applied_stmt_ops,
                             &mut warnings,
                         );
                     }
-                    ScenarioEffect::StmtForecastAssign { node_id, value } => {
+                    StatementOp::ForecastAssign { node_id, value } => {
                         let model = statement_model(&mut ctx.model, "statement forecast assign")?;
                         record_forecast_result(
                             crate::adapters::statements::apply_forecast_assign(
                                 model,
                                 node_id.as_str(),
                                 value,
-                                None,
                             ),
-                            &node_id,
+                            node_id,
                             "forecast_assign",
                             &mut applied,
                             &mut applied_stmt_ops,
                             &mut warnings,
                         );
                     }
-                    _ => {}
                 }
             }
         }

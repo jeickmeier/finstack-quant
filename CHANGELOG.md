@@ -2,6 +2,37 @@
 
 ## [Unreleased]
 
+### Scenarios API simplification
+
+#### Changed (breaking)
+
+- Rust `ScenarioSpec::parallel_bp_many` moved to `OperationSpec::parallel_bp_many`; Python `parallel_bp_many` and WASM `parallelBpMany` are unchanged.
+- Rust `ScenarioEngine::recalibration_provider()` → `get_recalibration_provider()`.
+- Time-roll carry valuation uses `finstack_quant_core::parallel::try_map_ordered` at every inventory size; results and ordering are unchanged, and `finstack-quant-scenarios` no longer depends on `rayon` directly.
+
+#### Added
+
+- Rust `ScenarioMarketTarget::id_label()`: the changed object's identifier, `BASE/QUOTE` for FX. Python `ApplicationReport.changes_to_dataframe()` reads it.
+
+#### Removed
+
+- `ScenarioSpec::with_hazard_bump_mode` on every host (Python `ScenarioSpec.with_hazard_bump_mode`, WASM `scenarioSpecWithHazardBumpMode`). Pass `hazard_bump_mode` to the constructor or set the field.
+- Python `ApplicationReport.warnings_json` and `HorizonResult.warnings_json`; `warnings` is the same list.
+- Rust `apply_time_roll_forward` (apply a `TimeRollForward` operation through `ScenarioEngine::apply`), the crate-root `ArbitrageViolation` re-export, `ApplicationEnvelope::into_parts`, `HazardBumpMode::is_solve_to_par`, `TemplateRegistry::get` and `RegisteredTemplate` (use `build`, `build_component`, `component_ids`, `list`), `schema::SCENARIO_SCHEMA_BASE` / `SCENARIO_SCHEMA_FILENAME`, and the unused `Error` constructors `market_data_not_found`, `node_not_found`, `invalid_tenor`, `tenor_not_found`, `invalid_period`.
+
+### Attribution API simplification
+
+#### Changed (breaking)
+
+- Rust `attribute_pnl` runs every `AttributionMethod`. `MetricsBased` prices the two endpoints with the default metrics the instrument type supports; it was a validation error. `attribute_pnl_metrics_based` remains the entry point for results that are already priced.
+- Rust `AttributionSpec::execute` and `AttributionEnvelope::execute` return a panic inside the pipeline as `Error::Internal`; `execute_contained` is removed from both. Python and WASM behaviour is unchanged.
+- Rust long-row projections are imported from `finstack_quant_attribution::long_rows` (`pnl_attribution_long_rows`, `pnl_attribution_wide_row`, `pnl_attribution_carry_rows`, `pnl_attribution_credit_factor_rows`); the crate-root re-exports are removed.
+
+#### Removed
+
+- Rust `ATTRIBUTION_SCHEMA`, `schema::ATTRIBUTION_SCHEMA_BASE`, `AttributionSchema::CURRENT` (use `AttributionSchema::Attribution`) and `Display for AttributionFactor` (it printed the `Debug` name; `as_str` is the wire name).
+- The attribution crate's direct `rayon` dependency; its parallel maps go through `finstack_quant_core::parallel`.
+
 ## [0.10.0] - 2026-10-06
 
 ### Dependencies

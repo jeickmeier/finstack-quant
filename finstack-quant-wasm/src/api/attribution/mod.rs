@@ -22,7 +22,7 @@ fn run_attribute_pnl(
 ) -> Result<finstack_quant_attribution::AttributionResult, JsValue> {
     let spec: finstack_quant_attribution::AttributionSpec =
         crate::utils::input::from_js_json(spec, "spec")?;
-    spec.execute_contained().map_err(to_js_err)
+    spec.execute().map_err(to_js_err)
 }
 
 /// Attribute one instrument from its canonical Rust specification.
@@ -71,7 +71,7 @@ pub fn attribute_pnl_json(spec: JsValue) -> Result<String, JsValue> {
     serde_json::to_string(&result.attribution).map_err(to_js_err)
 }
 
-/// Parse and execute one `AttributionEnvelope` with panic containment.
+/// Parse and execute one `AttributionEnvelope`.
 ///
 /// Shared by [`attribute_pnl_envelope`] and [`attribute_pnl_envelope_json`].
 fn run_attribute_pnl_envelope(
@@ -80,7 +80,7 @@ fn run_attribute_pnl_envelope(
     let spec_json: &str = &json_text(spec_json, "specJson")?;
     let envelope =
         finstack_quant_attribution::AttributionEnvelope::from_json(spec_json).map_err(to_js_err)?;
-    envelope.execute_contained().map_err(to_js_err)
+    envelope.execute().map_err(to_js_err)
 }
 
 /// Run attribution from a full `AttributionEnvelope` and return the result envelope.

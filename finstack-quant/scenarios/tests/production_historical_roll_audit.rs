@@ -10,8 +10,8 @@ use finstack_quant_core::{
     money::Money,
 };
 use finstack_quant_scenarios::{
-    apply_time_roll_forward, CurveKind, ExecutionContext, HazardBumpMode, OperationSpec,
-    ScenarioEngine, ScenarioSpec, TimeRollMode,
+    CurveKind, ExecutionContext, HazardBumpMode, OperationSpec, ScenarioEngine, ScenarioSpec,
+    TimeRollMode,
 };
 use finstack_quant_valuations::{
     instruments::{fixed_income::bond::CashflowSpec, Bond, Instrument},
@@ -198,6 +198,24 @@ fn production_first_order_spread_shock_converts_by_loss_given_default() {
     }
 }
 
+/// Roll `ctx` forward by `period` calendar days through the engine.
+fn roll(ctx: &mut ExecutionContext, period: &str) -> finstack_quant_scenarios::RollForwardReport {
+    let spec = ScenarioSpec {
+        id: "roll".into(),
+        operations: vec![OperationSpec::TimeRollForward {
+            period: period.into(),
+            apply_shocks: true,
+            roll_mode: TimeRollMode::CalendarDays,
+        }],
+        ..ScenarioSpec::default()
+    };
+    ScenarioEngine::new()
+        .apply(&spec, ctx)
+        .expect("roll succeeds")
+        .time_roll
+        .expect("roll report")
+}
+
 #[test]
 fn production_time_roll_materializes_raw_index_fixings_before_curve_roll() {
     let origin = date!(2025 - 01 - 02);
@@ -242,7 +260,7 @@ fn production_time_roll_materializes_raw_index_fixings_before_curve_roll() {
         calendar: None,
         as_of: origin,
     };
-    let report = apply_time_roll_forward(&mut ctx, "4D", TimeRollMode::CalendarDays).expect("roll");
+    let report = roll(&mut ctx, "4D");
     assert!(
         report.failed_instruments.is_empty(),
         "{:?}",
@@ -257,7 +275,7 @@ fn production_time_roll_materializes_raw_index_fixings_before_curve_roll() {
         (fixing - 0.03).abs() < 1e-12,
         "raw index must exclude the 150bp coupon spread"
     );
-    apply_time_roll_forward(&mut ctx, "1D", TimeRollMode::CalendarDays).expect("repeat roll");
+    roll(&mut ctx, "1D");
     assert_eq!(
         ctx.market
             .get_series("FIXING:USD-SOFR-3M")

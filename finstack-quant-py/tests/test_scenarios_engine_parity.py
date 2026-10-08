@@ -190,7 +190,6 @@ def test_report_exposes_structured_warnings_and_counters() -> None:
     assert isinstance(report, ApplicationReport)
     assert report.warning_count == len(report.warnings) == 1
     assert report.warnings[0]["kind"] == "equity_not_found"
-    assert json.loads(report.warnings_json) == report.warnings
     assert "warnings=1" in repr(result)
     assert "operations_applied=" in repr(report)
 

@@ -8,8 +8,8 @@
 //! When clamping occurs, warnings are returned to alert the caller that the
 //! requested shock could not be fully applied.
 
-use crate::adapters::traits::ScenarioEffect;
 use crate::engine::ExecutionContext;
+use crate::engine::ScenarioEffect;
 use crate::warning::Warning;
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::market_data::term_structures::BASE_CORR_DETACHMENT_MATCH_TOLERANCE;
@@ -98,7 +98,11 @@ pub(crate) fn base_corr_bucket_effects(
     points: f64,
     ctx: &ExecutionContext,
 ) -> Vec<ScenarioEffect> {
-    let dets = detachment_bp.map(crate::utils::bp_to_fractions);
+    let dets = detachment_bp.map(|bp| {
+        bp.iter()
+            .map(|bp| f64::from(*bp) / 10_000.0)
+            .collect::<Vec<f64>>()
+    });
 
     let bump = MarketBump::BaseCorrBucketPts {
         surface_id: surface_id.clone(),

@@ -197,34 +197,6 @@ class ScenarioSpec:
         """
         ...
 
-    def with_hazard_bump_mode(self, mode: Literal["solve_to_par", "first_order_shift"]) -> ScenarioSpec:
-        """Return a copy with a different ParCDS hazard delivery mode.
-
-        Parameters
-        ----------
-        mode : {"solve_to_par", "first_order_shift"}
-            ``solve_to_par`` re-bootstraps hazard from shocked par spreads;
-            ``first_order_shift`` applies ``delta_hazard = delta_spread / (1 - recovery)``
-            and reports an approximation warning.
-
-        Returns
-        -------
-        ScenarioSpec
-            New specification with ``hazard_bump_mode`` replaced.
-
-        Raises
-        ------
-        ValueError
-            If ``mode`` is not one of the accepted labels.
-
-        Examples
-        --------
-        >>> from finstack_quant.scenarios import ScenarioSpec
-        >>> ScenarioSpec("s", []).with_hazard_bump_mode("first_order_shift").hazard_bump_mode
-        'first_order_shift'
-        """
-        ...
-
     def __eq__(self, other: object) -> bool:
         """Structural equality on every field (id, operations, priority, modes).
 
@@ -828,23 +800,6 @@ class ApplicationReport:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def warnings_json(self) -> str:
-        """
-        The structured warnings as one JSON-encoded array.
-
-        Returns
-        -------
-        str
-            JSON array; ``json.loads`` gives the same list as ``warnings``.
-
-        Raises
-        ------
-        ValueError
-            If the warnings cannot be serialized.
         """
         ...
 
@@ -1490,23 +1445,6 @@ class HorizonResult:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def warnings_json(self) -> str:
-        """
-        JSON-encoded structured warnings.
-
-        Returns
-        -------
-        str
-            JSON array; ``json.loads`` gives the same list as ``warnings``.
-
-        Raises
-        ------
-        ValueError
-            If the warnings cannot be serialized.
         """
         ...
 

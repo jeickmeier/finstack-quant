@@ -2,7 +2,8 @@
 
 use super::credit_cascade::{
     apply_curve_shape_residual, build_credit_factor_attribution, optional_single_issuer_adder,
-    plan_credit_cascade, shift_credit_curves_par_spread, single_issuer_by_bucket, CreditStepKind,
+    plan_credit_cascade, resolve_issuer, shift_credit_curves_par_spread, single_issuer_by_bucket,
+    CreditStepKind,
 };
 use super::factors::{MarketRestoreFlags, MarketSnapshot};
 use super::spec::AttributionInputs;
@@ -48,19 +49,10 @@ impl AttributionInputs {
         notes: &mut Vec<String>,
     ) -> Result<Option<super::CreditFactorAttribution>> {
         use finstack_quant_core::money::Money;
-        use finstack_quant_core::types::IssuerId;
 
-        let issuer_id_str = match instrument
-            .attributes()
-            .get_meta(finstack_quant_models::factor::matching::ISSUER_ID_META_KEY)
-        {
-            Some(s) => s.to_string(),
-            None => return Ok(None),
+        let Some((issuer_id, issuer_row)) = resolve_issuer(model, instrument.as_ref()) else {
+            return Ok(None);
         };
-        let issuer_id = IssuerId::new(issuer_id_str);
-
-        let issuer_row = model.issuer_betas.iter().find(|r| r.issuer_id == issuer_id);
-
         if issuer_row.is_none() {
             notes.push(format!(
                 "credit_factor_detail unavailable: issuer {} not present in \
@@ -191,15 +183,7 @@ impl AttributionInputs {
         };
         let ccy = carry_detail.total.currency();
 
-        let issuer_id_str = match instrument
-            .attributes()
-            .get_meta(finstack_quant_models::factor::matching::ISSUER_ID_META_KEY)
-        {
-            Some(s) => s.to_string(),
-            None => return Ok(()),
-        };
-        let issuer_id = finstack_quant_core::types::IssuerId::new(issuer_id_str);
-        let Some(issuer_row) = model.issuer_betas.iter().find(|r| r.issuer_id == issuer_id) else {
+        let Some((issuer_id, Some(issuer_row))) = resolve_issuer(model, instrument.as_ref()) else {
             return Ok(());
         };
 
@@ -305,10 +289,7 @@ impl AttributionInputs {
         let ptp_credit_amt = ptp_amount * credit_share;
         let ptp_rates_amt = ptp_amount - ptp_credit_amt;
 
-        if carry_detail.coupon_income.is_some() {
-            carry_detail.coupon_income =
-                Some(SourceLine::split(coupon, coupon_rates, coupon_credit));
-        }
+        carry_detail.coupon_income = Some(SourceLine::split(coupon, coupon_rates, coupon_credit));
         if let Some(roll_total) = roll {
             carry_detail.roll_down = Some(SourceLine::split(roll_total, roll_rates, roll_credit));
         }

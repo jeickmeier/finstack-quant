@@ -1,6 +1,5 @@
 //! JSON Schema contract tests for scenario envelopes.
 
-use finstack_quant_scenarios::schema::{SCENARIO_SCHEMA_BASE, SCENARIO_SCHEMA_FILENAME};
 use finstack_quant_scenarios::InstrumentType;
 use serde_json::{json, Value};
 
@@ -108,7 +107,7 @@ fn checked_in_schema_matches_generated_type_and_metadata() {
     assert_eq!(schema, generated_schema());
     assert_eq!(
         schema["$id"],
-        format!("{SCENARIO_SCHEMA_BASE}{SCENARIO_SCHEMA_FILENAME}")
+        "https://finstack_quant.dev/schemas/scenarios/1/scenario.schema.json"
     );
     assert_eq!(
         schema["$schema"],

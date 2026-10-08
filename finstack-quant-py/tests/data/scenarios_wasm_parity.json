@@ -1069,35 +1069,6 @@
     "requires_instruments": false,
     "mutates_instruments": false
    }
-  ],
-  "with_hazard_bump_mode": {
-   "mode": "first_order_shift",
-   "expected": {
-    "id": "hold_1m_up25",
-    "name": null,
-    "description": null,
-    "operations": [
-     {
-      "kind": "time_roll_forward",
-      "period": "1M",
-      "apply_shocks": true,
-      "roll_mode": "calendar_days"
-     },
-     {
-      "kind": "curve_parallel_bp",
-      "curve_kind": "discount",
-      "curve_id": "USD-OIS",
-      "bp": 25.0
-     }
-    ],
-    "priority": 0,
-    "resolution_mode": "most_specific_wins",
-    "hazard_bump_mode": "first_order_shift"
-   }
-  },
-  "bad_mode_error": {
-   "exception": "ValueError",
-   "message": "Validation error: invalid value \"nope\": unknown variant `nope`, expected `solve_to_par` or `first_order_shift`"
-  }
+  ]
  }
 }

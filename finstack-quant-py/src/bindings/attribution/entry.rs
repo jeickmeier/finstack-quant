@@ -202,10 +202,10 @@ pub(crate) fn attribute_pnl(
     )?;
 
     let spec = AttributionSpec { instrument, inputs };
-    // `execute_contained` turns a Rust panic into `Error::Internal` so it
+    // `execute` turns a Rust panic into `Error::Internal` so it
     // surfaces as a catchable `RuntimeError` rather than a
     // `pyo3_runtime.PanicException` (a `BaseException`).
-    let result = py.detach(|| spec.execute_contained()).map_err(core_to_py)?;
+    let result = py.detach(|| spec.execute()).map_err(core_to_py)?;
     Ok(PyPnlAttribution {
         inner: result.attribution,
     })
@@ -313,7 +313,7 @@ pub(crate) fn attribute_pnl_many<'py>(
         .map_err(core_to_py)?;
     let rows = attributions
         .iter()
-        .map(finstack_quant_attribution::pnl_attribution_wide_row)
+        .map(finstack_quant_attribution::long_rows::pnl_attribution_wide_row)
         .collect::<Result<Vec<_>, _>>()
         .map_err(crate::errors::core_to_py)?;
     serde_rows_to_dataframe_with_schema(py, &rows, &WIDE_COLUMNS)
@@ -409,8 +409,7 @@ fn run_attribute_pnl_envelope(
     spec_json: &str,
 ) -> PyResult<finstack_quant_attribution::AttributionResultEnvelope> {
     let envelope = AttributionEnvelope::from_json(spec_json).map_err(core_to_py)?;
-    py.detach(|| envelope.execute_contained())
-        .map_err(core_to_py)
+    py.detach(|| envelope.execute()).map_err(core_to_py)
 }
 
 /// Run attribution from a full JSON ``AttributionEnvelope``.

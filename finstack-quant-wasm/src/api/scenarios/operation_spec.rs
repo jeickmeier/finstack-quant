@@ -18,8 +18,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::hierarchy::HierarchyTarget;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_scenarios::{
-    CurveKind, InstrumentType, NodeId, OperationSpec, RateBindingSpec, ScenarioSpec,
-    TenorMatchMode, TimeRollMode,
+    CurveKind, InstrumentType, NodeId, OperationSpec, RateBindingSpec, TenorMatchMode, TimeRollMode,
 };
 use indexmap::IndexMap;
 use wasm_bindgen::prelude::*;
@@ -210,7 +209,7 @@ pub fn parallel_bp_many(
     discount_curve_id: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let ids = js_string_seq(&curve_ids, "curveIds")?;
-    to_js_value(&ScenarioSpec::parallel_bp_many(
+    to_js_value(&OperationSpec::parallel_bp_many(
         label(&curve_kind, "curveKind")?,
         ids,
         js_f64(&bp, "bp")?,

@@ -1,6 +1,6 @@
 use super::super::helpers::factor_money_or_invalid;
 use super::super::types::{CrossFactorDetail, PnlAttribution};
-use super::context::AttributionInputs;
+use super::context::MetricsContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::metrics::MetricId;
 use indexmap::IndexMap;
@@ -27,7 +27,7 @@ fn add_cross_factor_term(
 }
 
 pub(super) fn apply(
-    inputs: &AttributionInputs<'_>,
+    inputs: &MetricsContext<'_>,
     attribution: &mut PnlAttribution,
     non_finite_detected: &mut bool,
 ) {
@@ -71,7 +71,7 @@ pub(super) fn apply(
     // twisted and cross-gamma materiality matters.
     let mut cross_total = 0.0;
     let mut cross_by_pair = IndexMap::new();
-    let currency = inputs.val_t1.value.currency();
+    let currency = inputs.ccy;
 
     let pairs = [
         (
