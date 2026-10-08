@@ -316,6 +316,11 @@ export type ImDecayProfile =
       };
     };
 /**
+ * Risk classes for SIMM categorization.
+ */
+export type SimmRiskClass =
+  "interest_rate" | "credit_qualifying" | "credit_non_qualifying" | "equity" | "commodity" | "fx";
+/**
  * Type of margin call.
  *
  * Classifies the nature of a margin call for proper processing
@@ -469,11 +474,6 @@ export type SaCcrSupervisoryCategory =
  */
 export type ScheduleAssetClass = BuiltInScheduleAssetClass | string;
 /**
- * Risk classes for SIMM categorization.
- */
-export type SimmRiskClass =
-  "interest_rate" | "credit_qualifying" | "credit_non_qualifying" | "equity" | "commodity" | "fx";
-/**
  * SIMM version identifier.
  */
 export type SimmVersion = "v2_6";
@@ -551,6 +551,69 @@ export interface ConcentrationBreach {
    * Allowed concentration limit
    */
   limit: number;
+}
+/**
+ * One time bucket of a CVA or DVA sum.
+ *
+ * The bucket ends at `time` and starts at the previous row's `time` (the
+ * first bucket starts at the valuation date, where survival and the discount
+ * factor are `1` and the exposure is held flat at the first profile node).
+ * The row records the factors exactly as multiplied:
+ *
+ * ```text
+ * contribution = loss_given_default × exposure_mid
+ *              × marginal_default_probability × discount_factor_mid
+ *              × survival_weight
+ * ```
+ *
+ * For CVA the defaulting party is the counterparty and the exposure is EPE;
+ * for DVA the defaulting party is the institution and the exposure is ENE
+ * net of any posted initial margin, floored at zero.
+ */
+export interface CreditXvaRow {
+  /**
+   * This bucket's term of the adjustment, in the exposure profile's
+   * currency (non-negative).
+   */
+  contribution: number;
+  /**
+   * Discount factor `DF(time)` read from the discount curve.
+   */
+  discount_factor: number;
+  /**
+   * Average of the discount factors at the bucket start and end.
+   */
+  discount_factor_mid: number;
+  /**
+   * Average of the exposure at the bucket start and end, in the exposure
+   * profile's currency (non-negative).
+   */
+  exposure_mid: number;
+  /**
+   * Loss given default `1 − recovery rate` of the defaulting party, as a
+   * decimal fraction; identical on every row.
+   */
+  loss_given_default: number;
+  /**
+   * Probability that the defaulting party defaults inside the bucket:
+   * `max(S(previous time) − S(time), 0)`.
+   */
+  marginal_default_probability: number;
+  /**
+   * Survival probability `S(time)` of the defaulting party read from its
+   * hazard curve, in `[0, 1]`.
+   */
+  survival_probability: number;
+  /**
+   * Average over the bucket of the *other* party's survival probability
+   * (first-to-default weighting): the institution's for CVA, the
+   * counterparty's for DVA. Exactly `1` for a unilateral adjustment.
+   */
+  survival_weight: number;
+  /**
+   * Bucket end in years from the valuation date.
+   */
+  time: number;
 }
 /**
  * Credit Support Annex specification (ISDA standard).
@@ -1082,6 +1145,19 @@ export interface FrtbSbaResult {
    */
   rrao: number;
   /**
+   * Per-risk-class delta, vega and curvature charges under every evaluated
+   * correlation scenario, in the reporting currency.
+   *
+   * Has one entry per key of `scenario_charges`; the three maps of an
+   * entry sum to that scenario's `scenario_charges` value, and the entry
+   * for `binding_scenario` equals `delta_by_risk_class`,
+   * `vega_by_risk_class` and `curvature_by_risk_class`. Empty only when
+   * deserialized from JSON written before this field existed.
+   */
+  scenario_breakdown?: {
+    [k: string]: FrtbScenarioCharges;
+  };
+  /**
    * Delta+Vega+Curvature charge under each scenario (for transparency).
    */
   scenario_charges: {
@@ -1098,6 +1174,33 @@ export interface FrtbSbaResult {
     [k: string]: number;
   };
   [k: string]: unknown;
+}
+/**
+ * Delta, vega and curvature charges by risk class under one correlation scenario.
+ *
+ * Risk classes whose charge is zero are omitted, as in the top-level
+ * [`FrtbSbaResult`] maps. Amounts are in the reporting currency of the
+ * sensitivities.
+ */
+export interface FrtbScenarioCharges {
+  /**
+   * Curvature risk charge by risk class under this scenario.
+   */
+  curvature_by_risk_class: {
+    [k: string]: number;
+  };
+  /**
+   * Delta risk charge by risk class under this scenario.
+   */
+  delta_by_risk_class: {
+    [k: string]: number;
+  };
+  /**
+   * Vega risk charge by risk class under this scenario.
+   */
+  vega_by_risk_class: {
+    [k: string]: number;
+  };
 }
 /**
  * FRTB sensitivity inputs organized by risk class.
@@ -1214,6 +1317,66 @@ export interface ImProfile {
   times: number[];
 }
 /**
+ * One time bucket of an FVA sum.
+ *
+ * The bucket ends at `time` and starts at the previous row's `time` (the
+ * first bucket starts at the valuation date). The row records the factors
+ * exactly as multiplied:
+ *
+ * ```text
+ * contribution = (epe_mid × funding_spread − ene_mid × funding_benefit_spread)
+ *              × discount_factor_mid × dt × joint_survival_mid
+ * ```
+ */
+export interface FundingXvaRow {
+  /**
+   * This bucket's term of the FVA, in the exposure profile's currency
+   * (positive = funding cost).
+   */
+  contribution: number;
+  /**
+   * Discount factor `DF(time)` read from the discount curve.
+   */
+  discount_factor: number;
+  /**
+   * Average of the discount factors at the bucket start and end.
+   */
+  discount_factor_mid: number;
+  /**
+   * Bucket length in years: `time` minus the previous row's `time`.
+   */
+  dt: number;
+  /**
+   * Average expected negative exposure over the bucket, in the exposure
+   * profile's currency (non-negative magnitude).
+   */
+  ene_mid: number;
+  /**
+   * Average expected positive exposure over the bucket, in the exposure
+   * profile's currency.
+   */
+  epe_mid: number;
+  /**
+   * Funding benefit spread applied to `ene_mid`, as a decimal fraction per
+   * year (basis points / 10 000); identical on every row.
+   */
+  funding_benefit_spread: number;
+  /**
+   * Funding cost spread applied to `epe_mid`, as a decimal fraction per
+   * year (basis points / 10 000); identical on every row.
+   */
+  funding_spread: number;
+  /**
+   * Product of the bucket-average counterparty and own survival
+   * probabilities. Exactly `1` when no hazard curves are applied.
+   */
+  joint_survival_mid: number;
+  /**
+   * Bucket end in years from the valuation date.
+   */
+  time: number;
+}
+/**
  * Haircut sensitivity (Haircut01) result.
  */
 export interface Haircut01 {
@@ -1305,6 +1468,153 @@ export interface ImResult {
    * Margin Period of Risk in business days used in calculation
    */
   mpor_days: number;
+  /**
+   * SIMM aggregation detail behind `breakdown` and `amount`: weighted
+   * sensitivities, concentration factors and bucket-level `K` for every
+   * component, plus the per-risk-class totals and the MPOR scale.
+   *
+   * `Some` only for results produced by the SIMM calculator; `None` for
+   * every other methodology and for JSON written before this field
+   * existed.
+   */
+  simm_detail?: SimmDetail | null;
+}
+/**
+ * Aggregation detail of one SIMM calculation.
+ *
+ * All amounts are in the calculation currency (USD) and are stated
+ * **before** the MPOR scale, so:
+ *
+ * ```text
+ * breakdown[c.component]      = c.margin × mpor_scale
+ * risk_class_margins[class]   = Σ c.margin over components of that class
+ * amount                      = sqrt(Σᵢ Σⱼ ψᵢⱼ Kᵢ Kⱼ) × mpor_scale
+ * ```
+ *
+ * where `Kᵢ` are the `risk_class_margins` and `ψ` is the SIMM
+ * inter-risk-class correlation matrix of the calculator's parameters.
+ */
+export interface SimmDetail {
+  /**
+   * One entry per key of [`ImResult::breakdown`], in calculation order.
+   */
+  components: SimmComponentDetail[];
+  /**
+   * Multiplier applied to the aggregate and to every breakdown amount:
+   * `sqrt(mpor_days / 10)` (dimensionless; `1` at the standard 10-day
+   * MPOR).
+   */
+  mpor_scale: number;
+  /**
+   * Margin per risk class before inter-risk-class correlation and before
+   * the MPOR scale: the sum of that class's delta, vega and curvature
+   * component margins. Risk classes with no positive component are absent.
+   */
+  risk_class_margins: {
+    [k: string]: number;
+  };
+}
+/**
+ * Bucket-level detail of one SIMM breakdown component.
+ */
+export interface SimmComponentDetail {
+  /**
+   * Buckets in the canonical order used by the cross-bucket aggregation.
+   */
+  buckets: SimmBucketDetail[];
+  /**
+   * Component label; equals the matching [`ImResult::breakdown`] key (for
+   * example `IR_Delta`).
+   */
+  component: string;
+  /**
+   * Historical volatility ratio (dimensionless). For equity, FX and
+   * commodity vega components it multiplies every `sensitivity` before
+   * risk weighting. For the interest-rate curvature component the
+   * component margin is divided by its square. `1` everywhere else.
+   */
+  historical_volatility_ratio: number;
+  /**
+   * Component margin after cross-bucket aggregation, before the MPOR
+   * scale, in the calculation currency.
+   */
+  margin: number;
+  /**
+   * Risk class whose margin this component adds to.
+   */
+  risk_class: SimmRiskClass;
+}
+/**
+ * One SIMM bucket: its weighted sensitivities and intra-bucket aggregate.
+ *
+ * What a bucket is depends on the component: a currency for interest rate,
+ * a credit sector for credit qualifying, `residual` for credit
+ * non-qualifying, one name for equity, `fx` for FX, and the commodity
+ * bucket number for commodity.
+ */
+export interface SimmBucketDetail {
+  /**
+   * Bucket label (see the type documentation).
+   */
+  bucket: string;
+  /**
+   * Intra-bucket aggregate `K_b = sqrt(Σᵢ Σⱼ ρᵢⱼ WSᵢ WSⱼ)` in the
+   * calculation currency, with `ρ` from the calculator's parameters.
+   */
+  k: number;
+  /**
+   * Sum of the weighted sensitivities capped to `[-k, k]`: the `S_b` term
+   * used wherever the component correlates this bucket with another.
+   */
+  signed_sum: number;
+  /**
+   * Weighted sensitivities in the order they enter the intra-bucket
+   * correlated sum.
+   */
+  weighted_sensitivities: SimmWeightedSensitivity[];
+}
+/**
+ * One weighted sensitivity inside a SIMM bucket.
+ *
+ * For delta and vega components
+ * `weighted_sensitivity = sensitivity × historical_volatility_ratio ×
+ * risk_weight × concentration_factor` (the ratio is the component's). For
+ * curvature components `sensitivity` is the factor's curvature risk
+ * exposure after the expiry scaling factor and netting, and the weight and
+ * concentration factor are `1`.
+ */
+export interface SimmWeightedSensitivity {
+  /**
+   * Concentration risk factor `max(1, sqrt(|net sensitivity| / threshold))`
+   * applied to this sensitivity (dimensionless, `≥ 1`).
+   */
+  concentration_factor: number;
+  /**
+   * Risk factor label: currency, issuer or name, currency pair
+   * (`AAA/BBB`), or commodity bucket number.
+   */
+  risk_factor: string;
+  /**
+   * SIMM risk weight from the calculator's parameters, as published and
+   * multiplied directly against the sensitivity.
+   */
+  risk_weight: number;
+  /**
+   * Net input sensitivity for this factor, in the units documented on
+   * [`SimmSensitivities`](crate::SimmSensitivities) (calculation currency
+   * per unit move).
+   */
+  sensitivity: number;
+  /**
+   * Tenor label of the sensitivity; `None` for factors without a tenor
+   * dimension.
+   */
+  tenor?: string | null;
+  /**
+   * Weighted sensitivity `WS` entering the intra-bucket aggregation, in
+   * the calculation currency.
+   */
+  weighted_sensitivity: number;
 }
 /**
  * Margin call event.
@@ -1773,6 +2083,12 @@ export interface SimmSensitivitiesJson {
  */
 export interface VmResult {
   /**
+   * Signed collateral balance netted against `net_exposure`, exactly as
+   * passed to the calculator: positive when the desk holds collateral,
+   * negative when the desk has posted it.
+   */
+  collateral_balance: Money;
+  /**
    * Amount to collect from the counterparty, including returned collateral
    */
   collect_amount: Money;
@@ -1785,6 +2101,17 @@ export interface VmResult {
    */
   gross_exposure: Money;
   /**
+   * CSA independent amount added to the threshold-adjusted exposure to
+   * give `net_exposure`, in the CSA base currency.
+   */
+  independent_amount: Money;
+  /**
+   * CSA minimum transfer amount in the CSA base currency. When
+   * `|unrounded_call| < mta`, no transfer is made and both `post_amount`
+   * and `collect_amount` are zero.
+   */
+  mta: Money;
+  /**
    * Net exposure after applying threshold and independent amount
    */
   net_exposure: Money;
@@ -1793,9 +2120,28 @@ export interface VmResult {
    */
   post_amount: Money;
   /**
+   * CSA rounding increment in the CSA base currency. A transfer that
+   * passes the MTA test has its magnitude rounded to a multiple of this
+   * increment: up when `unrounded_call` has the same sign as
+   * `net_exposure` (a delivery), down otherwise (a return). Zero disables
+   * rounding.
+   */
+  rounding_increment: Money;
+  /**
    * Settlement date for the margin transfer
    */
   settlement_date: string;
+  /**
+   * CSA threshold applied symmetrically to `|gross_exposure|`, in the CSA
+   * base currency (non-negative).
+   */
+  threshold: Money;
+  /**
+   * Signed credit support amount before the minimum-transfer test and
+   * rounding: `net_exposure − collateral_balance`. Positive means collect
+   * from the counterparty, negative means the desk pays (post or return).
+   */
+  unrounded_call: Money;
 }
 /**
  * Result of XVA calculations.
@@ -1809,6 +2155,13 @@ export interface XvaResult {
    */
   cva: number;
   /**
+   * Per-time-bucket terms of the CVA sum, one row per exposure-profile
+   * node, in time order. Summing `contribution` in row order reproduces
+   * `cva`. Empty only when deserialized from JSON written before this
+   * field existed.
+   */
+  cva_rows?: CreditXvaRow[];
+  /**
    * DVA (Debit Valuation Adjustment): own-default benefit.
    *
    * Positive DVA represents the expected gain to the desk from
@@ -1817,6 +2170,11 @@ export interface XvaResult {
    * `None` when DVA is not computed (unilateral CVA only).
    */
   dva?: number | null;
+  /**
+   * Per-time-bucket terms of the DVA sum, in time order; `contribution`
+   * sums to `dva`. `Some` exactly when `dva` is `Some` (bilateral XVA).
+   */
+  dva_rows?: CreditXvaRow[] | null;
   /**
    * Time-weighted average of Effective EPE (regulatory scalar metric).
    *
@@ -1870,6 +2228,12 @@ export interface XvaResult {
    * `None` when FVA is not computed.
    */
   fva?: number | null;
+  /**
+   * Per-time-bucket terms of the FVA sum, in time order; `contribution`
+   * sums to `fva`. `Some` exactly when `fva` is `Some` (bilateral XVA with
+   * a funding configuration).
+   */
+  fva_rows?: FundingXvaRow[] | null;
   /**
    * Maximum expected positive exposure across the profile, in reporting currency.
    */

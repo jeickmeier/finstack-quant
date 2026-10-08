@@ -41,6 +41,7 @@ def test_to_arrow_long_matches_pandas_long_columns() -> None:
         "value_money",
         "currency",
         "value_type",
+        "source",
     ]
 
     df = res.to_dataframe(orient="long")

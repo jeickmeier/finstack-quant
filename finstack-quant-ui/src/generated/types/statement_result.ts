@@ -367,6 +367,14 @@ export type D_76Adf23Abc095Fd56514 =
       };
     };
 /**
+ * Which evaluation layer produced a statement cell (one node in one period).
+ *
+ * The evaluator resolves every cell by the precedence
+ * `Value > Forecast > Formula`, after the node's optional `where` mask. The
+ * winning layer is recorded per cell in [`StatementResult::node_sources`].
+ */
+export type D_2A886A29E286928Aba1B = "value" | "forecast" | "formula" | "where_masked";
+/**
  * Node value type classification.
  *
  * Determines whether a node represents monetary values (with a specific currency)
@@ -564,7 +572,23 @@ export interface StatementResultWire {
    */
   monetary_nodes?: {
     [k: string]: {
-      [k: string]: D_1B5716Dde9957A614F3C5;
+      [k: string]: D_1B5716Dde9957A614F3C;
+    };
+  };
+  /**
+   * Map of node_id → (period_id → [`CellSource`]): which layer of the
+   * `Value > Forecast > Formula` precedence produced each cell of `nodes`.
+   *
+   * Populated for every cell by [`Evaluator`](crate::evaluator::Evaluator)
+   * (with or without market context / capital structure). The model spec
+   * alone does not determine it: an as-of visibility cutoff can hide an
+   * explicit value so that the forecast or formula fires instead. Empty
+   * only for results that were not produced by the evaluator (hand-built)
+   * or were serialized before this field existed.
+   */
+  node_sources?: {
+    [k: string]: {
+      [k: string]: D_2A886A29E286928Aba1B;
     };
   };
   /**
@@ -620,6 +644,16 @@ export interface D_4F32370227B1985D85E9 {
    */
   check_name: string;
   /**
+   * Every numeric comparison the check evaluated, passing and failing
+   * alike, in evaluation order. A passing check therefore still reports
+   * the actual value, expected value and tolerance it was judged on.
+   * Unlike `findings`, this list is not reduced by the suite's
+   * `min_severity` / `materiality_threshold` reporting filters. Empty for
+   * checks that do not compare two numbers, for periods a check skipped,
+   * and for reports serialized before this field existed.
+   */
+  comparisons?: DF881E913E411C3Be88E6[];
+  /**
    * Individual findings produced by the check.
    */
   findings: D_82A7F3795866Afe7C96C[];
@@ -630,6 +664,46 @@ export interface D_4F32370227B1985D85E9 {
   [k: string]: unknown;
 }
 /**
+ * The two numbers a check compared, and the tolerance it allowed.
+ *
+ * Recorded for every numeric comparison a check performs — whether it passed
+ * or failed — so the verdict can be reconstructed from exported data:
+ * the comparison fails exactly when `|actual - expected| > tolerance`.
+ *
+ * `actual`, `expected` and `tolerance` are all in the units of the compared
+ * nodes (currency units for monetary nodes, the same units as
+ * [`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not
+ * a fraction or percentage.
+ */
+export interface DF881E913E411C3Be88E6 {
+  /**
+   * Observed (left-hand) value, in the compared nodes' units.
+   */
+  actual: number;
+  /**
+   * Value the identity requires (right-hand side), in the same units.
+   */
+  expected: number;
+  /**
+   * Stable snake_case name of the identity that was tested (for example
+   * `"balance_sheet_articulation"` or `"cash_flow_components"`); a check
+   * that tests several identities per period uses a distinct label for each.
+   */
+  identity: string;
+  /**
+   * Period the comparison was evaluated for, if it is period-specific.
+   */
+  period?: string | null;
+  /**
+   * Absolute tolerance applied to `|actual - expected|`, in the same units.
+   * This is the effective tolerance: the per-check override when one is
+   * configured, otherwise
+   * `max(default_tolerance, default_relative_tolerance * |reference|)`.
+   */
+  tolerance: number;
+  [k: string]: unknown;
+}
+/**
  * A single finding produced by a check for a specific period or node.
  */
 export interface D_82A7F3795866Afe7C96C {
@@ -637,6 +711,14 @@ export interface D_82A7F3795866Afe7C96C {
    * Identifier of the check that produced this finding.
    */
   check_id: string;
+  /**
+   * The failed numeric comparison behind this finding (actual, expected and
+   * tolerance). `None` for findings that do not compare two numbers:
+   * skipped periods, missing or non-finite inputs, sign-convention
+   * warnings, and formula checks without a tolerance (a formula check
+   * with a tolerance compares its value against zero).
+   */
+  comparison?: DF881E913E411C3Be88E6 | null;
   /**
    * Materiality context, if applicable.
    */
@@ -744,6 +826,11 @@ export interface D_033184211Bfcc772Ee94 {
  *         fees: Money::from((0_i64, Currency::USD)),
  *         debt_balance: Money::from((4_900_000_i64, Currency::USD)),
  *         accrued_interest: Money::from((5_000_i64, Currency::USD)),
+ *         opening_balance: None,
+ *         scheduled_principal: None,
+ *         mandatory_prepayment: None,
+ *         sweep_prepayment: None,
+ *         voluntary_prepayment: None,
  *     });
  * cs.totals.insert(period, CashflowBreakdown {
  *     interest_expense_cash: Money::from((10_000_i64, Currency::USD)),
@@ -753,12 +840,31 @@ export interface D_033184211Bfcc772Ee94 {
  *     fees: Money::from((0_i64, Currency::USD)),
  *     debt_balance: Money::from((4_900_000_i64, Currency::USD)),
  *     accrued_interest: Money::from((5_000_i64, Currency::USD)),
+ *     opening_balance: None,
+ *     scheduled_principal: None,
+ *     mandatory_prepayment: None,
+ *     sweep_prepayment: None,
+ *     voluntary_prepayment: None,
  * });
  *
  * assert_eq!(cs.get_total_interest(&period).unwrap(), 12_500.0);
  * ```
  */
 export interface DF840Db5F4C38222F7Ca7 {
+  /**
+   * Cash the waterfall had to allocate in each period: the value of
+   * `WaterfallSpec.available_cash_node`, floored at zero (a negative pool
+   * is reported as a `NegativeAvailableCashFloored` warning), in the
+   * waterfall's currency.
+   *
+   * Only populated for periods in which a waterfall ran; empty for models
+   * without a waterfall and for JSON written before this field existed.
+   * Reconciles the period's uses:
+   * `fees + cash interest + principal + equity_distribution == available_cash`.
+   */
+  available_cash?: {
+    [k: string]: D_1B5716Dde9957A614F3C;
+  };
   /**
    * Map of instrument_id → (period_id → cashflow_type → amount)
    */
@@ -776,7 +882,7 @@ export interface DF840Db5F4C38222F7Ca7 {
    * `fees + cash interest + principal + equity == available cash`.
    */
   equity_distribution?: {
-    [k: string]: D_1B5716Dde9957A614F3C5;
+    [k: string]: D_1B5716Dde9957A614F3C;
   };
   /**
    * Reporting currency used for `totals` (if populated)
@@ -798,48 +904,22 @@ export interface DF840Db5F4C38222F7Ca7 {
   };
 }
 /**
- * Breakdown of cashflows by type for a single period.
+ * Currency-tagged monetary amount with safe arithmetic.
  *
- * Outflow-like fields such as interest, fees, and principal payments are
- * stored as positive amounts representing debt service paid or accrued during
- * the period.
+ * Values retain decimal precision independently of ISO 4217 display precision.
  *
- * Interest expense is split into cash and PIK components for visibility
- * into non-cash interest accrual. Use `interest_expense_total()` for the
- * combined value. All monetary fields use the Money type for currency safety.
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
  *
- * Interest *expense* and interest *income* are tracked separately rather than
- * as one signed field: a two-leg instrument (an interest-rate swap) can net to
- * a receipt in a period — a pay-fixed hedge is in the money whenever the
- * floating leg exceeds the fixed leg — and a receipt is not debt service. The
- * waterfall allocates cash against expense claims, so folding a receipt into
- * `interest_expense_cash` as a negative claim would corrupt pro-rata
- * allocation. See [`Self::net_interest_expense_cash`] for the combined view.
- */
-export interface D_677810Bf9653Cfb0A467 {
-  accrued_interest: D_1B5716Dde9957A614F3C;
-  debt_balance: D_1B5716Dde9957A614F3C1;
-  fees: D_1B5716Dde9957A614F3C2;
-  interest_expense_cash: D_1B5716Dde9957A614F3C3;
-  interest_expense_pik: D_1B5716Dde9957A614F3C4;
-  /**
-   * Net cash interest **received** during the period.
-   *
-   * Includes net hedge receipts and receipts from negative-rate debt coupons.
-   * Stored as a positive amount, like the
-   * outflow-oriented fields, and reported through the `cs.interest_income`
-   * namespace.
-   *
-   * `None` means that no income leg applies. Read it via
-   * [`Self::interest_income_cash_or_zero`] when a currency-preserving zero
-   * is more convenient than an optional value.
-   */
-  interest_income_cash?: D_1B5716Dde9957A614F3C5 | null;
-  principal_payment: D_1B5716Dde9957A614F3C6;
-}
-/**
- * Debt coupon interest accrued but not yet paid (liability).
- * Hedge-leg accrual valuation is outside the debt-service contract and is zero.
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
  */
 export interface D_1B5716Dde9957A614F3C {
   /**
@@ -1014,7 +1094,106 @@ export interface D_1B5716Dde9957A614F3C {
     | "ZWL";
 }
 /**
- * Outstanding debt balance at period end
+ * Breakdown of cashflows by type for a single period.
+ *
+ * Outflow-like fields such as interest, fees, and principal payments are
+ * stored as positive amounts representing debt service paid or accrued during
+ * the period.
+ *
+ * Interest expense is split into cash and PIK components for visibility
+ * into non-cash interest accrual. Use `interest_expense_total()` for the
+ * combined value. All monetary fields use the Money type for currency safety.
+ *
+ * Interest *expense* and interest *income* are tracked separately rather than
+ * as one signed field: a two-leg instrument (an interest-rate swap) can net to
+ * a receipt in a period — a pay-fixed hedge is in the money whenever the
+ * floating leg exceeds the fixed leg — and a receipt is not debt service. The
+ * waterfall allocates cash against expense claims, so folding a receipt into
+ * `interest_expense_cash` as a negative claim would corrupt pro-rata
+ * allocation. See [`Self::net_interest_expense_cash`] for the combined view.
+ */
+export interface D_677810Bf9653Cfb0A467 {
+  accrued_interest: D_1B5716Dde9957A614F3C1;
+  debt_balance: D_1B5716Dde9957A614F3C2;
+  fees: D_1B5716Dde9957A614F3C3;
+  interest_expense_cash: D_1B5716Dde9957A614F3C4;
+  interest_expense_pik: D_1B5716Dde9957A614F3C5;
+  /**
+   * Net cash interest **received** during the period.
+   *
+   * Includes net hedge receipts and receipts from negative-rate debt coupons.
+   * Stored as a positive amount, like the
+   * outflow-oriented fields, and reported through the `cs.interest_income`
+   * namespace.
+   *
+   * `None` means that no income leg applies. Read it via
+   * [`Self::interest_income_cash_or_zero`] when a currency-preserving zero
+   * is more convenient than an optional value.
+   */
+  interest_income_cash?: D_1B5716Dde9957A614F3C | null;
+  /**
+   * Part of `principal_payment` paid at the waterfall's
+   * `MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepay_node`).
+   * Zero when no waterfall ran. Same sign, currency and absence rule as
+   * [`Self::scheduled_principal`].
+   */
+  mandatory_prepayment?: D_1B5716Dde9957A614F3C | null;
+  /**
+   * Outstanding debt balance at period start, before this period's draws,
+   * repayments and PIK capitalization. Positive amount in the breakdown's
+   * currency. On `totals` it is the sum across instruments.
+   *
+   * Always `Some` on breakdowns produced by the evaluator. `None` on
+   * hand-built breakdowns and on JSON written before this field existed.
+   */
+  opening_balance?: D_1B5716Dde9957A614F3C | null;
+  principal_payment: D_1B5716Dde9957A614F3C6;
+  /**
+   * Part of `principal_payment` paid against the instrument's own
+   * contractual schedule: amortization, maturity redemption,
+   * schedule-embedded prepayments and revolver repayments, including
+   * scheduled principal carried in arrears from an earlier period. Under a
+   * waterfall this is the cash allocated at the `Amortization` priority.
+   * Positive amount in the breakdown's currency.
+   *
+   * The four principal components
+   * (`scheduled_principal`, `mandatory_prepayment`, `sweep_prepayment`,
+   * `voluntary_prepayment`) sum to `principal_payment`. Always `Some` on
+   * breakdowns produced by the evaluator or the waterfall; `None` on
+   * hand-built breakdowns and on JSON written before this field existed.
+   */
+  scheduled_principal?: D_1B5716Dde9957A614F3C | null;
+  /**
+   * Part of `principal_payment` paid by the excess-cash-flow sweep at the
+   * waterfall's `Sweep` priority. Zero when no waterfall ran. Same sign,
+   * currency and absence rule as [`Self::scheduled_principal`].
+   */
+  sweep_prepayment?: D_1B5716Dde9957A614F3C | null;
+  /**
+   * Part of `principal_payment` paid at the waterfall's
+   * `VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepay_node`).
+   * Zero when no waterfall ran. Same sign, currency and absence rule as
+   * [`Self::scheduled_principal`].
+   */
+  voluntary_prepayment?: D_1B5716Dde9957A614F3C | null;
+}
+/**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
  */
 export interface D_1B5716Dde9957A614F3C1 {
   /**
@@ -1189,7 +1368,22 @@ export interface D_1B5716Dde9957A614F3C1 {
     | "ZWL";
 }
 /**
- * Fees (commitment fees, etc.)
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
  */
 export interface D_1B5716Dde9957A614F3C2 {
   /**
@@ -1364,7 +1558,22 @@ export interface D_1B5716Dde9957A614F3C2 {
     | "ZWL";
 }
 /**
- * Cash interest payments (coupons, floating resets)
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
  */
 export interface D_1B5716Dde9957A614F3C3 {
   /**
@@ -1539,7 +1748,22 @@ export interface D_1B5716Dde9957A614F3C3 {
     | "ZWL";
 }
 /**
- * PIK (payment-in-kind) interest accrued but not paid in cash
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
  */
 export interface D_1B5716Dde9957A614F3C4 {
   /**

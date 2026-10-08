@@ -361,13 +361,13 @@
         {
           "id": "S1",
           "weight": 0.09898451882774165,
-          "capital": 98984.5188277417,
+          "capital": 98984.5188277416,
           "volatility": 0.015545631755148025
         },
         {
           "id": "S2",
           "weight": 0.9010154811722583,
-          "capital": 901015.4811722582,
+          "capital": 901015.4811722584,
           "volatility": 0.0017078251276599332
         }
       ],
@@ -442,6 +442,23 @@
             "portfolio_shape_changed": false,
             "all_dirty": false
           },
+          "applied_shocks": [
+            {
+              "applies_to": {
+                "scope": "market",
+                "target": {
+                  "kind": "curve",
+                  "curve_kind": "discount",
+                  "curve_id": "USD-OIS"
+                }
+              },
+              "shock": {
+                "kind": "uniform",
+                "value": 10.0,
+                "unit": "bp"
+              }
+            }
+          ],
           "warnings": [],
           "meta": {
             "numeric_mode": "f64",
@@ -495,6 +512,23 @@
             "portfolio_shape_changed": false,
             "all_dirty": false
           },
+          "applied_shocks": [
+            {
+              "applies_to": {
+                "scope": "market",
+                "target": {
+                  "kind": "curve",
+                  "curve_kind": "discount",
+                  "curve_id": "USD-OIS"
+                }
+              },
+              "shock": {
+                "kind": "uniform",
+                "value": -15.0,
+                "unit": "bp"
+              }
+            }
+          ],
           "warnings": [],
           "meta": {
             "numeric_mode": "f64",
@@ -575,6 +609,14 @@
           },
           "mark_to_market_pnl": {
             "amount": "-383.5172156612254026715204",
+            "currency": "USD"
+          },
+          "pv_t0": {
+            "amount": "1000075.9402703035310711316556",
+            "currency": "USD"
+          },
+          "pv_t1": {
+            "amount": "999692.4230546423056684601352",
             "currency": "USD"
           },
           "carry": {
@@ -687,6 +729,14 @@
             "amount": "-767.0344313224508053430408",
             "currency": "USD"
           },
+          "pv_t0": {
+            "amount": "2000151.8805406070621422633111",
+            "currency": "USD"
+          },
+          "pv_t1": {
+            "amount": "1999384.8461092846113369202703",
+            "currency": "USD"
+          },
           "carry": {
             "amount": "219.2067377436361983460935",
             "currency": "USD"
@@ -791,7 +841,7 @@
       },
       "result_invalid": false
     },
-    "attribution_explain": "Portfolio P&L: USD -1150.55\n  ├─ Carry: USD 328.81 (-28.6%)\n  ├─ Rates Curves: USD -1479.36 (128.6%)\n  ├─ Credit Curves: USD 0.00 (-0.0%)\n  ├─ Inflation: USD 0.00 (-0.0%)\n  ├─ Correlations: USD 0.00 (-0.0%)\n  ├─ FX: USD 0.00 (-0.0%)\n  ├─ FX Translation: USD 0.00 (-0.0%)\n  ├─ Cross Factor: USD 0.00 (-0.0%)\n  ├─ Vol: USD 0.00 (-0.0%)\n  ├─ Model Params: USD 0.00 (-0.0%)\n  ├─ Market Scalars: USD 0.00 (-0.0%)\n  └─ Residual: USD 0.00 (-0.0%)",
+    "attribution_explain": "Portfolio P&L: USD -1150.55\n  \u251c\u2500 Carry: USD 328.81 (-28.6%)\n  \u251c\u2500 Rates Curves: USD -1479.36 (128.6%)\n  \u251c\u2500 Credit Curves: USD 0.00 (-0.0%)\n  \u251c\u2500 Inflation: USD 0.00 (-0.0%)\n  \u251c\u2500 Correlations: USD 0.00 (-0.0%)\n  \u251c\u2500 FX: USD 0.00 (-0.0%)\n  \u251c\u2500 FX Translation: USD 0.00 (-0.0%)\n  \u251c\u2500 Cross Factor: USD 0.00 (-0.0%)\n  \u251c\u2500 Vol: USD 0.00 (-0.0%)\n  \u251c\u2500 Model Params: USD 0.00 (-0.0%)\n  \u251c\u2500 Market Scalars: USD 0.00 (-0.0%)\n  \u2514\u2500 Residual: USD 0.00 (-0.0%)",
     "attribution_reconciliation_check": {
       "total_residual": 6.821210263296962e-13,
       "is_reconciled": true,
@@ -929,8 +979,8 @@
     },
     "valuation_position_value_base": 2000151.880540607,
     "valuation_entity_value": 3000227.82081091,
-    "metrics_total_dv01": -148.7784207641962,
-    "metrics_position_dv01": -99.18561384279747,
+    "metrics_total_dv01": -148.77842076437082,
+    "metrics_position_dv01": -99.18561384291388,
     "builder_spec": {
       "id": "HOST-PARITY",
       "name": "Desk book",

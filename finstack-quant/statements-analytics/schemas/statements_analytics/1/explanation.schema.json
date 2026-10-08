@@ -1,5 +1,30 @@
 {
   "$defs": {
+    "CellSource": {
+      "description": "Which evaluation layer produced a statement cell (one node in one period).\n\nThe evaluator resolves every cell by the precedence\n`Value > Forecast > Formula`, after the node's optional `where` mask. The\nwinning layer is recorded per cell in [`StatementResult::node_sources`].",
+      "oneOf": [
+        {
+          "const": "value",
+          "description": "The explicit value stored on the node for this period (and visible\nunder the active as-of policy).",
+          "type": "string"
+        },
+        {
+          "const": "forecast",
+          "description": "The node's forecast method (forecast periods only).",
+          "type": "string"
+        },
+        {
+          "const": "formula",
+          "description": "The node's formula.",
+          "type": "string"
+        },
+        {
+          "const": "where_masked",
+          "description": "The node's `where` clause evaluated to false (or `NaN`) for this\nperiod, so the cell was set to `0.0` without consulting the value,\nforecast or formula.",
+          "type": "string"
+        }
+      ]
+    },
     "ExplanationStep": {
       "description": "Step in a calculation breakdown.",
       "properties": {
@@ -8,7 +33,7 @@
           "type": "string"
         },
         "operation": {
-          "description": "Operation applied (e.g., \"+\", \"-\", \"*\", \"/\")",
+          "description": "Sign with which the component enters the formula: `\"+\"` or `\"-\"`.\n\nSet only when the formula is a pure sum/difference of references, in\nwhich case the signed step values sum to the explained value; unset\nfor any other formula.",
           "type": [
             "string",
             "null"
@@ -22,6 +47,85 @@
       "required": [
         "component",
         "value"
+      ],
+      "type": "object"
+    },
+    "ForecastMethod": {
+      "description": "Available forecast methods.",
+      "oneOf": [
+        {
+          "const": "forward_fill",
+          "description": "Carry last value forward",
+          "type": "string"
+        },
+        {
+          "const": "growth_pct",
+          "description": "Compound growth: `v[t] = v[t-1] * (1 + rate)`",
+          "type": "string"
+        },
+        {
+          "const": "curve_pct",
+          "description": "Period-specific growth rates: `v[t] = v[t-1] * (1 + curve[t])`",
+          "type": "string"
+        },
+        {
+          "const": "normal",
+          "description": "Sample from normal distribution (deterministic with seed)",
+          "type": "string"
+        },
+        {
+          "const": "log_normal",
+          "description": "Sample from log-normal distribution (deterministic with seed)",
+          "type": "string"
+        },
+        {
+          "const": "override",
+          "description": "Explicit period overrides",
+          "type": "string"
+        },
+        {
+          "const": "time_series",
+          "description": "Reference external time series",
+          "type": "string"
+        },
+        {
+          "const": "seasonal",
+          "description": "Seasonal pattern (additive/multiplicative)",
+          "type": "string"
+        },
+        {
+          "const": "fade_to_target",
+          "description": "Glide from the base value to a target level: linear, geometric\n(CAGR-to-terminal), or exponential (half-life) shape",
+          "type": "string"
+        },
+        {
+          "const": "mean_reverting",
+          "description": "Mean-reverting AR(1) path:\n`v[t] = v[t-1] + reversion_speed * (long_run_mean - v[t-1]) + std_dev * z[t]`",
+          "type": "string"
+        },
+        {
+          "const": "bootstrap",
+          "description": "Resample historical growth rates or level diffs (deterministic with seed)",
+          "type": "string"
+        }
+      ]
+    },
+    "ForecastSpec": {
+      "additionalProperties": false,
+      "description": "Forecast method specification.\n\nDefines how to forecast future values for a node.",
+      "properties": {
+        "method": {
+          "$ref": "#/$defs/ForecastMethod",
+          "description": "Forecast method"
+        },
+        "params": {
+          "additionalProperties": true,
+          "description": "Method-specific parameters",
+          "type": "object"
+        }
+      },
+      "required": [
+        "method"
       ],
       "type": "object"
     },
@@ -89,7 +193,7 @@
   "description": "Detailed explanation of a node's calculation.",
   "properties": {
     "breakdown": {
-      "description": "Breakdown of calculation components",
+      "description": "Components of the formula with the values they resolved to in this\nperiod, including `cs.<component>.<instrument_or_total>`\ncapital-structure references.\n\nPopulated only when the formula produced the value (`source` is\n`formula`, or unknown). Empty when `source` is `value`, `forecast` or\n`where_masked`: the formula was not evaluated, and `source` /\n`forecast` describe where the value came from. When the formula is a\npure sum/difference of references there is one step per term, in\nformula order, each with `operation` `\"+\"` or `\"-\"`, and the signed\nvalues sum to `final_value`. For any other formula each referenced\ncomponent is listed once with `operation` unset.",
       "items": {
         "$ref": "#/$defs/ExplanationStep"
       },
@@ -99,8 +203,19 @@
       "$ref": "#/$defs/NonFiniteF64Wire",
       "description": "Final calculated value; non-finite values serialize as `\"nan\"`,\n`\"inf\"` or `\"-inf\"`."
     },
+    "forecast": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ForecastSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The node's forecast specification (method and parameters) when\n`source` is `forecast`; `None` for every other source."
+    },
     "formula_text": {
-      "description": "Formula text (if calculated)",
+      "description": "Formula text (if calculated). Present whenever the node has a\nformula, including when `source` shows that an explicit value or a\nforecast took precedence over it.",
       "type": [
         "string",
         "null"
@@ -117,6 +232,17 @@
     "period_id": {
       "$ref": "#/$defs/PeriodId",
       "description": "Period being explained"
+    },
+    "source": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CellSource"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Evaluation layer that produced `final_value` under the\n`Value > Forecast > Formula` precedence: `value` (the explicit value\nstored on the node), `forecast`, `formula`, or `where_masked` (the\nnode's `where` clause zeroed the cell).\n\nRead from [`StatementResult::node_sources`]; `None` when the results\ncarry no source for the cell (hand-built results, or results or\nexplanations serialized before sources were recorded)."
     }
   },
   "required": [

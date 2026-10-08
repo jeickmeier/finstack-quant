@@ -2460,11 +2460,18 @@ export type TraceEntry =
       name: string;
     };
 /**
- * Rounding modes supported by the library.
+ * Smile-model parameters fitted to one expiry slice of a volatility surface.
  *
- * The variants mirror the most common conventions found in pricing engines.
+ * The wire form is externally tagged by model: `{"sabr": {...}}` or
+ * `{"svi": {...}}`.
  */
-export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
+export type FittedSliceParameters =
+  | {
+      sabr: SabrParameters;
+    }
+  | {
+      svi: SviParams;
+    };
 /**
  * Finite JSON number that is strictly greater than zero.
  *
@@ -2472,6 +2479,49 @@ export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor
  * generated schemas enforce the same positive-number contract.
  */
 export type PositiveF64Wire = number;
+/**
+ * Finite JSON number in the closed interval `[0, 1]`.
+ */
+export type ClosedUnitIntervalF64Wire = number;
+/**
+ * Finite JSON number greater than or equal to zero.
+ */
+export type NonNegativeF64Wire = number;
+/**
+ * Finite correlation coefficient in the closed interval `[-1, 1]`.
+ */
+export type CorrelationWire = number;
+/**
+ * Units of the residuals in [`CalibrationReport::residuals`],
+ * [`CalibrationReport::max_residual`] and [`CalibrationReport::rmse`].
+ *
+ * The wire form is the snake_case variant name (for example
+ * `"pv_per_unit_notional"`).
+ */
+export type ResidualUnits =
+  | "pv_per_unit_notional"
+  | "quoted_volatility"
+  | "discounted_upfront_fraction"
+  | "absolute_residual_over_step_tolerance";
+/**
+ * Rounding modes supported by the library.
+ *
+ * The variants mirror the most common conventions found in pricing engines.
+ */
+export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
+/**
+ * Numerical procedure that produced a [`CalibrationReport`].
+ *
+ * The wire form is the snake_case variant name (for example
+ * `"sequential_bootstrap"`).
+ */
+export type SolverMethod =
+  | "sequential_bootstrap"
+  | "global_fit_lm_weighted_lsq"
+  | "per_slice_least_squares"
+  | "scalar_root_find"
+  | "scalar_minimization"
+  | "plan_execution";
 /**
  * Serializable state representation for any curve type.
  *
@@ -4934,6 +4984,23 @@ export interface CalibrationDiagnostics {
    */
   condition_number?: number | null;
   /**
+   * Finite-difference Jacobian of the residuals at the solution.
+   *
+   * `jacobian[i][j]` is the derivative of the residual of quote `i` with
+   * respect to solved parameter `j`: rows follow [`Self::per_quote`] order,
+   * columns follow the solved parameters in knot order (for curve targets,
+   * the knot values at increasing knot times). Entries are in the report's
+   * residual units per unit of the solved parameter, and are unweighted;
+   * [`Self::condition_number`] is computed from this matrix with the
+   * residual weights applied. `per_quote[i].sensitivity` equals
+   * `max_j |jacobian[i][j]|`.
+   *
+   * Present only for global (simultaneous) solves in which every parameter
+   * bump could be priced. Absent for sequential bootstraps, which solve one
+   * knot per quote and build no full Jacobian.
+   */
+  jacobian?: number[][] | null;
+  /**
    * Maximum absolute residual across all quotes.
    */
   max_residual: number;
@@ -4942,23 +5009,9 @@ export interface CalibrationDiagnostics {
    */
   per_quote: QuoteQuality[];
   /**
-   * Coefficient of determination (R-squared) for the fit.
-   *
-   * Values close to 1.0 indicate a good fit. Only meaningful when
-   * target values have meaningful variance.
-   */
-  r_squared?: number | null;
-  /**
    * Root mean square residual across all quotes.
    */
   rms_residual: number;
-  /**
-   * Singular values of the Jacobian matrix (if computed).
-   *
-   * Useful for diagnosing rank deficiency and understanding which
-   * parameter directions are well-determined vs poorly-determined.
-   */
-  singular_values?: number[] | null;
 }
 /**
  * Per-quote quality metrics from a calibration run.
@@ -5334,6 +5387,15 @@ export interface CalibrationReport {
    */
   explanation?: ExplanationTrace | null;
   /**
+   * Smile parameters fitted per quoted expiry, in increasing expiry order.
+   *
+   * Populated by the equity SABR (`vol_surface`) and SVI (`svi_surface`)
+   * surface calibrators, whose gridded output surface does not retain the
+   * fitted parameters. Empty for every other calibrator, including the
+   * swaption SABR cube, which stores its node parameters on the cube.
+   */
+  fitted_slices?: FittedSlice[];
+  /**
    * Number of solver iterations or function evaluations.
    */
   iterations: number;
@@ -5368,6 +5430,16 @@ export interface CalibrationReport {
    */
   objective_value: number;
   /**
+   * Units of [`Self::residuals`], [`Self::max_residual`] and [`Self::rmse`].
+   *
+   * Set by every calibrator in this crate and mirrored as the
+   * `residual_units` entry of [`Self::metadata`]. `None` only on reports
+   * built directly through [`Self::new`] or
+   * [`Self::for_type_with_tolerance`] without a solver, and on JSON
+   * written before this field existed.
+   */
+  residual_units?: ResidualUnits | null;
+  /**
    * Final residuals (fitting errors) by instrument identifier.
    */
   residuals: {
@@ -5391,6 +5463,14 @@ export interface CalibrationReport {
    * Solver configuration used during this calibration run.
    */
   solver_config?: SolverConfig;
+  /**
+   * Numerical procedure that produced this report.
+   *
+   * Set by every calibrator in this crate. `None` only on reports built
+   * directly through [`Self::new`] or [`Self::for_type_with_tolerance`]
+   * without a solver, and on JSON written before this field existed.
+   */
+  solver_method?: SolverMethod | null;
   /**
    * User-facing success flag. True only if both fitting and validation passed.
    */
@@ -5450,6 +5530,94 @@ export interface ExplanationTrace {
    */
   type: string;
   [k: string]: unknown;
+}
+/**
+ * Parameters a surface calibrator fitted to the quotes of one expiry.
+ *
+ * The SABR and SVI surface calibrators fit one smile per quoted expiry and
+ * then sample those smiles onto the surface's target grid. The gridded
+ * surface keeps only the sampled volatilities, so the fitted parameters are
+ * recorded here, one entry per quoted expiry in increasing expiry order.
+ */
+export interface FittedSlice {
+  /**
+   * Expiry of the quotes this slice was fitted to, as an Act/365F year
+   * fraction from the calibration base date. This is a quoted expiry, not
+   * necessarily a node of the surface's target expiry grid.
+   */
+  expiry: number;
+  /**
+   * Solver iterations spent on this slice (all attempted starts for SABR).
+   * The slice iterations sum to [`CalibrationReport::iterations`].
+   */
+  iterations: number;
+  /**
+   * Largest `|model − market| / market` volatility error of the fitted
+   * smile over this slice's quotes, as a decimal fraction of the quoted
+   * volatility (`1e-4` is 0.01%). It measures the smile fit itself; the
+   * report's residuals measure the gridded surface instead.
+   *
+   * Present for SABR slices. Absent for SVI slices, whose fit reports no
+   * per-slice error.
+   */
+  max_relative_quote_error?: number | null;
+  /**
+   * Fitted model parameters for this expiry.
+   */
+  parameters: FittedSliceParameters;
+}
+/**
+ * SABR model parameters
+ */
+export interface SabrParameters {
+  /**
+   * Initial volatility (alpha)
+   */
+  alpha: PositiveF64Wire;
+  /**
+   * CEV exponent (beta) - typically 0 to 1
+   */
+  beta: ClosedUnitIntervalF64Wire;
+  /**
+   * Volatility of volatility (nu/volvol)
+   */
+  nu: NonNegativeF64Wire;
+  /**
+   * Correlation between asset and volatility (rho)
+   */
+  rho: CorrelationWire;
+  /**
+   * Shift parameter for handling negative rates (optional)
+   */
+  shift?: PositiveF64Wire | null;
+}
+/**
+ * SVI (Stochastic Volatility Inspired) raw parameterization.
+ *
+ * Represents one slice of the volatility surface at a fixed expiry
+ * using five parameters that control the shape of the smile.
+ */
+export interface SviParams {
+  /**
+   * Overall variance level.
+   */
+  a: number;
+  /**
+   * Slope of the wings.
+   */
+  b: number;
+  /**
+   * Translation.
+   */
+  m: number;
+  /**
+   * Rotation / asymmetry parameter.
+   */
+  rho: number;
+  /**
+   * Smoothing parameter.
+   */
+  sigma: number;
 }
 /**
  * Metadata bundle that accompanies valuation outputs.

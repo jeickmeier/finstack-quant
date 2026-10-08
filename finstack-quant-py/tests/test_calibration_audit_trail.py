@@ -118,9 +118,7 @@ def test_directly_built_curves_have_no_calibration_recipe() -> None:
 
 
 def test_hazard_curve_exposes_its_hazard_calibration_recipe() -> None:
-    wire = json.loads(
-        HazardCurve("RECIPE", "2025-01-01", [(1.0, 0.01), (5.0, 0.02)], recovery_rate=0.4).to_json()
-    )
+    wire = json.loads(HazardCurve("RECIPE", "2025-01-01", [(1.0, 0.01), (5.0, 0.02)], recovery_rate=0.4).to_json())
     quote_input = {
         "quote": {"type": "cds_par_spread", "id": "CDS-5Y"},
         "pillar_date": "2026-01-01",

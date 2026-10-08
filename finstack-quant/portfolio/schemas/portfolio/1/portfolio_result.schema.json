@@ -1009,6 +1009,21 @@
           "$ref": "#/$defs/EntityId",
           "description": "Entity that owns this position"
         },
+        "fx_rate": {
+          "description": "Spot FX rate applied to collapse [`value_native`](Self::value_native)\ninto [`value_base`](Self::value_base): units of the portfolio base\ncurrency per one unit of the native currency, observed at the\nvaluation date, so `value_native × fx_rate = value_base` (up to the\nbase currency's `Money` rounding).\n\nAbsent when the native currency is the base currency (no FX lookup is\nmade), and on values deserialized from JSON written before this field\nexisted.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fx_triangulated": {
+          "description": "Whether [`fx_rate`](Self::fx_rate) was built by triangulating through\nthe FX matrix's pivot currency (`true`) or read from a direct or\ninverse quote (`false`).\n\nAbsent exactly when `fx_rate` is absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "inapplicable_metrics": {
           "description": "Metrics on the portfolio menu that this position's instrument type has\nno calculator for, and which were therefore never requested of it.\n\nA portfolio metric list is a menu offered to a heterogeneous book (see\n[`RequestedMetrics`]), so this records the per-position narrowing that\nmakes such a list usable. It is not a failure report: unlike\n[`PortfolioValuation::degraded_positions`] and\n[`PortfolioMetrics::skipped_metrics`](crate::metrics::PortfolioMetrics::skipped_metrics),\nnothing here could have been computed and was not. An entry means the\nmodel gives this instrument type no such exposure, so the position\ncontributes nothing to that metric's portfolio total by construction.\n\nListed in menu order. Empty for a position that supports the whole menu.",
           "items": {

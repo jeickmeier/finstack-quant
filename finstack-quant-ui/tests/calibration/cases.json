@@ -348,7 +348,6 @@
             "bid_ask_validation": "not_applicable_single_side_quote_schema",
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
-            "method": "plan_execution",
             "raw_residuals": "retained_in_step_reports",
             "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
@@ -374,7 +373,9 @@
             "version": "0.10.0"
           },
           "worst_quote_id": "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio",
-          "worst_quote_residual": 0.00007395574357360601
+          "worst_quote_residual": 0.00007395574357360601,
+          "solver_method": "plan_execution",
+          "residual_units": "absolute_residual_over_step_tolerance"
         },
         "step_reports": {
           "USD-OIS": {
@@ -397,6 +398,7 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -423,7 +425,9 @@
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
             "worst_quote_residual": -7.395574357360601e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           }
         },
         "results_meta": {
@@ -989,7 +993,6 @@
             "bid_ask_validation": "not_applicable_single_side_quote_schema",
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
-            "method": "plan_execution",
             "raw_residuals": "retained_in_step_reports",
             "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
@@ -1015,7 +1018,9 @@
             "version": "0.10.0"
           },
           "worst_quote_id": "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio",
-          "worst_quote_residual": 0.00007395574357360601
+          "worst_quote_residual": 0.00007395574357360601,
+          "solver_method": "plan_execution",
+          "residual_units": "absolute_residual_over_step_tolerance"
         },
         "step_reports": {
           "USD-OIS": {
@@ -1038,6 +1043,7 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -1064,7 +1070,9 @@
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
             "worst_quote_residual": -7.395574357360601e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           },
           "USD-SOFR-3M": {
             "success": true,
@@ -1093,9 +1101,9 @@
               "lm_jacobian_evals": "1",
               "lm_lambda_final": "1.00e-3",
               "lm_termination_reason": "ConvergedResidualNorm",
-              "method": "global_fit_lm_weighted_lsq",
               "residual_closure_evals": "11",
               "residual_evals": "11",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "tolerance_definition": "max_abs_residual",
@@ -1123,7 +1131,9 @@
             },
             "worst_quote_id": "FRA-SOFR-3M-9X12",
             "worst_quote_residual": 6.665452062914726e-18,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "global_fit_lm_weighted_lsq",
+            "residual_units": "pv_per_unit_notional"
           }
         },
         "results_meta": {
@@ -1937,7 +1947,6 @@
             "bid_ask_validation": "not_applicable_single_side_quote_schema",
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
-            "method": "plan_execution",
             "raw_residuals": "retained_in_step_reports",
             "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
@@ -1963,7 +1972,9 @@
             "version": "0.10.0"
           },
           "worst_quote_id": "ISSUER-A-CDS:ISSUER-A-CDS-5Y:tolerance_ratio",
-          "worst_quote_residual": 0.00008197283997424254
+          "worst_quote_residual": 0.00008197283997424254,
+          "solver_method": "plan_execution",
+          "residual_units": "absolute_residual_over_step_tolerance"
         },
         "step_reports": {
           "ISSUER-A-CDS": {
@@ -1985,6 +1996,7 @@
               "calibration_type": "hazard_curve",
               "curve_id": "ISSUER-A-CDS",
               "entity": "Issuer-A",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -2011,7 +2023,9 @@
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "ISSUER-A-CDS-5Y",
             "worst_quote_residual": 8.197283997424254e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           },
           "USD-OIS": {
             "success": true,
@@ -2033,6 +2047,7 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -2059,7 +2074,9 @@
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
             "worst_quote_residual": -7.395574357360601e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           }
         },
         "results_meta": {
@@ -2873,7 +2890,6 @@
             "bid_ask_validation": "not_applicable_single_side_quote_schema",
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
-            "method": "plan_execution",
             "raw_residuals": "retained_in_step_reports",
             "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
@@ -2899,7 +2915,9 @@
             "version": "0.10.0"
           },
           "worst_quote_id": "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio",
-          "worst_quote_residual": 0.00007965718396008015
+          "worst_quote_residual": 0.00007965718396008015,
+          "solver_method": "plan_execution",
+          "residual_units": "absolute_residual_over_step_tolerance"
         },
         "step_reports": {
           "CDX-NA-IG-46": {
@@ -2921,6 +2939,7 @@
               "calibration_type": "hazard_curve",
               "curve_id": "CDX-NA-IG-46",
               "entity": "CDX.NA.IG.46",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -2947,7 +2966,9 @@
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "CDX-IG-46-10Y",
             "worst_quote_residual": 7.844035750798062e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           },
           "USD-OIS": {
             "success": true,
@@ -2969,6 +2990,7 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -2995,7 +3017,9 @@
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
             "worst_quote_residual": 7.965718396008014e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           }
         },
         "results_meta": {
@@ -3972,7 +3996,6 @@
             "bid_ask_validation": "not_applicable_single_side_quote_schema",
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
-            "method": "plan_execution",
             "raw_residuals": "retained_in_step_reports",
             "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
@@ -3998,7 +4021,9 @@
             "version": "0.10.0"
           },
           "worst_quote_id": "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio",
-          "worst_quote_residual": 0.00007965718396008015
+          "worst_quote_residual": 0.00007965718396008015,
+          "solver_method": "plan_execution",
+          "residual_units": "absolute_residual_over_step_tolerance"
         },
         "step_reports": {
           "CDX-NA-IG-46": {
@@ -4020,6 +4045,7 @@
               "calibration_type": "hazard_curve",
               "curve_id": "CDX-NA-IG-46",
               "entity": "CDX.NA.IG.46",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -4046,7 +4072,9 @@
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "CDX-IG-46-10Y",
             "worst_quote_residual": 7.844035750798062e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           },
           "CDX-NA-IG-46-BASE-CORR-STEP": {
             "success": true,
@@ -4090,7 +4118,9 @@
             },
             "worst_quote_id": "CDX-IG-46-3-7",
             "worst_quote_residual": 8.643693399923424e-13,
-            "success_tolerance": 0.001
+            "success_tolerance": 0.001,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "discounted_upfront_fraction"
           },
           "USD-OIS": {
             "success": true,
@@ -4112,6 +4142,7 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -4138,7 +4169,9 @@
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
             "worst_quote_residual": 7.965718396008014e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           }
         },
         "results_meta": {
@@ -5104,7 +5137,6 @@
             "bid_ask_validation": "not_applicable_single_side_quote_schema",
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
-            "method": "plan_execution",
             "raw_residuals": "retained_in_step_reports",
             "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
@@ -5130,7 +5162,9 @@
             "version": "0.10.0"
           },
           "worst_quote_id": "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.004:tolerance_ratio",
-          "worst_quote_residual": 0.00048295368887396606
+          "worst_quote_residual": 0.00048295368887396606,
+          "solver_method": "plan_execution",
+          "residual_units": "absolute_residual_over_step_tolerance"
         },
         "step_reports": {
           "CDX-NA-IG-46": {
@@ -5152,6 +5186,7 @@
               "calibration_type": "hazard_curve",
               "curve_id": "CDX-NA-IG-46",
               "entity": "CDX.NA.IG.46",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -5178,7 +5213,9 @@
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "CDX-IG-46-10Y",
             "worst_quote_residual": 7.844035750798062e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           },
           "CDX-NA-IG-46-CDSO-VOL-STEP": {
             "success": true,
@@ -5203,6 +5240,7 @@
               "calibrated_expiries": "0.109589,0.361644,0.610959",
               "calibrated_expiry_count": "3",
               "expiry_extrapolation_policy": "clamp",
+              "residual_units": "quoted_volatility",
               "sabr_parameters_at_bounds": "T=0.109589:nu;T=0.361644:nu;T=0.610959:nu",
               "sabr_residual_evaluations": "T=0.109589:388;T=0.361644:347;T=0.610959:371",
               "sabr_winning_iterations": "T=0.109589:26;T=0.361644:22;T=0.610959:23",
@@ -5242,7 +5280,50 @@
             },
             "worst_quote_id": "CDX-NA-IG-46-VOL-20260617-0.004",
             "worst_quote_residual": 4.829536888739661e-7,
-            "success_tolerance": 0.001
+            "success_tolerance": 0.001,
+            "solver_method": "per_slice_least_squares",
+            "residual_units": "quoted_volatility",
+            "fitted_slices": [
+              {
+                "expiry": 0.1095890410958904,
+                "parameters": {
+                  "sabr": {
+                    "alpha": 0.3602999968224341,
+                    "beta": 1,
+                    "nu": 0.0010000000000639612,
+                    "rho": -0.00019570767450616255
+                  }
+                },
+                "iterations": 305,
+                "max_relative_quote_error": 0.0000013404210071439524
+              },
+              {
+                "expiry": 0.36164383561643837,
+                "parameters": {
+                  "sabr": {
+                    "alpha": 0.3699999889724215,
+                    "beta": 1,
+                    "nu": 0.00100000000000817,
+                    "rho": -0.00016332004910502018
+                  }
+                },
+                "iterations": 186,
+                "max_relative_quote_error": 0.0000012652889657937794
+              },
+              {
+                "expiry": 0.6109589041095891,
+                "parameters": {
+                  "sabr": {
+                    "alpha": 0.37999997246616185,
+                    "beta": 1,
+                    "nu": 0.0010000000002755498,
+                    "rho": -0.00000941892885719664
+                  }
+                },
+                "iterations": 154,
+                "max_relative_quote_error": 0.0000010252096575189433
+              }
+            ]
           },
           "USD-OIS": {
             "success": true,
@@ -5264,6 +5345,7 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -5290,7 +5372,9 @@
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
             "worst_quote_residual": 7.965718396008014e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           }
         },
         "results_meta": {
@@ -6325,7 +6409,6 @@
             "bid_ask_validation": "not_applicable_single_side_quote_schema",
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
-            "method": "plan_execution",
             "raw_residuals": "retained_in_step_reports",
             "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
@@ -6351,7 +6434,9 @@
             "version": "0.10.0"
           },
           "worst_quote_id": "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.05:tolerance_ratio",
-          "worst_quote_residual": 0.3215806260034078
+          "worst_quote_residual": 0.3215806260034078,
+          "solver_method": "plan_execution",
+          "residual_units": "absolute_residual_over_step_tolerance"
         },
         "step_reports": {
           "USD-OIS": {
@@ -6374,6 +6459,7 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -6400,7 +6486,9 @@
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
             "worst_quote_residual": 7.965718396008014e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           },
           "USD-SOFR-3M": {
             "success": true,
@@ -6429,9 +6517,9 @@
               "lm_jacobian_evals": "1",
               "lm_lambda_final": "1.00e-3",
               "lm_termination_reason": "ConvergedResidualNorm",
-              "method": "global_fit_lm_weighted_lsq",
               "residual_closure_evals": "11",
               "residual_evals": "11",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "tolerance_definition": "max_abs_residual",
@@ -6459,7 +6547,9 @@
             },
             "worst_quote_id": "FRA-SOFR-3M-9X12",
             "worst_quote_residual": 6.666502761828352e-18,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "global_fit_lm_weighted_lsq",
+            "residual_units": "pv_per_unit_notional"
           },
           "USD-SWAPTION-NORMAL-VOL-STEP": {
             "success": true,
@@ -6504,6 +6594,7 @@
               "clamped_target_points": "0",
               "failed_buckets": "0",
               "interpolated_target_points": "6",
+              "residual_units": "quoted_volatility",
               "sabr_extrapolation_policy": "clamp",
               "sabr_parameters_at_bounds": "T=1.000000,tenor=10.000000:rho;T=2.002740,tenor=10.000000:rho",
               "sabr_residual_evaluations": "T=1.000000,tenor=2.000000:130;T=1.000000,tenor=5.000000:210;T=1.000000,tenor=10.000000:160;T=2.002740,tenor=2.000000:175;T=2.002740,tenor=5.000000:165;T=2.002740,tenor=10.000000:160;T=5.002740,tenor=2.000000:180;T=5.002740,tenor=5.000000:140;T=5.002740,tenor=10.000000:140",
@@ -6534,7 +6625,9 @@
             },
             "worst_quote_id": "USD-SWPTN-VOL-20270508-20370511-0.05",
             "worst_quote_residual": 0.0004823709390051117,
-            "success_tolerance": 0.0015
+            "success_tolerance": 0.0015,
+            "solver_method": "per_slice_least_squares",
+            "residual_units": "quoted_volatility"
           }
         },
         "results_meta": {
@@ -7159,7 +7252,6 @@
             "bid_ask_validation": "not_applicable_single_side_quote_schema",
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
-            "method": "plan_execution",
             "raw_residuals": "retained_in_step_reports",
             "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
@@ -7185,7 +7277,9 @@
             "version": "0.10.0"
           },
           "worst_quote_id": "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-175.0:tolerance_ratio",
-          "worst_quote_residual": 0.6446119164336128
+          "worst_quote_residual": 0.6446119164336128,
+          "solver_method": "plan_execution",
+          "residual_units": "absolute_residual_over_step_tolerance"
         },
         "step_reports": {
           "AAPL-EQUITY-VOL-STEP": {
@@ -7211,6 +7305,7 @@
               "calibrated_expiries": "0.252055,0.504110,1.000000",
               "calibrated_expiry_count": "3",
               "expiry_extrapolation_policy": "clamp",
+              "residual_units": "quoted_volatility",
               "sabr_parameters_at_bounds": "T=0.252055:rho;T=0.504110:rho;T=1.000000:rho",
               "sabr_residual_evaluations": "T=0.252055:188;T=0.504110:167;T=1.000000:196",
               "sabr_winning_iterations": "T=0.252055:10;T=0.504110:9;T=1.000000:11",
@@ -7250,7 +7345,50 @@
             },
             "worst_quote_id": "AAPL-VOL-20261108-175.0",
             "worst_quote_residual": -0.0006446119164336128,
-            "success_tolerance": 0.001
+            "success_tolerance": 0.001,
+            "solver_method": "per_slice_least_squares",
+            "residual_units": "quoted_volatility",
+            "fitted_slices": [
+              {
+                "expiry": 0.25205479452054796,
+                "parameters": {
+                  "sabr": {
+                    "alpha": 3.2969272810246166,
+                    "beta": 0.5,
+                    "nu": 0.40992766370671746,
+                    "rho": -0.99
+                  }
+                },
+                "iterations": 73,
+                "max_relative_quote_error": 0.002503163435507827
+              },
+              {
+                "expiry": 0.5041095890410959,
+                "parameters": {
+                  "sabr": {
+                    "alpha": 3.1612986383186765,
+                    "beta": 0.5,
+                    "nu": 0.4203054407132149,
+                    "rho": -0.99
+                  }
+                },
+                "iterations": 76,
+                "max_relative_quote_error": 0.002685882909898389
+              },
+              {
+                "expiry": 1,
+                "parameters": {
+                  "sabr": {
+                    "alpha": 3.0199191024785716,
+                    "beta": 0.5,
+                    "nu": 0.4370395152931476,
+                    "rho": -0.99
+                  }
+                },
+                "iterations": 106,
+                "max_relative_quote_error": 0.002751689983207155
+              }
+            ]
           },
           "USD-OIS": {
             "success": true,
@@ -7272,6 +7410,7 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -7298,7 +7437,9 @@
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
             "worst_quote_residual": 7.965718396008014e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           }
         },
         "results_meta": {
@@ -7475,7 +7616,6 @@
             "bid_ask_validation": "not_applicable_single_side_quote_schema",
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
-            "method": "plan_execution",
             "raw_residuals": "retained_in_step_reports",
             "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
@@ -7499,7 +7639,9 @@
             },
             "fx_policy_applied": null,
             "version": "0.10.0"
-          }
+          },
+          "solver_method": "plan_execution",
+          "residual_units": "absolute_residual_over_step_tolerance"
         },
         "step_reports": {},
         "results_meta": {
@@ -7690,7 +7832,6 @@
             "bid_ask_validation": "not_applicable_single_side_quote_schema",
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
-            "method": "plan_execution",
             "raw_residuals": "retained_in_step_reports",
             "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
@@ -7714,7 +7855,9 @@
             },
             "fx_policy_applied": null,
             "version": "0.10.0"
-          }
+          },
+          "solver_method": "plan_execution",
+          "residual_units": "absolute_residual_over_step_tolerance"
         },
         "step_reports": {},
         "results_meta": {
@@ -7979,7 +8122,6 @@
             "bid_ask_validation": "not_applicable_single_side_quote_schema",
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
-            "method": "plan_execution",
             "raw_residuals": "retained_in_step_reports",
             "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
@@ -8003,7 +8145,9 @@
             },
             "fx_policy_applied": null,
             "version": "0.10.0"
-          }
+          },
+          "solver_method": "plan_execution",
+          "residual_units": "absolute_residual_over_step_tolerance"
         },
         "step_reports": {},
         "results_meta": {
@@ -9015,7 +9159,6 @@
             "bid_ask_validation": "not_applicable_single_side_quote_schema",
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
-            "method": "plan_execution",
             "raw_residuals": "retained_in_step_reports",
             "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
@@ -9041,7 +9184,9 @@
             "version": "0.10.0"
           },
           "worst_quote_id": "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio",
-          "worst_quote_residual": 0.09439544866398501
+          "worst_quote_residual": 0.09439544866398501,
+          "solver_method": "plan_execution",
+          "residual_units": "absolute_residual_over_step_tolerance"
         },
         "step_reports": {
           "CDX-NA-IG-46": {
@@ -9063,6 +9208,7 @@
               "calibration_type": "hazard_curve",
               "curve_id": "CDX-NA-IG-46",
               "entity": "CDX.NA.IG.46",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -9089,7 +9235,9 @@
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "CDX-IG-46-3Y",
             "worst_quote_residual": 9.808402725205979e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           },
           "CDX-NA-IG-46-BASE-CORR-STEP": {
             "success": true,
@@ -9134,7 +9282,9 @@
             },
             "worst_quote_id": "CDX-IG-46-15-30",
             "worst_quote_residual": -0.00009439544866398501,
-            "success_tolerance": 0.001
+            "success_tolerance": 0.001,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "discounted_upfront_fraction"
           },
           "USD-OIS": {
             "success": true,
@@ -9156,6 +9306,7 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -9182,7 +9333,9 @@
             "model_version": "Multi-curve OIS discounting v1.0",
             "worst_quote_id": "USD-OIS-SWAP-5Y",
             "worst_quote_residual": 7.965718396008014e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           }
         },
         "results_meta": {
@@ -9553,7 +9706,6 @@
             "bid_ask_validation": "not_applicable_single_side_quote_schema",
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
-            "method": "plan_execution",
             "raw_residuals": "retained_in_step_reports",
             "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
@@ -9579,7 +9731,9 @@
             "version": "0.10.0"
           },
           "worst_quote_id": "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio",
-          "worst_quote_residual": 0.00007395574357360601
+          "worst_quote_residual": 0.00007395574357360601,
+          "solver_method": "plan_execution",
+          "residual_units": "absolute_residual_over_step_tolerance"
         },
         "step_reports": {
           "USD-OIS": {
@@ -9602,6 +9756,7 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
+              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -9670,7 +9825,9 @@
             },
             "worst_quote_id": "USD-OIS-SWAP-5Y",
             "worst_quote_residual": -7.395574357360601e-13,
-            "success_tolerance": 1e-8
+            "success_tolerance": 1e-8,
+            "solver_method": "sequential_bootstrap",
+            "residual_units": "pv_per_unit_notional"
           }
         },
         "results_meta": {

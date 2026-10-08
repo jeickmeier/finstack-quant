@@ -1033,7 +1033,7 @@
     "swap": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"interest_rate_swap\",\"spec\":{\"id\":\"IRS-1\",\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"side\":\"pay\",\"fixed_leg\":{\"discount_curve_id\":\"USD-OIS\",\"rate\":\"0.04\",\"frequency\":{\"count\":6,\"unit\":\"months\"},\"day_count\":\"30_360\",\"business_day_convention\":\"modified_following\",\"calendar_id\":null,\"stub\":\"short_front\",\"start\":\"2024-01-15\",\"end\":\"2029-01-15\",\"par_method\":null,\"payment_lag_days\":0,\"end_of_month\":false},\"float_leg\":{\"discount_curve_id\":\"USD-OIS\",\"forward_curve_id\":\"USD-SOFR-3M\",\"spread_bp\":\"0\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"business_day_convention\":\"modified_following\",\"calendar_id\":null,\"stub\":\"short_front\",\"reset_lag_days\":0,\"fixing_calendar_id\":null,\"start\":\"2024-01-15\",\"end\":\"2029-01-15\",\"compounding\":\"simple\",\"payment_lag_days\":0,\"end_of_month\":false},\"adjust_fixed_accrual_dates\":false,\"adjust_float_accrual_dates\":false,\"attributes\":{}}}}",
     "price": 91153.2666429046,
     "dv01": 4798.288799512549,
-    "result_json": "{\"schema_version\":1,\"instrument_id\":\"IRS-1\",\"as_of\":\"2024-01-15\",\"value\":{\"amount\":\"91153.2666429046\",\"currency\":\"USD\"},\"measures\":{\"dv01\":4798.288799512549},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002024-01-15T00:00:00.000000000Z\",\"version\":\"0.10.0\"},\"covenants\":null}",
+    "result_json": "{\"schema_version\":1,\"instrument_id\":\"IRS-1\",\"as_of\":\"2024-01-15\",\"value\":{\"amount\":\"91153.2666429046\",\"currency\":\"USD\"},\"measures\":{\"dv01\":4798.288799512549},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002024-01-15T00:00:00.000000000Z\",\"version\":\"0.10.0\"},\"covenants\":null,\"provenance\":{\"model\":\"discounting\",\"requested_as_of\":\"2024-01-15\",\"market_dependencies\":{\"curves\":{\"discount_curves\":[\"USD-OIS\"],\"forward_curves\":[\"USD-SOFR-3M\"],\"credit_curves\":[],\"inflation_curves\":[]},\"market_scalar_ids\":[],\"volatility_dependencies\":[],\"fx_pairs\":[],\"series_ids\":[\"FIXING:USD-SOFR-3M\"]},\"sensitivity_bumps\":{\"rate_bump_bp\":1.0,\"credit_spread_bump_bp\":1.0,\"spot_bump_decimal\":0.01,\"vol_bump_decimal\":0.01}}}",
     "price_decimal": "91153.2666429046",
     "get_metric": 4798.288799512549,
     "metric_keys": ["dv01"],
@@ -5445,7 +5445,10 @@
         "CovenantReport",
         "CreditDerivativeValuationDetails",
         "ExplanationTrace",
+        "FxPair",
         "FxValuationDetails",
+        "InstrumentCurves",
+        "MarketDependencies",
         "ModelKey",
         "MonteCarloValuationDetails",
         "PositiveF64Wire",
@@ -5456,13 +5459,16 @@
         "RoundingContext",
         "RoundingMode",
         "SchemaVersion",
+        "SensitivityBumps",
         "StochasticPricingResult",
         "StructuredCreditPricingMode",
         "ToleranceConfig",
         "TraceEntry",
         "TranchePricingResult",
         "TrancheSeniority",
-        "ValuationDetails"
+        "ValuationDetails",
+        "ValuationProvenance",
+        "VolatilityDependency"
       ]
     }
   }

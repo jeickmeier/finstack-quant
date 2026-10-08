@@ -4,6 +4,18 @@
   "additionalProperties": false,
   "description": "Outcome of a `goal_seek` solve.",
   "properties": {
+    "converged": {
+      "default": false,
+      "description": "Whether `|residual| <= tolerance`.\n\n[`goal_seek`] returns an error instead of a result when the residual\ncheck fails, so every result it produces has `converged == true`;\n`false` only for a result read from JSON written before this field\nexisted.",
+      "type": "boolean"
+    },
+    "evaluations": {
+      "default": 0,
+      "description": "Number of model evaluations the solve used: every objective probe by\nthe root finder (bracket search and Brent iterations, including a\nwidened second attempt when the sign-constrained one fails) plus the\nfinal residual check. Zero only for a result read from JSON written\nbefore this field existed.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
     "model": {
       "anyOf": [
         {
@@ -15,8 +27,20 @@
       ],
       "description": "Copy of the input model with `solved_value` written into the driver\nnode at the driver period, re-validated; `None` when `update_model`\nwas `false`."
     },
+    "residual": {
+      "default": 0.0,
+      "description": "Signed residual at `solved_value`: the target node's value in the\ntarget period minus the requested target, in the target node's units.\n\nRe-evaluated on the model after the solver returned, so it is the\nresidual of the reported driver value, not the solver's last iterate.",
+      "format": "double",
+      "type": "number"
+    },
     "solved_value": {
       "description": "Driver value, in the driver node's own units (the currency amount for\na monetary node), that brings the target node to the target value\nwithin tolerance.",
+      "format": "double",
+      "type": "number"
+    },
+    "tolerance": {
+      "default": 0.0,
+      "description": "Absolute acceptance tolerance on `residual`, in the target node's\nunits: `1e-9 * max(|target_value|, 1)`.",
       "format": "double",
       "type": "number"
     }

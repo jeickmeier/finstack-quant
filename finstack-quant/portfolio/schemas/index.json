@@ -245,7 +245,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_result.schema.json",
-      "bytes": 42854,
+      "bytes": 43826,
       "kind": "output",
       "path": "schemas/portfolio/1/portfolio_result.schema.json",
       "summary": "Complete results from portfolio evaluation.",
@@ -290,7 +290,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/replay_result.schema.json",
-      "bytes": 87601,
+      "bytes": 100627,
       "kind": "output",
       "path": "schemas/portfolio/1/replay_result.schema.json",
       "summary": "Full output of a replay run.",
@@ -299,7 +299,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
-      "bytes": 75026,
+      "bytes": 86396,
       "kind": "output",
       "path": "schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
       "summary": "One ordered result from `scenario_pnl_batch`.",
@@ -308,7 +308,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_view.schema.json",
-      "bytes": 74815,
+      "bytes": 86185,
       "kind": "output",
       "path": "schemas/portfolio/1/scenario_pnl_view.schema.json",
       "summary": "Scenario-P&L view returned by binding surfaces.",
@@ -317,7 +317,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json",
-      "bytes": 80295,
+      "bytes": 92637,
       "kind": "output",
       "path": "schemas/portfolio/1/scenario_revalue_view.schema.json",
       "summary": "Scenario-and-revalue view returned by binding surfaces.",

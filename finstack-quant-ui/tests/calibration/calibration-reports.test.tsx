@@ -96,11 +96,7 @@ it("separates deposit/swap and unlike steps and isolates missing input identitie
     "rate_quote / deposit",
     "rate_quote / swap",
   ]);
-  expect(
-    groups.every(
-      (p) => p.units === "Solver units (quote convention unavailable)",
-    ),
-  ).toBe(true);
+  expect(groups.every((p) => p.units === "pv_per_unit_notional")).toBe(true);
   expect(
     residualPanels("USD-OIS", report).every((p) => p.points.length === 1),
   ).toBe(true);

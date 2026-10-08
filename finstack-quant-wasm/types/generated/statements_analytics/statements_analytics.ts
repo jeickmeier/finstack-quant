@@ -278,6 +278,14 @@ export type ReversionMethod =
       };
     };
 /**
+ * Which evaluation layer produced a statement cell (one node in one period).
+ *
+ * The evaluator resolves every cell by the precedence
+ * `Value > Forecast > Formula`, after the node's optional `where` mask. The
+ * winning layer is recorded per cell in [`StatementResult::node_sources`].
+ */
+export type CellSource = "value" | "forecast" | "formula" | "where_masked";
+/**
  * Category that groups related checks together.
  */
 export type CheckCategory =
@@ -497,6 +505,21 @@ export type NonFiniteF64Wire = number | NonFiniteSentinel;
  * Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.
  */
 export type NonFiniteSentinel = "inf" | "-inf" | "nan";
+/**
+ * Available forecast methods.
+ */
+export type ForecastMethod =
+  | "forward_fill"
+  | "growth_pct"
+  | "curve_pct"
+  | "normal"
+  | "log_normal"
+  | "override"
+  | "time_series"
+  | "seasonal"
+  | "fade_to_target"
+  | "mean_reverting"
+  | "bootstrap";
 /**
  * Node computation type.
  *
@@ -1043,6 +1066,46 @@ export interface CeclResult {
   [k: string]: unknown;
 }
 /**
+ * The two numbers a check compared, and the tolerance it allowed.
+ *
+ * Recorded for every numeric comparison a check performs — whether it passed
+ * or failed — so the verdict can be reconstructed from exported data:
+ * the comparison fails exactly when `|actual - expected| > tolerance`.
+ *
+ * `actual`, `expected` and `tolerance` are all in the units of the compared
+ * nodes (currency units for monetary nodes, the same units as
+ * [`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not
+ * a fraction or percentage.
+ */
+export interface CheckComparison {
+  /**
+   * Observed (left-hand) value, in the compared nodes' units.
+   */
+  actual: number;
+  /**
+   * Value the identity requires (right-hand side), in the same units.
+   */
+  expected: number;
+  /**
+   * Stable snake_case name of the identity that was tested (for example
+   * `"balance_sheet_articulation"` or `"cash_flow_components"`); a check
+   * that tests several identities per period uses a distinct label for each.
+   */
+  identity: string;
+  /**
+   * Period the comparison was evaluated for, if it is period-specific.
+   */
+  period?: string | null;
+  /**
+   * Absolute tolerance applied to `|actual - expected|`, in the same units.
+   * This is the effective tolerance: the per-check override when one is
+   * configured, otherwise
+   * `max(default_tolerance, default_relative_tolerance * |reference|)`.
+   */
+  tolerance: number;
+  [k: string]: unknown;
+}
+/**
  * Configuration parameters that govern check execution.
  *
  * Identity checks trigger a finding when
@@ -1093,6 +1156,14 @@ export interface CheckFinding {
    * Identifier of the check that produced this finding.
    */
   check_id: string;
+  /**
+   * The failed numeric comparison behind this finding (actual, expected and
+   * tolerance). `None` for findings that do not compare two numbers:
+   * skipped periods, missing or non-finite inputs, sign-convention
+   * warnings, and formula checks without a tolerance (a formula check
+   * with a tolerance compares its value against zero).
+   */
+  comparison?: CheckComparison | null;
   /**
    * Materiality context, if applicable.
    */
@@ -1168,6 +1239,16 @@ export interface CheckResult {
    * Human-readable name of the check.
    */
   check_name: string;
+  /**
+   * Every numeric comparison the check evaluated, passing and failing
+   * alike, in evaluation order. A passing check therefore still reports
+   * the actual value, expected value and tolerance it was judged on.
+   * Unlike `findings`, this list is not reduced by the suite's
+   * `min_severity` / `materiality_threshold` reporting filters. Empty for
+   * checks that do not compare two numbers, for periods a check skipped,
+   * and for reports serialized before this field existed.
+   */
+  comparisons?: CheckComparison[];
   /**
    * Individual findings produced by the check.
    */
@@ -1576,6 +1657,21 @@ export interface CorporateValuationResult {
    */
   enterprise_value: Money;
   /**
+   * EV-to-equity bridge whose net adjustment is
+   * [`net_debt`](Self::net_debt): gross debt (`total_debt`) and `cash`
+   * separately, plus preferred equity, minority interest, non-operating
+   * assets and other adjustments, all in the model currency.
+   *
+   * `net_debt = total_debt - cash + preferred_equity + minority_interest -
+   * non_operating_assets - Σ other_adjustments`, so `total_debt - cash`
+   * equals `net_debt` whenever the remaining components are zero (always
+   * the case unless `DcfOptions::equity_bridge` supplies them). Under a
+   * flat `net_debt_override` the override is reported as `total_debt` with
+   * `cash` zero. `None` only for a result deserialized from JSON written
+   * before this field existed.
+   */
+  equity_bridge?: EquityBridge | null;
+  /**
    * Equity value (EV - Net Debt, after discounts)
    */
   equity_value: Money;
@@ -1587,6 +1683,47 @@ export interface CorporateValuationResult {
    * Net debt (or effective bridge amount) used in calculation
    */
   net_debt: Money;
+  /**
+   * One row per explicit forecast period that was discounted, in date
+   * order: the free cash flow, its discounting tenor and factor, and its
+   * present value.
+   *
+   * The `present_value` column sums to [`pv_explicit`](Self::pv_explicit),
+   * and that sum plus [`terminal_value_pv`](Self::terminal_value_pv) is
+   * [`enterprise_value`](Self::enterprise_value). Rows carry unrounded
+   * `f64` amounts while the `Money` totals are rounded to the currency's
+   * minor unit, so the reconciliation holds to within one minor unit.
+   * Empty only for a result deserialized from JSON written before this
+   * field existed.
+   */
+  periods?: DcfPeriodRow[];
+  /**
+   * Present value of the explicit forecast flows: the sum of
+   * `periods[i].present_value`.
+   *
+   * `None` only for a result deserialized from JSON written before this
+   * field existed.
+   */
+  pv_explicit?: Money | null;
+  /**
+   * Discounting tenor of the terminal value in years (ACT/365.25 from the
+   * valuation date to the last explicit flow date).
+   *
+   * An exit-multiple terminal value always uses the full tenor; a
+   * growth-perpetuity terminal value uses the mid-year-adjusted tenor when
+   * `DcfOptions::mid_year_convention` is set. `None` only for a result
+   * deserialized from JSON written before this field existed.
+   */
+  terminal_discount_years?: number | null;
+  /**
+   * Terminal value at the horizon date, before discounting to the
+   * valuation date.
+   *
+   * `terminal_value / (1 + wacc)^terminal_discount_years` is
+   * [`terminal_value_pv`](Self::terminal_value_pv). `None` only for a
+   * result deserialized from JSON written before this field existed.
+   */
+  terminal_value?: Money | null;
   /**
    * Terminal value (present value)
    */
@@ -1600,7 +1737,89 @@ export interface CorporateValuationResult {
    * the reported equity value.
    */
   valuation_discount: Money;
+  /**
+   * Discount rate (WACC) applied to every explicit flow and to the
+   * terminal value, as an annually compounded decimal (`0.10` = 10%).
+   *
+   * `None` only for a result deserialized from JSON written before this
+   * field existed.
+   */
+  wacc?: number | null;
   [k: string]: unknown;
+}
+/**
+ * Structured equity bridge for converting Enterprise Value to Equity Value.
+ *
+ * Standard professional bridge:
+ * ```text
+ * Equity = EV - Total Debt + Cash - Preferred Equity - Minority Interest
+ *          + Non-Operating Assets + Σ(other adjustments)
+ * ```
+ *
+ * Every [`DiscountedCashFlow`] carries one; a flat net-debt deduction is
+ * written as `EquityBridge { total_debt, cash, ..Default::default() }`.
+ */
+export interface EquityBridge {
+  /**
+   * Cash and cash equivalents.
+   */
+  cash?: number;
+  /**
+   * Non-controlling (minority) interests.
+   */
+  minority_interest?: number;
+  /**
+   * Non-operating assets (excess cash, investments, real estate, etc.).
+   */
+  non_operating_assets?: number;
+  /**
+   * Named adjustments (e.g., unfunded pension, contingent liabilities).
+   * Positive values increase equity; negative values decrease it.
+   */
+  other_adjustments?: [unknown, unknown][];
+  /**
+   * Preferred stock at liquidation preference.
+   */
+  preferred_equity?: number;
+  /**
+   * Total interest-bearing debt.
+   */
+  total_debt?: number;
+}
+/**
+ * One explicit forecast period of a DCF: the flow and how it was discounted.
+ *
+ * Amounts are unrounded `f64` values in the model currency of the owning
+ * [`CorporateValuationResult`].
+ */
+export interface DcfPeriodRow {
+  /**
+   * Date the flow is discounted from: the last day of the period.
+   */
+  date: DateWire;
+  /**
+   * Discount factor `(1 + wacc)^-discount_years` (unitless).
+   */
+  discount_factor: number;
+  /**
+   * Discounting tenor in years: ACT/365.25 from the valuation date to
+   * `date`, less half the average flow spacing (floored at zero) under the
+   * mid-year convention.
+   */
+  discount_years: number;
+  /**
+   * Unlevered free cash flow of the period, in the model currency.
+   */
+  free_cash_flow: number;
+  /**
+   * Statement period the flow was read from.
+   */
+  period_id: PeriodId;
+  /**
+   * Present value `free_cash_flow / (1 + wacc)^discount_years`, in the
+   * model currency.
+   */
+  present_value: number;
 }
 /**
  * Optional DCF, coverage, check-suite, valuation-date and LTV settings of the corporate analysis pipeline.
@@ -1849,45 +2068,6 @@ export interface DcfOptions {
    * [`DcfOptions::wacc_denominator_epsilon`].
    */
   wacc_sensitivity_bump?: number;
-}
-/**
- * Structured equity bridge for converting Enterprise Value to Equity Value.
- *
- * Standard professional bridge:
- * ```text
- * Equity = EV - Total Debt + Cash - Preferred Equity - Minority Interest
- *          + Non-Operating Assets + Σ(other adjustments)
- * ```
- *
- * Every [`DiscountedCashFlow`] carries one; a flat net-debt deduction is
- * written as `EquityBridge { total_debt, cash, ..Default::default() }`.
- */
-export interface EquityBridge {
-  /**
-   * Cash and cash equivalents.
-   */
-  cash?: number;
-  /**
-   * Non-controlling (minority) interests.
-   */
-  minority_interest?: number;
-  /**
-   * Non-operating assets (excess cash, investments, real estate, etc.).
-   */
-  non_operating_assets?: number;
-  /**
-   * Named adjustments (e.g., unfunded pension, contingent liabilities).
-   * Positive values increase equity; negative values decrease it.
-   */
-  other_adjustments?: [unknown, unknown][];
-  /**
-   * Preferred stock at liquidation preference.
-   */
-  preferred_equity?: number;
-  /**
-   * Total interest-bearing debt.
-   */
-  total_debt?: number;
 }
 /**
  * Valuation discounts for private company equity.
@@ -2496,7 +2676,18 @@ export interface EffectiveTaxRateCheck {
  */
 export interface Explanation {
   /**
-   * Breakdown of calculation components
+   * Components of the formula with the values they resolved to in this
+   * period, including `cs.<component>.<instrument_or_total>`
+   * capital-structure references.
+   *
+   * Populated only when the formula produced the value (`source` is
+   * `formula`, or unknown). Empty when `source` is `value`, `forecast` or
+   * `where_masked`: the formula was not evaluated, and `source` /
+   * `forecast` describe where the value came from. When the formula is a
+   * pure sum/difference of references there is one step per term, in
+   * formula order, each with `operation` `"+"` or `"-"`, and the signed
+   * values sum to `final_value`. For any other formula each referenced
+   * component is listed once with `operation` unset.
    */
   breakdown: ExplanationStep[];
   /**
@@ -2505,7 +2696,14 @@ export interface Explanation {
    */
   final_value: NonFiniteF64Wire;
   /**
-   * Formula text (if calculated)
+   * The node's forecast specification (method and parameters) when
+   * `source` is `forecast`; `None` for every other source.
+   */
+  forecast?: ForecastSpec | null;
+  /**
+   * Formula text (if calculated). Present whenever the node has a
+   * formula, including when `source` shows that an explicit value or a
+   * forecast took precedence over it.
    */
   formula_text?: string | null;
   /**
@@ -2520,6 +2718,17 @@ export interface Explanation {
    * Period being explained
    */
   period_id: PeriodId;
+  /**
+   * Evaluation layer that produced `final_value` under the
+   * `Value > Forecast > Formula` precedence: `value` (the explicit value
+   * stored on the node), `forecast`, `formula`, or `where_masked` (the
+   * node's `where` clause zeroed the cell).
+   *
+   * Read from [`StatementResult::node_sources`]; `None` when the results
+   * carry no source for the cell (hand-built results, or results or
+   * explanations serialized before sources were recorded).
+   */
+  source?: CellSource | null;
   [k: string]: unknown;
 }
 /**
@@ -2531,7 +2740,11 @@ export interface ExplanationStep {
    */
   component: string;
   /**
-   * Operation applied (e.g., "+", "-", "*", "/")
+   * Sign with which the component enters the formula: `"+"` or `"-"`.
+   *
+   * Set only when the formula is a pure sum/difference of references, in
+   * which case the signed step values sum to the explained value; unset
+   * for any other formula.
    */
   operation?: string | null;
   /**
@@ -2540,6 +2753,23 @@ export interface ExplanationStep {
    */
   value: NonFiniteF64Wire;
   [k: string]: unknown;
+}
+/**
+ * Forecast method specification.
+ *
+ * Defines how to forecast future values for a node.
+ */
+export interface ForecastSpec {
+  /**
+   * Forecast method
+   */
+  method: ForecastMethod;
+  /**
+   * Method-specific parameters
+   */
+  params?: {
+    [k: string]: unknown;
+  };
 }
 /**
  * A single credit exposure for ECL computation.
@@ -2839,17 +3069,47 @@ export interface FreeRentWindowSpec {
  */
 export interface GoalSeekResult {
   /**
+   * Whether `|residual| <= tolerance`.
+   *
+   * [`goal_seek`] returns an error instead of a result when the residual
+   * check fails, so every result it produces has `converged == true`;
+   * `false` only for a result read from JSON written before this field
+   * existed.
+   */
+  converged?: boolean;
+  /**
+   * Number of model evaluations the solve used: every objective probe by
+   * the root finder (bracket search and Brent iterations, including a
+   * widened second attempt when the sign-constrained one fails) plus the
+   * final residual check. Zero only for a result read from JSON written
+   * before this field existed.
+   */
+  evaluations?: number;
+  /**
    * Copy of the input model with `solved_value` written into the driver
    * node at the driver period, re-validated; `None` when `update_model`
    * was `false`.
    */
   model?: statements.FinancialModelSpec | null;
   /**
+   * Signed residual at `solved_value`: the target node's value in the
+   * target period minus the requested target, in the target node's units.
+   *
+   * Re-evaluated on the model after the solver returned, so it is the
+   * residual of the reported driver value, not the solver's last iterate.
+   */
+  residual?: number;
+  /**
    * Driver value, in the driver node's own units (the currency amount for
    * a monetary node), that brings the target node to the target value
    * within tolerance.
    */
   solved_value: number;
+  /**
+   * Absolute acceptance tolerance on `residual`, in the target node's
+   * units: `1e-9 * max(|target_value|, 1)`.
+   */
+  tolerance?: number;
 }
 /**
  * Flags line items whose period-over-period growth exceeds configurable upper / lower bounds.

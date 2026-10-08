@@ -12,6 +12,20 @@
             "null"
           ]
         },
+        "jacobian": {
+          "description": "Finite-difference Jacobian of the residuals at the solution.\n\n`jacobian[i][j]` is the derivative of the residual of quote `i` with\nrespect to solved parameter `j`: rows follow [`Self::per_quote`] order,\ncolumns follow the solved parameters in knot order (for curve targets,\nthe knot values at increasing knot times). Entries are in the report's\nresidual units per unit of the solved parameter, and are unweighted;\n[`Self::condition_number`] is computed from this matrix with the\nresidual weights applied. `per_quote[i].sensitivity` equals\n`max_j |jacobian[i][j]|`.\n\nPresent only for global (simultaneous) solves in which every parameter\nbump could be priced. Absent for sequential bootstraps, which solve one\nknot per quote and build no full Jacobian.",
+          "items": {
+            "items": {
+              "format": "double",
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "max_residual": {
           "description": "Maximum absolute residual across all quotes.",
           "format": "double",
@@ -24,29 +38,10 @@
           },
           "type": "array"
         },
-        "r_squared": {
-          "description": "Coefficient of determination (R-squared) for the fit.\n\nValues close to 1.0 indicate a good fit. Only meaningful when\ntarget values have meaningful variance.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "rms_residual": {
           "description": "Root mean square residual across all quotes.",
           "format": "double",
           "type": "number"
-        },
-        "singular_values": {
-          "description": "Singular values of the Jacobian matrix (if computed).\n\nUseful for diagnosing rank deficiency and understanding which\nparameter directions are well-determined vs poorly-determined.",
-          "items": {
-            "format": "double",
-            "type": "number"
-          },
-          "type": [
-            "array",
-            "null"
-          ]
         }
       },
       "required": [
@@ -86,6 +81,13 @@
           ],
           "description": "Optional detailed trace of the calibration steps (enabled via config)."
         },
+        "fitted_slices": {
+          "description": "Smile parameters fitted per quoted expiry, in increasing expiry order.\n\nPopulated by the equity SABR (`vol_surface`) and SVI (`svi_surface`)\nsurface calibrators, whose gridded output surface does not retain the\nfitted parameters. Empty for every other calibrator, including the\nswaption SABR cube, which stores its node parameters on the cube.",
+          "items": {
+            "$ref": "#/$defs/FittedSlice"
+          },
+          "type": "array"
+        },
         "iterations": {
           "description": "Number of solver iterations or function evaluations.",
           "format": "uint",
@@ -123,6 +125,17 @@
           "description": "Final objective function value (usually RMSE).",
           "format": "double",
           "type": "number"
+        },
+        "residual_units": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResidualUnits"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Units of [`Self::residuals`], [`Self::max_residual`] and [`Self::rmse`].\n\nSet by every calibrator in this crate and mirrored as the\n`residual_units` entry of [`Self::metadata`]. `None` only on reports\nbuilt directly through [`Self::new`] or\n[`Self::for_type_with_tolerance`] without a solver, and on JSON\nwritten before this field existed."
         },
         "residuals": {
           "additionalProperties": {
@@ -171,6 +184,17 @@
             "tolerance": 1e-12
           },
           "description": "Solver configuration used during this calibration run."
+        },
+        "solver_method": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SolverMethod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Numerical procedure that produced this report.\n\nSet by every calibrator in this crate. `None` only on reports built\ndirectly through [`Self::new`] or [`Self::for_type_with_tolerance`]\nwithout a solver, and on JSON written before this field existed."
         },
         "success": {
           "description": "User-facing success flag. True only if both fitting and validation passed.",
@@ -260,6 +284,20 @@
       "const": "finstack_quant.calibration/1",
       "description": "Exact schema marker accepted by calibration envelopes.",
       "type": "string"
+    },
+    "ClosedUnitIntervalF64Wire": {
+      "description": "Finite JSON number in the closed interval `[0, 1]`.",
+      "format": "double",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "type": "number"
+    },
+    "CorrelationWire": {
+      "description": "Finite correlation coefficient in the closed interval `[-1, 1]`.",
+      "format": "double",
+      "maximum": 1.0,
+      "minimum": -1.0,
+      "type": "number"
     },
     "CreditIndexState": {
       "additionalProperties": false,
@@ -1267,6 +1305,72 @@
         }
       ]
     },
+    "FittedSlice": {
+      "additionalProperties": false,
+      "description": "Parameters a surface calibrator fitted to the quotes of one expiry.\n\nThe SABR and SVI surface calibrators fit one smile per quoted expiry and\nthen sample those smiles onto the surface's target grid. The gridded\nsurface keeps only the sampled volatilities, so the fitted parameters are\nrecorded here, one entry per quoted expiry in increasing expiry order.",
+      "properties": {
+        "expiry": {
+          "description": "Expiry of the quotes this slice was fitted to, as an Act/365F year\nfraction from the calibration base date. This is a quoted expiry, not\nnecessarily a node of the surface's target expiry grid.",
+          "format": "double",
+          "type": "number"
+        },
+        "iterations": {
+          "description": "Solver iterations spent on this slice (all attempted starts for SABR).\nThe slice iterations sum to [`CalibrationReport::iterations`].",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_relative_quote_error": {
+          "description": "Largest `|model − market| / market` volatility error of the fitted\nsmile over this slice's quotes, as a decimal fraction of the quoted\nvolatility (`1e-4` is 0.01%). It measures the smile fit itself; the\nreport's residuals measure the gridded surface instead.\n\nPresent for SABR slices. Absent for SVI slices, whose fit reports no\nper-slice error.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "parameters": {
+          "$ref": "#/$defs/FittedSliceParameters",
+          "description": "Fitted model parameters for this expiry."
+        }
+      },
+      "required": [
+        "expiry",
+        "parameters",
+        "iterations"
+      ],
+      "type": "object"
+    },
+    "FittedSliceParameters": {
+      "description": "Smile-model parameters fitted to one expiry slice of a volatility surface.\n\nThe wire form is externally tagged by model: `{\"sabr\": {...}}` or\n`{\"svi\": {...}}`.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "SABR parameters (`alpha`, `beta`, `nu`, `rho` and the optional\ndisplacement `shift`).",
+          "properties": {
+            "sabr": {
+              "$ref": "#/$defs/SabrParameters"
+            }
+          },
+          "required": [
+            "sabr"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Raw SVI total-variance parameters (`a`, `b`, `rho`, `m`, `sigma`) in\nlog-moneyness `ln(K / F)`.",
+          "properties": {
+            "svi": {
+              "$ref": "#/$defs/SviParams"
+            }
+          },
+          "required": [
+            "svi"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "ForwardCurveTransform": {
       "additionalProperties": false,
       "properties": {
@@ -2053,6 +2157,12 @@
         }
       ]
     },
+    "NonNegativeF64Wire": {
+      "description": "Finite JSON number greater than or equal to zero.",
+      "format": "double",
+      "minimum": 0.0,
+      "type": "number"
+    },
     "ParInterp": {
       "description": "Interpolation method for reporting par spreads stored on the curve.\n\nApplies only to *par-spread* readouts (the spreads quoted at calibration\npillars), not to the underlying hazard rates. Hazard interpolation always\nfollows piecewise-constant survival. Use `LogLinear` when spreads span\nmultiple decades (e.g. high-yield issuers) so interpolation stays in\nlog-space; otherwise the default `Linear` is fine.",
       "oneOf": [
@@ -2573,6 +2683,31 @@
       ],
       "type": "object"
     },
+    "ResidualUnits": {
+      "description": "Units of the residuals in [`CalibrationReport::residuals`],\n[`CalibrationReport::max_residual`] and [`CalibrationReport::rmse`].\n\nThe wire form is the snake_case variant name (for example\n`\"pv_per_unit_notional\"`).",
+      "oneOf": [
+        {
+          "const": "pv_per_unit_notional",
+          "description": "Present value of the quote's calibration instrument on the calibrated\ncurve, divided by the target's residual notional: a dimensionless\nfraction of notional (`1e-4` is one basis point of notional). Used by\nthe discount, forward, hazard, inflation, cross-currency basis and\nparametric curve targets.",
+          "type": "string"
+        },
+        {
+          "const": "quoted_volatility",
+          "description": "Model-implied volatility minus quoted volatility, in the quote's own\nvolatility convention and decimal units (`0.01` is one volatility\npoint for lognormal quotes; normal quotes are in rate units).",
+          "type": "string"
+        },
+        {
+          "const": "discounted_upfront_fraction",
+          "description": "Discounted tranche present value divided by the tranche notional: the\nupfront error as a decimal fraction of tranche notional.",
+          "type": "string"
+        },
+        {
+          "const": "absolute_residual_over_step_tolerance",
+          "description": "`|residual| / step_tolerance`, dimensionless. Used by the plan-level\nreport, whose residual map pools steps with different native units.",
+          "type": "string"
+        }
+      ]
+    },
     "ResultsMeta": {
       "description": "Metadata bundle that accompanies valuation outputs.\n\nThe metadata is intentionally small so it can be attached to reports and\ndownstream data stores for reproducibility and audit trails.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{results_meta, FinstackConfig, NUMERIC_MODE_F64};\n\nlet meta = results_meta(&FinstackConfig::default());\nassert_eq!(meta.numeric_mode, NUMERIC_MODE_F64);\nassert!(meta.timestamp.is_none()); // deterministic by default\n```",
       "properties": {
@@ -2732,6 +2867,46 @@
       ],
       "type": "object"
     },
+    "SabrParameters": {
+      "additionalProperties": false,
+      "description": "SABR model parameters",
+      "properties": {
+        "alpha": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "description": "Initial volatility (alpha)"
+        },
+        "beta": {
+          "$ref": "#/$defs/ClosedUnitIntervalF64Wire",
+          "description": "CEV exponent (beta) - typically 0 to 1"
+        },
+        "nu": {
+          "$ref": "#/$defs/NonNegativeF64Wire",
+          "description": "Volatility of volatility (nu/volvol)"
+        },
+        "rho": {
+          "$ref": "#/$defs/CorrelationWire",
+          "description": "Correlation between asset and volatility (rho)"
+        },
+        "shift": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PositiveF64Wire"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Shift parameter for handling negative rates (optional)"
+        }
+      },
+      "required": [
+        "alpha",
+        "beta",
+        "nu",
+        "rho"
+      ],
+      "type": "object"
+    },
     "ScalarTimeSeries": {
       "additionalProperties": false,
       "description": "Date-indexed time series with flexible interpolation.\n\nProvides lightweight storage for historical or forecast data with step or\nlinear interpolation. Unlike full term structures, this is optimized for\nsparse, irregularly-spaced observations.\n\n# Storage\n\nUses columnar format with parallel arrays:\n- Dates stored as i32 (days since Unix epoch) for compact size\n- Values stored as f64\n- Binary search for O(log n) lookup\n\n# Interpolation\n\n- **Step**: Last observation carried forward (LOCF)\n- **Linear**: Linear interpolation between observations\n\n# Use Cases\n\n- **Economic indicators**: GDP, unemployment rate, PMI\n- **Credit metrics**: Historical credit spreads, CDS levels\n- **Commodity fundamentals**: Inventory levels, production data\n- **Any sparse time series**: Where full curve infrastructure is overkill\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"US-UNEMPLOYMENT\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 31).expect(\"Valid date\"), 3.7),\n        (Date::from_calendar_date(2024, Month::February, 29).expect(\"Valid date\"), 3.9),\n    ],\n    None,\n)\n.expect(\"Series creation should succeed\")\n.with_interpolation(SeriesInterpolation::Linear);\n\nlet mid = Date::from_calendar_date(2024, Month::February, 14).expect(\"Valid date\");\nlet interpolated = series.value_on(mid).expect(\"Value lookup should succeed\");\nassert!(interpolated > 3.7 && interpolated < 3.9);\n```",
@@ -2847,6 +3022,80 @@
           "type": "number"
         }
       },
+      "type": "object"
+    },
+    "SolverMethod": {
+      "description": "Numerical procedure that produced a [`CalibrationReport`].\n\nThe wire form is the snake_case variant name (for example\n`\"sequential_bootstrap\"`).",
+      "oneOf": [
+        {
+          "const": "sequential_bootstrap",
+          "description": "Knots solved one at a time in maturity order, each by a bracketed\none-dimensional root find on its own quote (curve bootstraps and the\npiecewise Hull-White volatility bootstrap).",
+          "type": "string"
+        },
+        {
+          "const": "global_fit_lm_weighted_lsq",
+          "description": "All parameters solved simultaneously by weighted Levenberg-Marquardt\nleast squares over every quote.",
+          "type": "string"
+        },
+        {
+          "const": "per_slice_least_squares",
+          "description": "One independent least-squares smile fit per expiry (or per\nexpiry/tenor bucket), as used by the SABR and SVI surface calibrators.",
+          "type": "string"
+        },
+        {
+          "const": "scalar_root_find",
+          "description": "A single scalar parameter solved by a bracketed one-dimensional root\nfind (Student-t degrees of freedom).",
+          "type": "string"
+        },
+        {
+          "const": "scalar_minimization",
+          "description": "A single scalar parameter solved by one-dimensional minimisation of\nthe sum of squared pricing errors (Hull-White volatility at a fixed\nmean reversion).",
+          "type": "string"
+        },
+        {
+          "const": "plan_execution",
+          "description": "Aggregation of the step reports of a calibration plan; no solver ran\nat this level.",
+          "type": "string"
+        }
+      ]
+    },
+    "SviParams": {
+      "additionalProperties": false,
+      "description": "SVI (Stochastic Volatility Inspired) raw parameterization.\n\nRepresents one slice of the volatility surface at a fixed expiry\nusing five parameters that control the shape of the smile.\n\n# Examples\n\n```rust\nuse finstack_quant_models::volatility::svi::SviParams;\n\nlet params = SviParams {\n    a: 0.04, b: 0.4, rho: -0.4, m: 0.0, sigma: 0.1,\n};\nparams.validate().expect(\"valid SVI params\");\n\nlet w = params.total_variance(0.0); // ATM total variance\nassert!(w > 0.0);\n\nlet vol = params.implied_vol(0.0, 1.0).expect(\"valid checked inputs\"); // ATM implied vol at T=1\nassert!(vol > 0.0);\n```",
+      "properties": {
+        "a": {
+          "description": "Overall variance level.",
+          "format": "double",
+          "type": "number"
+        },
+        "b": {
+          "description": "Slope of the wings.",
+          "format": "double",
+          "type": "number"
+        },
+        "m": {
+          "description": "Translation.",
+          "format": "double",
+          "type": "number"
+        },
+        "rho": {
+          "description": "Rotation / asymmetry parameter.",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma": {
+          "description": "Smoothing parameter.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "rho",
+        "m",
+        "sigma"
+      ],
       "type": "object"
     },
     "ToleranceConfig": {
@@ -3224,13 +3473,13 @@
             "bid_ask_validation": "not_applicable_single_side_quote_schema",
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
-            "method": "plan_execution",
             "raw_residuals": "retained_in_step_reports",
             "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
           "objective_value": 0.0,
+          "residual_units": "absolute_residual_over_step_tolerance",
           "residuals": {},
           "results_meta": {
             "fx_policy_applied": null,
@@ -3253,6 +3502,7 @@
             "max_iterations": 100,
             "tolerance": 1e-12
           },
+          "solver_method": "plan_execution",
           "success": true,
           "validation_passed": true
         },

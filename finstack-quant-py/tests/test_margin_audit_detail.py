@@ -19,6 +19,7 @@ from finstack_quant.margin import (
     ExposureProfile,
     FrtbSensitivities,
     FundingConfig,
+    ImResult,
     ScheduleImCalculator,
     SimmCalculator,
     SimmSensitivities,
@@ -72,7 +73,7 @@ def test_vm_result_exposes_every_step_of_the_call(
     assert row["rounding_increment"] == pytest.approx(result.rounding_increment)
 
 
-def _simm_result():
+def _simm_result() -> ImResult:
     sens = SimmSensitivities("USD")
     sens.add_ir_delta("USD", "5Y", 100_000.0)
     sens.add_ir_delta("USD", "10Y", -60_000.0)

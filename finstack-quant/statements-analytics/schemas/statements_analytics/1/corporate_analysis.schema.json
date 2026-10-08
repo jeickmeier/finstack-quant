@@ -15,6 +15,17 @@
           "$ref": "#/$defs/Money",
           "description": "Enterprise value (PV of all cash flows + terminal value)"
         },
+        "equity_bridge": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EquityBridge"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "EV-to-equity bridge whose net adjustment is\n[`net_debt`](Self::net_debt): gross debt (`total_debt`) and `cash`\nseparately, plus preferred equity, minority interest, non-operating\nassets and other adjustments, all in the model currency.\n\n`net_debt = total_debt - cash + preferred_equity + minority_interest -\nnon_operating_assets - Σ other_adjustments`, so `total_debt - cash`\nequals `net_debt` whenever the remaining components are zero (always\nthe case unless `DcfOptions::equity_bridge` supplies them). Under a\nflat `net_debt_override` the override is reported as `total_debt` with\n`cash` zero. `None` only for a result deserialized from JSON written\nbefore this field existed."
+        },
         "equity_value": {
           "$ref": "#/$defs/Money",
           "description": "Equity value (EV - Net Debt, after discounts)"
@@ -31,6 +42,43 @@
           "$ref": "#/$defs/Money",
           "description": "Net debt (or effective bridge amount) used in calculation"
         },
+        "periods": {
+          "description": "One row per explicit forecast period that was discounted, in date\norder: the free cash flow, its discounting tenor and factor, and its\npresent value.\n\nThe `present_value` column sums to [`pv_explicit`](Self::pv_explicit),\nand that sum plus [`terminal_value_pv`](Self::terminal_value_pv) is\n[`enterprise_value`](Self::enterprise_value). Rows carry unrounded\n`f64` amounts while the `Money` totals are rounded to the currency's\nminor unit, so the reconciliation holds to within one minor unit.\nEmpty only for a result deserialized from JSON written before this\nfield existed.",
+          "items": {
+            "$ref": "#/$defs/DcfPeriodRow"
+          },
+          "type": "array"
+        },
+        "pv_explicit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present value of the explicit forecast flows: the sum of\n`periods[i].present_value`.\n\n`None` only for a result deserialized from JSON written before this\nfield existed."
+        },
+        "terminal_discount_years": {
+          "description": "Discounting tenor of the terminal value in years (ACT/365.25 from the\nvaluation date to the last explicit flow date).\n\nAn exit-multiple terminal value always uses the full tenor; a\ngrowth-perpetuity terminal value uses the mid-year-adjusted tenor when\n`DcfOptions::mid_year_convention` is set. `None` only for a result\ndeserialized from JSON written before this field existed.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "terminal_value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Terminal value at the horizon date, before discounting to the\nvaluation date.\n\n`terminal_value / (1 + wacc)^terminal_discount_years` is\n[`terminal_value_pv`](Self::terminal_value_pv). `None` only for a\nresult deserialized from JSON written before this field existed."
+        },
         "terminal_value_pv": {
           "$ref": "#/$defs/Money",
           "description": "Terminal value (present value)"
@@ -38,6 +86,14 @@
         "valuation_discount": {
           "$ref": "#/$defs/Money",
           "description": "Total valuation discount (DLOM, DLOC, other) deducted after the\nEV-to-equity bridge; zero when `DcfOptions::valuation_discounts` is unset.\n\n`enterprise_value - net_debt - valuation_discount` equals\n`equity_value`, so a bridge built from these three steps reconciles to\nthe reported equity value."
+        },
+        "wacc": {
+          "description": "Discount rate (WACC) applied to every explicit flow and to the\nterminal value, as an annually compounded decimal (`0.10` = 10%).\n\n`None` only for a result deserialized from JSON written before this\nfield existed.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
@@ -992,10 +1048,113 @@
         }
       ]
     },
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "DcfPeriodRow": {
+      "additionalProperties": false,
+      "description": "One explicit forecast period of a DCF: the flow and how it was discounted.\n\nAmounts are unrounded `f64` values in the model currency of the owning\n[`CorporateValuationResult`].",
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Date the flow is discounted from: the last day of the period."
+        },
+        "discount_factor": {
+          "description": "Discount factor `(1 + wacc)^-discount_years` (unitless).",
+          "format": "double",
+          "type": "number"
+        },
+        "discount_years": {
+          "description": "Discounting tenor in years: ACT/365.25 from the valuation date to\n`date`, less half the average flow spacing (floored at zero) under the\nmid-year convention.",
+          "format": "double",
+          "type": "number"
+        },
+        "free_cash_flow": {
+          "description": "Unlevered free cash flow of the period, in the model currency.",
+          "format": "double",
+          "type": "number"
+        },
+        "period_id": {
+          "$ref": "#/$defs/PeriodId",
+          "description": "Statement period the flow was read from."
+        },
+        "present_value": {
+          "description": "Present value `free_cash_flow / (1 + wacc)^discount_years`, in the\nmodel currency.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "period_id",
+        "date",
+        "free_cash_flow",
+        "discount_years",
+        "discount_factor",
+        "present_value"
+      ],
+      "type": "object"
+    },
     "DecimalWire": {
       "description": "Exact decimal encoded only as a JSON string.",
       "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
       "type": "string"
+    },
+    "EquityBridge": {
+      "additionalProperties": false,
+      "description": "Structured equity bridge for converting Enterprise Value to Equity Value.\n\nStandard professional bridge:\n```text\nEquity = EV - Total Debt + Cash - Preferred Equity - Minority Interest\n         + Non-Operating Assets + Σ(other adjustments)\n```\n\nEvery [`DiscountedCashFlow`] carries one; a flat net-debt deduction is\nwritten as `EquityBridge { total_debt, cash, ..Default::default() }`.",
+      "properties": {
+        "cash": {
+          "default": 0.0,
+          "description": "Cash and cash equivalents.",
+          "format": "double",
+          "type": "number"
+        },
+        "minority_interest": {
+          "default": 0.0,
+          "description": "Non-controlling (minority) interests.",
+          "format": "double",
+          "type": "number"
+        },
+        "non_operating_assets": {
+          "default": 0.0,
+          "description": "Non-operating assets (excess cash, investments, real estate, etc.).",
+          "format": "double",
+          "type": "number"
+        },
+        "other_adjustments": {
+          "description": "Named adjustments (e.g., unfunded pension, contingent liabilities).\nPositive values increase equity; negative values decrease it.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "preferred_equity": {
+          "default": 0.0,
+          "description": "Preferred stock at liquidation preference.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_debt": {
+          "default": 0.0,
+          "description": "Total interest-bearing debt.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "type": "object"
     },
     "Money": {
       "additionalProperties": false,

@@ -1481,7 +1481,16 @@
       "zeroRate",
       "zeroRateOnDate"
     ],
-    "getters": ["baseDate", "dayCount", "dfs", "extrapolation", "id", "interpStyle", "knots"]
+    "getters": [
+      "baseDate",
+      "dayCount",
+      "dfs",
+      "extrapolation",
+      "id",
+      "interpStyle",
+      "knots",
+      "rateCalibration"
+    ]
   },
   "core.HazardCurve": {
     "kind": "class",
@@ -1502,6 +1511,7 @@
       "baseDate",
       "currency",
       "dayCount",
+      "hazardCalibration",
       "id",
       "issuer",
       "knotPoints",
@@ -1524,6 +1534,7 @@
       "interpStyle",
       "knots",
       "projectionGrid",
+      "rateCalibration",
       "resetLag",
       "tenor"
     ]
@@ -3598,6 +3609,7 @@
       "InstrumentArtifactCache",
       "Portfolio",
       "PortfolioBuilder",
+      "PortfolioMarginAggregator",
       "aggregateFullCashflows",
       "aggregateMetrics",
       "allocateWeights",
@@ -3682,6 +3694,12 @@
       "free",
       "positionWhatIf"
     ],
+    "getters": []
+  },
+  "portfolio.PortfolioMarginAggregator": {
+    "kind": "class",
+    "statics": ["fromPortfolio"],
+    "methods": ["calculate", "free"],
     "getters": []
   },
   "portfolio.parsePortfolioSpecJson": {

@@ -20,6 +20,42 @@
         }
       ]
     },
+    "FrtbScenarioCharges": {
+      "additionalProperties": false,
+      "description": "Delta, vega and curvature charges by risk class under one correlation scenario.\n\nRisk classes whose charge is zero are omitted, as in the top-level\n[`FrtbSbaResult`] maps. Amounts are in the reporting currency of the\nsensitivities.",
+      "properties": {
+        "curvature_by_risk_class": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Curvature risk charge by risk class under this scenario.",
+          "type": "object"
+        },
+        "delta_by_risk_class": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Delta risk charge by risk class under this scenario.",
+          "type": "object"
+        },
+        "vega_by_risk_class": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Vega risk charge by risk class under this scenario.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "delta_by_risk_class",
+        "vega_by_risk_class",
+        "curvature_by_risk_class"
+      ],
+      "type": "object"
+    },
     "PositiveF64Wire": {
       "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
       "exclusiveMinimum": 0.0,
@@ -195,6 +231,35 @@
         "version": "0.10.0"
       },
       "rrao": 0.0,
+      "scenario_breakdown": {
+        "high": {
+          "curvature_by_risk_class": {},
+          "delta_by_risk_class": {
+            "equity": 125000.0,
+            "fx": 60000.0,
+            "girr": 4950.0
+          },
+          "vega_by_risk_class": {}
+        },
+        "low": {
+          "curvature_by_risk_class": {},
+          "delta_by_risk_class": {
+            "equity": 125000.0,
+            "fx": 60000.0,
+            "girr": 6229.5153714
+          },
+          "vega_by_risk_class": {}
+        },
+        "medium": {
+          "curvature_by_risk_class": {},
+          "delta_by_risk_class": {
+            "equity": 125000.0,
+            "fx": 60000.0,
+            "girr": 5626.24927294
+          },
+          "vega_by_risk_class": {}
+        }
+      },
       "scenario_charges": {
         "high": 189950.0,
         "low": 191229.515371,
@@ -253,6 +318,13 @@
       "description": "Residual Risk Add-On.",
       "format": "double",
       "type": "number"
+    },
+    "scenario_breakdown": {
+      "additionalProperties": {
+        "$ref": "#/$defs/FrtbScenarioCharges"
+      },
+      "description": "Per-risk-class delta, vega and curvature charges under every evaluated\ncorrelation scenario, in the reporting currency.\n\nHas one entry per key of `scenario_charges`; the three maps of an\nentry sum to that scenario's `scenario_charges` value, and the entry\nfor `binding_scenario` equals `delta_by_risk_class`,\n`vega_by_risk_class` and `curvature_by_risk_class`. Empty only when\ndeserialized from JSON written before this field existed.",
+      "type": "object"
     },
     "scenario_charges": {
       "additionalProperties": {

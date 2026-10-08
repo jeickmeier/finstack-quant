@@ -56,7 +56,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_analysis.schema.json",
-      "bytes": 29376,
+      "bytes": 36724,
       "kind": "output",
       "path": "schemas/statements_analytics/1/corporate_analysis.schema.json",
       "summary": "Unified analysis result combining statement, equity, and credit perspectives.",
@@ -173,7 +173,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/explanation.schema.json",
-      "bytes": 4185,
+      "bytes": 9666,
       "kind": "component",
       "path": "schemas/statements_analytics/1/explanation.schema.json",
       "summary": "Detailed explanation of a node's calculation.",
@@ -209,7 +209,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/goal_seek_result.schema.json",
-      "bytes": 1006,
+      "bytes": 2424,
       "kind": "output",
       "path": "schemas/statements_analytics/1/goal_seek_result.schema.json",
       "summary": "Outcome of a `goal_seek` solve.",
@@ -245,7 +245,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
-      "bytes": 30677,
+      "bytes": 33811,
       "kind": "output",
       "path": "schemas/statements_analytics/1/lbo_result.schema.json",
       "summary": "Outputs of an LBO evaluation.",

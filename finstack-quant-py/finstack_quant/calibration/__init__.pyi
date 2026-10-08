@@ -3752,8 +3752,7 @@ class CalibrationDiagnostics:
     --------
     >>> from finstack_quant.calibration import CalibrationDiagnostics
     >>> d = CalibrationDiagnostics.from_json(
-    ...     '{"per_quote":[],"condition_number":null,"jacobian":null,'
-    ...     '"max_residual":0.0,"rms_residual":0.0}'
+    ...     '{"per_quote":[],"condition_number":null,"jacobian":null,"max_residual":0.0,"rms_residual":0.0}'
     ... )
     >>> d.max_residual
     0.0

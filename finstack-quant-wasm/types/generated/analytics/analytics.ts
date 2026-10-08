@@ -215,6 +215,19 @@ export interface BetaResult {
    */
   ci_upper: NonFiniteF64Wire;
   /**
+   * Two-sided confidence level of `ci_lower`/`ci_upper` as a decimal
+   * probability (`0.95` = 95%). The interval is
+   * `beta ± t_{n_obs − 2, (1 + confidence_level) / 2} × std_err`.
+   */
+  confidence_level?: number;
+  /**
+   * Number of paired observations the regression used: the overlap after
+   * truncating both series to the shorter length. Reported even when the
+   * estimates are [`f64::NAN`]. `0` when deserialized from JSON written
+   * before this field existed.
+   */
+  n_obs?: number;
+  /**
    * Standard error of the beta estimate, or [`f64::NAN`] when undefined.
    */
   std_err: NonFiniteF64Wire;
@@ -297,6 +310,13 @@ export interface GreeksResult {
    */
   beta: NonFiniteF64Wire;
   /**
+   * Number of paired observations the regression used: the overlap after
+   * truncating both series to the shorter length. Reported even when the
+   * estimates are [`f64::NAN`]. `0` when deserialized from JSON written
+   * before this field existed.
+   */
+  n_obs?: number;
+  /**
    * R-squared of the regression, or [`f64::NAN`] when undefined.
    */
   r_squared: NonFiniteF64Wire;
@@ -348,6 +368,13 @@ export interface MultiFactorResult {
    * Regression coefficients, one per factor.
    */
   betas: number[];
+  /**
+   * Number of observations the regression used: the common length of the
+   * dependent series and every factor series. Residual degrees of freedom
+   * are `n_obs − betas.len() − 1`. `0` when deserialized from JSON written
+   * before this field existed.
+   */
+  n_obs?: number;
   /**
    * Fraction of variance explained; NaN for a constant dependent series.
    */

@@ -831,6 +831,10 @@
   "description": "Variation margin calculation result.",
   "examples": [
     {
+      "collateral_balance": {
+        "amount": "0",
+        "currency": "USD"
+      },
       "collect_amount": {
         "amount": "1250000",
         "currency": "USD"
@@ -838,6 +842,14 @@
       "date": "2025-01-15",
       "gross_exposure": {
         "amount": "1750000",
+        "currency": "USD"
+      },
+      "independent_amount": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "mta": {
+        "amount": "250000",
         "currency": "USD"
       },
       "net_exposure": {
@@ -848,10 +860,26 @@
         "amount": "0",
         "currency": "USD"
       },
-      "settlement_date": "2025-01-16"
+      "rounding_increment": {
+        "amount": "10000",
+        "currency": "USD"
+      },
+      "settlement_date": "2025-01-16",
+      "threshold": {
+        "amount": "500000",
+        "currency": "USD"
+      },
+      "unrounded_call": {
+        "amount": "1250000",
+        "currency": "USD"
+      }
     }
   ],
   "properties": {
+    "collateral_balance": {
+      "$ref": "#/$defs/Money",
+      "description": "Signed collateral balance netted against `net_exposure`, exactly as\npassed to the calculator: positive when the desk holds collateral,\nnegative when the desk has posted it."
+    },
     "collect_amount": {
       "$ref": "#/$defs/Money",
       "description": "Amount to collect from the counterparty, including returned collateral"
@@ -864,6 +892,14 @@
       "$ref": "#/$defs/Money",
       "description": "Gross mark-to-market exposure"
     },
+    "independent_amount": {
+      "$ref": "#/$defs/Money",
+      "description": "CSA independent amount added to the threshold-adjusted exposure to\ngive `net_exposure`, in the CSA base currency."
+    },
+    "mta": {
+      "$ref": "#/$defs/Money",
+      "description": "CSA minimum transfer amount in the CSA base currency. When\n`|unrounded_call| < mta`, no transfer is made and both `post_amount`\nand `collect_amount` are zero."
+    },
     "net_exposure": {
       "$ref": "#/$defs/Money",
       "description": "Net exposure after applying threshold and independent amount"
@@ -872,9 +908,21 @@
       "$ref": "#/$defs/Money",
       "description": "Amount to post to the counterparty, including returned collateral"
     },
+    "rounding_increment": {
+      "$ref": "#/$defs/Money",
+      "description": "CSA rounding increment in the CSA base currency. A transfer that\npasses the MTA test has its magnitude rounded to a multiple of this\nincrement: up when `unrounded_call` has the same sign as\n`net_exposure` (a delivery), down otherwise (a return). Zero disables\nrounding."
+    },
     "settlement_date": {
       "description": "Settlement date for the margin transfer",
       "type": "string"
+    },
+    "threshold": {
+      "$ref": "#/$defs/Money",
+      "description": "CSA threshold applied symmetrically to `|gross_exposure|`, in the CSA\nbase currency (non-negative)."
+    },
+    "unrounded_call": {
+      "$ref": "#/$defs/Money",
+      "description": "Signed credit support amount before the minimum-transfer test and\nrounding: `net_exposure − collateral_balance`. Positive means collect\nfrom the counterparty, negative means the desk pays (post or return)."
     }
   },
   "required": [
@@ -883,7 +931,13 @@
     "net_exposure",
     "post_amount",
     "collect_amount",
-    "settlement_date"
+    "settlement_date",
+    "threshold",
+    "independent_amount",
+    "collateral_balance",
+    "unrounded_call",
+    "mta",
+    "rounding_increment"
   ],
   "title": "VmResult",
   "type": "object"

@@ -134,7 +134,9 @@ def _unmargined_portfolio() -> Portfolio:
 def _market() -> MarketContext:
     context = MarketContext()
     context.insert(
-        DiscountCurve("USD-OIS", date.fromisoformat(AS_OF), [(0.0, 1.0), (0.5, 0.98), (1.0, 0.95)], day_count="act_365f")
+        DiscountCurve(
+            "USD-OIS", date.fromisoformat(AS_OF), [(0.0, 1.0), (0.5, 0.98), (1.0, 0.95)], day_count="act_365f"
+        )
     )
     return context
 
@@ -176,7 +178,7 @@ def test_calculate_on_an_unmargined_portfolio_reports_no_netting_sets() -> None:
 def test_calculate_rejects_collateral_for_an_unknown_csa() -> None:
     portfolio = _unmargined_portfolio()
     aggregator = PortfolioMarginAggregator.from_portfolio(portfolio)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unknown IM collateral CSA"):
         aggregator.calculate(portfolio, _market(), AS_OF, current_im_collateral={"NO-SUCH-CSA": Money("1", "USD")})
     with pytest.raises(TypeError):
         aggregator.calculate(portfolio, _market(), 20250115)
@@ -238,7 +240,7 @@ def test_result_getters_reconcile_with_netting_set_rows() -> None:
 def test_results_round_trip_through_json_and_pickle() -> None:
     result = PortfolioMarginResult.from_json(json.dumps(_result_doc()))
     assert PortfolioMarginResult.from_json(result.to_json()).to_json() == result.to_json()
-    assert pickle.loads(pickle.dumps(result)).to_json() == result.to_json()
+    assert pickle.loads(pickle.dumps(result)).to_json() == result.to_json()  # noqa: S301
     # Canonical order on the wire is ascending identifier, whatever the input order.
     assert [ns["netting_set_id"]["kind"] for ns in json.loads(result.to_json())["netting_sets"]] == [
         "bilateral",
@@ -247,7 +249,7 @@ def test_results_round_trip_through_json_and_pickle() -> None:
 
     margin = next(iter(result.by_netting_set.values()))
     assert NettingSetMargin.from_json(margin.to_json()).to_json() == margin.to_json()
-    assert pickle.loads(pickle.dumps(margin)).to_json() == margin.to_json()
+    assert pickle.loads(pickle.dumps(margin)).to_json() == margin.to_json()  # noqa: S301
     assert "BANK_A:CSA_01" in repr(margin)
     assert "netting_sets=2" in repr(result)
 
@@ -255,5 +257,5 @@ def test_results_round_trip_through_json_and_pickle() -> None:
 def test_inconsistent_totals_are_rejected() -> None:
     doc = _result_doc()
     doc["total_initial_margin"] = _usd("999")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="totals do not equal netting-set sums"):
         PortfolioMarginResult.from_json(json.dumps(doc))

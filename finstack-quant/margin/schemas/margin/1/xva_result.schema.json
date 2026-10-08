@@ -1,5 +1,137 @@
 {
   "$defs": {
+    "CreditXvaRow": {
+      "additionalProperties": false,
+      "description": "One time bucket of a CVA or DVA sum.\n\nThe bucket ends at `time` and starts at the previous row's `time` (the\nfirst bucket starts at the valuation date, where survival and the discount\nfactor are `1` and the exposure is held flat at the first profile node).\nThe row records the factors exactly as multiplied:\n\n```text\ncontribution = loss_given_default × exposure_mid\n             × marginal_default_probability × discount_factor_mid\n             × survival_weight\n```\n\nFor CVA the defaulting party is the counterparty and the exposure is EPE;\nfor DVA the defaulting party is the institution and the exposure is ENE\nnet of any posted initial margin, floored at zero.",
+      "properties": {
+        "contribution": {
+          "description": "This bucket's term of the adjustment, in the exposure profile's\ncurrency (non-negative).",
+          "format": "double",
+          "type": "number"
+        },
+        "discount_factor": {
+          "description": "Discount factor `DF(time)` read from the discount curve.",
+          "format": "double",
+          "type": "number"
+        },
+        "discount_factor_mid": {
+          "description": "Average of the discount factors at the bucket start and end.",
+          "format": "double",
+          "type": "number"
+        },
+        "exposure_mid": {
+          "description": "Average of the exposure at the bucket start and end, in the exposure\nprofile's currency (non-negative).",
+          "format": "double",
+          "type": "number"
+        },
+        "loss_given_default": {
+          "description": "Loss given default `1 − recovery rate` of the defaulting party, as a\ndecimal fraction; identical on every row.",
+          "format": "double",
+          "type": "number"
+        },
+        "marginal_default_probability": {
+          "description": "Probability that the defaulting party defaults inside the bucket:\n`max(S(previous time) − S(time), 0)`.",
+          "format": "double",
+          "type": "number"
+        },
+        "survival_probability": {
+          "description": "Survival probability `S(time)` of the defaulting party read from its\nhazard curve, in `[0, 1]`.",
+          "format": "double",
+          "type": "number"
+        },
+        "survival_weight": {
+          "description": "Average over the bucket of the *other* party's survival probability\n(first-to-default weighting): the institution's for CVA, the\ncounterparty's for DVA. Exactly `1` for a unilateral adjustment.",
+          "format": "double",
+          "type": "number"
+        },
+        "time": {
+          "description": "Bucket end in years from the valuation date.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "time",
+        "discount_factor",
+        "survival_probability",
+        "marginal_default_probability",
+        "exposure_mid",
+        "discount_factor_mid",
+        "survival_weight",
+        "loss_given_default",
+        "contribution"
+      ],
+      "type": "object"
+    },
+    "FundingXvaRow": {
+      "additionalProperties": false,
+      "description": "One time bucket of an FVA sum.\n\nThe bucket ends at `time` and starts at the previous row's `time` (the\nfirst bucket starts at the valuation date). The row records the factors\nexactly as multiplied:\n\n```text\ncontribution = (epe_mid × funding_spread − ene_mid × funding_benefit_spread)\n             × discount_factor_mid × dt × joint_survival_mid\n```",
+      "properties": {
+        "contribution": {
+          "description": "This bucket's term of the FVA, in the exposure profile's currency\n(positive = funding cost).",
+          "format": "double",
+          "type": "number"
+        },
+        "discount_factor": {
+          "description": "Discount factor `DF(time)` read from the discount curve.",
+          "format": "double",
+          "type": "number"
+        },
+        "discount_factor_mid": {
+          "description": "Average of the discount factors at the bucket start and end.",
+          "format": "double",
+          "type": "number"
+        },
+        "dt": {
+          "description": "Bucket length in years: `time` minus the previous row's `time`.",
+          "format": "double",
+          "type": "number"
+        },
+        "ene_mid": {
+          "description": "Average expected negative exposure over the bucket, in the exposure\nprofile's currency (non-negative magnitude).",
+          "format": "double",
+          "type": "number"
+        },
+        "epe_mid": {
+          "description": "Average expected positive exposure over the bucket, in the exposure\nprofile's currency.",
+          "format": "double",
+          "type": "number"
+        },
+        "funding_benefit_spread": {
+          "description": "Funding benefit spread applied to `ene_mid`, as a decimal fraction per\nyear (basis points / 10 000); identical on every row.",
+          "format": "double",
+          "type": "number"
+        },
+        "funding_spread": {
+          "description": "Funding cost spread applied to `epe_mid`, as a decimal fraction per\nyear (basis points / 10 000); identical on every row.",
+          "format": "double",
+          "type": "number"
+        },
+        "joint_survival_mid": {
+          "description": "Product of the bucket-average counterparty and own survival\nprobabilities. Exactly `1` when no hazard curves are applied.",
+          "format": "double",
+          "type": "number"
+        },
+        "time": {
+          "description": "Bucket end in years from the valuation date.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "time",
+        "dt",
+        "discount_factor",
+        "epe_mid",
+        "ene_mid",
+        "discount_factor_mid",
+        "joint_survival_mid",
+        "funding_spread",
+        "funding_benefit_spread",
+        "contribution"
+      ],
+      "type": "object"
+    },
     "PositiveF64Wire": {
       "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
       "exclusiveMinimum": 0.0,
@@ -223,11 +355,28 @@
       "format": "double",
       "type": "number"
     },
+    "cva_rows": {
+      "description": "Per-time-bucket terms of the CVA sum, one row per exposure-profile\nnode, in time order. Summing `contribution` in row order reproduces\n`cva`. Empty only when deserialized from JSON written before this\nfield existed.",
+      "items": {
+        "$ref": "#/$defs/CreditXvaRow"
+      },
+      "type": "array"
+    },
     "dva": {
       "description": "DVA (Debit Valuation Adjustment): own-default benefit.\n\nPositive DVA represents the expected gain to the desk from\nthe institution's own default on negative-exposure positions.\n\n`None` when DVA is not computed (unilateral CVA only).",
       "format": "double",
       "type": [
         "number",
+        "null"
+      ]
+    },
+    "dva_rows": {
+      "description": "Per-time-bucket terms of the DVA sum, in time order; `contribution`\nsums to `dva`. `Some` exactly when `dva` is `Some` (bilateral XVA).",
+      "items": {
+        "$ref": "#/$defs/CreditXvaRow"
+      },
+      "type": [
+        "array",
         "null"
       ]
     },
@@ -298,6 +447,16 @@
       "format": "double",
       "type": [
         "number",
+        "null"
+      ]
+    },
+    "fva_rows": {
+      "description": "Per-time-bucket terms of the FVA sum, in time order; `contribution`\nsums to `fva`. `Some` exactly when `fva` is `Some` (bilateral XVA with\na funding configuration).",
+      "items": {
+        "$ref": "#/$defs/FundingXvaRow"
+      },
+      "type": [
+        "array",
         "null"
       ]
     },

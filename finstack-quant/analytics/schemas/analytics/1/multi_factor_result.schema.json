@@ -56,6 +56,13 @@
       },
       "type": "array"
     },
+    "n_obs": {
+      "default": 0,
+      "description": "Number of observations the regression used: the common length of the\ndependent series and every factor series. Residual degrees of freedom\nare `n_obs − betas.len() − 1`. `0` when deserialized from JSON written\nbefore this field existed.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
     "r_squared": {
       "$ref": "#/$defs/NonFiniteF64Wire",
       "description": "Fraction of variance explained; NaN for a constant dependent series."

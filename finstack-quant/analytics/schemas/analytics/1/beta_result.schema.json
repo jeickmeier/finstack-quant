@@ -51,6 +51,19 @@
       "$ref": "#/$defs/NonFiniteF64Wire",
       "description": "Upper bound of the 95% confidence interval, or [`f64::NAN`] when\nundefined."
     },
+    "confidence_level": {
+      "default": 0.95,
+      "description": "Two-sided confidence level of `ci_lower`/`ci_upper` as a decimal\nprobability (`0.95` = 95%). The interval is\n`beta ± t_{n_obs − 2, (1 + confidence_level) / 2} × std_err`.",
+      "format": "double",
+      "type": "number"
+    },
+    "n_obs": {
+      "default": 0,
+      "description": "Number of paired observations the regression used: the overlap after\ntruncating both series to the shorter length. Reported even when the\nestimates are [`f64::NAN`]. `0` when deserialized from JSON written\nbefore this field existed.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
     "std_err": {
       "$ref": "#/$defs/NonFiniteF64Wire",
       "description": "Standard error of the beta estimate, or [`f64::NAN`] when undefined."

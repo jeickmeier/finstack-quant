@@ -21,7 +21,44 @@
             "total_assets",
             "total_liabilities",
             "total_equity"
-          ]
+          ],
+          "comparison": {
+            "identity": "balance_sheet_articulation",
+            "period": "2025Q4",
+            "actual": 1150.0,
+            "expected": 1145.0,
+            "tolerance": 0.01
+          }
+        }
+      ],
+      "comparisons": [
+        {
+          "identity": "balance_sheet_articulation",
+          "period": "2025Q1",
+          "actual": 1000.0,
+          "expected": 1000.0,
+          "tolerance": 0.01
+        },
+        {
+          "identity": "balance_sheet_articulation",
+          "period": "2025Q2",
+          "actual": 1050.0,
+          "expected": 1050.0,
+          "tolerance": 0.01
+        },
+        {
+          "identity": "balance_sheet_articulation",
+          "period": "2025Q3",
+          "actual": 1100.0,
+          "expected": 1100.0,
+          "tolerance": 0.01
+        },
+        {
+          "identity": "balance_sheet_articulation",
+          "period": "2025Q4",
+          "actual": 1150.0,
+          "expected": 1145.0,
+          "tolerance": 0.01
         }
       ]
     },
@@ -30,14 +67,60 @@
       "check_name": "Retained Earnings Reconciliation",
       "category": "accounting_identity",
       "passed": true,
-      "findings": []
+      "findings": [],
+      "comparisons": [
+        {
+          "identity": "retained_earnings_roll_forward",
+          "period": "2025Q2",
+          "actual": 220.0,
+          "expected": 220.0,
+          "tolerance": 0.01
+        },
+        {
+          "identity": "retained_earnings_roll_forward",
+          "period": "2025Q3",
+          "actual": 240.0,
+          "expected": 240.0,
+          "tolerance": 0.01
+        },
+        {
+          "identity": "retained_earnings_roll_forward",
+          "period": "2025Q4",
+          "actual": 255.0,
+          "expected": 255.0,
+          "tolerance": 0.01
+        }
+      ]
     },
     {
       "check_id": "cash_reconciliation",
       "check_name": "Cash Reconciliation",
       "category": "accounting_identity",
       "passed": true,
-      "findings": []
+      "findings": [],
+      "comparisons": [
+        {
+          "identity": "cash_roll_forward",
+          "period": "2025Q2",
+          "actual": 120.0,
+          "expected": 120.0,
+          "tolerance": 0.01
+        },
+        {
+          "identity": "cash_roll_forward",
+          "period": "2025Q3",
+          "actual": 135.0,
+          "expected": 135.0,
+          "tolerance": 0.01
+        },
+        {
+          "identity": "cash_roll_forward",
+          "period": "2025Q4",
+          "actual": 150.0,
+          "expected": 150.0,
+          "tolerance": 0.01
+        }
+      ]
     },
     {
       "check_id": "growth_rate_consistency",

@@ -853,6 +853,191 @@
         "currency"
       ],
       "type": "object"
+    },
+    "SimmBucketDetail": {
+      "additionalProperties": false,
+      "description": "One SIMM bucket: its weighted sensitivities and intra-bucket aggregate.\n\nWhat a bucket is depends on the component: a currency for interest rate,\na credit sector for credit qualifying, `residual` for credit\nnon-qualifying, one name for equity, `fx` for FX, and the commodity\nbucket number for commodity.",
+      "properties": {
+        "bucket": {
+          "description": "Bucket label (see the type documentation).",
+          "type": "string"
+        },
+        "k": {
+          "description": "Intra-bucket aggregate `K_b = sqrt(Σᵢ Σⱼ ρᵢⱼ WSᵢ WSⱼ)` in the\ncalculation currency, with `ρ` from the calculator's parameters.",
+          "format": "double",
+          "type": "number"
+        },
+        "signed_sum": {
+          "description": "Sum of the weighted sensitivities capped to `[-k, k]`: the `S_b` term\nused wherever the component correlates this bucket with another.",
+          "format": "double",
+          "type": "number"
+        },
+        "weighted_sensitivities": {
+          "description": "Weighted sensitivities in the order they enter the intra-bucket\ncorrelated sum.",
+          "items": {
+            "$ref": "#/$defs/SimmWeightedSensitivity"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "bucket",
+        "weighted_sensitivities",
+        "k",
+        "signed_sum"
+      ],
+      "type": "object"
+    },
+    "SimmComponentDetail": {
+      "additionalProperties": false,
+      "description": "Bucket-level detail of one SIMM breakdown component.",
+      "properties": {
+        "buckets": {
+          "description": "Buckets in the canonical order used by the cross-bucket aggregation.",
+          "items": {
+            "$ref": "#/$defs/SimmBucketDetail"
+          },
+          "type": "array"
+        },
+        "component": {
+          "description": "Component label; equals the matching [`ImResult::breakdown`] key (for\nexample `IR_Delta`).",
+          "type": "string"
+        },
+        "historical_volatility_ratio": {
+          "description": "Historical volatility ratio (dimensionless). For equity, FX and\ncommodity vega components it multiplies every `sensitivity` before\nrisk weighting. For the interest-rate curvature component the\ncomponent margin is divided by its square. `1` everywhere else.",
+          "format": "double",
+          "type": "number"
+        },
+        "margin": {
+          "description": "Component margin after cross-bucket aggregation, before the MPOR\nscale, in the calculation currency.",
+          "format": "double",
+          "type": "number"
+        },
+        "risk_class": {
+          "$ref": "#/$defs/SimmRiskClass",
+          "description": "Risk class whose margin this component adds to."
+        }
+      },
+      "required": [
+        "component",
+        "risk_class",
+        "historical_volatility_ratio",
+        "buckets",
+        "margin"
+      ],
+      "type": "object"
+    },
+    "SimmDetail": {
+      "additionalProperties": false,
+      "description": "Aggregation detail of one SIMM calculation.\n\nAll amounts are in the calculation currency (USD) and are stated\n**before** the MPOR scale, so:\n\n```text\nbreakdown[c.component]      = c.margin × mpor_scale\nrisk_class_margins[class]   = Σ c.margin over components of that class\namount                      = sqrt(Σᵢ Σⱼ ψᵢⱼ Kᵢ Kⱼ) × mpor_scale\n```\n\nwhere `Kᵢ` are the `risk_class_margins` and `ψ` is the SIMM\ninter-risk-class correlation matrix of the calculator's parameters.",
+      "properties": {
+        "components": {
+          "description": "One entry per key of [`ImResult::breakdown`], in calculation order.",
+          "items": {
+            "$ref": "#/$defs/SimmComponentDetail"
+          },
+          "type": "array"
+        },
+        "mpor_scale": {
+          "description": "Multiplier applied to the aggregate and to every breakdown amount:\n`sqrt(mpor_days / 10)` (dimensionless; `1` at the standard 10-day\nMPOR).",
+          "format": "double",
+          "type": "number"
+        },
+        "risk_class_margins": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Margin per risk class before inter-risk-class correlation and before\nthe MPOR scale: the sum of that class's delta, vega and curvature\ncomponent margins. Risk classes with no positive component are absent.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "components",
+        "risk_class_margins",
+        "mpor_scale"
+      ],
+      "type": "object"
+    },
+    "SimmRiskClass": {
+      "description": "Risk classes for SIMM categorization.",
+      "oneOf": [
+        {
+          "const": "interest_rate",
+          "description": "Interest rate risk",
+          "type": "string"
+        },
+        {
+          "const": "credit_qualifying",
+          "description": "Credit qualifying (corporate, sovereign, and index credit, including high yield)",
+          "type": "string"
+        },
+        {
+          "const": "credit_non_qualifying",
+          "description": "Credit non-qualifying (securitizations and designated non-qualifying exposures)",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "Equity risk",
+          "type": "string"
+        },
+        {
+          "const": "commodity",
+          "description": "Commodity risk",
+          "type": "string"
+        },
+        {
+          "const": "fx",
+          "description": "Foreign exchange risk",
+          "type": "string"
+        }
+      ]
+    },
+    "SimmWeightedSensitivity": {
+      "additionalProperties": false,
+      "description": "One weighted sensitivity inside a SIMM bucket.\n\nFor delta and vega components\n`weighted_sensitivity = sensitivity × historical_volatility_ratio ×\nrisk_weight × concentration_factor` (the ratio is the component's). For\ncurvature components `sensitivity` is the factor's curvature risk\nexposure after the expiry scaling factor and netting, and the weight and\nconcentration factor are `1`.",
+      "properties": {
+        "concentration_factor": {
+          "description": "Concentration risk factor `max(1, sqrt(|net sensitivity| / threshold))`\napplied to this sensitivity (dimensionless, `≥ 1`).",
+          "format": "double",
+          "type": "number"
+        },
+        "risk_factor": {
+          "description": "Risk factor label: currency, issuer or name, currency pair\n(`AAA/BBB`), or commodity bucket number.",
+          "type": "string"
+        },
+        "risk_weight": {
+          "description": "SIMM risk weight from the calculator's parameters, as published and\nmultiplied directly against the sensitivity.",
+          "format": "double",
+          "type": "number"
+        },
+        "sensitivity": {
+          "description": "Net input sensitivity for this factor, in the units documented on\n[`SimmSensitivities`](crate::SimmSensitivities) (calculation currency\nper unit move).",
+          "format": "double",
+          "type": "number"
+        },
+        "tenor": {
+          "description": "Tenor label of the sensitivity; `None` for factors without a tenor\ndimension.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "weighted_sensitivity": {
+          "description": "Weighted sensitivity `WS` entering the intra-bucket aggregation, in\nthe calculation currency.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "risk_factor",
+        "sensitivity",
+        "risk_weight",
+        "concentration_factor",
+        "weighted_sensitivity"
+      ],
+      "type": "object"
     }
   },
   "$id": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
@@ -910,6 +1095,17 @@
       "format": "uint32",
       "minimum": 0,
       "type": "integer"
+    },
+    "simm_detail": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SimmDetail"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "SIMM aggregation detail behind `breakdown` and `amount`: weighted\nsensitivities, concentration factors and bucket-level `K` for every\ncomponent, plus the per-risk-class totals and the MPOR scale.\n\n`Some` only for results produced by the SIMM calculator; `None` for\nevery other methodology and for JSON written before this field\nexisted."
     }
   },
   "required": [

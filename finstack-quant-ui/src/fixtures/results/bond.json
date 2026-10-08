@@ -38,10 +38,32 @@
         "version": 1
       },
       "fx_policy_applied": null,
-      "timestamp": "+002026-10-05T08:19:45.549000000Z",
+      "timestamp": "+002026-10-08T02:45:39.060000000Z",
       "version": "0.10.0"
     },
-    "covenants": null
+    "covenants": null,
+    "provenance": {
+      "model": "discounting",
+      "requested_as_of": "2025-01-01",
+      "market_dependencies": {
+        "curves": {
+          "discount_curves": ["USD-OIS"],
+          "forward_curves": [],
+          "credit_curves": ["HZ"],
+          "inflation_curves": []
+        },
+        "market_scalar_ids": [],
+        "volatility_dependencies": [],
+        "fx_pairs": [],
+        "series_ids": []
+      },
+      "sensitivity_bumps": {
+        "rate_bump_bp": 1,
+        "credit_spread_bump_bp": 1,
+        "spot_bump_decimal": 0.01,
+        "vol_bump_decimal": 0.01
+      }
+    }
   },
   "groups": {
     "Alternatives": [
@@ -424,5 +446,5 @@
       "bucketed": true
     }
   ],
-  "facadeWasmSha256": "1ffbb6bf30d0011503ef7d73a02c8a59e856a35ad55d4052b78157a7db1a6b80"
+  "facadeWasmSha256": "edab93923cbad031884a2990d738ca54185b68ceecd2f481b8264061dc901141"
 }

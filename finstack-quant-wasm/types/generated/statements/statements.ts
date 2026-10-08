@@ -1815,6 +1815,14 @@ export type CapitalStructureWarning =
       [k: string]: unknown;
     };
 /**
+ * Which evaluation layer produced a statement cell (one node in one period).
+ *
+ * The evaluator resolves every cell by the precedence
+ * `Value > Forecast > Formula`, after the node's optional `where` mask. The
+ * winning layer is recorded per cell in [`StatementResult::node_sources`].
+ */
+export type CellSource = "value" | "forecast" | "formula" | "where_masked";
+/**
  * Category that groups related checks together.
  */
 export type CheckCategory =
@@ -4262,6 +4270,20 @@ export interface OvernightCouponConvention {
  */
 export interface CapitalStructureCashflows {
   /**
+   * Cash the waterfall had to allocate in each period: the value of
+   * `WaterfallSpec.available_cash_node`, floored at zero (a negative pool
+   * is reported as a `NegativeAvailableCashFloored` warning), in the
+   * waterfall's currency.
+   *
+   * Only populated for periods in which a waterfall ran; empty for models
+   * without a waterfall and for JSON written before this field existed.
+   * Reconciles the period's uses:
+   * `fees + cash interest + principal + equity_distribution == available_cash`.
+   */
+  available_cash?: {
+    [k: string]: Money;
+  };
+  /**
    * Map of instrument_id → (period_id → cashflow_type → amount)
    */
   by_instrument: {
@@ -4354,9 +4376,53 @@ export interface CashflowBreakdown {
    */
   interest_income_cash?: Money | null;
   /**
+   * Part of `principal_payment` paid at the waterfall's
+   * `MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepay_node`).
+   * Zero when no waterfall ran. Same sign, currency and absence rule as
+   * [`Self::scheduled_principal`].
+   */
+  mandatory_prepayment?: Money | null;
+  /**
+   * Outstanding debt balance at period start, before this period's draws,
+   * repayments and PIK capitalization. Positive amount in the breakdown's
+   * currency. On `totals` it is the sum across instruments.
+   *
+   * Always `Some` on breakdowns produced by the evaluator. `None` on
+   * hand-built breakdowns and on JSON written before this field existed.
+   */
+  opening_balance?: Money | null;
+  /**
    * Principal repayments (amortization, maturity)
    */
   principal_payment: Money;
+  /**
+   * Part of `principal_payment` paid against the instrument's own
+   * contractual schedule: amortization, maturity redemption,
+   * schedule-embedded prepayments and revolver repayments, including
+   * scheduled principal carried in arrears from an earlier period. Under a
+   * waterfall this is the cash allocated at the `Amortization` priority.
+   * Positive amount in the breakdown's currency.
+   *
+   * The four principal components
+   * (`scheduled_principal`, `mandatory_prepayment`, `sweep_prepayment`,
+   * `voluntary_prepayment`) sum to `principal_payment`. Always `Some` on
+   * breakdowns produced by the evaluator or the waterfall; `None` on
+   * hand-built breakdowns and on JSON written before this field existed.
+   */
+  scheduled_principal?: Money | null;
+  /**
+   * Part of `principal_payment` paid by the excess-cash-flow sweep at the
+   * waterfall's `Sweep` priority. Zero when no waterfall ran. Same sign,
+   * currency and absence rule as [`Self::scheduled_principal`].
+   */
+  sweep_prepayment?: Money | null;
+  /**
+   * Part of `principal_payment` paid at the waterfall's
+   * `VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepay_node`).
+   * Zero when no waterfall ran. Same sign, currency and absence rule as
+   * [`Self::scheduled_principal`].
+   */
+  voluntary_prepayment?: Money | null;
 }
 /**
  * Capital structure specification.
@@ -6392,6 +6458,46 @@ export interface PikToggleSpec {
   threshold: number;
 }
 /**
+ * The two numbers a check compared, and the tolerance it allowed.
+ *
+ * Recorded for every numeric comparison a check performs — whether it passed
+ * or failed — so the verdict can be reconstructed from exported data:
+ * the comparison fails exactly when `|actual - expected| > tolerance`.
+ *
+ * `actual`, `expected` and `tolerance` are all in the units of the compared
+ * nodes (currency units for monetary nodes, the same units as
+ * [`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not
+ * a fraction or percentage.
+ */
+export interface CheckComparison {
+  /**
+   * Observed (left-hand) value, in the compared nodes' units.
+   */
+  actual: number;
+  /**
+   * Value the identity requires (right-hand side), in the same units.
+   */
+  expected: number;
+  /**
+   * Stable snake_case name of the identity that was tested (for example
+   * `"balance_sheet_articulation"` or `"cash_flow_components"`); a check
+   * that tests several identities per period uses a distinct label for each.
+   */
+  identity: string;
+  /**
+   * Period the comparison was evaluated for, if it is period-specific.
+   */
+  period?: string | null;
+  /**
+   * Absolute tolerance applied to `|actual - expected|`, in the same units.
+   * This is the effective tolerance: the per-check override when one is
+   * configured, otherwise
+   * `max(default_tolerance, default_relative_tolerance * |reference|)`.
+   */
+  tolerance: number;
+  [k: string]: unknown;
+}
+/**
  * Configuration parameters that govern check execution.
  *
  * Identity checks trigger a finding when
@@ -6442,6 +6548,14 @@ export interface CheckFinding {
    * Identifier of the check that produced this finding.
    */
   check_id: string;
+  /**
+   * The failed numeric comparison behind this finding (actual, expected and
+   * tolerance). `None` for findings that do not compare two numbers:
+   * skipped periods, missing or non-finite inputs, sign-convention
+   * warnings, and formula checks without a tolerance (a formula check
+   * with a tolerance compares its value against zero).
+   */
+  comparison?: CheckComparison | null;
   /**
    * Materiality context, if applicable.
    */
@@ -6517,6 +6631,16 @@ export interface CheckResult {
    * Human-readable name of the check.
    */
   check_name: string;
+  /**
+   * Every numeric comparison the check evaluated, passing and failing
+   * alike, in evaluation order. A passing check therefore still reports
+   * the actual value, expected value and tolerance it was judged on.
+   * Unlike `findings`, this list is not reduced by the suite's
+   * `min_severity` / `materiality_threshold` reporting filters. Empty for
+   * checks that do not compare two numbers, for periods a check skipped,
+   * and for reports serialized before this field existed.
+   */
+  comparisons?: CheckComparison[];
   /**
    * Individual findings produced by the check.
    */
@@ -7045,6 +7169,22 @@ export interface StatementResult {
   monetary_nodes?: {
     [k: string]: {
       [k: string]: Money;
+    };
+  };
+  /**
+   * Map of node_id → (period_id → [`CellSource`]): which layer of the
+   * `Value > Forecast > Formula` precedence produced each cell of `nodes`.
+   *
+   * Populated for every cell by [`Evaluator`](crate::evaluator::Evaluator)
+   * (with or without market context / capital structure). The model spec
+   * alone does not determine it: an as-of visibility cutoff can hide an
+   * explicit value so that the forecast or formula fires instead. Empty
+   * only for results that were not produced by the evaluator (hand-built)
+   * or were serialized before this field existed.
+   */
+  node_sources?: {
+    [k: string]: {
+      [k: string]: CellSource;
     };
   };
   /**

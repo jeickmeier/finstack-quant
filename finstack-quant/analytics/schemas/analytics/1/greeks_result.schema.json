@@ -51,6 +51,13 @@
       "$ref": "#/$defs/NonFiniteF64Wire",
       "description": "Beta (slope) of portfolio vs benchmark, or [`f64::NAN`] when undefined."
     },
+    "n_obs": {
+      "default": 0,
+      "description": "Number of paired observations the regression used: the overlap after\ntruncating both series to the shorter length. Reported even when the\nestimates are [`f64::NAN`]. `0` when deserialized from JSON written\nbefore this field existed.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
     "r_squared": {
       "$ref": "#/$defs/NonFiniteF64Wire",
       "description": "R-squared of the regression, or [`f64::NAN`] when undefined."

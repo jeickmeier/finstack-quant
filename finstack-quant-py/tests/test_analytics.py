@@ -87,10 +87,13 @@ def test_degenerate_regression_frames_keep_numeric_nan_columns() -> None:
         (perf.beta()[0].to_dataframe(), perf.to_beta_dataframe()),
         (perf.greeks()[0].to_dataframe(), perf.to_greeks_dataframe()),
     ):
-        assert leaf.isna().all().all()
-        assert panel.isna().all().all()
-        assert all(dtype == "float64" for dtype in leaf.dtypes)
-        assert all(dtype == "float64" for dtype in panel.dtypes)
+        # The estimates are NaN; the sample description is always reported.
+        described = {"n_obs", "confidence_level"}
+        for frame in (leaf, panel):
+            estimates = frame.drop(columns=described & set(frame.columns))
+            assert estimates.isna().all().all()
+            assert all(dtype == "float64" for dtype in estimates.dtypes)
+            assert (frame["n_obs"] == 4).all()
         assert list(panel.index) == ["FUND", "BENCH"]
         assert panel.index.name == "ticker"
 

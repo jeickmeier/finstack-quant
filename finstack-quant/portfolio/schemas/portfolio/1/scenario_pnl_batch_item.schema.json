@@ -2,8 +2,15 @@
   "$defs": {
     "ApplicationReport": {
       "additionalProperties": false,
-      "description": "Report describing what happened during [`super::ScenarioEngine::apply`].\n\n# Examples\n```rust\nuse finstack_quant_scenarios::engine::ApplicationReport;\n\nlet report = ApplicationReport {\n    operations_applied: 3,\n    user_operations: 1,\n    expanded_operations: 3,\n    changes: Default::default(),\n    warnings: vec![],\n    meta: None,\n    time_roll: None,\n};\n\nassert_eq!(report.operations_applied, 3);\nassert_eq!(report.user_operations, 1);\nassert_eq!(report.expanded_operations, 3);\n```",
+      "description": "Report describing what happened during [`super::ScenarioEngine::apply`].\n\n# Examples\n```rust\nuse finstack_quant_scenarios::engine::ApplicationReport;\n\nlet report = ApplicationReport {\n    operations_applied: 3,\n    user_operations: 1,\n    expanded_operations: 3,\n    changes: Default::default(),\n    applied_shocks: vec![],\n    warnings: vec![],\n    meta: None,\n    time_roll: None,\n};\n\nassert_eq!(report.operations_applied, 3);\nassert_eq!(report.user_operations, 1);\nassert_eq!(report.expanded_operations, 3);\n```",
       "properties": {
+        "applied_shocks": {
+          "description": "Size of every market and instrument shock applied, in application\norder: one entry per accepted effect, so the entries reconcile with\n[`changes`](Self::changes) (every market target named there appears\nhere at least once, and the instrument indices here union to\n`changes.changed_instrument_indices`).\n\nStatement-forecast operations, rate bindings and the time roll are not\nlisted. Empty when the scenario applied no market or instrument shock,\nand on reports deserialized from JSON written before this field\nexisted.",
+          "items": {
+            "$ref": "#/$defs/AppliedShock"
+          },
+          "type": "array"
+        },
         "changes": {
           "$ref": "#/$defs/ScenarioChangeManifest",
           "description": "Authoritative metadata describing the state changed by applied effects."
@@ -64,6 +71,84 @@
         "warnings"
       ],
       "type": "object"
+    },
+    "AppliedShock": {
+      "additionalProperties": false,
+      "description": "One shock the engine applied, in application order.\n\n[`ScenarioChangeManifest`] says *which* targets changed (deduplicated, for\ncache invalidation); this says *by how much*. A target shocked by several\neffects has one entry per effect.",
+      "properties": {
+        "applies_to": {
+          "$ref": "#/$defs/AppliedShockTarget",
+          "description": "Market target or instruments the shock was applied to."
+        },
+        "level_change": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LevelChange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Stored level before and after the shock.\n\nPresent only for scalar price targets\n([`ScenarioMarketTarget::EquityPrice`]), where both levels are read\nfrom the market context around the mutation. Absent for FX, curves,\nsurfaces and instruments."
+        },
+        "shock": {
+          "$ref": "#/$defs/ShockMagnitude",
+          "description": "Size, unit and shape of the shock."
+        }
+      },
+      "required": [
+        "applies_to",
+        "shock"
+      ],
+      "type": "object"
+    },
+    "AppliedShockTarget": {
+      "description": "What one applied shock was applied to.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A resolved market-data target; the same value the shock contributed to\n[`ScenarioChangeManifest::market_targets`].",
+          "properties": {
+            "scope": {
+              "const": "market",
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/ScenarioMarketTarget",
+              "description": "Concrete market-data target that was shocked."
+            }
+          },
+          "required": [
+            "scope",
+            "target"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Instruments of the supplied inventory mutated in place.",
+          "properties": {
+            "indices": {
+              "description": "Zero-based inventory indices of the instruments the shock changed,\nascending.",
+              "items": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "scope": {
+              "const": "instruments",
+              "type": "string"
+            }
+          },
+          "required": [
+            "scope",
+            "indices"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "Currency": {
       "description": "ISO 4217 currency enumeration",
@@ -1304,6 +1389,27 @@
         }
       ]
     },
+    "LevelChange": {
+      "additionalProperties": false,
+      "description": "Level of a scalar market value immediately before and after a shock.",
+      "properties": {
+        "after": {
+          "description": "Stored level after the shock, in the same units.",
+          "format": "double",
+          "type": "number"
+        },
+        "before": {
+          "description": "Stored level before the shock, in the scalar's own units (the amount\nfor a monetary price).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "before",
+        "after"
+      ],
+      "type": "object"
+    },
     "Money": {
       "additionalProperties": false,
       "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
@@ -1713,6 +1819,215 @@
         "by_position"
       ],
       "type": "object"
+    },
+    "ShockMagnitude": {
+      "description": "Size and shape of one applied shock.\n\nSizes are the shock as requested on the (hierarchy-expanded) operation, in\nthat operation's own quote space, with the resolved location where the\nengine produced one. Delivery adjustments that change how the request\nreaches the market object — interpolation splits across neighbouring\nknots, solve-to-par recalibration, first-order hazard shifts, clamping —\nare reported in [`ApplicationReport::warnings`], not here.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "One size applied to the whole target: a parallel curve or surface\nshift, or the shock to a scalar price, an FX rate or a set of\ninstruments.",
+          "properties": {
+            "kind": {
+              "const": "uniform",
+              "type": "string"
+            },
+            "unit": {
+              "$ref": "#/$defs/ShockUnit",
+              "description": "Unit of `value`."
+            },
+            "value": {
+              "description": "Shock size in `unit`.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Triangular key-rate bump centred on one curve knot, emitted once per\nresolved knot of a discount or inflation curve node shock.",
+          "properties": {
+            "kind": {
+              "const": "key_rate",
+              "type": "string"
+            },
+            "time_years": {
+              "description": "Knot time the bump is centred on, in years on the curve's own time\naxis.",
+              "format": "double",
+              "type": "number"
+            },
+            "unit": {
+              "$ref": "#/$defs/ShockUnit",
+              "description": "Unit of `value`."
+            },
+            "value": {
+              "description": "Bump size delivered at that knot, in `unit`. For an off-knot tenor\nmatched by interpolation this is the knot's calibrated share of\nthe requested shock.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "time_years",
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Node shocks delivered by rebuilding the curve in one step (forward,\npar-CDS, commodity and volatility-index node shocks). Lists the nodes\nas requested; the rebuilt curve is not echoed.",
+          "properties": {
+            "kind": {
+              "const": "nodes",
+              "type": "string"
+            },
+            "nodes": {
+              "description": "Requested `(tenor, size)` nodes in operation order.",
+              "items": {
+                "$ref": "#/$defs/ShockNode"
+              },
+              "type": "array"
+            },
+            "unit": {
+              "$ref": "#/$defs/ShockUnit",
+              "description": "Unit of every node `value`."
+            }
+          },
+          "required": [
+            "kind",
+            "nodes",
+            "unit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Volatility-surface bucket shock.",
+          "properties": {
+            "expiries_years": {
+              "description": "Surface grid expiries the shock was restricted to, in years, after\nsnapping the requested tenors to the grid. Absent when every\nexpiry is shocked.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "kind": {
+              "const": "vol_bucket",
+              "type": "string"
+            },
+            "strikes": {
+              "description": "Strikes the shock was restricted to. Absent when every strike is\nshocked.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "unit": {
+              "$ref": "#/$defs/ShockUnit",
+              "description": "Unit of `value`."
+            },
+            "value": {
+              "description": "Shock size in `unit`.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Base-correlation shock restricted to detachment points.",
+          "properties": {
+            "detachments_bp": {
+              "description": "Detachment points the shock was restricted to, in basis points\n(`300` = 3%), as supplied on the operation.",
+              "items": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "const": "detachment_bucket",
+              "type": "string"
+            },
+            "unit": {
+              "$ref": "#/$defs/ShockUnit",
+              "description": "Unit of `value`."
+            },
+            "value": {
+              "description": "Shock size in `unit`.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "detachments_bp",
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ShockNode": {
+      "additionalProperties": false,
+      "description": "One requested curve-node shock, as written on the operation.",
+      "properties": {
+        "tenor": {
+          "description": "Tenor label of the node as supplied on the operation (for example `\"5Y\"`).",
+          "type": "string"
+        },
+        "value": {
+          "description": "Shock size requested at that tenor, in the enclosing\n[`ShockMagnitude::Nodes`] unit.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "tenor",
+        "value"
+      ],
+      "type": "object"
+    },
+    "ShockUnit": {
+      "description": "Unit in which an applied shock's size is expressed.",
+      "oneOf": [
+        {
+          "const": "bp",
+          "description": "Additive basis points of a rate or spread (`1.0` = 0.0001 in decimal\nrate space).",
+          "type": "string"
+        },
+        {
+          "const": "percent",
+          "description": "Relative change in percent of the current level (`5.0` = +5%).",
+          "type": "string"
+        },
+        {
+          "const": "absolute",
+          "description": "Additive change in the target's own quote units: volatility-index\npoints for a volatility-index curve, decimal correlation for base\ncorrelation and structured-credit correlations (`0.02` = +0.02).",
+          "type": "string"
+        }
+      ]
     },
     "ToleranceConfig": {
       "additionalProperties": false,

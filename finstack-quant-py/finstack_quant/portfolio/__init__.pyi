@@ -2643,7 +2643,19 @@ class NettingSetMargin:
     --------
     >>> import json
     >>> from finstack_quant.portfolio import NettingSetMargin
-    >>> doc = {"netting_set_id": {"kind": "bilateral", "counterparty_id": "BANK_A", "csa_id": "CSA_01"}, "csa_id": "CSA_01", "as_of": "2025-01-15", "initial_margin": {"amount": "100", "currency": "USD"}, "variation_margin": {"amount": "25", "currency": "USD"}, "total_margin": {"amount": "125", "currency": "USD"}, "position_count": 1, "im_methodology": "schedule", "is_approximate": False, "sensitivities": None, "im_breakdown": {}}
+    >>> doc = {
+    ...     "netting_set_id": {"kind": "bilateral", "counterparty_id": "BANK_A", "csa_id": "CSA_01"},
+    ...     "csa_id": "CSA_01",
+    ...     "as_of": "2025-01-15",
+    ...     "initial_margin": {"amount": "100", "currency": "USD"},
+    ...     "variation_margin": {"amount": "25", "currency": "USD"},
+    ...     "total_margin": {"amount": "125", "currency": "USD"},
+    ...     "position_count": 1,
+    ...     "im_methodology": "schedule",
+    ...     "is_approximate": False,
+    ...     "sensitivities": None,
+    ...     "im_breakdown": {},
+    ... }
     >>> margin = NettingSetMargin.from_json(json.dumps(doc))
     >>> (str(margin.netting_set_id), margin.initial_margin.amount, margin.variation_margin.amount)
     ('BANK_A:CSA_01', 100.0, 25.0)

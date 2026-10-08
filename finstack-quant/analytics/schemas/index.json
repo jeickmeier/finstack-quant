@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/beta_result.schema.json",
-      "bytes": 2406,
+      "bytes": 3082,
       "kind": "output",
       "path": "schemas/analytics/1/beta_result.schema.json",
       "summary": "OLS beta result with standard error and 95% confidence interval.",
@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/greeks_result.schema.json",
-      "bytes": 2401,
+      "bytes": 2771,
       "kind": "output",
       "path": "schemas/analytics/1/greeks_result.schema.json",
       "summary": "Greeks (alpha, beta, R-squared, adjusted R-squared) from a single-factor regression.",
@@ -56,7 +56,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/multi_factor_result.schema.json",
-      "bytes": 2647,
+      "bytes": 3025,
       "kind": "output",
       "path": "schemas/analytics/1/multi_factor_result.schema.json",
       "summary": "Result of a multi-factor regression.",

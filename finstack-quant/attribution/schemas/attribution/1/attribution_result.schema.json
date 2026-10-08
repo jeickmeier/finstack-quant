@@ -1488,6 +1488,31 @@
       ],
       "type": "object"
     },
+    "MoveUnit": {
+      "description": "Unit of a [`SensitivityStep`] market move; the sensitivity is a currency\namount per one such unit.",
+      "oneOf": [
+        {
+          "const": "basis_point",
+          "description": "One basis point (0.01%) of rate, spread or yield.",
+          "type": "string"
+        },
+        {
+          "const": "vol_point",
+          "description": "One volatility point (0.01 of absolute implied volatility).",
+          "type": "string"
+        },
+        {
+          "const": "percent",
+          "description": "One percent relative change of the quoted level (1.0 = 1%).",
+          "type": "string"
+        },
+        {
+          "const": "price_unit",
+          "description": "One unit of the quoted price or level (absolute change).",
+          "type": "string"
+        }
+      ]
+    },
     "PnlAttribution": {
       "description": "Complete P&L attribution result for a single instrument.\n\nDecomposes total P&L into constituent factors with optional detailed\nbreakdowns by curve, tenor, FX pair, etc.\n\n# Examples\n\n```no_run\nuse finstack_quant_attribution::{\n    attribute_pnl, AttributionMethod, AttributionRequest, ExecutionPolicy,\n};\nuse finstack_quant_valuations::instruments::Instrument;\nuse finstack_quant_valuations::instruments::rates::deposit::Deposit;\nuse finstack_quant_core::config::FinstackConfig;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::market_data::context::MarketContext;\nuse finstack_quant_core::money::Money;\nuse std::sync::Arc;\nuse time::macros::date;\n\n# fn main() -> Result<(), Box<dyn std::error::Error>> {\nlet as_of_t0 = date!(2025-01-15);\nlet as_of_t1 = date!(2025-01-16);\nlet market_t0 = MarketContext::new();\nlet market_t1 = MarketContext::new();\nlet config = FinstackConfig::default();\n\nlet instrument = Arc::new(\n    Deposit::builder()\n        .id(\"DEP-1D\".into())\n        .notional(Money::from((1_000_000_i64, Currency::USD)))\n        .start_date(as_of_t0)\n        .maturity(as_of_t1)\n        .day_count(finstack_quant_core::dates::DayCount::Act360)\n        .discount_curve_id(\"USD-OIS\".into())\n        .build()\n        .expect(\"deposit builder should succeed\"),\n) as Arc<dyn Instrument>;\n\nlet request = AttributionRequest {\n    execution_policy: ExecutionPolicy::Parallel,\n    ..AttributionRequest::new(\n        &instrument,\n        &market_t0,\n        &market_t1,\n        as_of_t0,\n        as_of_t1,\n        &config,\n    )\n};\nlet attribution = attribute_pnl(&AttributionMethod::Parallel, &request)?;\n\nprintln!(\"Total P&L: {}\", attribution.total_pnl);\nprintln!(\"Carry: {} ({:.1}%)\",\n    attribution.carry,\n    attribution.carry.amount() / attribution.total_pnl.amount() * 100.0\n);\n# Ok(())\n# }\n```",
       "properties": {
@@ -1641,6 +1666,28 @@
           "$ref": "#/$defs/Money",
           "description": "Model parameters P&L."
         },
+        "pv_t0": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present value at T₀ on the T₀ market: the opening endpoint of the\nattribution, in the `total_pnl` currency.\n\n`mark_to_market_pnl == pv_t1 − pv_t0`, and `total_pnl` adds the period\ncash receipts the method documents. After a target-currency\ntranslation this is the opening value converted at T₀ FX.\n\nAbsent when the result was not produced from two endpoint valuations in\nthe `total_pnl` currency: a bare [`Self::new`] result, a payload\nwritten before this field existed, or an opening value quoted in a\ndifferent currency from the closing value."
+        },
+        "pv_t1": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present value at T₁ on the T₁ market: the closing endpoint of the\nattribution, in the `total_pnl` currency.\n\nAfter a target-currency translation this is the closing value\nconverted at T₁ FX. Absent under the same conditions as\n[`Self::pv_t0`]."
+        },
         "rates_curves_pnl": {
           "$ref": "#/$defs/Money",
           "description": "Interest rate curves P&L."
@@ -1675,6 +1722,13 @@
           ],
           "description": "Detailed market scalars attribution."
         },
+        "sensitivity_steps": {
+          "description": "The working behind each factor of a sensitivity-based attribution, in\nthe order computed: sensitivity, observed market move, first-order\nP&L and second-order P&L (or the repriced value for factors isolated\nby a reprice).\n\nPopulated by the Taylor and metrics-based methods. Each factor bucket\nequals the sum of `explained_pnl + gamma_pnl` over its rows, with two\nmetrics-based exceptions that have no rows: `carry` is read directly\nfrom the T₀ carry metrics (see `carry_detail`), and `cross_factor_pnl`\nis itemized by pair in `cross_factor_detail`. Empty for\nthe parallel and waterfall methods, for a composite aggregate, and for\npayloads written before this field existed.",
+          "items": {
+            "$ref": "#/$defs/SensitivityStep"
+          },
+          "type": "array"
+        },
         "total_pnl": {
           "$ref": "#/$defs/Money",
           "description": "Total P&L *as reported by this attribution*.\n\nIn the standard total-return convention (the default carry path uses\nthe internal total-return carry helper), this is\n`(val_t1 − val_t0) + economic_cash_between(T0, T1)`. Cashflows received\nduring the period are added back so that\n`total_pnl == carry + factor_sum + residual` holds: the `carry` field\nincludes income and principal receipts, and reconciliation against the user's\nobserved val_t1 − val_t0 must subtract the economic cash out of\n`total_pnl` to recover the pure mark-to-market move.\n\n**For a raw mark-to-market view that excludes intra-period cashflows,\nread [`Self::mark_to_market_pnl`].** That field, when present, is the\nuntouched `val_t1 − val_t0` and never absorbs cash receipts."
@@ -1693,6 +1747,13 @@
         "vol_pnl": {
           "$ref": "#/$defs/Money",
           "description": "Implied volatility changes P&L."
+        },
+        "waterfall_steps": {
+          "description": "Ordered repricing steps of a waterfall attribution: the running\npresent value before and after each factor, in the order applied.\n\nThe step P&Ls chain from [`Self::pv_t0`] to the fully rolled value and\nsum to `mark_to_market_pnl − residual`. After a target-currency\ntranslation every step value is converted at T₁ FX, so the first\n`pv_before` equals `pv_t0 + fx_translation_pnl`.\n\nEmpty for every other method, for a composite aggregate, and for\npayloads written before this field existed.",
+          "items": {
+            "$ref": "#/$defs/WaterfallStep"
+          },
+          "type": "array"
         }
       },
       "required": [
@@ -1914,6 +1975,108 @@
       },
       "type": "object"
     },
+    "SensitivityBucket": {
+      "description": "One tenor bucket of a key-rate [`SensitivityStep`].\n\nThe bucket's first-order P&L is `sensitivity × market_move`; the bucket\nproducts of one step sum to that step's `explained_pnl`.",
+      "properties": {
+        "market_move": {
+          "description": "Observed T₀ → T₁ market move at this tenor, in the step's `move_unit`.",
+          "format": "double",
+          "type": "number"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Money",
+          "description": "Bucket sensitivity: currency amount per one unit of the step's\n`move_unit` (per basis point for key-rate DV01 / CS01)."
+        },
+        "tenor_years": {
+          "description": "Bucket tenor in years from the T₀ curve base date.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "tenor_years",
+        "sensitivity",
+        "market_move"
+      ],
+      "type": "object"
+    },
+    "SensitivityStep": {
+      "description": "The working behind one factor of a sensitivity-based (Taylor or\nmetrics-based) attribution.\n\nRows are stored on [`crate::PnlAttribution::sensitivity_steps`] in the\norder the method computed them. A row's contribution to its factor bucket\nis `explained_pnl + gamma_pnl`. Exactly one of four shapes applies:\n\n- **Scalar** (`sensitivity` and `market_move` present, `buckets` empty):\n  `explained_pnl = sensitivity × market_move`.\n- **Key-rate** (`buckets` non-empty): `explained_pnl = Σ bucket\n  sensitivity × bucket market_move`.\n- **Second-order only** (`market_move` present, no `sensitivity`, no\n  `buckets`): `explained_pnl` is zero and `gamma_pnl` is the second-order\n  term the metrics-based method computed from the T₀ convexity / gamma\n  metric of the supplied valuation and this `market_move`.\n- **Repriced** (`repriced_pv` present): the factor was isolated by a full\n  reprice instead of a sensitivity. For the Taylor `Theta` row\n  `repriced_pv` is the value at the T₁ date on the T₀ market and\n  `explained_pnl = (repriced_pv − pv_t0) + period cash receipts`. For every\n  other repriced row `repriced_pv` is the T₁ value with that factor\n  restored to its T₀ state and `explained_pnl = pv_t1 − repriced_pv`.\n\nWhen a sensitivity or move is not finite the working is omitted (the row\nkeeps only `factor`, `explained_pnl` and `gamma_pnl`), a note records it\nand the attribution is flagged invalid.\n\nAfter a target-currency translation every amount on a row is converted at\nT₁ FX, so these identities still hold with one substitution: in the\n`Theta` identity `pv_t0 + fx_translation_pnl` stands in for `pv_t0`\n(which is converted at T₀ FX).\n\n# Factor labels\n\n| Method | Labels | Bucket |\n|---|---|---|\n| Taylor | `Rates:{curve}`, `Forward:{curve}` | `rates_curves_pnl` |\n| Taylor | `Credit:{curve}` | `credit_curves_pnl` |\n| Taylor | `Vol:{surface}`, `Vol:scalars` | `vol_pnl` |\n| Taylor | `Fx`, `Inflation`, `Correlations`, `MarketScalars`, `ModelParameters` | the bucket of the same name |\n| Taylor | `Theta` | `carry` |\n| Metrics-based | `Rates:{curve}`, `Rates`, `RatesConvexity` | `rates_curves_pnl` |\n| Metrics-based | `Credit:{curve}`, `Credit`, `CreditGamma` | `credit_curves_pnl` |\n| Metrics-based | `Vol`, `Volga` | `vol_pnl` |\n| Metrics-based | `Fx` | `fx_pnl` |\n| Metrics-based | `Spot`, `SpotGamma` | `market_scalars_pnl` |\n| Metrics-based | `Inflation`, `InflationConvexity` | `inflation_curves_pnl` |\n| Metrics-based | `ModelParameters` | `model_params_pnl` |\n\nA label without a curve id (`Rates`, `Credit`) is the aggregate fallback:\none parallel sensitivity times the average move across the instrument's\ncurves.",
+      "properties": {
+        "buckets": {
+          "description": "Per-tenor sensitivities and moves for key-rate factors; empty\notherwise.",
+          "items": {
+            "$ref": "#/$defs/SensitivityBucket"
+          },
+          "type": "array"
+        },
+        "explained_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "First-order (or fully repriced) P&L of this factor, in the attribution\ncurrency."
+        },
+        "factor": {
+          "description": "Factor label, including its market-data id where one applies\n(`\"Rates:USD-OIS\"`, `\"Credit:ACME-HZD\"`, `\"Vol:SPX\"`, `\"Fx\"`,\n`\"Theta\"`).",
+          "type": "string"
+        },
+        "gamma_pnl": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Second-order (gamma / convexity / volga) P&L of this factor, in the\nattribution currency. Absent when no second-order term was computed."
+        },
+        "market_move": {
+          "description": "Observed T₀ → T₁ market move in `move_unit`. For a second-order-only\nrow this is the (averaged) move the convexity term was applied to.\nAbsent for key-rate and repriced rows.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "move_unit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MoveUnit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Unit of `market_move` and of the sensitivity denominator: basis points\nfor rates, credit and inflation rows, volatility points\nfor volatility rows, percent for the metrics-based `Fx` row and price\nunits for `Spot` rows. Absent for repriced rows."
+        },
+        "repriced_pv": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Repriced present value used to isolate this factor, in the attribution\ncurrency. Absent for sensitivity rows."
+        },
+        "sensitivity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Scalar sensitivity: currency amount per one `move_unit`. Absent for\nkey-rate and repriced rows."
+        }
+      },
+      "required": [
+        "factor",
+        "explained_pnl"
+      ],
+      "type": "object"
+    },
     "SourceLine": {
       "additionalProperties": false,
       "description": "One source-line of carry, optionally split into rates / credit components.\n\nUsed for `CarryDetail.coupon_income` and `CarryDetail.roll_down`. When no\n`CreditFactorModel` is supplied to attribution, `rates_part` and\n`credit_part` are both `None` and `total` carries the canonical scalar\nvalue. When a model is supplied, the two parts sum to `total` at\n1e-8 absolute tolerance.",
@@ -2010,6 +2173,41 @@
       },
       "required": [
         "by_surface"
+      ],
+      "type": "object"
+    },
+    "WaterfallStep": {
+      "description": "One sequential repricing step of a waterfall attribution.\n\nRows are stored on [`crate::PnlAttribution::waterfall_steps`] in the order\nthe waterfall applied them, so the present values chain:\n`steps[0].pv_before` is the opening value, each `pv_after` is the next\nrow's `pv_before`, and the last `pv_after` is the value with every listed\nfactor moved to T₁.\n\n`step_pnl == pv_after − pv_before` for every row. The factor bucket on\n[`crate::PnlAttribution`] equals `step_pnl`, except\n[`AttributionFactor::Carry`]: the `carry` bucket is the carry row's\n`step_pnl` plus the period cash receipts (`total_pnl −\nmark_to_market_pnl`).\n\nA factor the instrument does not use is not repriced and appears with\n`pv_after == pv_before`. When a credit-factor model replaces the single\ncredit step with a hierarchy cascade, the cascade is one\n[`AttributionFactor::CreditCurves`] row spanning all of its sub-steps; the\nper-level amounts are in `credit_factor_detail`.",
+      "properties": {
+        "factor": {
+          "$ref": "#/$defs/AttributionFactor",
+          "description": "Factor moved from its T₀ state to its T₁ state in this step."
+        },
+        "pv_after": {
+          "$ref": "#/$defs/Money",
+          "description": "Running present value after this step, in the attribution currency."
+        },
+        "pv_before": {
+          "$ref": "#/$defs/Money",
+          "description": "Running present value before this step, in the attribution currency."
+        },
+        "step_index": {
+          "description": "Zero-based position of this step in the applied factor order.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "step_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "P&L of this step, `pv_after − pv_before`, in the attribution currency."
+        }
+      },
+      "required": [
+        "step_index",
+        "factor",
+        "pv_before",
+        "pv_after",
+        "step_pnl"
       ],
       "type": "object"
     }

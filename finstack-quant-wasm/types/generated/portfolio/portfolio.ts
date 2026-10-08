@@ -6,6 +6,25 @@ import type * as valuations from '../valuations/index.js';
  */
 export type AllocationScheme = "equal" | "fixed" | "inverse_volatility" | "risk_budget";
 /**
+ * What one applied shock was applied to.
+ */
+export type AppliedShockTarget =
+  | {
+      scope: "market";
+      /**
+       * Concrete market-data target that was shocked.
+       */
+      target: ScenarioMarketTarget;
+    }
+  | {
+      /**
+       * Zero-based inventory indices of the instruments the shock changed,
+       * ascending.
+       */
+      indices: number[];
+      scope: "instruments";
+    };
+/**
  * A concrete market-data target changed while applying a scenario.
  *
  * Targets are recorded from hierarchy-expanded operations together with the
@@ -260,6 +279,99 @@ export type Currency =
   | "ZAR"
   | "ZMW"
   | "ZWL";
+/**
+ * Size and shape of one applied shock.
+ *
+ * Sizes are the shock as requested on the (hierarchy-expanded) operation, in
+ * that operation's own quote space, with the resolved location where the
+ * engine produced one. Delivery adjustments that change how the request
+ * reaches the market object — interpolation splits across neighbouring
+ * knots, solve-to-par recalibration, first-order hazard shifts, clamping —
+ * are reported in [`ApplicationReport::warnings`], not here.
+ */
+export type ShockMagnitude =
+  | {
+      kind: "uniform";
+      /**
+       * Unit of `value`.
+       */
+      unit: ShockUnit;
+      /**
+       * Shock size in `unit`.
+       */
+      value: number;
+    }
+  | {
+      kind: "key_rate";
+      /**
+       * Knot time the bump is centred on, in years on the curve's own time
+       * axis.
+       */
+      time_years: number;
+      /**
+       * Unit of `value`.
+       */
+      unit: ShockUnit;
+      /**
+       * Bump size delivered at that knot, in `unit`. For an off-knot tenor
+       * matched by interpolation this is the knot's calibrated share of
+       * the requested shock.
+       */
+      value: number;
+    }
+  | {
+      kind: "nodes";
+      /**
+       * Requested `(tenor, size)` nodes in operation order.
+       */
+      nodes: ShockNode[];
+      /**
+       * Unit of every node `value`.
+       */
+      unit: ShockUnit;
+    }
+  | {
+      /**
+       * Surface grid expiries the shock was restricted to, in years, after
+       * snapping the requested tenors to the grid. Absent when every
+       * expiry is shocked.
+       */
+      expiries_years?: number[] | null;
+      kind: "vol_bucket";
+      /**
+       * Strikes the shock was restricted to. Absent when every strike is
+       * shocked.
+       */
+      strikes?: number[] | null;
+      /**
+       * Unit of `value`.
+       */
+      unit: ShockUnit;
+      /**
+       * Shock size in `unit`.
+       */
+      value: number;
+    }
+  | {
+      /**
+       * Detachment points the shock was restricted to, in basis points
+       * (`300` = 3%), as supplied on the operation.
+       */
+      detachments_bp: number[];
+      kind: "detachment_bucket";
+      /**
+       * Unit of `value`.
+       */
+      unit: ShockUnit;
+      /**
+       * Shock size in `unit`.
+       */
+      value: number;
+    };
+/**
+ * Unit in which an applied shock's size is expressed.
+ */
+export type ShockUnit = "bp" | "percent" | "absolute";
 /**
  * Rounding modes supported by the library.
  *
@@ -1184,6 +1296,11 @@ export type NonPercentagePositionUnitName = "units" | "face_value";
  */
 export type MissingMetricPolicy = "zero" | "exclude" | "strict";
 /**
+ * Unit of a [`SensitivityStep`] market move; the sensitivity is a currency
+ * amount per one such unit.
+ */
+export type MoveUnit = "basis_point" | "vol_point" | "percent" | "price_unit";
+/**
  * Identifies a margin netting set.
  *
  * Instruments in the same netting set can offset each other for margin
@@ -1468,6 +1585,19 @@ export interface AllocationDiagnostics {
  */
 export interface ApplicationReport {
   /**
+   * Size of every market and instrument shock applied, in application
+   * order: one entry per accepted effect, so the entries reconcile with
+   * [`changes`](Self::changes) (every market target named there appears
+   * here at least once, and the instrument indices here union to
+   * `changes.changed_instrument_indices`).
+   *
+   * Statement-forecast operations, rate bindings and the time roll are not
+   * listed. Empty when the scenario applied no market or instrument shock,
+   * and on reports deserialized from JSON written before this field
+   * existed.
+   */
+  applied_shocks?: AppliedShock[];
+  /**
    * Authoritative metadata describing the state changed by applied effects.
    */
   changes: ScenarioChangeManifest;
@@ -1510,6 +1640,60 @@ export interface ApplicationReport {
    * Structured warnings generated during application (non-fatal).
    */
   warnings: Warning[];
+}
+/**
+ * One shock the engine applied, in application order.
+ *
+ * [`ScenarioChangeManifest`] says *which* targets changed (deduplicated, for
+ * cache invalidation); this says *by how much*. A target shocked by several
+ * effects has one entry per effect.
+ */
+export interface AppliedShock {
+  /**
+   * Market target or instruments the shock was applied to.
+   */
+  applies_to: AppliedShockTarget;
+  /**
+   * Stored level before and after the shock.
+   *
+   * Present only for scalar price targets
+   * ([`ScenarioMarketTarget::EquityPrice`]), where both levels are read
+   * from the market context around the mutation. Absent for FX, curves,
+   * surfaces and instruments.
+   */
+  level_change?: LevelChange | null;
+  /**
+   * Size, unit and shape of the shock.
+   */
+  shock: ShockMagnitude;
+}
+/**
+ * Level of a scalar market value immediately before and after a shock.
+ */
+export interface LevelChange {
+  /**
+   * Stored level after the shock, in the same units.
+   */
+  after: number;
+  /**
+   * Stored level before the shock, in the scalar's own units (the amount
+   * for a monetary price).
+   */
+  before: number;
+}
+/**
+ * One requested curve-node shock, as written on the operation.
+ */
+export interface ShockNode {
+  /**
+   * Tenor label of the node as supplied on the operation (for example `"5Y"`).
+   */
+  tenor: string;
+  /**
+   * Shock size requested at that tenor, in the enclosing
+   * [`ShockMagnitude::Nodes`] unit.
+   */
+  value: number;
 }
 /**
  * Authoritative change manifest produced while applying a scenario.
@@ -4080,6 +4264,29 @@ export interface PnlAttribution {
    */
   model_params_pnl: Money;
   /**
+   * Present value at T₀ on the T₀ market: the opening endpoint of the
+   * attribution, in the `total_pnl` currency.
+   *
+   * `mark_to_market_pnl == pv_t1 − pv_t0`, and `total_pnl` adds the period
+   * cash receipts the method documents. After a target-currency
+   * translation this is the opening value converted at T₀ FX.
+   *
+   * Absent when the result was not produced from two endpoint valuations in
+   * the `total_pnl` currency: a bare [`Self::new`] result, a payload
+   * written before this field existed, or an opening value quoted in a
+   * different currency from the closing value.
+   */
+  pv_t0?: Money | null;
+  /**
+   * Present value at T₁ on the T₁ market: the closing endpoint of the
+   * attribution, in the `total_pnl` currency.
+   *
+   * After a target-currency translation this is the closing value
+   * converted at T₁ FX. Absent under the same conditions as
+   * [`Self::pv_t0`].
+   */
+  pv_t1?: Money | null;
+  /**
    * Interest rate curves P&L.
    */
   rates_curves_pnl: Money;
@@ -4102,6 +4309,21 @@ export interface PnlAttribution {
    * Detailed market scalars attribution.
    */
   scalars_detail?: ScalarsAttribution | null;
+  /**
+   * The working behind each factor of a sensitivity-based attribution, in
+   * the order computed: sensitivity, observed market move, first-order
+   * P&L and second-order P&L (or the repriced value for factors isolated
+   * by a reprice).
+   *
+   * Populated by the Taylor and metrics-based methods. Each factor bucket
+   * equals the sum of `explained_pnl + gamma_pnl` over its rows, with two
+   * metrics-based exceptions that have no rows: `carry` is read directly
+   * from the T₀ carry metrics (see `carry_detail`), and `cross_factor_pnl`
+   * is itemized by pair in `cross_factor_detail`. Empty for
+   * the parallel and waterfall methods, for a composite aggregate, and for
+   * payloads written before this field existed.
+   */
+  sensitivity_steps?: SensitivityStep[];
   /**
    * Total P&L *as reported by this attribution*.
    *
@@ -4127,6 +4349,19 @@ export interface PnlAttribution {
    * Implied volatility changes P&L.
    */
   vol_pnl: Money;
+  /**
+   * Ordered repricing steps of a waterfall attribution: the running
+   * present value before and after each factor, in the order applied.
+   *
+   * The step P&Ls chain from [`Self::pv_t0`] to the fully rolled value and
+   * sum to `mark_to_market_pnl − residual`. After a target-currency
+   * translation every step value is converted at T₁ FX, so the first
+   * `pv_before` equals `pv_t0 + fx_translation_pnl`.
+   *
+   * Empty for every other method, for a composite aggregate, and for
+   * payloads written before this field existed.
+   */
+  waterfall_steps?: WaterfallStep[];
   [k: string]: unknown;
 }
 /**
@@ -4191,6 +4426,128 @@ export interface ScalarsAttribution {
   [k: string]: unknown;
 }
 /**
+ * The working behind one factor of a sensitivity-based (Taylor or
+ * metrics-based) attribution.
+ *
+ * Rows are stored on [`crate::PnlAttribution::sensitivity_steps`] in the
+ * order the method computed them. A row's contribution to its factor bucket
+ * is `explained_pnl + gamma_pnl`. Exactly one of four shapes applies:
+ *
+ * - **Scalar** (`sensitivity` and `market_move` present, `buckets` empty):
+ *   `explained_pnl = sensitivity × market_move`.
+ * - **Key-rate** (`buckets` non-empty): `explained_pnl = Σ bucket
+ *   sensitivity × bucket market_move`.
+ * - **Second-order only** (`market_move` present, no `sensitivity`, no
+ *   `buckets`): `explained_pnl` is zero and `gamma_pnl` is the second-order
+ *   term the metrics-based method computed from the T₀ convexity / gamma
+ *   metric of the supplied valuation and this `market_move`.
+ * - **Repriced** (`repriced_pv` present): the factor was isolated by a full
+ *   reprice instead of a sensitivity. For the Taylor `Theta` row
+ *   `repriced_pv` is the value at the T₁ date on the T₀ market and
+ *   `explained_pnl = (repriced_pv − pv_t0) + period cash receipts`. For every
+ *   other repriced row `repriced_pv` is the T₁ value with that factor
+ *   restored to its T₀ state and `explained_pnl = pv_t1 − repriced_pv`.
+ *
+ * When a sensitivity or move is not finite the working is omitted (the row
+ * keeps only `factor`, `explained_pnl` and `gamma_pnl`), a note records it
+ * and the attribution is flagged invalid.
+ *
+ * After a target-currency translation every amount on a row is converted at
+ * T₁ FX, so these identities still hold with one substitution: in the
+ * `Theta` identity `pv_t0 + fx_translation_pnl` stands in for `pv_t0`
+ * (which is converted at T₀ FX).
+ *
+ * # Factor labels
+ *
+ * | Method | Labels | Bucket |
+ * |---|---|---|
+ * | Taylor | `Rates:{curve}`, `Forward:{curve}` | `rates_curves_pnl` |
+ * | Taylor | `Credit:{curve}` | `credit_curves_pnl` |
+ * | Taylor | `Vol:{surface}`, `Vol:scalars` | `vol_pnl` |
+ * | Taylor | `Fx`, `Inflation`, `Correlations`, `MarketScalars`, `ModelParameters` | the bucket of the same name |
+ * | Taylor | `Theta` | `carry` |
+ * | Metrics-based | `Rates:{curve}`, `Rates`, `RatesConvexity` | `rates_curves_pnl` |
+ * | Metrics-based | `Credit:{curve}`, `Credit`, `CreditGamma` | `credit_curves_pnl` |
+ * | Metrics-based | `Vol`, `Volga` | `vol_pnl` |
+ * | Metrics-based | `Fx` | `fx_pnl` |
+ * | Metrics-based | `Spot`, `SpotGamma` | `market_scalars_pnl` |
+ * | Metrics-based | `Inflation`, `InflationConvexity` | `inflation_curves_pnl` |
+ * | Metrics-based | `ModelParameters` | `model_params_pnl` |
+ *
+ * A label without a curve id (`Rates`, `Credit`) is the aggregate fallback:
+ * one parallel sensitivity times the average move across the instrument's
+ * curves.
+ */
+export interface SensitivityStep {
+  /**
+   * Per-tenor sensitivities and moves for key-rate factors; empty
+   * otherwise.
+   */
+  buckets?: SensitivityBucket[];
+  /**
+   * First-order (or fully repriced) P&L of this factor, in the attribution
+   * currency.
+   */
+  explained_pnl: Money;
+  /**
+   * Factor label, including its market-data id where one applies
+   * (`"Rates:USD-OIS"`, `"Credit:ACME-HZD"`, `"Vol:SPX"`, `"Fx"`,
+   * `"Theta"`).
+   */
+  factor: string;
+  /**
+   * Second-order (gamma / convexity / volga) P&L of this factor, in the
+   * attribution currency. Absent when no second-order term was computed.
+   */
+  gamma_pnl?: Money | null;
+  /**
+   * Observed T₀ → T₁ market move in `move_unit`. For a second-order-only
+   * row this is the (averaged) move the convexity term was applied to.
+   * Absent for key-rate and repriced rows.
+   */
+  market_move?: number | null;
+  /**
+   * Unit of `market_move` and of the sensitivity denominator: basis points
+   * for rates, credit and inflation rows, volatility points
+   * for volatility rows, percent for the metrics-based `Fx` row and price
+   * units for `Spot` rows. Absent for repriced rows.
+   */
+  move_unit?: MoveUnit | null;
+  /**
+   * Repriced present value used to isolate this factor, in the attribution
+   * currency. Absent for sensitivity rows.
+   */
+  repriced_pv?: Money | null;
+  /**
+   * Scalar sensitivity: currency amount per one `move_unit`. Absent for
+   * key-rate and repriced rows.
+   */
+  sensitivity?: Money | null;
+  [k: string]: unknown;
+}
+/**
+ * One tenor bucket of a key-rate [`SensitivityStep`].
+ *
+ * The bucket's first-order P&L is `sensitivity × market_move`; the bucket
+ * products of one step sum to that step's `explained_pnl`.
+ */
+export interface SensitivityBucket {
+  /**
+   * Observed T₀ → T₁ market move at this tenor, in the step's `move_unit`.
+   */
+  market_move: number;
+  /**
+   * Bucket sensitivity: currency amount per one unit of the step's
+   * `move_unit` (per basis point for key-rate DV01 / CS01).
+   */
+  sensitivity: Money;
+  /**
+   * Bucket tenor in years from the T₀ curve base date.
+   */
+  tenor_years: number;
+  [k: string]: unknown;
+}
+/**
  * Detailed attribution for implied volatility changes.
  *
  * Provides per-surface breakdown.
@@ -4202,6 +4559,50 @@ export interface VolAttribution {
   by_surface: {
     [k: string]: Money;
   };
+  [k: string]: unknown;
+}
+/**
+ * One sequential repricing step of a waterfall attribution.
+ *
+ * Rows are stored on [`crate::PnlAttribution::waterfall_steps`] in the order
+ * the waterfall applied them, so the present values chain:
+ * `steps[0].pv_before` is the opening value, each `pv_after` is the next
+ * row's `pv_before`, and the last `pv_after` is the value with every listed
+ * factor moved to T₁.
+ *
+ * `step_pnl == pv_after − pv_before` for every row. The factor bucket on
+ * [`crate::PnlAttribution`] equals `step_pnl`, except
+ * [`AttributionFactor::Carry`]: the `carry` bucket is the carry row's
+ * `step_pnl` plus the period cash receipts (`total_pnl −
+ * mark_to_market_pnl`).
+ *
+ * A factor the instrument does not use is not repriced and appears with
+ * `pv_after == pv_before`. When a credit-factor model replaces the single
+ * credit step with a hierarchy cascade, the cascade is one
+ * [`AttributionFactor::CreditCurves`] row spanning all of its sub-steps; the
+ * per-level amounts are in `credit_factor_detail`.
+ */
+export interface WaterfallStep {
+  /**
+   * Factor moved from its T₀ state to its T₁ state in this step.
+   */
+  factor: AttributionFactor;
+  /**
+   * Running present value after this step, in the attribution currency.
+   */
+  pv_after: Money;
+  /**
+   * Running present value before this step, in the attribution currency.
+   */
+  pv_before: Money;
+  /**
+   * Zero-based position of this step in the applied factor order.
+   */
+  step_index: number;
+  /**
+   * P&L of this step, `pv_after − pv_before`, in the attribution currency.
+   */
+  step_pnl: Money;
   [k: string]: unknown;
 }
 /**
@@ -5136,6 +5537,26 @@ export interface PositionValue {
    * Entity that owns this position
    */
   entity_id: EntityId;
+  /**
+   * Spot FX rate applied to collapse [`value_native`](Self::value_native)
+   * into [`value_base`](Self::value_base): units of the portfolio base
+   * currency per one unit of the native currency, observed at the
+   * valuation date, so `value_native × fx_rate = value_base` (up to the
+   * base currency's `Money` rounding).
+   *
+   * Absent when the native currency is the base currency (no FX lookup is
+   * made), and on values deserialized from JSON written before this field
+   * existed.
+   */
+  fx_rate?: number | null;
+  /**
+   * Whether [`fx_rate`](Self::fx_rate) was built by triangulating through
+   * the FX matrix's pivot currency (`true`) or read from a direct or
+   * inverse quote (`false`).
+   *
+   * Absent exactly when `fx_rate` is absent.
+   */
+  fx_triangulated?: boolean | null;
   /**
    * Metrics on the portfolio menu that this position's instrument type has
    * no calculator for, and which were therefore never requested of it.

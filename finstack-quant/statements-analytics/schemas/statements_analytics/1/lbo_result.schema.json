@@ -30,12 +30,61 @@
         }
       ]
     },
+    "CheckComparison": {
+      "description": "The two numbers a check compared, and the tolerance it allowed.\n\nRecorded for every numeric comparison a check performs — whether it passed\nor failed — so the verdict can be reconstructed from exported data:\nthe comparison fails exactly when `|actual - expected| > tolerance`.\n\n`actual`, `expected` and `tolerance` are all in the units of the compared\nnodes (currency units for monetary nodes, the same units as\n[`CheckConfig::default_tolerance`]); `tolerance` is an absolute amount, not\na fraction or percentage.",
+      "properties": {
+        "actual": {
+          "description": "Observed (left-hand) value, in the compared nodes' units.",
+          "format": "double",
+          "type": "number"
+        },
+        "expected": {
+          "description": "Value the identity requires (right-hand side), in the same units.",
+          "format": "double",
+          "type": "number"
+        },
+        "identity": {
+          "description": "Stable snake_case name of the identity that was tested (for example\n`\"balance_sheet_articulation\"` or `\"cash_flow_components\"`); a check\nthat tests several identities per period uses a distinct label for each.",
+          "type": "string"
+        },
+        "period": {
+          "description": "Period the comparison was evaluated for, if it is period-specific.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tolerance": {
+          "description": "Absolute tolerance applied to `|actual - expected|`, in the same units.\nThis is the effective tolerance: the per-check override when one is\nconfigured, otherwise\n`max(default_tolerance, default_relative_tolerance * |reference|)`.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "identity",
+        "actual",
+        "expected",
+        "tolerance"
+      ],
+      "type": "object"
+    },
     "CheckFinding": {
       "description": "A single finding produced by a check for a specific period or node.",
       "properties": {
         "check_id": {
           "description": "Identifier of the check that produced this finding.",
           "type": "string"
+        },
+        "comparison": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CheckComparison"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The failed numeric comparison behind this finding (actual, expected and\ntolerance). `None` for findings that do not compare two numbers:\nskipped periods, missing or non-finite inputs, sign-convention\nwarnings, and formula checks without a tolerance (a formula check\nwith a tolerance compares its value against zero)."
         },
         "materiality": {
           "anyOf": [
@@ -113,6 +162,13 @@
         "check_name": {
           "description": "Human-readable name of the check.",
           "type": "string"
+        },
+        "comparisons": {
+          "description": "Every numeric comparison the check evaluated, passing and failing\nalike, in evaluation order. A passing check therefore still reports\nthe actual value, expected value and tolerance it was judged on.\nUnlike `findings`, this list is not reduced by the suite's\n`min_severity` / `materiality_threshold` reporting filters. Empty for\nchecks that do not compare two numbers, for periods a check skipped,\nand for reports serialized before this field existed.",
+          "items": {
+            "$ref": "#/$defs/CheckComparison"
+          },
+          "type": "array"
         },
         "findings": {
           "description": "Individual findings produced by the check.",

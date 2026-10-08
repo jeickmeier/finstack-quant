@@ -9765,14 +9765,14 @@ declare class Performance {
   excessReturns(rf: NumericArray, nperiods?: number): Float64Array[];
   /**
    * OLS beta versus the benchmark per asset, with standard error and 95% CI.
-   * @returns Per-ticker `{ beta, std_err, ci_lower, ci_upper }` objects in `tickerNames()` order.
+   * @returns Per-ticker `{ beta, std_err, ci_lower, ci_upper, n_obs, confidence_level }` objects in `tickerNames()` order; `n_obs` is the paired-observation count and `confidence_level` the decimal level (0.95) of the bounds.
    * @throws Error - Rejects if the beta results cannot be serialized to JavaScript.
    */
   beta(): BetaResult[];
   /**
    * Benchmark regression annualized Jensen alpha/beta statistics per asset.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
-   * @returns Per-ticker `{ alpha, beta, r_squared, adjusted_r_squared }` objects in `tickerNames()` order.
+   * @returns Per-ticker `{ alpha, beta, r_squared, adjusted_r_squared, n_obs }` objects in `tickerNames()` order; `n_obs` is the paired-observation count.
    * @throws Error - Rejects if the regression results cannot be serialized to JavaScript.
    */
   greeks(riskFreeRate?: number): GreeksResult[];
@@ -9837,7 +9837,7 @@ declare class Performance {
    * @param factorReturns - Matrix of aligned already-excess decimal factor-return series, one row per factor.
    * @param returnKind - `"excess"` or `"total"`; defaults to `"excess"`.
    * @param riskFreeRate - Annualized decimal risk-free rate, used only when `returnKind` is `"total"`; defaults to 0.0 and must be 0.0 for `"excess"`.
-   * @returns `{ alpha, betas, r_squared, adjusted_r_squared, residual_vol }` for the selected ticker.
+   * @returns `{ alpha, betas, r_squared, adjusted_r_squared, residual_vol, n_obs }` for the selected ticker; `n_obs` is the observation count.
    * @throws Error - Rejects a non-numeric `factor_returns` matrix, an unknown `returnKind`, a non-zero `riskFreeRate` with `"excess"`, an out-of-range `ticker_idx`, no factors, too few observations, non-finite or length-mismatched inputs, a singular factor design, a fitted coefficient, annualized intercept, or residual volatility that cannot be represented as a finite value, or a result that cannot be serialized to JavaScript. Constant responses retain undefined `NaN` R-squared statistics.
    */
   multiFactorGreeks(
@@ -12759,7 +12759,7 @@ export interface SimmCalculator extends WasmOwned {
    * @param sensitivities - Sensitivity set to aggregate; validated first, so an unknown tenor or commodity bucket throws instead of pricing to zero.
    * @param currency - Reporting currency; must be `"USD"` and match the sensitivities' base currency (concentration thresholds are in USD).
    * @param asOf - ISO-8601 calculation date stamped on the result.
-   * @returns The `ImResult` as a plain object: `amount` (Money), `methodology`, `mpor_days`, `as_of`, `approximation` and the SIMM component `breakdown`.
+   * @returns The `ImResult` as a plain object: `amount` (Money), `methodology`, `mpor_days`, `as_of`, `approximation`, the SIMM component `breakdown`, and `simm_detail` (per-component buckets with weighted sensitivities, concentration factors and bucket `k`, plus `risk_class_margins` and `mpor_scale`).
    * @throws Error - Throws if the sensitivities fail validation, the input or output currency is not USD, or the date is not ISO 8601.
    */
   calculateFromSensitivities(
@@ -12840,7 +12840,7 @@ export interface VmCalculator extends WasmOwned {
    * @param postedCollateral - Signed collateral balance in `currency`: positive held, negative posted, including pending agreed calls.
    * @param currency - ISO-4217 code; must equal the CSA base currency.
    * @param asOf - ISO-8601 calculation date; the settlement date is derived from it on the CSA calendar.
-   * @returns The `VmResult` as a plain object: `date`, `gross_exposure`, `net_exposure`, `post_amount`, `collect_amount` (Money) and `settlement_date`.
+   * @returns The `VmResult` as a plain object: `date`, `settlement_date`, and Money amounts `gross_exposure`, `threshold`, `independent_amount`, `net_exposure`, `collateral_balance`, `unrounded_call`, `mta`, `rounding_increment`, `post_amount` and `collect_amount`.
    * @throws Error - Throws if the currency is unknown or differs from the CSA base currency, an amount is non-finite, the date is not ISO 8601, or the CSA calendar is not registered.
    */
   calculate(exposure: number, postedCollateral: number, currency: string, asOf: string): VmResult;
@@ -32917,7 +32917,7 @@ export interface StatementsNamespace {
   /**
    * Export a statement result as a long-format table (twin of Python `StatementResult.to_arrow_long`, Rust `StatementResult::to_table_long`).
    * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
-   * @returns `TableEnvelope` with columns `node_id`, `period_id`, `value`, `value_money`, `currency`, `value_type`; monetary nodes repeat their value in `value_money` and set `currency`, scalar nodes leave both null.
+   * @returns `TableEnvelope` with columns `node_id`, `period_id`, `value`, `value_money`, `currency`, `value_type`, `source`; monetary nodes repeat their value in `value_money` and set `currency`, scalar nodes leave both null; `source` is the evaluation layer that produced the cell (`value`, `forecast`, `formula` or `where_masked`), null when the result records none.
    * @throws Error - Throws with kind `validation` if the result input is malformed or table construction fails.
    */
   statementResultToTableLong(resultJson: StatementResult | string): TableEnvelope;
@@ -34642,7 +34642,7 @@ export interface StatementsAnalyticsNamespace {
    * @param options - Optional Rust `DcfOptions`; every field is optional and a missing one takes its Rust default (`mid_year_convention`, `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `exit_multiple_metric_node`, ...). Unknown keys are rejected (object or JSON).
    * @param market - Optional `MarketContext` state used for statement evaluation, not for WACC discounting (object or JSON).
    * @param asOf - Optional ISO 8601 valuation date; required when `market` is supplied.
-   * @returns `CorporateValuationResult`: enterprise value, terminal-value PV, net debt and equity value as `Money` wire objects, plus per-share value when shares are supplied.
+   * @returns `CorporateValuationResult`: enterprise value, terminal-value PV, net debt and equity value as `Money` wire objects, plus per-share value when shares are supplied, and the DCF working: `wacc`, per-period `periods` rows (flow, discount factor, present value), `pv_explicit`, the undiscounted `terminal_value` with its `terminal_discount_years`, and the `equity_bridge` (gross debt and cash separately).
    * @throws Error - Throws with kind `validation` if an input is malformed, the model currency is missing, the WACC and terminal-value assumptions are inconsistent, or the valuation fails, and kind `not_found` if the UFCF or exit-multiple metric node is missing.
    */
   evaluateDcf(

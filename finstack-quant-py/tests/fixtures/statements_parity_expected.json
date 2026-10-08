@@ -543,7 +543,7 @@
       "stage": "stage1",
       "weighted": 39.7513758373272
     },
-    "explanation_text": "profit [2025Q1] = 60.00\nFormula: revenue - cogs\nType: Calculated\n\nComponents:\n  revenue = 100.00\n  cogs = 40.00\n",
+    "explanation_text": "profit [2025Q1] = 60.00\nFormula: revenue - cogs\nType: Calculated\nSource: formula\n\nComponents:\n  + revenue = 100.00\n  - cogs = 40.00\n",
     "forecast_summary": "MAE: 2.00, MAPE: 1.91% (eff_n=2), sMAPE: 1.91%, RMSE: 2.00 (n=2)",
     "lbo": {
       "checked": {
@@ -553,9 +553,53 @@
               "category": "accounting_identity",
               "check_id": "balance_sheet_articulation",
               "check_name": "Balance Sheet Articulation",
+              "comparisons": [
+                {
+                  "actual": 100.0,
+                  "expected": 400.0,
+                  "identity": "balance_sheet_articulation",
+                  "period": "2025Q1",
+                  "tolerance": 0.01
+                },
+                {
+                  "actual": 100.0,
+                  "expected": 400.0,
+                  "identity": "balance_sheet_articulation",
+                  "period": "2025Q2",
+                  "tolerance": 0.01
+                },
+                {
+                  "actual": 100.0,
+                  "expected": 400.0,
+                  "identity": "balance_sheet_articulation",
+                  "period": "2025Q3",
+                  "tolerance": 0.01
+                },
+                {
+                  "actual": 100.0,
+                  "expected": 400.0,
+                  "identity": "balance_sheet_articulation",
+                  "period": "2025Q4",
+                  "tolerance": 0.01
+                },
+                {
+                  "actual": 120.0,
+                  "expected": 320.0,
+                  "identity": "balance_sheet_articulation",
+                  "period": "2026Q1",
+                  "tolerance": 0.01
+                }
+              ],
               "findings": [
                 {
                   "check_id": "balance_sheet_articulation",
+                  "comparison": {
+                    "actual": 100.0,
+                    "expected": 400.0,
+                    "identity": "balance_sheet_articulation",
+                    "period": "2025Q1",
+                    "tolerance": 0.01
+                  },
                   "materiality": {
                     "absolute": 300.0,
                     "reference_label": "total_assets",
@@ -573,6 +617,13 @@
                 },
                 {
                   "check_id": "balance_sheet_articulation",
+                  "comparison": {
+                    "actual": 100.0,
+                    "expected": 400.0,
+                    "identity": "balance_sheet_articulation",
+                    "period": "2025Q2",
+                    "tolerance": 0.01
+                  },
                   "materiality": {
                     "absolute": 300.0,
                     "reference_label": "total_assets",
@@ -590,6 +641,13 @@
                 },
                 {
                   "check_id": "balance_sheet_articulation",
+                  "comparison": {
+                    "actual": 100.0,
+                    "expected": 400.0,
+                    "identity": "balance_sheet_articulation",
+                    "period": "2025Q3",
+                    "tolerance": 0.01
+                  },
                   "materiality": {
                     "absolute": 300.0,
                     "reference_label": "total_assets",
@@ -607,6 +665,13 @@
                 },
                 {
                   "check_id": "balance_sheet_articulation",
+                  "comparison": {
+                    "actual": 100.0,
+                    "expected": 400.0,
+                    "identity": "balance_sheet_articulation",
+                    "period": "2025Q4",
+                    "tolerance": 0.01
+                  },
                   "materiality": {
                     "absolute": 300.0,
                     "reference_label": "total_assets",
@@ -624,6 +689,13 @@
                 },
                 {
                   "check_id": "balance_sheet_articulation",
+                  "comparison": {
+                    "actual": 120.0,
+                    "expected": 320.0,
+                    "identity": "balance_sheet_articulation",
+                    "period": "2026Q1",
+                    "tolerance": 0.01
+                  },
                   "materiality": {
                     "absolute": 200.0,
                     "reference_label": "total_assets",
@@ -646,9 +718,46 @@
               "category": "accounting_identity",
               "check_id": "retained_earnings_reconciliation",
               "check_name": "Retained Earnings Reconciliation",
+              "comparisons": [
+                {
+                  "actual": 100.0,
+                  "expected": 200.0,
+                  "identity": "retained_earnings_roll_forward",
+                  "period": "2025Q2",
+                  "tolerance": 0.01
+                },
+                {
+                  "actual": 100.0,
+                  "expected": 200.0,
+                  "identity": "retained_earnings_roll_forward",
+                  "period": "2025Q3",
+                  "tolerance": 0.01
+                },
+                {
+                  "actual": 100.0,
+                  "expected": 200.0,
+                  "identity": "retained_earnings_roll_forward",
+                  "period": "2025Q4",
+                  "tolerance": 0.01
+                },
+                {
+                  "actual": 120.0,
+                  "expected": 220.0,
+                  "identity": "retained_earnings_roll_forward",
+                  "period": "2026Q1",
+                  "tolerance": 0.01
+                }
+              ],
               "findings": [
                 {
                   "check_id": "retained_earnings_reconciliation",
+                  "comparison": {
+                    "actual": 100.0,
+                    "expected": 200.0,
+                    "identity": "retained_earnings_roll_forward",
+                    "period": "2025Q2",
+                    "tolerance": 0.01
+                  },
                   "materiality": {
                     "absolute": 100.0,
                     "reference_label": "prior_retained_earnings",
@@ -665,6 +774,13 @@
                 },
                 {
                   "check_id": "retained_earnings_reconciliation",
+                  "comparison": {
+                    "actual": 100.0,
+                    "expected": 200.0,
+                    "identity": "retained_earnings_roll_forward",
+                    "period": "2025Q3",
+                    "tolerance": 0.01
+                  },
                   "materiality": {
                     "absolute": 100.0,
                     "reference_label": "prior_retained_earnings",
@@ -681,6 +797,13 @@
                 },
                 {
                   "check_id": "retained_earnings_reconciliation",
+                  "comparison": {
+                    "actual": 100.0,
+                    "expected": 200.0,
+                    "identity": "retained_earnings_roll_forward",
+                    "period": "2025Q4",
+                    "tolerance": 0.01
+                  },
                   "materiality": {
                     "absolute": 100.0,
                     "reference_label": "prior_retained_earnings",
@@ -697,6 +820,13 @@
                 },
                 {
                   "check_id": "retained_earnings_reconciliation",
+                  "comparison": {
+                    "actual": 120.0,
+                    "expected": 220.0,
+                    "identity": "retained_earnings_roll_forward",
+                    "period": "2026Q1",
+                    "tolerance": 0.01
+                  },
                   "materiality": {
                     "absolute": 100.0,
                     "reference_label": "prior_retained_earnings",
