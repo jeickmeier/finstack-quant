@@ -10,7 +10,7 @@
 //! - **IRS metrics**: DV01, annuity factors, par rates, present values
 //! - **Deposit metrics**: Discount factors, par rates, year fractions
 //! - **Risk metrics**: DV01 (standard for all parallel rate sensitivity), CS01, BucketedDV01, BucketedCS01, Theta, and all standardized "01" sensitivity metrics
-//! - **Standardized sensitivity metrics**: Dividend01, Inflation01, Prepayment01, Default01, Severity01, Conversion01, CollateralHaircut01, CollateralPrice01, Nav01, Carry01, Hurdle01, Dv01Domestic, Dv01Foreign, Fx01, Npv01, SpreadDv01, Correlation01, FxVega, ConvexityAdjustmentRisk
+//! - **Standardized sensitivity metrics**: Dividend01, Inflation01, Prepayment01, Default01, Severity01, Conversion01, CollateralHaircut01, CollateralPrice01, Nav01, Carry01, Hurdle01, Dv01Domestic, Dv01Foreign, Fx01, SpreadDv01, Correlation01, FxVega, ConvexityAdjustmentRisk
 //! - **Custom metrics**: User-defined metrics with dynamic identifiers
 
 use finstack_quant_core::HashMap;

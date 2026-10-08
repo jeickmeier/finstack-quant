@@ -1326,7 +1326,8 @@ pub(super) mod tests {
         );
         let amount = amount_from_result(&parsed);
         assert!(amount > 0.0);
-        assert_eq!(parsed["measures"]["mc_num_paths"], 64.0);
+        assert_eq!(parsed["measures"]["mc_num_paths"], 32.0);
+        assert_eq!(parsed["measures"]["mc_num_simulated_paths"], 64.0);
     }
 
     #[test]
@@ -1361,7 +1362,8 @@ pub(super) mod tests {
             "monte_carlo_hull_white_1f",
         );
         assert!(amount_from_result(&parsed) > 0.0);
-        assert_eq!(parsed["measures"]["mc_num_paths"], 64.0);
+        assert_eq!(parsed["measures"]["mc_num_paths"], 32.0);
+        assert_eq!(parsed["measures"]["mc_num_simulated_paths"], 64.0);
     }
 
     #[test]
@@ -1384,7 +1386,8 @@ pub(super) mod tests {
             "monte_carlo_hull_white_1f",
         );
         assert!(amount_from_result(&parsed) > 0.0);
-        assert_eq!(parsed["measures"]["mc_num_paths"], 16.0);
+        assert_eq!(parsed["measures"]["mc_num_paths"], 8.0);
+        assert_eq!(parsed["measures"]["mc_num_simulated_paths"], 16.0);
     }
 
     #[test]

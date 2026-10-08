@@ -11,7 +11,7 @@ use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
     serde_to_py, ColumnSchema,
 };
-use crate::errors::{display_to_py, portfolio_to_py, serde_json_to_py};
+use crate::errors::{portfolio_to_py, serde_json_to_py};
 
 /// Column schema for [`PyFiAttributionResult::to_dataframe`] (per-sector
 /// effects).
@@ -54,6 +54,12 @@ const FI_LINKED_SECTOR_COLUMNS: &[ColumnSchema<'static>] = &[
 pub struct PyFiAttributionResult {
     pub(crate) inner: finstack_quant_portfolio::FiAttributionResult,
 }
+
+crate::bindings::macros::wire_methods!(
+    PyFiAttributionResult,
+    finstack_quant_portfolio::FiAttributionResult,
+    "FiAttributionResult"
+);
 
 #[pymethods]
 impl PyFiAttributionResult {
@@ -156,32 +162,12 @@ impl PyFiAttributionResult {
         }
     }
 
-    /// Serialize to a compact JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Deserialize from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::FiAttributionResult =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "FiAttributionResult(sectors={}, active_return={})",
             self.inner.sectors.len(),
             self.inner.active_return,
         )
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 
@@ -199,6 +185,12 @@ impl PyFiAttributionResult {
 pub struct PyFiCarinoLinkedResult {
     pub(crate) inner: finstack_quant_portfolio::FiCarinoLinkedResult,
 }
+
+crate::bindings::macros::wire_methods!(
+    PyFiCarinoLinkedResult,
+    finstack_quant_portfolio::FiCarinoLinkedResult,
+    "FiCarinoLinkedResult"
+);
 
 #[pymethods]
 impl PyFiCarinoLinkedResult {
@@ -270,32 +262,12 @@ impl PyFiCarinoLinkedResult {
         )
     }
 
-    /// Serialize to a compact JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Deserialize from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::FiCarinoLinkedResult =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "FiCarinoLinkedResult(periods={}, sectors={})",
             self.inner.periods.len(),
             self.inner.linked_sectors.len(),
         )
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 
@@ -312,6 +284,12 @@ impl PyFiCarinoLinkedResult {
 pub struct PyFiReconciliationReport {
     pub(crate) inner: finstack_quant_portfolio::FiReconciliationReport,
 }
+
+crate::bindings::macros::wire_methods!(
+    PyFiReconciliationReport,
+    finstack_quant_portfolio::FiReconciliationReport,
+    "FiReconciliationReport"
+);
 
 #[pymethods]
 impl PyFiReconciliationReport {
@@ -344,31 +322,11 @@ impl PyFiReconciliationReport {
         )
     }
 
-    /// Serialize to a compact JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Deserialize from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::FiReconciliationReport =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "FiReconciliationReport(total_residual={}, is_reconciled={})",
             self.inner.total_residual, self.inner.is_reconciled,
         )
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 

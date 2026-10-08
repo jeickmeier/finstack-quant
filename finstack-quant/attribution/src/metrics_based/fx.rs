@@ -1,10 +1,10 @@
 use super::super::helpers::*;
 use super::super::types::*;
-use super::context::AttributionInputs;
+use super::context::MetricsContext;
 use finstack_quant_valuations::metrics::MetricId;
 
 pub(super) fn apply(
-    inputs: &AttributionInputs<'_>,
+    inputs: &MetricsContext<'_>,
     attribution: &mut PnlAttribution,
     non_finite_detected: &mut bool,
 ) {
@@ -27,13 +27,8 @@ pub(super) fn apply(
                 },
                 fx_amount,
             );
-            attribution.fx_pnl = factor_money_or_invalid(
-                fx_amount,
-                inputs.val_t1.value.currency(),
-                "FX P&L",
-                &mut attribution.meta.notes,
-                non_finite_detected,
-            );
+            attribution.fx_pnl =
+                inputs.money(fx_amount, "FX P&L", attribution, non_finite_detected);
             // Fx01 is the JOINT sensitivity to a simultaneous move of all the
             // instrument's FX pairs, but the shift above is measured on the
             // single `fx_exposure()` pair — approximate when the instrument

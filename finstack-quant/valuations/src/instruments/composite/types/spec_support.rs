@@ -11,6 +11,7 @@ use finstack_quant_core::dates::{
 use finstack_quant_core::expr::Expr;
 use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
 use finstack_quant_core::math::summation::neumaier_sum;
+use finstack_quant_core::math::variance;
 use finstack_quant_core::money::{fx::FxQuery, Money};
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::{Error, Result};
@@ -658,16 +659,15 @@ pub(crate) fn cashflows_between(
     Ok(neumaier_sum(amounts))
 }
 
+/// Sample (n-1) standard deviation of unit P&L observations.
+///
+/// Rejects fewer than two observations and any non-finite value instead of
+/// returning the zero or NaN that [`variance`] would produce for them.
 pub(super) fn sample_std_dev(values: &[f64]) -> Result<f64> {
     if values.len() < 2 || values.iter().any(|value| !value.is_finite()) {
         return Err(Error::Validation(
             "unit-P&L volatility requires at least two finite observations".to_string(),
         ));
     }
-    let mean = neumaier_sum(values.iter().copied()) / values.len() as f64;
-    let variance = neumaier_sum(values.iter().map(|value| {
-        let difference = *value - mean;
-        difference * difference
-    })) / (values.len() - 1) as f64;
-    Ok(variance.sqrt())
+    Ok(variance(values).sqrt())
 }

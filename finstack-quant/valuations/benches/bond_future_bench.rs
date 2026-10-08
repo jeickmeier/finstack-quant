@@ -147,22 +147,13 @@ fn bench_conversion_factor(c: &mut Criterion) {
 fn bench_model_price(c: &mut Criterion) {
     let mut group = c.benchmark_group("bond_future_model_price");
 
-    let ctd_bond = create_ctd_bond();
+    let mut future = create_ust_10y_future();
+    future.ctd_bond = Some(create_ctd_bond());
     let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 15).unwrap();
-    let delivery_date = Date::from_calendar_date(2025, Month::March, 31).unwrap();
-    let cf = 0.8234;
 
     group.bench_function("ust_10y", |b| {
-        b.iter(|| {
-            finstack_quant_valuations::instruments::fixed_income::bond_future::BondFuturePricer::fair_price(
-                black_box(&ctd_bond),
-                black_box(cf),
-                black_box(&market),
-                black_box(as_of),
-                black_box(delivery_date),
-            )
-        });
+        b.iter(|| future.fair_price(black_box(&market), black_box(as_of)));
     });
 
     group.finish();
@@ -266,29 +257,6 @@ fn bench_bucketed_dv01(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark invoice price calculation
-fn bench_invoice_price(c: &mut Criterion) {
-    let mut group = c.benchmark_group("bond_future_invoice_price");
-
-    let future = create_ust_10y_future();
-    let ctd_bond = create_ctd_bond();
-    let market = create_market();
-    let settlement = Date::from_calendar_date(2025, Month::March, 23).unwrap();
-
-    group.bench_function("ust_10y", |b| {
-        b.iter(|| {
-            future.invoice_price(
-                black_box(&ctd_bond),
-                black_box(future.terms.entry_price),
-                black_box(&market),
-                black_box(settlement),
-            )
-        });
-    });
-
-    group.finish();
-}
-
 /// Benchmark full pricing with all metrics
 fn bench_full_metrics(c: &mut Criterion) {
     let mut group = c.benchmark_group("bond_future_full_metrics");
@@ -322,7 +290,6 @@ criterion_group!(
     bench_instrument_value,
     bench_dv01,
     bench_bucketed_dv01,
-    bench_invoice_price,
     bench_full_metrics
 );
 criterion_main!(benches);

@@ -1,24 +1,16 @@
 use super::super::helpers::*;
 use super::super::types::*;
-use super::context::AttributionInputs;
-use super::shifts::{average_over, credit_curve_abs_shift_bp, twist_diagnostic_note};
+use super::context::MetricsContext;
+use super::shifts::{credit_curve_abs_shift_bp, note_twist};
 use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_valuations::metrics::MetricId;
-
-// Large Move Warning Thresholds
-//
-// These thresholds define when market moves are large enough that second-order
-// Taylor expansion may produce significant approximation errors (>5% relative).
-//
-// Beyond these thresholds, consider using parallel or waterfall attribution
-// for more accurate results.
 
 /// Maximum credit spread shift (in basis points) before warning.
 /// Credit spread convexity is typically larger than rate convexity.
 const LARGE_SPREAD_MOVE_THRESHOLD_BP: f64 = 50.0;
 
 pub(super) fn apply(
-    inputs: &AttributionInputs<'_>,
+    inputs: &MetricsContext<'_>,
     attribution: &mut PnlAttribution,
     non_finite_detected: &mut bool,
 ) {
@@ -81,11 +73,10 @@ pub(super) fn apply(
             );
         }
         if curves_with_data > 0 {
-            attribution.credit_curves_pnl = factor_money_or_invalid(
+            attribution.credit_curves_pnl = inputs.money(
                 credit_acc.total(),
-                inputs.val_t1.value.currency(),
                 "credit curves P&L (key-rate)",
-                &mut attribution.meta.notes,
+                attribution,
                 non_finite_detected,
             );
             credit_has_data = true;
@@ -113,11 +104,10 @@ pub(super) fn apply(
                 );
                 0.0
             };
-            attribution.credit_curves_pnl = factor_money_or_invalid(
+            attribution.credit_curves_pnl = inputs.money(
                 cs01 * avg_shift,
-                inputs.val_t1.value.currency(),
                 "credit curves P&L",
-                &mut attribution.meta.notes,
+                attribution,
                 non_finite_detected,
             );
             push_first_order_step(
@@ -166,13 +156,6 @@ pub(super) fn apply(
     // when the credit curve is twisted (signed mean ≈ 0). Emit a note so the
     // consumer knows the gamma number is not a real upper bound. Average over
     // the same credit curves the metrics-based attribution consumed.
-    let avg_credit_abs_shift_bp: Option<f64> =
-        average_over(&inputs.market_deps.curves.credit_curves, |curve_id| {
-            let v =
-                credit_curve_abs_shift_bp(curve_id.as_str(), inputs.market_t0, inputs.market_t1);
-            (v > 0.0).then_some(v)
-        })
-        .0;
     if credit_has_data {
         if let Some(avg_shift) = credit_convexity_avg_shift_bp {
             if let Some(cs_gamma) = inputs.val_t0.measures.get(MetricId::CsGamma.as_str()) {
@@ -185,11 +168,10 @@ pub(super) fn apply(
                     avg_shift,
                     gamma_pnl,
                 );
-                attribution.credit_curves_pnl = factor_money_or_invalid(
+                attribution.credit_curves_pnl = inputs.money(
                     attribution.credit_curves_pnl.amount() + gamma_pnl,
-                    inputs.val_t1.value.currency(),
                     "credit gamma P&L",
-                    &mut attribution.meta.notes,
+                    attribution,
                     non_finite_detected,
                 );
             }
@@ -203,15 +185,14 @@ pub(super) fn apply(
                 ));
             }
 
-            if let Some(abs_shift) = avg_credit_abs_shift_bp {
-                if let Some(note) = twist_diagnostic_note("Credit gamma", avg_shift, abs_shift) {
-                    attribution.meta.notes.push(note);
-                    attribution
-                        .meta
-                        .notes
-                        .push("Credit gamma: unreliable / bounds-exceeded".to_string());
-                }
-            }
+            // Averaged over the credit curves the attribution consumed.
+            note_twist(
+                &mut attribution.meta.notes,
+                "Credit gamma",
+                avg_shift,
+                &inputs.market_deps.curves.credit_curves,
+                |id| credit_curve_abs_shift_bp(id, inputs.market_t0, inputs.market_t1),
+            );
         }
     }
 }

@@ -2,36 +2,71 @@
 //!
 //! Tests cover:
 //! - Creation via builder pattern
-//! - TIPS and UK Gilt helper constructors
-//! - Parameter validation
+//! - TIPS and UK Gilt conventions
 //! - Various indexation methods
 //! - Deflation protection settings
 
 use super::common::*;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{DayCount, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+use finstack_quant_core::market_data::scalars::InflationLag;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::InflationLinkedBondParams;
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
     DeflationProtection, IndexationMethod, InflationLinkedBond,
 };
 use rust_decimal::Decimal;
 
+/// `ILB-TEST` with US TIPS conventions: 3-month lag, principal floor at
+/// maturity, base date on the issue date, USD-OIS / US-CPI-U curves.
+fn tips(
+    notional: Money,
+    real_coupon: f64,
+    issue: Date,
+    maturity: Date,
+    base_cpi: f64,
+    frequency: Tenor,
+    day_count: DayCount,
+) -> InflationLinkedBond {
+    InflationLinkedBond::builder()
+        .id(InstrumentId::new("ILB-TEST"))
+        .notional(notional)
+        .real_coupon(Decimal::try_from(real_coupon).expect("valid decimal"))
+        .frequency(frequency)
+        .day_count(day_count)
+        .issue_date(issue)
+        .maturity(maturity)
+        .base_cpi(base_cpi)
+        .base_date(issue)
+        .indexation_method(IndexationMethod::Tips)
+        .lag(InflationLag::Months(3))
+        .deflation_protection(DeflationProtection::MaturityOnly)
+        .business_day_convention(BusinessDayConvention::Following)
+        .stub(StubKind::None)
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .inflation_index_id(CurveId::new("US-CPI-U"))
+        .build()
+        .expect("valid TIPS")
+}
+
 #[test]
-fn test_tips_creation_via_helper() {
+fn test_tips_creation() {
     // Arrange
     let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let issue = d(2020, 1, 15);
     let maturity = d(2030, 1, 15);
 
-    let bond_params = InflationLinkedBondParams::tips(
-        notional, 0.0125, // 1.25% real coupon
-        issue, maturity, 250.0, // Base CPI
-    )
-    .expect("valid literal coupon");
-
     // Act
-    let tips = InflationLinkedBond::new_tips("US_TIPS_2030", &bond_params, "USD-OIS", "US-CPI-U");
+    let mut tips = tips(
+        notional,
+        0.0125, // 1.25% real coupon
+        issue,
+        maturity,
+        250.0, // Base CPI
+        Tenor::semi_annual(),
+        DayCount::ActActIsma,
+    );
+    tips.id = InstrumentId::new("US_TIPS_2030");
 
     // Assert
     assert_eq!(tips.id.as_str(), "US_TIPS_2030");
@@ -49,27 +84,34 @@ fn test_tips_creation_via_helper() {
 }
 
 #[test]
-fn test_uk_linker_creation_via_helper() {
+fn test_uk_linker_creation() {
     // Arrange
     let notional = Money::new(1_000_000.0, Currency::GBP).expect("valid money fixture");
     let issue = d(2020, 3, 22);
     let maturity = d(2040, 3, 22);
     let base_date = d(2019, 7, 1);
 
-    let bond_params = InflationLinkedBondParams::uk_linker(
-        notional, 0.00625, // 0.625% real coupon
-        issue, maturity, 280.0, // Base RPI
-    )
-    .expect("valid literal coupon");
-
-    // Act
-    let uk_gilt = InflationLinkedBond::new_uk_linker(
-        "UK_GILT_2040",
-        &bond_params,
-        base_date,
-        "GBP-NOMINAL",
-        "UK-RPI",
-    );
+    // Act: legacy (pre-September 2005) UK linker conventions — 8-month lag,
+    // no deflation floor.
+    let uk_gilt = InflationLinkedBond::builder()
+        .id(InstrumentId::new("UK_GILT_2040"))
+        .notional(notional)
+        .real_coupon(Decimal::try_from(0.00625).expect("valid decimal")) // 0.625% real coupon
+        .frequency(Tenor::semi_annual())
+        .day_count(DayCount::ActActIsma)
+        .issue_date(issue)
+        .maturity(maturity)
+        .base_cpi(280.0) // Base RPI
+        .base_date(base_date)
+        .indexation_method(IndexationMethod::Uk)
+        .lag(IndexationMethod::Uk.standard_lag())
+        .deflation_protection(DeflationProtection::None)
+        .business_day_convention(BusinessDayConvention::Following)
+        .stub(StubKind::None)
+        .discount_curve_id(CurveId::new("GBP-NOMINAL"))
+        .inflation_index_id(CurveId::new("UK-RPI"))
+        .build()
+        .expect("valid UK linker");
 
     // Assert
     assert_eq!(uk_gilt.id.as_str(), "UK_GILT_2040");
@@ -201,54 +243,6 @@ fn test_deflation_protection_from_str() {
 }
 
 #[test]
-fn test_parameter_struct_tips() {
-    // Arrange
-    let notional = Money::new(100_000.0, Currency::USD).expect("valid money fixture");
-    let issue = d(2020, 1, 1);
-    let maturity = d(2025, 1, 1);
-
-    // Act
-    let params = InflationLinkedBondParams::tips(notional, 0.02, issue, maturity, 200.0)
-        .expect("valid literal coupon");
-
-    // Assert
-    assert_eq!(params.notional.amount(), 100_000.0);
-    assert_eq!(
-        params.real_coupon,
-        Decimal::try_from(0.02).expect("valid decimal")
-    );
-    assert_eq!(params.issue_date, issue);
-    assert_eq!(params.maturity, maturity);
-    assert_eq!(params.base_cpi, 200.0);
-    assert_eq!(params.frequency, Tenor::semi_annual());
-    assert_eq!(params.day_count, DayCount::ActActIsma);
-}
-
-#[test]
-fn test_parameter_struct_uk_linker() {
-    // Arrange
-    let notional = Money::new(100_000.0, Currency::GBP).expect("valid money fixture");
-    let issue = d(2020, 1, 1);
-    let maturity = d(2030, 1, 1);
-
-    // Act
-    let params = InflationLinkedBondParams::uk_linker(notional, 0.005, issue, maturity, 300.0)
-        .expect("valid literal coupon");
-
-    // Assert
-    assert_eq!(params.notional.amount(), 100_000.0);
-    assert_eq!(
-        params.real_coupon,
-        Decimal::try_from(0.005).expect("valid decimal")
-    );
-    assert_eq!(params.issue_date, issue);
-    assert_eq!(params.maturity, maturity);
-    assert_eq!(params.base_cpi, 300.0);
-    assert_eq!(params.frequency, Tenor::semi_annual());
-    assert_eq!(params.day_count, DayCount::ActActIsma);
-}
-
-#[test]
 fn test_various_currencies() {
     // Arrange
     let issue = d(2020, 1, 1);
@@ -263,7 +257,7 @@ fn test_various_currencies() {
         (Currency::JPY, 100.0),
     ] {
         let notional = Money::new(1_000_000.0, ccy).expect("valid money fixture");
-        let params = InflationLinkedBondParams::new(
+        let mut bond = tips(
             notional,
             0.01,
             issue,
@@ -271,15 +265,10 @@ fn test_various_currencies() {
             base_cpi,
             Tenor::semi_annual(),
             DayCount::ActAct,
-        )
-        .expect("valid literal coupon");
-
-        let bond = InflationLinkedBond::new_tips(
-            format!("ILB-{}", ccy),
-            &params,
-            format!("{}-REAL", ccy),
-            format!("{}-CPI", ccy),
         );
+        bond.id = InstrumentId::new(format!("ILB-{}", ccy));
+        bond.discount_curve_id = CurveId::new(format!("{}-REAL", ccy));
+        bond.inflation_index_id = CurveId::new(format!("{}-CPI", ccy));
 
         assert_eq!(bond.notional.currency(), ccy);
     }
@@ -294,7 +283,7 @@ fn test_various_frequencies() {
 
     // Act & Assert - Test various payment frequencies
     for frequency in [Tenor::annual(), Tenor::semi_annual(), Tenor::quarterly()] {
-        let params = InflationLinkedBondParams::new(
+        let bond = tips(
             notional,
             0.01,
             issue,
@@ -302,10 +291,7 @@ fn test_various_frequencies() {
             250.0,
             frequency,
             DayCount::ActAct,
-        )
-        .expect("valid literal coupon");
-
-        let bond = InflationLinkedBond::new_tips("ILB-TEST", &params, "USD-OIS", "US-CPI-U");
+        );
 
         assert_eq!(bond.frequency, frequency);
     }
@@ -320,7 +306,7 @@ fn test_various_day_count_conventions() {
 
     // Act & Assert - Test various day count conventions
     for day_count in [DayCount::ActAct, DayCount::Act360, DayCount::Thirty360] {
-        let params = InflationLinkedBondParams::new(
+        let bond = tips(
             notional,
             0.01,
             issue,
@@ -328,10 +314,7 @@ fn test_various_day_count_conventions() {
             250.0,
             Tenor::semi_annual(),
             day_count,
-        )
-        .expect("valid literal coupon");
-
-        let bond = InflationLinkedBond::new_tips("ILB-TEST", &params, "USD-OIS", "US-CPI-U");
+        );
 
         assert_eq!(bond.day_count, day_count);
     }
@@ -369,49 +352,5 @@ fn test_quoted_clean_price_pct() {
             .market_quotes
             .quoted_clean_price_pct,
         None
-    );
-}
-
-#[test]
-fn test_ilb_params_rejects_nan_coupon() {
-    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
-    let issue = d(2020, 1, 1);
-    let maturity = d(2030, 1, 1);
-
-    let result = InflationLinkedBondParams::tips(notional, f64::NAN, issue, maturity, 250.0);
-    assert!(
-        result.is_err(),
-        "InflationLinkedBondParams should reject NaN real_coupon"
-    );
-}
-
-#[test]
-fn test_ilb_params_rejects_infinite_coupon() {
-    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
-    let issue = d(2020, 1, 1);
-    let maturity = d(2030, 1, 1);
-
-    let result = InflationLinkedBondParams::tips(notional, f64::INFINITY, issue, maturity, 250.0);
-    assert!(
-        result.is_err(),
-        "InflationLinkedBondParams should reject infinite real_coupon"
-    );
-}
-
-#[test]
-fn test_ilb_params_accepts_zero_coupon() {
-    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
-    let issue = d(2020, 1, 1);
-    let maturity = d(2030, 1, 1);
-
-    let result = InflationLinkedBondParams::tips(notional, 0.0, issue, maturity, 250.0);
-    assert!(
-        result.is_ok(),
-        "InflationLinkedBondParams should accept zero real_coupon"
-    );
-    assert_eq!(
-        result.unwrap().real_coupon,
-        rust_decimal::Decimal::ZERO,
-        "Zero coupon should map to Decimal::ZERO"
     );
 }

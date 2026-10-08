@@ -72,12 +72,8 @@ pub(crate) fn register_equity_option_metrics(
             (BucketedVega, crate::metrics::KeyRateVega::<
                 crate::instruments::EquityOption,
             >::default()),
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::EquityOption,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::EquityOption,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
             (Theta, crate::metrics::OptionGreekCalculator::<crate::instruments::EquityOption>::theta()),
             (Rho, crate::metrics::OptionGreekCalculator::<crate::instruments::EquityOption>::rho()),
             (ImpliedVol, implied_vol::ImpliedVolCalculator),

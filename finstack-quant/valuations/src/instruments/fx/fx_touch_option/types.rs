@@ -284,10 +284,6 @@ impl crate::instruments::common_impl::traits::Instrument for FxTouchOption {
         Some(self.expiry)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        None
-    }
-
     /// Roll the observed touch state with spot held at its `as_of` level.
     ///
     /// When the roll passes `monitoring_start_date` (or reaches expiry) and

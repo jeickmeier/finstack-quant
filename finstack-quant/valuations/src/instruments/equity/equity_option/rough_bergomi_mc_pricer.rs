@@ -396,15 +396,10 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
         let initial_state = [spot];
 
         // Derive deterministic seed from instrument id
-        let seed_val = if let Some(ref scenario) = equity_option
+        let seed_val = equity_option
             .instrument_pricing_overrides
             .model_config
-            .mc_seed_scenario
-        {
-            finstack_quant_models::monte_carlo::seed::derive_seed(&equity_option.id, scenario)
-        } else {
-            finstack_quant_models::monte_carlo::seed::derive_seed(&equity_option.id, "base")
-        };
+            .mc_seed(&equity_option.id);
         let mut rng = finstack_quant_models::monte_carlo::rng::philox::PhiloxRng::new(seed_val);
 
         // Resolve and cap the path count via the workspace helper before

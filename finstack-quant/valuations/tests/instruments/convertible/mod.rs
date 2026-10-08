@@ -3,7 +3,7 @@
 //! Tests are organized into focused modules:
 //! - `fixtures`: Common test fixtures, market contexts, and helper functions
 //! - `test_pricing_basic`: Basic valuation, parity, conversion value
-//! - `test_pricing_trees`: Binomial/trinomial trees and convergence
+//! - `test_pricing_trees`: Binomial tree pricing and convergence
 //! - `test_greeks`: Greeks calculations and sensitivities
 //! - `test_conversion_policies`: Voluntary, mandatory, window, event-triggered
 //! - `test_embedded_options`: Calls, puts, and combinations

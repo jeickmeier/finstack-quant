@@ -630,9 +630,16 @@ fn b2_cap_auto_uses_normal_quote_metadata_and_rejects_black_mismatch() {
 
 #[test]
 fn b3_shifted_swaption_prices_shifted_positive_rates() {
+    use finstack_quant_core::dates::{BusinessDayConvention, StubKind, Tenor};
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
+    use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_models::volatility::sabr::SabrParameters;
-    use finstack_quant_valuations::instruments::rates::swaption::{Swaption, SwaptionParams};
+    use finstack_quant_valuations::instruments::rates::irs::{
+        FixedLegSpec, FloatLegSpec, FloatingLegCompounding,
+    };
+    use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
+    use finstack_quant_valuations::instruments::{OptionType, SettlementType, VolatilityModel};
+    use rust_decimal::Decimal;
     let as_of = date!(2024 - 01 - 02);
     let curve = DiscountCurve::builder("DISC")
         .base_date(as_of)
@@ -647,15 +654,52 @@ fn b3_shifted_swaption_prices_shifted_positive_rates() {
             .build()
             .expect("forward"),
     );
-    let params = SwaptionParams::payer(
-        Money::from((1_000_000_i64, Currency::USD)),
-        0.02,
-        date!(2025 - 01 - 02),
-        date!(2025 - 01 - 02),
-        date!(2030 - 01 - 02),
-    )
-    .expect("params");
-    let mut option = Swaption::new("SHIFTED", &params, "DISC", "FWD", "VOL");
+    let swap_start = date!(2025 - 01 - 02);
+    let swap_end = date!(2030 - 01 - 02);
+    let fixed = FixedLegSpec {
+        discount_curve_id: CurveId::new("DISC"),
+        rate: Decimal::new(2, 2),
+        frequency: Tenor::semi_annual(),
+        day_count: DayCount::Thirty360,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: None,
+        stub: StubKind::None,
+        start: swap_start,
+        end: swap_end,
+        par_method: None,
+        payment_lag_days: 0,
+        end_of_month: false,
+    };
+    let float = FloatLegSpec {
+        discount_curve_id: CurveId::new("DISC"),
+        forward_curve_id: CurveId::new("FWD"),
+        spread_bp: Decimal::ZERO,
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act360,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: None,
+        stub: StubKind::None,
+        reset_lag_days: 0,
+        fixing_calendar_id: None,
+        start: swap_start,
+        end: swap_end,
+        compounding: FloatingLegCompounding::Simple,
+        payment_lag_days: 0,
+        end_of_month: false,
+    };
+    let mut option = Swaption::builder()
+        .id(InstrumentId::new("SHIFTED"))
+        .option_type(OptionType::Call)
+        .notional(Money::from((1_000_000_i64, Currency::USD)))
+        .expiry(swap_start)
+        .settlement(SettlementType::Physical)
+        .cash_settlement_method(CashSettlementMethod::default())
+        .vol_model(VolatilityModel::Black)
+        .vol_surface_id(CurveId::new("VOL"))
+        .underlying_fixed_leg(fixed)
+        .underlying_float_leg(float)
+        .build()
+        .expect("swaption");
     let base = option
         .price_black(&market, 0.3, as_of)
         .expect("black")

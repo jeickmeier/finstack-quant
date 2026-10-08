@@ -45,32 +45,10 @@
           "version": 1
         },
         "fx_policy_applied": null,
-        "timestamp": "+002026-10-07T23:28:08.931000000Z",
-        "version": "0.9.0"
+        "timestamp": "+002026-10-05T08:19:45.549000000Z",
+        "version": "0.10.0"
       },
-      "covenants": null,
-      "provenance": {
-        "model": "discounting",
-        "requested_as_of": "2025-01-01",
-        "market_dependencies": {
-          "curves": {
-            "discount_curves": ["USD-OIS"],
-            "forward_curves": [],
-            "credit_curves": ["HZ"],
-            "inflation_curves": []
-          },
-          "market_scalar_ids": [],
-          "volatility_dependencies": [],
-          "fx_pairs": [],
-          "series_ids": []
-        },
-        "sensitivity_bumps": {
-          "rate_bump_bp": 1,
-          "credit_spread_bump_bp": 1,
-          "spot_bump_decimal": 0.01,
-          "vol_bump_decimal": 0.01
-        }
-      }
+      "covenants": null
     },
     "groups": {
       "Alternatives": [
@@ -222,14 +200,6 @@
         "df_start",
         "expected_exercise_time",
         "financing_annuity",
-        "fixed_first_accrual_factor",
-        "fixed_first_payment_date",
-        "fixed_last_payment_date",
-        "fixed_leg_payment_count",
-        "floating_first_accrual_factor",
-        "floating_first_payment_date",
-        "floating_last_payment_date",
-        "floating_leg_payment_count",
         "implied_forward",
         "incremental_par_spread",
         "index_delta",
@@ -461,7 +431,7 @@
         "bucketed": true
       }
     ],
-    "facadeWasmSha256": "0c8783e54226209095182f50cc646a07da64b91f6d520e8b7e2dd8b63d26f5aa"
+    "facadeWasmSha256": "1ffbb6bf30d0011503ef7d73a02c8a59e856a35ad55d4052b78157a7db1a6b80"
   },
   "market": {
     "source": "finstack-quant/calibration/examples/market_bootstrap/05_cdx_base_correlation.json",
@@ -2271,19 +2241,19 @@
           "report": {
             "success": true,
             "residuals": {
-              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.00006846385076642036,
-              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.00006534319254569709,
-              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.000022389576770365238,
+              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.00006847549229860306,
+              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.00006534028216265142,
+              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.000022398307919502258,
               "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio": 0.00007395574357360601,
               "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 0.00006841673894086853,
               "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 0.0000310175892082043
             },
             "iterations": 196,
-            "objective_value": 0.00005855299285960772,
+            "objective_value": 0.000058555276920480054,
             "max_residual": 7.395574357360601e-13,
-            "rmse": 5.855299285960772e-13,
+            "rmse": 5.855527692048004e-13,
             "max_residual_ratio": 0.00007395574357360601,
-            "rmse_ratio": 0.00005855299285960772,
+            "rmse_ratio": 0.000058555276920480054,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -2313,7 +2283,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.9.0"
+              "version": "0.10.0"
             },
             "worst_quote_id": "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio",
             "worst_quote_residual": 0.00007395574357360601
@@ -2322,17 +2292,17 @@
             "USD-OIS": {
               "success": true,
               "residuals": {
-                "USD-OIS-SWAP-10Y": 6.846385076642036e-13,
-                "USD-OIS-SWAP-1Y": 6.534319254569709e-13,
-                "USD-OIS-SWAP-2Y": 2.2389576770365239e-13,
+                "USD-OIS-SWAP-10Y": 6.847549229860306e-13,
+                "USD-OIS-SWAP-1Y": 6.534028216265142e-13,
+                "USD-OIS-SWAP-2Y": 2.2398307919502257e-13,
                 "USD-OIS-SWAP-5Y": -7.395574357360601e-13,
                 "USD-SOFR-DEP-1M": 6.841673894086852e-13,
                 "USD-SOFR-DEP-3M": 3.10175892082043e-13
               },
               "iterations": 196,
-              "objective_value": 5.855299285960772e-13,
+              "objective_value": 5.855527692048004e-13,
               "max_residual": 7.395574357360601e-13,
-              "rmse": 5.855299285960772e-13,
+              "rmse": 5.855527692048004e-13,
               "validation_passed": true,
               "convergence_reason": "generic bootstrap calibration converged: max_residual (7.40e-13) within tolerance (1.00e-8)",
               "metadata": {
@@ -2360,7 +2330,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "Multi-curve OIS discounting v1.0",
               "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -2381,7 +2351,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.9.0"
+            "version": "0.10.0"
           }
         }
       }
@@ -2907,9 +2877,9 @@
           "report": {
             "success": true,
             "residuals": {
-              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.00006846385076642036,
-              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.00006534319254569709,
-              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.000022389576770365238,
+              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.00006847549229860306,
+              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.00006534028216265142,
+              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.000022398307919502258,
               "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio": 0.00007395574357360601,
               "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 0.00006841673894086853,
               "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 0.0000310175892082043,
@@ -2920,11 +2890,11 @@
               "USD-SOFR-3M:FRA-SOFR-3M-9X12:tolerance_ratio": 6.665452062914726e-10
             },
             "iterations": 196,
-            "objective_value": 0.00004324425115507638,
+            "objective_value": 0.00004324593804582593,
             "max_residual": 7.395574357360601e-13,
-            "rmse": 4.3244251155076386e-13,
+            "rmse": 4.3245938045825926e-13,
             "max_residual_ratio": 0.00007395574357360601,
-            "rmse_ratio": 0.00004324425115507638,
+            "rmse_ratio": 0.00004324593804582593,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -2954,7 +2924,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.9.0"
+              "version": "0.10.0"
             },
             "worst_quote_id": "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio",
             "worst_quote_residual": 0.00007395574357360601
@@ -2963,17 +2933,17 @@
             "USD-OIS": {
               "success": true,
               "residuals": {
-                "USD-OIS-SWAP-10Y": 6.846385076642036e-13,
-                "USD-OIS-SWAP-1Y": 6.534319254569709e-13,
-                "USD-OIS-SWAP-2Y": 2.2389576770365239e-13,
+                "USD-OIS-SWAP-10Y": 6.847549229860306e-13,
+                "USD-OIS-SWAP-1Y": 6.534028216265142e-13,
+                "USD-OIS-SWAP-2Y": 2.2398307919502257e-13,
                 "USD-OIS-SWAP-5Y": -7.395574357360601e-13,
                 "USD-SOFR-DEP-1M": 6.841673894086852e-13,
                 "USD-SOFR-DEP-3M": 3.10175892082043e-13
               },
               "iterations": 196,
-              "objective_value": 5.855299285960772e-13,
+              "objective_value": 5.855527692048004e-13,
               "max_residual": 7.395574357360601e-13,
-              "rmse": 5.855299285960772e-13,
+              "rmse": 5.855527692048004e-13,
               "validation_passed": true,
               "convergence_reason": "generic bootstrap calibration converged: max_residual (7.40e-13) within tolerance (1.00e-8)",
               "metadata": {
@@ -3001,7 +2971,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "Multi-curve OIS discounting v1.0",
               "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -3061,7 +3031,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "worst_quote_id": "FRA-SOFR-3M-9X12",
               "worst_quote_residual": 6.665452062914726e-18,
@@ -3081,7 +3051,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.9.0"
+            "version": "0.10.0"
           }
         }
       }
@@ -3860,19 +3830,19 @@
               "ISSUER-A-CDS:ISSUER-A-CDS-3Y:tolerance_ratio": 0.00005081449584026787,
               "ISSUER-A-CDS:ISSUER-A-CDS-5Y:tolerance_ratio": 0.00008197283997424254,
               "ISSUER-A-CDS:ISSUER-A-CDS-7Y:tolerance_ratio": 0.00006066072123778188,
-              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.00006846385076642036,
-              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.00006534319254569709,
-              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.000022389576770365238,
+              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.00006847549229860306,
+              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.00006534028216265142,
+              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.000022398307919502258,
               "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio": 0.00007395574357360601,
               "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 0.00006841673894086853,
               "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 0.0000310175892082043
             },
             "iterations": 674,
-            "objective_value": 0.00006195198952252366,
+            "objective_value": 0.00006195316703203292,
             "max_residual": 8.197283997424254e-13,
-            "rmse": 6.195198952252365e-13,
+            "rmse": 6.195316703203291e-13,
             "max_residual_ratio": 0.00008197283997424254,
-            "rmse_ratio": 0.00006195198952252366,
+            "rmse_ratio": 0.00006195316703203292,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -3902,7 +3872,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.9.0"
+              "version": "0.10.0"
             },
             "worst_quote_id": "ISSUER-A-CDS:ISSUER-A-CDS-5Y:tolerance_ratio",
             "worst_quote_residual": 0.00008197283997424254
@@ -3948,7 +3918,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "ISDA Standard Model v1.8.2",
               "worst_quote_id": "ISSUER-A-CDS-5Y",
@@ -3958,17 +3928,17 @@
             "USD-OIS": {
               "success": true,
               "residuals": {
-                "USD-OIS-SWAP-10Y": 6.846385076642036e-13,
-                "USD-OIS-SWAP-1Y": 6.534319254569709e-13,
-                "USD-OIS-SWAP-2Y": 2.2389576770365239e-13,
+                "USD-OIS-SWAP-10Y": 6.847549229860306e-13,
+                "USD-OIS-SWAP-1Y": 6.534028216265142e-13,
+                "USD-OIS-SWAP-2Y": 2.2398307919502257e-13,
                 "USD-OIS-SWAP-5Y": -7.395574357360601e-13,
                 "USD-SOFR-DEP-1M": 6.841673894086852e-13,
                 "USD-SOFR-DEP-3M": 3.10175892082043e-13
               },
               "iterations": 196,
-              "objective_value": 5.855299285960772e-13,
+              "objective_value": 5.855527692048004e-13,
               "max_residual": 7.395574357360601e-13,
-              "rmse": 5.855299285960772e-13,
+              "rmse": 5.855527692048004e-13,
               "validation_passed": true,
               "convergence_reason": "generic bootstrap calibration converged: max_residual (7.40e-13) within tolerance (1.00e-8)",
               "metadata": {
@@ -3996,7 +3966,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "Multi-curve OIS discounting v1.0",
               "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -4017,7 +3987,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.9.0"
+            "version": "0.10.0"
           }
         }
       }
@@ -4796,19 +4766,19 @@
               "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.000045876822306334386,
               "CDX-NA-IG-46:CDX-IG-46-5Y:tolerance_ratio": 0.00002001296264125818,
               "CDX-NA-IG-46:CDX-IG-46-7Y:tolerance_ratio": 0.0000021591018903310832,
-              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.00004712492227554322,
-              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.00000805594027042389,
-              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.0000035448465496301647,
+              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.0000471365638077259,
+              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.000008053029887378216,
+              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.000003553577698767185,
               "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio": 0.00007965718396008015,
               "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 0.00002261867848574184,
               "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 0.00004894227458862588
             },
             "iterations": 686,
-            "objective_value": 0.000042869799402733136,
+            "objective_value": 0.000042870978901166935,
             "max_residual": 7.965718396008014e-13,
-            "rmse": 4.286979940273313e-13,
+            "rmse": 4.2870978901166936e-13,
             "max_residual_ratio": 0.00007965718396008015,
-            "rmse_ratio": 0.000042869799402733136,
+            "rmse_ratio": 0.000042870978901166935,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -4838,7 +4808,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.9.0"
+              "version": "0.10.0"
             },
             "worst_quote_id": "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio",
             "worst_quote_residual": 0.00007965718396008015
@@ -4884,7 +4854,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "ISDA Standard Model v1.8.2",
               "worst_quote_id": "CDX-IG-46-10Y",
@@ -4894,17 +4864,17 @@
             "USD-OIS": {
               "success": true,
               "residuals": {
-                "USD-OIS-SWAP-10Y": 4.712492227554322e-13,
-                "USD-OIS-SWAP-1Y": 8.055940270423889e-14,
-                "USD-OIS-SWAP-2Y": 3.544846549630165e-14,
+                "USD-OIS-SWAP-10Y": 4.71365638077259e-13,
+                "USD-OIS-SWAP-1Y": 8.053029887378216e-14,
+                "USD-OIS-SWAP-2Y": 3.5535776987671854e-14,
                 "USD-OIS-SWAP-5Y": 7.965718396008014e-13,
                 "USD-SOFR-DEP-1M": -2.261867848574184e-13,
                 "USD-SOFR-DEP-3M": 4.894227458862588e-13
               },
               "iterations": 206,
-              "objective_value": 4.387565806719582e-13,
+              "objective_value": 4.3877770885396064e-13,
               "max_residual": 7.965718396008014e-13,
-              "rmse": 4.387565806719582e-13,
+              "rmse": 4.3877770885396064e-13,
               "validation_passed": true,
               "convergence_reason": "generic bootstrap calibration converged: max_residual (7.97e-13) within tolerance (1.00e-8)",
               "metadata": {
@@ -4932,7 +4902,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "Multi-curve OIS discounting v1.0",
               "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -4953,7 +4923,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.9.0"
+            "version": "0.10.0"
           }
         }
       }
@@ -5895,19 +5865,19 @@
               "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.000045876822306334386,
               "CDX-NA-IG-46:CDX-IG-46-5Y:tolerance_ratio": 0.00002001296264125818,
               "CDX-NA-IG-46:CDX-IG-46-7Y:tolerance_ratio": 0.0000021591018903310832,
-              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.00004712492227554322,
-              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.00000805594027042389,
-              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.0000035448465496301647,
+              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.0000471365638077259,
+              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.000008053029887378216,
+              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.000003553577698767185,
               "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio": 0.00007965718396008015,
               "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 0.00002261867848574184,
               "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 0.00004894227458862588
             },
             "iterations": 862,
-            "objective_value": 0.00003554575986605044,
+            "objective_value": 0.00003554673785448682,
             "max_residual": 8.643693399923424e-13,
-            "rmse": 5.10146759260488e-13,
+            "rmse": 5.10153573689381e-13,
             "max_residual_ratio": 0.00007965718396008015,
-            "rmse_ratio": 0.00003554575986605044,
+            "rmse_ratio": 0.00003554673785448682,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -5937,7 +5907,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.9.0"
+              "version": "0.10.0"
             },
             "worst_quote_id": "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio",
             "worst_quote_residual": 0.00007965718396008015
@@ -5983,7 +5953,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "ISDA Standard Model v1.8.2",
               "worst_quote_id": "CDX-IG-46-10Y",
@@ -6028,7 +5998,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "worst_quote_id": "CDX-IG-46-3-7",
               "worst_quote_residual": 8.643693399923424e-13,
@@ -6037,17 +6007,17 @@
             "USD-OIS": {
               "success": true,
               "residuals": {
-                "USD-OIS-SWAP-10Y": 4.712492227554322e-13,
-                "USD-OIS-SWAP-1Y": 8.055940270423889e-14,
-                "USD-OIS-SWAP-2Y": 3.544846549630165e-14,
+                "USD-OIS-SWAP-10Y": 4.71365638077259e-13,
+                "USD-OIS-SWAP-1Y": 8.053029887378216e-14,
+                "USD-OIS-SWAP-2Y": 3.5535776987671854e-14,
                 "USD-OIS-SWAP-5Y": 7.965718396008014e-13,
                 "USD-SOFR-DEP-1M": -2.261867848574184e-13,
                 "USD-SOFR-DEP-3M": 4.894227458862588e-13
               },
               "iterations": 206,
-              "objective_value": 4.387565806719582e-13,
+              "objective_value": 4.3877770885396064e-13,
               "max_residual": 7.965718396008014e-13,
-              "rmse": 4.387565806719582e-13,
+              "rmse": 4.3877770885396064e-13,
               "validation_passed": true,
               "convergence_reason": "generic bootstrap calibration converged: max_residual (7.97e-13) within tolerance (1.00e-8)",
               "metadata": {
@@ -6075,7 +6045,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "Multi-curve OIS discounting v1.0",
               "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -6096,7 +6066,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.9.0"
+            "version": "0.10.0"
           }
         }
       }
@@ -7027,19 +6997,19 @@
               "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.000045876822306334386,
               "CDX-NA-IG-46:CDX-IG-46-5Y:tolerance_ratio": 0.00002001296264125818,
               "CDX-NA-IG-46:CDX-IG-46-7Y:tolerance_ratio": 0.0000021591018903310832,
-              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.00004712492227554322,
-              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.00000805594027042389,
-              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.0000035448465496301647,
+              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.0000471365638077259,
+              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.000008053029887378216,
+              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.000003553577698767185,
               "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio": 0.00007965718396008015,
               "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 0.00002261867848574184,
               "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 0.00004894227458862588
             },
             "iterations": 1331,
-            "objective_value": 0.00017670775333733627,
+            "objective_value": 0.00017670791072173716,
             "max_residual": 4.829536888739661e-7,
             "rmse": 1.7382413311785321e-7,
             "max_residual_ratio": 0.00048295368887396606,
-            "rmse_ratio": 0.00017670775333733627,
+            "rmse_ratio": 0.00017670791072173716,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -7069,7 +7039,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.9.0"
+              "version": "0.10.0"
             },
             "worst_quote_id": "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.004:tolerance_ratio",
             "worst_quote_residual": 0.00048295368887396606
@@ -7115,7 +7085,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "ISDA Standard Model v1.8.2",
               "worst_quote_id": "CDX-IG-46-10Y",
@@ -7170,7 +7140,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "explanation": {
                 "type": "vol_surface",
@@ -7189,17 +7159,17 @@
             "USD-OIS": {
               "success": true,
               "residuals": {
-                "USD-OIS-SWAP-10Y": 4.712492227554322e-13,
-                "USD-OIS-SWAP-1Y": 8.055940270423889e-14,
-                "USD-OIS-SWAP-2Y": 3.544846549630165e-14,
+                "USD-OIS-SWAP-10Y": 4.71365638077259e-13,
+                "USD-OIS-SWAP-1Y": 8.053029887378216e-14,
+                "USD-OIS-SWAP-2Y": 3.5535776987671854e-14,
                 "USD-OIS-SWAP-5Y": 7.965718396008014e-13,
                 "USD-SOFR-DEP-1M": -2.261867848574184e-13,
                 "USD-SOFR-DEP-3M": 4.894227458862588e-13
               },
               "iterations": 206,
-              "objective_value": 4.387565806719582e-13,
+              "objective_value": 4.3877770885396064e-13,
               "max_residual": 7.965718396008014e-13,
-              "rmse": 4.387565806719582e-13,
+              "rmse": 4.3877770885396064e-13,
               "validation_passed": true,
               "convergence_reason": "generic bootstrap calibration converged: max_residual (7.97e-13) within tolerance (1.00e-8)",
               "metadata": {
@@ -7227,7 +7197,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "Multi-curve OIS discounting v1.0",
               "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -7248,7 +7218,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.9.0"
+            "version": "0.10.0"
           }
         }
       }
@@ -8216,9 +8186,9 @@
           "report": {
             "success": true,
             "residuals": {
-              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.00004712492227554322,
-              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.00000805594027042389,
-              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.0000035448465496301647,
+              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.0000471365638077259,
+              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.000008053029887378216,
+              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.000003553577698767185,
               "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio": 0.00007965718396008015,
               "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 0.00002261867848574184,
               "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 0.00004894227458862588,
@@ -8256,11 +8226,11 @@
               "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.05:tolerance_ratio": 0.260089284947829
             },
             "iterations": 1187,
-            "objective_value": 0.14833447721072818,
+            "objective_value": 0.14833447721082688,
             "max_residual": 0.0004823709390051117,
             "rmse": 0.00022250171427923299,
             "max_residual_ratio": 0.3215806260034078,
-            "rmse_ratio": 0.14833447721072818,
+            "rmse_ratio": 0.14833447721082688,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -8290,7 +8260,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.9.0"
+              "version": "0.10.0"
             },
             "worst_quote_id": "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.05:tolerance_ratio",
             "worst_quote_residual": 0.3215806260034078
@@ -8299,17 +8269,17 @@
             "USD-OIS": {
               "success": true,
               "residuals": {
-                "USD-OIS-SWAP-10Y": 4.712492227554322e-13,
-                "USD-OIS-SWAP-1Y": 8.055940270423889e-14,
-                "USD-OIS-SWAP-2Y": 3.544846549630165e-14,
+                "USD-OIS-SWAP-10Y": 4.71365638077259e-13,
+                "USD-OIS-SWAP-1Y": 8.053029887378216e-14,
+                "USD-OIS-SWAP-2Y": 3.5535776987671854e-14,
                 "USD-OIS-SWAP-5Y": 7.965718396008014e-13,
                 "USD-SOFR-DEP-1M": -2.261867848574184e-13,
                 "USD-SOFR-DEP-3M": 4.894227458862588e-13
               },
               "iterations": 206,
-              "objective_value": 4.387565806719582e-13,
+              "objective_value": 4.3877770885396064e-13,
               "max_residual": 7.965718396008014e-13,
-              "rmse": 4.387565806719582e-13,
+              "rmse": 4.3877770885396064e-13,
               "validation_passed": true,
               "convergence_reason": "generic bootstrap calibration converged: max_residual (7.97e-13) within tolerance (1.00e-8)",
               "metadata": {
@@ -8337,7 +8307,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "Multi-curve OIS discounting v1.0",
               "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -8397,7 +8367,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "worst_quote_id": "FRA-SOFR-3M-9X12",
               "worst_quote_residual": 6.666502761828352e-18,
@@ -8472,7 +8442,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "worst_quote_id": "USD-SWPTN-VOL-20270508-20370511-0.05",
               "worst_quote_residual": 0.0004823709390051117,
@@ -8492,7 +8462,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.9.0"
+            "version": "0.10.0"
           }
         }
       }
@@ -9082,19 +9052,19 @@
               "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-155.0:tolerance_ratio": 0.5118470727581426,
               "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-175.0:tolerance_ratio": 0.6328886961376456,
               "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-195.0:tolerance_ratio": 0.23563367765519483,
-              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.00004712492227554322,
-              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.00000805594027042389,
-              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.0000035448465496301647,
+              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.0000471365638077259,
+              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.000008053029887378216,
+              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.000003553577698767185,
               "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio": 0.00007965718396008015,
               "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 0.00002261867848574184,
               "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 0.00004894227458862588
             },
             "iterations": 461,
-            "objective_value": 0.40344280574515984,
+            "objective_value": 0.40344280574525176,
             "max_residual": 0.0006446119164336128,
             "rmse": 0.0004034428047908371,
             "max_residual_ratio": 0.6446119164336128,
-            "rmse_ratio": 0.40344280574515984,
+            "rmse_ratio": 0.40344280574525176,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -9124,7 +9094,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.9.0"
+              "version": "0.10.0"
             },
             "worst_quote_id": "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-175.0:tolerance_ratio",
             "worst_quote_residual": 0.6446119164336128
@@ -9178,7 +9148,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "explanation": {
                 "type": "vol_surface",
@@ -9197,17 +9167,17 @@
             "USD-OIS": {
               "success": true,
               "residuals": {
-                "USD-OIS-SWAP-10Y": 4.712492227554322e-13,
-                "USD-OIS-SWAP-1Y": 8.055940270423889e-14,
-                "USD-OIS-SWAP-2Y": 3.544846549630165e-14,
+                "USD-OIS-SWAP-10Y": 4.71365638077259e-13,
+                "USD-OIS-SWAP-1Y": 8.053029887378216e-14,
+                "USD-OIS-SWAP-2Y": 3.5535776987671854e-14,
                 "USD-OIS-SWAP-5Y": 7.965718396008014e-13,
                 "USD-SOFR-DEP-1M": -2.261867848574184e-13,
                 "USD-SOFR-DEP-3M": 4.894227458862588e-13
               },
               "iterations": 206,
-              "objective_value": 4.387565806719582e-13,
+              "objective_value": 4.3877770885396064e-13,
               "max_residual": 7.965718396008014e-13,
-              "rmse": 4.387565806719582e-13,
+              "rmse": 4.3877770885396064e-13,
               "validation_passed": true,
               "convergence_reason": "generic bootstrap calibration converged: max_residual (7.97e-13) within tolerance (1.00e-8)",
               "metadata": {
@@ -9235,7 +9205,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "Multi-curve OIS discounting v1.0",
               "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -9256,7 +9226,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.9.0"
+            "version": "0.10.0"
           }
         }
       }
@@ -9440,7 +9410,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.9.0"
+              "version": "0.10.0"
             }
           },
           "step_reports": {},
@@ -9457,7 +9427,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.9.0"
+            "version": "0.10.0"
           }
         }
       }
@@ -9655,7 +9625,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.9.0"
+              "version": "0.10.0"
             }
           },
           "step_reports": {},
@@ -9672,7 +9642,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.9.0"
+            "version": "0.10.0"
           }
         }
       }
@@ -9944,7 +9914,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.9.0"
+              "version": "0.10.0"
             }
           },
           "step_reports": {},
@@ -9961,7 +9931,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.9.0"
+            "version": "0.10.0"
           }
         }
       }
@@ -10938,19 +10908,19 @@
               "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.00009808402725205979,
               "CDX-NA-IG-46:CDX-IG-46-5Y:tolerance_ratio": 0.00004240744523459892,
               "CDX-NA-IG-46:CDX-IG-46-7Y:tolerance_ratio": 0.00005002435902781688,
-              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.00004712492227554322,
-              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.00000805594027042389,
-              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.0000035448465496301647,
+              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.0000471365638077259,
+              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.000008053029887378216,
+              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.000003553577698767185,
               "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio": 0.00007965718396008015,
               "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 0.00002261867848574184,
               "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 0.00004894227458862588
             },
             "iterations": 951,
-            "objective_value": 0.05141209964881013,
+            "objective_value": 0.051412099649486315,
             "max_residual": 0.00009439544866398501,
             "rmse": 0.00005141207650580434,
             "max_residual_ratio": 0.09439544866398501,
-            "rmse_ratio": 0.05141209964881013,
+            "rmse_ratio": 0.051412099649486315,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -10980,7 +10950,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.9.0"
+              "version": "0.10.0"
             },
             "worst_quote_id": "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio",
             "worst_quote_residual": 0.09439544866398501
@@ -11026,7 +10996,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "ISDA Standard Model v1.8.2",
               "worst_quote_id": "CDX-IG-46-3Y",
@@ -11072,7 +11042,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "worst_quote_id": "CDX-IG-46-15-30",
               "worst_quote_residual": -0.00009439544866398501,
@@ -11081,17 +11051,17 @@
             "USD-OIS": {
               "success": true,
               "residuals": {
-                "USD-OIS-SWAP-10Y": 4.712492227554322e-13,
-                "USD-OIS-SWAP-1Y": 8.055940270423889e-14,
-                "USD-OIS-SWAP-2Y": 3.544846549630165e-14,
+                "USD-OIS-SWAP-10Y": 4.71365638077259e-13,
+                "USD-OIS-SWAP-1Y": 8.053029887378216e-14,
+                "USD-OIS-SWAP-2Y": 3.5535776987671854e-14,
                 "USD-OIS-SWAP-5Y": 7.965718396008014e-13,
                 "USD-SOFR-DEP-1M": -2.261867848574184e-13,
                 "USD-SOFR-DEP-3M": 4.894227458862588e-13
               },
               "iterations": 206,
-              "objective_value": 4.387565806719582e-13,
+              "objective_value": 4.3877770885396064e-13,
               "max_residual": 7.965718396008014e-13,
-              "rmse": 4.387565806719582e-13,
+              "rmse": 4.3877770885396064e-13,
               "validation_passed": true,
               "convergence_reason": "generic bootstrap calibration converged: max_residual (7.97e-13) within tolerance (1.00e-8)",
               "metadata": {
@@ -11119,7 +11089,7 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "Multi-curve OIS discounting v1.0",
               "worst_quote_id": "USD-OIS-SWAP-5Y",
@@ -11140,7 +11110,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.9.0"
+            "version": "0.10.0"
           }
         }
       }
@@ -11476,19 +11446,19 @@
           "report": {
             "success": true,
             "residuals": {
-              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.00006846385076642036,
-              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.00006534319254569709,
-              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.000022389576770365238,
+              "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 0.00006847549229860306,
+              "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 0.00006534028216265142,
+              "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 0.000022398307919502258,
               "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio": 0.00007395574357360601,
               "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 0.00006841673894086853,
               "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 0.0000310175892082043
             },
             "iterations": 196,
-            "objective_value": 0.00005855299285960772,
+            "objective_value": 0.000058555276920480054,
             "max_residual": 7.395574357360601e-13,
-            "rmse": 5.855299285960772e-13,
+            "rmse": 5.855527692048004e-13,
             "max_residual_ratio": 0.00007395574357360601,
-            "rmse_ratio": 0.00005855299285960772,
+            "rmse_ratio": 0.000058555276920480054,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -11518,7 +11488,7 @@
                 "version": 1
               },
               "fx_policy_applied": null,
-              "version": "0.9.0"
+              "version": "0.10.0"
             },
             "worst_quote_id": "USD-OIS:USD-OIS-SWAP-5Y:tolerance_ratio",
             "worst_quote_residual": 0.00007395574357360601
@@ -11527,17 +11497,17 @@
             "USD-OIS": {
               "success": true,
               "residuals": {
-                "USD-OIS-SWAP-10Y": 6.846385076642036e-13,
-                "USD-OIS-SWAP-1Y": 6.534319254569709e-13,
-                "USD-OIS-SWAP-2Y": 2.2389576770365239e-13,
+                "USD-OIS-SWAP-10Y": 6.847549229860306e-13,
+                "USD-OIS-SWAP-1Y": 6.534028216265142e-13,
+                "USD-OIS-SWAP-2Y": 2.2398307919502257e-13,
                 "USD-OIS-SWAP-5Y": -7.395574357360601e-13,
                 "USD-SOFR-DEP-1M": 6.841673894086852e-13,
                 "USD-SOFR-DEP-3M": 3.10175892082043e-13
               },
               "iterations": 196,
-              "objective_value": 5.855299285960772e-13,
+              "objective_value": 5.855527692048004e-13,
               "max_residual": 7.395574357360601e-13,
-              "rmse": 5.855299285960772e-13,
+              "rmse": 5.855527692048004e-13,
               "validation_passed": true,
               "convergence_reason": "generic bootstrap calibration converged: max_residual (7.40e-13) within tolerance (1.00e-8)",
               "metadata": {
@@ -11565,50 +11535,56 @@
                   "version": 1
                 },
                 "fx_policy_applied": null,
-                "version": "0.9.0"
+                "version": "0.10.0"
               },
               "model_version": "Multi-curve OIS discounting v1.0",
               "diagnostics": {
                 "per_quote": [
                   {
                     "quote_label": "USD-SOFR-DEP-1M",
-                    "quote_value": 0.0525,
+                    "target_value": 0,
+                    "fitted_value": 6.841673894086852e-13,
                     "residual": 6.841673894086852e-13,
                     "sensitivity": 0.88971845237592
                   },
                   {
                     "quote_label": "USD-SOFR-DEP-3M",
-                    "quote_value": 0.052,
+                    "target_value": 0,
+                    "fitted_value": 3.10175892082043e-13,
                     "residual": 3.10175892082043e-13,
                     "sensitivity": 1.0132888888876979
                   },
                   {
                     "quote_label": "USD-OIS-SWAP-1Y",
-                    "quote_value": 0.051,
-                    "residual": 6.534319254569709e-13,
-                    "sensitivity": 1.0440595447532088
+                    "target_value": 0,
+                    "fitted_value": 6.534028216265142e-13,
+                    "residual": 6.534028216265142e-13,
+                    "sensitivity": 1.0440595447535168
                   },
                   {
                     "quote_label": "USD-OIS-SWAP-2Y",
-                    "quote_value": 0.049,
-                    "residual": 2.2389576770365239e-13,
-                    "sensitivity": 1.0384287139765105
+                    "target_value": 0,
+                    "fitted_value": 2.2398307919502257e-13,
+                    "residual": 2.2398307919502257e-13,
+                    "sensitivity": 1.0384287139765103
                   },
                   {
                     "quote_label": "USD-OIS-SWAP-5Y",
-                    "quote_value": 0.045,
+                    "target_value": 0,
+                    "fitted_value": -7.395574357360601e-13,
                     "residual": -7.395574357360601e-13,
                     "sensitivity": 1.0918319910493504
                   },
                   {
                     "quote_label": "USD-OIS-SWAP-10Y",
-                    "quote_value": 0.041,
-                    "residual": 6.846385076642036e-13,
-                    "sensitivity": 1.1297731135854208
+                    "target_value": 0,
+                    "fitted_value": 6.847549229860306e-13,
+                    "residual": 6.847549229860306e-13,
+                    "sensitivity": 1.1297731135883018
                   }
                 ],
                 "max_residual": 7.395574357360601e-13,
-                "rms_residual": 5.855299285960772e-13
+                "rms_residual": 5.855527692048004e-13
               },
               "worst_quote_id": "USD-OIS-SWAP-5Y",
               "worst_quote_residual": -7.395574357360601e-13,
@@ -11628,7 +11604,7 @@
               "version": 1
             },
             "fx_policy_applied": null,
-            "version": "0.9.0"
+            "version": "0.10.0"
           }
         }
       }
@@ -12159,7 +12135,7 @@
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "de83b838746a391688899bed741e2871cd5950017f59fc8dfe75d930ec7071ca"
+        "sha256": "f0e6cf14fed48de1c6a758735b486df461a808d6e8816967b41a12dbb2738c74"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/equity_option.json",
@@ -12192,7 +12168,7 @@
           "amount": "1000438.964391248",
           "currency": "USD"
         },
-        "cashflows": "{\"instrument_id\":\"US912828XG33\",\"currency\":\"USD\",\"model\":\"discounting\",\"as_of\":\"2025-01-01\",\"discount_curve_id\":\"USD-OIS\",\"flows\":[{\"date\":\"2025-01-01\",\"amount\":-1000000,\"currency\":\"USD\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":0,\"discount_factor\":1,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":0,\"pv\":0},{\"date\":\"2025-07-01\",\"amount\":21250,\"currency\":\"USD\",\"kind\":\"fixed\",\"accrual_factor\":0.5,\"accrual_start\":\"2025-01-01\",\"accrual_end\":\"2025-07-01\",\"accrual_day_count\":\"act_act_isma\",\"accrual_notional\":1000000,\"year_fraction\":0.4958904109589041,\"rate\":0.0425,\"discount_factor\":0.9791431782217929,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":20806.7925372131,\"pv\":20806.7925372131},{\"date\":\"2026-01-02\",\"amount\":21250,\"currency\":\"USD\",\"kind\":\"fixed\",\"accrual_factor\":0.5,\"accrual_start\":\"2025-07-01\",\"accrual_end\":\"2026-01-01\",\"accrual_day_count\":\"act_act_isma\",\"accrual_notional\":1000000,\"year_fraction\":1.0027397260273974,\"rate\":0.0425,\"discount_factor\":0.9592481486942815,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":20384.023159753484,\"pv\":20384.02315975348},{\"date\":\"2026-01-02\",\"amount\":1000000,\"currency\":\"USD\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":1.0027397260273974,\"discount_factor\":0.9592481486942815,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":959248.1486942816,\"pv\":959248.148694282}],\"total_pv\":1000438.9643912486,\"reconciles_with_base_value\":true}",
+        "cashflows": "{\"instrument_id\":\"US912828XG33\",\"currency\":\"USD\",\"model\":\"discounting\",\"as_of\":\"2025-01-01\",\"discount_curve_id\":\"USD-OIS\",\"flows\":[{\"date\":\"2025-01-01\",\"amount\":-1000000,\"currency\":\"USD\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":0,\"discount_factor\":1,\"discount_curve_id\":\"USD-OIS\",\"pv\":0},{\"date\":\"2025-07-01\",\"amount\":21250,\"currency\":\"USD\",\"kind\":\"fixed\",\"accrual_factor\":0.5,\"year_fraction\":0.4958904109589041,\"rate\":0.0425,\"discount_factor\":0.9791431782217929,\"discount_curve_id\":\"USD-OIS\",\"pv\":20806.7925372131},{\"date\":\"2026-01-02\",\"amount\":21250,\"currency\":\"USD\",\"kind\":\"fixed\",\"accrual_factor\":0.5,\"year_fraction\":1.0027397260273974,\"rate\":0.0425,\"discount_factor\":0.9592481486942815,\"discount_curve_id\":\"USD-OIS\",\"pv\":20384.02315975348},{\"date\":\"2026-01-02\",\"amount\":1000000,\"currency\":\"USD\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":1.0027397260273974,\"discount_factor\":0.9592481486942815,\"discount_curve_id\":\"USD-OIS\",\"pv\":959248.148694282}],\"total_pv\":1000438.9643912486,\"reconciles_with_base_value\":true}",
         "error": null
       },
       {
@@ -12210,7 +12186,7 @@
           "amount": "19685.39117022118",
           "currency": "USD"
         },
-        "cashflows": "{\"instrument_id\":\"FXSWAP-EURUSD-6M\",\"currency\":\"USD\",\"model\":\"discounting\",\"as_of\":\"2023-12-28\",\"discount_curve_id\":\"USD-OIS\",\"flows\":[{\"date\":\"2024-01-05\",\"amount\":-1100000,\"currency\":\"USD\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":0.021917808219178082,\"discount_factor\":0.999332623726518,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":-1099265.8860991697,\"pv\":-1099265.88609917},{\"date\":\"2024-01-05\",\"amount\":1000000,\"currency\":\"EUR\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":0.021917808219178082,\"discount_factor\":0.999332623726518,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":999332.623726518,\"fx_rate\":1.1,\"pv\":1099265.8860991697},{\"date\":\"2024-07-05\",\"amount\":1120000,\"currency\":\"USD\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":0.5205479452054794,\"discount_factor\":0.9842695585110532,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":1102381.9055323796,\"pv\":1102381.90553238},{\"date\":\"2024-07-05\",\"amount\":-1000000,\"currency\":\"EUR\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":0.5205479452054794,\"discount_factor\":0.9842695585110532,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-984269.5585110532,\"fx_rate\":1.1,\"pv\":-1082696.5143621583}],\"total_pv\":19685.391170221614,\"reconciles_with_base_value\":true}",
+        "cashflows": "{\"instrument_id\":\"FXSWAP-EURUSD-6M\",\"currency\":\"USD\",\"model\":\"discounting\",\"as_of\":\"2023-12-28\",\"discount_curve_id\":\"USD-OIS\",\"flows\":[{\"date\":\"2024-01-05\",\"amount\":-1100000,\"currency\":\"USD\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":0.021917808219178082,\"discount_factor\":0.999332623726518,\"discount_curve_id\":\"USD-OIS\",\"pv\":-1099265.88609917},{\"date\":\"2024-01-05\",\"amount\":1000000,\"currency\":\"EUR\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":0.021917808219178082,\"discount_factor\":0.999332623726518,\"discount_curve_id\":\"EUR-OIS\",\"pv\":1099265.8860991697},{\"date\":\"2024-07-05\",\"amount\":1120000,\"currency\":\"USD\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":0.5205479452054794,\"discount_factor\":0.9842695585110532,\"discount_curve_id\":\"USD-OIS\",\"pv\":1102381.90553238},{\"date\":\"2024-07-05\",\"amount\":-1000000,\"currency\":\"EUR\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":0.5205479452054794,\"discount_factor\":0.9842695585110532,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-1082696.5143621583}],\"total_pv\":19685.391170221614,\"reconciles_with_base_value\":true}",
         "error": null
       },
       {
@@ -12228,7 +12204,7 @@
           "amount": "415230.53614508373",
           "currency": "USD"
         },
-        "cashflows": "{\"instrument_id\":\"XCCY-USDEUR-5Y\",\"currency\":\"USD\",\"model\":\"discounting\",\"as_of\":\"2023-12-28\",\"discount_curve_id\":\"USD-OIS\",\"flows\":[{\"date\":\"2024-01-03\",\"amount\":-10000000,\"currency\":\"USD\",\"kind\":\"notional\",\"accrual_factor\":0,\"principal_delta\":0,\"year_fraction\":0.01643835616438356,\"discount_factor\":0.9994994260278584,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":-9994994.260278584,\"pv\":-9994994.26027858},{\"date\":\"2024-01-03\",\"amount\":9200000,\"currency\":\"EUR\",\"kind\":\"notional\",\"accrual_factor\":0,\"principal_delta\":0,\"year_fraction\":0.01643835616438356,\"discount_factor\":0.9994994260278584,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":9195394.719456296,\"fx_rate\":1.1,\"pv\":10114934.19140193},{\"date\":\"2024-04-03\",\"amount\":99723.4694995064,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":0.26575342465753427,\"rate\":0.039451042878925924,\"reset_date\":\"2024-01-03\",\"discount_factor\":0.9919380346672962,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":98919.50234554445,\"pv\":98919.5023455445},{\"date\":\"2024-04-03\",\"amount\":-71135.1905300888,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":0.26575342465753427,\"rate\":0.030588471799847018,\"reset_date\":\"2024-01-03\",\"discount_factor\":0.9919380346672962,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-70561.70109009994,\"fx_rate\":1.1,\"pv\":-77617.87119911},{\"date\":\"2024-07-03\",\"amount\":99723.4619281007,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":0.5150684931506849,\"rate\":0.039451039883643985,\"reset_date\":\"2024-04-03\",\"discount_factor\":0.9844338465805118,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":98171.1512202054,\"pv\":98171.1512202054},{\"date\":\"2024-07-03\",\"amount\":-71135.1866203254,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":0.5150684931506849,\"rate\":0.030588470118630518,\"reset_date\":\"2024-04-03\",\"discount_factor\":0.9844338465805118,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-70027.8853918695,\"fx_rate\":1.1,\"pv\":-77030.67393105644},{\"date\":\"2024-10-03\",\"amount\":100829.6369311657,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":0.7671232876712328,\"rate\":0.03945507532089057,\"reset_date\":\"2024-07-03\",\"discount_factor\":0.9769049030125532,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":98500.96668703138,\"pv\":98500.9666870314},{\"date\":\"2024-10-03\",\"amount\":-71922.2296465679,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":0.7671232876712328,\"rate\":0.030590740397878496,\"reset_date\":\"2024-07-03\",\"discount_factor\":0.9769049030125532,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-70261.17877732699,\"fx_rate\":1.1,\"pv\":-77287.2966550597},{\"date\":\"2025-01-03\",\"amount\":100829.5687885008,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":1.0191780821917809,\"rate\":0.039455048656369986,\"reset_date\":\"2024-10-03\",\"discount_factor\":0.9694404033248037,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":97748.25783339025,\"pv\":97748.2578333903},{\"date\":\"2025-01-03\",\"amount\":-71922.1944587058,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":1.0191780821917809,\"rate\":0.03059072543139693,\"reset_date\":\"2024-10-03\",\"discount_factor\":0.9694404033248037,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-69724.2812040527,\"fx_rate\":1.1,\"pv\":-76696.70932445797},{\"date\":\"2025-04-03\",\"amount\":98617.4989049493,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25,\"year_fraction\":1.2657534246575342,\"rate\":0.03944699956197985,\"reset_date\":\"2025-01-03\",\"discount_factor\":0.9622742819885133,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":94897.08295026308,\"pv\":94897.0829502631},{\"date\":\"2025-04-03\",\"amount\":-70348.2530598843,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25,\"year_fraction\":1.2657534246575342,\"rate\":0.030586196982557972,\"reset_date\":\"2025-01-03\",\"discount_factor\":0.9622742819885133,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-67694.3147023464,\"fx_rate\":1.1,\"pv\":-74463.74617258104},{\"date\":\"2025-07-03\",\"amount\":99723.4619281007,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":1.515068493150685,\"rate\":0.039451039883644026,\"reset_date\":\"2025-04-03\",\"discount_factor\":0.9550823938438775,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":95244.1227406892,\"pv\":95244.1227406892},{\"date\":\"2025-07-03\",\"amount\":-71135.1866203254,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":1.515068493150685,\"rate\":0.03058847011863056,\"reset_date\":\"2025-04-03\",\"discount_factor\":0.9550823938438775,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-67939.96432387135,\"fx_rate\":1.1,\"pv\":-74733.96075625854},{\"date\":\"2025-10-03\",\"amount\":100829.6369311657,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":1.7671232876712328,\"rate\":0.03945507532089055,\"reset_date\":\"2025-07-03\",\"discount_factor\":0.9478661127666621,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":95572.99600961791,\"pv\":95572.9960096179},{\"date\":\"2025-10-03\",\"amount\":-71922.2296465679,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":1.7671232876712328,\"rate\":0.030590740397878496,\"reset_date\":\"2025-07-03\",\"discount_factor\":0.9478661127666621,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-68172.64423660349,\"fx_rate\":1.1,\"pv\":-74989.90866026386},{\"date\":\"2026-01-05\",\"amount\":100829.5687885008,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":2.0246575342465754,\"rate\":0.03945504865636994,\"reset_date\":\"2025-10-03\",\"discount_factor\":0.9405492675489839,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":94835.17707130431,\"pv\":94835.1770713043},{\"date\":\"2026-01-05\",\"amount\":-71922.1944587058,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":2.0246575342465754,\"rate\":0.030590725431396917,\"reset_date\":\"2025-10-03\",\"discount_factor\":0.9405492675489839,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-67646.36731865133,\"fx_rate\":1.1,\"pv\":-74411.00405051644},{\"date\":\"2026-04-03\",\"amount\":98617.4989049493,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25,\"year_fraction\":2.265753424657534,\"rate\":0.03944699956197985,\"reset_date\":\"2026-01-03\",\"discount_factor\":0.933750651539414,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":92084.15385568385,\"pv\":92084.1538556839},{\"date\":\"2026-04-03\",\"amount\":-70348.2530598843,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25,\"year_fraction\":2.265753424657534,\"rate\":0.030586196982557955,\"reset_date\":\"2026-01-03\",\"discount_factor\":0.933750651539414,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-65687.72712932654,\"fx_rate\":1.1,\"pv\":-72256.49984225915},{\"date\":\"2026-07-03\",\"amount\":99723.4619281007,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":2.515068493150685,\"rate\":0.03945103988364405,\"reset_date\":\"2026-04-03\",\"discount_factor\":0.9267719445672449,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":92420.9067300835,\"pv\":92420.9067300835},{\"date\":\"2026-07-03\",\"amount\":-71135.1866203275,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":2.515068493150685,\"rate\":0.030588470118630588,\"reset_date\":\"2026-04-03\",\"discount_factor\":0.9267719445672449,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-65926.09523127478,\"fx_rate\":1.1,\"pv\":-72518.70475440228},{\"date\":\"2026-10-05\",\"amount\":100829.6369311657,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":2.7726027397260276,\"rate\":0.03945507532089058,\"reset_date\":\"2026-07-03\",\"discount_factor\":0.9196179311689893,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":92724.74211515892,\"pv\":92724.7421151589},{\"date\":\"2026-10-05\",\"amount\":-71922.2296465679,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":2.7726027397260276,\"rate\":0.030590740397878496,\"reset_date\":\"2026-07-03\",\"discount_factor\":0.9196179311689893,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-66140.97203263771,\"fx_rate\":1.1,\"pv\":-72755.06923590146},{\"date\":\"2027-01-04\",\"amount\":100829.5687885008,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":3.021917808219178,\"rate\":0.03945504865636994,\"reset_date\":\"2026-10-03\",\"discount_factor\":0.9127448499482156,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":92031.66963420344,\"pv\":92031.6696342034},{\"date\":\"2027-01-04\",\"amount\":-71922.1944587058,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":3.021917808219178,\"rate\":0.030590725431396862,\"reset_date\":\"2026-10-03\",\"discount_factor\":0.9127448499482156,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-65646.6125891578,\"fx_rate\":1.1,\"pv\":-72211.27384807359},{\"date\":\"2027-04-05\",\"amount\":98617.4989049493,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25,\"year_fraction\":3.271232876712329,\"rate\":0.039446999561979904,\"reset_date\":\"2027-01-03\",\"discount_factor\":0.9059231370662555,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":89339.87397759968,\"pv\":89339.8739775997},{\"date\":\"2027-04-05\",\"amount\":-70348.2530598843,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25,\"year_fraction\":3.271232876712329,\"rate\":0.030586196982558014,\"reset_date\":\"2027-01-03\",\"discount_factor\":0.9059231370662555,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-63730.110099141195,\"fx_rate\":1.1,\"pv\":-70103.12110905533},{\"date\":\"2027-07-05\",\"amount\":99723.4619281007,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":3.5205479452054793,\"rate\":0.03945103988364394,\"reset_date\":\"2027-04-03\",\"discount_factor\":0.8991524086041436,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":89666.59098699536,\"pv\":89666.5909869954},{\"date\":\"2027-07-05\",\"amount\":-71135.1866203275,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":3.5205479452054793,\"rate\":0.030588470118630588,\"reset_date\":\"2027-04-03\",\"discount_factor\":0.8991524086041436,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-63961.37438617272,\"fx_rate\":1.1,\"pv\":-70357.51182478997},{\"date\":\"2027-10-04\",\"amount\":100829.6369311657,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":3.76986301369863,\"rate\":0.03945507532089052,\"reset_date\":\"2027-07-03\",\"discount_factor\":0.8924322835122646,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":89983.62313219278,\"pv\":89983.6231321928},{\"date\":\"2027-10-04\",\"amount\":-71922.2296465679,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":3.76986301369863,\"rate\":0.030590740397878496,\"reset_date\":\"2027-07-03\",\"discount_factor\":0.8924322835122646,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-64185.71963878008,\"fx_rate\":1.1,\"pv\":-70604.29160265811},{\"date\":\"2028-01-03\",\"amount\":100829.5687885008,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":4.019178082191781,\"rate\":0.03945504865636984,\"reset_date\":\"2027-10-03\",\"discount_factor\":0.8857623835889091,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":89311.03918634434,\"pv\":89311.0391863443},{\"date\":\"2028-01-03\",\"amount\":-71922.1944587058,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":4.019178082191781,\"rate\":0.030590725431396862,\"reset_date\":\"2027-10-03\",\"discount_factor\":0.8857623835889091,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-63705.974396688274,\"fx_rate\":1.1,\"pv\":-70076.57183635714},{\"date\":\"2028-04-03\",\"amount\":99723.4997809904,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":4.2684931506849315,\"rate\":0.03945105485841363,\"reset_date\":\"2028-01-03\",\"discount_factor\":0.8791423334589885,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":87671.15029815683,\"pv\":87671.1502981568},{\"date\":\"2028-04-03\",\"amount\":-71135.2061675325,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":4.2684931506849315,\"rate\":0.03058847852402241,\"reset_date\":\"2028-01-03\",\"discount_factor\":0.8791423334589885,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-62537.97114121075,\"fx_rate\":1.1,\"pv\":-68791.76825533187},{\"date\":\"2028-07-03\",\"amount\":99723.4922112411,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":4.517808219178082,\"rate\":0.03945105186378761,\"reset_date\":\"2028-04-03\",\"discount_factor\":0.8725717605529086,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":87015.90316724691,\"pv\":87015.9031672469},{\"date\":\"2028-07-03\",\"amount\":-71135.2022584126,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":4.517808219178082,\"rate\":0.03058847684308223,\"reset_date\":\"2028-04-03\",\"discount_factor\":0.8725717605529086,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-62070.56867191032,\"fx_rate\":1.1,\"pv\":-68277.62553910133},{\"date\":\"2028-10-03\",\"amount\":100829.5460767661,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":4.76986301369863,\"rate\":0.039455039769169684,\"reset_date\":\"2028-07-03\",\"discount_factor\":0.8659789020469023,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":87316.25960544545,\"pv\":87316.2596054455},{\"date\":\"2028-10-03\",\"amount\":-71922.182730382,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":4.76986301369863,\"rate\":0.030590720442979526,\"reset_date\":\"2028-07-03\",\"discount_factor\":0.8659789020469023,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-62283.09283367288,\"fx_rate\":1.1,\"pv\":-68511.40211704018},{\"date\":\"2029-01-03\",\"amount\":100829.4779490271,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":5.021917808219178,\"rate\":0.03945501311048877,\"reset_date\":\"2028-10-03\",\"discount_factor\":0.8594358569605426,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":86656.46878800624,\"pv\":86656.4687880062},{\"date\":\"2029-01-03\",\"amount\":-71922.1475483031,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":5.021917808219178,\"rate\":0.0305907054789567,\"reset_date\":\"2028-10-03\",\"discount_factor\":0.8594358569605426,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-61812.47251261846,\"fx_rate\":1.1,\"pv\":-67993.71976388035},{\"date\":\"2029-01-03\",\"amount\":10000000,\"currency\":\"USD\",\"kind\":\"notional\",\"accrual_factor\":0,\"principal_delta\":0,\"year_fraction\":5.021917808219178,\"discount_factor\":0.8594358569605426,\"discount_curve_id\":\"USD-OIS\",\"native_pv\":8594358.569605425,\"pv\":8594358.56960543},{\"date\":\"2029-01-03\",\"amount\":-9200000,\"currency\":\"EUR\",\"kind\":\"notional\",\"accrual_factor\":0,\"principal_delta\":0,\"year_fraction\":5.021917808219178,\"discount_factor\":0.8594358569605426,\"discount_curve_id\":\"EUR-OIS\",\"native_pv\":-7906809.884036992,\"fx_rate\":1.1,\"pv\":-8697490.872440688}],\"total_pv\":415230.5361451007,\"reconciles_with_base_value\":true}",
+        "cashflows": "{\"instrument_id\":\"XCCY-USDEUR-5Y\",\"currency\":\"USD\",\"model\":\"discounting\",\"as_of\":\"2023-12-28\",\"discount_curve_id\":\"USD-OIS\",\"flows\":[{\"date\":\"2024-01-03\",\"amount\":-10000000,\"currency\":\"USD\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":0.01643835616438356,\"discount_factor\":0.9994994260278584,\"discount_curve_id\":\"USD-OIS\",\"pv\":-9994994.26027858},{\"date\":\"2024-01-03\",\"amount\":9200000,\"currency\":\"EUR\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":0.01643835616438356,\"discount_factor\":0.9994994260278584,\"discount_curve_id\":\"EUR-OIS\",\"pv\":10114934.19140193},{\"date\":\"2024-04-03\",\"amount\":99723.4694995064,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":0.26575342465753427,\"rate\":0.039451042878925924,\"reset_date\":\"2024-01-03\",\"discount_factor\":0.9919380346672962,\"discount_curve_id\":\"USD-OIS\",\"pv\":98919.5023455445},{\"date\":\"2024-04-03\",\"amount\":-71135.1905300888,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":0.26575342465753427,\"rate\":0.030588471799847018,\"reset_date\":\"2024-01-03\",\"discount_factor\":0.9919380346672962,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-77617.87119911},{\"date\":\"2024-07-03\",\"amount\":99723.4619281007,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":0.5150684931506849,\"rate\":0.039451039883643985,\"reset_date\":\"2024-04-03\",\"discount_factor\":0.9844338465805118,\"discount_curve_id\":\"USD-OIS\",\"pv\":98171.1512202054},{\"date\":\"2024-07-03\",\"amount\":-71135.1866203254,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":0.5150684931506849,\"rate\":0.030588470118630518,\"reset_date\":\"2024-04-03\",\"discount_factor\":0.9844338465805118,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-77030.67393105644},{\"date\":\"2024-10-03\",\"amount\":100829.6369311657,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":0.7671232876712328,\"rate\":0.03945507532089057,\"reset_date\":\"2024-07-03\",\"discount_factor\":0.9769049030125532,\"discount_curve_id\":\"USD-OIS\",\"pv\":98500.9666870314},{\"date\":\"2024-10-03\",\"amount\":-71922.2296465679,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":0.7671232876712328,\"rate\":0.030590740397878496,\"reset_date\":\"2024-07-03\",\"discount_factor\":0.9769049030125532,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-77287.2966550597},{\"date\":\"2025-01-03\",\"amount\":100829.5687885008,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":1.0191780821917809,\"rate\":0.039455048656369986,\"reset_date\":\"2024-10-03\",\"discount_factor\":0.9694404033248037,\"discount_curve_id\":\"USD-OIS\",\"pv\":97748.2578333903},{\"date\":\"2025-01-03\",\"amount\":-71922.1944587058,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":1.0191780821917809,\"rate\":0.03059072543139693,\"reset_date\":\"2024-10-03\",\"discount_factor\":0.9694404033248037,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-76696.70932445797},{\"date\":\"2025-04-03\",\"amount\":98617.4989049493,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25,\"year_fraction\":1.2657534246575342,\"rate\":0.03944699956197985,\"reset_date\":\"2025-01-03\",\"discount_factor\":0.9622742819885133,\"discount_curve_id\":\"USD-OIS\",\"pv\":94897.0829502631},{\"date\":\"2025-04-03\",\"amount\":-70348.2530598843,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25,\"year_fraction\":1.2657534246575342,\"rate\":0.030586196982557972,\"reset_date\":\"2025-01-03\",\"discount_factor\":0.9622742819885133,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-74463.74617258104},{\"date\":\"2025-07-03\",\"amount\":99723.4619281007,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":1.515068493150685,\"rate\":0.039451039883644026,\"reset_date\":\"2025-04-03\",\"discount_factor\":0.9550823938438775,\"discount_curve_id\":\"USD-OIS\",\"pv\":95244.1227406892},{\"date\":\"2025-07-03\",\"amount\":-71135.1866203254,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":1.515068493150685,\"rate\":0.03058847011863056,\"reset_date\":\"2025-04-03\",\"discount_factor\":0.9550823938438775,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-74733.96075625854},{\"date\":\"2025-10-03\",\"amount\":100829.6369311657,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":1.7671232876712328,\"rate\":0.03945507532089055,\"reset_date\":\"2025-07-03\",\"discount_factor\":0.9478661127666621,\"discount_curve_id\":\"USD-OIS\",\"pv\":95572.9960096179},{\"date\":\"2025-10-03\",\"amount\":-71922.2296465679,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":1.7671232876712328,\"rate\":0.030590740397878496,\"reset_date\":\"2025-07-03\",\"discount_factor\":0.9478661127666621,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-74989.90866026386},{\"date\":\"2026-01-05\",\"amount\":100829.5687885008,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":2.0246575342465754,\"rate\":0.03945504865636994,\"reset_date\":\"2025-10-03\",\"discount_factor\":0.9405492675489839,\"discount_curve_id\":\"USD-OIS\",\"pv\":94835.1770713043},{\"date\":\"2026-01-05\",\"amount\":-71922.1944587058,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":2.0246575342465754,\"rate\":0.030590725431396917,\"reset_date\":\"2025-10-03\",\"discount_factor\":0.9405492675489839,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-74411.00405051644},{\"date\":\"2026-04-03\",\"amount\":98617.4989049493,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25,\"year_fraction\":2.265753424657534,\"rate\":0.03944699956197985,\"reset_date\":\"2026-01-03\",\"discount_factor\":0.933750651539414,\"discount_curve_id\":\"USD-OIS\",\"pv\":92084.1538556839},{\"date\":\"2026-04-03\",\"amount\":-70348.2530598843,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25,\"year_fraction\":2.265753424657534,\"rate\":0.030586196982557955,\"reset_date\":\"2026-01-03\",\"discount_factor\":0.933750651539414,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-72256.49984225915},{\"date\":\"2026-07-03\",\"amount\":99723.4619281007,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":2.515068493150685,\"rate\":0.03945103988364405,\"reset_date\":\"2026-04-03\",\"discount_factor\":0.9267719445672449,\"discount_curve_id\":\"USD-OIS\",\"pv\":92420.9067300835},{\"date\":\"2026-07-03\",\"amount\":-71135.1866203275,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":2.515068493150685,\"rate\":0.030588470118630588,\"reset_date\":\"2026-04-03\",\"discount_factor\":0.9267719445672449,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-72518.70475440228},{\"date\":\"2026-10-05\",\"amount\":100829.6369311657,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":2.7726027397260276,\"rate\":0.03945507532089058,\"reset_date\":\"2026-07-03\",\"discount_factor\":0.9196179311689893,\"discount_curve_id\":\"USD-OIS\",\"pv\":92724.7421151589},{\"date\":\"2026-10-05\",\"amount\":-71922.2296465679,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":2.7726027397260276,\"rate\":0.030590740397878496,\"reset_date\":\"2026-07-03\",\"discount_factor\":0.9196179311689893,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-72755.06923590146},{\"date\":\"2027-01-04\",\"amount\":100829.5687885008,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":3.021917808219178,\"rate\":0.03945504865636994,\"reset_date\":\"2026-10-03\",\"discount_factor\":0.9127448499482156,\"discount_curve_id\":\"USD-OIS\",\"pv\":92031.6696342034},{\"date\":\"2027-01-04\",\"amount\":-71922.1944587058,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":3.021917808219178,\"rate\":0.030590725431396862,\"reset_date\":\"2026-10-03\",\"discount_factor\":0.9127448499482156,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-72211.27384807359},{\"date\":\"2027-04-05\",\"amount\":98617.4989049493,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25,\"year_fraction\":3.271232876712329,\"rate\":0.039446999561979904,\"reset_date\":\"2027-01-03\",\"discount_factor\":0.9059231370662555,\"discount_curve_id\":\"USD-OIS\",\"pv\":89339.8739775997},{\"date\":\"2027-04-05\",\"amount\":-70348.2530598843,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25,\"year_fraction\":3.271232876712329,\"rate\":0.030586196982558014,\"reset_date\":\"2027-01-03\",\"discount_factor\":0.9059231370662555,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-70103.12110905533},{\"date\":\"2027-07-05\",\"amount\":99723.4619281007,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":3.5205479452054793,\"rate\":0.03945103988364394,\"reset_date\":\"2027-04-03\",\"discount_factor\":0.8991524086041436,\"discount_curve_id\":\"USD-OIS\",\"pv\":89666.5909869954},{\"date\":\"2027-07-05\",\"amount\":-71135.1866203275,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":3.5205479452054793,\"rate\":0.030588470118630588,\"reset_date\":\"2027-04-03\",\"discount_factor\":0.8991524086041436,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-70357.51182478997},{\"date\":\"2027-10-04\",\"amount\":100829.6369311657,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":3.76986301369863,\"rate\":0.03945507532089052,\"reset_date\":\"2027-07-03\",\"discount_factor\":0.8924322835122646,\"discount_curve_id\":\"USD-OIS\",\"pv\":89983.6231321928},{\"date\":\"2027-10-04\",\"amount\":-71922.2296465679,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":3.76986301369863,\"rate\":0.030590740397878496,\"reset_date\":\"2027-07-03\",\"discount_factor\":0.8924322835122646,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-70604.29160265811},{\"date\":\"2028-01-03\",\"amount\":100829.5687885008,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":4.019178082191781,\"rate\":0.03945504865636984,\"reset_date\":\"2027-10-03\",\"discount_factor\":0.8857623835889091,\"discount_curve_id\":\"USD-OIS\",\"pv\":89311.0391863443},{\"date\":\"2028-01-03\",\"amount\":-71922.1944587058,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":4.019178082191781,\"rate\":0.030590725431396862,\"reset_date\":\"2027-10-03\",\"discount_factor\":0.8857623835889091,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-70076.57183635714},{\"date\":\"2028-04-03\",\"amount\":99723.4997809904,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":4.2684931506849315,\"rate\":0.03945105485841363,\"reset_date\":\"2028-01-03\",\"discount_factor\":0.8791423334589885,\"discount_curve_id\":\"USD-OIS\",\"pv\":87671.1502981568},{\"date\":\"2028-04-03\",\"amount\":-71135.2061675325,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":4.2684931506849315,\"rate\":0.03058847852402241,\"reset_date\":\"2028-01-03\",\"discount_factor\":0.8791423334589885,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-68791.76825533187},{\"date\":\"2028-07-03\",\"amount\":99723.4922112411,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":4.517808219178082,\"rate\":0.03945105186378761,\"reset_date\":\"2028-04-03\",\"discount_factor\":0.8725717605529086,\"discount_curve_id\":\"USD-OIS\",\"pv\":87015.9031672469},{\"date\":\"2028-07-03\",\"amount\":-71135.2022584126,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25277777777777777,\"year_fraction\":4.517808219178082,\"rate\":0.03058847684308223,\"reset_date\":\"2028-04-03\",\"discount_factor\":0.8725717605529086,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-68277.62553910133},{\"date\":\"2028-10-03\",\"amount\":100829.5460767661,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":4.76986301369863,\"rate\":0.039455039769169684,\"reset_date\":\"2028-07-03\",\"discount_factor\":0.8659789020469023,\"discount_curve_id\":\"USD-OIS\",\"pv\":87316.2596054455},{\"date\":\"2028-10-03\",\"amount\":-71922.182730382,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":4.76986301369863,\"rate\":0.030590720442979526,\"reset_date\":\"2028-07-03\",\"discount_factor\":0.8659789020469023,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-68511.40211704018},{\"date\":\"2029-01-03\",\"amount\":100829.4779490271,\"currency\":\"USD\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":5.021917808219178,\"rate\":0.03945501311048877,\"reset_date\":\"2028-10-03\",\"discount_factor\":0.8594358569605426,\"discount_curve_id\":\"USD-OIS\",\"pv\":86656.4687880062},{\"date\":\"2029-01-03\",\"amount\":-71922.1475483031,\"currency\":\"EUR\",\"kind\":\"float_reset\",\"accrual_factor\":0.25555555555555554,\"year_fraction\":5.021917808219178,\"rate\":0.0305907054789567,\"reset_date\":\"2028-10-03\",\"discount_factor\":0.8594358569605426,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-67993.71976388035},{\"date\":\"2029-01-03\",\"amount\":10000000,\"currency\":\"USD\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":5.021917808219178,\"discount_factor\":0.8594358569605426,\"discount_curve_id\":\"USD-OIS\",\"pv\":8594358.56960543},{\"date\":\"2029-01-03\",\"amount\":-9200000,\"currency\":\"EUR\",\"kind\":\"notional\",\"accrual_factor\":0,\"year_fraction\":5.021917808219178,\"discount_factor\":0.8594358569605426,\"discount_curve_id\":\"EUR-OIS\",\"pv\":-8697490.872440688}],\"total_pv\":415230.5361451007,\"reconciles_with_base_value\":true}",
         "error": null
       },
       {
@@ -12264,7 +12240,7 @@
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "de83b838746a391688899bed741e2871cd5950017f59fc8dfe75d930ec7071ca"
+        "sha256": "f0e6cf14fed48de1c6a758735b486df461a808d6e8816967b41a12dbb2738c74"
       },
       {
         "path": "finstack-quant-wasm/tests/facade/covenants.test.mjs",
@@ -12272,7 +12248,7 @@
       },
       {
         "path": "finstack-quant-wasm/index.d.ts",
-        "sha256": "82a4fc58c647fdeab73db815ad455736b8322c649b3368102324bdcd4443c979"
+        "sha256": "3ee66e2d7e0b165fec2f9804e8bf0713454d509f0325a9c48db4292496663778"
       },
       {
         "path": "finstack-quant-wasm/src/utils/mod.rs",
@@ -12280,7 +12256,7 @@
       },
       {
         "path": "finstack-quant/core/src/explain.rs",
-        "sha256": "ea322bb6bf470db3171193f9c01063b8de30d93b1b034eca5135033c4287c0c4"
+        "sha256": "dbc402cd9f504e179e00a83644574b0b2a9c0fc84932c46f5733554bcede38b6"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_option.json",
@@ -12323,7 +12299,7 @@
         },
         "detailType": "monte_carlo",
         "hostBigIntPaths": [["details", "data", "seed"]],
-        "resultJson": "{\"schema_version\":1,\"instrument_id\":\"WTI-OPT-2025M06\",\"as_of\":\"2025-01-02\",\"value\":{\"amount\":\"9636.00581552892\",\"currency\":\"USD\"},\"measures\":{},\"details\":{\"type\":\"monte_carlo\",\"data\":{\"model_key\":\"monte_carlo_schwartz_smith\",\"standard_error\":1506.8323239781655,\"training_paths\":0,\"training_simulated_paths\":0,\"make_whole_training_paths\":0,\"make_whole_training_simulated_paths\":0,\"estimator_paths\":64,\"simulated_paths\":64,\"seed\":42,\"time_grid\":[0.0,0.0017829963035442488,0.0035659926070884976,0.005348988910632746,0.007131985214176995,0.008914981517721243,0.010697977821265492,0.012480974124809741,0.01426397042835399,0.01604696673189824,0.017829963035442487,0.019612959338986737,0.021395955642530985,0.023178951946075235,0.024961948249619482,0.026744944553163733,0.02852794085670798,0.030310937160252228,0.03209393346379648,0.033876929767340726,0.03565992607088497,0.03744292237442923,0.039225918677973474,0.04100891498151772,0.04279191128506197,0.044574907588606216,0.04635790389215047,0.04814090019569472,0.049923896499238965,0.05170689280278321,0.053489889106327466,0.055272885409871714,0.05705588171341596,0.05883887801696021,0.060621874320504456,0.06240487062404871,0.06418786692759296,0.06597086323113721,0.06775385953468145,0.0695368558382257,0.07131985214176995,0.0731028484453142,0.07488584474885845,0.0766688410524027,0.07845183735594695,0.08023483365949119,0.08201782996303544,0.0838008262665797,0.08558382257012394,0.08736681887366819,0.08914981517721243,0.09093281148075669,0.09271580778430094,0.09449880408784518,0.09628180039138944,0.09806479669493369,0.09984779299847793,0.10163078930202218,0.10341378560556642,0.10519678190911068,0.10697977821265493,0.10876277451619917,0.11054577081974343,0.11232876712328767,0.11411176342683192,0.11589475973037618,0.11767775603392042,0.11946075233746467,0.12124374864100891,0.12302674494455317,0.12480974124809742,0.12659273755164166,0.12837573385518591,0.13015873015873017,0.13194172646227442,0.13372472276581865,0.1355077190693629,0.13729071537290716,0.1390737116764514,0.14085670797999567,0.1426397042835399,0.14442270058708415,0.1462056968906284,0.14798869319417265,0.1497716894977169,0.15155468580126114,0.1533376821048054,0.15512067840834964,0.1569036747118939,0.15868667101543815,0.16046966731898238,0.16225266362252663,0.1640356599260709,0.16581865622961514,0.1676016525331594,0.16938464883670362,0.17116764514024788,0.17295064144379213,0.17473363774733638,0.17651663405088064,0.17829963035442487,0.18008262665796912,0.18186562296151337,0.18364861926505763,0.18543161556860188,0.1872146118721461,0.18899760817569036,0.19078060447923462,0.19256360078277887,0.19434659708632313,0.19612959338986738,0.1979125896934116,0.19969558599695586,0.20147858230050011,0.20326157860404437,0.20504457490758862,0.20682757121113285,0.2086105675146771,0.21039356381822136,0.2121765601217656,0.21395955642530987,0.2157425527288541,0.21752554903239835,0.2193085453359426,0.22109154163948685,0.2228745379430311,0.22465753424657534,0.2264405305501196,0.22822352685366384,0.2300065231572081,0.23178951946075235,0.23357251576429658,0.23535551206784083,0.2371385083713851,0.23892150467492934,0.2407045009784736,0.24248749728201782,0.24427049358556208,0.24605348988910633,0.24783648619265058,0.24961948249619484,0.2514024787997391,0.2531854751032833,0.2549684714068276,0.25675146771037183,0.25853446401391605,0.26031746031746034,0.26210045662100456,0.26388345292454884,0.26566644922809307,0.2674494455316373,0.2692324418351816,0.2710154381387258,0.2727984344422701,0.2745814307458143,0.27636442704935854,0.2781474233529028,0.27993041965644705,0.28171341595999133,0.28349641226353556,0.2852794085670798,0.28706240487062407,0.2888454011741683,0.2906283974777126,0.2924113937812568,0.294194390084801,0.2959773863883453,0.29776038269188954,0.2995433789954338,0.30132637529897804,0.30310937160252227,0.30489236790606655,0.3066753642096108,0.30845836051315506,0.3102413568166993,0.3120243531202435,0.3138073494237878,0.315590345727332,0.3173733420308763,0.31915633833442053,0.32093933463796476,0.32272233094150904,0.32450532724505327,0.32628832354859755,0.3280713198521418,0.329854316155686,0.3316373124592303,0.3334203087627745,0.3352033050663188,0.336986301369863,0.33876929767340724,0.3405522939769515,0.34233529028049575,0.34411828658404003,0.34590128288758426,0.3476842791911285,0.34946727549467277,0.351250271798217,0.3530332681017613,0.3548162644053055,0.35659926070884973,0.358382257012394,0.36016525331593824,0.3619482496194825,0.36373124592302675,0.365514242226571,0.36729723853011526,0.3690802348336595,0.37086323113720376,0.372646227440748,0.3744292237442922,0.3762122200478365,0.3779952163513807,0.379778212654925,0.38156120895846923,0.3833442052620135,0.38512720156555774,0.38691019786910197,0.38869319417264625,0.3904761904761905,0.39225918677973476,0.394042183083279,0.3958251793868232,0.3976081756903675,0.3993911719939117,0.401174168297456,0.40295716460100023,0.40474016090454445,0.40652315720808874,0.40830615351163296,0.41008914981517725,0.41187214611872147,0.4136551424222657,0.41543813872581,0.4172211350293542,0.4190041313328985,0.4207871276364427,0.42257012393998694,0.4243531202435312,0.42613611654707545,0.42791911285061973,0.42970210915416396,0.4314851054577082,0.43326810176125247,0.4350510980647967,0.436834094368341,0.4386170906718852,0.44040008697542943,0.4421830832789737,0.44396607958251794,0.4457490758860622,0.44753207218960644,0.44931506849315067],\"antithetic\":false,\"sobol\":false,\"brownian_bridge\":false}},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-07T23:28:16.231000000Z\",\"version\":\"0.9.0\"},\"covenants\":null,\"provenance\":{\"model\":\"monte_carlo_schwartz_smith\",\"requested_as_of\":\"2025-01-02\",\"market_dependencies\":{\"curves\":{\"discount_curves\":[\"USD-OIS\"],\"forward_curves\":[\"WTI-FORWARD\"],\"credit_curves\":[],\"inflation_curves\":[]},\"market_scalar_ids\":[],\"volatility_dependencies\":[{\"vol_surface_id\":\"WTI-VOL\",\"spot_id\":null,\"reference_strike\":75.0}],\"fx_pairs\":[],\"series_ids\":[]}}}"
+        "resultJson": "{\"schema_version\":1,\"instrument_id\":\"WTI-OPT-2025M06\",\"as_of\":\"2025-01-02\",\"value\":{\"amount\":\"9636.00581552892\",\"currency\":\"USD\"},\"measures\":{},\"details\":{\"type\":\"monte_carlo\",\"data\":{\"model_key\":\"monte_carlo_schwartz_smith\",\"standard_error\":1506.8323239781655,\"training_paths\":0,\"training_simulated_paths\":0,\"make_whole_training_paths\":0,\"make_whole_training_simulated_paths\":0,\"estimator_paths\":64,\"simulated_paths\":64,\"seed\":42,\"time_grid\":[0.0,0.0017829963035442488,0.0035659926070884976,0.005348988910632746,0.007131985214176995,0.008914981517721243,0.010697977821265492,0.012480974124809741,0.01426397042835399,0.01604696673189824,0.017829963035442487,0.019612959338986737,0.021395955642530985,0.023178951946075235,0.024961948249619482,0.026744944553163733,0.02852794085670798,0.030310937160252228,0.03209393346379648,0.033876929767340726,0.03565992607088497,0.03744292237442923,0.039225918677973474,0.04100891498151772,0.04279191128506197,0.044574907588606216,0.04635790389215047,0.04814090019569472,0.049923896499238965,0.05170689280278321,0.053489889106327466,0.055272885409871714,0.05705588171341596,0.05883887801696021,0.060621874320504456,0.06240487062404871,0.06418786692759296,0.06597086323113721,0.06775385953468145,0.0695368558382257,0.07131985214176995,0.0731028484453142,0.07488584474885845,0.0766688410524027,0.07845183735594695,0.08023483365949119,0.08201782996303544,0.0838008262665797,0.08558382257012394,0.08736681887366819,0.08914981517721243,0.09093281148075669,0.09271580778430094,0.09449880408784518,0.09628180039138944,0.09806479669493369,0.09984779299847793,0.10163078930202218,0.10341378560556642,0.10519678190911068,0.10697977821265493,0.10876277451619917,0.11054577081974343,0.11232876712328767,0.11411176342683192,0.11589475973037618,0.11767775603392042,0.11946075233746467,0.12124374864100891,0.12302674494455317,0.12480974124809742,0.12659273755164166,0.12837573385518591,0.13015873015873017,0.13194172646227442,0.13372472276581865,0.1355077190693629,0.13729071537290716,0.1390737116764514,0.14085670797999567,0.1426397042835399,0.14442270058708415,0.1462056968906284,0.14798869319417265,0.1497716894977169,0.15155468580126114,0.1533376821048054,0.15512067840834964,0.1569036747118939,0.15868667101543815,0.16046966731898238,0.16225266362252663,0.1640356599260709,0.16581865622961514,0.1676016525331594,0.16938464883670362,0.17116764514024788,0.17295064144379213,0.17473363774733638,0.17651663405088064,0.17829963035442487,0.18008262665796912,0.18186562296151337,0.18364861926505763,0.18543161556860188,0.1872146118721461,0.18899760817569036,0.19078060447923462,0.19256360078277887,0.19434659708632313,0.19612959338986738,0.1979125896934116,0.19969558599695586,0.20147858230050011,0.20326157860404437,0.20504457490758862,0.20682757121113285,0.2086105675146771,0.21039356381822136,0.2121765601217656,0.21395955642530987,0.2157425527288541,0.21752554903239835,0.2193085453359426,0.22109154163948685,0.2228745379430311,0.22465753424657534,0.2264405305501196,0.22822352685366384,0.2300065231572081,0.23178951946075235,0.23357251576429658,0.23535551206784083,0.2371385083713851,0.23892150467492934,0.2407045009784736,0.24248749728201782,0.24427049358556208,0.24605348988910633,0.24783648619265058,0.24961948249619484,0.2514024787997391,0.2531854751032833,0.2549684714068276,0.25675146771037183,0.25853446401391605,0.26031746031746034,0.26210045662100456,0.26388345292454884,0.26566644922809307,0.2674494455316373,0.2692324418351816,0.2710154381387258,0.2727984344422701,0.2745814307458143,0.27636442704935854,0.2781474233529028,0.27993041965644705,0.28171341595999133,0.28349641226353556,0.2852794085670798,0.28706240487062407,0.2888454011741683,0.2906283974777126,0.2924113937812568,0.294194390084801,0.2959773863883453,0.29776038269188954,0.2995433789954338,0.30132637529897804,0.30310937160252227,0.30489236790606655,0.3066753642096108,0.30845836051315506,0.3102413568166993,0.3120243531202435,0.3138073494237878,0.315590345727332,0.3173733420308763,0.31915633833442053,0.32093933463796476,0.32272233094150904,0.32450532724505327,0.32628832354859755,0.3280713198521418,0.329854316155686,0.3316373124592303,0.3334203087627745,0.3352033050663188,0.336986301369863,0.33876929767340724,0.3405522939769515,0.34233529028049575,0.34411828658404003,0.34590128288758426,0.3476842791911285,0.34946727549467277,0.351250271798217,0.3530332681017613,0.3548162644053055,0.35659926070884973,0.358382257012394,0.36016525331593824,0.3619482496194825,0.36373124592302675,0.365514242226571,0.36729723853011526,0.3690802348336595,0.37086323113720376,0.372646227440748,0.3744292237442922,0.3762122200478365,0.3779952163513807,0.379778212654925,0.38156120895846923,0.3833442052620135,0.38512720156555774,0.38691019786910197,0.38869319417264625,0.3904761904761905,0.39225918677973476,0.394042183083279,0.3958251793868232,0.3976081756903675,0.3993911719939117,0.401174168297456,0.40295716460100023,0.40474016090454445,0.40652315720808874,0.40830615351163296,0.41008914981517725,0.41187214611872147,0.4136551424222657,0.41543813872581,0.4172211350293542,0.4190041313328985,0.4207871276364427,0.42257012393998694,0.4243531202435312,0.42613611654707545,0.42791911285061973,0.42970210915416396,0.4314851054577082,0.43326810176125247,0.4350510980647967,0.436834094368341,0.4386170906718852,0.44040008697542943,0.4421830832789737,0.44396607958251794,0.4457490758860622,0.44753207218960644,0.44931506849315067],\"antithetic\":false,\"sobol\":false,\"brownian_bridge\":false}},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-08T01:12:29.578000000Z\",\"version\":\"0.10.0\"},\"covenants\":null}"
       },
       {
         "type": "composite",
@@ -12336,7 +12312,7 @@
         },
         "detailType": "composite",
         "hostBigIntPaths": [],
-        "resultJson": "{\"schema_version\":1,\"instrument_id\":\"COMPOSITE-EXAMPLE\",\"as_of\":\"2025-01-01\",\"value\":{\"amount\":\"10\",\"currency\":\"USD\"},\"measures\":{},\"details\":{\"type\":\"composite\",\"data\":{\"state_effective_date\":\"2025-01-01\",\"reporting_currency\":\"USD\",\"resolved_legs\":[{\"instrument_id\":\"COMPOSITE-LONG\",\"quantity\":1.0},{\"instrument_id\":\"COMPOSITE-SHORT\",\"quantity\":-1.0}],\"weighting_inputs\":{},\"leg_results\":[{\"instrument_id\":\"COMPOSITE-LONG\",\"quantity\":1.0,\"native_value\":{\"amount\":\"100\",\"currency\":\"USD\"},\"reporting_value\":{\"amount\":\"100\",\"currency\":\"USD\"},\"valuation\":{\"schema_version\":1,\"instrument_id\":\"COMPOSITE-LONG\",\"as_of\":\"2025-01-01\",\"value\":{\"amount\":\"100\",\"currency\":\"USD\"},\"measures\":{},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-07T23:28:16.247000000Z\",\"version\":\"0.9.0\"},\"covenants\":null,\"provenance\":{\"model\":\"discounting\",\"requested_as_of\":\"2025-01-01\",\"market_dependencies\":{\"curves\":{\"discount_curves\":[\"USD\"],\"forward_curves\":[],\"credit_curves\":[],\"inflation_curves\":[]},\"market_scalar_ids\":[],\"volatility_dependencies\":[],\"fx_pairs\":[],\"series_ids\":[]}}}},{\"instrument_id\":\"COMPOSITE-SHORT\",\"quantity\":-1.0,\"native_value\":{\"amount\":\"-90\",\"currency\":\"USD\"},\"reporting_value\":{\"amount\":\"-90\",\"currency\":\"USD\"},\"valuation\":{\"schema_version\":1,\"instrument_id\":\"COMPOSITE-SHORT\",\"as_of\":\"2025-01-01\",\"value\":{\"amount\":\"90\",\"currency\":\"USD\"},\"measures\":{},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-07T23:28:16.247000000Z\",\"version\":\"0.9.0\"},\"covenants\":null,\"provenance\":{\"model\":\"discounting\",\"requested_as_of\":\"2025-01-01\",\"market_dependencies\":{\"curves\":{\"discount_curves\":[\"USD\"],\"forward_curves\":[],\"credit_curves\":[],\"inflation_curves\":[]},\"market_scalar_ids\":[],\"volatility_dependencies\":[],\"fx_pairs\":[],\"series_ids\":[]}}}}],\"exposures\":{\"reporting_currency\":\"USD\",\"paths\":[{\"path\":[\"COMPOSITE-EXAMPLE\",\"COMPOSITE-LONG\"],\"instrument_id\":\"COMPOSITE-LONG\",\"instrument_type\":\"equity\",\"quantity\":1.0,\"value\":{\"amount\":\"100\",\"currency\":\"USD\"},\"measures\":{}},{\"path\":[\"COMPOSITE-EXAMPLE\",\"COMPOSITE-SHORT\"],\"instrument_id\":\"COMPOSITE-SHORT\",\"instrument_type\":\"equity\",\"quantity\":-1.0,\"value\":{\"amount\":\"-90\",\"currency\":\"USD\"},\"measures\":{}}],\"aggregates\":[{\"instrument_id\":\"COMPOSITE-LONG\",\"instrument_type\":\"equity\",\"net_quantity\":1.0,\"gross_quantity\":1.0,\"net_value\":{\"amount\":\"100\",\"currency\":\"USD\"},\"gross_value\":{\"amount\":\"100\",\"currency\":\"USD\"},\"net_measures\":{},\"gross_measures\":{}},{\"instrument_id\":\"COMPOSITE-SHORT\",\"instrument_type\":\"equity\",\"net_quantity\":-1.0,\"gross_quantity\":1.0,\"net_value\":{\"amount\":\"-90\",\"currency\":\"USD\"},\"gross_value\":{\"amount\":\"90\",\"currency\":\"USD\"},\"net_measures\":{},\"gross_measures\":{}}]}}},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-07T23:28:16.246000000Z\",\"version\":\"0.9.0\"},\"covenants\":null,\"provenance\":{\"model\":\"discounting\",\"requested_as_of\":\"2025-01-01\",\"market_dependencies\":{\"curves\":{\"discount_curves\":[\"USD\"],\"forward_curves\":[],\"credit_curves\":[],\"inflation_curves\":[]},\"market_scalar_ids\":[],\"volatility_dependencies\":[],\"fx_pairs\":[],\"series_ids\":[]}}}"
+        "resultJson": "{\"schema_version\":1,\"instrument_id\":\"COMPOSITE-EXAMPLE\",\"as_of\":\"2025-01-01\",\"value\":{\"amount\":\"10\",\"currency\":\"USD\"},\"measures\":{},\"details\":{\"type\":\"composite\",\"data\":{\"state_effective_date\":\"2025-01-01\",\"reporting_currency\":\"USD\",\"resolved_legs\":[{\"instrument_id\":\"COMPOSITE-LONG\",\"quantity\":1.0},{\"instrument_id\":\"COMPOSITE-SHORT\",\"quantity\":-1.0}],\"weighting_inputs\":{},\"leg_results\":[{\"instrument_id\":\"COMPOSITE-LONG\",\"quantity\":1.0,\"native_value\":{\"amount\":\"100\",\"currency\":\"USD\"},\"reporting_value\":{\"amount\":\"100\",\"currency\":\"USD\"},\"valuation\":{\"schema_version\":1,\"instrument_id\":\"COMPOSITE-LONG\",\"as_of\":\"2025-01-01\",\"value\":{\"amount\":\"100\",\"currency\":\"USD\"},\"measures\":{},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-08T01:12:29.589000000Z\",\"version\":\"0.10.0\"},\"covenants\":null}},{\"instrument_id\":\"COMPOSITE-SHORT\",\"quantity\":-1.0,\"native_value\":{\"amount\":\"-90\",\"currency\":\"USD\"},\"reporting_value\":{\"amount\":\"-90\",\"currency\":\"USD\"},\"valuation\":{\"schema_version\":1,\"instrument_id\":\"COMPOSITE-SHORT\",\"as_of\":\"2025-01-01\",\"value\":{\"amount\":\"90\",\"currency\":\"USD\"},\"measures\":{},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-08T01:12:29.589000000Z\",\"version\":\"0.10.0\"},\"covenants\":null}}],\"exposures\":{\"reporting_currency\":\"USD\",\"paths\":[{\"path\":[\"COMPOSITE-EXAMPLE\",\"COMPOSITE-LONG\"],\"instrument_id\":\"COMPOSITE-LONG\",\"instrument_type\":\"equity\",\"quantity\":1.0,\"value\":{\"amount\":\"100\",\"currency\":\"USD\"},\"measures\":{}},{\"path\":[\"COMPOSITE-EXAMPLE\",\"COMPOSITE-SHORT\"],\"instrument_id\":\"COMPOSITE-SHORT\",\"instrument_type\":\"equity\",\"quantity\":-1.0,\"value\":{\"amount\":\"-90\",\"currency\":\"USD\"},\"measures\":{}}],\"aggregates\":[{\"instrument_id\":\"COMPOSITE-LONG\",\"instrument_type\":\"equity\",\"net_quantity\":1.0,\"gross_quantity\":1.0,\"net_value\":{\"amount\":\"100\",\"currency\":\"USD\"},\"gross_value\":{\"amount\":\"100\",\"currency\":\"USD\"},\"net_measures\":{},\"gross_measures\":{}},{\"instrument_id\":\"COMPOSITE-SHORT\",\"instrument_type\":\"equity\",\"net_quantity\":-1.0,\"gross_quantity\":1.0,\"net_value\":{\"amount\":\"-90\",\"currency\":\"USD\"},\"gross_value\":{\"amount\":\"90\",\"currency\":\"USD\"},\"net_measures\":{},\"gross_measures\":{}}]}}},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-08T01:12:29.588000000Z\",\"version\":\"0.10.0\"},\"covenants\":null}"
       },
       {
         "type": "credit_default_swap",
@@ -12349,7 +12325,7 @@
         },
         "detailType": "credit_derivative",
         "hostBigIntPaths": [],
-        "resultJson": "{\"schema_version\":1,\"instrument_id\":\"CDS-CORP-5Y\",\"as_of\":\"2023-12-28\",\"value\":{\"amount\":\"82667.8321605278\",\"currency\":\"USD\"},\"measures\":{},\"details\":{\"type\":\"credit_derivative\",\"data\":{\"model_key\":\"hazard_rate\",\"integration_method\":\"isda_standard_model\"}},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-07T23:28:16.253000000Z\",\"version\":\"0.9.0\"},\"covenants\":null,\"provenance\":{\"model\":\"hazard_rate\",\"requested_as_of\":\"2023-12-28\",\"market_dependencies\":{\"curves\":{\"discount_curves\":[\"USD-OIS\"],\"forward_curves\":[],\"credit_curves\":[\"CORP-HAZARD\"],\"inflation_curves\":[]},\"market_scalar_ids\":[],\"volatility_dependencies\":[],\"fx_pairs\":[],\"series_ids\":[]}}}"
+        "resultJson": "{\"schema_version\":1,\"instrument_id\":\"CDS-CORP-5Y\",\"as_of\":\"2023-12-28\",\"value\":{\"amount\":\"82667.8321605278\",\"currency\":\"USD\"},\"measures\":{},\"details\":{\"type\":\"credit_derivative\",\"data\":{\"model_key\":\"hazard_rate\",\"integration_method\":\"isda_standard_model\"}},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-08T01:12:29.594000000Z\",\"version\":\"0.10.0\"},\"covenants\":null}"
       },
       {
         "type": "fx_option",
@@ -12362,7 +12338,7 @@
         },
         "detailType": "fx",
         "hostBigIntPaths": [],
-        "resultJson": "{\"schema_version\":1,\"instrument_id\":\"FXOPT-EURUSD-CALL\",\"as_of\":\"2023-12-28\",\"value\":{\"amount\":\"130200.8917953093\",\"currency\":\"USD\"},\"measures\":{},\"details\":{\"type\":\"fx\",\"data\":{\"fx_triangulated\":false}},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-07T23:28:16.255000000Z\",\"version\":\"0.9.0\"},\"covenants\":null,\"provenance\":{\"model\":\"black76\",\"requested_as_of\":\"2023-12-28\",\"market_dependencies\":{\"curves\":{\"discount_curves\":[\"USD-OIS\",\"EUR-OIS\"],\"forward_curves\":[],\"credit_curves\":[],\"inflation_curves\":[]},\"market_scalar_ids\":[],\"volatility_dependencies\":[{\"vol_surface_id\":\"EURUSD-VOL\",\"spot_id\":null,\"reference_strike\":1.12}],\"fx_pairs\":[{\"base\":\"EUR\",\"quote\":\"USD\"}],\"series_ids\":[]}}}"
+        "resultJson": "{\"schema_version\":1,\"instrument_id\":\"FXOPT-EURUSD-CALL\",\"as_of\":\"2023-12-28\",\"value\":{\"amount\":\"130200.8917953093\",\"currency\":\"USD\"},\"measures\":{},\"details\":{\"type\":\"fx\",\"data\":{\"fx_triangulated\":false}},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-08T01:12:29.596000000Z\",\"version\":\"0.10.0\"},\"covenants\":null}"
       },
       {
         "type": "structured_credit",
@@ -12379,7 +12355,7 @@
           ["details", "data", "pricing_mode", "monte_carlo", "num_paths"],
           ["details", "data", "tranche_results", 0, "paths_with_principal"]
         ],
-        "resultJson": "{\"schema_version\":1,\"instrument_id\":\"CLO-EXAMPLE\",\"as_of\":\"2023-12-28\",\"value\":{\"amount\":\"108912295.5840659\",\"currency\":\"USD\"},\"measures\":{\"expected_loss\":3305959.372673459,\"unexpected_loss\":0.0,\"expected_shortfall\":3305959.372673459,\"pv_std_error\":0.0,\"tranche_npv::CLONOTES-A\":108912295.5840659,\"tranche_expected_loss::CLONOTES-A\":3305959.372673459,\"tranche_wal::CLONOTES-A\":3.9376112188049017},\"details\":{\"type\":\"structured_credit_stochastic\",\"data\":{\"npv\":{\"amount\":\"108912295.5840659\",\"currency\":\"USD\"},\"clean_price\":108.91229558406594,\"dirty_price\":108.91229558406594,\"expected_loss\":{\"amount\":\"3305959.372673459\",\"currency\":\"USD\"},\"unexpected_loss\":{\"amount\":\"0\",\"currency\":\"USD\"},\"expected_shortfall\":{\"amount\":\"3305959.372673459\",\"currency\":\"USD\"},\"es_confidence\":0.95,\"pv_std_error\":0.0,\"pv_confidence_interval\":[108912295.58406594,108912295.58406594],\"num_paths\":16,\"pricing_mode\":{\"monte_carlo\":{\"num_paths\":8,\"antithetic\":true}},\"tranche_results\":[{\"tranche_id\":\"CLONOTES-A\",\"seniority\":\"senior\",\"npv\":{\"amount\":\"108912295.5840659\",\"currency\":\"USD\"},\"price_pct\":108.91229558406594,\"expected_loss\":{\"amount\":\"3305959.372673459\",\"currency\":\"USD\"},\"unexpected_loss\":{\"amount\":\"0\",\"currency\":\"USD\"},\"expected_shortfall\":{\"amount\":\"3305959.372673459\",\"currency\":\"USD\"},\"attach_pct\":0.0,\"detach_pct\":100.0,\"wal\":3.9376112188049017,\"paths_with_principal\":16,\"credit_duration\":3.5772420981506277,\"draw_option_cost\":{\"amount\":\"0\",\"currency\":\"USD\"}}],\"unfunded_draw_path_fraction\":0.0,\"expected_collateral_draws\":{\"amount\":\"0\",\"currency\":\"USD\"},\"draw_option_cost\":{\"amount\":\"0\",\"currency\":\"USD\"}}},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-07T23:28:16.278000000Z\",\"version\":\"0.9.0\"},\"covenants\":null,\"provenance\":{\"model\":\"structured_credit_stochastic\",\"requested_as_of\":\"2023-12-28\",\"market_dependencies\":{\"curves\":{\"discount_curves\":[\"USD-OIS\"],\"forward_curves\":[],\"credit_curves\":[],\"inflation_curves\":[]},\"market_scalar_ids\":[],\"volatility_dependencies\":[],\"fx_pairs\":[],\"series_ids\":[]}}}"
+        "resultJson": "{\"schema_version\":1,\"instrument_id\":\"CLO-EXAMPLE\",\"as_of\":\"2023-12-28\",\"value\":{\"amount\":\"108912295.5840659\",\"currency\":\"USD\"},\"measures\":{\"expected_loss\":3305959.372673459,\"unexpected_loss\":0.0,\"expected_shortfall\":3305959.372673459,\"pv_std_error\":0.0,\"tranche_npv::CLONOTES-A\":108912295.5840659,\"tranche_expected_loss::CLONOTES-A\":3305959.372673459,\"tranche_wal::CLONOTES-A\":3.9376112188049017},\"details\":{\"type\":\"structured_credit_stochastic\",\"data\":{\"npv\":{\"amount\":\"108912295.5840659\",\"currency\":\"USD\"},\"clean_price\":108.91229558406594,\"dirty_price\":108.91229558406594,\"expected_loss\":{\"amount\":\"3305959.372673459\",\"currency\":\"USD\"},\"unexpected_loss\":{\"amount\":\"0\",\"currency\":\"USD\"},\"expected_shortfall\":{\"amount\":\"3305959.372673459\",\"currency\":\"USD\"},\"es_confidence\":0.95,\"pv_std_error\":0.0,\"pv_confidence_interval\":[108912295.58406594,108912295.58406594],\"num_paths\":16,\"pricing_mode\":{\"monte_carlo\":{\"num_paths\":8,\"antithetic\":true}},\"tranche_results\":[{\"tranche_id\":\"CLONOTES-A\",\"seniority\":\"senior\",\"npv\":{\"amount\":\"108912295.5840659\",\"currency\":\"USD\"},\"price_pct\":108.91229558406594,\"expected_loss\":{\"amount\":\"3305959.372673459\",\"currency\":\"USD\"},\"unexpected_loss\":{\"amount\":\"0\",\"currency\":\"USD\"},\"expected_shortfall\":{\"amount\":\"3305959.372673459\",\"currency\":\"USD\"},\"attach_pct\":0.0,\"detach_pct\":100.0,\"wal\":3.9376112188049017,\"paths_with_principal\":16,\"credit_duration\":3.5772420981506277,\"draw_option_cost\":{\"amount\":\"0\",\"currency\":\"USD\"}}],\"unfunded_draw_path_fraction\":0.0,\"expected_collateral_draws\":{\"amount\":\"0\",\"currency\":\"USD\"},\"draw_option_cost\":{\"amount\":\"0\",\"currency\":\"USD\"}}},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-08T01:12:29.616000000Z\",\"version\":\"0.10.0\"},\"covenants\":null}"
       },
       {
         "type": "bond",
@@ -12392,7 +12368,7 @@
         },
         "detailType": "monte_carlo",
         "hostBigIntPaths": [["details", "data", "seed"]],
-        "resultJson": "{\"schema_version\":1,\"instrument_id\":\"US912828XG33\",\"as_of\":\"2025-01-01\",\"value\":{\"amount\":\"992091.570117712\",\"currency\":\"USD\"},\"measures\":{\"mc_stderr\":68.02406436382614,\"mc_ci_95_low\":991930.718765425,\"mc_ci_95_high\":992252.421469998,\"mc_num_paths\":8.0,\"mc_num_simulated_paths\":16.0,\"mc_relative_stderr\":0.00006856631626832093},\"details\":{\"type\":\"monte_carlo\",\"data\":{\"model_key\":\"rates_credit\",\"standard_error\":68.02406436382614,\"training_paths\":0,\"training_simulated_paths\":0,\"make_whole_training_paths\":0,\"make_whole_training_simulated_paths\":0,\"estimator_paths\":8,\"simulated_paths\":16,\"seed\":10049819788103739979,\"time_grid\":[0.0,0.0027397260273972607,0.0054794520547945215,0.008219178082191782,0.010958904109589043,0.013698630136986302,0.016438356164383564,0.019178082191780823,0.021917808219178086,0.024657534246575342,0.027397260273972605,0.030136986301369868,0.03287671232876713,0.03561643835616438,0.038356164383561646,0.04109589041095891,0.04383561643835617,0.04657534246575343,0.049315068493150684,0.05205479452054795,0.05479452054794521,0.05753424657534247,0.060273972602739735,0.06301369863013699,0.06575342465753425,0.06849315068493152,0.07123287671232877,0.07397260273972604,0.07671232876712329,0.07945205479452055,0.08219178082191782,0.08493150684931508,0.08767123287671234,0.0904109589041096,0.09315068493150686,0.09589041095890412,0.09863013698630137,0.10136986301369864,0.1041095890410959,0.10684931506849316,0.10958904109589042,0.1123287671232877,0.11506849315068494,0.11780821917808221,0.12054794520547947,0.12328767123287672,0.12602739726027398,0.12876712328767123,0.1315068493150685,0.13424657534246578,0.13698630136986303,0.13972602739726028,0.14246575342465753,0.1452054794520548,0.14794520547945209,0.15068493150684933,0.15342465753424658,0.15616438356164386,0.1589041095890411,0.16164383561643839,0.16438356164383564,0.16712328767123288,0.16986301369863016,0.1726027397260274,0.1753424657534247,0.17808219178082194,0.1808219178082192,0.18356164383561643,0.1863013698630137,0.189041095890411,0.19178082191780824,0.1945205479452055,0.19726027397260273,0.2,0.2027397260273973,0.20547945205479454,0.2082191780821918,0.2109589041095891,0.2136986301369863,0.2164383561643836,0.21917808219178084,0.22191780821917811,0.2246575342465754,0.2273972602739726,0.2301369863013699,0.23287671232876714,0.23561643835616441,0.2383561643835617,0.24109589041095894,0.2438356164383562,0.24657534246575344,0.24931506849315072,0.25205479452054796,0.25479452054794527,0.25753424657534246,0.26027397260273977,0.263013698630137,0.26575342465753427,0.26849315068493157,0.27123287671232876,0.27397260273972607,0.2767123287671233,0.27945205479452057,0.28219178082191787,0.28493150684931506,0.28767123287671237,0.2904109589041096,0.29315068493150687,0.29589041095890417,0.2986301369863014,0.30136986301369867,0.3041095890410959,0.30684931506849317,0.30958904109589047,0.3123287671232877,0.31506849315068497,0.3178082191780822,0.32054794520547947,0.32328767123287677,0.326027397260274,0.32876712328767127,0.3315068493150685,0.33424657534246577,0.3369863013698631,0.3397260273972603,0.34246575342465757,0.3452054794520548,0.34794520547945207,0.3506849315068494,0.35342465753424657,0.35616438356164387,0.3589041095890411,0.3616438356164384,0.3643835616438357,0.36712328767123287,0.36986301369863017,0.3726027397260274,0.3753424657534247,0.378082191780822,0.38082191780821917,0.3835616438356165,0.3863013698630137,0.389041095890411,0.3917808219178083,0.39452054794520547,0.3972602739726028,0.4,0.4027397260273973,0.4054794520547946,0.4082191780821919,0.4109589041095891,0.4136986301369863,0.4164383561643836,0.4191780821917809,0.4219178082191782,0.4246575342465754,0.4273972602739726,0.43013698630136993,0.4328767123287672,0.4356164383561645,0.4383561643835617,0.4410958904109589,0.44383561643835623,0.4465753424657535,0.4493150684931508,0.452054794520548,0.4547945205479452,0.45753424657534253,0.4602739726027398,0.4630136986301371,0.4657534246575343,0.4684931506849315,0.47123287671232883,0.4739726027397261,0.4767123287671234,0.4794520547945206,0.4821917808219179,0.48493150684931513,0.4876712328767124,0.4904109589041097,0.4931506849315069,0.4958904109589042,0.49863013698630143,0.5013698630136987,0.5041095890410959,0.5068493150684932,0.5095890410958905,0.5123287671232877,0.5150684931506849,0.5178082191780823,0.5205479452054795,0.5232876712328768,0.526027397260274,0.5287671232876713,0.5315068493150685,0.5342465753424658,0.5369863013698631,0.5397260273972603,0.5424657534246575,0.5452054794520549,0.5479452054794521,0.5506849315068494,0.5534246575342466,0.5561643835616439,0.5589041095890411,0.5616438356164384,0.5643835616438357,0.5671232876712329,0.5698630136986301,0.5726027397260275,0.5753424657534247,0.578082191780822,0.5808219178082192,0.5835616438356165,0.5863013698630137,0.589041095890411,0.5917808219178083,0.5945205479452055,0.5972602739726028,0.6000000000000001,0.6027397260273973,0.6054794520547946,0.6082191780821918,0.6109589041095891,0.6136986301369863,0.6164383561643836,0.6191780821917809,0.6219178082191781,0.6246575342465754,0.6273972602739727,0.6301369863013699,0.6328767123287672,0.6356164383561644,0.6383561643835617,0.6410958904109589,0.6438356164383562,0.6465753424657535,0.6493150684931507,0.652054794520548,0.6547945205479453,0.6575342465753425,0.6602739726027398,0.663013698630137,0.6657534246575343,0.6684931506849315,0.6712328767123289,0.6739726027397261,0.6767123287671233,0.6794520547945206,0.6821917808219179,0.6849315068493151,0.6876712328767124,0.6904109589041096,0.6931506849315069,0.6958904109589041,0.6986301369863015,0.7013698630136987,0.704109589041096,0.7068493150684931,0.7095890410958905,0.7123287671232877,0.7150684931506851,0.7178082191780822,0.7205479452054795,0.7232876712328768,0.726027397260274,0.7287671232876713,0.7315068493150686,0.7342465753424657,0.7369863013698631,0.7397260273972603,0.7424657534246577,0.7452054794520548,0.7479452054794521,0.7506849315068495,0.7534246575342466,0.756164383561644,0.7589041095890412,0.7616438356164383,0.7643835616438357,0.767123287671233,0.7698630136986303,0.7726027397260274,0.7753424657534247,0.778082191780822,0.7808219178082192,0.7835616438356166,0.7863013698630138,0.7890410958904109,0.7917808219178083,0.7945205479452055,0.7972602739726029,0.8,0.8027397260273973,0.8054794520547947,0.8082191780821918,0.8109589041095892,0.8136986301369864,0.8164383561643838,0.8191780821917809,0.8219178082191781,0.8246575342465755,0.8273972602739726,0.8301369863013699,0.8328767123287673,0.8356164383561644,0.8383561643835618,0.841095890410959,0.8438356164383564,0.8465753424657535,0.8493150684931507,0.8520547945205481,0.8547945205479452,0.8575342465753425,0.8602739726027399,0.863013698630137,0.8657534246575344,0.8684931506849316,0.871232876712329,0.8739726027397261,0.8767123287671234,0.8794520547945207,0.8821917808219178,0.8849315068493151,0.8876712328767125,0.8904109589041097,0.893150684931507,0.8958904109589042,0.8986301369863016,0.9013698630136987,0.904109589041096,0.9068493150684933,0.9095890410958904,0.9123287671232877,0.9150684931506851,0.9178082191780823,0.9205479452054796,0.9232876712328768,0.9260273972602742,0.9287671232876713,0.9315068493150686,0.9342465753424659,0.936986301369863,0.9397260273972603,0.9424657534246577,0.9452054794520549,0.9479452054794522,0.9506849315068494,0.9534246575342468,0.9561643835616439,0.9589041095890412,0.9616438356164385,0.9643835616438358,0.9671232876712329,0.9698630136986303,0.9726027397260275,0.9753424657534248,0.978082191780822,0.9808219178082194,0.9835616438356165,0.9863013698630138,0.9890410958904111,0.9917808219178084,0.9945205479452055,0.9972602739726029,1.0000000000000002,1.0027397260273974],\"antithetic\":true,\"sobol\":false,\"brownian_bridge\":false}},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-07T23:28:16.294000000Z\",\"version\":\"0.9.0\"},\"covenants\":null,\"provenance\":{\"model\":\"rates_credit\",\"requested_as_of\":\"2025-01-01\",\"market_dependencies\":{\"curves\":{\"discount_curves\":[\"USD-OIS\"],\"forward_curves\":[],\"credit_curves\":[\"HZ\"],\"inflation_curves\":[]},\"market_scalar_ids\":[],\"volatility_dependencies\":[],\"fx_pairs\":[],\"series_ids\":[]}}}"
+        "resultJson": "{\"schema_version\":1,\"instrument_id\":\"US912828XG33\",\"as_of\":\"2025-01-01\",\"value\":{\"amount\":\"992091.570117712\",\"currency\":\"USD\"},\"measures\":{\"mc_stderr\":68.02406436382614,\"mc_ci_95_low\":991930.718765425,\"mc_ci_95_high\":992252.421469998,\"mc_num_paths\":8.0,\"mc_num_simulated_paths\":16.0,\"mc_relative_stderr\":0.00006856631626832093},\"details\":{\"type\":\"monte_carlo\",\"data\":{\"model_key\":\"rates_credit\",\"standard_error\":68.02406436382614,\"training_paths\":0,\"training_simulated_paths\":0,\"make_whole_training_paths\":0,\"make_whole_training_simulated_paths\":0,\"estimator_paths\":8,\"simulated_paths\":16,\"seed\":10049819788103739979,\"time_grid\":[0.0,0.0027397260273972607,0.0054794520547945215,0.008219178082191782,0.010958904109589043,0.013698630136986302,0.016438356164383564,0.019178082191780823,0.021917808219178086,0.024657534246575342,0.027397260273972605,0.030136986301369868,0.03287671232876713,0.03561643835616438,0.038356164383561646,0.04109589041095891,0.04383561643835617,0.04657534246575343,0.049315068493150684,0.05205479452054795,0.05479452054794521,0.05753424657534247,0.060273972602739735,0.06301369863013699,0.06575342465753425,0.06849315068493152,0.07123287671232877,0.07397260273972604,0.07671232876712329,0.07945205479452055,0.08219178082191782,0.08493150684931508,0.08767123287671234,0.0904109589041096,0.09315068493150686,0.09589041095890412,0.09863013698630137,0.10136986301369864,0.1041095890410959,0.10684931506849316,0.10958904109589042,0.1123287671232877,0.11506849315068494,0.11780821917808221,0.12054794520547947,0.12328767123287672,0.12602739726027398,0.12876712328767123,0.1315068493150685,0.13424657534246578,0.13698630136986303,0.13972602739726028,0.14246575342465753,0.1452054794520548,0.14794520547945209,0.15068493150684933,0.15342465753424658,0.15616438356164386,0.1589041095890411,0.16164383561643839,0.16438356164383564,0.16712328767123288,0.16986301369863016,0.1726027397260274,0.1753424657534247,0.17808219178082194,0.1808219178082192,0.18356164383561643,0.1863013698630137,0.189041095890411,0.19178082191780824,0.1945205479452055,0.19726027397260273,0.2,0.2027397260273973,0.20547945205479454,0.2082191780821918,0.2109589041095891,0.2136986301369863,0.2164383561643836,0.21917808219178084,0.22191780821917811,0.2246575342465754,0.2273972602739726,0.2301369863013699,0.23287671232876714,0.23561643835616441,0.2383561643835617,0.24109589041095894,0.2438356164383562,0.24657534246575344,0.24931506849315072,0.25205479452054796,0.25479452054794527,0.25753424657534246,0.26027397260273977,0.263013698630137,0.26575342465753427,0.26849315068493157,0.27123287671232876,0.27397260273972607,0.2767123287671233,0.27945205479452057,0.28219178082191787,0.28493150684931506,0.28767123287671237,0.2904109589041096,0.29315068493150687,0.29589041095890417,0.2986301369863014,0.30136986301369867,0.3041095890410959,0.30684931506849317,0.30958904109589047,0.3123287671232877,0.31506849315068497,0.3178082191780822,0.32054794520547947,0.32328767123287677,0.326027397260274,0.32876712328767127,0.3315068493150685,0.33424657534246577,0.3369863013698631,0.3397260273972603,0.34246575342465757,0.3452054794520548,0.34794520547945207,0.3506849315068494,0.35342465753424657,0.35616438356164387,0.3589041095890411,0.3616438356164384,0.3643835616438357,0.36712328767123287,0.36986301369863017,0.3726027397260274,0.3753424657534247,0.378082191780822,0.38082191780821917,0.3835616438356165,0.3863013698630137,0.389041095890411,0.3917808219178083,0.39452054794520547,0.3972602739726028,0.4,0.4027397260273973,0.4054794520547946,0.4082191780821919,0.4109589041095891,0.4136986301369863,0.4164383561643836,0.4191780821917809,0.4219178082191782,0.4246575342465754,0.4273972602739726,0.43013698630136993,0.4328767123287672,0.4356164383561645,0.4383561643835617,0.4410958904109589,0.44383561643835623,0.4465753424657535,0.4493150684931508,0.452054794520548,0.4547945205479452,0.45753424657534253,0.4602739726027398,0.4630136986301371,0.4657534246575343,0.4684931506849315,0.47123287671232883,0.4739726027397261,0.4767123287671234,0.4794520547945206,0.4821917808219179,0.48493150684931513,0.4876712328767124,0.4904109589041097,0.4931506849315069,0.4958904109589042,0.49863013698630143,0.5013698630136987,0.5041095890410959,0.5068493150684932,0.5095890410958905,0.5123287671232877,0.5150684931506849,0.5178082191780823,0.5205479452054795,0.5232876712328768,0.526027397260274,0.5287671232876713,0.5315068493150685,0.5342465753424658,0.5369863013698631,0.5397260273972603,0.5424657534246575,0.5452054794520549,0.5479452054794521,0.5506849315068494,0.5534246575342466,0.5561643835616439,0.5589041095890411,0.5616438356164384,0.5643835616438357,0.5671232876712329,0.5698630136986301,0.5726027397260275,0.5753424657534247,0.578082191780822,0.5808219178082192,0.5835616438356165,0.5863013698630137,0.589041095890411,0.5917808219178083,0.5945205479452055,0.5972602739726028,0.6000000000000001,0.6027397260273973,0.6054794520547946,0.6082191780821918,0.6109589041095891,0.6136986301369863,0.6164383561643836,0.6191780821917809,0.6219178082191781,0.6246575342465754,0.6273972602739727,0.6301369863013699,0.6328767123287672,0.6356164383561644,0.6383561643835617,0.6410958904109589,0.6438356164383562,0.6465753424657535,0.6493150684931507,0.652054794520548,0.6547945205479453,0.6575342465753425,0.6602739726027398,0.663013698630137,0.6657534246575343,0.6684931506849315,0.6712328767123289,0.6739726027397261,0.6767123287671233,0.6794520547945206,0.6821917808219179,0.6849315068493151,0.6876712328767124,0.6904109589041096,0.6931506849315069,0.6958904109589041,0.6986301369863015,0.7013698630136987,0.704109589041096,0.7068493150684931,0.7095890410958905,0.7123287671232877,0.7150684931506851,0.7178082191780822,0.7205479452054795,0.7232876712328768,0.726027397260274,0.7287671232876713,0.7315068493150686,0.7342465753424657,0.7369863013698631,0.7397260273972603,0.7424657534246577,0.7452054794520548,0.7479452054794521,0.7506849315068495,0.7534246575342466,0.756164383561644,0.7589041095890412,0.7616438356164383,0.7643835616438357,0.767123287671233,0.7698630136986303,0.7726027397260274,0.7753424657534247,0.778082191780822,0.7808219178082192,0.7835616438356166,0.7863013698630138,0.7890410958904109,0.7917808219178083,0.7945205479452055,0.7972602739726029,0.8,0.8027397260273973,0.8054794520547947,0.8082191780821918,0.8109589041095892,0.8136986301369864,0.8164383561643838,0.8191780821917809,0.8219178082191781,0.8246575342465755,0.8273972602739726,0.8301369863013699,0.8328767123287673,0.8356164383561644,0.8383561643835618,0.841095890410959,0.8438356164383564,0.8465753424657535,0.8493150684931507,0.8520547945205481,0.8547945205479452,0.8575342465753425,0.8602739726027399,0.863013698630137,0.8657534246575344,0.8684931506849316,0.871232876712329,0.8739726027397261,0.8767123287671234,0.8794520547945207,0.8821917808219178,0.8849315068493151,0.8876712328767125,0.8904109589041097,0.893150684931507,0.8958904109589042,0.8986301369863016,0.9013698630136987,0.904109589041096,0.9068493150684933,0.9095890410958904,0.9123287671232877,0.9150684931506851,0.9178082191780823,0.9205479452054796,0.9232876712328768,0.9260273972602742,0.9287671232876713,0.9315068493150686,0.9342465753424659,0.936986301369863,0.9397260273972603,0.9424657534246577,0.9452054794520549,0.9479452054794522,0.9506849315068494,0.9534246575342468,0.9561643835616439,0.9589041095890412,0.9616438356164385,0.9643835616438358,0.9671232876712329,0.9698630136986303,0.9726027397260275,0.9753424657534248,0.978082191780822,0.9808219178082194,0.9835616438356165,0.9863013698630138,0.9890410958904111,0.9917808219178084,0.9945205479452055,0.9972602739726029,1.0000000000000002,1.0027397260273974],\"antithetic\":true,\"sobol\":false,\"brownian_bridge\":false}},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002026-10-08T01:12:29.630000000Z\",\"version\":\"0.10.0\"},\"covenants\":null}"
       }
     ],
     "covenantRequest": {
@@ -12400,7 +12376,7 @@
       "metricsJson": "{\"debt_to_ebitda\":6}",
       "asOf": "2026-03-31"
     },
-    "covenantReportsJson": "{\"max_debt_ebitda\":{\"covenant_type\":\"Debt/EBITDA <= 5.00x\",\"covenant_id\":\"max_debt_ebitda\",\"passed\":false,\"actual_value\":6,\"threshold\":5,\"details\":null,\"headroom\":-0.2,\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"version\":\"0.9.0\"}}}"
+    "covenantReportsJson": "{\"max_debt_ebitda\":{\"covenant_type\":\"Debt/EBITDA <= 5.00x\",\"covenant_id\":\"max_debt_ebitda\",\"passed\":false,\"actual_value\":6,\"threshold\":5,\"details\":null,\"headroom\":-0.2,\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"rate_epsilon\":1e-12,\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"version\":\"0.10.0\"}}}"
   },
   "irsInstrument": {
     "instrument": {

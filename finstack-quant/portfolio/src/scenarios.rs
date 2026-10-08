@@ -632,7 +632,7 @@ pub fn scenario_pnl_batch(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::PortfolioBuilder;
+
     use crate::position::{Position, PositionUnit};
     use crate::test_utils::build_test_market;
     use crate::types::Entity;
@@ -754,7 +754,7 @@ mod tests {
         )
         .expect("test should succeed");
 
-        let portfolio = PortfolioBuilder::new("TEST")
+        let portfolio = Portfolio::builder("TEST")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))
@@ -833,7 +833,7 @@ mod tests {
         )
         .expect("test should succeed");
 
-        let portfolio = PortfolioBuilder::new("TEST")
+        let portfolio = Portfolio::builder("TEST")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))
@@ -885,7 +885,7 @@ mod tests {
         )
         .expect("test should succeed");
 
-        let mut portfolio = PortfolioBuilder::new("TEST")
+        let mut portfolio = Portfolio::builder("TEST")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))
@@ -930,7 +930,7 @@ mod tests {
         )
         .expect("test should succeed");
 
-        PortfolioBuilder::new("TEST")
+        Portfolio::builder("TEST")
             .base_currency(Currency::USD)
             .as_of(as_of)
             .entity(Entity::new("ENTITY_A"))
@@ -988,7 +988,7 @@ mod tests {
             PositionUnit::Units,
         )
         .expect("counting position");
-        let portfolio = PortfolioBuilder::new("COUNTING_SCENARIO_BATCH")
+        let portfolio = Portfolio::builder("COUNTING_SCENARIO_BATCH")
             .base_currency(Currency::USD)
             .as_of(date!(2024 - 01 - 01))
             .entity(Entity::new("ENTITY_A"))

@@ -194,7 +194,7 @@ pub(super) fn assert_sensitivity_steps_reconcile(attribution: &PnlAttribution) {
             "Fx" => &mut fx,
             "Inflation" | "InflationConvexity" => &mut inflation,
             "Correlations" => &mut correlations,
-            "MarketScalars" | "Spot" | "SpotGamma" | "Dividend" => &mut scalars,
+            "MarketScalars" | "Spot" | "SpotGamma" => &mut scalars,
             "ModelParameters" => &mut model_params,
             "Rates" | "RatesConvexity" => &mut rates,
             "Credit" | "CreditGamma" => &mut credit,

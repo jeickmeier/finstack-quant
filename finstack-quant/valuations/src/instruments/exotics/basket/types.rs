@@ -355,10 +355,6 @@ impl Instrument for Basket {
         Money::new(scaled, self.notional.currency())
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        None
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

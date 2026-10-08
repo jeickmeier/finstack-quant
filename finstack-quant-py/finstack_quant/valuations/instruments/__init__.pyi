@@ -111,7 +111,7 @@ __all__ = [
     "Waterfall",
     "bond_from_cashflows_json",
     "calculate_pool_stats",
-    "calculate_var_with_pricing",
+    "calculate_var",
     "instrument_cashflows",
     "instrument_envelope_from_spec",
     "list_models",
@@ -28296,7 +28296,7 @@ def list_standard_metrics() -> list[str]:
     >>> from finstack_quant.valuations.instruments import list_standard_metrics
     >>> metrics = list_standard_metrics()
     >>> (len(metrics), "dirty_price" in metrics, "dv01" in metrics)
-    (230, True, True)
+    (222, True, True)
     """
     ...
 
@@ -36071,7 +36071,7 @@ class InstrumentCashflowEnvelope:
         """
         ...
 
-def calculate_var_with_pricing(
+def calculate_var(
     instruments: list[Any],
     market: MarketContext | str,
     history: MarketHistory | dict[str, Any] | str,
@@ -36082,7 +36082,7 @@ def calculate_var_with_pricing(
     """
     Historical VaR and expected shortfall of a list of instruments.
 
-    Mirrors Rust ``metrics::risk::calculate_var_with_pricing``: every
+    Mirrors Rust ``metrics::risk::calculate_var``: every
     instrument is repriced under every ``history`` scenario, the per-scenario
     P&Ls are summed across instruments, and VaR / ES are read off that single
     portfolio distribution (R type-7 linear-interpolated quantile). Unlike
@@ -36139,7 +36139,7 @@ def calculate_var_with_pricing(
     >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
     >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.core.types import Rate
-    >>> from finstack_quant.valuations.instruments import Bond, MarketHistory, calculate_var_with_pricing
+    >>> from finstack_quant.valuations.instruments import Bond, MarketHistory, calculate_var
     >>> as_of = datetime.date(2024, 1, 2)
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
     >>> def bond(id):
@@ -36152,8 +36152,8 @@ def calculate_var_with_pricing(
     ...     2,
     ...     [{"date": "2023-12-29", "shifts": shift(0.0010)}, {"date": "2023-12-28", "shifts": shift(-0.0005)}],
     ... )
-    >>> one = calculate_var_with_pricing([bond("A")], market, history, as_of)
-    >>> two = calculate_var_with_pricing([bond("A"), bond("B")], market, history, as_of)
+    >>> one = calculate_var([bond("A")], market, history, as_of)
+    >>> two = calculate_var([bond("A"), bond("B")], market, history, as_of)
     >>> (two.num_scenarios, one.var < 0, abs(two.var - 2 * one.var) < 1e-6)
     (2, True, True)
     """
@@ -36164,7 +36164,7 @@ class VarResult:
     Historical VaR / expected shortfall with its P&L distribution.
 
     Typed wrapper of the Rust ``VarResult`` returned by
-    :func:`calculate_var_with_pricing`. VaR and ES follow the P&L sign: losses
+    :func:`calculate_var`. VaR and ES follow the P&L sign: losses
     are negative, and ``expected_shortfall <= var``.
 
     Examples
@@ -36333,7 +36333,7 @@ class VarResult:
         ...
     def to_json(self) -> str:
         """
-        Serialize to compact JSON (the WASM ``calculateVarWithPricing`` object).
+        Serialize to compact JSON (the WASM ``calculateVar`` object).
 
         Returns
         -------

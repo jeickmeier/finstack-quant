@@ -1,8 +1,8 @@
 //! Generic sequential bootstrapping algorithm.
 
 use super::helpers::BracketDiagnostics;
+use super::helpers::{bracket_solve_1d, ScanStrategy};
 use super::traits::BootstrapTarget;
-use super::{bracket_solve_1d_nearest_first_with_diagnostics, bracket_solve_1d_with_diagnostics};
 use crate::constants::{OBJECTIVE_VALID_ABS_MAX, RESIDUAL_PENALTY_ABS_MIN};
 use crate::report::{CalibrationDiagnostics, QuoteQuality};
 use crate::{CalibrationConfig, CalibrationReport};
@@ -165,7 +165,7 @@ fn normalize_scan_points(mut points: Vec<f64>, initial_guess: f64, time: f64) ->
 ///
 /// # Genuine bracketed root vs. local minimum
 ///
-/// `tentative = None` does NOT always mean "no bracket". `bracket_solve_1d_with_diagnostics`
+/// `tentative = None` does NOT always mean "no bracket". `bracket_solve_1d`
 /// returns `None` whenever its bisection / false-position loop did not formally hit the
 /// **solver** tolerance — which can be tighter than the **validation** tolerance. When a
 /// real sign-change bracket *was* discovered (`diag.is_sign_change_bracket`) and the best
@@ -312,7 +312,7 @@ fn validate_and_commit_knot<T: BootstrapTarget>(
 /// is preserved.
 ///
 /// The algorithm uses a scan-then-bracket approach (see
-/// [`bracket_solve_1d_with_diagnostics`](super::helpers)):
+/// [`bracket_solve_1d`](super::helpers)):
 /// 1. **Scan**: Evaluates the objective on a caller-supplied grid to find a
 ///    sign-change bracket (the bracket whose midpoint is closest to the
 ///    initial guess wins).
@@ -533,17 +533,18 @@ impl SequentialBootstrapper {
         };
         let scan_points = normalize_scan_points(scan_points, initial_guess, time)?;
 
-        let solve = if target.supports_nearest_first_bracketing() {
-            bracket_solve_1d_nearest_first_with_diagnostics
+        let scan_strategy = if target.supports_nearest_first_bracketing() {
+            ScanStrategy::NearestFirst
         } else {
-            bracket_solve_1d_with_diagnostics
+            ScanStrategy::Exhaustive
         };
-        let (tentative, diag) = solve(
+        let (tentative, diag) = bracket_solve_1d(
             &objective,
             initial_guess,
             &scan_points,
             config.solver.tolerance(),
             config.solver.max_iterations(),
+            scan_strategy,
         )?;
 
         // W-40: a result is "approximate" if it was NOT derived from a true sign-change
@@ -701,7 +702,7 @@ mod tests {
             Ok(quote.0)
         }
 
-        fn build_curve(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
+        fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
             Ok(DummyCurve(knots.to_vec()))
         }
 
@@ -773,7 +774,7 @@ mod tests {
             Ok(quote.time)
         }
 
-        fn build_curve(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
+        fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
             if knots.iter().any(|(_, value)| *value < 0.0) {
                 return Err(finstack_quant_core::Error::Calibration {
                     message: "negative knot is outside the feasible domain".to_string(),
@@ -918,7 +919,10 @@ mod w40_tests {
             Ok(quote.t)
         }
 
-        fn build_curve(&self, knots: &[(f64, f64)]) -> finstack_quant_core::Result<Self::Curve> {
+        fn build_curve_for_solver(
+            &self,
+            knots: &[(f64, f64)],
+        ) -> finstack_quant_core::Result<Self::Curve> {
             knots
                 .last()
                 .map(|(_, v)| *v)
@@ -1047,7 +1051,10 @@ mod w40_tests {
             Ok(quote.t)
         }
 
-        fn build_curve(&self, knots: &[(f64, f64)]) -> finstack_quant_core::Result<Self::Curve> {
+        fn build_curve_for_solver(
+            &self,
+            knots: &[(f64, f64)],
+        ) -> finstack_quant_core::Result<Self::Curve> {
             knots
                 .last()
                 .map(|(_, v)| *v)
@@ -1258,8 +1265,11 @@ mod w40_tests {
             NonMonotoneNoBracketTarget.quote_time(quote)
         }
 
-        fn build_curve(&self, knots: &[(f64, f64)]) -> finstack_quant_core::Result<Self::Curve> {
-            NonMonotoneNoBracketTarget.build_curve(knots)
+        fn build_curve_for_solver(
+            &self,
+            knots: &[(f64, f64)],
+        ) -> finstack_quant_core::Result<Self::Curve> {
+            NonMonotoneNoBracketTarget.build_curve_for_solver(knots)
         }
 
         fn residual_units(&self) -> crate::report::ResidualUnits {
@@ -1352,15 +1362,11 @@ mod solver_tests {
             Ok(quote.t)
         }
 
-        fn build_curve(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
+        fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
             knots
                 .last()
                 .map(|(_, v)| *v)
                 .ok_or(Error::Input(finstack_quant_core::InputError::TooFewPoints))
-        }
-
-        fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
-            self.build_curve(knots)
         }
 
         fn residual_units(&self) -> crate::report::ResidualUnits {
@@ -1530,7 +1536,7 @@ mod solver_tests {
                 Ok(quote.t)
             }
 
-            fn build_curve(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
+            fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
                 knots
                     .last()
                     .map(|(_, v)| *v)

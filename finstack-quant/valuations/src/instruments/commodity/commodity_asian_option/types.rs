@@ -394,10 +394,6 @@ impl crate::instruments::common_impl::traits::Instrument for CommodityAsianOptio
         pricer::compute_pv(self, market, as_of)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        self.fixing_dates.first().copied()
-    }
-
     fn expiry(&self) -> Option<Date> {
         Some(self.expiry)
     }

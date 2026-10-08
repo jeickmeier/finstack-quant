@@ -1,7 +1,7 @@
 use super::super::helpers::*;
 use super::super::types::*;
-use super::context::AttributionInputs;
-use super::shifts::{average_over, rate_curve_abs_shift_bp, twist_diagnostic_note};
+use super::context::MetricsContext;
+use super::shifts::{note_twist, rate_curve_abs_shift_bp};
 use finstack_quant_core::config::{RoundingContext, ZeroKind};
 use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_valuations::metrics::MetricId;
@@ -24,7 +24,7 @@ const LARGE_RATE_MOVE_THRESHOLD_BP: f64 = 100.0;
 const KEYRATE_WEIGHT_EPS: f64 = 1e-12;
 
 pub(super) fn apply(
-    inputs: &AttributionInputs<'_>,
+    inputs: &MetricsContext<'_>,
     attribution: &mut PnlAttribution,
     non_finite_detected: &mut bool,
 ) {
@@ -89,11 +89,10 @@ pub(super) fn apply(
             );
         }
         let rates_pnl = rates_acc.total();
-        attribution.rates_curves_pnl = factor_money_or_invalid(
+        attribution.rates_curves_pnl = inputs.money(
             rates_pnl,
-            inputs.val_t1.value.currency(),
             "rates curves P&L (key-rate)",
-            &mut attribution.meta.notes,
+            attribution,
             non_finite_detected,
         );
 
@@ -143,11 +142,10 @@ pub(super) fn apply(
             rates_pnl,
         );
 
-        attribution.rates_curves_pnl = factor_money_or_invalid(
+        attribution.rates_curves_pnl = inputs.money(
             rates_pnl,
-            inputs.val_t1.value.currency(),
             "rates curves P&L (aggregate dv01)",
-            &mut attribution.meta.notes,
+            attribution,
             non_finite_detected,
         );
 
@@ -192,11 +190,6 @@ pub(super) fn apply(
     // `½·γ·avg²` collapses to ≈0 even though the true second-order
     // contribution `½·Δrᵀ·H·Δr` is non-trivial. Emit a note so the consumer
     // knows the convexity number is *not* a real upper bound.
-    let avg_rate_abs_shift_bp: Option<f64> = average_over(&inputs.rates_curve_ids, |curve_id| {
-        let v = rate_curve_abs_shift_bp(curve_id.as_str(), inputs.market_t0, inputs.market_t1);
-        (v > 0.0).then_some(v)
-    })
-    .0;
     if let Some(avg_shift) = convexity_avg_shift_bp {
         let rc = RoundingContext::default();
         // The two convexity MetricIds have DIFFERENT producer units and must
@@ -249,11 +242,10 @@ pub(super) fn apply(
                 avg_shift,
                 convexity_pnl,
             );
-            attribution.rates_curves_pnl = factor_money_or_invalid(
+            attribution.rates_curves_pnl = inputs.money(
                 attribution.rates_curves_pnl.amount() + convexity_pnl,
-                inputs.val_t1.value.currency(),
                 "rates convexity P&L",
-                &mut attribution.meta.notes,
+                attribution,
                 non_finite_detected,
             );
         }
@@ -270,14 +262,12 @@ pub(super) fn apply(
         }
 
         // Twist-domination warning.
-        if let Some(abs_shift) = avg_rate_abs_shift_bp {
-            if let Some(note) = twist_diagnostic_note("Rates convexity", avg_shift, abs_shift) {
-                attribution.meta.notes.push(note);
-                attribution
-                    .meta
-                    .notes
-                    .push("Rates convexity: unreliable / bounds-exceeded".to_string());
-            }
-        }
+        note_twist(
+            &mut attribution.meta.notes,
+            "Rates convexity",
+            avg_shift,
+            &inputs.rates_curve_ids,
+            |id| rate_curve_abs_shift_bp(id, inputs.market_t0, inputs.market_t1),
+        );
     }
 }

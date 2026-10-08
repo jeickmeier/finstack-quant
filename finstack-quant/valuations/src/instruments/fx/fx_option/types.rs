@@ -469,10 +469,6 @@ impl crate::instruments::common_impl::traits::Instrument for FxOption {
         Some(self.expiry)
     }
 
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        None
-    }
-
     fn valuation_details(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,

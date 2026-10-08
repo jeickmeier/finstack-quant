@@ -5,9 +5,10 @@
 //! [`MarketContext::convert_money`] — call sites here use it directly.
 
 use super::types::{
-    AttributionFactor, AttributionMethod, CarryDetail, MoveUnit, PnlAttribution, SensitivityBucket,
-    SensitivityStep, SourceLine,
+    AttributionFactor, AttributionMethod, CarryDetail, ExecutionPolicy, MoveUnit, PnlAttribution,
+    SensitivityBucket, SensitivityStep, SourceLine,
 };
+use crate::AttributionRequest;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
@@ -27,6 +28,7 @@ use finstack_quant_valuations::instruments::MarketDependencies;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::metrics::collect_period_cash;
 use finstack_quant_valuations::metrics::MetricId;
+use std::sync::Arc;
 
 /// Families the instrument declares a pricing dependency on.
 ///
@@ -69,8 +71,7 @@ impl InstrumentFactorUse {
         let inflation = !deps.curves.inflation_curves.is_empty();
         let fx = !deps.fx_pairs.is_empty() || instrument.fx_exposure().is_some();
         let volatility = !deps.volatility_dependencies.is_empty();
-        let scalars =
-            !deps.market_scalar_ids.is_empty() || instrument.dividend_schedule_id().is_some();
+        let scalars = !deps.market_scalar_ids.is_empty();
         // An empty dependency set is "undeclared", not "uses nothing". Test
         // stubs and some custom instruments omit the declaration; fail open
         // so a live FX/scalar/credit factor is not dropped into residual.
@@ -175,6 +176,61 @@ pub(crate) fn compute_pnl_with_fx(
     val_t1_converted.checked_sub(val_t0_converted)
 }
 
+/// Price both endpoints of a repricing request.
+///
+/// Returns the T₀-parameter instrument with the unscaled `(T₀, T₁)` values.
+/// Prepared endpoints on the request replace the two valuations.
+pub(crate) fn endpoint_values(
+    request: &AttributionRequest<'_>,
+) -> Result<(Arc<dyn Instrument>, Money, Money)> {
+    let instrument_t0 = match request.model_params_t0 {
+        Some(params) => crate::model_params::with_model_params(request.instrument, params)?,
+        None => Arc::clone(request.instrument),
+    };
+    let (val_t0, val_t1) = match request.prepared_endpoints {
+        Some(endpoints) => endpoints,
+        None => (
+            instrument_t0.value(request.market_t0, request.as_of_t0)?,
+            request
+                .instrument
+                .value(request.market_t1, request.as_of_t1)?,
+        ),
+    };
+    Ok((instrument_t0, val_t0, val_t1))
+}
+
+/// Seed a repricing attribution: total P&L in the T₁ value's currency, the
+/// request's rounding context, and the execution policy the run used.
+pub(crate) fn seed_attribution(
+    request: &AttributionRequest<'_>,
+    val_t0: Money,
+    val_t1: Money,
+    method: AttributionMethod,
+    execution_policy: ExecutionPolicy,
+) -> Result<PnlAttribution> {
+    let total_pnl = compute_pnl_with_fx(
+        val_t0,
+        val_t1,
+        val_t1.currency(),
+        request.market_t0,
+        request.market_t1,
+        request.as_of_t0,
+        request.as_of_t1,
+    )?;
+    let mut attribution = init_attribution(
+        total_pnl,
+        request.instrument.id(),
+        request.as_of_t0,
+        request.as_of_t1,
+        method,
+        Some(request.config),
+    );
+    stamp_endpoints(&mut attribution, val_t0, val_t1);
+    // Policy-visibility invariant: results carry the parallel flag.
+    attribution.meta.execution_policy = Some(execution_policy);
+    Ok(attribution)
+}
+
 pub(crate) fn init_attribution(
     total_pnl: Money,
     instrument_id: &str,
@@ -183,17 +239,11 @@ pub(crate) fn init_attribution(
     method: AttributionMethod,
     config: Option<&FinstackConfig>,
 ) -> PnlAttribution {
-    match config {
-        Some(config) => PnlAttribution::new_with_rounding(
-            total_pnl,
-            instrument_id,
-            as_of_t0,
-            as_of_t1,
-            method,
-            finstack_quant_core::config::rounding_context_from(config),
-        ),
-        None => PnlAttribution::new(total_pnl, instrument_id, as_of_t0, as_of_t1, method),
+    let mut attribution = PnlAttribution::new(total_pnl, instrument_id, as_of_t0, as_of_t1, method);
+    if let Some(config) = config {
+        attribution.meta.rounding = finstack_quant_core::config::rounding_context_from(config);
     }
+    attribution
 }
 
 /// Record the endpoint present values the attribution was computed from.
@@ -224,7 +274,7 @@ pub(crate) struct TotalReturnCarryInputs {
     /// isolated date-roll factor). `None` when no funding curve is configured
     /// or the curve/PV/day-count lookup fails.
     pub funding_cost: Option<Money>,
-    /// Diagnostics for the caller to merge into `meta.notes`.
+    /// Diagnostics merged into `meta.notes` by [`apply_total_return_carry`].
     pub warnings: Vec<String>,
     /// Top-level valuation calls made by this helper, including failed attempts.
     pub num_repricings: usize,
@@ -290,8 +340,7 @@ pub(crate) fn total_return_carry_inputs(
             PricingOptions::default(),
         )
         .ok()
-        .and_then(|r| r.measures.get(MetricId::Accrued.as_str()).copied())
-        .filter(|v| v.is_finite());
+        .and_then(|result| metric(Some(&result), MetricId::Accrued));
     let delta_accrued = match (accrued_t0, accrued_t1) {
         (Some(a0), Some(a1)) => Some(Money::new(a1 - a0, currency)?),
         _ => None,
@@ -513,11 +562,15 @@ fn reprice_funding_cost(
 /// all-in price carry. Economic carry net of financing is `total − funding`.
 /// The metrics path adds funding back to the net `CarryTotal` metric to
 /// preserve the same gross carry basis.
+///
+/// Merges `inputs.warnings` into `meta.notes` and returns the valuation calls
+/// the inputs cost, for the caller's repricing count.
 pub(crate) fn apply_total_return_carry(
     attribution: &mut PnlAttribution,
     theta: Money,
     inputs: TotalReturnCarryInputs,
-) -> Result<()> {
+) -> Result<usize> {
+    attribution.meta.notes.extend(inputs.warnings);
     attribution.carry = theta.checked_add(inputs.cash_paid)?;
     if inputs.cash_paid.amount().abs() > 0.0 {
         attribution.total_pnl = attribution.total_pnl.checked_add(inputs.cash_paid)?;
@@ -550,7 +603,7 @@ pub(crate) fn apply_total_return_carry(
         roll_down: roll_down.map(SourceLine::scalar),
         funding_cost: inputs.funding_cost,
     });
-    Ok(())
+    Ok(inputs.num_repricings)
 }
 
 pub(crate) fn stamp_fx_policy(
@@ -611,7 +664,7 @@ pub(crate) fn finalize_attribution(
 ///   is propagated to callers, and
 /// - Returns a **zero sentinel** in `currency` so the attribution can continue
 ///   and produce a complete (though flagged-invalid) result rather than
-///   panicking inside [`Money::new`], which panics on non-finite input.
+///   failing on [`Money::new`], which rejects non-finite input.
 ///
 /// For finite amounts it delegates directly to [`Money::new`].
 #[inline]

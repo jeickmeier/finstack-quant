@@ -181,6 +181,7 @@ impl ParametricCurveTarget {
             ),
             Some(DayCount::Act365F),
             residual_notional,
+            None,
         )?;
         let prepared_quotes = prepared.quotes;
 

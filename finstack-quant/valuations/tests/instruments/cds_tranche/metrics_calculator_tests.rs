@@ -702,7 +702,6 @@ mod production_credit_audit {
     use finstack_quant_core::market_data::term_structures::{
         BaseCorrelationCurve, CreditIndexData,
     };
-    use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer;
     use std::collections::BTreeMap;
     use std::sync::Arc;
 
@@ -784,11 +783,5 @@ mod production_credit_audit {
                 "missing risk labels for {id}"
             );
         }
-        let provider =
-            finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
-        let direct = CdsTranchePricer::new()
-            .calculate_cs01(&tranche, &market, base_date(), &provider, 1.0)
-            .expect("direct hedge sensitivity");
-        assert!((direct - expected).abs() < 1e-4 * expected.abs());
     }
 }

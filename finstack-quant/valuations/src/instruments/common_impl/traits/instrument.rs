@@ -792,20 +792,6 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         None
     }
 
-    /// Dividend schedule ID for this instrument.
-    ///
-    /// Returns the dividend schedule ID if this instrument depends on dividends.
-    /// Used by dividend attribution.
-    ///
-    /// Default implementation returns `None`.
-    ///
-    /// # Returns
-    ///
-    /// `Some(schedule_id)` if dividend-sensitive, `None` otherwise
-    fn dividend_schedule_id(&self) -> Option<CurveId> {
-        None
-    }
-
     /// Repo (financing) discount curve ID for this instrument.
     ///
     /// Returns the funding or repo curve used to finance the position for
@@ -926,20 +912,6 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// }
     /// ```
     fn expiry(&self) -> Option<Date> {
-        None
-    }
-
-    /// Get the instrument's effective start/value date, if applicable.
-    ///
-    /// Returns the date at which the instrument's economics begin (e.g., accrual start,
-    /// effective date, or issue date). This is used by shared metrics such as DfStart
-    /// and year-fraction calculations.
-    ///
-    /// # Returns
-    ///
-    /// - `Some(Date)` for instruments with a defined effective start/value date
-    /// - `None` for instruments without a clear start (e.g., equity spot positions)
-    fn effective_start_date(&self) -> Option<Date> {
         None
     }
 

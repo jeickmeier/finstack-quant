@@ -28,18 +28,14 @@ pub(crate) fn register_commodity_asian_option_metrics(
     )?;
     registry.register_metric(
         MetricId::Dv01,
-        Arc::new(crate::metrics::UnifiedDv01Calculator::<
-            crate::instruments::commodity::commodity_asian_option::CommodityAsianOption,
-        >::new(
-            crate::metrics::Dv01CalculatorConfig::parallel_combined()
+        Arc::new(crate::metrics::UnifiedDv01Calculator::new(
+            crate::metrics::Dv01CalculatorConfig::parallel_combined(),
         )),
         &[InstrumentType::CommodityAsianOption],
     )?;
     registry.register_metric(
         MetricId::BucketedDv01,
-        Arc::new(crate::metrics::UnifiedDv01Calculator::<
-            crate::instruments::commodity::commodity_asian_option::CommodityAsianOption,
-        >::new(
+        Arc::new(crate::metrics::UnifiedDv01Calculator::new(
             crate::metrics::Dv01CalculatorConfig::triangular_key_rate(),
         )),
         &[InstrumentType::CommodityAsianOption],

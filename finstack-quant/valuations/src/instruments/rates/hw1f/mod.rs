@@ -5,8 +5,6 @@ pub mod bank_account;
 pub use bank_account::{accumulate_bank_factors, bank_step_factor};
 /// Bermudan call provision shared across callable exotic rate products.
 pub mod bermudan_call;
-/// Deterministic coupon / payoff helpers for exotic rate products.
-pub mod coupon_profiles;
 /// Cumulative coupon tracker for path-dependent products (TARN, Snowball).
 pub mod cumulative_coupon;
 pub use cumulative_coupon::CouponEvent;
@@ -23,8 +21,7 @@ pub use params::{resolve_hw1f_params, Hw1fParamFamily, HW_SIGMA_BUMP};
 /// HW1F θ(t) preparation and term-forward bond reconstruction.
 pub mod hw1f_curve;
 pub use hw1f_curve::{
-    initial_short_rate_from_curve, prepare_hw1f_model_params, prepare_hw1f_params, Hw1fTermForward,
-    PeriodForwardCoeffs,
+    initial_short_rate_from_curve, prepare_hw1f_params, Hw1fTermForward, PeriodForwardCoeffs,
 };
 
 /// Historical CMS (par swap rate) fixing lookups for seasoned CMS trades.

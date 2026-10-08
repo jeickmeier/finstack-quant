@@ -465,10 +465,6 @@ impl crate::instruments::common_impl::traits::Instrument for CommodityForward {
         finstack_quant_core::money::Money::new(pv, self.underlying.currency)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        None
-    }
-
     fn expiry(&self) -> Option<Date> {
         Some(self.maturity)
     }

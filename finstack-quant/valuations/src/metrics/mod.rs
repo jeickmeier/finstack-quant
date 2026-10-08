@@ -286,7 +286,7 @@ pub(crate) mod sensitivities;
 mod shared;
 
 // Core surface (supported)
-pub use aggregation::{is_additive_metric, metric_aggregation, MetricAggregation};
+pub use aggregation::is_additive_metric;
 pub use core::finite_difference::bump_surface_vol_absolute;
 pub(crate) use core::ids::closest_metric_names;
 pub use core::ids::{MetricGroup, MetricId, MetricUnit};

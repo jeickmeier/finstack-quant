@@ -348,9 +348,9 @@ export interface D_1C927C69467A281351A3 {
  * - `calendar_id`: Holiday calendar identifier for business day logic (e.g., "nyse", "target")
  *
  * `start_date` is always the accrual start (spot) date. Callers holding a
- * trade date compute the spot date before building (see
- * [`Deposit::from_conventions`]). When `calendar_id` is set, `start_date` and
- * `maturity` are adjusted by the business day convention.
+ * trade date compute the spot date before building. When `calendar_id` is
+ * set, `start_date` and `maturity` are adjusted by the business day
+ * convention.
  */
 export interface D_8Dbf50E93309E9Ee85F5 {
   attributes: Attributes;

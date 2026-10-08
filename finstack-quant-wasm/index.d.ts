@@ -24289,7 +24289,7 @@ export interface ValuationInstrumentsNamespace {
   /**
    * Historical VaR and expected shortfall of a list of instruments.
    *
-   * Mirrors Rust `metrics::risk::calculate_var_with_pricing`: every instrument
+   * Mirrors Rust `metrics::risk::calculate_var`: every instrument
    * is repriced under every `historyJson` scenario, the per-scenario P&Ls are
    * summed across instruments, and VaR / ES are read off that single portfolio
    * distribution (R type-7 linear-interpolated quantile), so offsetting
@@ -24304,7 +24304,7 @@ export interface ValuationInstrumentsNamespace {
    * @returns `VarResult` plain object: `var`, `expected_shortfall` (losses negative), the worst-first `pnl_distribution`, `num_scenarios`, `confidence_level`, `skipped_fx` and `skipped_vol`.
    * @throws Error - Throws with kind `validation` if an envelope, the market, history, config, `asOf` or `model` is invalid, the confidence level is outside `(0, 1)`, a non-empty portfolio has no scenarios, or a mixed-currency portfolio has no reporting currency; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if a scenario revaluation fails.
    */
-  calculateVarWithPricing(
+  calculateVar(
     instrumentsJson: generated.valuations.InstrumentEnvelope[] | string,
     marketJson: JsonInput,
     historyJson: JsonInput,
@@ -31868,124 +31868,6 @@ export interface ValuationsNamespace {
    * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema or `base` is not a canonically encoded metric key.
    */
   valuationResultMetricSeries(result: ValuationResult | string, base: string): [string[], number][];
-  /**
-   * Simulated TARN coupon profile along a deterministic floating-rate path.
-   *
-   * Returns a JSON object:
-   * ```text
-   * {
-   *   "coupons_paid": number[],
-   *   "cumulative":   number[],
-   *   "redemption_index": number | null,
-   *   "redeemed_early":   boolean
-   * }
-   * ```
-   *
-   * Each period's coupon is `max(fixed_rate - L_i, coupon_floor) * day_count_fraction`.
-   * Payments accumulate in a
-   * Rust `CumulativeCouponTracker` configured with
-   * `target_coupon`; once cumulative hits the target, the final coupon is
-   * capped and the instrument is considered redeemed.
-   * @returns Period coupons, running cumulative, redemption index, and whether the TARN redeemed early.
-   * @param fixedRate - Fixed coupon rate in decimal form before subtracting each floating fixing.
-   * @param couponFloor - Minimum period coupon rate in decimal form after the TARN rate calculation.
-   * @param floatingFixings - Ordered floating-rate fixings in decimal form, one for each coupon period.
-   * @param targetCoupon - Cumulative coupon target, as a fraction of notional, that redeems the TARN.
-   * @param dayCountFraction - Accrual year fraction applied to each coupon period.
-   * @throws Error - Throws a JavaScript exception if `fixed_rate`, `coupon_floor`, `target_coupon`, `day_count_fraction`, or any fixing is non-finite; `coupon_floor` is negative; `target_coupon` or `day_count_fraction` is non-positive; or the result cannot be converted to a JavaScript object.
-   */
-  tarnCouponProfile(
-    fixedRate: number,
-    couponFloor: number,
-    floatingFixings: number[],
-    targetCoupon: number,
-    dayCountFraction: number
-  ): {
-    coupons_paid: number[];
-    cumulative: number[];
-    redemption_index: number | null;
-    redeemed_early: boolean;
-  };
-  /**
-   * Snowball coupon schedule.
-   *
-   *   `c_i = clip(c_{i-1} + fixed_rate - L_i, floor, cap)` with `c_0 = initial_coupon`.
-   * @returns One decimal coupon rate per fixing, in the same order as `floatingFixings`.
-   * @param initialCoupon - Starting coupon rate before the first snowball update, in decimal form.
-   * @param fixedRate - Fixed coupon rate in decimal form added at each snowball step.
-   * @param floatingFixings - Ordered floating-rate fixings in decimal form, one for each coupon period.
-   * @param couponFloor - Minimum permitted coupon rate in decimal form.
-   * @param couponCap - Optional maximum permitted coupon rate in decimal form; `null`/`undefined` leaves the coupon uncapped.
-   * @throws Error - Throws a JavaScript exception if `initial_coupon` or `coupon_floor` is negative; `initial_coupon`, `fixed_rate`, `coupon_floor`, or any fixing is non-finite; or `coupon_cap` is set and is non-finite or not greater than `coupon_floor`.
-   */
-  snowballCouponProfile(
-    initialCoupon: number,
-    fixedRate: number,
-    floatingFixings: number[],
-    couponFloor: number,
-    couponCap: number | null | undefined
-  ): Float64Array;
-  /**
-   * Path-independent inverse-floater coupon schedule.
-   * @returns One decimal coupon rate per fixing, in the same order as `floatingFixings`.
-   * @param fixedRate - Fixed coupon rate in decimal form before the geared floating deduction.
-   * @param floatingFixings - Ordered floating-rate fixings in decimal form, one for each coupon period.
-   * @param couponFloor - Minimum permitted coupon rate in decimal form.
-   * @param couponCap - Optional maximum permitted coupon rate in decimal form; `null`/`undefined` leaves the coupon uncapped.
-   * @param gearing - Positive multiplier applied to each floating fixing in the inverse-floater coupon.
-   * @throws Error - Throws a JavaScript exception if `coupon_floor` is negative; `fixed_rate`, `coupon_floor`, `gearing`, or any fixing is non-finite; `gearing` is non-positive; or `coupon_cap` is set and is non-finite or not greater than `coupon_floor`.
-   */
-  inverseFloaterCouponProfile(
-    fixedRate: number,
-    floatingFixings: number[],
-    couponFloor: number,
-    couponCap: number | null | undefined,
-    gearing: number
-  ): Float64Array;
-  /**
-   * Intrinsic (undiscounted, unhedged) payoff of a CMS spread option.
-   *
-   * `call:  notional * max(long_cms - short_cms - strike, 0)`
-   * `put:   notional * max(strike - (long_cms - short_cms), 0)`
-   * @returns Undiscounted intrinsic payoff in the same units as `notional`.
-   * @param longCms - Long-tenor CMS rate in decimal form.
-   * @param shortCms - Short-tenor CMS rate in decimal form.
-   * @param strike - CMS rate-spread strike in decimal form.
-   * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @param notional - Non-negative trade notional in the instrument's native currency units.
-   * @throws Error - Throws a JavaScript exception if a CMS rate or `strike` is non-finite, or if `notional` is negative or non-finite.
-   */
-  cmsSpreadOptionIntrinsic(
-    longCms: number,
-    shortCms: number,
-    strike: number,
-    isCall: boolean,
-    notional: number
-  ): number;
-  /**
-   * Accrued coupon on a range-accrual leg over a set of observations.
-   *
-   * Counts the fraction of observations with a rate in the inclusive interval
-   * `[lower, upper]` and scales by the period day-count fraction:
-   *
-   * `accrued = coupon_rate * day_count_fraction * (#in-range / #observations)`.
-   *
-   * The call provision is not applied here.
-   * @returns Accrued coupon as a decimal fraction of notional for the observation period.
-   * @param lower - Inclusive lower bound of the observed-rate range, in decimal form.
-   * @param upper - Inclusive upper bound of the observed-rate range, in decimal form.
-   * @param observations - Observed floating rates in decimal form for the accrual period.
-   * @param couponRate - Contractual coupon rate in decimal form before range weighting.
-   * @param dayCountFraction - Accrual year fraction for the coupon period.
-   * @throws Error - Throws a JavaScript exception if the range bounds are non-finite or not strictly ordered; `observations` is empty or contains a non-finite value; or `coupon_rate` or `day_count_fraction` is negative or non-finite.
-   */
-  callableRangeAccrualAccrued(
-    lower: number,
-    upper: number,
-    observations: number[],
-    couponRate: number,
-    dayCountFraction: number
-  ): number;
   /**
    * Compiled-in JSON Schemas of the valuations wire format.
    */

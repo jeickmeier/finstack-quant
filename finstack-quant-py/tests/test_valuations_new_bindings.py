@@ -14,10 +14,6 @@ import json
 import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, HazardCurve, MarketContext
-from finstack_quant.valuations import (
-    inverse_floater_coupon_profile,
-    snowball_coupon_profile,
-)
 from finstack_quant.valuations.instruments import (
     InstrumentCashflowEnvelope,
     instrument_cashflows,
@@ -261,8 +257,3 @@ def test_revolving_credit_credit_cashflows_fail_closed() -> None:
             "2024-01-01",
             "discounting",
         ).to_json()
-
-
-def test_coupon_profile_entrypoints_have_distinct_explicit_inputs() -> None:
-    assert snowball_coupon_profile(0.02, 0.05, [0.01, 0.04], 0.0, 0.10) == pytest.approx([0.06, 0.07])
-    assert inverse_floater_coupon_profile(0.05, [0.01, 0.02], 0.0, 0.10, 2.0) == pytest.approx([0.03, 0.01])

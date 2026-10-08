@@ -171,20 +171,16 @@ pub(crate) fn register_commodity_spread_option_metrics(
     )?;
     registry.register_metric(
         MetricId::Dv01,
-        Arc::new(
-            crate::metrics::UnifiedDv01Calculator::<CommoditySpreadOption>::new(
-                crate::metrics::Dv01CalculatorConfig::parallel_combined(),
-            ),
-        ),
+        Arc::new(crate::metrics::UnifiedDv01Calculator::new(
+            crate::metrics::Dv01CalculatorConfig::parallel_combined(),
+        )),
         &[InstrumentType::CommoditySpreadOption],
     )?;
     registry.register_metric(
         MetricId::BucketedDv01,
-        Arc::new(
-            crate::metrics::UnifiedDv01Calculator::<CommoditySpreadOption>::new(
-                crate::metrics::Dv01CalculatorConfig::triangular_key_rate(),
-            ),
-        ),
+        Arc::new(crate::metrics::UnifiedDv01Calculator::new(
+            crate::metrics::Dv01CalculatorConfig::triangular_key_rate(),
+        )),
         &[InstrumentType::CommoditySpreadOption],
     )?;
     Ok(())

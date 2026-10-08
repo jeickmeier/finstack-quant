@@ -242,10 +242,6 @@ impl crate::instruments::common_impl::traits::Instrument for Tarn {
         ))
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        Some(self.start_date)
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 

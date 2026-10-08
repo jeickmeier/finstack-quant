@@ -333,22 +333,6 @@ fn junior_expected_loss_comes_from_writedowns() {
 }
 
 #[test]
-fn oversized_explicit_tree_errors_before_pricing() {
-    let mut sc = structured_credit(false);
-    sc.instrument_pricing_overrides.model_config.tree_steps = Some(24);
-    let market = fixed_market();
-
-    let err = sc
-        .price_stochastic_with_mode(&market, as_of(), StructuredCreditPricingMode::Tree)
-        .expect_err("oversized path-preserving tree should fail");
-
-    assert!(
-        err.to_string().contains("max_tree_paths"),
-        "error should mention path cap, got {err}"
-    );
-}
-
-#[test]
 fn stochastic_default_volatility_changes_loss_dispersion() {
     let market = fixed_market();
     let pricing_mode = StructuredCreditPricingMode::MonteCarlo {

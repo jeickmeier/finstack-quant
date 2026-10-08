@@ -15,13 +15,13 @@ repricing cost and operational moving parts.
 | Tier         | Entry point                                                | Behavior                                                                                       |
 |--------------|------------------------------------------------------------|------------------------------------------------------------------------------------------------|
 | Minimal      | [`pnl_bridge`](src/lib.rs)                          | Scalar `value(T₁) − value(T₀)` in target currency. No decomposition.                          |
-| Linear       | [`attribute_pnl_metrics_based`](src/metrics_based/)      | Linear (and optional second-order) approximation from precomputed metrics. No extra repricing. |
+| Linear       | [`attribute_pnl_metrics_based`](src/metrics_based/)      | Linear (and optional second-order) approximation from precomputed metrics. No extra repricing. `attribute_pnl` + `AttributionMethod::MetricsBased` prices the two endpoints first. |
 | Parallel     | [`attribute_pnl`](src/lib.rs) + `AttributionMethod::Parallel` | Isolate one factor at a time (T₀ for that factor, T₁ elsewhere). Residual carries cross-effects. |
 | Waterfall    | [`attribute_pnl`](src/lib.rs) + `AttributionMethod::Waterfall` | Apply factors in order; per-factor P&Ls sum to total P&L up to tolerance. Order matters.       |
 | Taylor       | [`attribute_pnl`](src/lib.rs) + `AttributionMethod::Taylor` | First- and optional second-order sensitivity expansion from bump-and-reprice Greeks; FX, inflation, correlations, scalars, and model parameters are isolated by restore-and-reprice. |
 
-`AttributionMethod` selects among the four decomposition methods when
-dispatching through a spec: `Parallel` (the `Default`),
+`AttributionMethod` selects among the four decomposition methods for
+`attribute_pnl` and for a spec: `Parallel` (the `Default`),
 `Waterfall(Vec<AttributionFactor>)`, `MetricsBased`, and
 `Taylor(TaylorAttributionConfig)`.
 
@@ -134,15 +134,14 @@ and credit-factor-model overrides. Both types are
 `#[serde(deny_unknown_fields)]`.
 
 The version marker is the `AttributionSchema` enum, whose single variant
-serializes as the string constant `ATTRIBUTION_SCHEMA`
-(`"finstack_quant.attribution/1"`); an unrecognized marker is rejected during
-deserialization.
+serializes as `"finstack_quant.attribution/1"`; an unrecognized marker is
+rejected during deserialization.
 
 ```rust,ignore
 use finstack_quant_attribution::{AttributionEnvelope, AttributionSchema};
 
 let envelope: AttributionEnvelope = serde_json::from_str(&json)?;
-assert_eq!(envelope.schema, AttributionSchema::CURRENT);
+assert_eq!(envelope.schema, AttributionSchema::Attribution);
 
 let result_envelope = envelope.execute()?;
 let result = &result_envelope.result; // AttributionResult { attribution, results_meta }
@@ -174,15 +173,16 @@ Two schema artifacts are checked in under
 | `AttributionInputs` | `spec` | Shared markets, dates and options for instrument batches |
 | `pnl_attribution_wide_row`, `PnlAttributionWideRow` | `long_rows` | Single-row aggregate projection used by Python `to_dataframe` |
 | `CreditFactorDetailOptions` | `credit_factor` | Controls optional per-issuer and per-bucket detail emitted by the canonical attribution methods |
-| `AttributionEnvelope`, `AttributionSpec`, `AttributionInputs`, `AttributionSchema`, `AttributionConfig`, `AttributionResult`, `AttributionResultEnvelope`, `ATTRIBUTION_SCHEMA`, `default_attribution_metrics`, `validate_attribution_json` | `spec` | JSON contract |
+| `AttributionEnvelope`, `AttributionSpec`, `AttributionInputs`, `AttributionSchema`, `AttributionConfig`, `AttributionResult`, `AttributionResultEnvelope`, `default_attribution_metrics`, `validate_attribution_json` | `spec` | JSON contract |
 | `attribute_return_contribution`, `attribute_return_contribution_json`, `validate_return_contribution_json`, `ReturnContributionSpec`, `ReturnContributionResult`, `ReturnContributionPosition`, `ReturnContributionFactor`, `ReturnContributionWeighting`, `InstrumentContribution`, `GroupContribution`, `FactorContribution`, `BenchmarkRelativeContribution` | `return_contribution` | Single-period weight × return contribution |
 | `pnl_attribution_long_rows`, `pnl_attribution_carry_rows`, `pnl_attribution_credit_factor_rows`, `LongDetailRow` | `long_rows` | Long-format projection of a `PnlAttribution`, consumed by the Python DataFrame exports |
-| `ARTIFACTS`, `ATTRIBUTION_SCHEMA_BASE` | `schema` | Published JSON Schema artifacts and their base URI |
+| `ARTIFACTS` | `schema` | Published JSON Schema artifacts |
 
 `long_rows` and `schema` are the crate's only public submodules. Every other
 module in the layout above is `pub(crate)`; the `Module` column names where an
 item is defined, not an importable path — those items reach callers through the
-crate-root re-exports in [`lib.rs`](src/lib.rs).
+crate-root re-exports in [`lib.rs`](src/lib.rs). The `long_rows` and `schema`
+items are imported from their module.
 
 Sign, carry, currency, and residual conventions are documented in the crate
 rustdoc.
@@ -259,7 +259,7 @@ The authoritative contract, including the full Rust-only inventory, is
 
 | Path | Contents |
 |------|----------|
-| [`tests/attribution.rs`](tests/attribution.rs) | Aggregator for the [`tests/attribution/`](tests/attribution) tree: invariants, per-factor suites, QuantLib parity, schema and serialization contracts, rounding policy |
+| [`tests/attribution/`](tests/attribution) | One module per feature area: invariants, per-factor suites, QuantLib parity, schema and serialization contracts, rounding policy |
 | [`tests/market_restore.rs`](tests/market_restore.rs) | `MarketSnapshot` / `MarketRestoreFlags` round-trip behavior |
 | [`tests/cross_factor_attribution_tests.rs`](tests/cross_factor_attribution_tests.rs) | Cross-factor / interaction residual behavior |
 | [`tests/credit_carry_split.rs`](tests/credit_carry_split.rs) | Credit carry decomposition split |

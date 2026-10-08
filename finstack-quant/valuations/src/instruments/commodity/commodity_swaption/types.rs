@@ -545,10 +545,6 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
         Money::new(unit_price * self.quantity, self.underlying.currency)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        Some(self.underlying_start_date)
-    }
-
     fn expiry(&self) -> Option<Date> {
         Some(self.expiry)
     }

@@ -6,9 +6,7 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fx::quanto_option::types::QuantoOption;
-use crate::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
+use crate::pricer::{expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError};
 use crate::results::ValuationResult;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -169,20 +167,8 @@ impl Pricer for QuantoOptionAnalyticalPricer {
         }
 
         if as_of >= quanto.expiry {
-            let spot = crate::metrics::scalar_numeric_value(
-                market.get_price(&quanto.spot_id).map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::default(),
-                    )
-                })?,
-            );
-            let scale = payoff_scale(quanto).map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+            let spot = crate::metrics::scalar_numeric_value(market.get_price(&quanto.spot_id)?);
+            let scale = payoff_scale(quanto)?;
             let strike = quanto.strike;
             let intrinsic_unit = match quanto.option_type {
                 crate::instruments::OptionType::Call => (spot - strike).max(0.0),
@@ -201,24 +187,14 @@ impl Pricer for QuantoOptionAnalyticalPricer {
         }
 
         let (spot, r_dom, r_for, q, sigma_equity, sigma_fx, t) =
-            collect_quanto_inputs(quanto, market, as_of).map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+            collect_quanto_inputs(quanto, market, as_of)?;
 
         if t <= 0.0 {
             // Expiry convention: settle at intrinsic (consistent with the
             // FxOption/digital/barrier siblings) rather than returning 0.
             // The quanto payoff converts the foreign-currency intrinsic at
             // the contractual fixed FX rate via `payoff_scale`.
-            let scale = payoff_scale(quanto).map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+            let scale = payoff_scale(quanto)?;
             let strike = quanto.strike;
             let intrinsic_unit = match quanto.option_type {
                 crate::instruments::OptionType::Call => (spot - strike).max(0.0),
@@ -261,9 +237,7 @@ impl Pricer for QuantoOptionAnalyticalPricer {
             ),
         };
 
-        let scale = payoff_scale(quanto).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let scale = payoff_scale(quanto)?;
         let pv = Money::new(price * scale, quanto.quote_currency).map_err(|error| {
             crate::pricer::PricingError::from_core(
                 error,

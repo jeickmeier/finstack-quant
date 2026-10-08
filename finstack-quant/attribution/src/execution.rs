@@ -1,9 +1,7 @@
 //! Attribution spec execution dispatch.
 
-use super::spec::{
-    default_attribution_metrics, AttributionInputs, AttributionResult, AttributionSpec,
-};
-use super::{attribute_pnl_metrics_based, AttributionMethod};
+use super::spec::{AttributionInputs, AttributionResult, AttributionSpec};
+use super::AttributionMethod;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{currency::Currency, dates::Date, money::Money, Error, Result};
 use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
@@ -81,6 +79,22 @@ fn translation_t0_value(
     Ok(value)
 }
 
+/// Parse configured metric names, rejecting every unknown name at once.
+fn parse_metric_names(names: &[String]) -> Result<Vec<MetricId>> {
+    let (parsed, unknown): (Vec<_>, Vec<_>) = names
+        .iter()
+        .map(|name| MetricId::parse_strict(name).map_err(|_| name.as_str()))
+        .partition(|parsed| parsed.is_ok());
+    if !unknown.is_empty() {
+        let unknown: Vec<&str> = unknown.into_iter().filter_map(|name| name.err()).collect();
+        return Err(Error::Validation(format!(
+            "Unknown metric names: {}",
+            unknown.join(", ")
+        )));
+    }
+    Ok(parsed.into_iter().filter_map(|id| id.ok()).collect())
+}
+
 /// Run `f`, converting a Rust panic into [`finstack_quant_core::Error::Internal`].
 ///
 /// Language hosts must not let an unwind cross their boundary (a WASM unwind
@@ -103,36 +117,30 @@ pub(crate) fn contain_panic<T>(label: &str, f: impl FnOnce() -> Result<T>) -> Re
 }
 
 impl AttributionSpec {
-    /// Execute the attribution with panic containment.
-    ///
-    /// Identical to [`Self::execute`] except that a Rust panic inside the
-    /// pipeline is returned as [`finstack_quant_core::Error::Internal`]
-    /// instead of unwinding. Language bindings call this variant.
-    ///
-    /// # Errors
-    ///
-    /// Everything [`Self::execute`] returns, plus `Error::Internal` for a
-    /// contained panic.
-    pub fn execute_contained(&self) -> Result<AttributionResult> {
-        contain_panic("execute", || self.execute())
-    }
-
     /// Execute the attribution specification.
     ///
-    /// Returns a complete result with the P&L attribution and metadata.
+    /// Returns a complete result with the P&L attribution and metadata. A Rust
+    /// panic inside the pipeline is returned as an error instead of unwinding,
+    /// so language bindings can call this directly.
     ///
     /// # Errors
     ///
     /// Propagates instrument and market reconstruction, configured rounding,
     /// pricing, FX conversion, and method-specific attribution errors. For the
     /// metrics-based method, unknown configured metric names are rejected
-    /// before valuation.
+    /// before valuation. A contained panic is
+    /// [`finstack_quant_core::Error::Internal`].
     pub fn execute(&self) -> Result<AttributionResult> {
-        crate::helpers::validate_attribution_period(self.inputs.as_of_t0, self.inputs.as_of_t1)?;
-        let market_t0 = MarketContext::try_from(self.inputs.market_t0.clone())?;
-        let market_t1 = MarketContext::try_from(self.inputs.market_t1.clone())?;
-        self.inputs
-            .execute_instrument(&self.instrument, &market_t0, &market_t1)
+        contain_panic("execute", || {
+            crate::helpers::validate_attribution_period(
+                self.inputs.as_of_t0,
+                self.inputs.as_of_t1,
+            )?;
+            let market_t0 = MarketContext::try_from(self.inputs.market_t0.clone())?;
+            let market_t1 = MarketContext::try_from(self.inputs.market_t1.clone())?;
+            self.inputs
+                .execute_instrument(&self.instrument, &market_t0, &market_t1)
+        })
     }
 }
 
@@ -184,115 +192,14 @@ impl AttributionInputs {
             )
         };
 
-        let mut attribution = match &self.method {
-            AttributionMethod::Parallel
-            | AttributionMethod::Waterfall(_)
-            | AttributionMethod::Taylor(_) => crate::attribute_pnl(&self.method, &request)?,
-
-            AttributionMethod::MetricsBased => {
-                let instrument_t0 = match &self.model_params_t0 {
-                    Some(params) => {
-                        crate::model_params::with_model_params(&instrument_arc, params)?
-                    }
-                    None => Arc::clone(&instrument_arc),
-                };
-                let mut metrics_instrument = instrument_t0.clone_box();
-                // A zero-day window has no carry (the metrics-based carry step
-                // zeroes it), so the theta horizon is only set for a real window.
-                let window_days = (self.as_of_t1 - self.as_of_t0).whole_days();
-                if window_days > 0 {
-                    if let Some(overrides) = metrics_instrument.get_metric_pricing_overrides_mut() {
-                        let days = u32::try_from(window_days).map_err(|_| {
-                            Error::Validation(format!(
-                                "attribution window of {window_days} days exceeds the theta horizon range"
-                            ))
-                        })?;
-                        overrides.theta_period = Some(finstack_quant_core::dates::Tenor::new(
-                            days,
-                            finstack_quant_core::dates::TenorUnit::Days,
-                        )?);
-                    }
-                }
-                let metrics_instrument: Arc<dyn Instrument> = Arc::from(metrics_instrument);
-                let metrics = match self.config.as_ref().and_then(|cfg| cfg.metrics.as_ref()) {
-                    Some(metric_names) => {
-                        let mut parsed = Vec::new();
-                        let mut unknown = Vec::new();
-                        for name in metric_names {
-                            match MetricId::parse_strict(name) {
-                                Ok(id) => parsed.push(id),
-                                Err(_) => unknown.push(name.clone()),
-                            }
-                        }
-                        if !unknown.is_empty() {
-                            return Err(Error::Validation(format!(
-                                "Unknown metric names: {}",
-                                unknown.join(", ")
-                            )));
-                        }
-                        parsed
-                    }
-                    // No caller-named list: fall back to the engine's own
-                    // cross-instrument menu. That menu is a superset, not a
-                    // request, so narrow it to what this instrument type
-                    // actually supports. A metric the caller named above stays
-                    // unnarrowed and still errors if it is inapplicable,
-                    // because that is a genuine request.
-                    None => {
-                        let registry = finstack_quant_valuations::metrics::standard_registry();
-                        registry.applicable_subset(
-                            &default_attribution_metrics(),
-                            metrics_instrument.key(),
-                        )
-                    }
-                };
-
-                // Attach FinstackConfig so sensitivity bump knobs (e.g. rate_bump_bp)
-                // reach the producer instead of silently falling back to defaults.
-                let pricing_options = finstack_quant_calibration::recalibration::pricing_options()
-                    .with_config(&config);
-                let val_t0 = metrics_instrument.price_with_metrics(
-                    market_t0,
-                    self.as_of_t0,
-                    &metrics,
-                    pricing_options.clone(),
-                )?;
-                let val_t1 = instrument_arc.price_with_metrics(
-                    market_t1,
-                    self.as_of_t1,
-                    &[],
-                    pricing_options,
-                )?;
-
-                let mut result = attribute_pnl_metrics_based(
-                    &metrics_instrument,
-                    market_t0,
-                    market_t1,
-                    &val_t0,
-                    &val_t1,
-                    self.as_of_t0,
-                    self.as_of_t1,
-                )?;
-                result.meta.num_repricings = 2;
-                if self.model_params_t0.is_some() {
-                    let closing_value_opening_params =
-                        instrument_t0.value(market_t1, self.as_of_t1)?;
-                    result.model_params_pnl =
-                        val_t1.value.checked_sub(closing_value_opening_params)?;
-                    let step = crate::helpers::sensitivity_step(
-                        "ModelParameters",
-                        crate::helpers::FactorWorking::Repriced {
-                            pv: closing_value_opening_params,
-                        },
-                        result.model_params_pnl,
-                        None,
-                        &mut result.meta.notes,
-                    );
-                    result.sensitivity_steps.push(step);
-                    result.meta.num_repricings += 1;
-                }
-                result
+        let configured_metrics = self.config.as_ref().and_then(|cfg| cfg.metrics.as_deref());
+        let mut attribution = match (&self.method, configured_metrics) {
+            // A metric the caller named stays unnarrowed and still errors if
+            // it is inapplicable, because that is a genuine request.
+            (AttributionMethod::MetricsBased, Some(names)) => {
+                crate::metrics_based::attribute_request(&request, Some(parse_metric_names(names)?))?
             }
+            _ => crate::attribute_pnl(&self.method, &request)?,
         };
         attribution.meta.rounding = finstack_quant_core::config::rounding_context_from(&config);
         attribution.compute_residual()?;

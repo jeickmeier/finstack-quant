@@ -1,19 +1,8 @@
-//! Integration tests for P&L attribution.
-//!
-//! ## Test Modules
-//!
-//! - `audit_steps`: Exported endpoints and step rows rebuild the reported buckets
-//! - `bond_attribution`: Basic bond P&L attribution tests
-//! - `fx_attribution`: FX translation and waterfall attribution tests
-//! - `invariants`: Mathematical invariants (sign conventions, scaling, edge cases)
-//! - `metrics_based_convexity`: Second-order metrics support
-//! - `analytical_self_consistency`: Validates attribution against the library's
-//!   own analytical DV01 / Convexity formulas (self-consistency, NOT a true
-//!   external QuantLib parity — that is a separate effort).
-//! - `scalars_attribution`: Market scalars extraction/restoration
-//! - `serialization_roundtrip`: JSON serialization tests
-//! - `spec_tests`: Attribution spec validation tests
-//! - `rounding_policy`: Rounding policy stamping tests
+//! P&L attribution integration tests, one module per feature area.
+
+#[allow(dead_code)]
+#[path = "../support/attribution_test_utils.rs"]
+pub(crate) mod attribution_support;
 
 mod analytical_self_consistency;
 mod audit_steps;

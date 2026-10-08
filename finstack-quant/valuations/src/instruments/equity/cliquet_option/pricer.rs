@@ -208,17 +208,10 @@ impl CliquetOptionMcPricer {
 
         // Derive deterministic seed from instrument ID and scenario
 
-        use finstack_quant_models::monte_carlo::seed;
-
-        let seed = if let Some(ref scenario) = inst
+        let seed = inst
             .instrument_pricing_overrides
             .model_config
-            .mc_seed_scenario
-        {
-            seed::derive_seed(&inst.id, scenario)
-        } else {
-            seed::derive_seed(&inst.id, "base")
-        };
+            .mc_seed(&inst.id);
 
         // Build time grid that includes reset dates to ensure exact period boundaries.
         // Without this, the MC simulation may not visit exact reset dates, leading to

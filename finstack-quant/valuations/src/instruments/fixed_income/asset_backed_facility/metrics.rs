@@ -138,12 +138,12 @@ pub(crate) fn register_asset_backed_facility_metrics(
         registry: registry,
         instrument: InstrumentType::AssetBackedFacility,
         metrics: [
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<AssetBackedFacility>::new(
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(
                 crate::metrics::Dv01CalculatorConfig::parallel_combined()
             )),
             (Cs01, crate::metrics::ZSpreadParallelCs01::<AssetBackedFacility>::hazard_when_credit_curve()),
             (BucketedCs01, crate::metrics::ZSpreadBucketedCs01::<AssetBackedFacility>::hazard_when_credit_curve()),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<AssetBackedFacility>::new(
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(
                 crate::metrics::Dv01CalculatorConfig::triangular_key_rate()
             )),
         ]

@@ -6,7 +6,7 @@ use crate::bindings::pandas_utils::{
     serde_to_py, ColumnSchema,
 };
 use crate::errors::{display_to_py, serde_json_to_py};
-use finstack_quant_attribution::{
+use finstack_quant_attribution::long_rows::{
     pnl_attribution_carry_rows, pnl_attribution_credit_factor_rows, pnl_attribution_long_rows,
     pnl_attribution_sensitivity_step_rows, pnl_attribution_waterfall_step_rows,
     pnl_attribution_wide_row,

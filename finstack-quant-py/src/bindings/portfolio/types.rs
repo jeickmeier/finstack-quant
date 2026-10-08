@@ -98,7 +98,11 @@ impl PyPortfolio {
         let ccy = extract_currency(base_currency)?;
         let date = py_to_date(as_of)?;
         Ok(PyPortfolioBuilder {
-            inner: Some(PortfolioBuilder::new(id).base_currency(ccy).as_of(date)),
+            inner: Some(
+                finstack_quant_portfolio::Portfolio::builder(id)
+                    .base_currency(ccy)
+                    .as_of(date),
+            ),
         })
     }
 
@@ -512,28 +516,14 @@ pub struct PyPositionValue {
     pub(crate) inner: finstack_quant_portfolio::valuation::PositionValue,
 }
 
+crate::bindings::macros::wire_methods!(
+    PyPositionValue,
+    finstack_quant_portfolio::valuation::PositionValue,
+    "PositionValue"
+);
+
 #[pymethods]
 impl PyPositionValue {
-    /// Support `pickle` via the same serde round-trip as ``to_json``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse a position value from canonical JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to canonical JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Position identifier.
     #[getter]
     fn position_id(&self) -> String {

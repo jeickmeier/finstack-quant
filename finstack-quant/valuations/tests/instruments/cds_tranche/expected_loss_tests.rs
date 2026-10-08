@@ -4,15 +4,11 @@
 //! - Basic expected loss calculation
 //! - EL curve generation and monotonicity
 //! - Homogeneous pool calculations
-//! - Heterogeneous pool calculations (normal approximation and exact convolution)
+//! - Heterogeneous pool calculations (exact convolution)
 //! - Tranche subordination effects on EL
 
-#![allow(clippy::field_reassign_with_default)]
-
 use super::helpers::*;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CdsTranchePricer, CdsTranchePricerConfig, HeteroMethod,
-};
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer;
 
 // ==================== Basic Expected Loss Tests ====================
 
@@ -113,10 +109,7 @@ fn test_expected_loss_scales_with_notional() {
 #[test]
 fn test_homogeneous_expected_loss() {
     // Arrange
-    let mut config = CdsTranchePricerConfig::default();
-    config.use_issuer_curves = false; // Force homogeneous
-    let pricer = CdsTranchePricer::with_config(config).expect("valid tranche pricer config");
-
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
     let market = standard_market_context(); // No issuer curves
 
@@ -129,46 +122,25 @@ fn test_homogeneous_expected_loss() {
 }
 
 #[test]
-fn test_heterogeneous_spa_expected_loss() {
-    // Arrange
-    let mut config = CdsTranchePricerConfig::default();
-    config.use_issuer_curves = true;
-    config.hetero_method = HeteroMethod::NormalApprox;
-    let pricer = CdsTranchePricer::with_config(config).expect("valid tranche pricer config");
-
-    let tranche = mezzanine_tranche();
-    let market = market_context_with_issuers(50);
-
-    // Act
-    let result = pricer.calculate_expected_loss(&tranche, &market);
-
-    // Assert
-    assert!(result.is_ok());
-    assert_finite_non_negative(result.unwrap(), "Heterogeneous normal-approx EL");
-}
-
-#[test]
 fn test_heterogeneous_exact_convolution_expected_loss() {
     // Arrange
-    let mut config = CdsTranchePricerConfig::default();
-    config.use_issuer_curves = true;
-    config.hetero_method = HeteroMethod::ExactConvolution;
-    config.grid_step = 0.002;
-    let pricer = CdsTranchePricer::with_config(config).expect("valid tranche pricer config");
-
+    let pricer = CdsTranchePricer::new();
     let tranche = mezzanine_tranche();
-    let market = market_context_with_issuers(10); // Small pool for exact method
 
-    // Act
-    let result = pricer.calculate_expected_loss(&tranche, &market);
+    for pool_size in [10, 50] {
+        let market = market_context_with_issuers(pool_size);
 
-    // Assert
-    assert!(result.is_ok());
-    assert_finite_non_negative(result.unwrap(), "Heterogeneous exact convolution EL");
+        // Act
+        let result = pricer.calculate_expected_loss(&tranche, &market);
+
+        // Assert
+        assert!(result.is_ok());
+        assert_finite_non_negative(result.unwrap(), "Heterogeneous exact convolution EL");
+    }
 }
 
 #[test]
-fn test_hetero_spa_matches_homogeneous_when_issuers_identical() {
+fn test_hetero_matches_homogeneous_when_issuers_identical() {
     // Arrange
     let base_market = standard_market_context();
     let index_data = base_market.get_credit_index("CDX.NA.IG.42").unwrap();
@@ -191,20 +163,22 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_identical() {
             .unwrap();
 
     let hetero_market = base_market
+        .clone()
         .insert_credit_index("CDX.NA.IG.42", hetero_index)
         .expect("identical issuer curves reference the existing index hazard");
+    // Same ten-name pool without issuer curves: the homogeneous path.
+    let homo_index = finstack_quant_core::market_data::term_structures::CreditIndexData::builder()
+        .num_constituents(10)
+        .recovery_rate(index_data.recovery_rate)
+        .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
+        .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
+        .build()
+        .unwrap();
+    let homo_market = base_market
+        .insert_credit_index("CDX.NA.IG.42", homo_index)
+        .expect("ten-name index without issuer curves");
 
-    let mut homo_config = CdsTranchePricerConfig::default();
-    homo_config.use_issuer_curves = false;
-    let homo_pricer =
-        CdsTranchePricer::with_config(homo_config).expect("valid tranche pricer config");
-
-    let mut hetero_config = CdsTranchePricerConfig::default();
-    hetero_config.use_issuer_curves = true;
-    hetero_config.hetero_method = HeteroMethod::NormalApprox;
-    let hetero_pricer =
-        CdsTranchePricer::with_config(hetero_config).expect("valid tranche pricer config");
-
+    let pricer = CdsTranchePricer::new();
     let tranche = custom_tranche(
         3.0,
         7.0,
@@ -213,10 +187,10 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_identical() {
     );
 
     // Act
-    let el_homo = homo_pricer
-        .calculate_expected_loss(&tranche, &hetero_market)
+    let el_homo = pricer
+        .calculate_expected_loss(&tranche, &homo_market)
         .unwrap();
-    let el_hetero = hetero_pricer
+    let el_hetero = pricer
         .calculate_expected_loss(&tranche, &hetero_market)
         .unwrap();
 
@@ -225,82 +199,7 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_identical() {
         el_hetero,
         el_homo,
         0.0001,
-        "Hetero normal-approx should match homogeneous when issuers identical",
-    );
-}
-
-#[test]
-fn test_hetero_spa_vs_exact_convolution_small_pool() {
-    // Arrange
-    let market = market_context_with_issuers(8);
-
-    let mut spa_config = CdsTranchePricerConfig::default();
-    spa_config.use_issuer_curves = true;
-    spa_config.hetero_method = HeteroMethod::NormalApprox;
-    let spa_pricer =
-        CdsTranchePricer::with_config(spa_config).expect("valid tranche pricer config");
-
-    let mut exact_config = CdsTranchePricerConfig::default();
-    exact_config.use_issuer_curves = true;
-    exact_config.hetero_method = HeteroMethod::ExactConvolution;
-    exact_config.grid_step = 0.002;
-    let exact_pricer =
-        CdsTranchePricer::with_config(exact_config).expect("valid tranche pricer config");
-
-    let tranche = mezzanine_tranche();
-
-    // Act
-    let el_spa = spa_pricer
-        .calculate_expected_loss(&tranche, &market)
-        .unwrap();
-    let el_exact = exact_pricer
-        .calculate_expected_loss(&tranche, &market)
-        .unwrap();
-
-    // Assert: normal approximation and exact should be close for small pools
-    relative_eq(
-        el_spa,
-        el_exact,
-        0.05,
-        "Normal approximation and exact convolution should be close for small pools",
-    );
-}
-
-#[test]
-fn test_exact_convolution_grid_refinement() {
-    // Arrange
-    let market = market_context_with_issuers(10);
-
-    let mut coarse_config = CdsTranchePricerConfig::default();
-    coarse_config.use_issuer_curves = true;
-    coarse_config.hetero_method = HeteroMethod::ExactConvolution;
-    coarse_config.grid_step = 0.005;
-    let coarse_pricer =
-        CdsTranchePricer::with_config(coarse_config).expect("valid tranche pricer config");
-
-    let mut fine_config = CdsTranchePricerConfig::default();
-    fine_config.use_issuer_curves = true;
-    fine_config.hetero_method = HeteroMethod::ExactConvolution;
-    fine_config.grid_step = 0.001;
-    let fine_pricer =
-        CdsTranchePricer::with_config(fine_config).expect("valid tranche pricer config");
-
-    let tranche = equity_tranche();
-
-    // Act
-    let el_coarse = coarse_pricer
-        .calculate_expected_loss(&tranche, &market)
-        .unwrap();
-    let el_fine = fine_pricer
-        .calculate_expected_loss(&tranche, &market)
-        .unwrap();
-
-    // Assert: Finer grid should converge to similar result
-    relative_eq(
-        el_coarse,
-        el_fine,
-        0.02,
-        "Grid refinement should converge to similar EL",
+        "Issuer-curve pricing should match homogeneous when issuers identical",
     );
 }
 

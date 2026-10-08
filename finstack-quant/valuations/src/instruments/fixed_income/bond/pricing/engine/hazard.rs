@@ -349,11 +349,12 @@ mod tests {
 
         let market = MarketContext::new().insert(disc).insert(hazard_zero);
 
-        let pv_rf = BondEngine::price(&bond, &market, issue).expect("RF price should succeed");
+        let pv_rf = BondEngine::price_with_oas(&bond, &market, issue, 0.0)
+            .expect("RF price should succeed");
         let pv_haz =
             HazardBondEngine::price(&bond, &market, issue).expect("Hazard price should succeed");
 
-        let diff = (pv_rf.amount() - pv_haz.amount()).abs();
+        let diff = (pv_rf - pv_haz.amount()).abs();
         assert!(
             diff < 1e-6,
             "Hazard price with zero intensity should match risk-free price; diff={}",
@@ -405,16 +406,17 @@ mod tests {
             "settlement convention: cashflows dated on as_of must be excluded"
         );
 
-        let pv_rf = BondEngine::price(&bond, &market, as_of).expect("RF price should succeed");
+        let pv_rf = BondEngine::price_with_oas(&bond, &market, as_of, 0.0)
+            .expect("RF price should succeed");
         let pv_haz =
             HazardBondEngine::price(&bond, &market, as_of).expect("Hazard price should succeed");
 
-        let diff = (pv_rf.amount() - pv_haz.amount()).abs();
+        let diff = (pv_rf - pv_haz.amount()).abs();
         assert!(
             diff < 1e-6,
             "zero-hazard price must match the discounting engine when a coupon \
              lands on as_of; pv_rf={}, pv_haz={}, diff={}",
-            pv_rf.amount(),
+            pv_rf,
             pv_haz.amount(),
             diff
         );
@@ -940,16 +942,17 @@ mod tests {
 
         let market = MarketContext::new().insert(disc).insert(hazard_zero);
 
-        let pv_rf = BondEngine::price(&bond, &market, issue).expect("RF price should succeed");
+        let pv_rf = BondEngine::price_with_oas(&bond, &market, issue, 0.0)
+            .expect("RF price should succeed");
         let pv_haz =
             HazardBondEngine::price(&bond, &market, issue).expect("Hazard price should succeed");
 
-        let diff = (pv_rf.amount() - pv_haz.amount()).abs();
+        let diff = (pv_rf - pv_haz.amount()).abs();
         assert!(
             diff < 1e-6,
             "PIK hazard price with zero intensity should match risk-free price; \
              pv_rf={}, pv_haz={}, diff={}",
-            pv_rf.amount(),
+            pv_rf,
             pv_haz.amount(),
             diff
         );

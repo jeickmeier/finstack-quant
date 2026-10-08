@@ -98,31 +98,6 @@ impl MetricId {
     /// Convexity adjustment applied to a quoted or model futures rate.
     pub const ConvexityAdjustment: Self = Self(Cow::Borrowed("convexity_adjustment"));
 
-    /// Number of fixed-leg payment cashflows in a rates instrument schedule.
-    pub const FixedLegPaymentCount: Self = Self(Cow::Borrowed("fixed_leg_payment_count"));
-
-    /// Number of floating-leg payment cashflows in a rates instrument schedule.
-    pub const FloatingLegPaymentCount: Self = Self(Cow::Borrowed("floating_leg_payment_count"));
-
-    /// First fixed-leg payment date as days since Unix epoch.
-    pub const FixedFirstPaymentDate: Self = Self(Cow::Borrowed("fixed_first_payment_date"));
-
-    /// Last fixed-leg payment date as days since Unix epoch.
-    pub const FixedLastPaymentDate: Self = Self(Cow::Borrowed("fixed_last_payment_date"));
-
-    /// First floating-leg payment date as days since Unix epoch.
-    pub const FloatingFirstPaymentDate: Self = Self(Cow::Borrowed("floating_first_payment_date"));
-
-    /// Last floating-leg payment date as days since Unix epoch.
-    pub const FloatingLastPaymentDate: Self = Self(Cow::Borrowed("floating_last_payment_date"));
-
-    /// First fixed-leg accrual factor.
-    pub const FixedFirstAccrualFactor: Self = Self(Cow::Borrowed("fixed_first_accrual_factor"));
-
-    /// First floating-leg accrual factor.
-    pub const FloatingFirstAccrualFactor: Self =
-        Self(Cow::Borrowed("floating_first_accrual_factor"));
-
     // Bermudan exercise
 
     /// Expected exercise time of a Bermudan swaption, conditional on exercise.
@@ -162,12 +137,6 @@ impl MetricId {
 
     /// Annuity of reference leg
     pub const AnnuityReference: Self = Self(Cow::Borrowed("annuity_reference"));
-
-    /// DV01 of primary leg
-    pub const Dv01Primary: Self = Self(Cow::Borrowed("dv01_primary"));
-
-    /// DV01 of reference leg
-    pub const Dv01Reference: Self = Self(Cow::Borrowed("dv01_reference"));
 
     /// Par spread for basis swap (absolute: the spread that would set NPV to zero)
     pub const BasisParSpread: Self = Self(Cow::Borrowed("basis_par_spread"));

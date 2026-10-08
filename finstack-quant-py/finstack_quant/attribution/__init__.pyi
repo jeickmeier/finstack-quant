@@ -813,8 +813,8 @@ class PnlAttribution:
         target-currency translation use ``pv_t0 + fx_translation_pnl`` in
         place of ``pv_t0``, because row amounts are converted at T₁ FX).
 
-        ``move_unit`` is ``"basis_point"`` for rates, credit, dividend-yield
-        and inflation rows, ``"vol_point"`` (0.01 of absolute volatility) for
+        ``move_unit`` is ``"basis_point"`` for rates, credit and inflation
+        rows, ``"vol_point"`` (0.01 of absolute volatility) for
         volatility rows, ``"percent"`` for the metrics-based FX row and
         ``"price_unit"`` for spot rows; sensitivities are currency amounts per
         one such unit. Metrics-based carry and cross-factor P&L have no rows

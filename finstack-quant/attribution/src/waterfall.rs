@@ -33,12 +33,10 @@
 //! - Recommended for risk reporting where sum must equal total
 
 use super::credit_cascade::{
-    build_credit_factor_attribution, plan_credit_cascade, shift_credit_curves_par_spread,
-    snap_hazard_to_t1, CreditCascade, CreditStepKind,
+    build_credit_factor_attribution, note_unplanned_cascade, plan_credit_cascade, CreditCascade,
 };
 use super::factors::*;
 use super::helpers::*;
-use super::model_params;
 use super::types::*;
 use crate::AttributionRequest;
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
@@ -199,12 +197,9 @@ pub(crate) fn attribute_pnl_waterfall(
         market_t1,
         as_of_t0,
         as_of_t1,
-        config,
         strict_validation,
-        model_params_t0,
         credit_factor_model,
         credit_factor_detail_options,
-        prepared_endpoints,
         ..
     } = *request;
     if factor_order.is_empty() {
@@ -241,50 +236,20 @@ pub(crate) fn attribute_pnl_waterfall(
     }
     validate_attribution_period(as_of_t0, as_of_t1)?;
 
-    // Step 1: Price at T₀
-    // Use T₀ model parameters for T₀ valuation if available
-    let instrument_t0 = if let Some(params) = model_params_t0 {
-        model_params::with_model_params(instrument, params)?
-    } else {
-        Arc::clone(instrument)
-    };
-    let (val_t0, val_t1) = if let Some(endpoints) = prepared_endpoints {
-        endpoints
-    } else {
-        (
-            instrument_t0.value(market_t0, as_of_t0)?,
-            instrument.value(market_t1, as_of_t1)?,
-        )
-    };
-
-    let total_pnl = compute_pnl_with_fx(
+    let (instrument_t0, val_t0, val_t1) = endpoint_values(request)?;
+    let mut attribution = seed_attribution(
+        request,
         val_t0,
         val_t1,
-        val_t1.currency(),
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-    )?;
-
-    let mut attribution = init_attribution(
-        total_pnl,
-        instrument.id(),
-        as_of_t0,
-        as_of_t1,
         AttributionMethod::Waterfall(factor_order.clone()),
-        Some(config),
-    );
-    // Policy-visibility invariant: stamp the execution policy the
-    // attribution ran under (workspace rule: results carry the parallel flag).
-    stamp_endpoints(&mut attribution, val_t0, val_t1);
-    attribution.meta.execution_policy = Some(ExecutionPolicy::Serial);
+        ExecutionPolicy::Serial,
+    )?;
     // Waterfall factor P&Ls are path-dependent; stamp the executed order.
     attribution.meta.notes.push(format!(
         "waterfall order: {}",
         factor_order
             .iter()
-            .map(ToString::to_string)
+            .map(|factor| format!("{factor:?}"))
             .collect::<Vec<_>>()
             .join(" -> ")
     ));
@@ -297,15 +262,7 @@ pub(crate) fn attribute_pnl_waterfall(
         None => None,
     };
     if credit_factor_model.is_some() && cascade.is_none() {
-        tracing::warn!(
-            instrument_id = instrument.id(),
-            method = "waterfall",
-            "Credit factor model supplied but credit cascade could not be planned"
-        );
-        attribution.meta.notes.push(format!(
-            "credit_factor_model supplied but no resolvable issuer/hazard cascade for {}; credit_factor_detail omitted",
-            instrument.id()
-        ));
+        note_unplanned_cascade(&mut attribution, instrument.id(), "waterfall");
     }
     let mut credit_step_pnls: Vec<finstack_quant_core::money::Money> = Vec::new();
 
@@ -358,12 +315,8 @@ pub(crate) fn attribute_pnl_waterfall(
                     ctx.as_of_t1,
                     factor_pnl.currency(),
                 )?;
-                for w in &carry_inputs.warnings {
-                    attribution.meta.notes.push(w.clone());
-                }
-                ctx.num_repricings += carry_inputs.num_repricings;
-
-                apply_total_return_carry(&mut attribution, theta, carry_inputs)?;
+                ctx.num_repricings +=
+                    apply_total_return_carry(&mut attribution, theta, carry_inputs)?;
             }
             AttributionFactor::RatesCurves => attribution.rates_curves_pnl = factor_pnl,
             AttributionFactor::CreditCurves => attribution.credit_curves_pnl = factor_pnl,
@@ -409,7 +362,7 @@ pub(crate) fn attribute_pnl_waterfall(
         &mut attribution,
         instrument.id(),
         "waterfall",
-        ctx.num_repricings(),
+        ctx.num_repricings,
         0.01,
         0.001, // Waterfall should have very small residual
     );
@@ -433,10 +386,6 @@ struct WaterfallContext<'a> {
 }
 
 impl<'a> WaterfallContext<'a> {
-    fn num_repricings(&self) -> usize {
-        self.num_repricings
-    }
-
     /// Apply the credit cascade as a sequence of per-step bumps replacing the
     /// single CreditCurves step. Returns the *aggregate* credit P&L (sum of
     /// all step P&Ls); per-step amounts are appended to `step_pnls` in order.
@@ -449,42 +398,24 @@ impl<'a> WaterfallContext<'a> {
         let base_currency = self.current_val.currency();
         let mut total = Money::from((0_i64, base_currency));
 
-        // Credit base: the running market *before* the credit cascade — its
-        // credit curves are still T0. Par-spread re-bootstrap bumps do not
-        // compose cleanly under chaining, so each parallel step's market is
-        // built as a SINGLE par-spread bump of the cumulative bp from this
-        // fixed base (not chained off the previous step's re-bootstrapped
-        // curve). The marginal step P&L `val(cumᵏ) − val(cumᵏ⁻¹)` still
-        // telescopes to `val(T1 credit) − val(T0 credit) ≡ credit_curves_pnl`.
+        // Credit base: the running market *before* the credit cascade, whose
+        // credit curves are still T0. The marginal step P&L
+        // `val(cumᵏ) − val(cumᵏ⁻¹)` telescopes to
+        // `val(T1 credit) − val(T0 credit) ≡ credit_curves_pnl`.
         let credit_base = self.current_market.clone();
-        let discount_id = cascade.discount_curve_id.as_ref();
-        let mut cumulative_bp = 0.0_f64;
 
-        for (idx, step) in cascade.steps.iter().enumerate() {
+        for (idx, (step, cumulative_bp)) in
+            cascade.steps_with_cumulative_bp().into_iter().enumerate()
+        {
             let prev_val = self.current_val;
-            let new_market = match step.kind {
-                CreditStepKind::CurveShape => {
-                    // Snap to T1 hazard. After the parallel Generic / Level /
-                    // Adder bumps this step absorbs whatever non-parallel
-                    // (steepening / twist) residual remains, and makes the
-                    // cascade end-state match the single Credit step
-                    // exactly so `Σ steps ≡ credit_curves_pnl` still holds.
-                    snap_hazard_to_t1(&credit_base, self.market_t1, &cascade.hazard_curve_ids)
-                }
-                // Generic / Level(k) / Adder all apply a *parallel* par-spread
-                // bp bump; accumulate and re-bootstrap once from the fixed base.
-                CreditStepKind::Generic | CreditStepKind::Level(_) | CreditStepKind::Adder => {
-                    cumulative_bp += step.delta_bp;
-                    shift_credit_curves_par_spread(
-                        self.source_market,
-                        &credit_base,
-                        &cascade.hazard_curve_ids,
-                        discount_id,
-                        cumulative_bp,
-                        self.recalibration_provider.as_ref(),
-                    )?
-                }
-            };
+            let new_market = cascade.step_market(
+                step,
+                cumulative_bp,
+                self.source_market,
+                &credit_base,
+                self.market_t1,
+                self.recalibration_provider.as_ref(),
+            )?;
             let new_val = self.current_instrument.value(&new_market, self.as_of_t1)?;
             self.num_repricings += 1;
             let step_pnl =
@@ -509,7 +440,7 @@ impl<'a> WaterfallContext<'a> {
     }
 
     fn apply_factor(&mut self, factor: &AttributionFactor) -> Result<Money> {
-        let _span = tracing::info_span!("waterfall_factor", factor = %factor).entered();
+        let _span = tracing::info_span!("waterfall_factor", factor = ?factor).entered();
         let prev_val = self.current_val;
         let base_currency = prev_val.currency();
 
@@ -521,25 +452,13 @@ impl<'a> WaterfallContext<'a> {
             return self.apply_model_params(prev_val, base_currency, factor);
         }
 
-        // Carry only changes the date, not the market — skip the clone
-        if matches!(factor, AttributionFactor::Carry) {
-            let new_val = self
-                .current_instrument
-                .value(&self.current_market, self.as_of_t1)?;
-            self.num_repricings += 1;
-            let factor_pnl = compute_pnl(
-                prev_val,
-                new_val,
-                base_currency,
-                &self.current_market,
-                self.as_of_t1,
-            )?;
-            self.update_current_value(prev_val, factor_pnl)?;
-            return Ok(factor_pnl);
-        }
-
-        let new_market = self.build_market_for_factor(factor)?;
-        let new_val = self.current_instrument.value(&new_market, self.as_of_t1)?;
+        // Carry only changes the date, so it reprices the running market as is.
+        let new_market = match MarketRestoreFlags::for_factor(factor) {
+            Some(flags) => Some(self.restore_t1_family(flags)?),
+            None => None,
+        };
+        let market = new_market.as_ref().unwrap_or(&self.current_market);
+        let new_val = self.current_instrument.value(market, self.as_of_t1)?;
         self.num_repricings += 1;
 
         let factor_pnl = if matches!(factor, AttributionFactor::Fx) {
@@ -548,15 +467,17 @@ impl<'a> WaterfallContext<'a> {
                 new_val,
                 base_currency,
                 &self.current_market,
-                &new_market,
+                market,
                 self.as_of_t0,
                 self.as_of_t1,
             )?
         } else {
-            compute_pnl(prev_val, new_val, base_currency, &new_market, self.as_of_t1)?
+            compute_pnl(prev_val, new_val, base_currency, market, self.as_of_t1)?
         };
 
-        self.current_market = new_market;
+        if let Some(new_market) = new_market {
+            self.current_market = new_market;
+        }
         self.update_current_value(prev_val, factor_pnl)?;
         Ok(factor_pnl)
     }
@@ -599,22 +520,8 @@ impl<'a> WaterfallContext<'a> {
         }
     }
 
-    fn build_market_for_factor(&self, factor: &AttributionFactor) -> Result<MarketContext> {
-        let flags = match factor {
-            AttributionFactor::Carry => return Ok(self.current_market.clone()),
-            AttributionFactor::RatesCurves => MarketRestoreFlags::RATES,
-            AttributionFactor::CreditCurves => MarketRestoreFlags::CREDIT,
-            AttributionFactor::InflationCurves => MarketRestoreFlags::INFLATION,
-            AttributionFactor::Correlations => MarketRestoreFlags::CORRELATION,
-            AttributionFactor::Fx => MarketRestoreFlags::FX,
-            AttributionFactor::Volatility => MarketRestoreFlags::VOL,
-            AttributionFactor::MarketScalars => MarketRestoreFlags::SCALARS,
-            AttributionFactor::ModelParameters => {
-                return Err(Error::internal(
-                    "model parameter restoration is not implemented for attribution waterfall",
-                ))
-            }
-        };
+    /// The running market with one family advanced to its T₁ state.
+    fn restore_t1_family(&self, flags: MarketRestoreFlags) -> Result<MarketContext> {
         let dependencies = self.current_instrument.market_dependencies()?;
         let family_t1 =
             MarketSnapshot::extract_with_dependencies(self.market_t1, flags, &dependencies);

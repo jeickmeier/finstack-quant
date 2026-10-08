@@ -401,10 +401,6 @@ impl crate::instruments::common_impl::traits::Instrument for DollarRoll {
         )
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        self.trade_date
-    }
-
     fn rate_risk_rebuild(
         &self,
         base: &finstack_quant_core::market_data::context::MarketContext,

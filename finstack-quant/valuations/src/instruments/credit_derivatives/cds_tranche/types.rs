@@ -449,54 +449,6 @@ impl CdsTranche {
         pricer.calculate_correlation_delta(self, market, as_of)
     }
 
-    /// Calculate accrued premium on the tranche.
-    ///
-    /// Returns the premium accrued since the last payment date, calculated on
-    /// the outstanding notional (after any realized losses).
-    ///
-    /// # Returns
-    ///
-    /// The accrued premium amount in the tranche currency. This represents:
-    /// - For protection buyer: amount owed to seller
-    /// - For protection seller: amount receivable from buyer
-    ///
-    /// # Use Cases
-    ///
-    /// - Dirty vs clean price calculation: `dirty_price = clean_price + accrued`
-    /// - Settlement amount calculation
-    /// - Mark-to-market accounting
-    pub fn accrued_premium(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_accrued_premium(self, market, as_of)
-    }
-
-    /// Calculate detailed jump-to-default metrics including min, max, and average.
-    ///
-    /// For heterogeneous portfolios, provides the full distribution of JTD impacts.
-    pub fn jump_to_default_detail(
-        &self,
-        market: &MarketContext,
-    ) -> finstack_quant_core::Result<pricing::JumpToDefaultResult> {
-        let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_jump_to_default_detail(self, market)
-    }
-
-    /// Get the expected loss curve for diagnostic purposes.
-    ///
-    /// Returns (Date, EL_fraction) pairs showing cumulative expected loss over time.
-    pub fn expected_loss_curve(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<Vec<(Date, f64)>> {
-        let pricer = pricing::CdsTranchePricer::new();
-        pricer.get_expected_loss_curve(self, market, as_of)
-    }
-
     // Builder now provided by derive
 }
 
@@ -535,10 +487,6 @@ impl Instrument for CdsTranche {
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.maturity)
-    }
-
-    fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        self.start_date
     }
 
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();

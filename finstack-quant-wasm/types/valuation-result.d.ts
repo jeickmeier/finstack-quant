@@ -466,68 +466,6 @@ export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor
  */
 export type SchemaVersion = number;
 /**
- * Pricing mode selection.
- *
- * Choose based on horizon × dimensionality: `Tree` for SHORT-horizon
- * non-recombining stochastic deals (deterministic, low variance),
- * `MonteCarlo` for long-horizon or high-dimensional pools, `Hybrid` to
- * front-load tree precision and tail with MC.
- *
- * # Tree mode is bounded by construction — read this before selecting it
- *
- * Path-preserving tree pricing keeps `3^n` terminal nodes for `n`
- * periods, checked against `max_tree_paths` (default 100,000). `3^11 =
- * 177,147`, so **Tree hard-errors for any deal with more than ten periods
- * remaining** — which is essentially every real deal, since
- * `build_scenario_tree_config` sets `num_periods` to months-to-maturity.
- *
- * The default is [`StructuredCreditPricingMode::MonteCarlo`] — the mode that can price the
- * deals this module is built for at realistic horizons (the public
- * `price_stochastic` entry point also selects Monte Carlo). Tree remains
- * available and correct for genuinely short horizons; select it explicitly.
- *
- * Test coverage:
- * - **Tree**: `tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`, at horizons within the node bound.
- * - **MonteCarlo**: the same suites plus the convergence tests.
- * - **Hybrid**: structured-credit pricer integration tests.
- *
- * This interface was referenced by `ValuationResult1`'s JSON-Schema
- * via the `definition` "StructuredCreditPricingMode".
- *
- * This interface was referenced by `ValuationResult`'s JSON-Schema
- * via the `definition` "StructuredCreditPricingMode".
- */
-export type StructuredCreditPricingMode =
-  | "tree"
-  | {
-      monte_carlo: {
-        /**
-         * Pair each estimator's path with its sign-flipped mirror.
-         */
-        antithetic: boolean;
-        /**
-         * Number of independent estimators; must be at least two to estimate
-         * sampling uncertainty. With `antithetic` each estimator averages a
-         * `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
-         * Sample standard error and the Student-t interval use this estimator
-         * count, with `num_paths - 1` degrees of freedom.
-         */
-        num_paths: bigint;
-      };
-    }
-  | {
-      hybrid: {
-        /**
-         * Monte Carlo continuation paths per tree prefix
-         */
-        num_paths: bigint;
-        /**
-         * Tree periods before switching to MC
-         */
-        tree_periods: bigint;
-      };
-    };
-/**
  * Tranche seniority levels
  *
  * This interface was referenced by `ValuationResult1`'s JSON-Schema
@@ -3705,43 +3643,11 @@ export interface StochasticPricingResult {
   expected_shortfall: Money10;
   npv: Money11;
   /**
-   * Number of simulated scenario paths (`2 × pricing_mode.num_paths` for
-   * antithetic Monte Carlo, prefixes × suffixes for Hybrid).
+   * Number of simulated scenario paths (`2 × pricing_mode.num_paths` with
+   * antithetic pairing, `pricing_mode.num_paths` without).
    */
   num_paths: bigint;
-  /**
-   * Pricing mode used.
-   */
-  pricing_mode:
-    | "tree"
-    | {
-        monte_carlo: {
-          /**
-           * Pair each estimator's path with its sign-flipped mirror.
-           */
-          antithetic: boolean;
-          /**
-           * Number of independent estimators; must be at least two to estimate
-           * sampling uncertainty. With `antithetic` each estimator averages a
-           * `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
-           * Sample standard error and the Student-t interval use this estimator
-           * count, with `num_paths - 1` degrees of freedom.
-           */
-          num_paths: bigint;
-        };
-      }
-    | {
-        hybrid: {
-          /**
-           * Monte Carlo continuation paths per tree prefix
-           */
-          num_paths: bigint;
-          /**
-           * Tree periods before switching to MC
-           */
-          tree_periods: bigint;
-        };
-      };
+  pricing_mode: StructuredCreditPricingMode;
   /**
    * Two-sided 95% Student-t confidence interval for the mean PV, in the
    * NPV currency, using one fewer degree of freedom than the independent
@@ -4652,6 +4558,25 @@ export interface Money11 {
     | "ZAR"
     | "ZMW"
     | "ZWL";
+}
+/**
+ * Pricing mode used.
+ */
+export interface StructuredCreditPricingMode {
+  monte_carlo: {
+    /**
+     * Pair each estimator's path with its sign-flipped mirror.
+     */
+    antithetic: boolean;
+    /**
+     * Number of independent estimators; must be at least two to estimate
+     * sampling uncertainty. With `antithetic` each estimator averages a
+     * `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
+     * Sample standard error and the Student-t interval use this estimator
+     * count, with `num_paths - 1` degrees of freedom.
+     */
+    num_paths: bigint;
+  };
 }
 /**
  * Tranche-level pricing result.
@@ -5757,6 +5682,41 @@ export interface Money17 {
     | "ZAR"
     | "ZMW"
     | "ZWL";
+}
+/**
+ * Stochastic pricing mode.
+ *
+ * Monte Carlo is the only engine: each scenario path draws its monthly
+ * systematic factors from a seeded Philox substream and runs the full deal
+ * waterfall. The mode is echoed on
+ * [`StochasticPricingResult::pricing_mode`](super::StochasticPricingResult)
+ * so a result records the estimator count it was produced with.
+ *
+ * Test coverage:
+ * `tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`
+ * plus the convergence tests.
+ *
+ * This interface was referenced by `ValuationResult1`'s JSON-Schema
+ * via the `definition` "StructuredCreditPricingMode".
+ *
+ * This interface was referenced by `ValuationResult`'s JSON-Schema
+ * via the `definition` "StructuredCreditPricingMode".
+ */
+export interface StructuredCreditPricingMode1 {
+  monte_carlo: {
+    /**
+     * Pair each estimator's path with its sign-flipped mirror.
+     */
+    antithetic: boolean;
+    /**
+     * Number of independent estimators; must be at least two to estimate
+     * sampling uncertainty. With `antithetic` each estimator averages a
+     * `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
+     * Sample standard error and the Student-t interval use this estimator
+     * count, with `num_paths - 1` degrees of freedom.
+     */
+    num_paths: bigint;
+  };
 }
 /**
  * Numerical tolerance configuration for floating-point comparisons.

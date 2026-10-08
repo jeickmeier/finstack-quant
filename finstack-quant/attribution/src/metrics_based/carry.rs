@@ -1,12 +1,12 @@
 use super::super::helpers::*;
 use super::super::types::*;
-use super::context::AttributionInputs;
+use super::context::MetricsContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::metrics::MetricId;
 
 pub(super) fn apply(
-    inputs: &AttributionInputs<'_>,
+    inputs: &MetricsContext<'_>,
     attribution: &mut PnlAttribution,
     non_finite_detected: &mut bool,
 ) -> Result<()> {
@@ -99,11 +99,10 @@ pub(super) fn apply(
         );
 
         if let Some(carry_total) = inputs.val_t0.measures.get(MetricId::CarryTotal.as_str()) {
-            attribution.carry = factor_money_or_invalid(
+            attribution.carry = inputs.money(
                 *carry_total,
-                inputs.ccy,
                 "carry total",
-                &mut attribution.meta.notes,
+                attribution,
                 non_finite_detected,
             );
         }
@@ -122,13 +121,7 @@ pub(super) fn apply(
             funding_cost,
         });
     } else if let Some(theta) = inputs.val_t0.measures.get(MetricId::Theta.as_str()) {
-        attribution.carry = factor_money_or_invalid(
-            *theta,
-            inputs.ccy,
-            "carry/theta",
-            &mut attribution.meta.notes,
-            non_finite_detected,
-        );
+        attribution.carry = inputs.money(*theta, "carry/theta", attribution, non_finite_detected);
         attribution.carry_detail = Some(CarryDetail {
             total: attribution.carry,
             coupon_income: None,

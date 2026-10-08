@@ -15,7 +15,7 @@ pub(crate) fn register_tarn_metrics(
 
     registry.register_metric(
         MetricId::Dv01,
-        Arc::new(UnifiedDv01Calculator::<super::Tarn>::new(
+        Arc::new(UnifiedDv01Calculator::new(
             Dv01CalculatorConfig::parallel_combined(),
         )),
         &[InstrumentType::Tarn],
@@ -25,7 +25,7 @@ pub(crate) fn register_tarn_metrics(
         registry: registry,
         instrument: InstrumentType::Tarn,
         metrics: [
-            (BucketedDv01, UnifiedDv01Calculator::<super::Tarn>::new(
+            (BucketedDv01, UnifiedDv01Calculator::new(
                 Dv01CalculatorConfig::triangular_key_rate(),
             )),
         ]

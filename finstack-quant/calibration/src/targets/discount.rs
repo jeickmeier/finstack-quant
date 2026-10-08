@@ -12,8 +12,8 @@ use crate::solver::global::GlobalFitOptimizer;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
 use crate::targets::rate_recipe::recipe_ois_compounding;
 use crate::targets::util::{
-    discount_and_forward_curve_ids, prepare_rate_calibration_quotes_with_ois_override,
-    quote_annuity_proxy, scheme_factor, sorted_knot_grid, ContextScratch,
+    discount_and_forward_curve_ids, prepare_rate_calibration_quotes, pv01_residual_weight,
+    sorted_knot_grid, validate_global_knot_grid, ContextScratch,
 };
 use crate::validation::RateBoundsPolicy;
 use crate::CalibrationReport;
@@ -21,7 +21,8 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve, RateCalibrationCurveRole, RateCalibrationRecipe,
+    DiscountCurve, DiscountCurveBuilder, RateCalibrationCurveRole, RateCalibrationRecipe,
+    ValidationMode,
 };
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
@@ -231,17 +232,56 @@ impl DiscountCurveTarget {
         (log_lo + t * (log_hi - log_lo)).exp()
     }
 
+    /// Whether discount factors may increase with maturity (negative forwards):
+    /// the explicit config flag, else the rate-bounds policy for the currency.
+    fn allow_non_monotonic(&self) -> bool {
+        let policy_allow = match self.params.config.rate_bounds_policy {
+            RateBoundsPolicy::Explicit => self.params.config.rate_bounds.min_rate < 0.0,
+            RateBoundsPolicy::AutoCurrency => {
+                matches!(
+                    self.params.currency,
+                    Currency::EUR | Currency::JPY | Currency::CHF
+                )
+            }
+        };
+        self.params
+            .config
+            .discount_curve
+            .allow_non_monotonic_final
+            .unwrap_or(policy_allow)
+    }
+
+    /// Curve builder shared by the solver and final builds.
+    ///
+    /// Stamps the calibration OIS cut-off convention so bootstrap-internal swap
+    /// repricing and downstream single-curve OIS pricing take the same
+    /// compounded fast-path branch.
+    fn curve_builder(
+        &self,
+        id: &CurveId,
+        knots: &[(f64, f64)],
+        allow_non_monotonic: bool,
+    ) -> DiscountCurveBuilder {
+        let validation = if allow_non_monotonic {
+            ValidationMode::Raw {
+                allow_non_monotonic: true,
+                forward_floor: None,
+            }
+        } else {
+            ValidationMode::MarketStandard
+        };
+        DiscountCurve::builder(id.clone())
+            .base_date(self.params.base_date)
+            .day_count(self.params.curve_day_count)
+            .knots(knots.iter().copied())
+            .interp(self.params.solve_interp)
+            .extrapolation(self.params.extrapolation)
+            .calibration_ois_cutoff_days_opt(self.params.calibration_ois_cutoff_days)
+            .validation(validation)
+    }
+
     fn knots_from_params(&self, times: &[f64], params: &[f64]) -> Result<Vec<(f64, f64)>> {
-        if times.len() != params.len() {
-            return Err(finstack_quant_core::Error::Calibration {
-                message: format!(
-                    "Global solve dimension mismatch: {} times vs {} params",
-                    times.len(),
-                    params.len()
-                ),
-                category: "global_solve".to_string(),
-            });
-        }
+        validate_global_knot_grid(times, params, "")?;
 
         let mut knots = Vec::with_capacity(times.len() + 2);
         knots.push((0.0, 1.0));
@@ -250,20 +290,8 @@ impl DiscountCurveTarget {
             .params
             .config
             .effective_rate_bounds(self.params.currency);
-        let mut last_t = 0.0;
 
         for (&t, &z) in times.iter().zip(params.iter()) {
-            if t <= last_t {
-                return Err(finstack_quant_core::Error::Calibration {
-                    message: format!(
-                        "Non-increasing knot time {:.10} detected (previous {:.10}). \
-Global solve requires strictly increasing times.",
-                        t, last_t
-                    ),
-                    category: "global_solve".to_string(),
-                });
-            }
-            last_t = t;
             let clamped_z = z.clamp(bounds.min_rate, bounds.max_rate);
             let mut df = Self::zero_rate_to_df(clamped_z, t);
             df = df.clamp(
@@ -330,7 +358,7 @@ Global solve requires strictly increasing times.",
         // bootstrap-internal swaps for OvernightRfr indices use the step-level
         // selection instead of the registry default.
         let residual_notional: f64 = 1_000_000.0;
-        let prepared = prepare_rate_calibration_quotes_with_ois_override(
+        let prepared = prepare_rate_calibration_quotes(
             quotes,
             params.base_date,
             discount_and_forward_curve_ids(discount_id.as_ref(), forward_id.as_ref()),
@@ -553,10 +581,6 @@ impl BootstrapTarget for DiscountCurveTarget {
         Ok(quote.pillar_time())
     }
 
-    fn build_curve(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
-        self.build_curve_for_solver(knots)
-    }
-
     fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
         if knots.len() < 2 {
             return Err(finstack_quant_core::Error::Calibration {
@@ -580,17 +604,7 @@ impl BootstrapTarget for DiscountCurveTarget {
         // The solver curve should respect the same monotonic/no-arbitrage policy as the final
         // curve. Allowing non-monotone solver curves can make bootstrapping converge to
         // an infeasible (arbitrage) shape and then fail only at the end.
-        let config_flag = self.params.config.discount_curve.allow_non_monotonic_final;
-        let policy_allow = match self.params.config.rate_bounds_policy {
-            RateBoundsPolicy::Explicit => self.params.config.rate_bounds.min_rate < 0.0,
-            RateBoundsPolicy::AutoCurrency => {
-                matches!(
-                    self.params.currency,
-                    Currency::EUR | Currency::JPY | Currency::CHF
-                )
-            }
-        };
-        let allow_non_monotonic = config_flag.unwrap_or(policy_allow);
+        let allow_non_monotonic = self.allow_non_monotonic();
 
         if !allow_non_monotonic {
             // Hard guard: even if the underlying curve builder's `build_for_solver()` is lenient,
@@ -604,32 +618,7 @@ impl BootstrapTarget for DiscountCurveTarget {
             }
         }
 
-        let mut builder = DiscountCurve::builder(self.params.discount_curve_id.clone())
-            .base_date(self.params.base_date)
-            .day_count(self.params.curve_day_count)
-            .knots(knots.iter().copied())
-            .interp(self.params.solve_interp)
-            .extrapolation(self.params.extrapolation)
-            // Stamp the calibration cut-off convention so the bootstrap-internal
-            // swap repricing takes the same compounded fast-path branch that
-            // downstream single-curve OIS pricing will take against the final
-            // curve — keeping calibration and pricing self-consistent.
-            .calibration_ois_cutoff_days_opt(self.params.calibration_ois_cutoff_days);
-
-        builder = if allow_non_monotonic {
-            builder.validation(
-                finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                    allow_non_monotonic: true,
-                    forward_floor: None,
-                },
-            )
-        } else {
-            builder.validation(
-                finstack_quant_core::market_data::term_structures::ValidationMode::MarketStandard,
-            )
-        };
-
-        builder
+        self.curve_builder(&self.params.discount_curve_id, knots, allow_non_monotonic)
             .build_for_solver()
             .map_err(|e| finstack_quant_core::Error::Calibration {
                 message: format!("Failed to build temp curve: {}", e),
@@ -638,48 +627,9 @@ impl BootstrapTarget for DiscountCurveTarget {
     }
 
     fn build_curve_final(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
-        let config_flag = self.params.config.discount_curve.allow_non_monotonic_final;
-        let policy_allow = match self.params.config.rate_bounds_policy {
-            RateBoundsPolicy::Explicit => self.params.config.rate_bounds.min_rate < 0.0,
-            RateBoundsPolicy::AutoCurrency => {
-                matches!(
-                    self.params.currency,
-                    Currency::EUR | Currency::JPY | Currency::CHF
-                )
-            }
-        };
-        let allow_non_monotonic = config_flag.unwrap_or(policy_allow);
-
-        // Note: MonotoneConvex is now compatible with non-monotone (negative-rate)
-        // discount factors — it auto-detects negative discrete forwards and skips
-        // its positivity amelioration (user decision
-        // Open Question 10) — so no interpolation-style guard is needed here.
-
-        let mut builder = DiscountCurve::builder(self.params.curve_id.clone())
-            .base_date(self.params.base_date)
-            .day_count(self.params.curve_day_count)
-            .knots(knots.iter().copied())
-            .interp(self.params.solve_interp)
-            .extrapolation(self.params.extrapolation)
-            // Carry the calibration cut-off convention onto the final curve so
-            // downstream single-curve OIS pricing matches the convention the
-            // bootstrap-internal swaps were repriced under.
-            .calibration_ois_cutoff_days_opt(self.params.calibration_ois_cutoff_days);
-
-        if allow_non_monotonic {
-            builder = builder.validation(
-                finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                    allow_non_monotonic: true,
-                    forward_floor: None,
-                },
-            );
-        } else {
-            builder = builder.validation(
-                finstack_quant_core::market_data::term_structures::ValidationMode::MarketStandard,
-            );
-        }
-
-        builder
+        // MonotoneConvex handles non-monotone (negative-rate) discount factors
+        // itself, so no interpolation-style guard is needed here.
+        self.curve_builder(&self.params.curve_id, knots, self.allow_non_monotonic())
             .build()
             .map_err(|e| finstack_quant_core::Error::Calibration {
                 message: e.to_string(),
@@ -852,33 +802,11 @@ impl GlobalSolveTarget for DiscountCurveTarget {
     fn residual_weights(&self, quotes: &[Self::Quote], weights_out: &mut [f64]) -> Result<()> {
         for (i, quote) in quotes.iter().enumerate() {
             let t = self.quote_time(quote)?.max(1e-6);
-
-            // Item 4: par-instrument residuals must enter the least-squares problem on a
-            // common *rate-error* scale, weighted by ~1/PV01 (inverse fixed-leg annuity).
-            //
-            // The residual handed to the solver is `pv / residual_notional`. For a par
-            // instrument `PV(r) ≈ A(t)·(r − r_par)·notional`, so the residual is
-            // `≈ A(t)·Δr` — a PV01-scaled rate error, NOT a rate error. The global
-            // solver minimises `Σ (r_i·√w_i)²`, so to recover the rate-error scale
-            // (`r_i·√w_i ≈ Δr`) the weight must be `w_i ≈ 1/A(t)²`.
-            //
-            // None of the previous schemes did this: `LinearTime` (`w = t`) actively
-            // up-weighted the long end — where `A` is largest and a given rate error
-            // already produces the largest PV residual — leaving the short end loose.
-            //
-            // `pv01_inverse_sq = 1/A(t)²` is the PV01-normalisation common to every
-            // scheme; the scheme factor then applies the *relative* time emphasis the
-            // user selected on top of a correct common scale.
-            let annuity = quote_annuity_proxy(quote, t);
-            let pv01_inverse_sq = 1.0 / (annuity * annuity);
-
-            let weight = pv01_inverse_sq
-                * scheme_factor(&self.params.config.discount_curve.weighting_scheme, t);
-            weights_out[i] = if weight.is_finite() {
-                weight.max(WEIGHT_MIN_FLOOR)
-            } else {
-                WEIGHT_MIN_FLOOR
-            };
+            weights_out[i] = pv01_residual_weight(
+                quote,
+                t,
+                &self.params.config.discount_curve.weighting_scheme,
+            );
         }
         Ok(())
     }
@@ -971,7 +899,7 @@ impl GlobalSolveTarget for DiscountCurveTarget {
             // in place (`with_curve` uses `insert_mut`), avoiding the full
             // `MarketContext` clone + consuming rebuild the previous code did.
             params_bumped[j] = p_orig + h;
-            let curve_plus = self.build_curve_for_solver_from_params(times, &params_bumped)?;
+            let curve_plus = self.build_curve_from_params(times, &params_bumped)?;
             self.scratch.with_curve(&curve_plus, |ctx_plus| {
                 for (i, quote) in quotes.iter().enumerate() {
                     if has_local_interpolation && quote_times[i] < t_cutoff - 1e-4 {
@@ -985,7 +913,7 @@ impl GlobalSolveTarget for DiscountCurveTarget {
 
             // -h evaluation
             params_bumped[j] = p_orig - h;
-            let curve_minus = self.build_curve_for_solver_from_params(times, &params_bumped)?;
+            let curve_minus = self.build_curve_from_params(times, &params_bumped)?;
             self.scratch.with_curve(&curve_minus, |ctx_minus| {
                 for (i, quote) in quotes.iter().enumerate() {
                     if has_local_interpolation && quote_times[i] < t_cutoff - 1e-4 {

@@ -7,7 +7,6 @@
 
 use crate::solver::SolverConfig;
 use crate::validation::{RateBounds, RateBoundsPolicy, ValidationMode};
-use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::explain::ExplainOpts;
 use finstack_quant_core::market_data::hierarchy::MarketDataHierarchy;
@@ -452,7 +451,7 @@ fn market_freshness_is_default(policy: &MarketFreshnessPolicy) -> bool {
 /// Global configuration for the calibration subsystem.
 ///
 /// This struct consolidates all settings for solvers, validation, and market-regime
-/// specific bounds. It is typically derived from a `FinstackConfig` extension section.
+/// specific bounds.
 /// Public callers should treat it as the behavioral contract for calibration
 /// execution policy: solver choice, convergence settings, validation thresholds,
 /// rate-bound policy, and curve-specific numerical guardrails.
@@ -486,8 +485,7 @@ fn market_freshness_is_default(policy: &MarketFreshnessPolicy) -> bool {
 ///
 /// 1. **Step-level** (`CalibrationStep.params.method`): Per-instrument-type overrides
 /// 2. **Plan-level** (`CalibrationPlan.settings`): Plan-wide defaults
-/// 3. **Finstack config extensions** (`calibration.config.v1`): application defaults
-/// 4. **Global defaults** (`CalibrationConfig::default()`): fallback values
+/// 3. **Global defaults** (`CalibrationConfig::default()`): fallback values
 ///
 /// Step-level settings always take precedence over plan-level settings.
 /// In other words, this struct provides default policy, but explicit plan steps
@@ -604,9 +602,6 @@ fn default_fail_on_bad_fit() -> bool {
     true
 }
 
-/// Extension section key for calibration overrides.
-pub const CALIBRATION_CONFIG_KEY: &str = "calibration.config.v1";
-
 /// Recursively overlay `overlay` onto `base` (objects merge, everything else replaces).
 fn merge_json(base: &mut serde_json::Value, overlay: serde_json::Value) {
     match (base, overlay) {
@@ -650,48 +645,6 @@ impl Default for CalibrationConfig {
 }
 
 impl CalibrationConfig {
-    /// Build a calibration config from a `FinstackConfig` extension section.
-    ///
-    /// If the extension section `calibration.config.v1` is present, its
-    /// fields override the defaults; otherwise defaults are used.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the extension section is present but malformed
-    /// (e.g., unknown fields when `deny_unknown_fields` is enforced).
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use finstack_quant_core::config::FinstackConfig;
-    /// use finstack_quant_calibration::CalibrationConfig;
-    ///
-    /// let cfg = FinstackConfig::default();
-    /// let calib_cfg = CalibrationConfig::from_finstack_config_or_default(&cfg)
-    ///     .expect("valid config");
-    /// assert_eq!(calib_cfg.solver.tolerance(), 1e-12); // default
-    /// ```
-    pub fn from_finstack_config_or_default(
-        cfg: &FinstackConfig,
-    ) -> finstack_quant_core::Result<Self> {
-        let config = if let Some(raw) = cfg.extensions.get(CALIBRATION_CONFIG_KEY) {
-            // Deserialize directly into CalibrationConfig; missing fields use defaults via #[serde(default)]
-            serde_json::from_value(raw.clone()).map_err(|e| {
-                finstack_quant_core::Error::Calibration {
-                    message: format!(
-                        "Failed to parse extension '{}': {}",
-                        CALIBRATION_CONFIG_KEY, e
-                    ),
-                    category: "config".to_string(),
-                }
-            })?
-        } else {
-            Self::default()
-        };
-        config.validate()?;
-        Ok(config)
-    }
-
     /// Validate cross-field calibration configuration invariants.
     ///
     /// # Errors

@@ -38,32 +38,10 @@
         "version": 1
       },
       "fx_policy_applied": null,
-      "timestamp": "+002026-10-07T23:28:08.931000000Z",
-      "version": "0.9.0"
+      "timestamp": "+002026-10-05T08:19:45.549000000Z",
+      "version": "0.10.0"
     },
-    "covenants": null,
-    "provenance": {
-      "model": "discounting",
-      "requested_as_of": "2025-01-01",
-      "market_dependencies": {
-        "curves": {
-          "discount_curves": ["USD-OIS"],
-          "forward_curves": [],
-          "credit_curves": ["HZ"],
-          "inflation_curves": []
-        },
-        "market_scalar_ids": [],
-        "volatility_dependencies": [],
-        "fx_pairs": [],
-        "series_ids": []
-      },
-      "sensitivity_bumps": {
-        "rate_bump_bp": 1,
-        "credit_spread_bump_bp": 1,
-        "spot_bump_decimal": 0.01,
-        "vol_bump_decimal": 0.01
-      }
-    }
+    "covenants": null
   },
   "groups": {
     "Alternatives": [
@@ -215,14 +193,6 @@
       "df_start",
       "expected_exercise_time",
       "financing_annuity",
-      "fixed_first_accrual_factor",
-      "fixed_first_payment_date",
-      "fixed_last_payment_date",
-      "fixed_leg_payment_count",
-      "floating_first_accrual_factor",
-      "floating_first_payment_date",
-      "floating_last_payment_date",
-      "floating_leg_payment_count",
       "implied_forward",
       "incremental_par_spread",
       "index_delta",
@@ -454,5 +424,5 @@
       "bucketed": true
     }
   ],
-  "facadeWasmSha256": "0c8783e54226209095182f50cc646a07da64b91f6d520e8b7e2dd8b63d26f5aa"
+  "facadeWasmSha256": "1ffbb6bf30d0011503ef7d73a02c8a59e856a35ad55d4052b78157a7db1a6b80"
 }

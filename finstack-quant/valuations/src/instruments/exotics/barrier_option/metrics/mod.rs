@@ -44,15 +44,9 @@ pub(crate) fn register_barrier_option_metrics(
             instrument: InstrumentType::BarrierOption,
             metrics: [
                 (Vega, crate::metrics::GenericFdVega::<crate::instruments::BarrierOption>::default()),
-                (Rho, crate::metrics::UnifiedDv01Calculator::<
-                    crate::instruments::BarrierOption,
-                >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-                (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                    crate::instruments::BarrierOption,
-                >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-                (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                    crate::instruments::BarrierOption,
-                >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+                (Rho, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+                (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+                (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
                 // Theta is now registered universally in metrics::standard_registry()
             ]
         }

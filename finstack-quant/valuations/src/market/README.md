@@ -11,7 +11,6 @@ contains no quote ingestion or calibration engine.
 | Path | Visibility | Contents |
 |------|------------|----------|
 | `conventions/` | public | Convention definitions, typed IDs, and the global registry |
-| `credit_option_vol.rs` | public | CDX/iTraxx option-surface lookup converted to additive hazard volatility |
 
 ## Conventions
 
@@ -37,17 +36,6 @@ depend on these valuation-owned conventions.
 
 `conventions::ids` also defines typed identifiers referenced by instruments
 and calibration quotes, including `SwaptionConventionId`.
-
-## Credit option volatility
-
-`credit_option_vol` queries index-option surfaces at the native displayed
-coordinate: decimal spread for CDX IG and iTraxx, clean price in percentage
-points for CDX HY. Surface values are lognormal forward-spread model
-volatilities.
-
-Its spread-volatility to hazard-volatility mapping is a first-order local
-conversion, not calibration. It does not exactly reprice the source index
-option, and issuer/index beta remains a caller decision.
 
 ## Dependency boundary
 

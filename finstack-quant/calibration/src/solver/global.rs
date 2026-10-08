@@ -667,7 +667,7 @@ where
             params
         };
 
-        let curve = match target.build_curve_for_solver_from_params(times, params_ref) {
+        let curve = match target.build_curve_from_params(times, params_ref) {
             Ok(c) => c,
             Err(e) => {
                 record_eval_error(
@@ -743,7 +743,7 @@ where
 
             if self
                 .target
-                .build_curve_for_solver_from_params(self.times, params_ref)
+                .build_curve_from_params(self.times, params_ref)
                 .is_err()
             {
                 return None;
@@ -801,7 +801,7 @@ where
     let stats = solution.stats;
 
     // Compute weighted L2 norm of the final residuals for comparison.
-    let final_curve = target.build_curve_for_solver_from_params(times, &solved_params)?;
+    let final_curve = target.build_curve_from_params(times, &solved_params)?;
     let mut resid_values = vec![0.0; n_residuals];
     target.calculate_residuals(&final_curve, active_quotes, &mut resid_values)?;
 
@@ -1139,13 +1139,13 @@ where
         // Central differences: O(h^2) accuracy
         bumped[j] = solved_params[j] + h;
         let ok_up = target
-            .build_curve_for_solver_from_params(times, &bumped)
+            .build_curve_from_params(times, &bumped)
             .and_then(|c| target.calculate_residuals(&c, active_quotes, &mut resid_up))
             .is_ok();
 
         bumped[j] = solved_params[j] - h;
         let ok_dn = target
-            .build_curve_for_solver_from_params(times, &bumped)
+            .build_curve_from_params(times, &bumped)
             .and_then(|c| target.calculate_residuals(&c, active_quotes, &mut resid_dn))
             .is_ok();
 

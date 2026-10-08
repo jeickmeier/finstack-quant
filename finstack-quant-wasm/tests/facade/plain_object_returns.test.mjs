@@ -34,14 +34,6 @@ function assertPlainObject(value, label) {
   assert.ok(!Array.isArray(value), `${label} must not be an array`);
 }
 
-test('tarnCouponProfile returns a plain object with readable properties', () => {
-  const profile = wasm.tarnCouponProfile(0.05, 0.0, [0.01, 0.02, 0.03], 0.08, 0.5);
-  assertPlainObject(profile, 'tarnCouponProfile result');
-  assert.ok(Array.isArray(profile.coupons_paid), 'coupons_paid is an array');
-  assert.ok(Array.isArray(profile.cumulative), 'cumulative is an array');
-  assert.equal(typeof profile.redeemed_early, 'boolean');
-});
-
 test('SabrSmile.validateNoArbitrage returns a plain object', () => {
   const params = new wasm.SabrParameters(0.2, 1.0, 0.3, -0.2);
   const smile = new wasm.SabrSmile(params, 100.0, 1.0);

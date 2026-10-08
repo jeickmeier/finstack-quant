@@ -22,34 +22,6 @@
 //! (`{ portfolio, report }`, and `MaterializationReport | ValidationReport`
 //! respectively); validation diagnostics are returned, not thrown.
 //!
-//! # Stability tiers
-//!
-//! The exports below fall into three stability tiers. Treat the tier as a
-//! contract about how disruptive future changes are likely to be.
-//!
-//! **Stable** — golden-tested, signatures preserved across releases:
-//! - `Portfolio` (typed handle: `builder`, `fromSpec`, `toJson`, `id`, `name`,
-//!   `asOf`, `baseCurrency`, `tags`, `meta`, `entityIds`, `positionIds`,
-//!   `numPositions`) and its `PortfolioBuilder`
-//! - `parsePortfolioSpecJson`
-//! - `valuePortfolio`,
-//!   `aggregateFullCashflows`,
-//!   `applyScenarioAndRevalue`,
-//!   `scenarioPnl`, `scenarioPnlBatch`,
-//!   `attributePortfolioPnl`
-//! - `aggregateMetrics`
-//! - `replayPortfolio`
-//!
-//! **Stable, JSON-shape may evolve** — function names stable, but the
-//! returned / accepted JSON payload structure may grow additive
-//! (non-breaking) fields between releases:
-//! - `optimizePortfolio`
-//!   (`PortfolioOptimizationSpec` / `PortfolioOptimizationResult` JSON)
-//! - `parametricVarDecomposition`, `parametricEsDecomposition`,
-//!   `historicalVarDecomposition`, `evaluateRiskBudget`
-//! - `allocateWeights`, `factorStress`, `positionWhatIf`,
-//!   `buildCreditVolReport`
-//!
 //! A Rust method on a result type is a free function that takes the plain
 //! result object first (`portfolioAttributionExplainText`,
 //! `portfolioValuationGetPositionValue`, `portfolioMetricsGetTotal`, ...); see
@@ -1252,82 +1224,4 @@ pub fn replay_portfolio(
     )
     .map_err(to_js_err)?;
     to_js_value_with_bigints(&result)
-}
-
-/// Host-target unit tests.
-///
-/// Only exports that return plain Rust values (`String`, `f64`,
-/// `Option<f64>`) can be exercised here: every export converted to a
-/// structured object returns a `JsValue`, and `JsValue` construction aborts
-/// off `wasm32`. Those live in `tests/wasm_portfolio.rs` under
-/// `#[wasm_bindgen_test]`, where they also gate the `JSON.stringify`
-/// round-trip that catches an ES-`Map` serialization regression.
-#[cfg(test)]
-mod tests {
-
-    fn minimal_portfolio_spec_json() -> String {
-        serde_json::json!({
-            "id": "test_portfolio",
-            "name": "Test",
-            "base_currency": "USD",
-            "as_of": "2024-01-15",
-            "entities": {},
-            "positions": []
-        })
-        .to_string()
-    }
-
-    fn empty_market_json() -> String {
-        let ctx = finstack_quant_core::market_data::context::MarketContext::new();
-        serde_json::to_string(&ctx).expect("serialize")
-    }
-
-    /// Tests the replay_portfolio WASM binding logic by exercising the same
-    /// JSON parsing / domain call / serialization pipeline directly.
-    /// We call the domain functions instead of the wasm wrapper because
-    /// `JsValue::from_str` panics on non-wasm32 targets when an error is
-    /// produced.
-    #[test]
-    fn replay_portfolio_empty_portfolio() {
-        let spec_json = minimal_portfolio_spec_json();
-        let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
-            serde_json::from_str(&spec_json).expect("parse spec");
-        let portfolio =
-            finstack_quant_portfolio::Portfolio::from_spec(spec).expect("build portfolio");
-
-        let market_val: serde_json::Value =
-            serde_json::from_str(&empty_market_json()).expect("parse market");
-        let snapshots_json = serde_json::json!([
-            {"date": "2024-01-15", "market": market_val},
-            {"date": "2024-01-16", "market": market_val}
-        ])
-        .to_string();
-
-        let timeline =
-            finstack_quant_portfolio::replay::ReplayTimeline::from_json_snapshots(&snapshots_json)
-                .expect("build timeline");
-
-        let config_json = serde_json::json!({
-            "mode": "pv_only",
-            "attribution_method": "parallel"
-        })
-        .to_string();
-        let config: finstack_quant_portfolio::replay::ReplayConfig =
-            serde_json::from_str(&config_json).expect("parse config");
-
-        let finstack_config = finstack_quant_core::config::FinstackConfig::default();
-
-        let result = finstack_quant_portfolio::replay::replay_portfolio(
-            &portfolio,
-            &timeline,
-            &config,
-            &finstack_config,
-        )
-        .expect("replay");
-
-        let json = serde_json::to_string(&result).expect("serialize");
-        let parsed: serde_json::Value = serde_json::from_str(&json).expect("parse json");
-        assert!(parsed["steps"].is_array());
-        assert_eq!(parsed["steps"].as_array().expect("array").len(), 2);
-    }
 }

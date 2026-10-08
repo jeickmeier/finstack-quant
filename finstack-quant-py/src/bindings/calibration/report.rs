@@ -1,8 +1,7 @@
 //! Typed calibration report, diagnostics, quote-quality and validation-report wrappers.
 
+use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{dict_to_dataframe, serde_to_py};
-use crate::bindings::pickle_support::reduce_via_json;
-use crate::errors::serde_json_to_py;
 use finstack_quant_calibration::api::validate::CalibrationValidationReport;
 use finstack_quant_calibration::{CalibrationDiagnostics, CalibrationReport, QuoteQuality};
 use numpy::PyArray1;
@@ -78,40 +77,12 @@ impl PyQuoteQuality {
         self.inner.sensitivity
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize QuoteQuality"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or has unknown fields.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|e| serde_json_to_py(e, "invalid QuoteQuality JSON"))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("QuoteQuality", &self.inner)
     }
 }
+
+wire_methods!(PyQuoteQuality, QuoteQuality, "QuoteQuality");
 
 /// Per-quote fit quality and conditioning diagnostics for one calibration step.
 ///
@@ -196,36 +167,6 @@ impl PyCalibrationDiagnostics {
         quote_quality_dataframe(py, &self.inner.per_quote)
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CalibrationDiagnostics"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or has unknown fields.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|e| serde_json_to_py(e, "invalid CalibrationDiagnostics JSON"))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CalibrationDiagnostics(quotes={}, max_residual={:.3e}, rms_residual={:.3e})",
@@ -235,6 +176,12 @@ impl PyCalibrationDiagnostics {
         )
     }
 }
+
+wire_methods!(
+    PyCalibrationDiagnostics,
+    CalibrationDiagnostics,
+    "CalibrationDiagnostics"
+);
 
 /// Build the per-quote quality frame shared by diagnostics and residual exports.
 pub(crate) fn quote_quality_dataframe<'py>(
@@ -477,36 +424,6 @@ impl PyCalibrationReport {
         quote_quality_dataframe(py, &self.inner.quote_rows())
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CalibrationReport"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or has unknown fields.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|e| serde_json_to_py(e, "invalid CalibrationReport JSON"))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CalibrationReport(success={}, quotes={}, iterations={}, max_residual={:.3e}, rmse={:.3e})",
@@ -518,6 +435,8 @@ impl PyCalibrationReport {
         )
     }
 }
+
+wire_methods!(PyCalibrationReport, CalibrationReport, "CalibrationReport");
 
 /// Solver-free validation report: every static envelope error plus the step dependency graph.
 ///
@@ -598,36 +517,6 @@ impl PyCalibrationValidationReport {
         dict_to_dataframe(py, &data, None)
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If serialization fails.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CalibrationValidationReport"))
-    }
-
-    /// Rebuild from JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|e| serde_json_to_py(e, "invalid CalibrationValidationReport JSON"))
-    }
-
-    /// Pickle support through the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CalibrationValidationReport(errors={}, steps={})",
@@ -636,3 +525,9 @@ impl PyCalibrationValidationReport {
         )
     }
 }
+
+wire_methods!(
+    PyCalibrationValidationReport,
+    CalibrationValidationReport,
+    "CalibrationValidationReport"
+);

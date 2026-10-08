@@ -2,15 +2,11 @@
 //!
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-#[cfg(test)]
-use finstack_quant_core::math::summation::kahan_sum;
-#[cfg(test)]
-use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
 use super::super::super::types::Bond;
 
-/// Bond pricing engine providing core valuation methods.
+/// Discounting kernel for non-callable bonds.
 ///
 /// Uses `Bond::pricing_dated_cashflows` (internal helper) for discount flows:
 /// coupons, amortization, and positive notional (redemption). Negative
@@ -65,55 +61,6 @@ use super::super::super::types::Bond;
 pub struct BondEngine;
 
 impl BondEngine {
-    /// Price a bond using discount curve present value calculation.
-    ///
-    /// Computes the present value by discounting all future holder-view cashflows
-    /// from the valuation date (`as_of`) using the bond's discount curve.
-    ///
-    /// # Arguments
-    ///
-    /// * `bond` - The bond to price
-    /// * `context` - Market context containing the discount curve
-    /// * `as_of` - Valuation date
-    ///
-    /// # Returns
-    ///
-    /// Present value of the bond in the bond's currency, discounted from `as_of`.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err` when:
-    /// - The bond has embedded call, put, or return-floor rights
-    /// - Discount curve is not found in market context
-    /// - Bond has no future cashflows
-    /// - Cashflow schedule building fails
-    #[cfg(test)]
-    pub(crate) fn price(bond: &Bond, market: &MarketContext, as_of: Date) -> Result<Money> {
-        if bond.has_exercise_rights() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Bond '{}' has embedded call, put, or return-floor rights; discounting is a non-callable model. Use 'tree' for rates-only optional pricing or 'rates_credit' for joint rates-credit optional pricing.",
-                bond.id
-            )));
-        }
-        let flows = bond.pricing_dated_cashflows(market, as_of)?;
-        let disc = market.get_discount(bond.discount_curve_id.as_str())?;
-        let Some((_, first)) = flows.first() else {
-            return Ok(Money::from((0_i64, bond.notional.currency())));
-        };
-        let ccy = first.currency();
-
-        // PV is anchored at as_of (valuation date), not settlement. Same-day
-        // cashflows are included with DF(as_of, as_of) = 1.0.
-        let mut pv_values: Vec<f64> = Vec::with_capacity(flows.len());
-        for (d, amt) in &flows {
-            if *d < as_of {
-                continue;
-            }
-            pv_values.push((*amt * disc.df_between_dates(as_of, *d)?).amount());
-        }
-        Money::new(kahan_sum(pv_values), ccy)
-    }
-
     /// Price a non-callable bond with a constant OAS applied to discounting.
     ///
     /// The input uses the bond's configured OAS quote compounding and is
@@ -164,7 +111,7 @@ mod tests {
     use time::macros::date;
 
     #[test]
-    fn public_discount_engine_rejects_embedded_rights() {
+    fn discounting_model_rejects_embedded_rights() {
         let mut bond = Bond::example().expect("example bond");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
@@ -176,7 +123,13 @@ mod tests {
             puts: Vec::new(),
         });
 
-        let error = BondEngine::price(&bond, &MarketContext::new(), date!(2025 - 01 - 01))
+        let error = bond
+            .price_at_oas_for_model_outcome(
+                crate::pricer::ModelKey::Discounting,
+                &MarketContext::new(),
+                date!(2025 - 01 - 01),
+                0.0,
+            )
             .expect_err("discounting must not silently ignore embedded rights");
         assert!(error.to_string().contains("non-callable"), "{error}");
     }

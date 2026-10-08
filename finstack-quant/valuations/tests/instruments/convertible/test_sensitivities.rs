@@ -8,9 +8,7 @@
 //! - Monotonicity and convexity properties
 
 use super::fixtures::*;
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    price_convertible_bond, ConvertibleTreeType,
-};
+use finstack_quant_valuations::instruments::fixed_income::convertible::price_convertible_bond;
 
 #[test]
 fn test_sensitivity_to_spot_price() {
@@ -25,13 +23,9 @@ fn test_sensitivity_to_spot_price() {
             market_params::VOL_STANDARD,
             market_params::DIV_YIELD,
         );
-        let price = price_convertible_bond(
-            &with_tree_steps(&bond, 50),
-            &market,
-            ConvertibleTreeType::Binomial,
-            dates::base_date(),
-        )
-        .unwrap();
+        let price =
+            price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date())
+                .unwrap();
         prices.push(price.amount());
     }
 
@@ -60,13 +54,9 @@ fn test_sensitivity_to_volatility() {
             *vol,
             market_params::DIV_YIELD,
         );
-        let price = price_convertible_bond(
-            &with_tree_steps(&bond, 50),
-            &market,
-            ConvertibleTreeType::Binomial,
-            dates::base_date(),
-        )
-        .unwrap();
+        let price =
+            price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date())
+                .unwrap();
         prices.push(price.amount());
     }
 
@@ -91,13 +81,9 @@ fn test_sensitivity_to_interest_rates() {
 
     for rate in &rates {
         let market = create_market_context_with_rate(*rate);
-        let price = price_convertible_bond(
-            &with_tree_steps(&bond, 50),
-            &market,
-            ConvertibleTreeType::Binomial,
-            dates::base_date(),
-        )
-        .unwrap();
+        let price =
+            price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date())
+                .unwrap();
         prices.push(price.amount());
     }
 
@@ -126,13 +112,9 @@ fn test_sensitivity_to_dividend_yield() {
             market_params::VOL_STANDARD,
             *div_yield,
         );
-        let price = price_convertible_bond(
-            &with_tree_steps(&bond, 50),
-            &market,
-            ConvertibleTreeType::Binomial,
-            dates::base_date(),
-        )
-        .unwrap();
+        let price =
+            price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date())
+                .unwrap();
         prices.push(price.amount());
     }
 
@@ -163,7 +145,6 @@ fn test_convexity_in_spot() {
     let price_center = price_convertible_bond(
         &with_tree_steps(&bond, 50),
         &market_center,
-        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -173,13 +154,9 @@ fn test_convexity_in_spot() {
         market_params::VOL_STANDARD,
         market_params::DIV_YIELD,
     );
-    let price_up = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market_up,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price_up =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market_up, dates::base_date())
+            .unwrap();
 
     let market_down = create_market_context_with_params(
         spot_center - bump,
@@ -189,7 +166,6 @@ fn test_convexity_in_spot() {
     let price_down = price_convertible_bond(
         &with_tree_steps(&bond, 50),
         &market_down,
-        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -218,7 +194,6 @@ fn test_cross_sensitivity_spot_vol() {
     let price_hs_lv = price_convertible_bond(
         &with_tree_steps(&bond, 50),
         &market_hs_lv,
-        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -232,7 +207,6 @@ fn test_cross_sensitivity_spot_vol() {
     let price_hs_hv = price_convertible_bond(
         &with_tree_steps(&bond, 50),
         &market_hs_hv,
-        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -254,7 +228,6 @@ fn test_cross_sensitivity_spot_vol() {
     let price_ls_lv = price_convertible_bond(
         &with_tree_steps(&bond, 50),
         &market_ls_lv,
-        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -268,7 +241,6 @@ fn test_cross_sensitivity_spot_vol() {
     let price_ls_hv = price_convertible_bond(
         &with_tree_steps(&bond, 50),
         &market_ls_hv,
-        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -291,13 +263,8 @@ fn test_sensitivity_extreme_low_spot() {
         market_params::DIV_YIELD,
     );
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
 
     // Should be close to bond floor
     let approx_bond_floor =
@@ -321,13 +288,8 @@ fn test_sensitivity_extreme_high_spot() {
         market_params::DIV_YIELD,
     );
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
 
     // Should track conversion value closely
     let conversion_value = theoretical_conversion_value(500.0, bond_params::CONVERSION_RATIO);
@@ -349,13 +311,8 @@ fn test_sensitivity_very_low_volatility() {
         market_params::DIV_YIELD,
     );
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 30),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 30), &market, dates::base_date()).unwrap();
 
     // With very low vol, should be close to max(bond_floor, conversion_value)
     let conversion_value =
@@ -378,13 +335,8 @@ fn test_sensitivity_high_volatility() {
         market_params::DIV_YIELD,
     );
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
 
     // Should exceed intrinsic value due to option value
     let conversion_value =
@@ -406,25 +358,19 @@ fn test_parallel_rate_shift() {
     let price_base = price_convertible_bond(
         &with_tree_steps(&bond, 50),
         &base_market,
-        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
 
     let up_market = create_market_context_with_rate(0.04);
-    let price_up = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &up_market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price_up =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &up_market, dates::base_date())
+            .unwrap();
 
     let down_market = create_market_context_with_rate(0.02);
     let price_down = price_convertible_bond(
         &with_tree_steps(&bond, 50),
         &down_market,
-        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -451,13 +397,9 @@ fn test_spot_vol_surface() {
         for vol in &vols {
             let market = create_market_context_with_params(*spot, *vol, market_params::DIV_YIELD);
 
-            let price = price_convertible_bond(
-                &with_tree_steps(&bond, 50),
-                &market,
-                ConvertibleTreeType::Binomial,
-                dates::base_date(),
-            )
-            .unwrap();
+            let price =
+                price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date())
+                    .unwrap();
 
             assert!(
                 price.amount() > 0.0 && price.amount().is_finite(),
@@ -481,7 +423,6 @@ fn test_time_decay_sensitivity() {
     let price_short = price_convertible_bond(
         &with_tree_steps(&bond_short, 20),
         &market,
-        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -489,7 +430,6 @@ fn test_time_decay_sensitivity() {
     let price_long = price_convertible_bond(
         &with_tree_steps(&bond_long, 50),
         &market,
-        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();

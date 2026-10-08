@@ -55,7 +55,7 @@ impl StructuredCredit {
     /// valuation envelope use
     /// [`Instrument::price_with_metrics`](crate::instruments::Instrument::price_with_metrics)
     /// with [`ModelKey::StructuredCreditStochastic`](crate::pricer::ModelKey::StructuredCreditStochastic);
-    /// [`Self::price_stochastic_with_mode`] forces a tree or hybrid mode.
+    /// [`Self::price_stochastic_with_mode`] forces an explicit estimator count.
     ///
     /// # Arguments
     ///
@@ -142,7 +142,7 @@ impl StructuredCredit {
         )
     }
 
-    /// Advanced stochastic pricing with an explicit mode (tree, Monte Carlo, or hybrid).
+    /// Stochastic pricing with an explicit Monte Carlo mode.
     ///
     /// Prefer the registry `StructuredCreditStochastic` model key for host
     /// pricing. Use this method only when a caller needs to force a
@@ -152,8 +152,7 @@ impl StructuredCredit {
     ///
     /// * `market` - Market context supplying the discount and forward curves.
     /// * `as_of` - Requested valuation date.
-    /// * `pricing_mode` - Engine to run: the scenario tree, Monte Carlo with
-    ///   an explicit estimator count and antithetic pairing, or the hybrid.
+    /// * `pricing_mode` - Monte Carlo estimator count and antithetic pairing.
     ///
     /// # Errors
     ///
@@ -251,7 +250,7 @@ impl StructuredCredit {
         as_of: Date,
     ) -> finstack_quant_core::Result<ScenarioTreeConfig> {
         let months_to_maturity = as_of.months_until(self.maturity).max(1) as usize;
-        let mut tree_config = ScenarioTreeConfig::new(months_to_maturity, 3);
+        let mut tree_config = ScenarioTreeConfig::new(months_to_maturity);
 
         let (prepay, default) = self.effective_stochastic_specs()?;
         tree_config.prepay_spec = prepay;
@@ -275,7 +274,7 @@ impl StructuredCredit {
         // `dX = κ(θ − X)dt + σdW`, making
         // `λ = λ₀ exp(-βσX - 0.5β²σ²)` an exponential-OU intensity
         // (Duffie-Singleton 1999; Lando 1998). κ = 0 intentionally retains the
-        // horizon-persistent factor configured by the base tree.
+        // horizon-persistent factor of the base scenario configuration.
         if let StochasticDefaultSpec::IntensityProcess { mean_reversion, .. } =
             &tree_config.default_spec
         {

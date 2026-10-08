@@ -26,7 +26,7 @@ from finstack_quant.valuations.instruments import (
     MetricPricingOverrides,
     TermLoan,
     VarResult,
-    calculate_var_with_pricing,
+    calculate_var,
     instrument_cashflows,
     instrument_envelope_from_spec,
     metric_metadata,
@@ -505,7 +505,7 @@ def test_pricing_entry_points_reject_retired_pricing_options_keyword() -> None:
         )  # schema-rejection-test: retired kwarg pricing_options
 
 
-# VALA-006 — multi-instrument historical VaR (calculate_var_with_pricing)
+# VALA-006 — multi-instrument historical VaR (calculate_var)
 
 
 def _rate_history() -> MarketHistory:
@@ -525,7 +525,7 @@ def _rate_history() -> MarketHistory:
 
 def test_calculate_var_single_instrument_matches_hvar_metric() -> None:
     history = _rate_history()
-    result = calculate_var_with_pricing([_bond()], _market(), history, AS_OF)
+    result = calculate_var([_bond()], _market(), history, AS_OF)
     metric = price_instrument(_bond(), _market(), AS_OF, metrics=["hvar", "expected_shortfall"], market_history=history)
 
     assert isinstance(result, VarResult)
@@ -551,22 +551,22 @@ def test_calculate_var_diversifies_offsetting_positions() -> None:
             {"date": "2024-01-10", "shifts": shift(0.0020)},
         ],
     )
-    bond_var = calculate_var_with_pricing([_bond()], _market(), history, AS_OF).var
-    swap_var = calculate_var_with_pricing([_swap()], _market(), history, AS_OF).var
+    bond_var = calculate_var([_bond()], _market(), history, AS_OF).var
+    swap_var = calculate_var([_swap()], _market(), history, AS_OF).var
     # Long bond (loses when rates rise) against a pay-fixed swap (gains).
-    hedged = calculate_var_with_pricing([_bond(), _swap().to_json()], _market(), history, AS_OF)
+    hedged = calculate_var([_bond(), _swap().to_json()], _market(), history, AS_OF)
 
     assert bond_var < -1.0
     assert swap_var < -1.0
     assert hedged.num_scenarios == 3
     assert abs(hedged.var) < abs(bond_var) + abs(swap_var) - 1.0
-    doubled = calculate_var_with_pricing([_bond(), _bond()], _market(), history, AS_OF)
+    doubled = calculate_var([_bond(), _bond()], _market(), history, AS_OF)
     assert doubled.var == pytest.approx(2.0 * bond_var, rel=1e-12)
 
 
 def test_calculate_var_config_model_and_result_round_trip() -> None:
     history = _rate_history()
-    result = calculate_var_with_pricing(
+    result = calculate_var(
         [_bond()],
         _market(),
         json.loads(history.to_json()),
@@ -581,14 +581,14 @@ def test_calculate_var_config_model_and_result_round_trip() -> None:
     assert list(frame.columns) == ["pnl"]
     assert frame["pnl"].tolist() == result.pnl_distribution
 
-    empty = calculate_var_with_pricing([], _market(), history, AS_OF)
+    empty = calculate_var([], _market(), history, AS_OF)
     assert (empty.var, empty.num_scenarios) == (0.0, 0)
     with pytest.raises(ValueError, match="strictly between"):
-        calculate_var_with_pricing([_bond()], _market(), history, AS_OF, config={"confidence_level": 1.5})
+        calculate_var([_bond()], _market(), history, AS_OF, config={"confidence_level": 1.5})
     with pytest.raises(ValueError, match="unknown field"):
-        calculate_var_with_pricing([_bond()], _market(), history, AS_OF, config={"confidence": 0.99})
+        calculate_var([_bond()], _market(), history, AS_OF, config={"confidence": 0.99})
     with pytest.raises(ValueError, match="no_such_model"):
-        calculate_var_with_pricing([_bond()], _market(), history, AS_OF, model="no_such_model")
+        calculate_var([_bond()], _market(), history, AS_OF, model="no_such_model")
 
 
 # VALA-007 — instrument_envelope_from_spec for JSON-only instrument types
@@ -638,8 +638,8 @@ def test_instrument_envelope_dict_is_accepted_by_instrument_entry_points() -> No
         instrument_cashflows(bond, _market(), AS_OF, "discounting").to_json()
     )
 
-    var = calculate_var_with_pricing([envelope], _market(), _rate_history(), AS_OF)
-    assert var.var == calculate_var_with_pricing([bond], _market(), _rate_history(), AS_OF).var
+    var = calculate_var([envelope], _market(), _rate_history(), AS_OF)
+    assert var.var == calculate_var([bond], _market(), _rate_history(), AS_OF).var
 
     with pytest.raises(TypeError, match="dict or JSON string"):
         price_instrument(1.5, _market(), AS_OF)

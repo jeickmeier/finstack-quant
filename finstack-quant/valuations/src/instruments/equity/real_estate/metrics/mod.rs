@@ -102,12 +102,8 @@ pub(crate) fn register_levered_real_estate_metrics(
         registry: registry,
         instrument: InstrumentType::LeveredRealEstateEquity,
         metrics: [
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::LeveredRealEstateEquity,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::LeveredRealEstateEquity,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     };
 

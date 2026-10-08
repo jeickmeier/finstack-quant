@@ -168,9 +168,5 @@ pub use report::{
     ResidualUnits, SolverMethod,
 };
 
-// Internal/advanced re-exports (not part of typical usage)
-#[doc(hidden)]
-pub use config::CALIBRATION_CONFIG_KEY;
-
 /// Calibration methodology identifiers recorded in audit reports.
 pub mod versions;

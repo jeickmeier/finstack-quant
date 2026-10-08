@@ -25,7 +25,7 @@ use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::{Portfolio, PortfolioBuilder};
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::{
     CdsConvention, CdsValuationConvention, CreditDefaultSwap, PayReceive, PremiumLegSpec,
     ProtectionLegSpec,
@@ -47,7 +47,7 @@ use finstack_quant_valuations::instruments::fixed_income::convertible::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
 };
 use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
-    InflationLinkedBond, InflationLinkedBondParams,
+    DeflationProtection, IndexationMethod, InflationLinkedBond,
 };
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
@@ -60,7 +60,7 @@ use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, CollateralType, Repo};
-use finstack_quant_valuations::instruments::rates::swaption::{Swaption, SwaptionParams};
+use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::EquityUnderlyingParams;
@@ -441,7 +441,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
 /// Remaining slots are filled with deposits.
 pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     let base = base_date();
-    let mut builder = PortfolioBuilder::new("INSTITUTIONAL_PORTFOLIO")
+    let mut builder = Portfolio::builder("INSTITUTIONAL_PORTFOLIO")
         .name("Large Investment Organization")
         .base_currency(Currency::USD)
         .as_of(base);
@@ -752,21 +752,51 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let swaption_id = format!("SWAPTION_{}", i);
         let expiry = Date::from_calendar_date(2026, Month::July, 1).unwrap();
         let swap_end = Date::from_calendar_date(2030, Month::July, 1).unwrap();
-        let params = SwaptionParams::payer(
-            Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-            0.04,
-            expiry,
-            expiry,
-            swap_end,
-        )
-        .expect("valid benchmark swaption params");
-        let swaption = Swaption::new(
-            swaption_id.clone(),
-            &params,
-            "USD-OIS",
-            "USD-SOFR-3M",
-            "SWAPTION-VOL",
-        );
+        let fixed = finstack_quant_valuations::instruments::rates::irs::FixedLegSpec {
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            rate: rust_decimal::Decimal::try_from(0.04).expect("valid literal"),
+            frequency: Tenor::semi_annual(),
+            day_count: DayCount::Thirty360,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            calendar_id: None,
+            stub: StubKind::None,
+            start: expiry,
+            end: swap_end,
+            par_method: None,
+            payment_lag_days: 0,
+            end_of_month: false,
+        };
+        let float = finstack_quant_valuations::instruments::rates::irs::FloatLegSpec {
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            forward_curve_id: finstack_quant_core::types::CurveId::new("USD-SOFR-3M"),
+            spread_bp: rust_decimal::Decimal::ZERO,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            calendar_id: None,
+            stub: StubKind::None,
+            reset_lag_days: 0,
+            fixing_calendar_id: None,
+            start: expiry,
+            end: swap_end,
+            compounding:
+                finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding::Simple,
+            payment_lag_days: 0,
+            end_of_month: false,
+        };
+        let swaption = Swaption::builder()
+            .id(swaption_id.clone().into())
+            .option_type(OptionType::Call)
+            .notional(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
+            .expiry(expiry)
+            .settlement(SettlementType::Physical)
+            .cash_settlement_method(CashSettlementMethod::default())
+            .vol_model(finstack_quant_valuations::instruments::VolatilityModel::Black)
+            .vol_surface_id(finstack_quant_core::types::CurveId::new("SWAPTION-VOL"))
+            .underlying_fixed_leg(fixed)
+            .underlying_float_leg(float)
+            .build()
+            .expect("valid benchmark swaption");
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(
@@ -951,17 +981,25 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     // 14. Inflation-Linked Bonds
     for i in 0..positions_per_exotic.min(2) {
         let ilb_id = format!("TIPS_{}", i);
-        let bond_params = InflationLinkedBondParams::new(
-            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-            0.01,
-            base,
-            maturity_5y(),
-            100.0,
-            Tenor::semi_annual(),
-            DayCount::Act365F,
-        )
-        .expect("valid literal coupon");
-        let ilb = InflationLinkedBond::new_tips(ilb_id.clone(), &bond_params, "USD-OIS", "USD-CPI");
+        let ilb = InflationLinkedBond::builder()
+            .id(ilb_id.clone().into())
+            .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
+            .real_coupon(rust_decimal::Decimal::new(1, 2))
+            .frequency(Tenor::semi_annual())
+            .day_count(DayCount::Act365F)
+            .issue_date(base)
+            .maturity(maturity_5y())
+            .base_cpi(100.0)
+            .base_date(base)
+            .indexation_method(IndexationMethod::Tips)
+            .lag(finstack_quant_core::market_data::scalars::InflationLag::Months(3))
+            .deflation_protection(DeflationProtection::MaturityOnly)
+            .business_day_convention(BusinessDayConvention::Following)
+            .stub(StubKind::None)
+            .discount_curve_id("USD-OIS".into())
+            .inflation_index_id("USD-CPI".into())
+            .build()
+            .expect("valid benchmark TIPS");
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(
@@ -1179,7 +1217,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
 /// complete benchmark market data.
 pub fn create_attribution_portfolio(num_positions: usize) -> Portfolio {
     let portfolio = create_institutional_portfolio(num_positions);
-    let mut builder = PortfolioBuilder::new(format!("ATTRIBUTION_{}", num_positions))
+    let mut builder = Portfolio::builder(format!("ATTRIBUTION_{}", num_positions))
         .name("Attribution Benchmark Portfolio")
         .base_currency(portfolio.base_currency)
         .as_of(portfolio.as_of);

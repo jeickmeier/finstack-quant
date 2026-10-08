@@ -679,7 +679,7 @@ pub struct SensitivityBucket {
 /// | Metrics-based | `Credit:{curve}`, `Credit`, `CreditGamma` | `credit_curves_pnl` |
 /// | Metrics-based | `Vol`, `Volga` | `vol_pnl` |
 /// | Metrics-based | `Fx` | `fx_pnl` |
-/// | Metrics-based | `Spot`, `SpotGamma`, `Dividend` | `market_scalars_pnl` |
+/// | Metrics-based | `Spot`, `SpotGamma` | `market_scalars_pnl` |
 /// | Metrics-based | `Inflation`, `InflationConvexity` | `inflation_curves_pnl` |
 /// | Metrics-based | `ModelParameters` | `model_params_pnl` |
 ///
@@ -694,7 +694,7 @@ pub struct SensitivityStep {
     /// `"Theta"`).
     pub factor: String,
     /// Unit of `market_move` and of the sensitivity denominator: basis points
-    /// for rates, credit, dividend-yield and inflation rows, volatility points
+    /// for rates, credit and inflation rows, volatility points
     /// for volatility rows, percent for the metrics-based `Fx` row and price
     /// units for `Spot` rows. Absent for repriced rows.
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -688,33 +688,6 @@ impl PnlAttribution {
         }
     }
 
-    /// Create a new P&L attribution with explicit rounding context.
-    ///
-    /// # Arguments
-    ///
-    /// * `total_pnl` - Total P&L (val_t1 - val_t0)
-    /// * `instrument_id` - Instrument identifier
-    /// * `t0` - Start date
-    /// * `t1` - End date
-    /// * `method` - Attribution methodology
-    /// * `rounding` - Rounding context to stamp
-    ///
-    /// # Returns
-    ///
-    /// New `PnlAttribution` with all factor P&Ls initialized to zero.
-    pub(crate) fn new_with_rounding(
-        total_pnl: Money,
-        instrument_id: impl Into<String>,
-        t0: Date,
-        t1: Date,
-        method: AttributionMethod,
-        rounding: RoundingContext,
-    ) -> Self {
-        let mut attr = Self::new(total_pnl, instrument_id, t0, t1, method);
-        attr.meta.rounding = rounding;
-        attr
-    }
-
     /// Apply `f` to every signed `Money` leaf: the per-factor aggregates
     /// (`carry` … `market_scalars_pnl`) and every leaf of every populated
     /// detail struct.
@@ -1059,104 +1032,65 @@ impl PnlAttribution {
             show_zeros || !rc.is_effectively_zero_money(m.amount(), m.currency())
         };
 
-        let mut lines = Vec::new();
-        lines.push(format!("Total P&L: {}", self.total_pnl));
-
-        if show(&self.carry) {
-            lines.push(format!("  ├─ Carry: {}", fmt(&self.carry)));
-            if let Some(ref detail) = self.carry_detail {
-                if let Some(ref coupon_income) = detail.coupon_income {
-                    lines.push(format!("  │   ├─ Coupon Income: {}", coupon_income.total));
-                }
-                if let Some(ref pull_to_par) = detail.pull_to_par {
-                    lines.push(format!("  │   ├─ Pull-to-Par: {}", pull_to_par));
-                }
-                if let Some(ref roll_down) = detail.roll_down {
-                    lines.push(format!("  │   ├─ Roll-Down: {}", roll_down.total));
-                }
-                if let Some(ref funding_cost) = detail.funding_cost {
-                    lines.push(format!("  │   └─ Funding Cost: {}", funding_cost));
-                }
+        let child = |label: &dyn std::fmt::Display, pnl: &Money| format!("  │   ├─ {label}: {pnl}");
+        let mut carry_lines = Vec::new();
+        if let Some(detail) = &self.carry_detail {
+            if let Some(coupon_income) = &detail.coupon_income {
+                carry_lines.push(child(&"Coupon Income", &coupon_income.total));
+            }
+            if let Some(pull_to_par) = &detail.pull_to_par {
+                carry_lines.push(child(&"Pull-to-Par", pull_to_par));
+            }
+            if let Some(roll_down) = &detail.roll_down {
+                carry_lines.push(child(&"Roll-Down", &roll_down.total));
+            }
+            if let Some(funding_cost) = &detail.funding_cost {
+                carry_lines.push(format!("  │   └─ Funding Cost: {funding_cost}"));
             }
         }
+        let by_curve = |by_curve: Option<
+            &indexmap::IndexMap<finstack_quant_core::types::CurveId, Money>,
+        >|
+         -> Vec<String> {
+            by_curve
+                .into_iter()
+                .flatten()
+                .map(|(curve_id, pnl)| child(curve_id, pnl))
+                .collect()
+        };
+        let cross_lines = self
+            .cross_factor_detail
+            .iter()
+            .flat_map(|detail| &detail.by_pair)
+            .map(|(pair, pnl)| child(pair, pnl))
+            .collect();
 
-        if show(&self.rates_curves_pnl) {
-            lines.push(format!(
-                "  ├─ Rates Curves: {}",
-                fmt(&self.rates_curves_pnl)
-            ));
-            if let Some(ref detail) = self.rates_detail {
-                for (curve_id, pnl) in &detail.by_curve {
-                    lines.push(format!("  │   ├─ {}: {}", curve_id, pnl));
-                }
+        let mut lines = vec![format!("Total P&L: {}", self.total_pnl)];
+        for (label, amount, children) in [
+            ("Carry", &self.carry, carry_lines),
+            (
+                "Rates Curves",
+                &self.rates_curves_pnl,
+                by_curve(self.rates_detail.as_ref().map(|d| &d.by_curve)),
+            ),
+            (
+                "Credit Curves",
+                &self.credit_curves_pnl,
+                by_curve(self.credit_detail.as_ref().map(|d| &d.by_curve)),
+            ),
+            ("Inflation Curves", &self.inflation_curves_pnl, Vec::new()),
+            ("Correlations", &self.correlations_pnl, Vec::new()),
+            ("FX", &self.fx_pnl, Vec::new()),
+            ("FX Translation", &self.fx_translation_pnl, Vec::new()),
+            ("Vol", &self.vol_pnl, Vec::new()),
+            ("Cross-Factor", &self.cross_factor_pnl, cross_lines),
+            ("Model Params", &self.model_params_pnl, Vec::new()),
+            ("Market Scalars", &self.market_scalars_pnl, Vec::new()),
+        ] {
+            if show(amount) {
+                lines.push(format!("  ├─ {label}: {}", fmt(amount)));
+                lines.extend(children);
             }
-        }
-
-        if show(&self.credit_curves_pnl) {
-            lines.push(format!(
-                "  ├─ Credit Curves: {}",
-                fmt(&self.credit_curves_pnl)
-            ));
-            if let Some(ref detail) = self.credit_detail {
-                for (curve_id, pnl) in &detail.by_curve {
-                    lines.push(format!("  │   ├─ {}: {}", curve_id, pnl));
-                }
-            }
-        }
-
-        if show(&self.inflation_curves_pnl) {
-            lines.push(format!(
-                "  ├─ Inflation Curves: {}",
-                fmt(&self.inflation_curves_pnl)
-            ));
-        }
-
-        if show(&self.correlations_pnl) {
-            lines.push(format!(
-                "  ├─ Correlations: {}",
-                fmt(&self.correlations_pnl)
-            ));
-        }
-
-        if show(&self.fx_pnl) {
-            lines.push(format!("  ├─ FX: {}", fmt(&self.fx_pnl)));
-        }
-
-        if show(&self.fx_translation_pnl) {
-            lines.push(format!(
-                "  ├─ FX Translation: {}",
-                fmt(&self.fx_translation_pnl)
-            ));
-        }
-
-        if show(&self.vol_pnl) {
-            lines.push(format!("  ├─ Vol: {}", fmt(&self.vol_pnl)));
-        }
-
-        if show(&self.cross_factor_pnl) {
-            lines.push(format!(
-                "  ├─ Cross-Factor: {}",
-                fmt(&self.cross_factor_pnl)
-            ));
-            if let Some(ref detail) = self.cross_factor_detail {
-                for (pair_label, pnl) in &detail.by_pair {
-                    lines.push(format!("  │   ├─ {}: {}", pair_label, pnl));
-                }
-            }
-        }
-
-        if show(&self.model_params_pnl) {
-            lines.push(format!(
-                "  ├─ Model Params: {}",
-                fmt(&self.model_params_pnl)
-            ));
-        }
-
-        if show(&self.market_scalars_pnl) {
-            lines.push(format!(
-                "  ├─ Market Scalars: {}",
-                fmt(&self.market_scalars_pnl)
-            ));
         }
 
         lines.push(format!("  └─ Residual: {}", fmt(&self.residual)));
@@ -1234,22 +1168,6 @@ impl std::fmt::Display for AttributionMethod {
             AttributionMethod::Waterfall(_) => write!(f, "Waterfall"),
             AttributionMethod::MetricsBased => write!(f, "MetricsBased"),
             AttributionMethod::Taylor(_) => write!(f, "Taylor"),
-        }
-    }
-}
-
-impl std::fmt::Display for AttributionFactor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AttributionFactor::Carry => write!(f, "Carry"),
-            AttributionFactor::RatesCurves => write!(f, "RatesCurves"),
-            AttributionFactor::CreditCurves => write!(f, "CreditCurves"),
-            AttributionFactor::InflationCurves => write!(f, "InflationCurves"),
-            AttributionFactor::Correlations => write!(f, "Correlations"),
-            AttributionFactor::Fx => write!(f, "Fx"),
-            AttributionFactor::Volatility => write!(f, "Volatility"),
-            AttributionFactor::ModelParameters => write!(f, "ModelParameters"),
-            AttributionFactor::MarketScalars => write!(f, "MarketScalars"),
         }
     }
 }
@@ -1373,7 +1291,7 @@ mod tests {
             let attribution: PnlAttribution = serde_json::from_value(mismatched).unwrap();
             assert!(attribution.validate_currencies().is_err(), "missed {path}");
             assert!(
-                crate::pnl_attribution_wide_row(&attribution).is_err(),
+                crate::long_rows::pnl_attribution_wide_row(&attribution).is_err(),
                 "wide row accepted {path}"
             );
         }
@@ -1507,6 +1425,54 @@ mod tests {
         assert!(explanation.contains("Roll-Down"));
         assert!(explanation.contains("Funding Cost"));
         assert!(!explanation.contains("Theta"));
+    }
+
+    #[test]
+    fn explain_renders_nonzero_factors_with_their_children() {
+        let usd = |amount: i64| Money::from((amount, Currency::USD));
+        let mut attribution = PnlAttribution::new(
+            usd(100),
+            "BOND-1",
+            date!(2025 - 01 - 15),
+            date!(2025 - 02 - 15),
+            AttributionMethod::Parallel,
+        );
+        attribution.carry = usd(40);
+        attribution.carry_detail = Some(CarryDetail {
+            total: usd(40),
+            coupon_income: Some(SourceLine::scalar(usd(30))),
+            pull_to_par: None,
+            roll_down: None,
+            funding_cost: Some(usd(5)),
+        });
+        attribution.rates_curves_pnl = usd(50);
+        attribution.rates_detail = Some(RatesCurvesAttribution {
+            by_curve: IndexMap::from([(
+                finstack_quant_core::types::CurveId::new("USD-OIS"),
+                usd(50),
+            )]),
+            by_tenor: IndexMap::new(),
+            discount_total: usd(50),
+            forward_total: usd(0),
+        });
+        attribution
+            .compute_residual()
+            .expect("same-currency residual");
+
+        let expected = [
+            format!("Total P&L: {}", usd(100)),
+            format!("  ├─ Carry: {} (40.0%)", usd(40)),
+            format!("  │   ├─ Coupon Income: {}", usd(30)),
+            format!("  │   └─ Funding Cost: {}", usd(5)),
+            format!("  ├─ Rates Curves: {} (50.0%)", usd(50)),
+            format!("  │   ├─ USD-OIS: {}", usd(50)),
+            format!("  └─ Residual: {} (10.0%)", usd(10)),
+        ]
+        .join("\n");
+        assert_eq!(attribution.explain(), expected);
+        assert!(attribution
+            .explain_verbose()
+            .contains("  ├─ Market Scalars: "));
     }
 
     #[test]

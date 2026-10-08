@@ -64,6 +64,7 @@
 //! - [`crate::parallel`] - Parallel attribution using this module
 //! - [`crate::waterfall`] - Waterfall attribution using this module
 
+use crate::types::AttributionFactor;
 use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
 use finstack_quant_core::market_data::dividends::DividendSchedule;
 use finstack_quant_core::market_data::scalars::InflationIndex;
@@ -181,6 +182,22 @@ impl MarketRestoreFlags {
     pub const fn contains(&self, other: Self) -> bool {
         (self.0 & other.0) == other.0
     }
+
+    /// Market family restored for one attribution factor.
+    ///
+    /// Carry and model parameters are not market restores and map to `None`.
+    pub(crate) const fn for_factor(factor: &AttributionFactor) -> Option<Self> {
+        match factor {
+            AttributionFactor::Carry | AttributionFactor::ModelParameters => None,
+            AttributionFactor::RatesCurves => Some(Self::RATES),
+            AttributionFactor::CreditCurves => Some(Self::CREDIT),
+            AttributionFactor::InflationCurves => Some(Self::INFLATION),
+            AttributionFactor::Correlations => Some(Self::CORRELATION),
+            AttributionFactor::Fx => Some(Self::FX),
+            AttributionFactor::Volatility => Some(Self::VOL),
+            AttributionFactor::MarketScalars => Some(Self::SCALARS),
+        }
+    }
 }
 
 impl std::ops::BitOr for MarketRestoreFlags {
@@ -275,6 +292,34 @@ pub struct MarketSnapshot {
 }
 
 impl MarketSnapshot {
+    /// True when any family selected by `flags` holds data in this snapshot.
+    pub(crate) fn has_data(&self, flags: MarketRestoreFlags) -> bool {
+        let selected = |flag| flags.contains(flag);
+        (selected(MarketRestoreFlags::DISCOUNT) && !self.discount_curves.is_empty())
+            || (selected(MarketRestoreFlags::FORWARD)
+                && (!self.forward_curves.is_empty()
+                    || !self.basis_spread_curves.is_empty()
+                    || !self.parametric_curves.is_empty()
+                    || !self.fixing_series.is_empty()))
+            || (selected(MarketRestoreFlags::HAZARD) && !self.hazard_curves.is_empty())
+            || (selected(MarketRestoreFlags::INFLATION)
+                && (!self.inflation_curves.is_empty() || !self.inflation_indices.is_empty()))
+            || (selected(MarketRestoreFlags::CORRELATION)
+                && !self.base_correlation_curves.is_empty())
+            || (selected(MarketRestoreFlags::FX) && self.fx.is_some())
+            || (selected(MarketRestoreFlags::VOL)
+                && (!self.surfaces.is_empty()
+                    || !self.vol_cubes.is_empty()
+                    || !self.fx_delta_vol_surfaces.is_empty()
+                    || !self.vol_index_curves.is_empty()
+                    || !self.volatility_scalars.is_empty()))
+            || (selected(MarketRestoreFlags::SCALARS)
+                && (!self.prices.is_empty()
+                    || !self.series.is_empty()
+                    || !self.dividends.is_empty()
+                    || !self.price_curves.is_empty()))
+    }
+
     /// Extract factor families from a market context based on which flags are set.
     ///
     /// Only the families corresponding to set flags are populated into the snapshot;
@@ -488,13 +533,9 @@ impl MarketSnapshot {
             for curve in snapshot.forward_curves.values() {
                 new_market.insert_mut(Arc::clone(curve));
             }
-        }
-        if restore_flags.contains(MarketRestoreFlags::FORWARD) {
             for curve in snapshot.basis_spread_curves.values() {
                 new_market.insert_mut(Arc::clone(curve));
             }
-        }
-        if restore_flags.contains(MarketRestoreFlags::FORWARD) {
             for curve in snapshot.parametric_curves.values() {
                 new_market.insert_mut(Arc::clone(curve));
             }

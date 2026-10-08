@@ -362,15 +362,15 @@ const RATE_HISTORY = {
   })),
 };
 
-test('calculateVarWithPricing matches the hvar metric and aggregates positions', () => {
+test('calculateVar matches the hvar metric and aggregates positions', () => {
   const long = JSON.parse(flatBond('LONG', 1_000_000));
-  const result = valuations.instruments.calculateVarWithPricing(
+  const result = valuations.instruments.calculateVar(
     [long],
     FLAT_MARKET,
     RATE_HISTORY,
     '2024-01-15'
   );
-  const fromText = valuations.instruments.calculateVarWithPricing(
+  const fromText = valuations.instruments.calculateVar(
     JSON.stringify([long]),
     FLAT_MARKET,
     RATE_HISTORY,
@@ -391,7 +391,7 @@ test('calculateVarWithPricing matches the hvar metric and aggregates positions',
   assert.ok(result.var < 0);
   assert.ok(Math.abs(result.var - metric.measures.hvar) < 1e-9);
 
-  const doubled = valuations.instruments.calculateVarWithPricing(
+  const doubled = valuations.instruments.calculateVar(
     [long, JSON.parse(flatBond('LONG-2', 1_000_000))],
     FLAT_MARKET,
     JSON.stringify(RATE_HISTORY),
@@ -399,7 +399,7 @@ test('calculateVarWithPricing matches the hvar metric and aggregates positions',
     { confidence_level: 0.99 },
     'discounting'
   );
-  const single99 = valuations.instruments.calculateVarWithPricing(
+  const single99 = valuations.instruments.calculateVar(
     [long],
     FLAT_MARKET,
     RATE_HISTORY,
@@ -411,15 +411,9 @@ test('calculateVarWithPricing matches the hvar metric and aggregates positions',
   assert.ok(Math.abs(doubled.var - 2 * single99.var) < 1e-6);
   assert.throws(
     () =>
-      valuations.instruments.calculateVarWithPricing(
-        [long],
-        FLAT_MARKET,
-        RATE_HISTORY,
-        '2024-01-15',
-        {
-          confidence_level: 1.5,
-        }
-      ),
+      valuations.instruments.calculateVar([long], FLAT_MARKET, RATE_HISTORY, '2024-01-15', {
+        confidence_level: 1.5,
+      }),
     (error) => error.name === 'FinstackError' && error.kind === 'validation'
   );
 });
@@ -427,7 +421,7 @@ test('calculateVarWithPricing matches the hvar metric and aggregates positions',
 test('VaR inventory rejects JSON strings nested inside the envelope array', () => {
   assert.throws(
     () =>
-      valuations.instruments.calculateVarWithPricing(
+      valuations.instruments.calculateVar(
         [flatBond('STRING', 1_000_000)],
         FLAT_MARKET,
         RATE_HISTORY,
@@ -504,7 +498,7 @@ test('CdsOption is a typed class matching the Python wrapper', () => {
 test('VaR inventory applies the whole-input byte limit', () => {
   assert.throws(
     () =>
-      valuations.instruments.calculateVarWithPricing(
+      valuations.instruments.calculateVar(
         `[]${' '.repeat(16 * 1024 * 1024)}`,
         FLAT_MARKET,
         RATE_HISTORY,

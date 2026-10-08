@@ -5,32 +5,41 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::{Error as CoreError, Result as CoreResult};
 use finstack_quant_models::correlation::copula::{Copula, CopulaSpec};
-use finstack_quant_models::correlation::recovery::RecoverySpec;
-use finstack_quant_models::correlation::Result as CorrelationResult;
 use std::sync::OnceLock;
 
-// Default Configuration Constants
+// Pricing Model Constants
+//
+// These are fixed parameters of the tranche pricing model; callers choose only
+// the copula via [`CdsTranchePricer::with_copula`].
 
-/// Absolute error budget for one capped pool expectation, in portfolio fractions.
-pub(super) const DEFAULT_INTEGRATION_TOLERANCE: f64 = 1e-10;
+/// Absolute error budget for one capped pool expectation, in portfolio
+/// fractions. Tail truncation and nested-factor quadrature each consume a
+/// share of this budget. Student-t pricing uses the copula's product Gauss
+/// rule and ignores it.
+pub(super) const INTEGRATION_TOLERANCE: f64 = 1e-10;
+
+/// Maximum adaptive subdivisions per conditioning interval. The summed
+/// absolute quadrature error must meet the total budget, or pricing fails.
+pub(super) const INTEGRATION_MAX_DEPTH: usize = 20;
 
 /// Minimum correlation value for numerical stability (avoids division by near-zero)
-const DEFAULT_MIN_CORRELATION: f64 = 0.01;
+pub(super) const MIN_CORRELATION: f64 = 0.01;
 
 /// Maximum correlation value for numerical stability (avoids degenerate cases)
-const DEFAULT_MAX_CORRELATION: f64 = 0.99;
+pub(super) const MAX_CORRELATION: f64 = 0.99;
 
 /// Boundary width for smooth correlation clamping transitions
-const DEFAULT_CORR_BOUNDARY_WIDTH: f64 = 0.005;
+pub(super) const CORR_BOUNDARY_WIDTH: f64 = 0.005;
 
-/// Grid step for exact convolution method (fraction of portfolio notional)
-const DEFAULT_GRID_STEP: f64 = 0.001;
+/// Grid step for the heterogeneous exact convolution (fraction of portfolio
+/// notional). Grid error is separate from the factor integration tolerance.
+pub(super) const GRID_STEP: f64 = 0.001;
 
-/// Default settlement lag for index CDS (T+1 since Big Bang 2009)
-const DEFAULT_INDEX_SETTLEMENT_LAG: i32 = 1;
+/// Settlement lag for index CDS (T+1 since Big Bang 2009)
+pub(super) const INDEX_SETTLEMENT_DAYS: i32 = 1;
 
-/// Default settlement lag for bespoke CDS tranches (T+3 per ISDA)
-const DEFAULT_BESPOKE_SETTLEMENT_LAG: i32 = 3;
+/// Settlement lag for bespoke CDS tranches (T+3 per ISDA)
+pub(super) const BESPOKE_SETTLEMENT_DAYS: i32 = 3;
 
 // Numerical-Stability Constants
 //
@@ -63,11 +72,8 @@ pub(super) const PROBABILITY_CLIP: f64 = 1e-12;
 /// `1.0 / n` (worst-case `n·ε ≈ 125 · 2.2e-16 ≈ 3e-14 ≪ 1e-9`).
 pub(super) const HOMOGENEITY_TOLERANCE: f64 = 1e-9;
 
-/// Minimum grid step to avoid degenerate convolution buckets
-pub(super) const GRID_STEP_MIN: f64 = 1e-6;
-
 /// Hard cap on convolution PMF points. Exceeding it returns an error;
-/// an exact calculation never silently switches to a normal approximation.
+/// an exact calculation never silently switches to an approximation.
 pub(super) const MAX_GRID_POINTS: usize = 200_000;
 
 /// Maximum conservative issuer × grid-point visits per conditional
@@ -78,346 +84,53 @@ pub(super) const MAX_CONVOLUTION_WORK: usize = 5_000_000;
 /// Tolerance for par spread solver convergence
 pub(super) const PAR_SPREAD_TOLERANCE: f64 = 1e-6;
 
-/// Parameters for the CDS Tranche pricing model.
-///
-/// This configuration controls all aspects of tranche pricing including:
-/// - Copula model selection (Gaussian, Student-t, RFL, Multi-factor)
-/// - Recovery model (constant or stochastic)
-/// - Numerical integration parameters
-/// - Risk metric bump sizes and methods
-/// - ISDA convention settings
-/// - Settlement and schedule generation
-///
-/// # ISDA Compliance
-///
-/// Default settings follow ISDA standard model conventions:
-/// - Mid-period protection timing (`mid_period_protection = true`)
-/// - Act/360 day count (set on instrument)
-/// - Quarterly payment frequency on IMM dates
-/// - T+1 settlement for index CDS
-///
-/// # Extended Models
-///
-/// The pricer supports multiple copula and recovery models:
-///
-/// ## Copula Models
-/// - **Gaussian** (default): Standard one-factor, no tail dependence
-/// - **Student-t**: Fat tails, captures tail dependence
-/// - **RFL**: Random factor loading, stochastic correlation
-/// - **Multi-factor**: Sector-specific correlation structure
-///
-/// ## Recovery Models
-/// - **Constant** (default): Fixed recovery rate
-/// - **Stochastic**: Recovery correlated with market factor
-#[derive(Debug, Clone)]
-pub struct CdsTranchePricerConfig {
-    // Model Selection
-    /// Copula model specification (default: Gaussian)
-    pub copula_spec: CopulaSpec,
-    /// Stochastic (copula) recovery model; `None` (the default) uses the
-    /// index recovery rate.
-    pub stochastic_recovery_spec: Option<RecoverySpec>,
-
-    /// Absolute numerical integration budget in portfolio-notional fractions
-    /// (default `1e-10`). Must lie in `[1e-12, 1e-4]`. Tail truncation and
-    /// nested-factor quadrature each consume a share of this budget.
-    ///
-    /// Student-t pricing uses the copula's product Gauss rule by default and
-    /// ignores this budget unless
-    /// [`Self::adaptive_student_t_integration`] is enabled.
-    pub integration_tolerance: f64,
-    /// Maximum adaptive subdivisions per conditioning interval (default 20).
-    /// Zero permits only the initial refinement check. The summed absolute
-    /// quadrature error must meet the total budget, or pricing fails.
-    ///
-    /// Student-t product-Gauss pricing ignores this depth.
-    pub integration_max_depth: usize,
-    /// When `true`, Student-t factor integrals use nested adaptive Simpson
-    /// subject to [`Self::integration_tolerance`]. When `false` (default),
-    /// Student-t uses the copula's fixed product Gauss–Laguerre ×
-    /// Gauss–Hermite rule.
-    pub adaptive_student_t_integration: bool,
-    /// Whether to use issuer-specific curves if available
-    pub use_issuer_curves: bool,
-    /// Minimum correlation value for numerical stability
-    pub min_correlation: f64,
-    /// Maximum correlation value for numerical stability
-    pub max_correlation: f64,
-
-    // ISDA Convention Settings
-    /// Whether to use mid-period discounting for protection leg (ISDA standard: true)
-    pub mid_period_protection: bool,
-    /// Whether to include accrual-on-default in the premium leg
-    pub include_accrual_on_default: bool,
-    /// Settlement lag in business days for index CDS (default: 1 for Big Bang)
-    pub index_settlement_days: i32,
-    /// Settlement lag in business days for bespoke tranches (default: 3 per ISDA)
-    pub bespoke_settlement_days: i32,
-
-    // Numerical Stability
-    /// Smooth boundary width for correlation clamping transitions
-    pub corr_boundary_width: f64,
-
-    // Heterogeneous Portfolio Settings
-    /// Heterogeneous issuer method when issuer curves are available.
-    /// Defaults to bounded exact convolution; the normal approximation is
-    /// an explicit opt-in without a general concentration error guarantee.
-    pub hetero_method: HeteroMethod,
-    /// Grid step for exact convolution (fraction of portfolio notional,
-    /// default `0.001`, floored at `1e-6`). Pricing returns an error if the
-    /// rounded loss support needs more than 200,000 grid points or positive
-    /// issuer count times grid points exceeds 5,000,000 per factor evaluation.
-    /// The latter is a conservative computation limit, not a bound on total
-    /// adaptive integration work. Stochastic recovery additionally checks an
-    /// unscaled unit-exposure grid before its normalization integrals, then
-    /// checks the scaled grid; the preflight can conservatively reject a
-    /// configuration whose eventual scales would reduce its support. Grid error
-    /// is separate from the factor integration tolerance; refine this step
-    /// to check convergence for the requested attachment and detachment.
-    pub grid_step: f64,
-}
-
-impl Default for CdsTranchePricerConfig {
-    fn default() -> Self {
-        Self {
-            // Model selection
-            copula_spec: CopulaSpec::default(),
-            stochastic_recovery_spec: None, // Use index recovery rate by default
-
-            // Numerical integration
-            integration_tolerance: DEFAULT_INTEGRATION_TOLERANCE,
-            integration_max_depth: 20,
-            adaptive_student_t_integration: false,
-            use_issuer_curves: true,
-            min_correlation: DEFAULT_MIN_CORRELATION,
-            max_correlation: DEFAULT_MAX_CORRELATION,
-
-            // ISDA conventions
-            mid_period_protection: true, // ISDA standard
-            include_accrual_on_default: true,
-            index_settlement_days: DEFAULT_INDEX_SETTLEMENT_LAG,
-            bespoke_settlement_days: DEFAULT_BESPOKE_SETTLEMENT_LAG,
-
-            // Numerical stability
-            corr_boundary_width: DEFAULT_CORR_BOUNDARY_WIDTH,
-
-            // Heterogeneous portfolio
-            hetero_method: HeteroMethod::ExactConvolution,
-            grid_step: DEFAULT_GRID_STEP,
-        }
-    }
-}
-
-impl CdsTranchePricerConfig {
-    /// Validate numerical and model parameters before constructing a pricer.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`finstack_quant_core::Error::Validation`] when a parameter is
-    /// non-finite, outside its documented range, or requests an unsupported
-    /// quadrature rule.
-    pub fn validate(&self) -> CoreResult<()> {
-        match &self.copula_spec {
-            CopulaSpec::Gaussian | CopulaSpec::MultiFactor => {}
-            CopulaSpec::StudentT { degrees_of_freedom } => {
-                CopulaSpec::student_t(*degrees_of_freedom)
-                    .map_err(|error| CoreError::Validation(error.to_string()))?;
-            }
-            CopulaSpec::RandomFactorLoading { loading_volatility } => {
-                validate_range(
-                    "copula_spec.loading_volatility",
-                    *loading_volatility,
-                    0.0,
-                    0.5,
-                )?;
-            }
-        }
-        if let Some(recovery) = &self.stochastic_recovery_spec {
-            recovery
-                .validate()
-                .map_err(|error| CoreError::Validation(error.to_string()))?;
-        }
-        validate_range(
-            "integration_tolerance",
-            self.integration_tolerance,
-            1e-12,
-            1e-4,
-        )?;
-        if self.integration_max_depth > 30 {
-            return Err(CoreError::Validation(
-                "integration_max_depth must not exceed 30".to_owned(),
-            ));
-        }
-        validate_range("min_correlation", self.min_correlation, 0.0, 1.0)?;
-        validate_range("max_correlation", self.max_correlation, 0.0, 1.0)?;
-        if self.min_correlation >= self.max_correlation {
-            return Err(CoreError::Validation(format!(
-                "min_correlation {} must be less than max_correlation {}",
-                self.min_correlation, self.max_correlation
-            )));
-        }
-        validate_range("corr_boundary_width", self.corr_boundary_width, 0.0, 1.0)?;
-        validate_positive("grid_step", self.grid_step)?;
-        if self.index_settlement_days < 0 || self.bespoke_settlement_days < 0 {
-            return Err(CoreError::Validation(format!(
-                "settlement lags must be non-negative, got index={} bespoke={}",
-                self.index_settlement_days, self.bespoke_settlement_days
-            )));
-        }
-        Ok(())
-    }
-
-    /// Create configuration with Student-t copula.
-    ///
-    /// # Arguments
-    /// * `df` - Degrees of freedom (typical: 4-10 for CDX)
-    pub fn with_student_t_copula(mut self, df: f64) -> CorrelationResult<Self> {
-        self.copula_spec = CopulaSpec::student_t(df)?;
-        Ok(self)
-    }
-
-    /// Create configuration with Random Factor Loading copula.
-    ///
-    /// # Arguments
-    /// * `loading_vol` - Loading volatility (typical: 0.05-0.20)
-    pub fn with_rfl_copula(mut self, loading_vol: f64) -> Self {
-        self.copula_spec = CopulaSpec::random_factor_loading(loading_vol);
-        self
-    }
-
-    /// Create configuration with the global-plus-sector two-factor copula.
-    #[must_use]
-    pub fn with_multi_factor_copula(mut self) -> Self {
-        self.copula_spec = CopulaSpec::multi_factor();
-        self
-    }
-
-    /// Enable stochastic recovery with market-standard calibration.
-    ///
-    /// Uses typical calibration from CDX equity tranche:
-    /// - Mean: 40%, Vol: 25%, Correlation: +40% (canonical low-factor-stress
-    ///   convention: recovery falls when the systematic factor falls)
-    pub fn with_stochastic_recovery(mut self) -> Self {
-        self.stochastic_recovery_spec = Some(RecoverySpec::market_standard_stochastic());
-        self
-    }
-
-    /// Enable stochastic recovery with custom parameters.
-    ///
-    /// # Arguments
-    /// * `mean` - Mean recovery rate (typical: 0.40)
-    /// * `vol` - Recovery volatility (typical: 0.20-0.30)
-    /// * `corr` - Correlation with factor (typical: +0.30 to +0.50 under the
-    ///   canonical low-factor-stress convention)
-    pub fn with_custom_stochastic_recovery(mut self, mean: f64, vol: f64, corr: f64) -> Self {
-        self.stochastic_recovery_spec = Some(RecoverySpec::MarketCorrelated {
-            mean_recovery: mean.clamp(0.0, 1.0),
-            recovery_volatility: vol.clamp(0.0, 0.5),
-            factor_correlation: corr.clamp(-1.0, 1.0),
-        });
-        self
-    }
-
-    /// Set constant recovery rate (overriding index recovery).
-    pub fn with_constant_recovery(mut self, rate: f64) -> Self {
-        self.stochastic_recovery_spec = Some(RecoverySpec::Constant {
-            rate: rate.clamp(0.0, 1.0),
-        });
-        self
-    }
-
-    /// Set the absolute integration error budget for capped pool expectations.
-    ///
-    /// # Arguments
-    ///
-    /// * `tolerance` - Absolute error budget in portfolio-notional fractions,
-    ///   between `1e-12` and `1e-4`. Validated when constructing the pricer.
-    ///   Student-t product-Gauss pricing ignores this budget unless
-    ///   [`Self::with_adaptive_student_t_integration`] is enabled.
-    #[must_use]
-    pub fn with_integration_tolerance(mut self, tolerance: f64) -> Self {
-        self.integration_tolerance = tolerance;
-        self
-    }
-
-    /// Choose nested adaptive Simpson for Student-t factor integrals.
-    ///
-    /// The default Student-t path uses the copula's product Gauss rule.
-    /// Enable this only when a caller must meet
-    /// [`Self::integration_tolerance`] rather than the fixed quadrature
-    /// accuracy.
-    ///
-    /// # Arguments
-    ///
-    /// * `enabled` - `true` to use nested adaptive Simpson over the Student-t
-    ///   mixing variable and systematic factor; `false` (default) to use
-    ///   product Gauss–Laguerre × Gauss–Hermite quadrature.
-    #[must_use]
-    pub fn with_adaptive_student_t_integration(mut self, enabled: bool) -> Self {
-        self.adaptive_student_t_integration = enabled;
-        self
-    }
-}
-
-fn validate_positive(name: &str, value: f64) -> CoreResult<()> {
-    if value.is_finite() && value > 0.0 {
-        Ok(())
-    } else {
-        Err(CoreError::Validation(format!(
-            "{name} must be finite and positive, got {value}"
-        )))
-    }
-}
-
-fn validate_range(name: &str, value: f64, min: f64, max: f64) -> CoreResult<()> {
-    if value.is_finite() && (min..=max).contains(&value) {
-        Ok(())
-    } else {
-        Err(CoreError::Validation(format!(
-            "{name} must be finite and in [{min}, {max}], got {value}"
-        )))
-    }
-}
-
-/// Heterogeneous expected loss evaluation method
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HeteroMethod {
-    /// Moment-matched normal (CLT) approximation for heterogeneous pool loss.
-    ///
-    /// Matches the conditional loss mean and variance with a Gaussian; can
-    /// place probability mass below zero. This is an explicit approximation
-    /// choice, not a saddlepoint method. Its error is not controlled by the
-    /// factor integration tolerance and can be large for concentrated pools
-    /// at any nominal constituent count. Callers must validate its accuracy
-    /// for their exposures and tranche strikes. Pools at or below
-    /// `credit::SMALL_POOL_THRESHOLD` positive-weight constituents still use
-    /// exact convolution regardless of this setting.
-    NormalApprox,
-    /// Conditional convolution on the configured loss grid (default).
-    /// Slower than the normal approximation; retains discrete name exposure
-    /// and requires separate loss-grid convergence checks. Exceeding the
-    /// 200,000-point grid limit or the 5,000,000 issuer-grid visits per
-    /// factor-evaluation budget fails instead of changing pricing methods.
-    ExactConvolution,
-}
-
 /// Copula-based pricing engine for CDS tranches.
 ///
-/// Supports multiple copula models (Gaussian, Student-t, RFL, Multi-factor)
-/// and optional stochastic recovery for market-standard tranche pricing.
+/// Supports the Gaussian, Student-t, random-factor-loading and multi-factor
+/// copulas selected through [`CopulaSpec`]. Recovery is the index (or
+/// per-issuer) recovery rate.
 ///
 /// The copula instance is constructed lazily and cached for the pricer's
 /// lifetime. Gaussian, RFL, and multi-factor expected losses use adaptive
 /// integration over every conditioning factor with explicit tail and
-/// convergence budgets. Student-t uses the copula's product Gauss rule
-/// unless adaptive integration is enabled.
+/// convergence budgets. Student-t uses the copula's product Gauss rule.
 ///
-/// Configuration is validated by [`CdsTranchePricer::with_config`] and remains
-/// immutable for the pricer's lifetime. The cached copula
-/// therefore cannot drift from the settings used by uncached calculations.
+/// Default settings follow ISDA standard model conventions: mid-period
+/// protection timing, accrual-on-default in the premium leg, T+1 settlement
+/// for index tranches and T+3 for bespoke tranches.
+///
+/// The copula specification is validated by [`CdsTranchePricer::with_copula`]
+/// and remains immutable for the pricer's lifetime, so the cached copula
+/// cannot drift from the specification used by uncached calculations.
 pub struct CdsTranchePricer {
-    pub(super) config: CdsTranchePricerConfig,
+    pub(super) copula_spec: CopulaSpec,
     pub(super) copula_cache: OnceLock<Box<dyn Copula + Send + Sync>>,
+}
+
+/// Validate a copula specification before constructing a pricer.
+///
+/// # Errors
+///
+/// Returns [`finstack_quant_core::Error::Validation`] when the Student-t
+/// degrees of freedom or the random-factor-loading volatility are outside
+/// their documented ranges.
+pub(super) fn validate_copula_spec(spec: &CopulaSpec) -> CoreResult<()> {
+    match spec {
+        CopulaSpec::Gaussian | CopulaSpec::MultiFactor => Ok(()),
+        CopulaSpec::StudentT { degrees_of_freedom } => CopulaSpec::student_t(*degrees_of_freedom)
+            .map(|_| ())
+            .map_err(|error| CoreError::Validation(error.to_string())),
+        CopulaSpec::RandomFactorLoading { loading_volatility } => {
+            let value = *loading_volatility;
+            if value.is_finite() && (0.0..=0.5).contains(&value) {
+                Ok(())
+            } else {
+                Err(CoreError::Validation(format!(
+                    "copula_spec.loading_volatility must be finite and in [0, 0.5], got {value}"
+                )))
+            }
+        }
+    }
 }
 
 /// Which per-name exposure a capped pool expectation integrates over.
@@ -437,8 +150,6 @@ pub(super) enum PoolExposure {
 /// One point of the projected tranche erosion curve.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct ElWdPoint {
-    /// Payment date.
-    pub(super) date: Date,
     /// Cumulative expected LOSS as a fraction of tranche notional.
     pub(super) el_fraction: f64,
     /// Cumulative expected senior-side recovery WRITEDOWN as a fraction of
@@ -500,8 +211,8 @@ impl Default for CdsTranchePricer {
 }
 
 impl CdsTranchePricer {
-    /// Get the current configuration.
-    pub fn get_config(&self) -> &CdsTranchePricerConfig {
-        &self.config
+    /// Copula specification used for every valuation performed by this pricer.
+    pub fn get_copula_spec(&self) -> &CopulaSpec {
+        &self.copula_spec
     }
 }

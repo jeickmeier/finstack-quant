@@ -203,6 +203,12 @@ struct PyFactorPnlProfile {
     inner: finstack_quant_portfolio::sensitivity::FactorPnlProfile,
 }
 
+crate::bindings::macros::wire_methods!(
+    PyFactorPnlProfile,
+    finstack_quant_portfolio::sensitivity::FactorPnlProfile,
+    "FactorPnlProfile"
+);
+
 impl PyFactorPnlProfile {
     fn from_inner(inner: finstack_quant_portfolio::sensitivity::FactorPnlProfile) -> Self {
         Self { inner }
@@ -211,26 +217,6 @@ impl PyFactorPnlProfile {
 
 #[pymethods]
 impl PyFactorPnlProfile {
-    /// Support `pickle` via the same serde round-trip as ``to_json``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from JSON (``{base_currency, factor_id, position_ids, shifts, position_pnls}``).
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to compact JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// ISO reporting currency for every P&L amount.
     #[getter]
     fn base_currency(&self) -> String {

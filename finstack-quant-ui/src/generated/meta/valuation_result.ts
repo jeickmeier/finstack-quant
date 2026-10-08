@@ -23,7 +23,7 @@ export default [
             },
             "version": 1
           },
-          "version": "0.9.0"
+          "version": "0.10.0"
         },
         "schema_version": 1,
         "value": {
@@ -314,7 +314,7 @@ export default [
         },
         "version": 1
       },
-      "version": "0.9.0"
+      "version": "0.10.0"
     },
     "description": "Audit stamp: numeric mode, rounding context, and FX policy in force.",
     "ref": "#/$defs/ResultsMeta",
@@ -605,7 +605,7 @@ export default [
   {
     "path": "#/$defs/d_482fa346c77e25f26a51/properties/num_paths",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StochasticPricingResult/properties/num_paths",
-    "description": "Number of simulated scenario paths (`2 × pricing_mode.num_paths` for\nantithetic Monte Carlo, prefixes × suffixes for Hybrid).",
+    "description": "Number of simulated scenario paths (`2 × pricing_mode.num_paths` with\nantithetic pairing, `pricing_mode.num_paths` without).",
     "format": "uint",
     "minimum": 0
   },
@@ -3559,57 +3559,23 @@ export default [
   {
     "path": "#/$defs/d_fcd765f028a63b1f206f",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode",
-    "description": "Pricing mode selection.\n\nChoose based on horizon × dimensionality: `Tree` for SHORT-horizon\nnon-recombining stochastic deals (deterministic, low variance),\n`MonteCarlo` for long-horizon or high-dimensional pools, `Hybrid` to\nfront-load tree precision and tail with MC.\n\n# Tree mode is bounded by construction — read this before selecting it\n\nPath-preserving tree pricing keeps `3^n` terminal nodes for `n`\nperiods, checked against `max_tree_paths` (default 100,000). `3^11 =\n177,147`, so **Tree hard-errors for any deal with more than ten periods\nremaining** — which is essentially every real deal, since\n`build_scenario_tree_config` sets `num_periods` to months-to-maturity.\n\nThe default is [`StructuredCreditPricingMode::MonteCarlo`] — the mode that can price the\ndeals this module is built for at realistic horizons (the public\n`price_stochastic` entry point also selects Monte Carlo). Tree remains\navailable and correct for genuinely short horizons; select it explicitly.\n\nTest coverage:\n- **Tree**: `tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`, at horizons within the node bound.\n- **MonteCarlo**: the same suites plus the convergence tests.\n- **Hybrid**: structured-credit pricer integration tests."
+    "description": "Stochastic pricing mode.\n\nMonte Carlo is the only engine: each scenario path draws its monthly\nsystematic factors from a seeded Philox substream and runs the full deal\nwaterfall. The mode is echoed on\n[`StochasticPricingResult::pricing_mode`](super::StochasticPricingResult)\nso a result records the estimator count it was produced with.\n\nTest coverage:\n`tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`\nplus the convergence tests."
   },
   {
-    "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/0",
-    "const": "tree",
-    "description": "Tree-based pricing (exact, non-recombining).\n\nBounded to roughly ten periods by the `3^n` node count — see the type\ndocs. Not the default for that reason."
+    "path": "#/$defs/d_fcd765f028a63b1f206f/properties/monte_carlo",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/properties/monte_carlo"
   },
   {
-    "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/1",
-    "description": "Monte Carlo pricing with a specified number of independent estimators.\n\nThe default, because it is the only mode that can price a deal at a\nrealistic horizon."
-  },
-  {
-    "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/1/properties/monte_carlo",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/1/properties/monte_carlo"
-  },
-  {
-    "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/1/properties/monte_carlo/properties/antithetic",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/1/properties/monte_carlo/properties/antithetic",
+    "path": "#/$defs/d_fcd765f028a63b1f206f/properties/monte_carlo/properties/antithetic",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/properties/monte_carlo/properties/antithetic",
     "description": "Pair each estimator's path with its sign-flipped mirror."
   },
   {
-    "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/1/properties/monte_carlo/properties/num_paths",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/1/properties/monte_carlo/properties/num_paths",
+    "path": "#/$defs/d_fcd765f028a63b1f206f/properties/monte_carlo/properties/num_paths",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/properties/monte_carlo/properties/num_paths",
     "description": "Number of independent estimators; must be at least two to estimate\nsampling uncertainty. With `antithetic` each estimator averages a\n`(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.\nSample standard error and the Student-t interval use this estimator\ncount, with `num_paths - 1` degrees of freedom.",
     "format": "uint",
     "minimum": 2
-  },
-  {
-    "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/2",
-    "description": "Hybrid: tree for short horizons, MC for long"
-  },
-  {
-    "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/2/properties/hybrid",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/2/properties/hybrid"
-  },
-  {
-    "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/2/properties/hybrid/properties/num_paths",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/2/properties/hybrid/properties/num_paths",
-    "description": "Monte Carlo continuation paths per tree prefix",
-    "format": "uint",
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/2/properties/hybrid/properties/tree_periods",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/2/properties/hybrid/properties/tree_periods",
-    "description": "Tree periods before switching to MC",
-    "format": "uint",
-    "minimum": 0
   },
   {
     "path": "#/properties/as_of",

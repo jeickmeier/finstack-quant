@@ -9,7 +9,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyModule};
 
 use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema;
-use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
+use crate::errors::{core_to_py, serde_json_to_py};
 
 /// Result of geometrically linking TWRR sub-period returns.
 ///
@@ -24,6 +24,12 @@ use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
 pub struct PyLinkedReturn {
     pub(crate) inner: finstack_quant_portfolio::LinkedReturn,
 }
+
+crate::bindings::macros::wire_methods!(
+    PyLinkedReturn,
+    finstack_quant_portfolio::LinkedReturn,
+    "LinkedReturn"
+);
 
 #[pymethods]
 impl PyLinkedReturn {
@@ -56,31 +62,11 @@ impl PyLinkedReturn {
         )
     }
 
-    /// Serialize to a compact JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Deserialize from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::LinkedReturn =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "LinkedReturn(cumulative={}, annualised={}, num_periods={})",
             self.inner.cumulative, self.inner.annualised, self.inner.num_periods,
         )
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 

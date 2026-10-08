@@ -605,10 +605,6 @@ impl Instrument for RealEstateAsset {
         pricer::compute_pv(self, as_of)
     }
 
-    fn effective_start_date(&self) -> Option<Date> {
-        None
-    }
-
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 impl crate::cashflow::traits::CashflowScheduleSource for RealEstateAsset {
