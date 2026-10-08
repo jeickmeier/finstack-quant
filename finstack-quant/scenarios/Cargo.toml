@@ -26,11 +26,6 @@ thiserror = { workspace = true }
 time = { workspace = true, features = ["macros"] }
 tracing = { version = "0.1", default-features = false }
 
-# rayon has no working thread pool on single-threaded wasm32; parallel
-# code paths are cfg-gated to native targets, so the dependency is too.
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-rayon = "1.11"
-
 [features]
 default = ["json-schema"]
 json-schema = [

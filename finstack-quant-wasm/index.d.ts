@@ -279,7 +279,6 @@ import type {
   AttributionFactor,
   Compounding,
   CurveKind,
-  HazardBumpMode,
   HierarchyTarget,
   HorizonResult,
   HorizonSummary,
@@ -32508,8 +32507,8 @@ export interface ModelBuilder extends WasmOwned {
   /**
    * Add a fixed-rate bond to the capital structure (US conventions: 30/360, semi-annual).
    *
-   * Twin of Python `ModelBuilder.add_bond` (Rust `ModelBuilder::add_bond`).
-   * A failed call consumes the builder.
+   * Twin of Python `ModelBuilder.add_bond` (Rust `ModelBuilder::try_add_bond`).
+   * A failed call leaves the builder usable.
    * @param id - Unique instrument identifier.
    * @param notional - Principal as a `Money` wire object (`{amount, currency}`).
    * @param couponRate - Annual coupon rate as a decimal (`0.05` = 5%).
@@ -32530,8 +32529,8 @@ export interface ModelBuilder extends WasmOwned {
    * Add a fixed-rate bond with a market convention preset.
    *
    * Twin of Python `ModelBuilder.add_bond_with_convention` (Rust
-   * `ModelBuilder::add_bond_with_convention`). A failed call consumes the
-   * builder.
+   * `ModelBuilder::try_add_bond_with_convention`). A failed call leaves
+   * the builder usable.
    * @param id - Unique instrument identifier.
    * @param notional - Principal as a `Money` wire object (`{amount, currency}`).
    * @param couponRate - Annual coupon rate as a decimal (`0.03` = 3%).
@@ -32553,8 +32552,8 @@ export interface ModelBuilder extends WasmOwned {
   /**
    * Add a pay-fixed interest rate swap to the capital structure (US conventions).
    *
-   * Twin of Python `ModelBuilder.add_swap` (Rust `ModelBuilder::add_swap`).
-   * A failed call consumes the builder.
+   * Twin of Python `ModelBuilder.add_swap` (Rust `ModelBuilder::try_add_swap`).
+   * A failed call leaves the builder usable.
    * @param id - Unique instrument identifier.
    * @param notional - Swap notional as a `Money` wire object (`{amount, currency}`).
    * @param fixedRate - Fixed leg rate as a decimal (`0.04` = 4%).
@@ -32577,8 +32576,8 @@ export interface ModelBuilder extends WasmOwned {
    * Add a pay-fixed interest rate swap with explicit leg conventions.
    *
    * Twin of Python `ModelBuilder.add_swap_with_conventions` (Rust
-   * `ModelBuilder::add_swap_with_conventions`). A failed call consumes the
-   * builder.
+   * `ModelBuilder::try_add_swap_with_conventions`). A failed call leaves
+   * the builder usable.
    * @param id - Unique instrument identifier.
    * @param notional - Swap notional as a `Money` wire object (`{amount, currency}`).
    * @param fixedRate - Fixed leg rate as a decimal (`0.04` = 4%).
@@ -36915,17 +36914,6 @@ export interface ScenariosNamespace {
    * @throws Error - Throws a `TypeError` when `spec` is not an object or JSON string, and a `validation` error when it is not a valid `ScenarioSpec`.
    */
   scenarioSpecMutatesInstruments(spec: ScenarioSpec | string): boolean;
-  /**
-   * Copy a scenario with a different ParCDS hazard delivery mode.
-   *
-   * Free-function twin of Python `ScenarioSpec.with_hazard_bump_mode` (Rust
-   * `ScenarioSpec::with_hazard_bump_mode`). The input is not modified.
-   * @param spec - `ScenarioSpec` object or JSON; it is validated first.
-   * @param mode - `"solve_to_par"` (re-bootstrap hazard from shocked par spreads) or `"first_order_shift"` (shift hazard knots in place).
-   * @returns A new `ScenarioSpec` object with `hazard_bump_mode` replaced.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments, and a `validation` error when `spec` is not a valid `ScenarioSpec` or `mode` is not an accepted label.
-   */
-  scenarioSpecWithHazardBumpMode(spec: ScenarioSpec | string, mode: HazardBumpMode): ScenarioSpec;
   /**
    * Render a horizon result as a multi-line text summary.
    *

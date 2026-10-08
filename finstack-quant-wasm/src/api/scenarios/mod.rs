@@ -17,6 +17,14 @@ fn builtin_registry() -> Result<&'static finstack_quant_scenarios::TemplateRegis
 }
 
 /// Parse the optional `FinstackConfig` argument; omitted means the Rust default.
+/// Parse and validate a `ScenarioSpec` argument (object or JSON text).
+pub(super) fn scenario_spec(
+    value: &JsValue,
+    name: &str,
+) -> Result<finstack_quant_scenarios::ScenarioSpec, JsValue> {
+    finstack_quant_scenarios::ScenarioSpec::from_json(&json_text(value, name)?).map_err(to_js_err)
+}
+
 fn parse_config(
     config_json: Option<&JsValue>,
 ) -> Result<finstack_quant_core::config::FinstackConfig, JsValue> {
@@ -40,9 +48,7 @@ fn parse_config(
 /// @param json_str - Scenario specification JSON string to deserialize and validate; the result is returned as a plain object.
 #[wasm_bindgen(js_name = parseScenarioSpec)]
 pub fn parse_scenario_spec(json_str: JsValue) -> Result<JsValue, JsValue> {
-    let json_str: &str = &json_text(&json_str, "jsonStr")?;
-    let spec = finstack_quant_scenarios::ScenarioSpec::from_json(json_str).map_err(to_js_err)?;
-    crate::utils::to_js_value(&spec)
+    crate::utils::to_js_value(&scenario_spec(&json_str, "jsonStr")?)
 }
 
 /// Compose multiple scenario specs (JSON array) into a single scenario.
@@ -80,9 +86,7 @@ pub fn compose_scenarios(specs: JsValue) -> Result<JsValue, JsValue> {
 /// @param json_str - Scenario specification JSON string to deserialize and validate.
 #[wasm_bindgen(js_name = validateScenarioSpec)]
 pub fn validate_scenario_spec(json_str: JsValue) -> Result<(), JsValue> {
-    let json_str: &str = &json_text(&json_str, "jsonStr")?;
-    finstack_quant_scenarios::ScenarioSpec::from_json(json_str).map_err(to_js_err)?;
-    Ok(())
+    scenario_spec(&json_str, "jsonStr").map(|_| ())
 }
 
 /// List all built-in template identifiers.
@@ -222,14 +226,12 @@ pub fn apply_scenario(
     instruments_json: Option<JsValue>,
     config_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
+    let spec = scenario_spec(&scenario_json, "scenarioJson")?;
     let market_json: &str = &json_text(&market_json, "marketJson")?;
     let model_json = opt_json_text(model_json.as_ref(), "modelJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let instruments_json = opt_json_text(instruments_json.as_ref(), "instrumentsJson")?;
     let config = parse_config(config_json.as_ref())?;
-    let spec =
-        finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
     let mut market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let mut model = model_json
@@ -317,7 +319,7 @@ pub fn compute_horizon_return(
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let market_json: &str = &json_text(&market_json, "marketJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
-    let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
+    let scenario = scenario_spec(&scenario_json, "scenarioJson")?;
     let method = js_opt_string(method.as_ref(), "method")?;
     let config = parse_config(config_json.as_ref())?;
     let calendar_id = js_opt_string(calendar_id.as_ref(), "calendarId")?;
@@ -335,9 +337,6 @@ pub fn compute_horizon_return(
         serde_json::from_str(market_json).map_err(to_js_err)?;
 
     let date = parse_iso_date(as_of)?;
-
-    let scenario =
-        finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
 
     let attribution_method = method
         .as_deref()

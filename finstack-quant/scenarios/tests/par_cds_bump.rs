@@ -787,10 +787,10 @@ fn default_provider_replays_calibrated_hazard_rolls_without_explicit_wiring() {
         .insert_price("SPOT", MarketScalar::Unitless(100.0));
     let original = source.get_hazard("ISSUER-A-CDS").expect("hazard");
     let base = original.base_date();
-    // Neither the standalone helper nor `ScenarioEngine::new()` is given a
-    // provider: both carry the default one, so a calibrated hazard keeps a
-    // usable recipe at the horizon instead of failing or losing it.
-    for standalone in [false, true] {
+    // `ScenarioEngine::new()` is given no provider: it carries the default one,
+    // so a calibrated hazard keeps a usable recipe at the horizon instead of
+    // failing or losing it, with or without further shocks.
+    for roll_only in [false, true] {
         let mut market = source.clone();
         let mut ctx = ExecutionContext {
             market: &mut market,
@@ -800,34 +800,23 @@ fn default_provider_replays_calibrated_hazard_rolls_without_explicit_wiring() {
             calendar: None,
             as_of: base,
         };
-        if standalone {
-            finstack_quant_scenarios::apply_time_roll_forward(
-                &mut ctx,
-                "1M",
-                finstack_quant_scenarios::TimeRollMode::CalendarDays,
-            )
-            .expect("standalone helper replays calibrated hazards");
-        } else {
-            ScenarioEngine::new()
-                .apply(
-                    &regression_scenario(
-                        "default-provider-roll",
-                        vec![
-                            OperationSpec::TimeRollForward {
-                                period: "1M".into(),
-                                apply_shocks: true,
-                                roll_mode: finstack_quant_scenarios::TimeRollMode::CalendarDays,
-                            },
-                            OperationSpec::EquityPricePct {
-                                ids: vec!["SPOT".into()],
-                                pct: 10.0,
-                            },
-                        ],
-                    ),
-                    &mut ctx,
-                )
-                .expect("default engine replays calibrated hazards");
+        let mut operations = vec![OperationSpec::TimeRollForward {
+            period: "1M".into(),
+            apply_shocks: true,
+            roll_mode: finstack_quant_scenarios::TimeRollMode::CalendarDays,
+        }];
+        if !roll_only {
+            operations.push(OperationSpec::EquityPricePct {
+                ids: vec!["SPOT".into()],
+                pct: 10.0,
+            });
         }
+        ScenarioEngine::new()
+            .apply(
+                &regression_scenario("default-provider-roll", operations),
+                &mut ctx,
+            )
+            .expect("default engine replays calibrated hazards");
         let horizon = ctx.as_of;
         assert!(horizon > base);
         let rolled = ctx
@@ -949,12 +938,21 @@ fn zero_day_business_rolls_preserve_recipes_and_allow_subsequent_shocks_without_
         calendar: None,
         as_of: base,
     };
-    let report = finstack_quant_scenarios::apply_time_roll_forward(
-        &mut ctx,
-        "1D",
-        finstack_quant_scenarios::TimeRollMode::BusinessDays,
-    )
-    .expect("standalone no-op needs no provider");
+    let report = ScenarioEngine::new()
+        .apply(
+            &regression_scenario(
+                "no-op-roll",
+                vec![OperationSpec::TimeRollForward {
+                    period: "1D".into(),
+                    apply_shocks: true,
+                    roll_mode: finstack_quant_scenarios::TimeRollMode::BusinessDays,
+                }],
+            ),
+            &mut ctx,
+        )
+        .expect("roll-only no-op")
+        .time_roll
+        .expect("roll report");
     assert_eq!(report.days, 0);
     assert_eq!(
         serde_json::to_value(

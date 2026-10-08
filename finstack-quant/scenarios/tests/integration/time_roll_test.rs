@@ -57,7 +57,7 @@ fn test_time_roll_1_day() {
 /// is only meaningful for forward time; a negative period (whether produced
 /// by Tenor::parse or a downstream calculation) silently corrupts carry and
 /// market-data roll. Either Tenor::parse rejects the string (preferred) or
-/// apply_time_roll_forward's explicit guard does.
+/// the time-roll adapter's explicit guard does.
 #[test]
 fn test_time_roll_negative_period_is_rejected() {
     let base_date = Date::from_calendar_date(2025, Month::January, 15).unwrap();

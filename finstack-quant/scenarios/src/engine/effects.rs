@@ -1,25 +1,57 @@
 //! Operation dispatch, effect processing, and market-bump batching.
 
-use super::instrument_shocks::{apply_correlation_effect, apply_instrument_shock, CorrelationKind};
+use super::instrument_shocks::apply_instrument_operation;
 use super::{
     AppliedShock, AppliedShockTarget, ExecutionContext, HazardApplyEnv, LevelChange,
     ScenarioChangeManifest, ScenarioMarketTarget, ShockMagnitude, ShockNode, ShockUnit,
 };
 use crate::adapters;
-use crate::adapters::traits::ScenarioEffect;
+use crate::adapters::curves::CurveApplyCtx;
 use crate::error::Result;
 use crate::spec::{CurveKind, OperationSpec};
 use crate::warning::Warning;
-use finstack_quant_core::market_data::bumps::{BumpType, MarketBump};
+use finstack_quant_core::market_data::bumps::{BumpSpec, BumpType, MarketBump};
+use finstack_quant_core::market_data::context::CurveStorage;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_core::HashSet;
-use finstack_quant_valuations::instruments::Instrument;
+
+/// Market change or warning an adapter produces for one operation, collected
+/// before mutation.
+///
+/// Adapter modules translate a market [`OperationSpec`] into a
+/// `Vec<ScenarioEffect>`; [`apply_generated_effects`] then applies them to the
+/// mutable [`ExecutionContext`].
+#[derive(Debug)]
+pub(crate) enum ScenarioEffect {
+    /// Market-data bump applied to the context.
+    MarketBump(MarketBump),
+    /// Price-scalar percentage bump, qualified by its market collection.
+    PriceBump {
+        /// Price-scalar identifier.
+        id: CurveId,
+        /// Percentage change; `10.0` increases the price by ten percent.
+        pct: f64,
+    },
+    /// Volatility-surface bump, qualified by its market collection.
+    SurfaceBump {
+        /// Volatility-surface identifier.
+        id: CurveId,
+        /// Canonical surface bump specification.
+        spec: BumpSpec,
+    },
+    /// Structured warning recorded on the application report.
+    Warning(Warning),
+    /// Replace a curve in the market (discount, forward, hazard, inflation, or vol-index).
+    UpdateCurve(CurveStorage),
+}
 
 /// Dispatch one operation to its adapter and produce effects.
 ///
-/// Hierarchy variants and `TimeRollForward` are handled upstream; reaching
-/// them here is an engine bug and returns [`crate::error::Error::Internal`].
+/// Only market operations produce effects. Hierarchy variants, `TimeRollForward`,
+/// statement operations and instrument-scoped operations are handled elsewhere;
+/// reaching them here is an engine bug and returns
+/// [`crate::error::Error::Internal`].
 fn generate_effects(
     op: &OperationSpec,
     ctx: &ExecutionContext,
@@ -42,8 +74,7 @@ fn generate_effects(
             curve_id,
             discount_curve_id.as_ref(),
             *bp,
-            ctx,
-            env,
+            &CurveApplyCtx::new(ctx, env),
         ),
         OperationSpec::CurveNodeBp {
             curve_kind,
@@ -57,8 +88,7 @@ fn generate_effects(
             discount_curve_id.as_ref(),
             nodes,
             *match_mode,
-            ctx,
-            env,
+            &CurveApplyCtx::new(ctx, env),
         ),
         OperationSpec::VolIndexParallelPts { curve_id, points } => {
             adapters::curves::vol_index_parallel_effects(curve_id, *points, ctx)
@@ -99,70 +129,24 @@ fn generate_effects(
             *pct,
             ctx,
         ),
-        OperationSpec::StmtForecastPercent { node_id, pct } => {
-            Ok(vec![ScenarioEffect::StmtForecastPercent {
-                node_id: node_id.clone(),
-                pct: *pct,
-            }])
-        }
-        OperationSpec::StmtForecastAssign { node_id, value } => {
-            Ok(vec![ScenarioEffect::StmtForecastAssign {
-                node_id: node_id.clone(),
-                value: *value,
-            }])
-        }
-        OperationSpec::RateBinding { binding } => Ok(vec![ScenarioEffect::RateBinding {
-            binding: binding.clone(),
-        }]),
-        OperationSpec::InstrumentPricePctByType {
-            instrument_types,
-            pct,
-        } => Ok(vec![ScenarioEffect::InstrumentPriceShock {
-            types: Some(instrument_types.clone()),
-            attrs: None,
-            pct: *pct,
-        }]),
-        OperationSpec::InstrumentPricePctByAttr { attrs, pct } => {
-            Ok(vec![ScenarioEffect::InstrumentPriceShock {
-                types: None,
-                attrs: Some(attrs.clone()),
-                pct: *pct,
-            }])
-        }
-        OperationSpec::InstrumentSpreadBpByType {
-            instrument_types,
-            bp,
-        } => Ok(vec![ScenarioEffect::InstrumentSpreadShock {
-            types: Some(instrument_types.clone()),
-            attrs: None,
-            bp: *bp,
-        }]),
-        OperationSpec::InstrumentSpreadBpByAttr { attrs, bp } => {
-            Ok(vec![ScenarioEffect::InstrumentSpreadShock {
-                types: None,
-                attrs: Some(attrs.clone()),
-                bp: *bp,
-            }])
-        }
-        OperationSpec::AssetCorrelationPts { delta_pts } => {
-            Ok(vec![ScenarioEffect::AssetCorrelationShock {
-                delta_pts: *delta_pts,
-            }])
-        }
-        OperationSpec::PrepayDefaultCorrelationPts { delta_pts } => {
-            Ok(vec![ScenarioEffect::PrepayDefaultCorrelationShock {
-                delta_pts: *delta_pts,
-            }])
-        }
-        OperationSpec::TimeRollForward { .. }
+        OperationSpec::StmtForecastPercent { .. }
+        | OperationSpec::StmtForecastAssign { .. }
+        | OperationSpec::RateBinding { .. }
+        | OperationSpec::InstrumentPricePctByType { .. }
+        | OperationSpec::InstrumentPricePctByAttr { .. }
+        | OperationSpec::InstrumentSpreadBpByType { .. }
+        | OperationSpec::InstrumentSpreadBpByAttr { .. }
+        | OperationSpec::AssetCorrelationPts { .. }
+        | OperationSpec::PrepayDefaultCorrelationPts { .. }
+        | OperationSpec::TimeRollForward { .. }
         | OperationSpec::HierarchyCurveParallelBp { .. }
         | OperationSpec::HierarchyVolSurfaceParallelPct { .. }
         | OperationSpec::HierarchyEquityPricePct { .. }
         | OperationSpec::HierarchyBaseCorrParallelPts { .. } => {
             Err(crate::error::Error::Internal(format!(
-                "scenario engine reached centralized dispatch for an op that should have been \
-                 handled upstream (Phase 0 or hierarchy expansion); this indicates a bug in the \
-                 dispatch pipeline. Operation: {op:?}"
+                "scenario engine reached market-effect dispatch for an op that should have \
+                 been handled elsewhere (Phase 0, hierarchy expansion, statement or instrument \
+                 application); this indicates a bug in the dispatch pipeline. Operation: {op:?}"
             )))
         }
     }
@@ -228,13 +212,6 @@ fn market_target_for_bump(op: &OperationSpec, bump: &MarketBump) -> Option<Scena
         }
         _ => None,
     }
-}
-
-fn market_target_for_curve_update(
-    op: &OperationSpec,
-    storage: &finstack_quant_core::market_data::context::CurveStorage,
-) -> Option<ScenarioMarketTarget> {
-    market_target_for_id(op, storage.id())
 }
 
 /// Unit of the sizes on a curve operation: commodity price curves are shocked
@@ -452,7 +429,6 @@ pub(super) fn generate_replace_curve_effects_parallel(
 /// Mutable sinks shared while applying one operation's effects.
 pub(super) struct EffectSink<'a> {
     pub pending_bumps: &'a mut Vec<MarketBump>,
-    pub deferred_stmts: &'a mut Vec<ScenarioEffect>,
     pub warnings: &'a mut Vec<Warning>,
     pub applied: &'a mut usize,
     pub changes: &'a mut ScenarioChangeManifest,
@@ -504,6 +480,12 @@ pub(super) fn process_effects(
     env: &HazardApplyEnv<'_>,
     sink: &mut EffectSink<'_>,
 ) -> Result<()> {
+    if let Some(outcome) = apply_instrument_operation(op, &mut ctx.instruments)? {
+        *sink.applied += outcome.count;
+        sink.record_instrument_shock(op, outcome.changed_indices);
+        sink.warnings.extend(outcome.warnings);
+        return Ok(());
+    }
     let effects = generate_effects(op, ctx, env)?;
     apply_generated_effects(op, effects, ctx, sink)
 }
@@ -558,86 +540,16 @@ pub(super) fn apply_generated_effects(
             ScenarioEffect::Warning(w) => sink.warnings.push(w),
             ScenarioEffect::UpdateCurve(storage) => {
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-                match market_target_for_curve_update(op, &storage) {
+                match market_target_for_id(op, storage.id()) {
                     Some(target) => sink.record_market_shock(target, requested_shock(op), None),
                     None => sink.changes.all_dirty = true,
                 }
                 *ctx.market = std::mem::take(ctx.market).insert(storage);
                 *sink.applied += 1;
             }
-            ScenarioEffect::InstrumentPriceShock { types, attrs, pct } => {
-                flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-                let outcome = apply_instrument_shock(
-                    types.as_deref(),
-                    attrs.as_ref(),
-                    pct,
-                    inventory(&mut ctx.instruments)?,
-                    adapters::instruments::apply_instrument_type_price_shock,
-                    adapters::instruments::apply_instrument_attr_price_shock,
-                );
-                *sink.applied += outcome.count;
-                sink.record_instrument_shock(op, outcome.changed_indices);
-                sink.warnings.extend(outcome.warnings);
-            }
-            ScenarioEffect::InstrumentSpreadShock { types, attrs, bp } => {
-                flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-                let outcome = apply_instrument_shock(
-                    types.as_deref(),
-                    attrs.as_ref(),
-                    bp,
-                    inventory(&mut ctx.instruments)?,
-                    adapters::instruments::apply_instrument_type_spread_shock,
-                    adapters::instruments::apply_instrument_attr_spread_shock,
-                );
-                *sink.applied += outcome.count;
-                sink.record_instrument_shock(op, outcome.changed_indices);
-                sink.warnings.extend(outcome.warnings);
-            }
-            ScenarioEffect::AssetCorrelationShock { delta_pts } => {
-                flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-                let (count, indices, ws) = apply_correlation_effect(
-                    CorrelationKind::Asset,
-                    delta_pts,
-                    inventory(&mut ctx.instruments)?,
-                );
-                *sink.applied += count;
-                sink.record_instrument_shock(op, indices);
-                sink.warnings.extend(ws);
-            }
-            ScenarioEffect::PrepayDefaultCorrelationShock { delta_pts } => {
-                flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-                let (count, indices, ws) = apply_correlation_effect(
-                    CorrelationKind::PrepayDefault,
-                    delta_pts,
-                    inventory(&mut ctx.instruments)?,
-                );
-                *sink.applied += count;
-                sink.record_instrument_shock(op, indices);
-                sink.warnings.extend(ws);
-            }
-            stmt @ (ScenarioEffect::StmtForecastPercent { .. }
-            | ScenarioEffect::StmtForecastAssign { .. }
-            | ScenarioEffect::RateBinding { .. }) => {
-                sink.deferred_stmts.push(stmt);
-            }
         }
     }
     Ok(())
-}
-
-/// The instrument inventory an instrument-scoped effect mutates.
-///
-/// [`super::ScenarioEngine::apply`] rejects instrument-scoped operations
-/// without an inventory before any effect runs, so a missing inventory here is
-/// an engine invariant violation.
-fn inventory<'a>(
-    instruments: &'a mut Option<&mut Vec<Box<dyn Instrument>>>,
-) -> Result<&'a mut Vec<Box<dyn Instrument>>> {
-    instruments.as_deref_mut().ok_or_else(|| {
-        crate::error::Error::internal(
-            "instrument-scoped effect reached the engine without an instrument inventory",
-        )
-    })
 }
 
 /// Flush any accumulated [`MarketBump`]s through `MarketContext::bump` in a

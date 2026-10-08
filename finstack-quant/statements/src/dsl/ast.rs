@@ -260,14 +260,6 @@ impl StmtExpr {
             else_expr: Box::new(else_expr),
         }
     }
-
-    /// Create a capital structure reference.
-    pub fn cs_ref(component: impl Into<String>, instrument_or_total: impl Into<String>) -> Self {
-        Self::CsRef {
-            component: component.into(),
-            instrument_or_total: instrument_or_total.into(),
-        }
-    }
 }
 
 #[cfg(test)]

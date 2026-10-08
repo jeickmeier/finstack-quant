@@ -4,14 +4,10 @@
 //! WASM scenario specs and horizon results are plain objects, so each Python
 //! method is a function taking that object (or its JSON) first.
 
-use crate::utils::input::{from_js_json, js_string, json_text};
-use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_scenarios::{HazardBumpMode, HorizonResult, ScenarioSpec};
+use crate::utils::input::{from_js_json, js_string};
+use crate::utils::to_js_err;
+use finstack_quant_scenarios::HorizonResult;
 use wasm_bindgen::prelude::*;
-
-fn scenario_spec(value: &JsValue) -> Result<ScenarioSpec, JsValue> {
-    ScenarioSpec::from_json(&json_text(value, "spec")?).map_err(to_js_err)
-}
 
 fn horizon_result(value: &JsValue) -> Result<HorizonResult, JsValue> {
     from_js_json(value, "result")
@@ -30,7 +26,7 @@ fn horizon_result(value: &JsValue) -> Result<HorizonResult, JsValue> {
 /// `validation` error when it is not a valid `ScenarioSpec`.
 #[wasm_bindgen(js_name = scenarioSpecRequiresInstruments)]
 pub fn scenario_spec_requires_instruments(spec: JsValue) -> Result<bool, JsValue> {
-    Ok(scenario_spec(&spec)?.requires_instruments())
+    Ok(super::scenario_spec(&spec, "spec")?.requires_instruments())
 }
 
 /// Report whether applying a scenario can replace or mutate instruments.
@@ -46,30 +42,7 @@ pub fn scenario_spec_requires_instruments(spec: JsValue) -> Result<bool, JsValue
 /// `validation` error when it is not a valid `ScenarioSpec`.
 #[wasm_bindgen(js_name = scenarioSpecMutatesInstruments)]
 pub fn scenario_spec_mutates_instruments(spec: JsValue) -> Result<bool, JsValue> {
-    Ok(scenario_spec(&spec)?.mutates_instruments())
-}
-
-/// Copy a scenario with a different ParCDS hazard delivery mode.
-///
-/// Free-function twin of Python `ScenarioSpec.with_hazard_bump_mode` (Rust
-/// `ScenarioSpec::with_hazard_bump_mode`). The input is not modified.
-/// @param spec - `ScenarioSpec` object or JSON; it is validated first.
-/// @param mode - `"solve_to_par"` (re-bootstrap hazard from shocked par spreads) or `"first_order_shift"` (shift hazard knots in place).
-/// @returns A new `ScenarioSpec` object with `hazard_bump_mode` replaced.
-///
-/// # Errors
-///
-/// Throws a `TypeError` for wrongly typed arguments, and a `validation` error
-/// when `spec` is not a valid `ScenarioSpec` or `mode` is not an accepted
-/// label.
-#[wasm_bindgen(js_name = scenarioSpecWithHazardBumpMode)]
-pub fn scenario_spec_with_hazard_bump_mode(
-    spec: JsValue,
-    mode: JsValue,
-) -> Result<JsValue, JsValue> {
-    let mode: HazardBumpMode =
-        finstack_quant_core::wire::serde_parse(&js_string(&mode, "mode")?).map_err(to_js_err)?;
-    to_js_value(&scenario_spec(&spec)?.with_hazard_bump_mode(mode))
+    Ok(super::scenario_spec(&spec, "spec")?.mutates_instruments())
 }
 
 /// Render a horizon result as a multi-line text summary.

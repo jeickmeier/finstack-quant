@@ -81,43 +81,6 @@ pub fn compile(ast: &StmtExpr) -> Result<Expr> {
     }
 }
 
-/// Validate monetary/scalar dimensional compatibility for a formula AST.
-///
-/// `node_types` describes known model outputs. Unknown references remain
-/// dimension-unknown so they can be resolved later; known monetary operands
-/// must be compatible for addition, subtraction, comparison, and conditional
-/// branches. This catches currency-unit mistakes before numerical evaluation.
-///
-/// `FinancialModelSpec::validate_semantics` repeatedly applies the companion
-/// inference routine through formula dependencies, so calculated monetary
-/// nodes retain currency and indirect cross-currency operations are rejected.
-/// This standalone validator checks only the `node_types` supplied by its
-/// caller; references absent from that map remain unknown. Variance-like
-/// squared units also remain unknown because `NodeValueType` intentionally
-/// represents only scalar and monetary outputs.
-///
-/// # Arguments
-///
-/// * `ast` - Parsed statements DSL expression whose known value dimensions are
-///   checked before evaluation.
-/// * `node_types` - Known node output types keyed by node ID; references absent
-///   from this map remain dimension-unknown.
-///
-/// # Errors
-///
-/// Returns an error when the expression combines incompatible known dimensions
-/// (for example, currencies that cannot be added), uses a monetary value where
-/// a scalar-only operation is required, or supplies an invalid function
-/// dimension. It does not prove the units of references absent from
-/// `node_types`.
-pub fn validate_dimensions(
-    ast: &StmtExpr,
-    node_types: &IndexMap<NodeId, NodeValueType>,
-) -> Result<()> {
-    infer_dimension(ast, node_types, None, &IndexMap::new())?;
-    Ok(())
-}
-
 /// Infer a formula's output type from known node types and capital-structure
 /// currencies. Totals use the reporting currency; named instruments retain
 /// their native currencies, matching cashflow evaluation.
@@ -720,6 +683,13 @@ fn compile_if_then_else(
 mod tests {
     use super::*;
     use crate::dsl::parse_formula;
+
+    fn validate_dimensions(
+        ast: &StmtExpr,
+        node_types: &IndexMap<NodeId, NodeValueType>,
+    ) -> Result<()> {
+        infer_dimension(ast, node_types, None, &IndexMap::new()).map(|_| ())
+    }
     use finstack_quant_core::expr::ExprNode;
 
     #[test]

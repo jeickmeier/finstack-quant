@@ -318,6 +318,24 @@ test('ModelBuilder capital-structure and registry steps build a valid model', ()
       ),
     (e) => e.kind === 'validation'
   );
+
+  // A capital-structure call rejected by Rust leaves the builder usable.
+  assert.throws(
+    () =>
+      bad.addSwap(
+        'SEK-SWAP',
+        { amount: '1000000', currency: 'SEK' },
+        0.03,
+        '2025-01-15',
+        '2030-01-15',
+        'SEK-OIS',
+        'SEK-STIBOR-3M'
+      ),
+    (e) => /no standard rates calendar/.test(e.message)
+  );
+  bad.periods('2025Q1..Q2');
+  bad.valueScalar('revenue', { [Q1]: 1.0 });
+  assert.equal(bad.build().id, 'bad');
 });
 
 test('MixedNodeBuilder.valuesMoney and forecast feed the mixed node', () => {

@@ -1,6 +1,7 @@
 //! Python wrappers for statement model types and enums.
 
 use crate::bindings::date_utils::date_to_py;
+use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{
     serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
 };
@@ -227,6 +228,12 @@ impl PyForecastSpec {
         Self { inner }
     }
 }
+
+wire_methods!(
+    PyForecastSpec,
+    finstack_quant_statements::types::ForecastSpec,
+    "ForecastSpec"
+);
 
 #[pymethods]
 impl PyForecastSpec {
@@ -535,35 +542,6 @@ impl PyForecastSpec {
         serde_to_py(py, &self.inner.params)
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a forecast spec from its canonical JSON form.
-    ///
-    /// Unknown fields are rejected, so a typo in ``method`` or ``params``
-    /// fails loudly rather than being silently dropped.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid ForecastSpec JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this forecast spec to canonical JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize ForecastSpec"))
-    }
-
     /// Return ``ForecastSpec(method='growth_pct', params={'rate': 0.05})``.
     fn __repr__(&self) -> String {
         let params = serde_json::Value::Object(
@@ -775,6 +753,8 @@ pub struct PyNodeSpec {
     pub(crate) inner: NodeSpec,
 }
 
+wire_methods!(PyNodeSpec, NodeSpec, "NodeSpec");
+
 #[pymethods]
 impl PyNodeSpec {
     /// Build a node specification.
@@ -835,29 +815,6 @@ impl PyNodeSpec {
         inner.where_text = where_text;
         inner.tags = tags.unwrap_or_default();
         Ok(Self { inner })
-    }
-
-    /// Support `pickle` via the canonical JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a node spec from its canonical JSON form (unknown fields
-    /// are rejected).
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner =
-            serde_json::from_str(json).map_err(|e| serde_json_to_py(e, "invalid NodeSpec JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this node spec to canonical JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize NodeSpec"))
     }
 
     /// Node identifier.

@@ -108,21 +108,6 @@ fn push_swap(
     Ok(())
 }
 
-/// Default settlement-calendar id for a currency.
-///
-/// Maps the major currencies to their standard market calendars so a swap's
-/// coupon dates roll on the right holiday set (e.g. EUR → TARGET2, not NYSE).
-/// Unmapped currencies fall back to the US calendar.
-fn default_calendar_for(currency: finstack_quant_core::currency::Currency) -> &'static str {
-    use finstack_quant_core::currency::Currency;
-    match currency {
-        Currency::EUR => "target2",
-        Currency::GBP => "gblo",
-        Currency::JPY => "jpto",
-        _ => "usny",
-    }
-}
-
 /// Build an `InterestRateSwap` from leg parameters.
 #[allow(clippy::too_many_arguments)]
 fn build_swap_internal(
@@ -148,10 +133,18 @@ fn build_swap_internal(
         ))
     })?;
 
-    // Default the settlement calendar from the swap's currency rather than
-    // hardcoding the US calendar for every leg — a EUR swap must roll on
-    // TARGET2, not NYSE holidays.
-    let calendar_id = default_calendar_for(notional.currency()).to_string();
+    // The swap rolls on its currency's standard rates calendar. A currency
+    // without one is rejected rather than silently rolled on US holidays.
+    let currency = notional.currency();
+    let calendar_id =
+        finstack_quant_valuations::instruments::pricing::default_rate_calendar_id(currency)
+            .ok_or_else(|| {
+                crate::error::Error::build(format!(
+                    "swap '{id_str}': no standard rates calendar is defined for {currency}; \
+                     add the swap with `add_debt` and explicit leg calendars"
+                ))
+            })?
+            .to_string();
 
     let discount_curve_id = CurveId::new(discount_curve_id);
     let forward_curve_id = CurveId::new(forward_curve_id);
@@ -467,8 +460,9 @@ impl<State> ModelBuilder<State> {
     /// ```
     ///
     /// The swap is created with the `Pay` side, zero floating spread, simple
-    /// compounding, and a settlement calendar chosen from the notional
-    /// currency (EUR → TARGET2, GBP → GBLO, JPY → JPTO, otherwise USNY). It
+    /// compounding, and the notional currency's standard rates calendar (USD,
+    /// EUR, GBP, JPY, AUD, CAD and CHF are mapped; any other currency is
+    /// rejected, so add such a swap with `add_debt`). It
     /// is serialized into the capital-structure specification; pricing occurs
     /// only during market-aware evaluation.
     ///

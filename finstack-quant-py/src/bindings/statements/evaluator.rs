@@ -6,10 +6,11 @@ use super::parse_period_id;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::{extract_market_ref, extract_model_ref};
+use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{
     selected_table_to_dataframe, table_to_dataframe, values_to_series,
 };
-use crate::errors::{serde_json_to_py, statements_to_py};
+use crate::errors::statements_to_py;
 use finstack_quant_statements::evaluator::PeriodDateConvention;
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
@@ -26,35 +27,14 @@ pub struct PyStatementResult {
     pub(crate) inner: finstack_quant_statements::evaluator::StatementResult,
 }
 
+wire_methods!(
+    PyStatementResult,
+    finstack_quant_statements::evaluator::StatementResult,
+    "StatementResult"
+);
+
 #[pymethods]
 impl PyStatementResult {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_statements::evaluator::StatementResult =
-            serde_json::from_str(json)
-                .map_err(|e| serde_json_to_py(e, "invalid StatementResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize StatementResult"))
-    }
-
     /// Get the value for a node at a specific period.
     ///
     /// Returns the f64 view of whichever source won this period under the

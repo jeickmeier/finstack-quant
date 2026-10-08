@@ -149,6 +149,26 @@ pub struct ScenarioChangeManifest {
     pub all_dirty: bool,
 }
 
+impl ScenarioMarketTarget {
+    /// Display identifier of the changed market object.
+    ///
+    /// # Returns
+    ///
+    /// The curve, surface or price identifier, or `BASE/QUOTE` for an FX pair.
+    #[must_use]
+    pub fn id_label(&self) -> String {
+        match self {
+            Self::Curve { curve_id, .. } | Self::VolatilityIndex { curve_id } => {
+                curve_id.as_str().to_string()
+            }
+            Self::BaseCorrelation { surface_id } => surface_id.as_str().to_string(),
+            Self::VolSurface { vol_surface_id } => vol_surface_id.as_str().to_string(),
+            Self::EquityPrice { spot_id } => spot_id.as_str().to_string(),
+            Self::Fx { base, quote } => format!("{base}/{quote}"),
+        }
+    }
+}
+
 impl ScenarioChangeManifest {
     pub(super) fn record_market_target(&mut self, target: ScenarioMarketTarget) {
         if !self.market_targets.contains(&target) {
@@ -541,20 +561,6 @@ impl ApplicationEnvelope {
             instruments: instruments.map(instrument_envelopes).transpose()?,
             report,
         })
-    }
-
-    /// Split into market JSON, optional model JSON, instrument envelopes, and
-    /// the [`ApplicationReport`] this envelope was built from.
-    #[must_use]
-    pub fn into_parts(
-        self,
-    ) -> (
-        serde_json::Value,
-        Option<serde_json::Value>,
-        Option<Vec<InstrumentEnvelope>>,
-        ApplicationReport,
-    ) {
-        (self.market, self.model, self.instruments, self.report)
     }
 }
 

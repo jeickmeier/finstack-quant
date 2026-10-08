@@ -7,6 +7,7 @@ use crate::error::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -217,7 +218,51 @@ pub struct CashflowBreakdown {
     pub voluntary_prepayment: Option<Money>,
 }
 
+/// Field names of [`CashflowBreakdown::audit_detail`], in the same order.
+const AUDIT_DETAIL_LABELS: [&str; 5] = [
+    "opening_balance",
+    "scheduled_principal",
+    "mandatory_prepayment",
+    "sweep_prepayment",
+    "voluntary_prepayment",
+];
+
 impl CashflowBreakdown {
+    /// Every component of the breakdown as a `(flow_type, amount)` pair.
+    ///
+    /// The labels are the field names (`interest_expense_cash`,
+    /// `interest_income_cash`, `interest_expense_pik`, `principal_payment`,
+    /// `fees`, `debt_balance`, `accrued_interest`). `interest_income_cash` is
+    /// listed only when the instrument reports income, so a pure-debt
+    /// breakdown yields six rows and a hedged one seven.
+    ///
+    /// Breakdowns produced by the evaluator additionally list
+    /// `opening_balance` and the four sources of `principal_payment`
+    /// (`scheduled_principal`, `mandatory_prepayment`, `sweep_prepayment`,
+    /// `voluntary_prepayment`), each only when recorded. Those four rows sum
+    /// to the `principal_payment` row, so do not add them to it.
+    #[must_use]
+    pub fn flows(&self) -> Vec<(&'static str, Money)> {
+        let mut flows = vec![("interest_expense_cash", self.interest_expense_cash)];
+        if let Some(income) = self.interest_income_cash {
+            flows.push(("interest_income_cash", income));
+        }
+        flows.extend([
+            ("interest_expense_pik", self.interest_expense_pik),
+            ("principal_payment", self.principal_payment),
+            ("fees", self.fees),
+            ("debt_balance", self.debt_balance),
+            ("accrued_interest", self.accrued_interest),
+        ]);
+        flows.extend(
+            AUDIT_DETAIL_LABELS
+                .into_iter()
+                .zip(self.audit_detail())
+                .filter_map(|(label, money)| money.map(|money| (label, money))),
+        );
+        flows
+    }
+
     /// Create a new breakdown with a specific currency.
     pub fn with_currency(currency: Currency) -> Self {
         Self {
@@ -349,14 +394,7 @@ impl CashflowBreakdown {
         if let Some(income) = self.interest_income_cash {
             fields.push(("interest_income_cash", income.currency()));
         }
-        let detail_names = [
-            "opening_balance",
-            "scheduled_principal",
-            "mandatory_prepayment",
-            "sweep_prepayment",
-            "voluntary_prepayment",
-        ];
-        for (name, money) in detail_names.into_iter().zip(self.audit_detail()) {
+        for (name, money) in AUDIT_DETAIL_LABELS.into_iter().zip(self.audit_detail()) {
             if let Some(money) = money {
                 fields.push((name, money.currency()));
             }
@@ -388,7 +426,114 @@ pub(crate) fn add_optional_money(total: &mut Option<Money>, part: Option<Money>)
 // All construction must go through `with_currency()` to ensure correct
 // currency propagation in multi-currency models.
 
+/// Instrument label carried by the rows of
+/// [`CapitalStructureCashflows::to_totals_table`].
+pub const TOTAL_ROW_LABEL: &str = "__total__";
+
+/// Build the long `(instrument, period, flow_type, amount, currency)` table.
+fn flows_table<'a>(
+    rows: impl Iterator<Item = (&'a str, &'a PeriodId, &'a CashflowBreakdown)>,
+    layout: &str,
+) -> Result<TableEnvelope> {
+    let mut instruments = Vec::new();
+    let mut periods = Vec::new();
+    let mut flow_types = Vec::new();
+    let mut amounts = Vec::new();
+    let mut currencies = Vec::new();
+    for (instrument, period, breakdown) in rows {
+        for (flow_type, money) in breakdown.flows() {
+            instruments.push(instrument.to_string());
+            periods.push(period.to_string());
+            flow_types.push(flow_type.to_string());
+            amounts.push(money.amount());
+            currencies.push(money.currency().to_string());
+        }
+    }
+    let mut metadata = IndexMap::new();
+    metadata.insert("layout".to_string(), serde_json::json!(layout));
+    metadata.insert(
+        "source".to_string(),
+        serde_json::json!("capital_structure_cashflows"),
+    );
+    TableEnvelope::new_with_metadata(
+        vec![
+            TableColumn::new("instrument", TableColumnData::String(instruments))
+                .with_role(TableColumnRole::Dimension),
+            TableColumn::new("period", TableColumnData::String(periods))
+                .with_role(TableColumnRole::Index),
+            TableColumn::new("flow_type", TableColumnData::String(flow_types))
+                .with_role(TableColumnRole::Dimension),
+            TableColumn::new("amount", TableColumnData::Float64(amounts))
+                .with_role(TableColumnRole::Measure),
+            TableColumn::new("currency", TableColumnData::String(currencies))
+                .with_role(TableColumnRole::Attribute),
+        ],
+        metadata,
+    )
+    .map_err(Into::into)
+}
+
 impl CapitalStructureCashflows {
+    /// Periods covered by these cashflows, in ascending order.
+    ///
+    /// Uses the periods of the reporting totals when they exist; otherwise the
+    /// sorted union of every instrument's periods.
+    #[must_use]
+    pub fn periods(&self) -> Vec<PeriodId> {
+        if !self.totals.is_empty() {
+            return self.totals.keys().copied().collect();
+        }
+        let mut periods: Vec<PeriodId> = self
+            .by_instrument
+            .values()
+            .flat_map(|by_period| by_period.keys().copied())
+            .collect();
+        periods.sort();
+        periods.dedup();
+        periods
+    }
+
+    /// Export per-instrument cashflows as a long table.
+    ///
+    /// Columns: `instrument`, `period` (period identifier such as `2025Q1`),
+    /// `flow_type` (see [`CashflowBreakdown::flows`]), `amount` (in the row's
+    /// own `currency`) and `currency` (ISO 4217 code). One row per instrument,
+    /// period and flow type; amounts are in each instrument's native currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error only if the table columns fail envelope validation.
+    pub fn to_table(&self) -> Result<TableEnvelope> {
+        flows_table(
+            self.by_instrument
+                .iter()
+                .flat_map(|(instrument, by_period)| {
+                    by_period
+                        .iter()
+                        .map(move |(period, breakdown)| (instrument.as_str(), period, breakdown))
+                }),
+            "by_instrument",
+        )
+    }
+
+    /// Export the reporting-currency totals as a long table.
+    ///
+    /// Same columns as [`to_table`](Self::to_table); every row carries
+    /// [`TOTAL_ROW_LABEL`] in `instrument`. Empty when no reporting-currency
+    /// total could be formed (see `totals`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error only if the table columns fail envelope validation.
+    pub fn to_totals_table(&self) -> Result<TableEnvelope> {
+        flows_table(
+            self.totals
+                .iter()
+                .map(|(period, breakdown)| (TOTAL_ROW_LABEL, period, breakdown)),
+            "totals",
+        )
+    }
+
     /// Create empty capital-structure cashflows.
     ///
     /// # Example

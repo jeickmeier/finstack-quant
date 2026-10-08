@@ -117,8 +117,6 @@ pub(crate) mod utils;
 /// Structured warning enum surfaced via `ApplicationReport.warnings`.
 pub mod warning;
 
-pub use adapters::time_roll::apply_time_roll_forward;
-pub use adapters::vol::ArbitrageViolation;
 pub use engine::{
     ApplicationEnvelope, ApplicationReport, AppliedShock, AppliedShockTarget, ExecutionContext,
     LevelChange, RollForwardReport, ScenarioEngine, ShockMagnitude, ShockNode, ShockUnit,

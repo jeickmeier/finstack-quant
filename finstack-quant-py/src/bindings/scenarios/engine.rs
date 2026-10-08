@@ -23,8 +23,7 @@ use super::extract::{extract_config, extract_instruments};
 ///
 /// ``warnings`` is a list of structured dicts, each carrying a ``kind``
 /// discriminator (``"equity_not_found"``, ``"discount_curve_heuristic"``, ...)
-/// plus variant-specific fields; ``warnings_json`` is the same list as one
-/// JSON string.
+/// plus variant-specific fields.
 #[pyclass(
     name = "ApplicationReport",
     module = "finstack_quant.scenarios",
@@ -80,12 +79,6 @@ impl PyApplicationReport {
     #[getter]
     fn warnings<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.warnings)
-    }
-
-    /// The structured warnings as one JSON-encoded array.
-    #[getter]
-    fn warnings_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.warnings).map_err(display_to_py)
     }
 
     /// Number of warnings raised while applying the scenario.
@@ -165,41 +158,22 @@ impl PyApplicationReport {
     /// and ``curve_kind`` (curve family for ``curve`` rows, else ``None``).
     /// Empty when nothing changed.
     fn changes_to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        use finstack_quant_scenarios::engine::ScenarioMarketTarget as T;
-        let rows: Vec<serde_json::Value> = self
+        // `kind` and `curve_kind` are the target's own serde fields; only the
+        // identifier needs the Rust display form (FX pairs have two fields).
+        let rows = self
             .inner
             .changes
             .market_targets
             .iter()
             .map(|target| {
-                let (kind, id, curve_kind) = match target {
-                    T::Curve {
-                        curve_kind,
-                        curve_id,
-                    } => (
-                        "curve",
-                        curve_id.as_str().to_string(),
-                        serde_json::to_value(curve_kind)
-                            .ok()
-                            .and_then(|v| v.as_str().map(str::to_string)),
-                    ),
-                    T::VolatilityIndex { curve_id } => {
-                        ("volatility_index", curve_id.as_str().to_string(), None)
-                    }
-                    T::BaseCorrelation { surface_id } => {
-                        ("base_correlation", surface_id.as_str().to_string(), None)
-                    }
-                    T::VolSurface { vol_surface_id } => {
-                        ("vol_surface", vol_surface_id.as_str().to_string(), None)
-                    }
-                    T::EquityPrice { spot_id } => {
-                        ("equity_price", spot_id.as_str().to_string(), None)
-                    }
-                    T::Fx { base, quote } => ("fx", format!("{base}/{quote}"), None),
-                };
-                serde_json::json!({ "kind": kind, "id": id, "curve_kind": curve_kind })
+                let wire = serde_json::to_value(target).map_err(display_to_py)?;
+                Ok(serde_json::json!({
+                    "kind": wire["kind"],
+                    "id": target.id_label(),
+                    "curve_kind": wire["curve_kind"],
+                }))
             })
-            .collect();
+            .collect::<PyResult<Vec<serde_json::Value>>>()?;
         serde_rows_to_dataframe_with_schema(
             py,
             &rows,
@@ -351,7 +325,12 @@ impl PyApplicationResult {
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
         let envelope: ApplicationEnvelope = serde_json::from_str(json).map_err(display_to_py)?;
-        let (market, model, instruments, report) = envelope.into_parts();
+        let ApplicationEnvelope {
+            market,
+            model,
+            instruments,
+            report,
+        } = envelope;
         let instruments = instruments
             .map(|items| {
                 items

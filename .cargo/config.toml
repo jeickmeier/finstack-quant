@@ -1,0 +1,4 @@
+# ld64 drops local symbols itself; rustc's `-C strip` would run Xcode's `strip`,
+# whose output dyld rejects ("mis-aligned LINKEDIT string pool").
+[target.'cfg(target_vendor = "apple")']
+rustflags = ["-C", "link-arg=-Wl,-x"]

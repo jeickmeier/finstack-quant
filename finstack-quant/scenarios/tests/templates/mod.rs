@@ -25,19 +25,21 @@ fn embedded_registry_contains_all_five_builtins_end_to_end() {
     assert_eq!(listed_ids, builtin_ids());
 
     for template_id in builtin_ids() {
-        let entry = registry
-            .get(template_id)
-            .unwrap_or_else(|| panic!("missing builtin template: {template_id}"));
-        let scenario = entry.build();
+        let scenario = registry
+            .build(template_id)
+            .unwrap_or_else(|error| panic!("missing builtin template {template_id}: {error}"));
+        let component_ids = registry
+            .component_ids(template_id)
+            .unwrap_or_else(|error| panic!("missing builtin template {template_id}: {error}"));
 
         assert_eq!(scenario.id, template_id);
         assert!(!scenario.operations.is_empty());
-        assert_eq!(entry.component_ids().len(), 5);
+        assert_eq!(component_ids.len(), 5);
 
-        for component_id in entry.component_ids() {
-            let component = entry
-                .component(component_id)
-                .unwrap_or_else(|| panic!("missing component {component_id}"));
+        for component_id in component_ids {
+            let component = registry
+                .build_component(template_id, component_id)
+                .unwrap_or_else(|error| panic!("missing component {component_id}: {error}"));
             assert_eq!(component.id, component_id);
             assert!(!component.operations.is_empty());
         }
@@ -71,15 +73,11 @@ fn cross_template_component_composition_still_works() {
     let registry = TemplateRegistry::embedded_builtins()
         .unwrap_or_else(|error| panic!("failed to load embedded templates: {error}"));
     let rate_spec = registry
-        .get("rate_shock_2022")
-        .unwrap_or_else(|| panic!("missing rate_shock_2022"))
-        .component("rate_shock_2022_rates")
-        .unwrap_or_else(|| panic!("missing rate_shock_2022_rates"));
+        .build_component("rate_shock_2022", "rate_shock_2022_rates")
+        .unwrap_or_else(|error| panic!("missing rate_shock_2022_rates: {error}"));
     let svb_credit_spec = registry
-        .get("svb_2023")
-        .unwrap_or_else(|| panic!("missing svb_2023"))
-        .component("svb_2023_credit")
-        .unwrap_or_else(|| panic!("missing svb_2023_credit"));
+        .build_component("svb_2023", "svb_2023_credit")
+        .unwrap_or_else(|error| panic!("missing svb_2023_credit: {error}"));
 
     let mut composed = ScenarioSpec::compose(vec![rate_spec.clone(), svb_credit_spec.clone()])
         .unwrap_or_else(|error| panic!("failed to compose scenarios: {error}"));
@@ -100,10 +98,8 @@ fn embedded_registry_svb_credit_component_contains_attr_spread_shock() {
     let registry = TemplateRegistry::embedded_builtins()
         .unwrap_or_else(|error| panic!("failed to load embedded templates: {error}"));
     let credit = registry
-        .get("svb_2023")
-        .unwrap_or_else(|| panic!("missing svb_2023"))
-        .component("svb_2023_credit")
-        .unwrap_or_else(|| panic!("missing svb_2023_credit"));
+        .build_component("svb_2023", "svb_2023_credit")
+        .unwrap_or_else(|error| panic!("missing svb_2023_credit: {error}"));
 
     assert!(credit.operations.iter().any(|operation| {
         matches!(
@@ -120,9 +116,8 @@ fn embedded_registry_built_scenario_roundtrips_through_serde_and_validation() {
     let registry = TemplateRegistry::embedded_builtins()
         .unwrap_or_else(|error| panic!("failed to load embedded templates: {error}"));
     let scenario = registry
-        .get("ltcm_1998")
-        .unwrap_or_else(|| panic!("missing ltcm_1998"))
-        .build();
+        .build("ltcm_1998")
+        .unwrap_or_else(|error| panic!("missing ltcm_1998: {error}"));
 
     let json = serde_json::to_string(&scenario)
         .unwrap_or_else(|error| panic!("failed to serialize scenario: {error}"));

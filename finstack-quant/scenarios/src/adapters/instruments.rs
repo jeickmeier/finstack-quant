@@ -52,8 +52,10 @@ fn instrument_label(attrs: &Attributes) -> String {
 
 /// Kind of instrument shock: price (percent) or spread (bp).
 #[derive(Clone, Copy)]
-enum ShockKind {
+pub(crate) enum ShockKind {
+    /// Percentage price shock.
     Price,
+    /// Additive spread shock in basis points.
     Spread,
 }
 
@@ -212,81 +214,50 @@ fn record_fallback(
     });
 }
 
-/// Apply a percentage price shock to instruments matching the provided types.
-pub(crate) fn apply_instrument_type_price_shock(
-    instruments: &mut [Box<dyn Instrument>],
-    instrument_types: &[InstrumentType],
-    pct: f64,
-) -> InstrumentShockOutcome {
-    apply_shock(
-        instruments,
-        |inst| instrument_types.contains(&inst.key()),
-        ShockKind::Price,
-        pct,
-    )
+/// Which instruments an instrument shock targets.
+pub(crate) enum InstrumentFilter<'a> {
+    /// Instruments whose type is in the list.
+    Types(&'a [InstrumentType]),
+    /// Instruments whose metadata matches every pair (AND, case-insensitive).
+    Attrs(&'a indexmap::IndexMap<String, String>),
 }
 
-/// Apply a spread shock to instruments matching the provided types.
-pub(crate) fn apply_instrument_type_spread_shock(
+/// Apply a price (percent) or spread (bp) shock to the instruments selected by `filter`.
+///
+/// An attribute filter that matches nothing records
+/// [`Warning::InstrumentShockNoMatch`].
+pub(crate) fn apply_instrument_shock(
     instruments: &mut [Box<dyn Instrument>],
-    instrument_types: &[InstrumentType],
-    bp: f64,
+    filter: InstrumentFilter<'_>,
+    kind: ShockKind,
+    raw_value: f64,
 ) -> InstrumentShockOutcome {
-    apply_shock(
-        instruments,
-        |inst| instrument_types.contains(&inst.key()),
-        ShockKind::Spread,
-        bp,
-    )
-}
-
-/// Apply a percentage price shock to instruments matching the provided attributes.
-pub(crate) fn apply_instrument_attr_price_shock(
-    instruments: &mut [Box<dyn Instrument>],
-    attrs: &indexmap::IndexMap<String, String>,
-    pct: f64,
-) -> InstrumentShockOutcome {
-    let filters = normalise_filters(attrs);
-    let mut outcome = apply_shock(
-        instruments,
-        |inst| matches_attr_filter(inst.attributes(), &filters),
-        ShockKind::Price,
-        pct,
-    );
-    if outcome.count == 0 {
-        outcome.warnings.push(Warning::InstrumentShockNoMatch {
-            filter_desc: format!("{attrs:?}"),
-        });
+    match filter {
+        InstrumentFilter::Types(types) => apply_shock(
+            instruments,
+            |inst| types.contains(&inst.key()),
+            kind,
+            raw_value,
+        ),
+        InstrumentFilter::Attrs(attrs) => {
+            let filters = normalise_filters(attrs);
+            let mut outcome = apply_shock(
+                instruments,
+                |inst| matches_attr_filter(inst.attributes(), &filters),
+                kind,
+                raw_value,
+            );
+            if outcome.count == 0 {
+                outcome.warnings.push(Warning::InstrumentShockNoMatch {
+                    filter_desc: format!("{attrs:?}"),
+                });
+            }
+            outcome
+        }
     }
-    outcome
-}
-
-/// Apply a spread shock to instruments matching the provided attributes.
-pub(crate) fn apply_instrument_attr_spread_shock(
-    instruments: &mut [Box<dyn Instrument>],
-    attrs: &indexmap::IndexMap<String, String>,
-    bp: f64,
-) -> InstrumentShockOutcome {
-    let filters = normalise_filters(attrs);
-    let mut outcome = apply_shock(
-        instruments,
-        |inst| matches_attr_filter(inst.attributes(), &filters),
-        ShockKind::Spread,
-        bp,
-    );
-    if outcome.count == 0 {
-        outcome.warnings.push(Warning::InstrumentShockNoMatch {
-            filter_desc: format!("{attrs:?}"),
-        });
-    }
-    outcome
 }
 
 fn matches_attr_filter(attrs: &Attributes, filters: &[(String, String)]) -> bool {
-    if filters.is_empty() {
-        return true;
-    }
-
     filters.iter().all(|(key, value)| {
         attrs
             .meta
@@ -313,8 +284,18 @@ mod tests {
             finstack_quant_valuations::instruments::Bond::example().expect("bond"),
         )];
         for _ in 0..2 {
-            apply_instrument_type_price_shock(&mut instruments, &[InstrumentType::Bond], -60.0);
-            apply_instrument_type_spread_shock(&mut instruments, &[InstrumentType::Bond], 25.0);
+            apply_instrument_shock(
+                &mut instruments,
+                InstrumentFilter::Types(&[InstrumentType::Bond]),
+                ShockKind::Price,
+                -60.0,
+            );
+            apply_instrument_shock(
+                &mut instruments,
+                InstrumentFilter::Types(&[InstrumentType::Bond]),
+                ShockKind::Spread,
+                25.0,
+            );
         }
         let overrides = instruments[0]
             .get_scenario_pricing_overrides()
@@ -342,8 +323,12 @@ mod tests {
             .collect();
         let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(composite)];
 
-        let outcome =
-            apply_instrument_type_price_shock(&mut instruments, &[InstrumentType::Equity], 10.0);
+        let outcome = apply_instrument_shock(
+            &mut instruments,
+            InstrumentFilter::Types(&[InstrumentType::Equity]),
+            ShockKind::Price,
+            10.0,
+        );
         assert_eq!(outcome.count, 1);
         let shocked = instruments[0]
             .as_any()
@@ -379,8 +364,12 @@ mod tests {
         let composite = CompositeInstrument::example().expect("composite example should build");
         let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(composite)];
 
-        let outcome =
-            apply_instrument_type_price_shock(&mut instruments, &[InstrumentType::Composite], 10.0);
+        let outcome = apply_instrument_shock(
+            &mut instruments,
+            InstrumentFilter::Types(&[InstrumentType::Composite]),
+            ShockKind::Price,
+            10.0,
+        );
         assert_eq!(outcome.count, 1);
         let shocked = instruments[0]
             .as_any()

@@ -14,7 +14,9 @@ use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{Date, Period, PeriodId};
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder, NeedPeriods, Ready};
-use finstack_quant_statements::capital_structure::WaterfallSpec;
+use finstack_quant_statements::capital_structure::{
+    BondConventionParams, SwapConventions, SwapParams, WaterfallSpec,
+};
 use finstack_quant_statements::types::{
     AmountOrScalar, FinancialStatementInstrument, ForecastSpec, NodeSpec,
 };
@@ -33,8 +35,8 @@ fn invalid(message: &str) -> JsValue {
 
 fn consumed() -> JsValue {
     invalid(
-        "Builder is no longer usable: it was consumed by build()/mixed() or by a failed \
-         capital-structure call. Construct a new ModelBuilder.",
+        "Builder is no longer usable: it was consumed by build()/mixed(). Construct a new \
+         ModelBuilder.",
     )
 }
 
@@ -86,6 +88,32 @@ pub struct JsModelBuilder {
     inner: Option<BuilderState>,
 }
 
+/// Run a fallible `&mut` capital-structure step in whichever state the builder
+/// is in. The builder is left untouched when the step fails.
+macro_rules! try_in_place {
+    ($self:ident, |$b:ident| $call:expr) => {
+        match $self.inner.as_mut() {
+            Some(BuilderState::NeedPeriods($b)) => $call,
+            Some(BuilderState::Ready($b)) => $call,
+            None => return Err(consumed()),
+        }
+        .map_err(to_js_err)
+    };
+}
+
+/// Run an infallible consuming capital-structure step in whichever state the
+/// builder is in.
+macro_rules! replace_with {
+    ($self:ident, |$b:ident| $call:expr) => {{
+        let next = match $self.take_any()? {
+            BuilderState::NeedPeriods($b) => BuilderState::NeedPeriods($call),
+            BuilderState::Ready($b) => BuilderState::Ready($call),
+        };
+        $self.inner = Some(next);
+        Ok(())
+    }};
+}
+
 impl JsModelBuilder {
     fn take_any(&mut self) -> Result<BuilderState, JsValue> {
         self.inner.take().ok_or_else(consumed)
@@ -109,26 +137,6 @@ impl JsModelBuilder {
             }
             None => Err(consumed()),
         }
-    }
-
-    /// Apply a capital-structure step that exists in both builder states.
-    fn capital_structure(
-        &mut self,
-        need: impl FnOnce(
-            ModelBuilder<NeedPeriods>,
-        ) -> finstack_quant_statements::Result<ModelBuilder<NeedPeriods>>,
-        ready: impl FnOnce(
-            ModelBuilder<Ready>,
-        ) -> finstack_quant_statements::Result<ModelBuilder<Ready>>,
-    ) -> Result<(), JsValue> {
-        let next = match self.take_any()? {
-            BuilderState::NeedPeriods(builder) => {
-                BuilderState::NeedPeriods(need(builder).map_err(to_js_err)?)
-            }
-            BuilderState::Ready(builder) => BuilderState::Ready(ready(builder).map_err(to_js_err)?),
-        };
-        self.inner = Some(next);
-        Ok(())
     }
 }
 
@@ -445,8 +453,8 @@ impl JsModelBuilder {
 
     /// Add a fixed-rate bond to the capital structure (US conventions: 30/360, semi-annual).
     ///
-    /// Twin of Python `ModelBuilder.add_bond` (Rust `ModelBuilder::add_bond`).
-    /// A failed call consumes the builder.
+    /// Twin of Python `ModelBuilder.add_bond` (Rust `ModelBuilder::try_add_bond`).
+    /// A failed call leaves the builder usable.
     ///
     /// @param id - Unique instrument identifier.
     /// @param notional - Principal as a `Money` wire object (`{amount, currency}`).
@@ -471,18 +479,21 @@ impl JsModelBuilder {
         let issue = iso_date(&issue_date, "issueDate")?;
         let maturity = iso_date(&maturity_date, "maturityDate")?;
         let curve = js_string(&discount_curve_id, "discountCurveId")?;
-        let (id2, curve2) = (id.clone(), curve.clone());
-        self.capital_structure(
-            |b| b.add_bond(id, notional, coupon_rate, issue, maturity, curve),
-            |b| b.add_bond(id2, notional, coupon_rate, issue, maturity, curve2),
-        )
+        try_in_place!(self, |b| b.try_add_bond(
+            id,
+            notional,
+            coupon_rate,
+            issue,
+            maturity,
+            curve
+        ))
     }
 
     /// Add a fixed-rate bond with a market convention preset.
     ///
     /// Twin of Python `ModelBuilder.add_bond_with_convention` (Rust
-    /// `ModelBuilder::add_bond_with_convention`). A failed call consumes the
-    /// builder.
+    /// `ModelBuilder::try_add_bond_with_convention`). A failed call leaves
+    /// the builder usable.
     ///
     /// @param id - Unique instrument identifier.
     /// @param notional - Principal as a `Money` wire object (`{amount, currency}`).
@@ -506,28 +517,30 @@ impl JsModelBuilder {
     ) -> Result<(), JsValue> {
         let id = js_string(&id, "id")?;
         let notional: Money = from_js_json(&notional, "notional")?;
-        let rate =
+        let coupon_rate =
             finstack_quant_core::types::Rate::from_decimal(js_f64(&coupon_rate, "couponRate")?)
                 .map_err(to_js_err)?;
-        let issue = iso_date(&issue_date, "issueDate")?;
-        let maturity = iso_date(&maturity_date, "maturityDate")?;
+        let issue_date = iso_date(&issue_date, "issueDate")?;
+        let maturity_date = iso_date(&maturity_date, "maturityDate")?;
         let convention: finstack_quant_valuations::instruments::BondConvention =
             finstack_quant_core::wire::serde_parse(&js_string(&convention, "convention")?)
                 .map_err(to_js_err)?;
-        let curve = js_string(&discount_curve_id, "discountCurveId")?;
-        let (id2, curve2) = (id.clone(), curve.clone());
-        self.capital_structure(
-            |b| b.add_bond_with_convention(id, notional, rate, issue, maturity, convention, curve),
-            |b| {
-                b.add_bond_with_convention(id2, notional, rate, issue, maturity, convention, curve2)
-            },
-        )
+        let params = BondConventionParams {
+            id,
+            notional,
+            coupon_rate,
+            issue_date,
+            maturity_date,
+            convention,
+            discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?,
+        };
+        try_in_place!(self, |b| b.try_add_bond_with_convention(params))
     }
 
     /// Add a pay-fixed interest rate swap to the capital structure (US conventions).
     ///
-    /// Twin of Python `ModelBuilder.add_swap` (Rust `ModelBuilder::add_swap`).
-    /// A failed call consumes the builder.
+    /// Twin of Python `ModelBuilder.add_swap` (Rust `ModelBuilder::try_add_swap`).
+    /// A failed call leaves the builder usable.
     ///
     /// @param id - Unique instrument identifier.
     /// @param notional - Swap notional as a `Money` wire object (`{amount, currency}`).
@@ -549,29 +562,23 @@ impl JsModelBuilder {
         discount_curve_id: JsValue,
         forward_curve_id: JsValue,
     ) -> Result<(), JsValue> {
-        let id = js_string(&id, "id")?;
-        let notional: Money = from_js_json(&notional, "notional")?;
-        let fixed_rate = js_f64(&fixed_rate, "fixedRate")?;
-        let start = iso_date(&start_date, "startDate")?;
-        let maturity = iso_date(&maturity_date, "maturityDate")?;
-        let discount = js_string(&discount_curve_id, "discountCurveId")?;
-        let forward = js_string(&forward_curve_id, "forwardCurveId")?;
-        let (id2, discount2, forward2) = (id.clone(), discount.clone(), forward.clone());
-        self.capital_structure(
-            |b| b.add_swap(id, notional, fixed_rate, start, maturity, discount, forward),
-            |b| {
-                b.add_swap(
-                    id2, notional, fixed_rate, start, maturity, discount2, forward2,
-                )
-            },
-        )
+        let params = SwapParams {
+            id: js_string(&id, "id")?,
+            notional: from_js_json(&notional, "notional")?,
+            fixed_rate: js_f64(&fixed_rate, "fixedRate")?,
+            start_date: iso_date(&start_date, "startDate")?,
+            maturity_date: iso_date(&maturity_date, "maturityDate")?,
+            discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?,
+            forward_curve_id: js_string(&forward_curve_id, "forwardCurveId")?,
+        };
+        try_in_place!(self, |b| b.try_add_swap(params))
     }
 
     /// Add a pay-fixed interest rate swap with explicit leg conventions.
     ///
     /// Twin of Python `ModelBuilder.add_swap_with_conventions` (Rust
-    /// `ModelBuilder::add_swap_with_conventions`). A failed call consumes the
-    /// builder.
+    /// `ModelBuilder::try_add_swap_with_conventions`). A failed call leaves
+    /// the builder usable.
     ///
     /// @param id - Unique instrument identifier.
     /// @param notional - Swap notional as a `Money` wire object (`{amount, currency}`).
@@ -604,65 +611,41 @@ impl JsModelBuilder {
         business_day_convention: Option<JsValue>,
     ) -> Result<(), JsValue> {
         use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
-        let id = js_string(&id, "id")?;
-        let notional: Money = from_js_json(&notional, "notional")?;
-        let fixed_rate = js_f64(&fixed_rate, "fixedRate")?;
-        let start = iso_date(&start_date, "startDate")?;
-        let maturity = iso_date(&maturity_date, "maturityDate")?;
-        let discount = js_string(&discount_curve_id, "discountCurveId")?;
-        let forward = js_string(&forward_curve_id, "forwardCurveId")?;
-        let fixed_freq: Tenor = js_string(&fixed_frequency, "fixedFrequency")?
+        let params = SwapParams {
+            id: js_string(&id, "id")?,
+            notional: from_js_json(&notional, "notional")?,
+            fixed_rate: js_f64(&fixed_rate, "fixedRate")?,
+            start_date: iso_date(&start_date, "startDate")?,
+            maturity_date: iso_date(&maturity_date, "maturityDate")?,
+            discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?,
+            forward_curve_id: js_string(&forward_curve_id, "forwardCurveId")?,
+        };
+        let fixed_frequency: Tenor = js_string(&fixed_frequency, "fixedFrequency")?
             .parse()
             .map_err(to_js_err)?;
-        let fixed_dc: DayCount = js_string(&fixed_day_count, "fixedDayCount")?
+        let fixed_day_count: DayCount = js_string(&fixed_day_count, "fixedDayCount")?
             .parse()
             .map_err(to_js_err)?;
-        let float_freq: Tenor = js_string(&float_frequency, "floatFrequency")?
+        let float_frequency: Tenor = js_string(&float_frequency, "floatFrequency")?
             .parse()
             .map_err(to_js_err)?;
-        let float_dc: DayCount = js_string(&float_day_count, "floatDayCount")?
+        let float_day_count: DayCount = js_string(&float_day_count, "floatDayCount")?
             .parse()
             .map_err(to_js_err)?;
-        let roll_convention =
+        let business_day_convention =
             match js_opt_string(business_day_convention.as_ref(), "businessDayConvention")? {
                 Some(label) => label.parse::<BusinessDayConvention>().map_err(to_js_err)?,
                 None => BusinessDayConvention::default(),
             };
-        let (id2, discount2, forward2) = (id.clone(), discount.clone(), forward.clone());
-        self.capital_structure(
-            |b| {
-                b.add_swap_with_conventions(
-                    id,
-                    notional,
-                    fixed_rate,
-                    start,
-                    maturity,
-                    discount,
-                    forward,
-                    fixed_freq,
-                    fixed_dc,
-                    float_freq,
-                    float_dc,
-                    roll_convention,
-                )
-            },
-            |b| {
-                b.add_swap_with_conventions(
-                    id2,
-                    notional,
-                    fixed_rate,
-                    start,
-                    maturity,
-                    discount2,
-                    forward2,
-                    fixed_freq,
-                    fixed_dc,
-                    float_freq,
-                    float_dc,
-                    roll_convention,
-                )
-            },
-        )
+        let conventions = SwapConventions {
+            fixed_frequency,
+            fixed_day_count,
+            float_frequency,
+            float_day_count,
+            business_day_convention,
+        };
+        try_in_place!(self, |b| b
+            .try_add_swap_with_conventions(params, conventions))
     }
 
     /// Add a debt instrument to the capital structure.
@@ -684,8 +667,7 @@ impl JsModelBuilder {
         )?)
         .map_err(to_js_err)?;
         let spec = FinancialStatementInstrument::try_from(spec).map_err(to_js_err)?;
-        let (id2, spec2) = (id.clone(), spec.clone());
-        self.capital_structure(|b| Ok(b.add_debt(id, spec)), |b| Ok(b.add_debt(id2, spec2)))
+        replace_with!(self, |b| b.add_debt(id, spec))
     }
 
     /// Set the reporting currency used for capital-structure totals.
@@ -700,10 +682,7 @@ impl JsModelBuilder {
         let currency: finstack_quant_core::currency::Currency = js_string(&currency, "currency")?
             .parse()
             .map_err(to_js_err)?;
-        self.capital_structure(
-            |b| Ok(b.reporting_currency(currency)),
-            |b| Ok(b.reporting_currency(currency)),
-        )
+        replace_with!(self, |b| b.reporting_currency(currency))
     }
 
     /// Set the FX conversion policy for capital-structure cashflows.
@@ -717,7 +696,7 @@ impl JsModelBuilder {
         let policy: finstack_quant_core::money::fx::FxConversionPolicy =
             finstack_quant_core::wire::serde_parse(&js_string(&policy, "policy")?)
                 .map_err(to_js_err)?;
-        self.capital_structure(|b| Ok(b.fx_policy(policy)), |b| Ok(b.fx_policy(policy)))
+        replace_with!(self, |b| b.fx_policy(policy))
     }
 
     /// Attach a waterfall (priority of payments, ECF sweep, PIK toggle, payment classes).
@@ -729,8 +708,7 @@ impl JsModelBuilder {
     /// @throws Error with kind `validation` if `waterfallSpec` is malformed or the builder was consumed.
     pub fn waterfall(&mut self, waterfall_spec: JsValue) -> Result<(), JsValue> {
         let spec: WaterfallSpec = from_js_json(&waterfall_spec, "waterfallSpec")?;
-        let spec2 = spec.clone();
-        self.capital_structure(|b| Ok(b.waterfall(spec)), |b| Ok(b.waterfall(spec2)))
+        replace_with!(self, |b| b.waterfall(spec))
     }
 
     /// Build the model specification.

@@ -101,19 +101,13 @@ def test_rate_binding_validate_errors_match_the_shared_golden(case: dict[str, An
         binding.validate()
 
 
-def test_scenario_spec_predicates_and_hazard_mode_match_the_shared_golden() -> None:
+def test_scenario_spec_predicates_match_the_shared_golden() -> None:
     golden = GOLDEN["scenario_spec"]
     for case in golden["cases"]:
         spec = ScenarioSpec.from_json(json.dumps(case["spec"]))
         assert spec.requires_instruments() is case["requires_instruments"]
         assert spec.mutates_instruments() is case["mutates_instruments"]
         assert spec.validate() is None
-    spec = ScenarioSpec.from_json(json.dumps(golden["cases"][0]["spec"]))
-    bump = golden["with_hazard_bump_mode"]
-    assert json.loads(spec.with_hazard_bump_mode(bump["mode"]).to_json()) == bump["expected"]
-    assert spec.hazard_bump_mode == "solve_to_par"
-    with pytest.raises(ValueError, match=exact(golden["bad_mode_error"]["message"])):
-        spec.with_hazard_bump_mode("nope")
 
 
 def test_horizon_explain_and_factor_contribution_match_the_shared_golden() -> None:

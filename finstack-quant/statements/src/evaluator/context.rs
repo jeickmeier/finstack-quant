@@ -8,7 +8,7 @@
 use crate::error::{Error, Result};
 use crate::evaluator::results::EvalWarning;
 use crate::evaluator::PeriodHistory;
-use crate::types::{NodeId, NodeValueType};
+use crate::types::NodeId;
 use finstack_quant_core::dates::{PeriodId, PeriodKind};
 use indexmap::IndexMap;
 use std::cell::RefCell;
@@ -48,10 +48,6 @@ pub struct EvaluationContext {
     /// column layout as `current_values`. `None` for values set outside the
     /// evaluator's precedence loop.
     pub(crate) current_sources: Vec<Option<super::CellSource>>,
-
-    /// Track value types for each node (monetary vs scalar).
-    /// Wrapped in `Arc` so that per-period context copies are O(1).
-    pub node_value_types: Arc<IndexMap<String, NodeValueType>>,
 
     /// Capital structure cashflows (optional)
     pub capital_structure_cashflows: Option<crate::capital_structure::CapitalStructureCashflows>,
@@ -136,7 +132,6 @@ impl EvaluationContext {
             historical_capital_structure_cashflows,
             current_values: vec![None; num_nodes],
             current_sources: vec![None; num_nodes],
-            node_value_types: Arc::new(IndexMap::new()),
             capital_structure_cashflows: None,
             warnings: Vec::new(),
             sorted_history_cache: RefCell::new(IndexMap::new()),
@@ -153,18 +148,6 @@ impl EvaluationContext {
     pub(crate) fn invalidate_sorted_cache(&self, node_id: &str) {
         let mut cache = self.sorted_history_cache.borrow_mut();
         cache.shift_remove(node_id);
-    }
-
-    /// Set capital structure cashflows for this context.
-    ///
-    /// Callers typically invoke this when the evaluator loads supplementary
-    /// data from the capital structure module.
-    pub fn with_capital_structure(
-        mut self,
-        cashflows: crate::capital_structure::CapitalStructureCashflows,
-    ) -> Self {
-        self.capital_structure_cashflows = Some(cashflows);
-        self
     }
 
     /// Replace the current-period capital-structure cashflows, invalidating any
@@ -261,46 +244,6 @@ impl EvaluationContext {
                 node_id, self.period_id
             ))),
         }
-    }
-
-    /// Get the value for a node as a [`rust_decimal::Decimal`] boundary value.
-    ///
-    /// Converts the internally-stored `f64` to `Decimal` at the caller's
-    /// boundary. `NaN` and non-finite values become an error rather than
-    /// propagating as `Decimal::ZERO`. Use this helper from downstream
-    /// accounting / settlement / regulatory-capital code paths that need
-    /// the workspace's money invariants (see INVARIANTS.md §1), while the
-    /// evaluator's own storage remains `f64` pending a full Decimal
-    /// migration.
-    ///
-    /// A full migration of `current_values` to `Vec<Option<Decimal>>`
-    /// would ripple through 100+ formula / check call sites and remains
-    /// deferred; callers that need Decimal can opt in explicitly via
-    /// this boundary without forcing every downstream consumer to
-    /// migrate.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same missing-node or not-yet-evaluated errors as
-    /// [`get_value`](Self::get_value). It also returns an evaluation error when
-    /// the stored value is non-finite or cannot be represented as
-    /// [`rust_decimal::Decimal`].
-    pub fn get_value_decimal(&self, node_id: &str) -> Result<rust_decimal::Decimal> {
-        let value = self.get_value(node_id)?;
-        if !value.is_finite() {
-            return Err(Error::eval(format!(
-                "Cannot convert non-finite value {value} for node '{node_id}' to Decimal \
-                 (period {}); the Decimal boundary requires finite inputs",
-                self.period_id
-            )));
-        }
-        rust_decimal::Decimal::try_from(value).map_err(|e| {
-            Error::eval(format!(
-                "Failed to convert f64 value {value} to Decimal for node '{node_id}' \
-                 (period {}): {e}",
-                self.period_id
-            ))
-        })
     }
 
     /// Get historical value for a node at a specific period.
@@ -529,45 +472,5 @@ mod tests {
 
         assert!(Arc::ptr_eq(&ctx.history, &history));
         assert!(Arc::ptr_eq(&ctx.node_to_column, &columns));
-    }
-
-    /// `get_value_decimal` provides a Decimal-at-boundary conversion
-    /// for callers that need the workspace's money invariants. Finite
-    /// f64 values must round-trip cleanly; non-finite values must be
-    /// rejected rather than propagating as `Decimal::ZERO`.
-    #[test]
-    fn test_get_value_decimal_round_trips_finite_value() {
-        let mut node_to_column = IndexMap::new();
-        node_to_column.insert(NodeId::new("debt"), 0);
-
-        let mut ctx = EvaluationContext::new(
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            Arc::new(node_to_column),
-            Arc::new(IndexMap::new()),
-        );
-
-        ctx.set_value("debt", 1_234_567.89).expect("set ok");
-        let d = ctx.get_value_decimal("debt").expect("decimal ok");
-        let roundtrip: f64 = d.try_into().expect("f64 ok");
-        assert!((roundtrip - 1_234_567.89).abs() < 1e-4);
-    }
-
-    #[test]
-    fn test_get_value_decimal_rejects_non_finite() {
-        let mut node_to_column = IndexMap::new();
-        node_to_column.insert(NodeId::new("bad"), 0);
-
-        let mut ctx = EvaluationContext::new(
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            Arc::new(node_to_column),
-            Arc::new(IndexMap::new()),
-        );
-
-        ctx.set_value("bad", f64::NAN).expect("set NaN");
-        let err = ctx.get_value_decimal("bad").expect_err("must reject NaN");
-        assert!(
-            err.to_string().contains("non-finite"),
-            "expected non-finite rejection: {err}"
-        );
     }
 }

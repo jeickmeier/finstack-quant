@@ -1,7 +1,7 @@
 //! Equity price shock adapter.
 
-use crate::adapters::traits::ScenarioEffect;
 use crate::engine::ExecutionContext;
+use crate::engine::ScenarioEffect;
 use crate::error::Result;
 use crate::warning::Warning;
 use finstack_quant_core::types::CurveId;

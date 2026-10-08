@@ -61,7 +61,7 @@ fn parallel_bp_many(
     discount_curve_id: Option<String>,
 ) -> PyResult<Vec<operation_spec::PyOperationSpec>> {
     let kind = operation_spec::extract_curve_kind(curve_kind)?;
-    Ok(finstack_quant_scenarios::ScenarioSpec::parallel_bp_many(
+    Ok(finstack_quant_scenarios::OperationSpec::parallel_bp_many(
         kind,
         curve_ids,
         bp,
@@ -316,11 +316,11 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "build_from_template",
             "build_template_component",
             "compose_scenarios",
-            "parallel_bp_many",
             "compute_horizon_return",
             "list_builtin_template_metadata",
             "list_builtin_templates",
             "list_template_components",
+            "parallel_bp_many",
             "schema",
             "validate_scenario_spec",
         ],

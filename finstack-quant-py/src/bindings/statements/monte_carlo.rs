@@ -3,14 +3,15 @@
 //! The simulation itself is started from ``Evaluator.evaluate_monte_carlo``
 //! (see `evaluator.rs`), mirroring Rust's `Evaluator::evaluate_monte_carlo`.
 
+use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{dict_to_dataframe, table_to_dataframe};
-use crate::errors::serde_json_to_py;
+use crate::errors::{serde_json_to_py, statements_to_py};
 use finstack_quant_statements::evaluator::{
     MonteCarloConfig as RustMonteCarloConfig, MonteCarloResults as RustMonteCarloResults,
 };
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::PyDict;
 
 /// Configuration for statement-model Monte Carlo evaluation.
 #[pyclass(
@@ -22,6 +23,8 @@ use pyo3::types::{PyDict, PyList};
 pub(crate) struct PyMonteCarloConfig {
     pub(crate) inner: RustMonteCarloConfig,
 }
+
+wire_methods!(PyMonteCarloConfig, RustMonteCarloConfig, "MonteCarloConfig");
 
 #[pymethods]
 impl PyMonteCarloConfig {
@@ -63,33 +66,6 @@ impl PyMonteCarloConfig {
         }
         inner = inner.with_path_data(include_path_data);
         Self { inner }
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a configuration from its canonical JSON form.
-    ///
-    /// Unknown fields are rejected, so a mistyped key fails loudly instead of
-    /// silently falling back to a default.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid MonteCarloConfig JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this configuration to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize MonteCarloConfig"))
     }
 
     /// Number of paths the simulation will draw.
@@ -137,19 +113,6 @@ impl PyMonteCarloConfig {
     }
 }
 
-/// Column label for one percentile level: ``0.05`` → ``p5``, ``0.5`` →
-/// ``p50``, ``0.975`` → ``p97.5``.
-fn percentile_column(quantile: f64) -> String {
-    let pct = quantile * 100.0;
-    let rounded = pct.round();
-    if (pct - rounded).abs() < 1e-9 {
-        format!("p{}", rounded as i64)
-    } else {
-        format!("p{pct}")
-    }
-}
-
-/// Typed results for statement-model Monte Carlo evaluation.
 #[pyclass(
     name = "MonteCarloResults",
     module = "finstack_quant.statements",
@@ -160,37 +123,14 @@ pub(crate) struct PyMonteCarloResults {
     pub(crate) inner: RustMonteCarloResults,
 }
 
+wire_methods!(
+    PyMonteCarloResults,
+    RustMonteCarloResults,
+    "MonteCarloResults"
+);
+
 #[pymethods]
 impl PyMonteCarloResults {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize results from their canonical JSON form.
-    ///
-    /// Per-path detail is only present when the producing run set
-    /// ``include_path_data``; the internal path buffer used by
-    /// ``breach_probability`` is never serialized, so a round-tripped result
-    /// carries percentiles (and the optional path table) but not that buffer.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid MonteCarloResults JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize these results to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize MonteCarloResults"))
-    }
-
     /// Number of paths actually simulated.
     ///
     /// The aggregator fails the run unless this equals the configured
@@ -330,32 +270,14 @@ impl PyMonteCarloResults {
     ///     If ``metric`` was not simulated.
     #[pyo3(text_signature = "($self, metric)")]
     fn to_dataframe<'py>(&self, py: Python<'py>, metric: &str) -> PyResult<Bound<'py, PyAny>> {
-        let series = self.inner.percentile_results.get(metric).ok_or_else(|| {
-            PyKeyError::new_err(format!("unknown Monte Carlo metric: {metric:?}"))
-        })?;
-
-        let periods: Vec<String> = series.values.keys().map(ToString::to_string).collect();
-        let columns = PyDict::new(py);
-        for &quantile in &self.inner.percentiles {
-            let percentile_values = self.inner.percentile_by_period(metric, quantile);
-            let column: Vec<f64> = series
-                .values
-                .keys()
-                .map(|period| {
-                    percentile_values
-                        .as_ref()
-                        .and_then(|values| values.get(period))
-                        .copied()
-                        .unwrap_or(f64::NAN)
-                })
-                .collect();
-            columns.set_item(percentile_column(quantile), column)?;
-        }
-
-        let index = PyList::new(py, &periods)?;
-        let df = dict_to_dataframe(py, &columns, Some(index.into_any()))?;
-        df.getattr("index")?.setattr("name", "period")?;
-        Ok(df)
+        let table = self
+            .inner
+            .percentile_table(metric)
+            .map_err(statements_to_py)?
+            .ok_or_else(|| {
+                PyKeyError::new_err(format!("unknown Monte Carlo metric: {metric:?}"))
+            })?;
+        table_to_dataframe(py, &table)?.call_method1("set_index", ("period",))
     }
 
     /// Export the retained per-path values as a long-format pandas

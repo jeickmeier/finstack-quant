@@ -2,7 +2,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_scenarios::{ArbitrageViolation, RollForwardReport};
+use finstack_quant_scenarios::RollForwardReport;
 use indexmap::IndexMap;
 use time::macros::date;
 
@@ -26,7 +26,7 @@ where
 }
 
 #[test]
-fn test_scenarios_report_and_diagnostics_roundtrip() {
+fn test_roll_forward_report_roundtrip() {
     let mut total_carry = IndexMap::new();
     total_carry.insert(
         Currency::USD,
@@ -46,12 +46,5 @@ fn test_scenarios_report_and_diagnostics_roundtrip() {
         instrument_carry: vec![("BOND_A".to_string(), instrument_carry)],
         total_carry,
         failed_instruments: vec![("LOAN_B".to_string(), "missing carry inputs".to_string())],
-    });
-
-    assert_roundtrip_value(&ArbitrageViolation::CalendarSpread {
-        strike: 100.0,
-        expiry: 2.0,
-        prev_variance: 0.09,
-        curr_variance: 0.08,
     });
 }

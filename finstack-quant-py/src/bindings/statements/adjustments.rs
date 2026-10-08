@@ -1,6 +1,7 @@
 //! Python wrappers for EBITDA normalization and adjustments.
 
 use super::evaluator::PyStatementResult;
+use crate::bindings::macros::wire_methods;
 use crate::errors::{serde_json_to_py, statements_to_py, value_error};
 use finstack_quant_statements::adjustments::types::{
     Adjustment, AdjustmentValue, AppliedAdjustment, CapBaseMode, NormalizationConfig,
@@ -32,6 +33,8 @@ fn parse_cap_base_mode(mode: &str) -> PyResult<CapBaseMode> {
         ))
     })
 }
+
+wire_methods!(PyAdjustment, Adjustment, "Adjustment");
 
 #[pymethods]
 impl PyAdjustment {
@@ -146,28 +149,6 @@ impl PyAdjustment {
         }
     }
 
-    /// Support `pickle` via the canonical JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize an adjustment from canonical JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid Adjustment JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this adjustment to canonical JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize Adjustment"))
-    }
-
     /// Adjustment identifier.
     #[getter]
     fn id(&self) -> &str {
@@ -254,30 +235,10 @@ pub struct PyAppliedAdjustment {
     inner: AppliedAdjustment,
 }
 
+wire_methods!(PyAppliedAdjustment, AppliedAdjustment, "AppliedAdjustment");
+
 #[pymethods]
 impl PyAppliedAdjustment {
-    /// Support `pickle` via the canonical JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize an applied adjustment from canonical JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid AppliedAdjustment JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this applied adjustment to canonical JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize AppliedAdjustment"))
-    }
-
     /// Stable adjustment identifier.
     #[getter]
     fn adjustment_id(&self) -> &str {
@@ -336,29 +297,14 @@ pub struct PyNormalizationResult {
     inner: NormalizationResult,
 }
 
+wire_methods!(
+    PyNormalizationResult,
+    NormalizationResult,
+    "NormalizationResult"
+);
+
 #[pymethods]
 impl PyNormalizationResult {
-    /// Deserialize a normalization result from compact JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid NormalizationResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this result to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize NormalizationResult"))
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Reporting period identifier such as ``"2025Q1"``.
     #[getter]
     fn period(&self) -> String {
@@ -432,6 +378,12 @@ pub struct PyNormalizationConfig {
     pub(super) inner: NormalizationConfig,
 }
 
+wire_methods!(
+    PyNormalizationConfig,
+    NormalizationConfig,
+    "NormalizationConfig"
+);
+
 #[pymethods]
 impl PyNormalizationConfig {
     /// Create a normalization configuration for a target node.
@@ -497,37 +449,6 @@ impl PyNormalizationConfig {
     #[pyo3(text_signature = "($self)")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(statements_to_py)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a normalization configuration from JSON.
-    ///
-    /// Each adjustment carries an id, name, optional category, a value rule
-    /// (``{"type": "fixed", "amounts": {...}}`` or ``{"type":
-    /// "percentage_of_node", "node_id": ..., "percentage": 0.05}``), and an
-    /// optional cap. Unknown fields are rejected.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: NormalizationConfig = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid NormalizationConfig JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this configuration to compact JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize NormalizationConfig"))
     }
 
     /// Node identifier of the metric being normalized (e.g. ``"ebitda"``).

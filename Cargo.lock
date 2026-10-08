@@ -992,7 +992,6 @@ dependencies = [
  "finstack-quant-valuations",
  "indexmap",
  "jsonschema",
- "rayon",
  "schemars",
  "serde",
  "serde_json",

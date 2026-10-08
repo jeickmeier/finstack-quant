@@ -1,10 +1,4 @@
-//! Small numerical helpers shared by scenario adapters.
-
-/// Convert basis-point integers to absolute fractions (e.g., `300 bp` → `0.03`).
-#[inline]
-pub(crate) fn bp_to_fractions(bp: &[i32]) -> Vec<f64> {
-    bp.iter().map(|bp| f64::from(*bp) / 10_000.0).collect()
-}
+//! Curve-node interpolation weights used by the curve adapters.
 
 /// Interpolation weights and flat-extrapolation metadata for a curve-node shock.
 #[derive(Debug, Clone)]
@@ -69,14 +63,6 @@ pub(crate) fn calculate_interpolation_weights(target: f64, knots: &[f64]) -> Int
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_bps_to_fractions() {
-        let out = bp_to_fractions(&[300, 700]);
-        assert!((out[0] - 0.03).abs() < 1e-9);
-        assert!((out[1] - 0.07).abs() < 1e-9);
-        assert!(bp_to_fractions(&[]).is_empty());
-    }
 
     #[test]
     fn interpolation_weights_preserve_math_and_extrapolation_metadata() {

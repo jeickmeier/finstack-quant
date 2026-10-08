@@ -85,26 +85,6 @@ pub enum Error {
 }
 
 impl Error {
-    /// Create a market data not found error.
-    ///
-    /// # Arguments
-    ///
-    /// - `id`: Identifier of the missing market data object.
-    pub fn market_data_not_found(id: impl Into<String>) -> Self {
-        Self::MarketDataNotFound { id: id.into() }
-    }
-
-    /// Create a node not found error.
-    ///
-    /// # Arguments
-    ///
-    /// - `node_id`: Identifier of the missing statement node.
-    pub fn node_not_found(node_id: impl Into<String>) -> Self {
-        Self::NodeNotFound {
-            node_id: node_id.into(),
-        }
-    }
-
     /// Create an error for statement operations without a model in the execution context.
     ///
     /// # Arguments
@@ -132,37 +112,6 @@ impl Error {
     /// - `msg`: Human-readable internal error message.
     pub fn internal(msg: impl Into<String>) -> Self {
         Self::Internal(msg.into())
-    }
-
-    /// Create an invalid tenor error.
-    ///
-    /// # Arguments
-    ///
-    /// - `tenor`: Tenor string that failed validation or parsing.
-    pub fn invalid_tenor(tenor: impl Into<String>) -> Self {
-        Self::InvalidTenor(tenor.into())
-    }
-
-    /// Create a tenor not found error.
-    ///
-    /// # Arguments
-    ///
-    /// - `tenor`: Tenor string that could not be matched.
-    /// - `curve_id`: Curve identifier on which the tenor lookup failed.
-    pub fn tenor_not_found(tenor: impl Into<String>, curve_id: impl Into<String>) -> Self {
-        Self::TenorNotFound {
-            tenor: tenor.into(),
-            curve_id: curve_id.into(),
-        }
-    }
-
-    /// Create an invalid period error.
-    ///
-    /// # Arguments
-    ///
-    /// - `period`: Period string that failed validation or parsing.
-    pub fn invalid_period(period: impl Into<String>) -> Self {
-        Self::InvalidPeriod(period.into())
     }
 }
 
@@ -225,7 +174,7 @@ mod tests {
 
     #[test]
     fn converts_scenarios_errors_to_core_error() {
-        let core: finstack_quant_core::Error = Error::invalid_period("1X").into();
+        let core: finstack_quant_core::Error = Error::InvalidPeriod("1X".into()).into();
         assert!(matches!(core, finstack_quant_core::Error::Validation(_)));
     }
 
@@ -233,9 +182,16 @@ mod tests {
     fn lookup_misses_keep_not_found_kind() {
         use finstack_quant_core::error::ErrorKind;
         for err in [
-            Error::market_data_not_found("USD-OIS"),
-            Error::node_not_found("Revenue"),
-            Error::tenor_not_found("7Y", "USD-OIS"),
+            Error::MarketDataNotFound {
+                id: "USD-OIS".into(),
+            },
+            Error::NodeNotFound {
+                node_id: "Revenue".into(),
+            },
+            Error::TenorNotFound {
+                tenor: "7Y".into(),
+                curve_id: "USD-OIS".into(),
+            },
         ] {
             let core: finstack_quant_core::Error = err.into();
             assert_eq!(core.kind(), ErrorKind::NotFound, "{core}");

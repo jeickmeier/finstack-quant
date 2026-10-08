@@ -129,7 +129,7 @@ mod stack_safety {
     /// test fails long before a real deployment would.
     ///
     /// If this test starts aborting, `MAX_FORMULA_TERMS` is too high for the
-    /// per-term stack cost of the AST walkers (`compile`, `validate_dimensions`,
+    /// per-term stack cost of the AST walkers (`compile`, `infer_value_type`,
     /// `Drop`) — lower the budget rather than raising the stack here.
     #[test]
     fn formula_at_term_budget_compiles_on_a_small_stack() {

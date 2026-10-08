@@ -215,29 +215,6 @@ impl PyScenarioSpec {
         self.inner.mutates_instruments()
     }
 
-    /// Return a copy with a different ParCDS hazard delivery mode.
-    ///
-    /// Parameters
-    /// ----------
-    /// mode : str
-    ///     ``"solve_to_par"`` or ``"first_order_shift"``.
-    ///
-    /// Returns
-    /// -------
-    /// ScenarioSpec
-    ///     New specification with ``hazard_bump_mode`` replaced.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``mode`` is not one of the accepted labels.
-    fn with_hazard_bump_mode(&self, mode: &str) -> PyResult<Self> {
-        let mode = parse_hazard_bump_mode(mode)?;
-        Ok(Self {
-            inner: self.inner.clone().with_hazard_bump_mode(mode),
-        })
-    }
-
     /// Support pickle through the canonical JSON representation.
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;

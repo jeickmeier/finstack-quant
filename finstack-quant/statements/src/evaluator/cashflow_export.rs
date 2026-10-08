@@ -78,11 +78,7 @@ pub fn node_to_dated_schedule(
             let d = match date_convention {
                 PeriodDateConvention::Start => period.start,
                 PeriodDateConvention::End => {
-                    if period.end <= period.start {
-                        period.start
-                    } else {
-                        period.end - time::Duration::days(1)
-                    }
+                    crate::capital_structure::period_flows::period_snapshot_date(period)
                 }
             };
             out.push((d, v));

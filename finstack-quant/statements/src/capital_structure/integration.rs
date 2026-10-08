@@ -47,20 +47,16 @@ pub fn build_instrument_from_spec(
     })
 }
 
-/// Convert a money amount into the reporting currency when FX data is available.
+/// Convert a money amount into the reporting currency `rc`.
 pub(crate) fn convert_to_reporting(
     money: finstack_quant_core::money::Money,
     on: Date,
-    reporting_currency: Option<Currency>,
+    rc: Currency,
     fx_matrix: Option<&Arc<finstack_quant_core::money::fx::FxMatrix>>,
     fx_policy: finstack_quant_core::money::fx::FxConversionPolicy,
-) -> Result<Option<finstack_quant_core::money::Money>> {
-    let Some(rc) = reporting_currency else {
-        return Ok(None);
-    };
-
+) -> Result<finstack_quant_core::money::Money> {
     if rc == money.currency() {
-        return Ok(Some(money));
+        return Ok(money);
     }
 
     let Some(fx) = fx_matrix else {
@@ -76,8 +72,8 @@ pub(crate) fn convert_to_reporting(
     let rate = fx
         .rate(FxQuery::with_policy(money.currency(), rc, on, fx_policy))?
         .rate;
-    Ok(Some(finstack_quant_core::money::Money::new(
+    Ok(finstack_quant_core::money::Money::new(
         money.amount() * rate,
         rc,
-    )?))
+    )?)
 }

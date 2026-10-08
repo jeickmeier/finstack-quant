@@ -190,7 +190,6 @@ pub(crate) fn build_context_for_period(
         std::sync::Arc::clone(&context.history),
         std::sync::Arc::clone(&context.historical_capital_structure_cashflows),
     );
-    period_context.node_value_types = std::sync::Arc::clone(&context.node_value_types);
     period_context.capital_structure_cashflows = if target_period == context.period_id {
         context.capital_structure_cashflows.clone()
     } else {

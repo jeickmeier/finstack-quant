@@ -98,7 +98,7 @@ mod waterfall_spec;
 // Curated public facade for capital-structure types and builder inputs.
 pub use builder::{BondConventionParams, SwapConventions, SwapParams};
 pub(crate) use cashflows::add_optional_money;
-pub use cashflows::{CapitalStructureCashflows, CashflowBreakdown};
+pub use cashflows::{CapitalStructureCashflows, CashflowBreakdown, TOTAL_ROW_LABEL};
 pub use integration::build_instrument_from_spec;
 pub use period_flows::calculate_period_flows;
 pub use principal::PrincipalClaim;

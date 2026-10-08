@@ -97,7 +97,10 @@ debug = 1
 opt-level = 3           # Optimize for speed
 lto = "fat"             # Full link-time optimization (max cross-crate inlining)
 codegen-units = 1       # Single codegen unit for maximum optimization
-strip = "symbols"       # Strip symbols (profiling uses the `bench` profile, which keeps them)
+# Xcode 27's post-link `strip` emits a misaligned LINKEDIT string pool that dyld
+# refuses to load, so Apple targets strip at link time instead (.cargo/config.toml).
+# `debug = 0` would otherwise default to `strip = "debuginfo"`, which also runs it.
+strip = "none"
 
 [profile.release-size]
 # Size-optimized profile for WASM bundle size

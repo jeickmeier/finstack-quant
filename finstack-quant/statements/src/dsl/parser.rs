@@ -25,7 +25,7 @@ const MAX_PARSE_DEPTH: usize = 64;
 /// `1 + 1 + 1 + ...`: those levels parse iteratively (`many0` + `fold`), so an
 /// unbounded chain parses happily into a left-leaning AST whose *depth* equals
 /// the operator count. Every later consumer walks that AST recursively —
-/// [`crate::dsl::compile`], `validate_dimensions`, and even the derived `Drop`
+/// [`crate::dsl::compile`], dimension inference, and even the derived `Drop`
 /// of the boxed tree — so the depth lands on the stack after parsing has
 /// already succeeded. A stack overflow aborts the process (SIGABRT) and cannot
 /// be caught by the Python/WASM bindings' unwind guards, so bounding this is a
@@ -446,7 +446,7 @@ mod tests {
     /// Regression lock for a stack-overflow DoS: `MAX_PARSE_DEPTH` guards only
     /// parser recursion, so a chain like `1+1+1+...` parsed fine and produced a
     /// left-leaning AST whose depth equalled the operator count. `compile()`
-    /// (and `validate_dimensions`, and the AST's own `Drop`) then recursed to
+    /// (and dimension inference, and the AST's own `Drop`) then recursed to
     /// that depth and overflowed the stack — SIGABRT, not a catchable panic, so
     /// the Python/WASM bindings could not contain it. Reachable from any
     /// inbound formula: registry JSON, model-spec JSON, or the builder.

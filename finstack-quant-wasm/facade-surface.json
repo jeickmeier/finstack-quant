@@ -3937,7 +3937,6 @@
       "rateBindingSpecValidate",
       "scenarioSpecMutatesInstruments",
       "scenarioSpecRequiresInstruments",
-      "scenarioSpecWithHazardBumpMode",
       "schema",
       "validateScenarioSpec"
     ]
@@ -4063,9 +4062,6 @@
     "kind": "function"
   },
   "scenarios.scenarioSpecMutatesInstruments": {
-    "kind": "function"
-  },
-  "scenarios.scenarioSpecWithHazardBumpMode": {
     "kind": "function"
   },
   "scenarios.horizonResultExplainText": {

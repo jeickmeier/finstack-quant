@@ -55,8 +55,6 @@ def test_scenario_spec_exposes_hazard_bump_mode() -> None:
     assert defaulted.hazard_bump_mode == "solve_to_par"
     assert first_order.hazard_bump_mode == "first_order_shift"
     assert composed.hazard_bump_mode == "first_order_shift"
-    assert defaulted.with_hazard_bump_mode("first_order_shift").hazard_bump_mode == "first_order_shift"
-    assert defaulted.hazard_bump_mode == "solve_to_par", "with_hazard_bump_mode returns a copy"
 
 
 def test_compose_scenarios_rejects_mixed_hazard_bump_modes() -> None:

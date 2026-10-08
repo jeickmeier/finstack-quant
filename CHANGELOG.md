@@ -34,6 +34,24 @@
 - `TraceEntry::CalibrationIteration` (wire kind `calibration_iteration`) is removed; nothing produced it.
 - Rust `BondEngine::price_with_explanation` is removed; it had no production caller. The registry trace above replaces it.
 
+### Scenarios API simplification
+
+#### Changed (breaking)
+
+- Rust `ScenarioSpec::parallel_bp_many` moved to `OperationSpec::parallel_bp_many`; Python `parallel_bp_many` and WASM `parallelBpMany` are unchanged.
+- Rust `ScenarioEngine::recalibration_provider()` → `get_recalibration_provider()`.
+- Time-roll carry valuation uses `finstack_quant_core::parallel::try_map_ordered` at every inventory size; results and ordering are unchanged, and `finstack-quant-scenarios` no longer depends on `rayon` directly.
+
+#### Added
+
+- Rust `ScenarioMarketTarget::id_label()`: the changed object's identifier, `BASE/QUOTE` for FX. Python `ApplicationReport.changes_to_dataframe()` reads it.
+
+#### Removed
+
+- `ScenarioSpec::with_hazard_bump_mode` on every host (Python `ScenarioSpec.with_hazard_bump_mode`, WASM `scenarioSpecWithHazardBumpMode`). Pass `hazard_bump_mode` to the constructor or set the field.
+- Python `ApplicationReport.warnings_json` and `HorizonResult.warnings_json`; `warnings` is the same list.
+- Rust `apply_time_roll_forward` (apply a `TimeRollForward` operation through `ScenarioEngine::apply`), the crate-root `ArbitrageViolation` re-export, `ApplicationEnvelope::into_parts`, `HazardBumpMode::is_solve_to_par`, `TemplateRegistry::get` and `RegisteredTemplate` (use `build`, `build_component`, `component_ids`, `list`), `schema::SCENARIO_SCHEMA_BASE` / `SCENARIO_SCHEMA_FILENAME`, and the unused `Error` constructors `market_data_not_found`, `node_not_found`, `invalid_tenor`, `tenor_not_found`, `invalid_period`.
+
 ### Attribution API simplification
 
 #### Changed (breaking)
