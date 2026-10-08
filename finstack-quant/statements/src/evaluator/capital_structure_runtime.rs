@@ -75,7 +75,8 @@ impl Evaluator {
             compute_contractual_flows(instruments, cs_state, period, market_ctx, as_of)?;
 
         let fx_ctx = build_fx_context(model, market_ctx, period)?;
-        let mut cs_cashflows = build_cs_cashflows_from_contractual(&contractual_flows, period_id);
+        let mut cs_cashflows = crate::capital_structure::CapitalStructureCashflows::new();
+        merge_updated_flows(&mut cs_cashflows, &contractual_flows, period_id);
         recompute_cs_totals(&mut cs_cashflows, period_id, fx_ctx.as_ref())?;
 
         let mut context = EvaluationContext::new_with_history(
@@ -184,19 +185,11 @@ pub(crate) fn resolve_opening_balance(
     let schedule = instrument.raw_cashflow_schedule(market_ctx, as_of)?;
     let outstanding_path = schedule.outstanding_by_date()?;
 
-    let abs_money = |m: &Money| -> Money {
-        if m.amount() < 0.0 {
-            m.checked_neg()
-        } else {
-            *m
-        }
-    };
-
     // Same half-open rule as `calculate_period_flows`: a coupon/amort dated
     // exactly on `period_start` belongs to this period, so opening is the
     // balance strictly before that date.
     if let Some((_, m)) = outstanding_path.iter().rfind(|(d, _)| *d < period_start) {
-        return Ok(abs_money(m));
+        return Ok(m.abs());
     }
 
     // Initial funding dated on the first period boundary belongs to that
@@ -232,7 +225,7 @@ pub(crate) fn resolve_opening_balance(
     // Before the first event, principal is the schedule's initial notional.
     // The first path row is an after-event balance, so using it here would
     // apply boundary amortization or even a future redemption too early.
-    Ok(abs_money(&schedule.get_notional().initial))
+    Ok(schedule.get_notional().initial.abs())
 }
 
 fn compute_contractual_flows(
@@ -303,19 +296,6 @@ fn compute_contractual_flows(
     Ok((flows, warnings))
 }
 
-fn build_cs_cashflows_from_contractual(
-    contractual_flows: &IndexMap<String, crate::capital_structure::CashflowBreakdown>,
-    period_id: PeriodId,
-) -> crate::capital_structure::CapitalStructureCashflows {
-    let mut cs = crate::capital_structure::CapitalStructureCashflows::new();
-    for (inst_id, breakdown) in contractual_flows {
-        let mut period_map = IndexMap::new();
-        period_map.insert(period_id, breakdown.clone());
-        cs.by_instrument.insert(inst_id.clone(), period_map);
-    }
-    cs
-}
-
 /// Build the reporting-FX context for one period's `cs.*` totals.
 ///
 /// When `CapitalStructureSpec.fx_policy` is omitted, conversion uses
@@ -336,11 +316,7 @@ fn build_fx_context<'a>(
     let fx_policy = cs_spec
         .fx_policy
         .unwrap_or(finstack_quant_core::money::fx::FxConversionPolicy::PeriodEnd);
-    let snapshot_date = if period.end > period.start {
-        period.end - time::Duration::days(1)
-    } else {
-        period.start
-    };
+    let snapshot_date = crate::capital_structure::period_flows::period_snapshot_date(period);
     Ok(Some(CsTotalsContext {
         reporting_currency,
         fx_matrix,
@@ -380,15 +356,7 @@ fn recompute_cs_totals(
             crate::capital_structure::CashflowBreakdown::with_currency(currency)
         });
 
-        entry.interest_expense_cash += breakdown.interest_expense_cash;
-        entry.interest_expense_pik += breakdown.interest_expense_pik;
-        entry.principal_payment += breakdown.principal_payment;
-        entry.fees += breakdown.fees;
-        entry.debt_balance += breakdown.debt_balance;
-        entry.accrued_interest += breakdown.accrued_interest;
-        let mut income = entry.interest_income_cash_or_zero();
-        income += breakdown.interest_income_cash_or_zero();
-        entry.interest_income_cash = Some(income);
+        accumulate(entry, breakdown, Ok)?;
     }
 
     for (currency, breakdown) in &totals_by_currency {
@@ -409,54 +377,35 @@ fn recompute_cs_totals(
         if let Some(rc) = ctx.reporting_currency {
             let mut converted_total =
                 crate::capital_structure::CashflowBreakdown::with_currency(rc);
-            let mut all_converted = true;
-            for (_, breakdown) in &totals_by_currency {
-                let fields = [
-                    breakdown.interest_expense_cash,
-                    breakdown.interest_expense_pik,
-                    breakdown.principal_payment,
-                    breakdown.fees,
-                    breakdown.debt_balance,
-                    breakdown.accrued_interest,
-                    breakdown.interest_income_cash_or_zero(),
-                ];
-                let mut converted_fields = Vec::with_capacity(fields.len());
-                for money in &fields {
-                    match convert_to_reporting(
-                        *money,
-                        ctx.snapshot_date,
-                        Some(rc),
-                        ctx.fx_matrix,
-                        ctx.fx_policy,
-                    ) {
-                        Ok(Some(m)) => converted_fields.push(m),
-                        Ok(None) => {
-                            all_converted = false;
-                            break;
-                        }
-                        Err(e) => return Err(e),
-                    }
-                }
-                if !all_converted {
-                    break;
-                }
-                converted_total.interest_expense_cash += converted_fields[0];
-                converted_total.interest_expense_pik += converted_fields[1];
-                converted_total.principal_payment += converted_fields[2];
-                converted_total.fees += converted_fields[3];
-                converted_total.debt_balance += converted_fields[4];
-                converted_total.accrued_interest += converted_fields[5];
-                let mut income = converted_total.interest_income_cash_or_zero();
-                income += converted_fields[6];
-                converted_total.interest_income_cash = Some(income);
+            for breakdown in totals_by_currency.values() {
+                accumulate(&mut converted_total, breakdown, |money| {
+                    convert_to_reporting(money, ctx.snapshot_date, rc, ctx.fx_matrix, ctx.fx_policy)
+                })?;
             }
-            if all_converted {
-                cashflows.reporting_currency = Some(rc);
-                cashflows.totals.insert(period_id, converted_total);
-            }
+            cashflows.reporting_currency = Some(rc);
+            cashflows.totals.insert(period_id, converted_total);
         }
     }
 
+    Ok(())
+}
+
+/// Add every component of `source` into `total`, passing each amount through
+/// `convert` first (identity for same-currency sums, FX for reporting totals).
+fn accumulate(
+    total: &mut crate::capital_structure::CashflowBreakdown,
+    source: &crate::capital_structure::CashflowBreakdown,
+    convert: impl Fn(Money) -> crate::error::Result<Money>,
+) -> crate::error::Result<()> {
+    total.interest_expense_cash += convert(source.interest_expense_cash)?;
+    total.interest_expense_pik += convert(source.interest_expense_pik)?;
+    total.principal_payment += convert(source.principal_payment)?;
+    total.fees += convert(source.fees)?;
+    total.debt_balance += convert(source.debt_balance)?;
+    total.accrued_interest += convert(source.accrued_interest)?;
+    let mut income = total.interest_income_cash_or_zero();
+    income += convert(source.interest_income_cash_or_zero())?;
+    total.interest_income_cash = Some(income);
     Ok(())
 }
 

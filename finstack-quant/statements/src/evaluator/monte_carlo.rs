@@ -121,6 +121,18 @@ pub struct MonteCarloResults {
     pub path_data: Option<TableEnvelope>,
 }
 
+/// Column label for a percentile given as a fraction: `0.05` → `p5`,
+/// `0.975` → `p97.5`.
+fn percentile_label(percentile: f64) -> String {
+    let pct = percentile * 100.0;
+    let rounded = pct.round();
+    if (pct - rounded).abs() < 1e-9 {
+        format!("p{rounded}")
+    } else {
+        format!("p{pct}")
+    }
+}
+
 impl MonteCarloResults {
     /// Get a time series of a specific percentile for a metric.
     pub fn percentile_by_period(
@@ -142,6 +154,55 @@ impl MonteCarloResults {
         } else {
             Some(out)
         }
+    }
+
+    /// Export one metric's percentile bands as a wide table.
+    ///
+    /// Columns: `period` (period identifier such as `2025Q1`) followed by one
+    /// column per configured percentile, named `p<pct>` from the percentile in
+    /// percent (`0.05` → `p5`, `0.5` → `p50`, `0.975` → `p97.5`). A percentile
+    /// with no stored value for a period is `NaN`.
+    ///
+    /// # Arguments
+    ///
+    /// * `metric` - Node id of a simulated metric, exactly as it appears in
+    ///   `percentile_results`.
+    ///
+    /// # Returns
+    ///
+    /// `None` when `metric` was not simulated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if two configured percentiles produce the same column
+    /// name.
+    pub fn percentile_table(&self, metric: &str) -> Result<Option<TableEnvelope>> {
+        let Some(series) = self.percentile_results.get(metric) else {
+            return Ok(None);
+        };
+        let periods = series.values.keys().map(ToString::to_string).collect();
+        let mut columns = vec![TableColumn::new("period", TableColumnData::String(periods))
+            .with_role(TableColumnRole::Index)];
+        for &percentile in &self.percentiles {
+            let values = series
+                .values
+                .values()
+                .map(|pairs| {
+                    pairs
+                        .iter()
+                        .find(|(q, _)| (*q - percentile).abs() < 1e-12)
+                        .map_or(f64::NAN, |(_, value)| *value)
+                })
+                .collect();
+            columns.push(
+                TableColumn::new(
+                    percentile_label(percentile),
+                    TableColumnData::Float64(values),
+                )
+                .with_role(TableColumnRole::Measure),
+            );
+        }
+        TableEnvelope::new(columns).map(Some).map_err(Into::into)
     }
 
     /// Estimate the probability that a metric exceeds a threshold in any forecast period.

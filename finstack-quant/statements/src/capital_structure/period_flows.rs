@@ -50,11 +50,7 @@ pub(crate) fn funding_principal(flow: &CashFlow) -> Option<Money> {
         return (delta.amount() > 0.0).then_some(delta);
     }
     if matches!(flow.kind, CFKind::RevolvingDraw) || flow.amount.amount() <= 0.0 {
-        return Some(if flow.amount.amount() < 0.0 {
-            flow.amount.checked_neg()
-        } else {
-            flow.amount
-        });
+        return Some(flow.amount.abs());
     }
     None
 }
@@ -89,6 +85,15 @@ pub(crate) fn period_snapshot_date(period: &Period) -> Date {
     period.end - time::Duration::days(1)
 }
 
+/// Whether a flow returns principal to the lender: amortization, prepayment,
+/// revolver repayment, or a positive notional (redemption) row.
+fn is_principal_repayment(flow: &CashFlow) -> bool {
+    matches!(
+        flow.kind,
+        CFKind::Amortization | CFKind::PrePayment | CFKind::RevolvingRepayment
+    ) || (flow.kind == CFKind::Notional && flow.amount.amount() > 0.0)
+}
+
 /// Preserve the cash and economic dates of this period's principal claims.
 pub(crate) fn period_principal_claims(
     schedule: &CashFlowSchedule,
@@ -98,21 +103,12 @@ pub(crate) fn period_principal_claims(
         .get_flows()
         .iter()
         .filter(|flow| flow.date >= period.start && flow.date < period.end)
-        .filter(|flow| {
-            matches!(
-                flow.kind,
-                CFKind::Amortization | CFKind::PrePayment | CFKind::RevolvingRepayment
-            ) || (flow.kind == CFKind::Notional && flow.amount.amount() > 0.0)
-        })
+        .filter(|flow| is_principal_repayment(flow))
         .filter(|flow| flow.amount.amount() != 0.0)
         .map(|flow| crate::capital_structure::PrincipalClaim {
             payment_date: flow.date,
             balance_date: flow.get_balance_date(),
-            amount: if flow.amount.amount() < 0.0 {
-                flow.amount.checked_neg()
-            } else {
-                flow.amount
-            },
+            amount: flow.amount.abs(),
         })
         .collect()
 }
@@ -224,13 +220,7 @@ pub fn calculate_period_flows(
     let scheduled_opening = outstanding_path
         .iter()
         .filter(|(d, _)| *d < period.start)
-        .map(|(_, balance)| {
-            if balance.amount() < 0.0 {
-                balance.checked_neg()
-            } else {
-                *balance
-            }
-        })
+        .map(|(_, balance)| balance.abs())
         .next_back()
         .unwrap_or(full_schedule.get_notional().initial);
 
@@ -384,10 +374,7 @@ pub fn calculate_period_flows(
                 kind if is_cash_interest_kind(kind) => {
                     net_interest_cash += cf.amount.amount() * scale;
                 }
-                CFKind::Amortization | CFKind::PrePayment | CFKind::RevolvingRepayment => {
-                    breakdown.principal_payment += scaled_abs_value;
-                }
-                CFKind::Notional if cf.amount.amount() > 0.0 => {
+                _ if is_principal_repayment(cf) => {
                     breakdown.principal_payment += scaled_abs_value;
                 }
                 CFKind::CommitmentFee
@@ -456,13 +443,7 @@ pub fn calculate_period_flows(
         .iter()
         .rev()
         .find(|(date, _)| *date <= snapshot_date)
-        .map(|(_, balance)| {
-            if balance.amount() < 0.0 {
-                balance.checked_neg()
-            } else {
-                *balance
-            }
-        })
+        .map(|(_, balance)| balance.abs())
         .unwrap_or_else(|| {
             // No outstanding entry at or before the snapshot. If the
             // instrument has not been issued yet (forward-dated / delayed
@@ -481,11 +462,7 @@ pub fn calculate_period_flows(
                 return Money::from((0_i64, currency));
             }
             let initial = full_schedule.get_notional().initial;
-            if initial.amount() < 0.0 {
-                initial.checked_neg()
-            } else {
-                initial
-            }
+            initial.abs()
         });
 
     let closing_balance = if !is_debt {
@@ -500,13 +477,8 @@ pub fn calculate_period_flows(
                 .get_flows()
                 .iter()
                 .filter(|cf| cf.date >= period.start && cf.date < period.end)
-                .filter_map(|cf| match cf.kind {
-                    CFKind::Amortization | CFKind::PrePayment | CFKind::RevolvingRepayment => {
-                        Some(cf.amount.amount().abs())
-                    }
-                    CFKind::Notional if cf.amount.amount() > 0.0 => Some(cf.amount.amount().abs()),
-                    _ => None,
-                })
+                .filter(|cf| is_principal_repayment(cf))
+                .map(|cf| cf.amount.amount().abs())
                 .sum();
             Money::new(
                 (net_new_funding + breakdown.interest_expense_pik.amount() - in_period_repayments)

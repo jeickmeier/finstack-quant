@@ -4,7 +4,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use finstack_quant_statements::builder::{ModelBuilder, NeedPeriods};
+use finstack_quant_statements::builder::{ModelBuilder, NeedPeriods, Ready};
 use finstack_quant_statements::types::FinancialStatementInstrument;
 use finstack_quant_valuations::instruments::RevolvingCredit;
 use time::Month;
@@ -39,6 +39,53 @@ fn test_add_bond() {
         cs.debt_instruments[0].spec,
         FinancialStatementInstrument::Bond(_)
     ));
+}
+
+fn swap_in(currency: Currency) -> finstack_quant_statements::Result<ModelBuilder<Ready>> {
+    ModelBuilder::<NeedPeriods>::new("test")
+        .periods("2025Q1..2025Q2", None)
+        .expect("valid period range")
+        .add_swap(
+            "SWAP-001",
+            Money::new(5_000_000.0, currency).expect("valid money fixture"),
+            0.04,
+            Date::from_calendar_date(2025, Month::January, 1).expect("valid date"),
+            Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
+            "OIS",
+            "FWD-3M",
+        )
+}
+
+#[test]
+fn add_swap_rolls_on_the_currency_rates_calendar() {
+    for (currency, calendar) in [
+        (Currency::USD, "usny"),
+        (Currency::EUR, "target2"),
+        (Currency::AUD, "auce"),
+        (Currency::CAD, "cato"),
+        (Currency::CHF, "chzh"),
+    ] {
+        let model = swap_in(currency)
+            .expect("mapped currency")
+            .build()
+            .expect("valid model");
+        let cs = model.capital_structure.expect("capital structure");
+        let FinancialStatementInstrument::InterestRateSwap(swap) = &cs.debt_instruments[0].spec
+        else {
+            panic!("expected a swap");
+        };
+        assert_eq!(swap.fixed_leg.calendar_id.as_deref(), Some(calendar));
+        assert_eq!(swap.float_leg.calendar_id.as_deref(), Some(calendar));
+    }
+}
+
+#[test]
+fn add_swap_rejects_a_currency_without_a_standard_calendar() {
+    let error = swap_in(Currency::SEK).expect_err("SEK has no standard rates calendar");
+    assert!(
+        error.to_string().contains("no standard rates calendar"),
+        "unexpected error: {error}"
+    );
 }
 
 #[test]

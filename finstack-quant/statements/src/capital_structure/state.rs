@@ -31,12 +31,6 @@ pub struct CapitalStructureState {
     /// Closing balances by instrument ID at the end of the current period
     pub closing_balances: IndexMap<String, Money>,
 
-    /// Cumulative interest paid (cash) by instrument
-    pub cumulative_interest_cash: IndexMap<String, Money>,
-
-    /// Cumulative interest accrued (PIK) by instrument
-    pub cumulative_interest_pik: IndexMap<String, Money>,
-
     /// Cumulative principal payments by instrument
     pub cumulative_principal: IndexMap<String, Money>,
 

@@ -110,6 +110,8 @@ pub struct ModelBuilder<State> {
     pub(crate) nodes: IndexMap<NodeId, NodeSpec>,
     meta: IndexMap<String, serde_json::Value>,
     pub(crate) capital_structure: Option<crate::types::CapitalStructureSpec>,
+    /// Node most recently defined or modified; the target of `where_clause`.
+    last_node: Option<NodeId>,
     _state: PhantomData<State>,
 }
 
@@ -120,8 +122,17 @@ impl<State> ModelBuilder<State> {
     /// nodes programmatically. Prefer `.compute()` and `.value()` for
     /// standard model construction.
     pub fn insert_node(&mut self, id: NodeId, spec: NodeSpec) -> &mut Self {
-        self.nodes.insert(id, spec);
+        self.put_node(id, spec);
         self
+    }
+
+    /// Insert or replace a node and record it as the `where_clause` target.
+    ///
+    /// `IndexMap::insert` keeps a redefined key in its original slot, so the
+    /// map's last entry is not necessarily the node defined last.
+    fn put_node(&mut self, id: NodeId, spec: NodeSpec) {
+        self.last_node = Some(id.clone());
+        self.nodes.insert(id, spec);
     }
 
     /// Warn when a node-creating builder method would overwrite an existing
@@ -225,6 +236,7 @@ impl ModelBuilder<NeedPeriods> {
             nodes: IndexMap::new(),
             meta: IndexMap::new(),
             capital_structure: None,
+            last_node: None,
             _state: PhantomData,
         }
     }
@@ -296,6 +308,7 @@ impl ModelBuilder<NeedPeriods> {
             nodes: self.nodes,
             meta: self.meta,
             capital_structure: self.capital_structure,
+            last_node: self.last_node,
             _state: PhantomData,
         })
     }
@@ -328,6 +341,7 @@ impl ModelBuilder<NeedPeriods> {
             nodes: self.nodes,
             meta: self.meta,
             capital_structure: self.capital_structure,
+            last_node: self.last_node,
             _state: PhantomData,
         })
     }
@@ -360,12 +374,14 @@ impl ModelBuilder<Ready> {
                 "Period list must contain at least one period",
             ));
         }
+        let last_node = spec.nodes.last().map(|(id, _)| id.clone());
         Ok(Self {
             id: spec.id,
             periods: spec.periods,
             nodes: spec.nodes,
             meta: spec.meta,
             capital_structure: spec.capital_structure,
+            last_node,
             _state: PhantomData,
         })
     }
@@ -380,7 +396,7 @@ impl ModelBuilder<Ready> {
         let node = NodeSpec::new(key.clone(), NodeType::Calculated)
             .with_name(stored_metric.definition.name.clone())
             .with_formula(formula);
-        self.nodes.insert(key, node);
+        self.put_node(key, node);
     }
 
     /// Add a value node with explicit period values.
@@ -427,7 +443,7 @@ impl ModelBuilder<Ready> {
         let node = NodeSpec::new(node_id.clone(), NodeType::Value).with_values(values_map);
 
         self.warn_if_redefining(&node_id, "value");
-        self.nodes.insert(node_id, node);
+        self.put_node(node_id, node);
         self
     }
 
@@ -490,7 +506,7 @@ impl ModelBuilder<Ready> {
         node.value_type = value_type;
 
         self.warn_if_redefining(&node_id, "value_money");
-        self.nodes.insert(node_id, node);
+        self.put_node(node_id, node);
         self
     }
 
@@ -535,7 +551,7 @@ impl ModelBuilder<Ready> {
         node.value_type = Some(crate::types::NodeValueType::Scalar);
 
         self.warn_if_redefining(&node_id, "value_scalar");
-        self.nodes.insert(node_id, node);
+        self.put_node(node_id, node);
         self
     }
 
@@ -673,7 +689,7 @@ impl ModelBuilder<Ready> {
         let node = NodeSpec::new(node_id.clone(), NodeType::Calculated).with_formula(formula);
 
         self.warn_if_redefining(&node_id, "compute");
-        self.nodes.insert(node_id, node);
+        self.put_node(node_id, node);
         Ok(self)
     }
 
@@ -762,6 +778,7 @@ impl ModelBuilder<Ready> {
 
         if let Some(node) = self.nodes.get_mut(node_id.as_str()) {
             node.forecast = Some(forecast_spec);
+            self.last_node = Some(node_id);
 
             // A node carrying a forecast must be Mixed so precedence resolves
             // Value > Forecast > Formula. Upgrade both Value AND Calculated:
@@ -773,7 +790,7 @@ impl ModelBuilder<Ready> {
             }
         } else {
             let node = NodeSpec::new(node_id.clone(), NodeType::Mixed).with_forecast(forecast_spec);
-            self.nodes.insert(node_id, node);
+            self.put_node(node_id, node);
         }
 
         self
@@ -806,7 +823,12 @@ impl ModelBuilder<Ready> {
         self
     }
 
-    /// Add a where clause to the last added node.
+    /// Add a where clause to the node most recently defined or modified.
+    ///
+    /// The target is the node named by the previous `value`, `compute`,
+    /// `forecast`, `mixed().build()` or `insert_node` call, including when that
+    /// call redefined an existing node. Called before any node is defined, it
+    /// logs a warning and does nothing.
     ///
     /// The where clause is a conditional expression that determines whether
     /// the node should be evaluated for a given period. If the where clause
@@ -832,8 +854,16 @@ impl ModelBuilder<Ready> {
     /// ```
     #[must_use = "builder methods must be chained"]
     pub fn where_clause(mut self, where_clause: impl Into<String>) -> Self {
-        if let Some((_, last_node)) = self.nodes.last_mut() {
-            last_node.where_text = Some(where_clause.into());
+        match self
+            .last_node
+            .as_ref()
+            .and_then(|id| self.nodes.get_mut(id))
+        {
+            Some(node) => node.where_text = Some(where_clause.into()),
+            None => tracing::warn!(
+                model_id = %self.id,
+                "where_clause ignored: no node has been defined on this builder yet"
+            ),
         }
         self
     }
@@ -1300,7 +1330,7 @@ impl MixedNodeBuilder {
             node.formula_text = Some(formula);
         }
 
-        self.parent.nodes.insert(self.node_id, node);
+        self.parent.put_node(self.node_id, node);
         Ok(self.parent)
     }
 }
@@ -1309,6 +1339,47 @@ impl MixedNodeBuilder {
 mod tests {
     use super::*;
     use crate::evaluator::Evaluator;
+
+    #[test]
+    fn where_clause_targets_a_redefined_node_not_the_last_map_slot() {
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let model = ModelBuilder::new("where-target")
+            .periods("2025Q1..Q1", None)
+            .expect("valid periods")
+            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
+            .compute("bonus", "revenue * 0.1")
+            .expect("valid formula")
+            .compute("tax", "revenue * 0.2")
+            .expect("valid formula")
+            // Redefining `bonus` keeps its original slot ahead of `tax`.
+            .compute("bonus", "revenue * 0.5")
+            .expect("valid formula")
+            .where_clause("revenue > 1000")
+            .build()
+            .expect("model builds");
+
+        let where_text = |id: &str| model.get_node(id).expect("node exists").where_text.clone();
+        assert_eq!(where_text("bonus").as_deref(), Some("revenue > 1000"));
+        assert_eq!(where_text("tax"), None);
+    }
+
+    #[test]
+    fn where_clause_targets_a_node_modified_by_forecast() {
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let model = ModelBuilder::new("where-forecast")
+            .periods("2025Q1..Q2", Some("2025Q1"))
+            .expect("valid periods")
+            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
+            .value("costs", &[(period, AmountOrScalar::scalar(40.0))])
+            .forecast("revenue", crate::types::ForecastSpec::forward_fill())
+            .where_clause("costs > 0")
+            .build()
+            .expect("model builds");
+
+        let where_text = |id: &str| model.get_node(id).expect("node exists").where_text.clone();
+        assert_eq!(where_text("revenue").as_deref(), Some("costs > 0"));
+        assert_eq!(where_text("costs"), None);
+    }
 
     #[test]
     fn test_formula_references_require_exact_node_ids() {

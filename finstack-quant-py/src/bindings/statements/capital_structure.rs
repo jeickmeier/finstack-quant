@@ -6,12 +6,12 @@
 //! All classes support JSON round-trip via `from_json`/`to_json`.
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
-use crate::errors::{serde_json_to_py, statements_to_py};
-use finstack_quant_core::dates::PeriodId;
+use crate::bindings::macros::wire_methods;
+use crate::bindings::pandas_utils::table_to_dataframe;
+use crate::errors::statements_to_py;
 use finstack_quant_statements::capital_structure::{
-    CapitalStructureCashflows, CashflowBreakdown, EcfSweepSpec, PaymentClassSpec, PaymentPriority,
-    PikToggleSpec, WaterfallSpec,
+    CapitalStructureCashflows, EcfSweepSpec, PaymentClassSpec, PaymentPriority, PikToggleSpec,
+    WaterfallSpec,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -26,16 +26,6 @@ fn priority_to_str(p: PaymentPriority) -> PyResult<String> {
     finstack_quant_core::wire::serde_label(&p).map_err(crate::errors::core_to_py)
 }
 
-/// Columns emitted by `CapitalStructureCashflows.to_dataframe` and
-/// `to_totals_dataframe`.
-const CASHFLOW_COLUMNS: [ColumnSchema<'static>; 5] = [
-    ("instrument", "str"),
-    ("period", "str"),
-    ("flow_type", "str"),
-    ("amount", "float64"),
-    ("currency", "str"),
-];
-
 /// Excess Cash Flow (ECF) sweep specification.
 ///
 /// Defines how to compute ECF and what fraction sweeps to debt paydown.
@@ -49,6 +39,8 @@ const CASHFLOW_COLUMNS: [ColumnSchema<'static>; 5] = [
 pub struct PyEcfSweepSpec {
     pub(super) inner: EcfSweepSpec,
 }
+
+wire_methods!(PyEcfSweepSpec, EcfSweepSpec, "EcfSweepSpec");
 
 #[pymethods]
 impl PyEcfSweepSpec {
@@ -108,32 +100,6 @@ impl PyEcfSweepSpec {
                 target_instrument_id,
             },
         }
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: EcfSweepSpec = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid EcfSweepSpec JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize EcfSweepSpec"))
     }
 
     /// Validate the sweep on its own (the Rust ``EcfSweepSpec::validate``).
@@ -244,6 +210,8 @@ pub struct PyPikToggleSpec {
     pub(super) inner: PikToggleSpec,
 }
 
+wire_methods!(PyPikToggleSpec, PikToggleSpec, "PikToggleSpec");
+
 #[pymethods]
 impl PyPikToggleSpec {
     /// Construct a PIK toggle spec.
@@ -293,32 +261,6 @@ impl PyPikToggleSpec {
                 min_periods_in_pik,
             },
         }
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a PIK toggle spec from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: PikToggleSpec = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid PikToggleSpec JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this PIK toggle spec to JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize PikToggleSpec"))
     }
 
     /// Validate the toggle on its own (the Rust ``PikToggleSpec::validate``).
@@ -408,6 +350,8 @@ pub struct PyPaymentClassSpec {
     pub(super) inner: PaymentClassSpec,
 }
 
+wire_methods!(PyPaymentClassSpec, PaymentClassSpec, "PaymentClassSpec");
+
 #[pymethods]
 impl PyPaymentClassSpec {
     /// Construct a payment class.
@@ -432,28 +376,6 @@ impl PyPaymentClassSpec {
                 instrument_ids,
             },
         }
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: PaymentClassSpec = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid PaymentClassSpec JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize PaymentClassSpec"))
     }
 
     /// Class identifier (for example ``"1L"``).
@@ -516,6 +438,8 @@ impl PyPaymentClassSpec {
 pub struct PyWaterfallSpec {
     pub(super) inner: WaterfallSpec,
 }
+
+wire_methods!(PyWaterfallSpec, WaterfallSpec, "WaterfallSpec");
 
 #[pymethods]
 impl PyWaterfallSpec {
@@ -584,32 +508,6 @@ impl PyWaterfallSpec {
         inner.mandatory_prepay_node = mandatory_prepay_node;
         inner.voluntary_prepay_node = voluntary_prepay_node;
         Ok(Self { inner })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: WaterfallSpec = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid WaterfallSpec JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize WaterfallSpec"))
     }
 
     /// Validate the spec against internal consistency rules.
@@ -763,66 +661,14 @@ pub struct PyCapitalStructureCashflows {
     pub(crate) inner: CapitalStructureCashflows,
 }
 
-/// Append one breakdown as long-format rows.
-fn push_breakdown_rows(
-    rows: &mut Vec<serde_json::Value>,
-    instrument: &str,
-    period: &PeriodId,
-    breakdown: &CashflowBreakdown,
-) {
-    for (flow_type, money) in breakdown_flows(breakdown) {
-        rows.push(serde_json::json!({
-            "instrument": instrument,
-            "period": period.to_string(),
-            "flow_type": flow_type,
-            "amount": money.amount(),
-            "currency": money.currency().to_string(),
-        }));
-    }
-}
-
-/// Flow-type labels and amounts of one breakdown, in export order.
-fn breakdown_flows(
-    breakdown: &CashflowBreakdown,
-) -> Vec<(&'static str, finstack_quant_core::money::Money)> {
-    let mut flows = vec![("interest_expense_cash", breakdown.interest_expense_cash)];
-    if let Some(income) = breakdown.interest_income_cash {
-        flows.push(("interest_income_cash", income));
-    }
-    flows.extend([
-        ("interest_expense_pik", breakdown.interest_expense_pik),
-        ("principal_payment", breakdown.principal_payment),
-        ("fees", breakdown.fees),
-        ("debt_balance", breakdown.debt_balance),
-        ("accrued_interest", breakdown.accrued_interest),
-    ]);
-    flows
-}
+wire_methods!(
+    PyCapitalStructureCashflows,
+    CapitalStructureCashflows,
+    "CapitalStructureCashflows"
+);
 
 #[pymethods]
 impl PyCapitalStructureCashflows {
-    /// Support `pickle` via the canonical JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from canonical JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid CapitalStructureCashflows JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to canonical JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CapitalStructureCashflows"))
-    }
-
     /// Instrument identifiers with cashflows, in capital-structure order.
     #[getter]
     fn instrument_ids(&self) -> Vec<String> {
@@ -832,18 +678,11 @@ impl PyCapitalStructureCashflows {
     /// Period identifiers covered, in timeline order.
     #[getter]
     fn periods(&self) -> Vec<String> {
-        if !self.inner.totals.is_empty() {
-            return self.inner.totals.keys().map(ToString::to_string).collect();
-        }
-        let mut periods: Vec<PeriodId> = self
-            .inner
-            .by_instrument
-            .values()
-            .flat_map(|by_period| by_period.keys().copied())
-            .collect();
-        periods.sort();
-        periods.dedup();
-        periods.iter().map(ToString::to_string).collect()
+        self.inner
+            .periods()
+            .iter()
+            .map(ToString::to_string)
+            .collect()
     }
 
     /// ISO-4217 code of the reporting currency used for totals, or ``None``.
@@ -1170,7 +1009,7 @@ impl PyCapitalStructureCashflows {
             let periods = PyDict::new(py);
             for (period, breakdown) in by_period {
                 let flows = PyDict::new(py);
-                for (flow_type, money) in breakdown_flows(breakdown) {
+                for (flow_type, money) in breakdown.flows() {
                     flows.set_item(flow_type, PyMoney { inner: money })?;
                 }
                 periods.set_item(period.to_string(), flows)?;
@@ -1206,13 +1045,7 @@ impl PyCapitalStructureCashflows {
     /// code of that instrument). Rows follow instrument then period order.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut rows = Vec::new();
-        for (instrument, by_period) in &self.inner.by_instrument {
-            for (period, breakdown) in by_period {
-                push_breakdown_rows(&mut rows, instrument, period, breakdown);
-            }
-        }
-        serde_rows_to_dataframe_with_schema(py, &rows, &CASHFLOW_COLUMNS)
+        table_to_dataframe(py, &self.inner.to_table().map_err(statements_to_py)?)
     }
 
     /// Export the cross-instrument totals as a long pandas ``DataFrame``.
@@ -1222,11 +1055,7 @@ impl PyCapitalStructureCashflows {
     /// when no reporting currency is configured.
     #[pyo3(text_signature = "($self)")]
     fn to_totals_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut rows = Vec::new();
-        for (period, breakdown) in &self.inner.totals {
-            push_breakdown_rows(&mut rows, "__total__", period, breakdown);
-        }
-        serde_rows_to_dataframe_with_schema(py, &rows, &CASHFLOW_COLUMNS)
+        table_to_dataframe(py, &self.inner.to_totals_table().map_err(statements_to_py)?)
     }
 
     /// Return ``CapitalStructureCashflows(instruments=2, periods=4)``.

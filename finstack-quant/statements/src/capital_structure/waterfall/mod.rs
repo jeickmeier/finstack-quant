@@ -58,7 +58,6 @@ mod cash_distribution;
 mod excess_cash_flow;
 mod payment_in_kind;
 mod payment_stack;
-mod period_close;
 
 use crate::capital_structure::cashflows::CashflowBreakdown;
 use crate::capital_structure::state::CapitalStructureState;
@@ -78,7 +77,6 @@ use cash_distribution::{
 use excess_cash_flow::{calculate_ecf_sweep, EcfDeductions};
 use payment_in_kind::{apply_pik_transitions, evaluate_pik_toggle, is_pik_enabled};
 use payment_stack::waterfall_currency;
-use period_close::update_cumulative_metrics;
 
 /// Money comparison tolerance for waterfall allocation, in currency units.
 ///
@@ -182,20 +180,16 @@ fn class_rank_for(spec: &WaterfallSpec, instrument_id: &str) -> Result<u32> {
     if spec.payment_classes.is_empty() {
         return Ok(0);
     }
-    let matches: Vec<_> = spec
-        .payment_classes
+    // `WaterfallSpec::validate` rejects an instrument listed in two classes.
+    spec.payment_classes
         .iter()
-        .filter(|class| class.instrument_ids.iter().any(|id| id == instrument_id))
-        .collect();
-    match matches.as_slice() {
-        [class] => Ok(class.rank),
-        [] => Err(crate::error::Error::build(format!(
-            "WaterfallSpec: instrument '{instrument_id}' is not in any payment class."
-        ))),
-        _ => Err(crate::error::Error::build(format!(
-            "WaterfallSpec: instrument '{instrument_id}' appears in more than one payment class."
-        ))),
-    }
+        .find(|class| class.instrument_ids.iter().any(|id| id == instrument_id))
+        .map(|class| class.rank)
+        .ok_or_else(|| {
+            crate::error::Error::build(format!(
+                "WaterfallSpec: instrument '{instrument_id}' is not in any payment class."
+            ))
+        })
 }
 
 /// Apply a named mandatory/voluntary prepayment at its priority rung.
@@ -745,7 +739,15 @@ pub fn execute_waterfall(
             ))
         })?;
 
-        update_cumulative_metrics(state, &instrument_id, &breakdown, currency)?;
+        let paid_to_date = state
+            .cumulative_principal
+            .get(instrument_id.as_str())
+            .copied()
+            .unwrap_or_else(|| Money::from((0_i64, currency)));
+        state.cumulative_principal.insert(
+            instrument_id.to_string(),
+            paid_to_date.checked_add(breakdown.principal_payment)?,
+        );
 
         result.insert(instrument_id.to_string(), breakdown);
     }

@@ -154,6 +154,7 @@ mod marginable;
 
 /// Shared pricing helpers used by this crate and `finstack-quant-calibration`.
 pub mod pricing {
+    pub use super::common_impl::pricing::overnight::default_rate_calendar_id;
     pub use super::common_impl::pricing::overnight_conventions;
     pub use super::common_impl::pricing::swap_legs;
     pub use super::common_impl::pricing::time;

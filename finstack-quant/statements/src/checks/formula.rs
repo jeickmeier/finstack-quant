@@ -57,12 +57,6 @@ impl Check for FormulaCheckSpec {
         let expression = crate::dsl::compiler::compile(&ast)?;
         let history = Arc::new(period_history(context.results, context.model));
         let historical_cashflows = Arc::new(period_cashflows(context.results, context.model));
-        let node_value_types = Arc::new(
-            value_types
-                .into_iter()
-                .map(|(node, value_type)| (node.to_string(), value_type))
-                .collect(),
-        );
         let mut findings = Vec::new();
 
         for period in &context.model.periods {
@@ -71,7 +65,6 @@ impl Check for FormulaCheckSpec {
                 Arc::clone(&history),
                 Arc::clone(&historical_cashflows),
             );
-            evaluation.node_value_types = Arc::clone(&node_value_types);
             evaluation.capital_structure_cashflows = context
                 .results
                 .cs_cashflows

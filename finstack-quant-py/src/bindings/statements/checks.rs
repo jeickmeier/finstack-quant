@@ -1,5 +1,6 @@
 //! Python wrappers for the financial statement checks framework.
 
+use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::bindings::pandas_utils::{serde_to_py, ColumnSchema};
 use crate::errors::{serde_json_to_py, statements_to_py, value_error};
@@ -209,6 +210,8 @@ pub struct PyFormulaCheckSpec {
     pub(super) inner: FormulaCheckSpec,
 }
 
+wire_methods!(PyFormulaCheckSpec, FormulaCheckSpec, "FormulaCheckSpec");
+
 #[pymethods]
 impl PyFormulaCheckSpec {
     /// Build a formula check.
@@ -269,28 +272,6 @@ impl PyFormulaCheckSpec {
                 tolerance,
             },
         })
-    }
-
-    /// Support `pickle` via the canonical JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a formula check from canonical JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid FormulaCheckSpec JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this check to canonical JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize FormulaCheckSpec"))
     }
 
     /// Check identifier.
@@ -560,30 +541,10 @@ pub struct PyCheckFinding {
     inner: CheckFinding,
 }
 
+wire_methods!(PyCheckFinding, CheckFinding, "CheckFinding");
+
 #[pymethods]
 impl PyCheckFinding {
-    /// Support `pickle` via the canonical JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a finding from canonical JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid CheckFinding JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this finding to canonical JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CheckFinding"))
-    }
-
     /// Identifier of the check that produced this finding.
     #[getter]
     fn check_id(&self) -> &str {
@@ -676,34 +637,14 @@ impl PyCheckReport {
     }
 }
 
+wire_methods!(
+    PyCheckReport,
+    finstack_quant_statements::checks::CheckReport,
+    "CheckReport"
+);
+
 #[pymethods]
 impl PyCheckReport {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a check report from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_statements::checks::CheckReport = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid CheckReport JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this report to compact JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CheckReport"))
-    }
-
     /// Whether the whole report passed: no error-severity finding was
     /// retained by any check.
     ///

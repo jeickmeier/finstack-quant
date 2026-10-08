@@ -13,8 +13,9 @@ use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
+use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::serde_to_py;
-use crate::errors::{core_to_py, serde_json_to_py, statements_to_py, value_error};
+use crate::errors::{core_to_py, statements_to_py, value_error};
 use finstack_quant_core::dates::{Period, PeriodId};
 use finstack_quant_core::money::fx::FxConversionPolicy;
 use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
@@ -82,30 +83,14 @@ pub struct PyMetricDefinition {
     inner: finstack_quant_statements::registry::MetricDefinition,
 }
 
+wire_methods!(
+    PyMetricDefinition,
+    finstack_quant_statements::registry::MetricDefinition,
+    "MetricDefinition"
+);
+
 #[pymethods]
 impl PyMetricDefinition {
-    /// Support `pickle` via the canonical JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a metric definition from its canonical JSON form.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid MetricDefinition JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this definition to canonical JSON.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize MetricDefinition"))
-    }
-
     /// Metric identifier within its namespace (``"gross_margin"``).
     #[getter]
     fn id(&self) -> &str {

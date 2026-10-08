@@ -34,13 +34,6 @@ pub(super) fn calculate_ecf_sweep(
     currency: Currency,
     warnings: &mut Vec<crate::evaluator::EvalWarning>,
 ) -> Result<Money> {
-    if !(0.0..=1.0).contains(&ecf_spec.sweep_percentage) {
-        return Err(crate::error::Error::capital_structure(format!(
-            "sweep_percentage must be in [0.0, 1.0], got {}",
-            ecf_spec.sweep_percentage
-        )));
-    }
-
     let ebitda = eval_value_or_formula(context, &ecf_spec.ebitda_node, warnings)?;
 
     let taxes = ecf_spec
