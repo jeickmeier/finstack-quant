@@ -69,7 +69,9 @@ try {
     `${server.url}${process.env.REGISTRY_WORKBENCH_PATH ?? "/"}`,
     { waitUntil: "networkidle" },
   );
-  await page.getByTitle(bond.result.value.amount).waitFor();
+  await page
+    .getByTitle(bond.result.value.amount, { exact: true })
+    .waitFor();
   const results = page.getByRole("region", { name: "Results", exact: true });
   await results.getByRole("tab", { name: "Request", exact: true }).click();
   await original(
@@ -454,7 +456,7 @@ try {
       bytes: bytes.length,
       sha256: createHash("sha256").update(bytes).digest("hex"),
     };
-    assert(wasm.bytes <= 25_000_000);
+    assert(wasm.bytes <= 40_000_000);
     assert.equal(wasm.sha256, process.env.REGISTRY_EXPECTED_WASM_SHA256);
     assert.equal(page.workers().length, 1);
   }

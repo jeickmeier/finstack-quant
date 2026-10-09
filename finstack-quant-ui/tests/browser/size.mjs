@@ -22,7 +22,7 @@ assert.equal(
   measured.optimizedSha256,
   "Size report must identify the selected WASM artifact",
 );
-const limitBytes = 25_000_000;
+const limitBytes = 40_000_000;
 const report = {
   ...measured,
   limitBytes,

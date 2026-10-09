@@ -2,7 +2,6 @@
 import type { ExampleProps } from "./props";
 import { useState } from "react";
 import { useAppForm } from "@/lib/finstack/form";
-import { DecimalField } from "@/components/finstack/core/primitives/domain-field/domain-field";
 function FormDemo() {
   const [submitted, setSubmitted] = useState("");
   const form = useAppForm({
@@ -20,7 +19,9 @@ function FormDemo() {
     >
       <form.AppForm>
         <form.AppField name="amount">
-          {() => <DecimalField label="Exact amount" />}
+          {(field) => (
+            <field.TextField label="Exact amount" inputMode="decimal" />
+          )}
         </form.AppField>
         <form.SubmitButton label="Submit amount" />
         <form.ResetButton />

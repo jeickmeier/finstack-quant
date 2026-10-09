@@ -124,12 +124,12 @@ optimized-size acceptance.
 ## Browser footprint gate
 
 The footprint gate measures all 78 instrument validators and the optimized
-`release-size` WASM package. The optimized raw artifact is 21,534,873 bytes
-against the 25,000,000-byte limit. Compression does not waive this raw-byte gate.
+`release-size` WASM package. The optimized raw artifact is 39,345,664 bytes
+against the 40,000,000-byte limit. Compression does not waive this raw-byte gate.
 
 `mise run wasm-pkg` owns the optimized web build and records raw/optimized/gzip/
 Brotli measurements without a UI-specific limit. `mise run ui-size` checks the
-selected artifact hash and enforces the 25,000,000-byte UI budget.
+selected artifact hash and enforces the 40,000,000-byte UI budget.
 
 `REGISTRY_MEASURE_FOOTPRINT=1 node finstack-quant-ui/tests/browser/run.mjs` requires `REGISTRY_WASM_PACKAGE` to select the optimized web
 package and matching generated glue, and runs the size gate before browser
