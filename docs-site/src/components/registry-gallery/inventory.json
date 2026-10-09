@@ -752,6 +752,14 @@
       "sha256": "e995ed7ad473fd7f2a3563cccb0b8f103a52901790f0b94bf8433ca5bf7bb2c4"
     },
     {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-result.json",
+      "sha256": "5eb543f08b3830a9e69c15c4fe0d12958a00ee3ab211f34e88e0e6ed08f130a7"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-check-report.json",
+      "sha256": "cbd9572dadee1ed44bc7f0a74d6b3a62bdf8ba43b45cd4622d8d77bd1dfe44f3"
+    },
+    {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q2.json",
       "sha256": "59e941b16e94b94331d17505ce107a3aa4d6b9975ba5a42aa21835f7fe5254d3"
     },

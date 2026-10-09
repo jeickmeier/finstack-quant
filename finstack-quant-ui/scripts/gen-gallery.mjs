@@ -31,6 +31,8 @@ const sources = {
   pricingMarket: "tests/valuations/instruments/pricing-market.json",
   statementModel: "src/fixtures/statements/analyst-model.json",
   statementChecks: "src/fixtures/statements/analyst-checks.json",
+  statementResult: "src/fixtures/statements/analyst-result.json",
+  statementCheckReport: "src/fixtures/statements/analyst-check-report.json",
   statementRollForward2025Q2:
     "src/fixtures/statements/roll-forward-2025Q2.json",
   statementRollForward2025Q3:

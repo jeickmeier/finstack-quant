@@ -53,6 +53,10 @@ const workerVisuals = new Set([
   "fx-surface-chart",
   "vol-cube-explorer",
   "pricing-workbench",
+  "financial-model-editor",
+  "statement-explanation",
+  "statement-checks",
+  "statements-workbench",
 ]);
 const run = (args, cwd, log) =>
   new Promise((resolve, reject) => {

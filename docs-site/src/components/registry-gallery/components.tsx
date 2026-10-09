@@ -27,15 +27,13 @@ import { Example as Example23 } from "./examples/curve-link-example";
 import { Example as Example24 } from "./examples/pricing-forms-example";
 import { Example as Example25 } from "./examples/pricing-workbench";
 import { Example as Example26 } from "./examples/dimensional-measures";
-import {
-  EditorExample,
-  GridExample,
-  ChartExample,
-  ExplanationExample,
-  ChecksExample,
-  CheckReportExample,
-  WorkbenchExample,
-} from "./examples/statements";
+import { Example as Example27 } from "./examples/financial-model-editor";
+import { Example as Example28 } from "./examples/statement-grid";
+import { Example as Example29 } from "./examples/statement-chart";
+import { Example as Example30 } from "./examples/statement-explanation";
+import { Example as Example31 } from "./examples/statement-checks";
+import { Example as Example32 } from "./examples/statement-check-report";
+import { Example as Example33 } from "./examples/statements-workbench";
 export const nativeItems = new Set([
   "schema-form",
   "instrument-form",
@@ -46,11 +44,8 @@ export const nativeItems = new Set([
   "vol-cube-explorer",
   "pricing-workbench",
   "financial-model-editor",
-  "statement-grid",
-  "statement-chart",
   "statement-explanation",
   "statement-checks",
-  "statement-check-report",
   "statements-workbench",
 ]);
 const examples = {
@@ -81,13 +76,13 @@ const examples = {
   "pricing-forms-example": Example24,
   "pricing-workbench": Example25,
   "dimensional-measures": Example26,
-  "financial-model-editor": EditorExample,
-  "statement-grid": GridExample,
-  "statement-chart": ChartExample,
-  "statement-explanation": ExplanationExample,
-  "statement-checks": ChecksExample,
-  "statement-check-report": CheckReportExample,
-  "statements-workbench": WorkbenchExample,
+  "financial-model-editor": Example27,
+  "statement-grid": Example28,
+  "statement-chart": Example29,
+  "statement-explanation": Example30,
+  "statement-checks": Example31,
+  "statement-check-report": Example32,
+  "statements-workbench": Example33,
 };
 export function ComponentDemo({
   name,
