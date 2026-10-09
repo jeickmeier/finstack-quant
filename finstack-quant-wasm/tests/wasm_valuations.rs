@@ -202,6 +202,7 @@ fn price_instrument_returns_result() {
         Some(metrics),
         None,
         None,
+        None,
     )
     .unwrap();
     let parsed = valuation_object(result);
@@ -223,6 +224,7 @@ fn price_instrument_accepts_metric_pricing_overrides() {
             r#"{"theta_period":{"count":1,"unit":"days"}}"#.to_string(),
         )),
         None,
+        None,
     )
     .unwrap();
     let parsed = valuation_object(result);
@@ -239,6 +241,7 @@ fn registered_term_loan_metrics_cross_wasm_json_boundary() {
         JsValue::from("2024-01-01"),
         Some(JsValue::from("discounting".to_string())),
         Some(metrics),
+        None,
         None,
         None,
     )
@@ -269,6 +272,7 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
             None,
             None,
             None,
+            None,
         )
         .unwrap_err(),
         price_instrument(
@@ -277,6 +281,7 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
             JsValue::from("not-a-date"),
             Some(JsValue::from("not-a-model".to_string())),
             Some(metrics),
+            None,
             None,
             None,
         )
@@ -377,6 +382,7 @@ fn price_instrument_structured_credit_stochastic_returns_details() {
         None,
         None,
         None,
+        None,
     )
     .expect("price");
     let parsed = valuation_object(result);
@@ -419,6 +425,7 @@ fn price_instrument_structured_credit_waterfall_rules() {
         JsValue::from(&mkt),
         JsValue::from("2024-01-01"),
         Some(JsValue::from("structured_credit_stochastic".to_string())),
+        None,
         None,
         None,
         None,
@@ -529,6 +536,7 @@ fn price_instrument_structured_credit_stochastic_missing_market_data_errors() {
         JsValue::from(&empty_market),
         JsValue::from("2024-01-01"),
         Some(JsValue::from("structured_credit_stochastic".to_string())),
+        None,
         None,
         None,
         None,
