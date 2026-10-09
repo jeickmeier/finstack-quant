@@ -130,6 +130,12 @@ without a QuantLib install.
 | `cargo_publish_checks.py` | Derives the crate publish order from internal dependencies, validates internal dependency versions, and dry-runs the first crate. | `mise run rust-publish-checks`, CI `Rust Publish Checks` |
 | `smoke_python_wheel.py` | Imports the installed `finstack_quant` wheel, walks every public subpackage, and exercises `Currency`/`Money`, `models.bs_price`, and `EuropeanPricer.price_call`. Runs against the built wheel on every release platform except linux-arm64. | `.github/workflows/release.yml`, `finstack-quant-py/tests/test_smoke_python_wheel.py` |
 
+## Notebook examples
+
+| Script | Purpose | Driven by |
+| --- | --- | --- |
+| `install_notebook_path.py` | Writes `finstack_notebooks.pth` into the active environment so `import _shared` works from any notebook working directory. | `mise run python-sync`, `mise run python-build` |
+
 ## Code health and hygiene
 
 | Script | Purpose | Driven by |

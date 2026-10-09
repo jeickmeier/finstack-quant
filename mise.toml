@@ -404,15 +404,18 @@ description = "Initialize Python virtual environment"
 run = "uv venv --python 3.12 --allow-existing"
 
 [tasks.python-sync]
-description = "Sync Python dev dependencies; python-build installs the native extension"
-run = "uv sync --group dev --no-install-project"
+description = "Sync Python dev dependencies and expose notebook _shared on the import path"
+run = """
+uv sync --group dev --no-install-project
+uv run --no-sync python scripts/install_notebook_path.py
+"""
 
 [tasks.python-build]
 description = "Build Python bindings in-place (pass --release for optimized build)"
 usage = '''
 flag "--release" help="Build with release profile (slower compile, faster runtime)"
 '''
-run = '{% if usage.release %}CARGO_INCREMENTAL=0 {% endif %}uv run --no-sync maturin develop{% if usage.release %} --release{% endif %}'
+run = '{% if usage.release %}CARGO_INCREMENTAL=0 {% endif %}uv run --no-sync maturin develop{% if usage.release %} --release{% endif %} && uv run --no-sync python scripts/install_notebook_path.py'
 
 [tasks.materialization-benchmark-fixtures]
 description = "Generate deterministic portfolio materialization benchmark fixtures"

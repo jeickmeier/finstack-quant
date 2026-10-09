@@ -52,9 +52,12 @@ uv run python finstack-quant-py/examples/notebooks/run_all_notebooks.py \
 
 The runner prepends the notebooks root, `finstack-quant-py/`, and the
 repository root to `PYTHONPATH` so `_shared` resolves without any per-notebook
-setup. Interactively, notebooks that need `_shared` do the equivalent with a
-relative `sys.path` insert (`".."` from a level directory, `"../.."` from a
-deep-dive subdirectory) before `from _shared import ...`.
+setup. `mise run python-sync` and `mise run python-build` write the same
+notebooks root into the virtualenv as `finstack_notebooks.pth`, so an
+interactive kernel can `from _shared import ...` from any notebook directory.
+Restart the kernel after installing or moving the checkout. A relative
+`sys.path` insert (`".."` from a level directory, `"../.."` from a deep-dive
+subdirectory) still works and is unnecessary once that path file is present.
 
 ## Curriculum structure
 
