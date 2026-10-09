@@ -4,8 +4,25 @@
     {
       "name": "mockup-component-registry",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8791", "--directory", "docs/superpowers/mockups/component-registry"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8791",
+        "--directory",
+        "docs/superpowers/mockups/component-registry"
+      ],
       "port": 8791
+    },
+    {
+      "name": "docs-site",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "docs-site",
+        "run",
+        "dev"
+      ],
+      "port": 3000
     }
   ]
 }

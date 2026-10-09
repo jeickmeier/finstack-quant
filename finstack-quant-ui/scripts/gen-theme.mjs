@@ -413,6 +413,9 @@ ${imports}
   const item = {
     name: "finstack-theme",
     type: "registry:theme",
+    title: "Finstack theme",
+    description:
+      "Shared light and dark tokens, compact and comfortable density, IBM Plex fonts and component styles for every finstack item.",
     docs: "Shared light/dark theme. Import styles/finstack/theme.css after Tailwind. Set data-theme and data-density on the app root. Tenant styles override the same properties after this stylesheet. IBM Plex Sans and Mono are supplied by pinned Fontsource packages under SIL OFL-1.1; no font binaries are copied into registry files.",
     dependencies: [
       "shadcn@4.21.0",

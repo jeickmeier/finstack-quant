@@ -26,7 +26,8 @@ const entry = (
   type = "registry:lib",
 ) => ({
   name,
-  docs: name,
+  title: name,
+  description: name,
   type,
   registryDependencies: deps.map((name) => `@finstack/${name}`),
   files: [{ target }],
@@ -63,7 +64,9 @@ describe("registry dependency boundaries", () => {
     expect(() => checkGraph(items)).toThrow(message),
   );
   it("rejects undocumented and unnamespaced entries", () => {
-    expect(() => checkGraph([{ ...entry("a"), docs: "" }])).toThrow(/docs/);
+    expect(() => checkGraph([{ ...entry("a"), description: "" }])).toThrow(
+      /description/,
+    );
     expect(() =>
       checkGraph([{ ...entry("a"), registryDependencies: ["b"] }, entry("b")]),
     ).toThrow(/namespace/);

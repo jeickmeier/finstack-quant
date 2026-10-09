@@ -742,6 +742,26 @@
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
       "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-model.json",
+      "sha256": "5d4a2f684ca0458b66d06504c55308add2787ac33fd9a08b76c5bca46d8ee247"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-checks.json",
+      "sha256": "e995ed7ad473fd7f2a3563cccb0b8f103a52901790f0b94bf8433ca5bf7bb2c4"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q2.json",
+      "sha256": "59e941b16e94b94331d17505ce107a3aa4d6b9975ba5a42aa21835f7fe5254d3"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q3.json",
+      "sha256": "76c22f1ed13fc01c1597ab4bd37af3e17c7533e5d566e34a845c26a2d5ba1ba5"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q4.json",
+      "sha256": "538396aaf87d5908ffa57d78dbae8488352c2263f556c182579b449289cbc051"
     }
   ]
 }

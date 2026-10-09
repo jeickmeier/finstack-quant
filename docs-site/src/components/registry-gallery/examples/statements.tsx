@@ -1,10 +1,6 @@
 "use client";
 import type { ExampleProps } from "./props";
-import model from "finstack-quant-ui/fixtures/statements/analyst-model.json";
-import checkSuite from "finstack-quant-ui/fixtures/statements/analyst-checks.json";
-import rolledQ2 from "finstack-quant-ui/fixtures/statements/roll-forward-2025Q2.json";
-import rolledQ3 from "finstack-quant-ui/fixtures/statements/roll-forward-2025Q3.json";
-import rolledQ4 from "finstack-quant-ui/fixtures/statements/roll-forward-2025Q4.json";
+import data from "../data.json";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import { FinancialModelEditor } from "@/components/finstack/statements/components/financial-model-editor/financial-model-editor";
@@ -20,8 +16,9 @@ import {
   workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 
+const model = data.statementModel;
 const modelJson = JSON.stringify(model);
-const suiteJson = JSON.stringify(checkSuite);
+const suiteJson = JSON.stringify(data.statementChecks);
 
 export function EditorExample(_props: ExampleProps) {
   return <FinancialModelEditor defaultJson={modelJson} onSubmit={() => {}} />;
@@ -118,9 +115,9 @@ export function CheckReportExample(_props: ExampleProps) {
 export function WorkbenchExample(_props: ExampleProps) {
   // Illustrative service responses; each complete model was evaluated and validated by WASM.
   const updates: Record<string, unknown> = {
-    "2025Q2": rolledQ2,
-    "2025Q3": rolledQ3,
-    "2025Q4": rolledQ4,
+    "2025Q2": data.statementRollForward2025Q2,
+    "2025Q3": data.statementRollForward2025Q3,
+    "2025Q4": data.statementRollForward2025Q4,
   };
   return (
     <div className="space-y-2">

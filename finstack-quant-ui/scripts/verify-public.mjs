@@ -86,7 +86,7 @@ assert.deepEqual(
 );
 assert(registry.items.length > 0);
 for (const item of registry.items) {
-  assert(item.docs?.trim());
+  assert(item.title?.trim() && item.description?.trim());
   assert.equal(typeof item.meta.version, "string");
   assert.equal(typeof item.meta.wasmVersion, "string");
   assert(Array.isArray(item.meta.schemaIds));

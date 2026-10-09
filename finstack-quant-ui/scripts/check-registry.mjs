@@ -23,7 +23,10 @@ export function checkGraph(items) {
   for (const item of items) {
     if (byName.has(item.name)) throw new Error(`Duplicate item: ${item.name}`);
     byName.set(item.name, item);
-    if (!item.docs?.trim()) throw new Error(`Missing docs: ${item.name}`);
+    // shadcn search, list and MCP read only these two; `docs` is an optional post-install note.
+    for (const field of ["title", "description"])
+      if (!item[field]?.trim())
+        throw new Error(`Missing ${field}: ${item.name}`);
     for (const file of item.files ?? []) {
       const target = file.target;
       if (

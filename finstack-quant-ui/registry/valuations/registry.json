@@ -4,6 +4,8 @@
     {
       "name": "metric-picker",
       "type": "registry:ui",
+      "title": "Metric picker",
+      "description": "Controlled metric selection over supplied grouped options, with local search.",
       "docs": "Controlled metric-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -29,6 +31,8 @@
     {
       "name": "measure-value",
       "type": "registry:ui",
+      "title": "Measure value",
+      "description": "Displays one supplied measure with its source-backed unit; missing values never become zero.",
       "docs": "Controlled measure-value primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -54,6 +58,8 @@
     {
       "name": "stamp-badge",
       "type": "registry:ui",
+      "title": "Stamp badge",
+      "description": "Displays the calculation stamps returned with a result: numeric mode, rounding, FX policy and version.",
       "docs": "Controlled stamp-badge primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -81,6 +87,8 @@
     {
       "name": "valuation-summary",
       "type": "registry:component",
+      "title": "Valuation summary",
+      "description": "Headline value, instrument ID, as-of date and calculation stamps of a supplied valuation result, with optional comparison.",
       "docs": "Displays supplied valuation context and raw measures. Comparisons retain independent currencies and stamps; no local differences, aggregates or FX conversion. Pass native metric groups and explicit source-backed units when available.",
       "files": [
         {
@@ -106,6 +114,8 @@
     {
       "name": "measures-grid",
       "type": "registry:component",
+      "title": "Measures grid",
+      "description": "Table of a valuation result's measures with native labels, grouped bucket tenors and exact values, with optional comparison.",
       "docs": "Displays supplied valuation context and measures. Native metric metadata provides readable labels and grouped, maturity-sorted bucket tenors; Exact keys reveals fully qualified keys. Values default to six significant digits, with Exact values and value titles retaining supplied precision. The nonzero view hides zero rows only when both sides are supplied and zero in a comparison; Show all reveals every row, and missing values remain distinct. Comparisons retain independent currencies, dates and stamps; no local differences, aggregates or FX conversion. Pass native metric metadata and explicit source-backed units when available.",
       "files": [
         {
@@ -133,6 +143,8 @@
     {
       "name": "dimensional-measures",
       "type": "registry:component",
+      "title": "Dimensional measures",
+      "description": "Per-coordinate measures as bucket lists, two-axis matrices and three-axis slices, driven by native metric metadata.",
       "docs": "Displays native per-coordinate valuation measures as bucket lists, two-axis matrices, and selectable three-axis slices. Uses Rust-supplied metric metadata for coordinates and units; exact values and canonical keys remain available.",
       "files": [
         {
@@ -155,6 +167,8 @@
     {
       "name": "instrument-form",
       "type": "registry:component",
+      "title": "Instrument form",
+      "description": "All-instrument form with grouped search, examples and lazily loaded schema modules; native validation is supplied by the caller.",
       "docs": "Standalone all-instrument generated form with grouped search, explicit examples and guarded recent selections. Lazy schema modules are reused by native module caching. Native validation is supplied by the consumer.",
       "files": [
         {
@@ -268,6 +282,8 @@
     {
       "name": "pricing-params-form",
       "type": "registry:component",
+      "title": "Pricing parameters form",
+      "description": "Controlled pricing parameters: model, metrics, metric pricing overrides and market history.",
       "docs": "Standalone controlled pricing parameters. Supply native groups from useModels/useMetrics. Metric pricing overrides are edited from their schema and emitted as compact JSON. Market history text and omitted versus empty metric selection are preserved. JSON validation checks syntax only; native pricing owns financial validation.",
       "files": [
         {
@@ -301,6 +317,8 @@
     {
       "name": "cashflow-viewer",
       "type": "registry:component",
+      "title": "Cashflow viewer",
+      "description": "Table of supplied native cashflow JSON with row-currency amounts, reporting-currency PV and exact JSON export.",
       "docs": "Supplied native cashflow JSON table with row-currency amounts and reporting-currency PV. Lossless numeric tokens; Rust supplies totals and reconciliation. Original JSON remains available for exact copy/download. Accepts text, loading and error props; no worker or query provider required.",
       "files": [
         {
@@ -336,6 +354,8 @@
     {
       "name": "explanation-trace",
       "type": "registry:component",
+      "title": "Explanation trace",
+      "description": "Lossless disclosure of a valuation result's optional explanation payload.",
       "docs": "Optional original valuation explanation rendered losslessly; no steps or severity are inferred.",
       "files": [
         {
@@ -361,6 +381,8 @@
     {
       "name": "valuation-details",
       "type": "registry:component",
+      "title": "Valuation details",
+      "description": "Routes a result's detail payload to its view: Monte Carlo diagnostics, explanation, covenants or raw JSON.",
       "docs": "Lazy native result detail routing. Only Monte Carlo has a complete published host shape; composite, credit, FX and structured-credit payloads stay raw. Unknown tags show a warning; full result metadata and nullable fields remain available.",
       "files": [
         {
@@ -389,6 +411,8 @@
     {
       "name": "scenario-heatmap",
       "type": "registry:component",
+      "title": "Scenario heatmap",
+      "description": "Heatmap of a structured-credit scenario table: clean price by CPR and CDR at a controlled severity.",
       "docs": "Display returned ScenarioTable prices at original CPR/CDR coordinates, with an explicitly controlled severity and priceDomain straddling the canonical par reference 100. Prices are clean settlement percentages of current tranche balance per Rust ScenarioCell.price. Optional shared linking, callbacks, tooltip body, annotations and complete figure exports. No valuation, rebasing or WAL/writedown overlay.",
       "files": [
         {
@@ -418,6 +442,8 @@
     {
       "name": "pricing-workbench",
       "type": "registry:block",
+      "title": "Pricing workbench",
+      "description": "All-instrument pricing workbench: market browser and editor, calibration, valuation results, cashflows and scenarios.",
       "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit scenarios. Host owns routes and domain inputs.",
       "files": [
         {
@@ -581,6 +607,8 @@
     {
       "name": "use-price-instrument",
       "type": "registry:hook",
+      "title": "usePriceInstrument",
+      "description": "Prices an instrument through the WASM worker; also exposes model, metric, metric-metadata and money-format queries.",
       "docs": "Browser-only shared worker and complete immutable queries. Wrap with FinstackQueryProvider, or FinstackProvider inside an existing QueryClientProvider. Worker and hooks follow the consumer source directory; the consumer owns its standard @/* source alias. Keep the matching local WASM package installed.",
       "files": [
         {
@@ -604,6 +632,8 @@
     {
       "name": "use-instrument-validator",
       "type": "registry:hook",
+      "title": "useInstrumentValidator",
+      "description": "Validates and canonicalizes instrument JSON through the WASM worker, for schema-form.",
       "docs": "Native SchemaForm validation using the existing FinstackProvider worker. Returns canonical JSON and rejects superseded revisions; does not write canonical output into active edits.",
       "files": [
         {
@@ -627,6 +657,8 @@
     {
       "name": "use-cashflows",
       "type": "registry:hook",
+      "title": "useCashflows",
+      "description": "Fetches native cashflow JSON for a pricing request through the WASM worker.",
       "docs": "Original native cashflow JSON with complete immutable request/session keys and native errors. Requires the shared Finstack/Query provider. No cashflow rows or financial logic are inferred.",
       "files": [
         {
@@ -650,6 +682,8 @@
     {
       "name": "use-scenario-table",
       "type": "registry:hook",
+      "title": "useScenarioTable",
+      "description": "Fetches a native structured-credit tranche scenario table through the WASM worker.",
       "docs": "Native structured-credit scenario table with immutable complete request/session keys. No locally computed prices.",
       "files": [
         {
@@ -673,6 +707,8 @@
     {
       "name": "pricing-forms-example",
       "type": "registry:component",
+      "title": "Pricing forms example",
+      "description": "Example: instrument and pricing forms wired to the validator and pricing hooks, without the workbench.",
       "docs": "Standalone instrument and pricing forms with caller state and real shared worker hooks. Example installs at the consumer source directory under examples/ and receives the consumer-owned components alias. Fixture request derives from manifest-listed native instrument/market fixtures. No workbench block is imported.",
       "files": [
         {

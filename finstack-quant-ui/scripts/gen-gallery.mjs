@@ -29,7 +29,28 @@ const sources = {
   irsInstrument:
     "../finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
   pricingMarket: "tests/valuations/instruments/pricing-market.json",
+  statementModel: "src/fixtures/statements/analyst-model.json",
+  statementChecks: "src/fixtures/statements/analyst-checks.json",
+  statementRollForward2025Q2:
+    "src/fixtures/statements/roll-forward-2025Q2.json",
+  statementRollForward2025Q3:
+    "src/fixtures/statements/roll-forward-2025Q3.json",
+  statementRollForward2025Q4:
+    "src/fixtures/statements/roll-forward-2025Q4.json",
 };
+// The example maps are hand-written: an unmapped visual item renders a crashing gallery page.
+const exampleMaps = (
+  await Promise.all(
+    ["primitives.tsx", "components.tsx"].map((name) =>
+      readFile(path.join(output, name), "utf8"),
+    ),
+  )
+).join("\n");
+const unmapped = visual
+  .map((item) => item.name)
+  .filter((name) => !exampleMaps.includes(`"${name}":`));
+if (unmapped.length)
+  throw new Error(`Visual items without a gallery example: ${unmapped}`);
 const data = {},
   provenance = [];
 for (const [name, relative] of Object.entries(sources)) {

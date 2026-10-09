@@ -5,6 +5,8 @@
       "name": "finstack-base",
       "type": "registry:base",
       "extends": "none",
+      "title": "Finstack base",
+      "description": "Registry base: the shadcn base-nova (Base UI) style with the React, Base UI and Tailwind versions every finstack item builds on.",
       "docs": "Uses unmodified official shadcn Base UI components in the base-nova style. Financial fields and blocks compose installed components under components/ui. Import finstack-theme for application tokens and layout; contracts install independently.",
       "dependencies": [
         "@base-ui/react@1.8.0",

@@ -18,10 +18,32 @@ const file = (path) => ({
   type: "registry:file",
   target: `lib/finstack/${path}`,
 });
-const item = (name, files, registryDependencies = [], dependencies = []) => ({
+const acronyms = new Set(
+  "cds cmo cms fx mbs ndf tarn tba trs xccy yoy".split(" "),
+);
+/** Sentence-case label from a kebab or snake name; financial acronyms stay upper case. */
+const label = (name) =>
+  name
+    .split(/[-_]/)
+    .map((word, index) =>
+      acronyms.has(word)
+        ? word.toUpperCase()
+        : index === 0
+          ? word[0].toUpperCase() + word.slice(1)
+          : word,
+    )
+    .join(" ");
+const item = (
+  name,
+  description,
+  files,
+  registryDependencies = [],
+  dependencies = [],
+) => ({
   name,
   type: "registry:lib",
-  docs: `Installs ${name} under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.`,
+  title: label(name),
+  description,
   files: files.map(file),
   registryDependencies: registryDependencies.map((name) => `@finstack/${name}`),
   dependencies,
@@ -48,19 +70,31 @@ for (const { schema } of roots) {
   const dependencies = [];
   if (instrument) dependencies.push("finstack-codec");
   if (text.includes(sharedMarker)) dependencies.push("shared-schema-defs");
-  contracts.push(
-    item(`contract-${name.replaceAll("_", "-")}`, files, dependencies),
-  );
+  contracts.push({
+    ...item(
+      `contract-${name.replaceAll("_", "-")}`,
+      `Generated schema, wire types${instrument ? ", metadata, validator module and example" : " and metadata"} for the canonical Rust ${name} contract. Validation is structural; native validation remains required.`,
+      files,
+      dependencies,
+    ),
+    title: `${label(name)} contract`,
+  });
 }
 const items = [
   item(
     "finstack-fixtures",
+    "Native bond valuation result fixture for examples and tests.",
     ["fixtures/results/bond.json"],
     ["contract-bond", "contract-market-context-state"],
   ),
-  item("primitive-contracts", ["generated/primitive-contracts.json"]),
+  item(
+    "primitive-contracts",
+    "Canonical option lists and constraints for controlled primitives, projected from the Rust schemas.",
+    ["generated/primitive-contracts.json"],
+  ),
   item(
     "shared-schema-defs",
+    "Shared definition document, wire types and metadata referenced by wide instrument schemas.",
     [
       "generated/defs/shared.json",
       "generated/types/shared.ts",
@@ -70,6 +104,7 @@ const items = [
   ),
   item(
     "finstack-format",
+    "Exact decimal, money, rate and date display formatting plus TanStack Table column presets.",
     ["format/format.ts", "format/columns.ts"],
     ["contract-valuation-result"],
     [
@@ -81,6 +116,7 @@ const items = [
   ),
   item(
     "finstack-codec",
+    "Lossless JSON codec and JSON Schema validator construction for the generated contracts.",
     ["codec.mjs", "codec.d.mts", "schema.mjs", "schema.d.mts"],
     [],
     ["lossless-json@4.3.1", "zod@4.6.5"],
@@ -88,6 +124,7 @@ const items = [
   ...contracts,
   item(
     "instrument-catalogue",
+    "Lazy catalogue of every instrument contract; each loader imports its schema, metadata and example on demand.",
     ["generated/instruments.ts", "generated/catalogue.json"],
     contracts
       .filter((entry) =>
@@ -95,13 +132,27 @@ const items = [
       )
       .map((entry) => entry.name),
   ),
-  item("contract-manifest", [
-    "generated/roots.json",
-    "generated/fixtures.json",
-    "contract-provenance.json",
-  ]),
-  item("finstack-views", ["views.ts", "generated/curve-views.json"]),
-  item("finstack-host", ["host.ts"], ["finstack-codec"], [wasm]),
+  item(
+    "contract-manifest",
+    "Schema root, fixture and provenance manifests for the generated contracts.",
+    [
+      "generated/roots.json",
+      "generated/fixtures.json",
+      "contract-provenance.json",
+    ],
+  ),
+  item(
+    "finstack-views",
+    "Read-only projections of stored curve and value state for display, without interpolation.",
+    ["views.ts", "generated/curve-views.json"],
+  ),
+  item(
+    "finstack-host",
+    "Adapters between structured WASM results and lossless UI state, including canonical export.",
+    ["host.ts"],
+    ["finstack-codec"],
+    [wasm],
+  ),
 ];
 for (const entry of items) {
   const stock = new Set();

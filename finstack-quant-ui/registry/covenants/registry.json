@@ -4,6 +4,8 @@
     {
       "name": "covenant-report",
       "type": "registry:component",
+      "title": "Covenant report",
+      "description": "Lossless disclosure of a valuation result's optional covenant payload.",
       "docs": "Optional original valuation covenant payload rendered losslessly; no verdict or financial headroom is inferred.",
       "files": [
         {

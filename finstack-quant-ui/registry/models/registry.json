@@ -4,6 +4,8 @@
     {
       "name": "monte-carlo-diagnostics",
       "type": "registry:component",
+      "title": "Monte Carlo diagnostics",
+      "description": "Monte Carlo valuation details: path counts, flags, standard error, seed and time grid.",
       "docs": "Published MonteCarloValuationDetails only: native counts, flags, standard error, full-width bigint seed and time grid. Includes the native LSMC standard-error caveat.",
       "files": [
         {
@@ -23,6 +25,8 @@
     {
       "name": "use-fx-delta-samples",
       "type": "registry:hook",
+      "title": "useFxDeltaSamples",
+      "description": "Evaluates an FX delta surface at supplied coordinates through the WASM worker.",
       "docs": "Native FX delta-surface evaluation with complete immutable quote/coordinate/forward keys. Null means no sampling request. Requires FinstackQueryProvider; returns annualized Black decimal volatilities or native errors.",
       "files": [
         {
@@ -46,6 +50,8 @@
     {
       "name": "use-cube-samples",
       "type": "registry:hook",
+      "title": "useCubeSamples",
+      "description": "Evaluates a SABR volatility cube at supplied coordinates through the WASM worker.",
       "docs": "Checked native cube evaluation with complete SABR/forward/interpolation/coordinate/convention query keys. Null disables sampling. Requires FinstackQueryProvider; no local model calculation or clamping.",
       "files": [
         {
@@ -69,6 +75,8 @@
     {
       "name": "fx-surface-chart",
       "type": "registry:component",
+      "title": "FX surface chart",
+      "description": "FX volatility surface: raw quotes plus natively evaluated Black volatilities as a heatmap, table and slices.",
       "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
       "files": [
         {
@@ -96,6 +104,8 @@
     {
       "name": "vol-cube-explorer",
       "type": "registry:component",
+      "title": "Volatility cube explorer",
+      "description": "Explores a volatility cube by strike and convention using natively evaluated samples.",
       "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
       "files": [
         {

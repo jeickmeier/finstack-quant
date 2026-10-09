@@ -17,7 +17,8 @@
     {
       "name": "finstack-fixtures",
       "type": "registry:lib",
-      "docs": "Installs finstack-fixtures under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Finstack fixtures",
+      "description": "Native bond valuation result fixture for examples and tests.",
       "files": [
         {
           "path": "src/fixtures/results/bond.json",
@@ -43,7 +44,8 @@
     {
       "name": "primitive-contracts",
       "type": "registry:lib",
-      "docs": "Installs primitive-contracts under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Primitive contracts",
+      "description": "Canonical option lists and constraints for controlled primitives, projected from the Rust schemas.",
       "files": [
         {
           "path": "src/generated/primitive-contracts.json",
@@ -59,7 +61,8 @@
     {
       "name": "shared-schema-defs",
       "type": "registry:lib",
-      "docs": "Installs shared-schema-defs under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Shared schema defs",
+      "description": "Shared definition document, wire types and metadata referenced by wide instrument schemas.",
       "files": [
         {
           "path": "src/generated/defs/shared.json",
@@ -85,7 +88,8 @@
     {
       "name": "finstack-format",
       "type": "registry:lib",
-      "docs": "Installs finstack-format under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Finstack format",
+      "description": "Exact decimal, money, rate and date display formatting plus TanStack Table column presets.",
       "files": [
         {
           "path": "src/format/format.ts",
@@ -117,7 +121,8 @@
     {
       "name": "finstack-codec",
       "type": "registry:lib",
-      "docs": "Installs finstack-codec under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Finstack codec",
+      "description": "Lossless JSON codec and JSON Schema validator construction for the generated contracts.",
       "files": [
         {
           "path": "src/codec.mjs",
@@ -148,7 +153,8 @@
     {
       "name": "contract-calibration",
       "type": "registry:lib",
-      "docs": "Installs contract-calibration under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Calibration contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust calibration contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/calibration.json",
@@ -180,7 +186,8 @@
     {
       "name": "contract-commodity-asian-option",
       "type": "registry:lib",
-      "docs": "Installs contract-commodity-asian-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Commodity asian option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust commodity_asian_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/commodity_asian_option.json",
@@ -222,7 +229,8 @@
     {
       "name": "contract-commodity-forward",
       "type": "registry:lib",
-      "docs": "Installs contract-commodity-forward under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Commodity forward contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust commodity_forward contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/commodity_forward.json",
@@ -264,7 +272,8 @@
     {
       "name": "contract-commodity-future-option",
       "type": "registry:lib",
-      "docs": "Installs contract-commodity-future-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Commodity future option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust commodity_future_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/commodity_future_option.json",
@@ -306,7 +315,8 @@
     {
       "name": "contract-commodity-future",
       "type": "registry:lib",
-      "docs": "Installs contract-commodity-future under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Commodity future contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust commodity_future contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/commodity_future.json",
@@ -348,7 +358,8 @@
     {
       "name": "contract-commodity-option",
       "type": "registry:lib",
-      "docs": "Installs contract-commodity-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Commodity option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust commodity_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/commodity_option.json",
@@ -390,7 +401,8 @@
     {
       "name": "contract-commodity-spread-option",
       "type": "registry:lib",
-      "docs": "Installs contract-commodity-spread-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Commodity spread option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust commodity_spread_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/commodity_spread_option.json",
@@ -432,7 +444,8 @@
     {
       "name": "contract-commodity-swap",
       "type": "registry:lib",
-      "docs": "Installs contract-commodity-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Commodity swap contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust commodity_swap contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/commodity_swap.json",
@@ -474,7 +487,8 @@
     {
       "name": "contract-commodity-swaption",
       "type": "registry:lib",
-      "docs": "Installs contract-commodity-swaption under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Commodity swaption contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust commodity_swaption contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/commodity_swaption.json",
@@ -516,7 +530,8 @@
     {
       "name": "contract-composite",
       "type": "registry:lib",
-      "docs": "Installs contract-composite under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Composite contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust composite contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/composite.json",
@@ -561,7 +576,8 @@
     {
       "name": "contract-cds-index",
       "type": "registry:lib",
-      "docs": "Installs contract-cds-index under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "CDS index contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust cds_index contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/cds_index.json",
@@ -603,7 +619,8 @@
     {
       "name": "contract-cds-option",
       "type": "registry:lib",
-      "docs": "Installs contract-cds-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "CDS option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust cds_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/cds_option.json",
@@ -645,7 +662,8 @@
     {
       "name": "contract-cds-tranche",
       "type": "registry:lib",
-      "docs": "Installs contract-cds-tranche under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "CDS tranche contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust cds_tranche contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/cds_tranche.json",
@@ -687,7 +705,8 @@
     {
       "name": "contract-credit-default-swap",
       "type": "registry:lib",
-      "docs": "Installs contract-credit-default-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Credit default swap contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust credit_default_swap contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/credit_default_swap.json",
@@ -729,7 +748,8 @@
     {
       "name": "contract-autocallable",
       "type": "registry:lib",
-      "docs": "Installs contract-autocallable under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Autocallable contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust autocallable contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/autocallable.json",
@@ -771,7 +791,8 @@
     {
       "name": "contract-cliquet-option",
       "type": "registry:lib",
-      "docs": "Installs contract-cliquet-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Cliquet option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust cliquet_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/cliquet_option.json",
@@ -813,7 +834,8 @@
     {
       "name": "contract-discounted-cash-flow",
       "type": "registry:lib",
-      "docs": "Installs contract-discounted-cash-flow under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Discounted cash flow contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust discounted_cash_flow contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/discounted_cash_flow.json",
@@ -855,7 +877,8 @@
     {
       "name": "contract-equity-future-option",
       "type": "registry:lib",
-      "docs": "Installs contract-equity-future-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Equity future option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust equity_future_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/equity_future_option.json",
@@ -897,7 +920,8 @@
     {
       "name": "contract-equity-future",
       "type": "registry:lib",
-      "docs": "Installs contract-equity-future under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Equity future contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust equity_future contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/equity_future.json",
@@ -939,7 +963,8 @@
     {
       "name": "contract-equity-option",
       "type": "registry:lib",
-      "docs": "Installs contract-equity-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Equity option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust equity_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/equity_option.json",
@@ -981,7 +1006,8 @@
     {
       "name": "contract-equity-total-return-future",
       "type": "registry:lib",
-      "docs": "Installs contract-equity-total-return-future under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Equity total return future contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust equity_total_return_future contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/equity_total_return_future.json",
@@ -1023,7 +1049,8 @@
     {
       "name": "contract-equity",
       "type": "registry:lib",
-      "docs": "Installs contract-equity under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Equity contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust equity contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/equity.json",
@@ -1065,7 +1092,8 @@
     {
       "name": "contract-levered-real-estate-equity",
       "type": "registry:lib",
-      "docs": "Installs contract-levered-real-estate-equity under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Levered real estate equity contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust levered_real_estate_equity contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/levered_real_estate_equity.json",
@@ -1107,7 +1135,8 @@
     {
       "name": "contract-private-markets-fund",
       "type": "registry:lib",
-      "docs": "Installs contract-private-markets-fund under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Private markets fund contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust private_markets_fund contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/private_markets_fund.json",
@@ -1149,7 +1178,8 @@
     {
       "name": "contract-real-estate-asset",
       "type": "registry:lib",
-      "docs": "Installs contract-real-estate-asset under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Real estate asset contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust real_estate_asset contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/real_estate_asset.json",
@@ -1191,7 +1221,8 @@
     {
       "name": "contract-trs-equity",
       "type": "registry:lib",
-      "docs": "Installs contract-trs-equity under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "TRS equity contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust trs_equity contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/trs_equity.json",
@@ -1233,7 +1264,8 @@
     {
       "name": "contract-variance-swap",
       "type": "registry:lib",
-      "docs": "Installs contract-variance-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Variance swap contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust variance_swap contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/variance_swap.json",
@@ -1275,7 +1307,8 @@
     {
       "name": "contract-volatility-index-future-option",
       "type": "registry:lib",
-      "docs": "Installs contract-volatility-index-future-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Volatility index future option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust volatility_index_future_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/volatility_index_future_option.json",
@@ -1317,7 +1350,8 @@
     {
       "name": "contract-volatility-index-future",
       "type": "registry:lib",
-      "docs": "Installs contract-volatility-index-future under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Volatility index future contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust volatility_index_future contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/volatility_index_future.json",
@@ -1359,7 +1393,8 @@
     {
       "name": "contract-asian-option",
       "type": "registry:lib",
-      "docs": "Installs contract-asian-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Asian option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust asian_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/asian_option.json",
@@ -1401,7 +1436,8 @@
     {
       "name": "contract-barrier-option",
       "type": "registry:lib",
-      "docs": "Installs contract-barrier-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Barrier option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust barrier_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/barrier_option.json",
@@ -1443,7 +1479,8 @@
     {
       "name": "contract-basket",
       "type": "registry:lib",
-      "docs": "Installs contract-basket under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Basket contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust basket contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/basket.json",
@@ -1488,7 +1525,8 @@
     {
       "name": "contract-callable-range-accrual",
       "type": "registry:lib",
-      "docs": "Installs contract-callable-range-accrual under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Callable range accrual contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust callable_range_accrual contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/callable_range_accrual.json",
@@ -1530,7 +1568,8 @@
     {
       "name": "contract-lookback-option",
       "type": "registry:lib",
-      "docs": "Installs contract-lookback-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Lookback option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust lookback_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/lookback_option.json",
@@ -1572,7 +1611,8 @@
     {
       "name": "contract-range-accrual",
       "type": "registry:lib",
-      "docs": "Installs contract-range-accrual under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Range accrual contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust range_accrual contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/range_accrual.json",
@@ -1614,7 +1654,8 @@
     {
       "name": "contract-snowball",
       "type": "registry:lib",
-      "docs": "Installs contract-snowball under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Snowball contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust snowball contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/snowball.json",
@@ -1656,7 +1697,8 @@
     {
       "name": "contract-tarn",
       "type": "registry:lib",
-      "docs": "Installs contract-tarn under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "TARN contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust tarn contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/tarn.json",
@@ -1698,7 +1740,8 @@
     {
       "name": "contract-agency-cmo",
       "type": "registry:lib",
-      "docs": "Installs contract-agency-cmo under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Agency CMO contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust agency_cmo contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/agency_cmo.json",
@@ -1740,7 +1783,8 @@
     {
       "name": "contract-agency-mbs-passthrough",
       "type": "registry:lib",
-      "docs": "Installs contract-agency-mbs-passthrough under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Agency MBS passthrough contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust agency_mbs_passthrough contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/agency_mbs_passthrough.json",
@@ -1782,7 +1826,8 @@
     {
       "name": "contract-agency-tba",
       "type": "registry:lib",
-      "docs": "Installs contract-agency-tba under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Agency TBA contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust agency_tba contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/agency_tba.json",
@@ -1824,7 +1869,8 @@
     {
       "name": "contract-asset-backed-facility",
       "type": "registry:lib",
-      "docs": "Installs contract-asset-backed-facility under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Asset backed facility contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust asset_backed_facility contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/asset_backed_facility.json",
@@ -1869,7 +1915,8 @@
     {
       "name": "contract-bond-future",
       "type": "registry:lib",
-      "docs": "Installs contract-bond-future under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Bond future contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust bond_future contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/bond_future.json",
@@ -1911,7 +1958,8 @@
     {
       "name": "contract-bond",
       "type": "registry:lib",
-      "docs": "Installs contract-bond under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Bond contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust bond contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/bond.json",
@@ -1953,7 +2001,8 @@
     {
       "name": "contract-convertible-bond",
       "type": "registry:lib",
-      "docs": "Installs contract-convertible-bond under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Convertible bond contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust convertible_bond contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/convertible_bond.json",
@@ -1995,7 +2044,8 @@
     {
       "name": "contract-dollar-roll",
       "type": "registry:lib",
-      "docs": "Installs contract-dollar-roll under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Dollar roll contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust dollar_roll contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/dollar_roll.json",
@@ -2037,7 +2087,8 @@
     {
       "name": "contract-inflation-linked-bond",
       "type": "registry:lib",
-      "docs": "Installs contract-inflation-linked-bond under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Inflation linked bond contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust inflation_linked_bond contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/inflation_linked_bond.json",
@@ -2079,7 +2130,8 @@
     {
       "name": "contract-revolving-credit",
       "type": "registry:lib",
-      "docs": "Installs contract-revolving-credit under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Revolving credit contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust revolving_credit contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/revolving_credit.json",
@@ -2121,7 +2173,8 @@
     {
       "name": "contract-structured-credit",
       "type": "registry:lib",
-      "docs": "Installs contract-structured-credit under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Structured credit contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust structured_credit contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/structured_credit.json",
@@ -2166,7 +2219,8 @@
     {
       "name": "contract-term-loan",
       "type": "registry:lib",
-      "docs": "Installs contract-term-loan under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Term loan contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust term_loan contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/term_loan.json",
@@ -2208,7 +2262,8 @@
     {
       "name": "contract-trs-fixed-income-index",
       "type": "registry:lib",
-      "docs": "Installs contract-trs-fixed-income-index under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "TRS fixed income index contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust trs_fixed_income_index contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/trs_fixed_income_index.json",
@@ -2250,7 +2305,8 @@
     {
       "name": "contract-fx-barrier-option",
       "type": "registry:lib",
-      "docs": "Installs contract-fx-barrier-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "FX barrier option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust fx_barrier_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/fx_barrier_option.json",
@@ -2292,7 +2348,8 @@
     {
       "name": "contract-fx-digital-option",
       "type": "registry:lib",
-      "docs": "Installs contract-fx-digital-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "FX digital option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust fx_digital_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/fx_digital_option.json",
@@ -2334,7 +2391,8 @@
     {
       "name": "contract-fx-forward",
       "type": "registry:lib",
-      "docs": "Installs contract-fx-forward under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "FX forward contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust fx_forward contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/fx_forward.json",
@@ -2376,7 +2434,8 @@
     {
       "name": "contract-fx-future-option",
       "type": "registry:lib",
-      "docs": "Installs contract-fx-future-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "FX future option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust fx_future_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/fx_future_option.json",
@@ -2418,7 +2477,8 @@
     {
       "name": "contract-fx-future",
       "type": "registry:lib",
-      "docs": "Installs contract-fx-future under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "FX future contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust fx_future contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/fx_future.json",
@@ -2460,7 +2520,8 @@
     {
       "name": "contract-fx-option",
       "type": "registry:lib",
-      "docs": "Installs contract-fx-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "FX option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust fx_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/fx_option.json",
@@ -2502,7 +2563,8 @@
     {
       "name": "contract-fx-spot",
       "type": "registry:lib",
-      "docs": "Installs contract-fx-spot under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "FX spot contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust fx_spot contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/fx_spot.json",
@@ -2544,7 +2606,8 @@
     {
       "name": "contract-fx-swap",
       "type": "registry:lib",
-      "docs": "Installs contract-fx-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "FX swap contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust fx_swap contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/fx_swap.json",
@@ -2586,7 +2649,8 @@
     {
       "name": "contract-fx-touch-option",
       "type": "registry:lib",
-      "docs": "Installs contract-fx-touch-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "FX touch option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust fx_touch_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/fx_touch_option.json",
@@ -2628,7 +2692,8 @@
     {
       "name": "contract-fx-variance-swap",
       "type": "registry:lib",
-      "docs": "Installs contract-fx-variance-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "FX variance swap contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust fx_variance_swap contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/fx_variance_swap.json",
@@ -2670,7 +2735,8 @@
     {
       "name": "contract-ndf",
       "type": "registry:lib",
-      "docs": "Installs contract-ndf under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "NDF contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust ndf contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/ndf.json",
@@ -2712,7 +2778,8 @@
     {
       "name": "contract-quanto-option",
       "type": "registry:lib",
-      "docs": "Installs contract-quanto-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Quanto option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust quanto_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/quanto_option.json",
@@ -2754,7 +2821,8 @@
     {
       "name": "contract-basis-swap",
       "type": "registry:lib",
-      "docs": "Installs contract-basis-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Basis swap contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust basis_swap contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/basis_swap.json",
@@ -2796,7 +2864,8 @@
     {
       "name": "contract-bermudan-swaption",
       "type": "registry:lib",
-      "docs": "Installs contract-bermudan-swaption under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Bermudan swaption contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust bermudan_swaption contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/bermudan_swaption.json",
@@ -2838,7 +2907,8 @@
     {
       "name": "contract-cap-floor",
       "type": "registry:lib",
-      "docs": "Installs contract-cap-floor under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Cap floor contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust cap_floor contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/cap_floor.json",
@@ -2880,7 +2950,8 @@
     {
       "name": "contract-cms-option",
       "type": "registry:lib",
-      "docs": "Installs contract-cms-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "CMS option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust cms_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/cms_option.json",
@@ -2922,7 +2993,8 @@
     {
       "name": "contract-cms-spread-option",
       "type": "registry:lib",
-      "docs": "Installs contract-cms-spread-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "CMS spread option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust cms_spread_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/cms_spread_option.json",
@@ -2964,7 +3036,8 @@
     {
       "name": "contract-cms-swap",
       "type": "registry:lib",
-      "docs": "Installs contract-cms-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "CMS swap contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust cms_swap contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/cms_swap.json",
@@ -3006,7 +3079,8 @@
     {
       "name": "contract-deposit",
       "type": "registry:lib",
-      "docs": "Installs contract-deposit under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Deposit contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust deposit contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/deposit.json",
@@ -3048,7 +3122,8 @@
     {
       "name": "contract-forward-rate-agreement",
       "type": "registry:lib",
-      "docs": "Installs contract-forward-rate-agreement under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Forward rate agreement contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust forward_rate_agreement contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/forward_rate_agreement.json",
@@ -3090,7 +3165,8 @@
     {
       "name": "contract-inflation-cap-floor",
       "type": "registry:lib",
-      "docs": "Installs contract-inflation-cap-floor under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Inflation cap floor contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust inflation_cap_floor contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/inflation_cap_floor.json",
@@ -3132,7 +3208,8 @@
     {
       "name": "contract-inflation-swap",
       "type": "registry:lib",
-      "docs": "Installs contract-inflation-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Inflation swap contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust inflation_swap contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/inflation_swap.json",
@@ -3174,7 +3251,8 @@
     {
       "name": "contract-interest-rate-future-option",
       "type": "registry:lib",
-      "docs": "Installs contract-interest-rate-future-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Interest rate future option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust interest_rate_future_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/interest_rate_future_option.json",
@@ -3216,7 +3294,8 @@
     {
       "name": "contract-interest-rate-future",
       "type": "registry:lib",
-      "docs": "Installs contract-interest-rate-future under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Interest rate future contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust interest_rate_future contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/interest_rate_future.json",
@@ -3258,7 +3337,8 @@
     {
       "name": "contract-interest-rate-swap",
       "type": "registry:lib",
-      "docs": "Installs contract-interest-rate-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Interest rate swap contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust interest_rate_swap contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/interest_rate_swap.json",
@@ -3300,7 +3380,8 @@
     {
       "name": "contract-repo",
       "type": "registry:lib",
-      "docs": "Installs contract-repo under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Repo contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust repo contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/repo.json",
@@ -3342,7 +3423,8 @@
     {
       "name": "contract-swaption",
       "type": "registry:lib",
-      "docs": "Installs contract-swaption under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Swaption contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust swaption contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/swaption.json",
@@ -3384,7 +3466,8 @@
     {
       "name": "contract-xccy-swap",
       "type": "registry:lib",
-      "docs": "Installs contract-xccy-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "XCCY swap contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust xccy_swap contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/xccy_swap.json",
@@ -3426,7 +3509,8 @@
     {
       "name": "contract-yoy-inflation-swap",
       "type": "registry:lib",
-      "docs": "Installs contract-yoy-inflation-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "YOY inflation swap contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust yoy_inflation_swap contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/yoy_inflation_swap.json",
@@ -3468,7 +3552,8 @@
     {
       "name": "contract-market-context-state",
       "type": "registry:lib",
-      "docs": "Installs contract-market-context-state under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Market context state contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust market_context_state contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/market_context_state.json",
@@ -3500,7 +3585,8 @@
     {
       "name": "contract-instrument-cashflow",
       "type": "registry:lib",
-      "docs": "Installs contract-instrument-cashflow under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Instrument cashflow contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust instrument_cashflow contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/instrument_cashflow.json",
@@ -3532,7 +3618,8 @@
     {
       "name": "contract-valuation-result",
       "type": "registry:lib",
-      "docs": "Installs contract-valuation-result under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Valuation result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust valuation_result contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/valuation_result.json",
@@ -3564,7 +3651,8 @@
     {
       "name": "contract-financial-model-spec",
       "type": "registry:lib",
-      "docs": "Installs contract-financial-model-spec under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Financial model spec contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust financial_model_spec contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/financial_model_spec.json",
@@ -3601,7 +3689,8 @@
     {
       "name": "contract-statement-result",
       "type": "registry:lib",
-      "docs": "Installs contract-statement-result under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Statement result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust statement_result contract. Validation is structural; native validation remains required.",
       "files": [
         {
           "path": "src/generated/schemas/statement_result.json",
@@ -3633,7 +3722,8 @@
     {
       "name": "instrument-catalogue",
       "type": "registry:lib",
-      "docs": "Installs instrument-catalogue under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Instrument catalogue",
+      "description": "Lazy catalogue of every instrument contract; each loader imports its schema, metadata and example on demand.",
       "files": [
         {
           "path": "src/generated/instruments.ts",
@@ -3816,7 +3906,8 @@
     {
       "name": "contract-manifest",
       "type": "registry:lib",
-      "docs": "Installs contract-manifest under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Contract manifest",
+      "description": "Schema root, fixture and provenance manifests for the generated contracts.",
       "files": [
         {
           "path": "src/generated/roots.json",
@@ -3842,7 +3933,8 @@
     {
       "name": "finstack-views",
       "type": "registry:lib",
-      "docs": "Installs finstack-views under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Finstack views",
+      "description": "Read-only projections of stored curve and value state for display, without interpolation.",
       "files": [
         {
           "path": "src/views.ts",
@@ -3863,7 +3955,8 @@
     {
       "name": "finstack-host",
       "type": "registry:lib",
-      "docs": "Installs finstack-host under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "title": "Finstack host",
+      "description": "Adapters between structured WASM results and lossless UI state, including canonical export.",
       "files": [
         {
           "path": "src/host.ts",

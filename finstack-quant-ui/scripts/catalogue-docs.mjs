@@ -24,7 +24,7 @@ Select an instrument below to open its canonical example in the workbench.
 
 | Instrument | Group | Canonical example ID |
 | --- | --- | --- |
-${catalogue.map((entry) => `| [${entry.title}](/docs/registry/workbench?instrument=${encodeURIComponent(entry.type)}) | ${entry.group.replaceAll("_", " ")} | ${entry.exampleId} |`).join("\n")}
+${catalogue.map((entry) => `| [${entry.title}](/docs/registry/workbench?instrument=${encodeURIComponent(entry.type)}) | ${entry.group.replaceAll("_", " ")} | ${entry.exampleId ?? "—"} |`).join("\n")}
 `,
   { parser: "mdx" },
 );

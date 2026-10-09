@@ -4,6 +4,8 @@
     {
       "name": "finstack-surface",
       "type": "registry:lib",
+      "title": "Surface context",
+      "description": "Theme and density context that keeps portaled popups consistent with a block-local surface.",
       "docs": "Surface theme and density context. Composed blocks provide it; primitives stamp it on portaled popups so menus match a block-local theme without writing the document root.",
       "files": [
         {
@@ -20,6 +22,8 @@
     {
       "name": "field-frame",
       "type": "registry:ui",
+      "title": "Field frame",
+      "description": "Accessible label, help, error and changed-state chrome around a single controlled field.",
       "docs": "Controlled field-frame primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -42,6 +46,8 @@
     {
       "name": "finstack-table",
       "type": "registry:ui",
+      "title": "Finstack table",
+      "description": "TanStack Table wrapper for supplied rows and totals with caller-owned row IDs and optional linked row or cell selection.",
       "docs": "Controlled finstack-table primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -75,6 +81,8 @@
     {
       "name": "enum-field",
       "type": "registry:ui",
+      "title": "Enum field",
+      "description": "Controlled choice field over supplied canonical options, rendered as a select or radio group.",
       "docs": "Controlled enum-field primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -97,6 +105,8 @@
     {
       "name": "json-viewer",
       "type": "registry:ui",
+      "title": "JSON viewer",
+      "description": "Read-only JSON viewer with lossless formatting, an Original toggle and exact-bytes copy and download.",
       "docs": "Read-only JSON with lossless formatted presentation and an Original toggle. Numeric tokens remain exact. Invalid JSON, including duplicate keys, stays in Original view with a formatting notice. Copy and download always preserve the supplied bytes. Import the installed finstack theme; no worker or workbench is required.",
       "files": [
         {
@@ -117,6 +127,8 @@
     {
       "name": "id-combobox",
       "type": "registry:ui",
+      "title": "ID combobox",
+      "description": "Free-text identifier input with virtualized supplied suggestions.",
       "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; IDs are never inferred.",
       "files": [
         {
@@ -139,6 +151,8 @@
     {
       "name": "finstack-chart",
       "type": "registry:ui",
+      "title": "Finstack chart",
+      "description": "Publication-grade SVG figure with titles, captions, sources, annotations and SVG or PNG export.",
       "docs": "Standalone native SVG publication figure with complete titles, captions, sources and exports. Supply native chart definitions for scale/axis/unit conventions and annotation marks. Import the theme; no WASM, forms, tables or worker runtime is required. Export needs a same-origin font stylesheet and explicit dimensions.",
       "files": [
         {
@@ -189,6 +203,8 @@
     {
       "name": "figure-example",
       "type": "registry:component",
+      "title": "Figure example",
+      "description": "Example: publication figures driven by supplied data, with SVG and PNG download actions.",
       "docs": "Standalone supplied-data publication example. Uses the same figure props on screen and in explicit 900x600 vector / 1800x1200 pixel exports (6x4 inches at 300 PPI). The theme includes licensed fonts; install IBM Plex Sans in a desktop editor if it cannot use embedded webfonts.",
       "files": [
         {
@@ -220,6 +236,8 @@
     {
       "name": "use-finstack",
       "type": "registry:hook",
+      "title": "useFinstack",
+      "description": "Provider and hook for the shared WASM worker: lifecycle status, reset and query session.",
       "docs": "Browser-only shared worker and complete immutable queries. Wrap with FinstackQueryProvider, or FinstackProvider inside an existing QueryClientProvider. Worker and hooks follow the consumer source directory; the consumer owns its standard @/* source alias. Keep the matching local WASM package installed.",
       "files": [
         {
@@ -268,6 +286,8 @@
     {
       "name": "use-linked-selection",
       "type": "registry:hook",
+      "title": "useLinkedSelection",
+      "description": "Shares one accepted selection key between charts, tables and controls, controlled or locally owned.",
       "docs": "React-only accepted string identity, controlled or locally owned. Pass null to clear; use stable supplied keys. Activation and focus are separate. The consumer owns its standard @/* source alias.",
       "files": [
         {
@@ -283,6 +303,8 @@
     {
       "name": "finstack-form",
       "type": "registry:ui",
+      "title": "Finstack form",
+      "description": "TanStack Form kit: shared form contexts, bound fields, array controls, error summary and submit and reset buttons.",
       "docs": "Shared TanStack Form contexts bound to registry fields, array controls, error summary and submit/reset controls. Values remain working edits; canonical validation is a separate boundary.",
       "files": [
         {
@@ -305,6 +327,8 @@
     {
       "name": "finstack-worker",
       "type": "registry:file",
+      "title": "Finstack worker",
+      "description": "Web worker, service and typed contract that run finstack-quant-wasm off the main thread.",
       "docs": "Installs the worker and its service/contracts under the consumer source directory workers/. Initialize through FinstackProvider in the browser; install the matching local WASM package. Only existing native facade calls run here.",
       "files": [
         {

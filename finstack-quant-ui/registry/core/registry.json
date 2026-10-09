@@ -4,6 +4,8 @@
     {
       "name": "decimal-input",
       "type": "registry:ui",
+      "title": "Decimal input",
+      "description": "Controlled exact-decimal text input; grouping is display-only and incomplete edits are retained.",
       "docs": "Controlled decimal-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -32,6 +34,8 @@
     {
       "name": "money-input",
       "type": "registry:ui",
+      "title": "Money input",
+      "description": "Controlled exact money amount with caller-supplied currency choices; performs no FX conversion.",
       "docs": "Controlled money-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -58,6 +62,8 @@
     {
       "name": "rate-input",
       "type": "registry:ui",
+      "title": "Rate input",
+      "description": "Controlled rate input with a reversible, source-backed display unit; invalid text stays editable.",
       "docs": "Controlled rate-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -85,6 +91,8 @@
     {
       "name": "tenor-input",
       "type": "registry:ui",
+      "title": "Tenor input",
+      "description": "Controlled tenor editor for a count and unit, with schema-supplied constraints.",
       "docs": "Controlled tenor-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -114,6 +122,8 @@
     {
       "name": "day-count-select",
       "type": "registry:ui",
+      "title": "Day-count select",
+      "description": "Day-count convention select with options projected from the canonical schema.",
       "docs": "Controlled day-count-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -134,6 +144,8 @@
     {
       "name": "bdc-select",
       "type": "registry:ui",
+      "title": "Business-day convention select",
+      "description": "Business-day convention select with options projected from the canonical schema.",
       "docs": "Controlled bdc-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -154,6 +166,8 @@
     {
       "name": "knot-table",
       "type": "registry:ui",
+      "title": "Knot table",
+      "description": "Editable table of supplied curve knots with caller-owned row IDs.",
       "docs": "Controlled knot-table primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -181,6 +195,8 @@
     {
       "name": "money-value",
       "type": "registry:ui",
+      "title": "Money value",
+      "description": "Displays an exact currency-tagged amount as prepared text or the raw amount.",
       "docs": "Controlled money-value primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -206,6 +222,8 @@
     {
       "name": "date-input",
       "type": "registry:ui",
+      "title": "Date input",
+      "description": "Controlled ISO date text input with a calendar popover.",
       "docs": "Controlled date-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "files": [
         {
@@ -228,6 +246,8 @@
     {
       "name": "domain-field",
       "type": "registry:ui",
+      "title": "Domain fields",
+      "description": "Decimal and date fields bound to the finstack-form field context.",
       "docs": "Date and decimal fields bound to the shared form context. Supply labels and constraints; canonical validation stays outside these controls.",
       "files": [
         {
@@ -256,6 +276,8 @@
     {
       "name": "curve-chart",
       "type": "registry:component",
+      "title": "Curve chart",
+      "description": "Charts stored curve knots from validated market state, faceted by curve variant, without interpolation.",
       "docs": "Displays validated CurveState entries with point-only stored coordinates. Variants are faceted, same-variant curves overlay. Base-correlation arrays and parametric fields retain their generated schema view. Native figure axes, annotations, typed callbacks, tooltip and per-variant exports are supported; linking requires a caller key mapping. No sampling or pricing engine.",
       "files": [
         {
@@ -289,6 +311,8 @@
     {
       "name": "market-context-form",
       "type": "registry:component",
+      "title": "Market context form",
+      "description": "Complete market editor for curves, FX, prices, surfaces and cubes, with native validation on submit.",
       "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces, SABR cubes and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import canonical JSON or a calibration envelope final_market. Supply useMarketValidator and receive complete canonical JSON on submit.",
       "files": [
         {
@@ -326,6 +350,8 @@
     {
       "name": "vol-surface-chart",
       "type": "registry:component",
+      "title": "Volatility surface chart",
+      "description": "Stored volatility surface as a heatmap, node table and exact row and column slices.",
       "docs": "Canonical stored volatility heatmap, node table and exact row/column slices. Supply validated surface metadata and an explicit raw-unit color extent. Optional shared selection links caller controls; no interpolation or worker dependency. Import the shared theme. FX quote arrays remain separate from stored grids.",
       "files": [
         {
@@ -368,6 +394,8 @@
     {
       "name": "fx-delta-quotes",
       "type": "registry:component",
+      "title": "FX delta quotes",
+      "description": "Table of stored FX ATM, risk-reversal and butterfly quote arrays, shown as supplied.",
       "docs": "Raw canonical FX ATM delta-neutral straddle, RR and BF quote arrays. Missing optional arrays remain missing. No forward, interpolation, strike grid or conversion is inferred.",
       "files": [
         {
@@ -396,6 +424,8 @@
     {
       "name": "fx-matrix-grid",
       "type": "registry:component",
+      "title": "FX matrix grid",
+      "description": "Directed stored FX rate matrices grouped by pair-global, provider and date-pinned sources.",
       "docs": "Exact directed stored FX matrices separated by pair-global, provider and date/policy-pinned sources. Missing cells remain unavailable, undated tuples stay undated, and complete config/state exports remain unchanged. No priority resolution, inverse rates or triangulation.",
       "files": [
         {
@@ -424,6 +454,8 @@
     {
       "name": "market-context-browser",
       "type": "registry:component",
+      "title": "Market context browser",
+      "description": "Searchable tree over every value in a market context, with matching stored curve, surface and FX views.",
       "docs": "Searchable disclosure tree over every actual market value and generated root fields. Inspect exact leaf JSON and matching stored curve/FX views. Optional surfaceOptions supplies explicit color extents; without them surface data remains raw. A host renderObject slot can supply evaluated views with explicit strike/forward/convention inputs. No worker is required for stored browsing. Parent accepts canonical market edits through market-context-form/use-market-validator.",
       "files": [
         {
@@ -465,6 +497,8 @@
     {
       "name": "use-market-validator",
       "type": "registry:hook",
+      "title": "useMarketValidator",
+      "description": "Validates and canonicalizes a complete market context through the WASM worker.",
       "docs": "Canonicalize complete markets through the shared native worker. Aborted validations never replace active edits.",
       "files": [
         {
@@ -488,6 +522,8 @@
     {
       "name": "schema-form",
       "type": "registry:component",
+      "title": "Schema form",
+      "description": "Form generated from an instrument's JSON Schema that emits canonical JSON after native validation.",
       "docs": "Generated schema form for the complete 78-tag instrument inventory. Supply a lazy generated module and native validation callback; canonical JSON is emitted after valid submission. Maps use editable key/value rows internally and emit exact string keys. Basic mode hides defaulted fields. Edited pricing coverage and catalogue activation are separate gates.",
       "files": [
         {
@@ -562,6 +598,8 @@
     {
       "name": "curve-link-example",
       "type": "registry:component",
+      "title": "Curve link example",
+      "description": "Example: a stored discount curve table and chart sharing one linked selection.",
       "docs": "Stored discount curve table and chart share accepted semantic selection. Explicit row/cell addresses preserve original data and render identity; caller activation callbacks update detail only. No WASM or financial calculations.",
       "files": [
         {

@@ -181,9 +181,8 @@ fixture, checking actual font loading and the theme/density switches.
 
 ## Display formatting
 
-`finstack-format` installs `lib/finstack/format/{format,columns,transport}.ts`.
-Scalar formatting is independent of WASM initialization. Import `transport`
-explicitly for canonical import/export; it reuses the existing adapters.
+`finstack-format` installs `lib/finstack/format/{format,columns}.ts`.
+Scalar formatting is independent of WASM initialization.
 
 `formatMoney` preserves the amount and applies returned per-currency rounding
 stamps through the native `core.Money` constructor supplied by the caller
@@ -228,9 +227,9 @@ consumer from actual registry JSON, checks keyboard/focus/clipboard behavior and
 ## Worker and query boundary
 
 Install `@finstack/use-price-instrument` and/or `@finstack/use-instrument-validator`.
-They include `use-finstack` and the worker closure. Hooks install at project-root
-`hooks/<crate>/<item>/`; the worker/service/contracts install at project-root `workers/`
-(the `~/` registry target intentionally stays outside an optional `src` folder).
+They include `use-finstack` and the worker closure. Hooks install at
+`hooks/<crate>/<item>/` and the worker/service/contracts at `workers/`, both under
+the consumer's source directory (`src/` when the application has one).
 The worker uses the consumer's standard `@/lib/finstack` alias for the installed
 codec. The shared registry index owns these worker files.
 

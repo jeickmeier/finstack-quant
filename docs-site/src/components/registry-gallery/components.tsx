@@ -26,6 +26,7 @@ import { Example as Example22 } from "./examples/scenario-heatmap";
 import { Example as Example23 } from "./examples/curve-link-example";
 import { Example as Example24 } from "./examples/pricing-forms-example";
 import { Example as Example25 } from "./examples/pricing-workbench";
+import { Example as Example26 } from "./examples/dimensional-measures";
 import {
   EditorExample,
   GridExample,
@@ -79,6 +80,7 @@ const examples = {
   "curve-link-example": Example23,
   "pricing-forms-example": Example24,
   "pricing-workbench": Example25,
+  "dimensional-measures": Example26,
   "financial-model-editor": EditorExample,
   "statement-grid": GridExample,
   "statement-chart": ChartExample,

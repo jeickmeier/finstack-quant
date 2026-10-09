@@ -4,6 +4,8 @@
     {
       "name": "calibration-form",
       "type": "registry:component",
+      "title": "Calibration form",
+      "description": "Editor for a canonical calibration envelope of steps and market quotes, with native validation on submit.",
       "docs": "Editable canonical calibration envelope from the generated root, step and MarketQuote contracts. Requires explicit defaultJson and native validate callback; onSubmit receives canonical JSON only. Remount for a new document. No solver or business defaults are inferred.",
       "files": [
         {
@@ -36,6 +38,8 @@
     {
       "name": "calibration-report",
       "type": "registry:component",
+      "title": "Calibration report",
+      "description": "Native calibration report: metrics, residuals, diagnostics and structured failures.",
       "docs": "Present native report metrics, residual identities, diagnostics and structured failures without unit conversion. Accepts the published CalibrationReport; complete raw report metadata remains visible. Optional caller-owned linking uses [stepId, quoteId] keys.",
       "files": [
         {
@@ -63,6 +67,8 @@
     {
       "name": "calibration-fit-chart",
       "type": "registry:component",
+      "title": "Calibration fit chart",
+      "description": "Signed calibration residuals against zero, paneled by step and quote kind.",
       "docs": "Plot signed returned residuals against zero in separate step and canonical quote-kind panels. Unmatched quote identities are isolated; missing quote-unit conventions are labeled solver units. Supports shared publication/export props, callbacks, tooltip slots and optional accepted selection.",
       "files": [
         {
@@ -94,6 +100,8 @@
     {
       "name": "use-calibrate",
       "type": "registry:hook",
+      "title": "useCalibrate",
+      "description": "Runs native calibration, static diagnostics and envelope validation through the WASM worker.",
       "docs": "Full-envelope native calibration, static diagnostics and canonical validation through FinstackQueryProvider. Null disables a request; exact envelope and worker session own query identity. Structured native errors and complete result fields are preserved.",
       "files": [
         {
