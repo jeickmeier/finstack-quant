@@ -3,7 +3,8 @@
 //! CDS tranches (synthetic CDO tranches) provide leveraged credit exposure
 //! to specific slices of the default distribution. Pricing supports multiple
 //! copula models including Gaussian, Student-t, Random Factor Loading, and
-//! Multi-factor, selected through [`CdsTranchePricer::with_copula`].
+//! Multi-factor, selected through
+//! [`CdsTranchePricer::with_copula`](crate::instruments::credit_derivatives::cds_tranche::CdsTranchePricer::with_copula).
 //!
 //! # Tranche Structure
 //!
