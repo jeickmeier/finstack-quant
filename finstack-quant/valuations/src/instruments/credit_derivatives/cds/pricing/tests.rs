@@ -170,6 +170,44 @@ fn test_par_spread_calculation() {
 }
 
 #[test]
+fn risky_pv01_reconciles_clean_npv_to_par_spread() {
+    let (disc, credit) = create_test_curves();
+    let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+    // Seasoned: 42 days of accrued premium separate the clean and dirty annuities.
+    let start = Date::from_calendar_date(2024, time::Month::November, 20).expect("valid date");
+    let mut cds = create_test_cds(
+        "CDS-RPV01",
+        start,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
+    cds.valuation_convention = CdsValuationConvention::BloombergCdswClean;
+    let pricer = CdsPricer::with_config(CdsPricerConfig::from_cds(&cds));
+    let par_spread = pricer
+        .par_spread(&cds, &disc, &credit, as_of)
+        .expect("par spread");
+    let risky_pv01 = pricer
+        .risky_pv01(&cds, &disc, &credit, as_of)
+        .expect("risky pv01");
+    let npv = pricer.npv_full(&cds, &disc, &credit, as_of).expect("npv");
+    let implied = (par_spread - 100.0) * risky_pv01;
+    assert!(
+        (npv - implied).abs() < 1e-6 * npv.abs().max(1.0),
+        "clean npv {npv} should equal (par - coupon) x risky_pv01 = {implied}"
+    );
+    let dirty_annuity_pv01 = pricer
+        .risky_annuity(&cds, &disc, &credit, as_of)
+        .expect("risky annuity")
+        * cds.notional.amount()
+        * ONE_BASIS_POINT;
+    assert!(
+        risky_pv01 < dirty_annuity_pv01,
+        "clean risky pv01 {risky_pv01} excludes accrued premium in {dirty_annuity_pv01}"
+    );
+}
+
+#[test]
 fn test_settlement_delay_reduces_protection_pv() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");

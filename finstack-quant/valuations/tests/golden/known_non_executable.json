@@ -9,90 +9,42 @@
           "metric": "embedded_option_value",
           "reason": "The Bloomberg proprietary callable-tree option value cannot be reconciled by widening the source-backed tolerance.",
           "evidence": "With the straight leg valued on the same BDT lattice as the callable (model_config.bdt_sigma), Finstack option value is -18312.684639 versus Bloomberg -19800.00, a 7.5% proprietary-tree model gap, while OAS remains within the established 3bp convention tolerance."
-        },
-        {
-          "metric": "npv",
-          "reason": "The Bloomberg invoice total remains the immutable source-backed target while the proprietary callable-tree inputs are unavailable.",
-          "evidence": "The executable callable-tree valuation produces 1039110.941365521983 versus Bloomberg 1039530.560000000056."
-        },
-        {
-          "metric": "i_spread",
-          "reason": "Finstack measures a workout I-spread against the linearly interpolated SOFR swap quote at the workout date, the same benchmark the IBM fixture matches within 1bp at maturity; the BHCCN screen's workout benchmark is not reproduced by that interpolation.",
-          "evidence": "YTW 8.955% minus the interpolated USD SOFR swap rate at the 2030-04-15 call gives 5.2640% versus Bloomberg 5.2990% (3.5bp). The previous 2bp match came from subtracting the continuous zero rate, which is not a swap rate and made the metric disagree with its own quote inverse (fix/fi-bond W2.2)."
-        }
-      ]
-    },
-    {
-      "path": "pricing/bloomberg/bond/ibm_eur_2034_callable_bloomberg.json",
-      "description": "IBM Bloomberg proprietary-tree benchmark gap",
-      "metrics": [
-        {
-          "metric": "npv",
-          "reason": "The Bloomberg invoice total remains the immutable source-backed target while the proprietary callable-tree inputs are unavailable.",
-          "evidence": "The executable callable-tree valuation produces 983118.722559568007 versus Bloomberg 983535.890000000014."
-        }
-      ]
-    },
-    {
-      "path": "pricing/bloomberg/fra/usd_fra_3x6.json",
-      "description": "USD Bloomberg FRA combined-DV01 benchmark gap",
-      "metrics": [
-        {
-          "metric": "dv01",
-          "reason": "The external target must remain unchanged pending an independent Bloomberg combined-risk definition refresh.",
-          "evidence": "The contractual grid restores Bloomberg par rate and zero NPV, but corrected DF-chained semantics produce DV01 -251.608657 versus Bloomberg -337.37 with 0.4 tolerance, an 85.76 gap."
-        }
-      ]
-    },
-    {
-      "path": "pricing/bloomberg/cds/cds_5y_par_spread.json",
-      "description": "Bloomberg CDS risk convention migration",
-      "metrics": [
-        {
-          "metric": "risky_pv01",
-          "reason": "The preserved screen target uses Bloomberg's premium-annuity convention.",
-          "evidence": "The replay-backed flat deal-spread proxy produces 4721.57548128 versus Bloomberg 4680.88."
         }
       ]
     },
     {
       "path": "pricing/bloomberg/cds_option/cdx_ig_46_payer_atm_jun26.json",
-      "description": "Known difference: CDX IG 46 Bloomberg CDSO methodology reconciliation deferred by user on 2026-09-10",
+      "description": "Known difference: CDX IG 46 Bloomberg CDSO residual after the 2026-10-08 flat-index-curve correction",
       "metrics": [
         {
           "metric": "npv",
-          "reason": "Known difference accepted for this remediation closeout; Bloomberg market-side and payoff/annuity conventions remain unresolved. Source expectations and tolerances are preserved.",
-          "evidence": "Reconciliation measurement: Finstack 112047.41325164 versus preserved target 118781.76; unchanged tolerance USD 6. See docs/audits/2026-09-09-cdso-reconciliation.md."
+          "reason": "Residual after pricing the index on a flat curve at its quote; the remaining Bloomberg forward, exercise-amount and risk conventions are not identifiable from the captured screens. Source expectations and tolerances are preserved.",
+          "evidence": "Flat 53.6264 bp curve measurement: Finstack 118350.60724574 versus preserved target 118781.76; unchanged tolerance USD 6. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section)."
         },
         {
           "metric": "par_spread",
-          "reason": "Known difference accepted for this remediation closeout; Bloomberg market-side and payoff/annuity conventions remain unresolved. Source expectations and tolerances are preserved.",
-          "evidence": "Reconciliation measurement: Finstack 55.05589752 versus preserved target 55.2848; unchanged tolerance 0.07 bp. See docs/audits/2026-09-09-cdso-reconciliation.md."
+          "reason": "Residual after pricing the index on a flat curve at its quote; the remaining Bloomberg forward, exercise-amount and risk conventions are not identifiable from the captured screens. Source expectations and tolerances are preserved.",
+          "evidence": "Flat 53.6264 bp curve measurement: Finstack 55.02488105 versus preserved target 55.2848; unchanged tolerance 0.07 bp. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section)."
         },
         {
           "metric": "delta",
-          "reason": "Known difference accepted for this remediation closeout; Bloomberg market-side and payoff/annuity conventions remain unresolved. Source expectations and tolerances are preserved.",
-          "evidence": "Reconciliation measurement: Finstack 0.51100454 versus preserved target 0.507; unchanged tolerance 0.001. See docs/audits/2026-09-09-cdso-reconciliation.md."
-        },
-        {
-          "metric": "gamma",
-          "reason": "Known difference accepted for this remediation closeout; Bloomberg market-side and payoff/annuity conventions remain unresolved. Source expectations and tolerances are preserved.",
-          "evidence": "Reconciliation measurement: Finstack 0.54177801 versus preserved target 0.547; unchanged tolerance 0.005. See docs/audits/2026-09-09-cdso-reconciliation.md."
+          "reason": "Residual after pricing the index on a flat curve at its quote; the remaining Bloomberg forward, exercise-amount and risk conventions are not identifiable from the captured screens. Source expectations and tolerances are preserved.",
+          "evidence": "Flat 53.6264 bp curve measurement: Finstack 0.50917392 versus preserved target 0.507; unchanged tolerance 0.001. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section)."
         },
         {
           "metric": "vega",
-          "reason": "Known difference accepted for this remediation closeout; Bloomberg market-side and payoff/annuity conventions remain unresolved. Source expectations and tolerances are preserved.",
-          "evidence": "Reconciliation measurement: Finstack 3351.02741090 versus preserved target 3411.78; unchanged tolerance USD 25 or 1%. See docs/audits/2026-09-09-cdso-reconciliation.md."
+          "reason": "Residual after pricing the index on a flat curve at its quote; the remaining Bloomberg forward, exercise-amount and risk conventions are not identifiable from the captured screens. Source expectations and tolerances are preserved.",
+          "evidence": "Flat 53.6264 bp curve measurement: Finstack 3366.29691355 versus preserved target 3411.78; unchanged tolerance USD 25 or 1%. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section)."
         },
         {
           "metric": "dv01",
-          "reason": "Known difference accepted for this remediation closeout; Bloomberg market-side and payoff/annuity conventions remain unresolved. Source expectations and tolerances are preserved.",
-          "evidence": "Reconciliation measurement: Finstack -109.05137160 versus preserved target -112.536042572938; unchanged tolerance USD 0.5. See docs/audits/2026-09-09-cdso-reconciliation.md."
+          "reason": "Residual after pricing the index on a flat curve at its quote; the remaining Bloomberg forward, exercise-amount and risk conventions are not identifiable from the captured screens. Source expectations and tolerances are preserved.",
+          "evidence": "Flat 53.6264 bp curve measurement: Finstack -9.65717151 versus preserved target -112.536042572938; unchanged tolerance USD 0.5. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section). The target is the fixture's earlier self-derived internal value, not a screen number; the screen IR DV01 is 228.21."
         },
         {
           "metric": "cs01",
-          "reason": "Known difference accepted for this remediation closeout; Bloomberg market-side and payoff/annuity conventions remain unresolved. Source expectations and tolerances are preserved.",
-          "evidence": "Reconciliation measurement: Finstack 23362.72591100 versus preserved target 25352.02; unchanged tolerance USD 650. See docs/audits/2026-09-09-cdso-reconciliation.md."
+          "reason": "Residual after pricing the index on a flat curve at its quote; the remaining Bloomberg forward, exercise-amount and risk conventions are not identifiable from the captured screens. Source expectations and tolerances are preserved.",
+          "evidence": "Flat 53.6264 bp curve measurement: Finstack 23966.54950855 versus preserved target 25352.02; unchanged tolerance USD 650. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section)."
         }
       ]
     }

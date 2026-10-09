@@ -6,7 +6,7 @@
     "description": "Bloomberg SWPM USD 2M x 5M FRA captured from screens on 2026-05-02.",
     "valuation_date": "2026-05-05",
     "source": "bloomberg-screen",
-    "source_detail": "Bloomberg SWPM FRA, curve 490 USD SOFR discounting, curve 559 USD 3M CME Term SOFR projection, curve date 2026-05-02, valuation date 2026-05-05 Canonical calibration setup. The USD-SOFR discount curve is now calibrated from 12 SWPM Curve 490 input rates (deposits + OIS swaps) using the per-step ois_compounding override (CompoundedWithRateCutoff{cutoff_days: 1}). The USD-3M-CME-TERM-SOFR forward curve is a synthetic flat 3.6437% test curve that doesn't correspond to a Bloomberg-conformant calibration; it is preserved verbatim in prior_market. The curve records the contractual 2026-07-06 to 2026-10-06 projection interval so DF-chained term projection preserves the quoted 3.6437% reset rate without reverting to rate_period averaging. Bloomberg par-rate and DV01 targets remain authoritative; the fixture is temporarily listed in known_non_executable because corrected combined DV01 requires an independent risk-definition refresh.",
+    "source_detail": "Bloomberg SWPM FRA, curve 490 USD SOFR discounting, curve 559 USD 3M CME Term SOFR projection, curve date 2026-05-02, valuation date 2026-05-05 Canonical calibration setup. The USD-SOFR discount curve is now calibrated from 12 SWPM Curve 490 input rates (deposits + OIS swaps) using the per-step ois_compounding override (CompoundedWithRateCutoff{cutoff_days: 1}). The USD-3M-CME-TERM-SOFR forward curve is a synthetic flat 3.6437% test curve that doesn't correspond to a Bloomberg-conformant calibration; it is preserved verbatim in prior_market. The curve records the contractual 2026-07-06 to 2026-10-06 projection interval so DF-chained term projection preserves the quoted 3.6437% reset rate without reverting to rate_period averaging. The dv01 target is the screen's BR01 (251.51, curve 559): the PV change for a 1bp move of the 3M Term SOFR projection curve, which for this at-the-money FRA equals the combined parallel bump of both fitted curves. The screen's DV01 (337.37) is not targeted: it shifts the SOFR curve quotes while holding curve 559's 3M cash rate and basis spreads fixed, so the 3x6 forward absorbs about 2bp and the 2x5 FRA about 1.34bp; the synthetic flat projection curve in this fixture cannot reproduce that re-bootstrap.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-02",
     "last_reviewed_by": "jeickmeier",
@@ -427,7 +427,7 @@
     "par_rate": 0.036437,
     "pv01": -251.51,
     "forward_pv01": -251.51,
-    "dv01": -337.37
+    "dv01": -251.51
   },
   "tolerances": {
     "npv": {
@@ -449,9 +449,9 @@
       "tolerance_reason": "Bloomberg BR01/DV01 displayed to cents; The canonical calibration setup replaces the materialized USD-SOFR discount snapshot with a calibrated curve (12 SWPM Curve 490 quotes + ois_compounding override = CompoundedWithRateCutoff{cutoff_days: 1}). The calibrated curve differs from Bloomberg's snapshot DFs by ~4e-4 at the FRA's pay_date due to schedule/day-count nuances inside Bloomberg's pricing kernel (see docs/archive/plans/2026-05-09-golden-fixture-envelope-migration-plan.md §14). The forward curve (USD-3M-CME-TERM-SOFR) is preserved verbatim in prior_market, so par_rate and NPV remain bit-stable; only sensitivities — which combine forward-rate shocks with discount-curve values — show the calibration drift."
     },
     "dv01": {
-      "abs": 0.4,
-      "rel": 0.0012,
-      "tolerance_reason": "Bloomberg BR01/DV01 displayed to cents; The canonical calibration setup replaces the materialized USD-SOFR discount snapshot with a calibrated curve (12 SWPM Curve 490 quotes + ois_compounding override = CompoundedWithRateCutoff{cutoff_days: 1}). The calibrated curve differs from Bloomberg's snapshot DFs by ~4e-4 at the FRA's pay_date due to schedule/day-count nuances inside Bloomberg's pricing kernel (see docs/archive/plans/2026-05-09-golden-fixture-envelope-migration-plan.md §14). The forward curve (USD-3M-CME-TERM-SOFR) is preserved verbatim in prior_market, so par_rate and NPV remain bit-stable; only sensitivities — which combine forward-rate shocks with discount-curve values — show the calibration drift."
+      "abs": 0.15,
+      "rel": 0.0006,
+      "tolerance_reason": "Bloomberg BR01 displayed to cents; same calibrated-discount-curve drift as pv01 and forward_pv01, which measure the same 1bp projection move."
     }
   }
 }

@@ -504,9 +504,24 @@ impl CdsPricer {
         Ok(annuity)
     }
 
-    /// Risky PV01: change in NPV for a 1bp increase in the CDS spread.
+    /// Risky PV01: PV of 1bp of running premium on the notional, on the
+    /// instrument's valuation convention.
     ///
-    /// Computed as `Risky Annuity × Notional / 10000`.
+    /// Computed as `annuity × Notional / 10000`:
+    ///
+    /// * Bloomberg CDSW clean conventions use the clean annuity, the premium
+    ///   leg per unit spread including accrual-on-default less accrued
+    ///   premium, so that `clean NPV = (par spread − coupon) × Risky PV01`
+    ///   for a protection buyer on [`CdsValuationConvention::BloombergCdswClean`].
+    /// * Dirty conventions use [`Self::risky_annuity`], the coupon-only
+    ///   annuity (QuantLib `couponLegBPS`).
+    ///
+    /// It is an annuity, not a bump-and-reprice sensitivity: the PV change for
+    /// a 1bp move in the quoted spread is the `cs01` metric (Bloomberg CDSW
+    /// "Spread DV01"), which also carries the annuity's own spread sensitivity
+    /// when the coupon differs from the par spread.
+    ///
+    /// [`CdsValuationConvention::BloombergCdswClean`]: crate::instruments::credit_derivatives::cds::CdsValuationConvention::BloombergCdswClean
     #[must_use = "risky PV01 calculation is pure computation"]
     pub(crate) fn risky_pv01(
         &self,
@@ -515,8 +530,12 @@ impl CdsPricer {
         surv: &HazardCurve,
         as_of: Date,
     ) -> Result<f64> {
-        let risky_annuity = self.risky_annuity(cds, disc, surv, as_of)?;
-        Ok(risky_annuity * cds.notional.amount() / BASIS_POINTS_PER_UNIT)
+        let annuity = if cds.uses_clean_price() {
+            self.clean_par_spread_denominator(cds, disc, surv, as_of)?
+        } else {
+            self.risky_annuity(cds, disc, surv, as_of)?
+        };
+        Ok(annuity * cds.notional.amount() / BASIS_POINTS_PER_UNIT)
     }
 
     /// Canonical CDS instrument NPV from the perspective of the `PayReceive`

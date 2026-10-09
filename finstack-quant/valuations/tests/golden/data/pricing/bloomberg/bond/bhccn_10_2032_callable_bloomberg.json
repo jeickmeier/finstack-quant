@@ -333,7 +333,7 @@
             "quotes": [
               {
                 "deposit": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 1,
@@ -345,7 +345,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 1,
@@ -358,7 +358,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 2,
@@ -371,7 +371,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 3,
@@ -384,7 +384,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 1,
@@ -397,7 +397,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 2,
@@ -410,7 +410,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 3,
@@ -423,7 +423,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 4,
@@ -436,7 +436,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 5,
@@ -449,7 +449,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 6,
@@ -462,7 +462,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 7,
@@ -475,7 +475,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 8,
@@ -488,7 +488,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 9,
@@ -501,7 +501,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 10,
@@ -514,7 +514,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 11,
@@ -527,7 +527,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 12,
@@ -540,7 +540,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 18,
@@ -553,7 +553,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 2,
@@ -566,7 +566,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 3,
@@ -579,7 +579,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 4,
@@ -592,7 +592,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 5,
@@ -605,7 +605,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 6,
@@ -618,7 +618,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 7,
@@ -631,7 +631,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 8,
@@ -644,7 +644,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 9,
@@ -657,7 +657,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 10,
@@ -670,7 +670,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 12,
@@ -683,7 +683,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 15,
@@ -696,7 +696,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 20,
@@ -709,7 +709,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 25,
@@ -722,7 +722,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 30,
@@ -735,7 +735,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 40,
@@ -748,7 +748,7 @@
               },
               {
                 "swap": {
-                  "index_id": "USD-SOFRRATE",
+                  "index_id": "USD-SOFR",
                   "pillar": {
                     "tenor": {
                       "count": 50,
@@ -975,7 +975,7 @@
                       "unit": "days"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -988,7 +988,7 @@
                       "unit": "weeks"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1001,7 +1001,7 @@
                       "unit": "weeks"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1014,7 +1014,7 @@
                       "unit": "weeks"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1027,7 +1027,7 @@
                       "unit": "months"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1040,7 +1040,7 @@
                       "unit": "months"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1053,7 +1053,7 @@
                       "unit": "months"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1066,7 +1066,7 @@
                       "unit": "months"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1079,7 +1079,7 @@
                       "unit": "months"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1092,7 +1092,7 @@
                       "unit": "months"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1105,7 +1105,7 @@
                       "unit": "months"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1118,7 +1118,7 @@
                       "unit": "months"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1131,7 +1131,7 @@
                       "unit": "months"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1144,7 +1144,7 @@
                       "unit": "months"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1157,7 +1157,7 @@
                       "unit": "months"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1170,7 +1170,7 @@
                       "unit": "months"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1183,7 +1183,7 @@
                       "unit": "months"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1196,7 +1196,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1209,7 +1209,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1222,7 +1222,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1235,7 +1235,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1248,7 +1248,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1261,7 +1261,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1274,7 +1274,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1287,7 +1287,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1300,7 +1300,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1313,7 +1313,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1326,7 +1326,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1339,7 +1339,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1352,7 +1352,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1365,7 +1365,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1378,7 +1378,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               },
               {
@@ -1391,7 +1391,7 @@
                       "unit": "years"
                     }
                   },
-                  "index_id": "USD-SOFRRATE"
+                  "index_id": "USD-SOFR"
                 }
               }
             ]
@@ -1616,7 +1616,6 @@
     }
   },
   "expected": {
-    "npv": 1039530.56,
     "clean_price": 1033975.0,
     "dirty_price": 1039530.56,
     "accrued": 5555.56,
@@ -1634,17 +1633,13 @@
     "vega": -0.06
   },
   "tolerances": {
-    "npv": {
-      "abs": 0.01,
-      "tolerance_reason": "Bloomberg invoice total is displayed to cents and is retained as the assertion target."
-    },
     "clean_price": {
       "abs": 0.01,
       "tolerance_reason": "Bloomberg clean price is 103.3975 on 1MM face, displayed to 0.0001 price points."
     },
     "dirty_price": {
       "abs": 0.01,
-      "tolerance_reason": "Bloomberg invoice total is displayed to cents and equals clean price plus accrued interest."
+      "tolerance_reason": "Bloomberg invoice total (principal plus accrued, payable on the settlement date) is displayed to cents. It is asserted here rather than as npv: npv is the same amount discounted from settlement back to the valuation date."
     },
     "accrued": {
       "abs": 0.01,

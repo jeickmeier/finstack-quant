@@ -634,7 +634,6 @@
     }
   },
   "expected": {
-    "npv": 983535.89,
     "clean_price": 974840.0,
     "dirty_price": 983535.89,
     "accrued": 8695.89,
@@ -652,17 +651,13 @@
     "vega": -0.01
   },
   "tolerances": {
-    "npv": {
-      "abs": 0.01,
-      "tolerance_reason": "Bloomberg invoice total is displayed to cents and is retained as the assertion target."
-    },
     "clean_price": {
       "abs": 0.01,
       "tolerance_reason": "Bloomberg clean price is 97.484 on 1MM face, displayed to 0.001 price points."
     },
     "dirty_price": {
       "abs": 0.01,
-      "tolerance_reason": "Bloomberg invoice total is displayed to cents and equals clean price plus accrued interest."
+      "tolerance_reason": "Bloomberg invoice total (principal plus accrued, payable on the settlement date) is displayed to cents. It is asserted here rather than as npv: npv is the same amount discounted from settlement back to the valuation date."
     },
     "accrued": {
       "abs": 0.01,

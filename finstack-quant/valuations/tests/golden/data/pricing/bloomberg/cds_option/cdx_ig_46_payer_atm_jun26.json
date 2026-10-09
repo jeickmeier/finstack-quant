@@ -6,7 +6,7 @@
     "description": "Bloomberg CDSO CDX.NA.IG.46 100MM USD payer option struck at the ATM forward spread.",
     "valuation_date": "2026-05-07",
     "source": "bloomberg-screen",
-    "source_detail": "Bloomberg CDSO/CDSW/CDSD CDX.NA.IG.46 V1, 100MM USD notional, S531 USD ISDA Swap Curve - Mid, CBBT Mid CDX curve, valuation date 2026-05-07, expiry 2026-06-17, ATM payer struck at 55.2848bp, Spread Vol 36.63% [dv01 re-blessed 2026-05-17: audit fix W-18 reconciled the CDS-option IR DV01 to finstack-quant's internal central-difference convention (consistent with the CDS DV01) for portfolio aggregation; dv01 is now an internal signed slope = -(Bloomberg CDSO screen DV01)/2, no longer a like-for-like Bloomberg-screen value.]",
+    "source_detail": "Bloomberg CDSO/CDSW/CDSD CDX.NA.IG.46 V1, 100MM USD notional, S531 USD ISDA Swap Curve - Mid, CBBT Mid CDX curve, valuation date 2026-05-07, expiry 2026-06-17, ATM payer struck at 55.2848bp, Spread Vol 36.63% [dv01 re-blessed 2026-05-17: audit fix W-18 reconciled the CDS-option IR DV01 to finstack-quant's internal central-difference convention (consistent with the CDS DV01) for portfolio aggregation; dv01 is now an internal signed slope = -(Bloomberg CDSO screen DV01)/2, no longer a like-for-like Bloomberg-screen value.] [credit curve flattened 2026-10-08: all index par-spread quotes are the CBBT Mid index quote, 53.6264 bp, as shown on the CDSO and linked CDSW screens (ISDA standard upfront model, single flat spread). The previous 16.14-92.35 bp term structure was transcribed from a different screen and is not an input to CDSO; expected outputs and tolerances are unchanged.]",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-07",
     "last_reviewed_by": "claude",
@@ -387,7 +387,7 @@
               "unit": "months"
             }
           },
-          "spread_bp": 16.14,
+          "spread_bp": 53.6264,
           "recovery_rate": 0.4
         },
         {
@@ -405,7 +405,7 @@
               "unit": "years"
             }
           },
-          "spread_bp": 16.14,
+          "spread_bp": 53.6264,
           "recovery_rate": 0.4
         },
         {
@@ -423,7 +423,7 @@
               "unit": "years"
             }
           },
-          "spread_bp": 24.14,
+          "spread_bp": 53.6264,
           "recovery_rate": 0.4
         },
         {
@@ -441,7 +441,7 @@
               "unit": "years"
             }
           },
-          "spread_bp": 32.36,
+          "spread_bp": 53.6264,
           "recovery_rate": 0.4
         },
         {
@@ -459,7 +459,7 @@
               "unit": "years"
             }
           },
-          "spread_bp": 42.9932,
+          "spread_bp": 53.6264,
           "recovery_rate": 0.4
         },
         {
@@ -495,7 +495,7 @@
               "unit": "years"
             }
           },
-          "spread_bp": 72.64,
+          "spread_bp": 53.6264,
           "recovery_rate": 0.4
         },
         {
@@ -513,7 +513,7 @@
               "unit": "years"
             }
           },
-          "spread_bp": 92.35,
+          "spread_bp": 53.6264,
           "recovery_rate": 0.4
         }
       ],

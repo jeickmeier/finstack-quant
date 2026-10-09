@@ -43,19 +43,18 @@ fn load_option(fixture: &Value) -> CdsOption {
 }
 
 /// Library NPV on the supplied curve. Bloomberg CDSO shows 118,781.76: an open
-/// reconciliation of 6,722.06 (5.7%), not a tolerance.
+/// reconciliation of 431.15 (0.36%), not a tolerance.
 ///
-/// What is established (2026-10-01 reconciliation, see
-/// `docs/audits/2026-09-09-cdso-reconciliation.md`): the underlying CDS and
-/// discounting match CDSW to USD 6 on 100MM; the gap decomposes into the
-/// forward spread (screen ATM forward 55.2848 bp versus 55.0559 bp here, about
-/// +5,176) and the variance clock (42 settlement-to-settlement days versus 41,
-/// about +1,494). The fixture does not record enough Bloomberg intermediates to
-/// identify the forward-spread convention, so no formulation reproduces NPV,
-/// vega, theta, delta and the forward together. Closing it needs a receiver
-/// CDSO at the same strike, the forward-start CDSW, the CBBT mid curve and a
-/// second strike or expiry.
-const LIBRARY_NPV: f64 = 112_059.704_078_51;
+/// What is established (see `docs/audits/2026-09-09-cdso-reconciliation.md`,
+/// 2026-10-08 section): CDSO prices the index on a flat curve at the index
+/// quote (53.6264 bp), which the fixture now supplies; the earlier 6,722 gap
+/// came from a term structure transcribed from another screen. None of the
+/// candidate conventions in the `cdx_ig_46_convention_matrix` diagnostic
+/// (variance clock, discount date, first-coupon annuity, separate front-end
+/// protection) reproduces NPV, forward, delta, vega and theta together.
+/// Closing the rest needs payer and receiver CDSO prices at a strike equal to
+/// the coupon and at two other strikes, plus the CDSO curve tab.
+const LIBRARY_NPV: f64 = 118_350.607_245_74;
 
 /// Pins the library value so an unintended pricing change is caught, and pins
 /// the size of the open Bloomberg difference so closing it is a deliberate,
@@ -76,7 +75,7 @@ fn cdx_ig_46_npv_is_pinned_with_the_open_bloomberg_difference() {
     );
     let open_difference = BBG_NPV - supplied_pv;
     assert!(
-        (open_difference - 6_722.06).abs() < 0.01,
+        (open_difference - 431.15).abs() < 0.01,
         "open Bloomberg difference changed: {open_difference} (target {BBG_NPV})",
     );
 }

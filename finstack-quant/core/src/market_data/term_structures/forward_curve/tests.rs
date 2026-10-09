@@ -171,6 +171,37 @@ fn reset_grid_preserves_off_grid_fixed_tenor_quote_meaning() {
 }
 
 #[test]
+fn rebuild_with_knots_extends_projection_grid_to_cover_longer_knots() {
+    let t_3m = 91.0 / 360.0;
+    let t_6m = 183.0 / 360.0;
+    let curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        .base_date(
+            Date::from_calendar_date(2025, time::Month::January, 1).expect("valid test date"),
+        )
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 0.047), (t_3m, 0.0485)])
+        .projection_grid([0.0, t_3m, t_6m])
+        .build()
+        .expect("reset-grid curve should build");
+
+    let rebuilt = curve
+        .rebuild_with_knots([(0.0, 0.047), (t_3m, 0.0485), (1.1, 0.05)])
+        .expect("knots past the grid end should rebuild");
+
+    let grid = rebuilt.projection_grid().expect("grid is retained");
+    assert_eq!(&grid[..3], &[0.0, t_3m, t_6m]);
+    assert_eq!(grid.len(), 6);
+    for step in grid[2..].windows(2) {
+        assert!((step[1] - step[0] - 0.25).abs() < 1e-14);
+    }
+
+    let same_span = curve
+        .rebuild_with_knots([(0.0, 0.05), (t_3m, 0.051)])
+        .expect("knots inside the grid should rebuild");
+    assert_eq!(same_span.projection_grid(), curve.projection_grid());
+}
+
+#[test]
 fn contractual_projection_grid_survives_serde_round_trip() {
     let terminal_time = 183.0 / 360.0;
     let projection_grid = [0.0, 91.0 / 360.0, terminal_time];

@@ -1,6 +1,9 @@
 //! CDS risky PV01 metric calculator.
 //!
-//! Returns the canonical Risky PV01 = `Risky Annuity × Notional / 10000`.
+//! Returns Risky PV01 = `annuity × Notional / 10000` on the instrument's
+//! valuation convention: the clean annuity (with accrual-on-default, less
+//! accrued premium) for the Bloomberg CDSW clean conventions, the coupon-only
+//! risky annuity otherwise.
 
 use crate::instruments::credit_derivatives::cds::pricing::CdsPricer;
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;

@@ -1055,7 +1055,7 @@
     "cds_par_spread": 138.59078484109983,
     "index": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"cds_index\",\"spec\":{\"id\":\"CDX-IG-42\",\"index_name\":\"CDX.NA.IG\",\"series\":42,\"version\":1,\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"index_factor\":1.0,\"side\":\"pay\",\"convention\":\"isda_na\",\"premium_leg\":{\"roll_rule\":\"cds_imm\",\"start\":\"2024-03-20\",\"end\":\"2029-06-20\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"stub\":\"short_front\",\"business_day_convention\":\"modified_following\",\"calendar_id\":\"nyse\",\"day_count\":\"act_360\",\"coupon_bp\":\"100\",\"discount_curve_id\":\"USD-OIS\"},\"protection_leg\":{\"credit_curve_id\":\"CDX.NA.IG.HAZARD\",\"recovery_rate\":0.4,\"settlement_delay\":3},\"pricing\":\"single_curve\",\"constituents\":[],\"num_constituents\":125,\"attributes\":{}}}}",
     "index_par_spread": 59.99799619742056,
-    "index_risky_pv01": 4406.833483531974,
+    "index_risky_pv01": 4409.636181503024,
     "index_cs01": 4480.475883319654,
     "tranche": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"cds_tranche\",\"spec\":{\"id\":\"CDX-42-3X7\",\"index_name\":\"CDX.NA.IG\",\"series\":42,\"attach_pct\":3.0,\"detach_pct\":7.0,\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"maturity\":\"2029-12-20\",\"coupon_bp\":100.0,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"business_day_convention\":\"following\",\"calendar_id\":null,\"discount_curve_id\":\"USD-OIS\",\"credit_index_id\":\"CDX.NA.IG.HAZARD\",\"side\":\"pay\",\"start_date\":null,\"realized_loss\":0.0,\"roll_rule\":\"cds_imm\",\"stub\":\"short_front\",\"upfront\":null,\"attributes\":{}}}}"
   },

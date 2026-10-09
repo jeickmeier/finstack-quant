@@ -657,7 +657,6 @@
   "expected": {
     "npv": -181992.0,
     "par_spread": 60.5,
-    "risky_pv01": 4680.88,
     "dv01": 45.91,
     "cs01": 4680.88,
     "recovery01": 76.03,
@@ -674,11 +673,6 @@
       "abs": 0.02,
       "rel": 1e-08,
       "tolerance_reason": "Bloomberg displays spread to four decimal places in bp, but executable par_spread recomputes from a transcribed survival/discount curve proxy rather than Bloomberg's internal curve object. Allow the documented sub-0.02bp curve-construction residual while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
-    },
-    "risky_pv01": {
-      "abs": 0.5,
-      "rel": 1e-08,
-      "tolerance_reason": "Bloomberg displays Spread DV01 to cents; widened to allow the remaining CDS curve/bootstrap convention residual while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
     },
     "dv01": {
       "abs": 1.5,

@@ -25,6 +25,12 @@ impl ForwardCurve {
     /// Replacement pillars define a new interpolation; previous roll and shock
     /// transformations are not reapplied to them.
     ///
+    /// When the replacement pillars reach past the end of the projection grid,
+    /// the grid is extended in index-tenor steps until it covers the last
+    /// pillar. Those are the boundaries projection-discount-factor chaining
+    /// already uses beyond the grid, so the extension changes no projected
+    /// rate.
+    ///
     /// # Arguments
     ///
     /// * `knots` - Replacement `(time, forward_rate)` pillars: times in year
@@ -39,7 +45,22 @@ impl ForwardCurve {
     where
         I: IntoIterator<Item = (f64, f64)>,
     {
-        self.metadata_builder(self.id.clone()).knots(knots).build()
+        let knots: Vec<(f64, f64)> = knots.into_iter().collect();
+        let last_knot = knots.iter().map(|&(time, _)| time).fold(0.0, f64::max);
+        let projection_grid = self.projection_grid.as_deref().map(|grid| {
+            let mut grid = grid.to_vec();
+            while let Some(&end) = grid.last() {
+                if end >= last_knot {
+                    break;
+                }
+                grid.push(end + self.tenor);
+            }
+            grid
+        });
+        self.metadata_builder(self.id.clone())
+            .projection_grid_opt(projection_grid)
+            .knots(knots)
+            .build()
     }
 
     /// Builder pre-populated with this curve's full metadata but **no** knots.
