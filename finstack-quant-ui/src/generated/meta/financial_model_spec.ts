@@ -407,23 +407,6 @@ export default [
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_0cb400890a91215df547",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OasPriceBasis",
-    "description": "Price/accrual convention used for OAS inversion targets."
-  },
-  {
-    "path": "#/$defs/d_0cb400890a91215df547/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OasPriceBasis/oneOf/0",
-    "const": "settlement_dirty",
-    "description": "Target the full settlement dirty price."
-  },
-  {
-    "path": "#/$defs/d_0cb400890a91215df547/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OasPriceBasis/oneOf/1",
-    "const": "forward_accrued_clean",
-    "description": "Target clean price plus only the forward accrued amount from valuation to settlement."
-  },
-  {
     "path": "#/$defs/d_0db717d28554658ae7c4",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/UtilizationProcess",
     "description": "Utilization process for stochastic draws/repayments.\n\nFor the 80/20 implementation, we support a single mean-reverting process.\nThis can be extended in the future to support other processes (jump-diffusion,\nregime-switching, etc.)."
@@ -3781,18 +3764,10 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/merton_mc_config/anyOf/1"
   },
   {
-    "path": "#/$defs/d_65b0652ed08913529246/properties/oas_price_basis",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/oas_price_basis",
-    "default": "settlement_dirty",
-    "description": "Price/accrual target convention for OAS inversion.",
-    "ref": "#/$defs/OasPriceBasis",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OasPriceBasis"
-  },
-  {
     "path": "#/$defs/d_65b0652ed08913529246/properties/oas_quote_compounding",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/oas_quote_compounding",
     "default": "continuous",
-    "description": "Quote compounding convention for OAS inputs and outputs.",
+    "description": "Quote compounding convention for OAS inputs and outputs.\n\nThe OAS is added to each short rate on this basis: a semiannual\n(`{\"periodic\": 2}`) OAS discounts at `1 + (z + oas) / 2` per half\nyear, the bond-equivalent convention of the Bloomberg OAS screen.",
     "ref": "#/$defs/Compounding",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Compounding"
   },

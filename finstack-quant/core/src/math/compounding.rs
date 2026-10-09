@@ -288,6 +288,55 @@ impl Compounding {
         }
     }
 
+    /// Continuous-rate shift produced by adding `spread` to a rate quoted
+    /// under `self`.
+    ///
+    /// A spread quoted on a compounding basis is added to the base rate on
+    /// that same basis, so the equivalent continuous shift depends on the
+    /// level of the base rate:
+    ///
+    /// ```text
+    /// shift = c(r_self + spread) − c(r_self),   r_self = self-quoted rate of `continuous_rate`
+    /// Periodic(n): shift = n × ln(e^(c/n) + spread/n) − c
+    /// Continuous:  shift = spread
+    /// ```
+    ///
+    /// This is how a bond-equivalent (semiannual) option-adjusted spread is
+    /// applied to each short rate of a lattice built on a semiannual curve.
+    ///
+    /// # Arguments
+    ///
+    /// * `continuous_rate` - Base rate as a continuously compounded decimal
+    ///   annual rate (0.04 = 4%).
+    /// * `spread` - Spread as a decimal on the `self` compounding basis
+    ///   (0.01 = 100 bp), added to the base rate restated on that basis.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use finstack_quant_core::math::Compounding;
+    ///
+    /// let base = 0.04_f64;
+    /// assert_eq!(Compounding::Continuous.continuous_spread_shift(base, 0.01), 0.01);
+    ///
+    /// // Semiannual: (1 + (z + s)/2) per half year, not (1 + z/2)(1 + s/2).
+    /// let shift = Compounding::SEMI_ANNUAL.continuous_spread_shift(base, 0.01);
+    /// let z = 2.0 * ((base / 2.0).exp() - 1.0);
+    /// let expected = 2.0 * (1.0 + (z + 0.01) / 2.0).ln() - base;
+    /// assert!((shift - expected).abs() < 1e-15);
+    /// ```
+    #[must_use]
+    #[inline]
+    pub fn continuous_spread_shift(&self, continuous_rate: f64, spread: f64) -> f64 {
+        match self {
+            Compounding::Continuous | Compounding::Simple => spread,
+            _ => {
+                self.instantaneous_rate(self.rate_from_instantaneous(continuous_rate) + spread)
+                    - continuous_rate
+            }
+        }
+    }
+
     /// Convert a rate quoted under `self` to the equivalent rate under `to`.
     ///
     /// Internally this computes the discount factor from the source convention

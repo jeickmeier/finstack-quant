@@ -1114,3 +1114,50 @@ fn short_rate_tree_prices_are_bit_pinned() {
         ]
     );
 }
+
+#[test]
+fn periodic_oas_is_added_to_each_node_rate_on_its_own_compounding() {
+    let base_date = finstack_quant_core::dates::Date::from_calendar_date(2025, Month::January, 1)
+        .expect("valid date");
+    let flat_rate = 0.04_f64;
+    let curve = DiscountCurve::builder("USD-FLAT")
+        .base_date(base_date)
+        .knots([
+            (0.0, 1.0),
+            (1.0, (-flat_rate).exp()),
+            (2.0, (-2.0 * flat_rate).exp()),
+        ])
+        .interp(InterpStyle::LogLinear)
+        .build()
+        .expect("flat curve");
+    // Zero volatility: every node carries the flat rate, so the semiannual
+    // OAS has the closed form (1 + (z + s) / 2)^(-2T).
+    let mut tree = ShortRateTree::new(ShortRateTreeConfig {
+        steps: 24,
+        model: ShortRateModel::HoLee,
+        volatility: 0.0,
+        ..ShortRateTreeConfig::default()
+    });
+    tree.calibrate(&curve, 2.0).expect("calibrate");
+
+    let oas_bp = 150.0;
+    let continuous = tree.price(oas_bp, &ConstantValuator).expect("continuous");
+    let same = tree
+        .price_with_oas_compounding(oas_bp, Compounding::Continuous, &ConstantValuator)
+        .expect("continuous via compounding");
+    assert_eq!(continuous, same);
+    assert!((continuous - (-2.0 * (flat_rate + 0.015)).exp()).abs() < 1e-10);
+
+    let semiannual = tree
+        .price_with_oas_compounding(oas_bp, Compounding::SEMI_ANNUAL, &ConstantValuator)
+        .expect("semiannual");
+    let z = 2.0 * ((flat_rate / 2.0).exp() - 1.0);
+    let expected = (1.0 + (z + 0.015) / 2.0).powf(-4.0);
+    assert!(
+        (semiannual - expected).abs() < 1e-10,
+        "semiannual OAS must add to the semiannual node rate: got {semiannual}, expected {expected}"
+    );
+    // Compounding the spread on its own would discount more.
+    let standalone = (1.0 + z / 2.0).powf(-4.0) * (1.0_f64 + 0.015 / 2.0).powf(-4.0);
+    assert!(semiannual > standalone);
+}

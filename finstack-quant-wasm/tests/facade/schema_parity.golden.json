@@ -107,7 +107,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1251496
+            "bytes": 1251001
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
@@ -489,7 +489,6 @@
           "NonNegativeF64Wire",
           "Notional",
           "NotionalExchange",
-          "OasPriceBasis",
           "OidEirSpec",
           "OidPolicy",
           "OpenUnitIntervalF64Wire",
@@ -2007,7 +2006,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1145229
+            "bytes": 1144734
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
@@ -2130,7 +2129,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 380837
+            "bytes": 380342
           },
           {
             "path": "schemas/statements/1/metric_registry.schema.json",
@@ -2301,7 +2300,6 @@
           "NodeValueType",
           "NonNegativeF64Wire",
           "Notional",
-          "OasPriceBasis",
           "OidEirSpec",
           "OidPolicy",
           "OpenUnitIntervalF64Wire",
@@ -2491,7 +2489,6 @@
           "NodeValueType",
           "NonNegativeF64Wire",
           "Notional",
-          "OasPriceBasis",
           "OidEirSpec",
           "OidPolicy",
           "OpenUnitIntervalF64Wire",
@@ -2680,7 +2677,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
             "type_name": "InstrumentPricingOverrides",
             "kind": "component",
-            "bytes": 64204
+            "bytes": 63709
           },
           {
             "path": "schemas/common/1/ir_future_conventions.schema.json",
@@ -3584,7 +3581,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1251496
+            "bytes": 1251001
           },
           {
             "domain": "attribution",
@@ -4488,7 +4485,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1145229
+            "bytes": 1144734
           },
           {
             "domain": "scenarios",
@@ -4536,7 +4533,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 380837
+            "bytes": 380342
           },
           {
             "domain": "statements",
@@ -4696,7 +4693,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
             "type_name": "InstrumentPricingOverrides",
             "kind": "component",
-            "bytes": 64204
+            "bytes": 63709
           },
           {
             "domain": "valuations",
@@ -6005,7 +6002,6 @@
           "NodeValueType",
           "NonNegativeF64Wire",
           "Notional",
-          "OasPriceBasis",
           "OidEirSpec",
           "OidPolicy",
           "OpenUnitIntervalF64Wire",

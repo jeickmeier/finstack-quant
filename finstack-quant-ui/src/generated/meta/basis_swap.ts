@@ -984,18 +984,10 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/merton_mc_config/anyOf/1"
   },
   {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/oas_price_basis",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/oas_price_basis",
-    "default": "settlement_dirty",
-    "description": "Price/accrual target convention for OAS inversion.",
-    "ref": "#/$defs/OasPriceBasis",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasPriceBasis"
-  },
-  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/oas_quote_compounding",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/oas_quote_compounding",
     "default": "continuous",
-    "description": "Quote compounding convention for OAS inputs and outputs.",
+    "description": "Quote compounding convention for OAS inputs and outputs.\n\nThe OAS is added to each short rate on this basis: a semiannual\n(`{\"periodic\": 2}`) OAS discounts at `1 + (z + oas) / 2` per half\nyear, the bond-equivalent convention of the Bloomberg OAS screen.",
     "ref": "#/$defs/Compounding",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding"
   },
@@ -2489,23 +2481,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BreakevenTarget/oneOf/4",
     "const": "oas",
     "description": "OAS breakeven, in **basis points** (sensitivity: CS01).\n\nNote that under [`BreakevenMode::Iterative`] the solve applies a\nparallel discount-curve shift. For an instrument with embedded\noptionality that is a duration-space answer, not a true OAS shift,\nbecause OAS is defined relative to the option model."
-  },
-  {
-    "path": "#/$defs/d_af1cbfbbe87bff81e3b3",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasPriceBasis",
-    "description": "Price/accrual convention used for OAS inversion targets."
-  },
-  {
-    "path": "#/$defs/d_af1cbfbbe87bff81e3b3/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasPriceBasis/oneOf/0",
-    "const": "settlement_dirty",
-    "description": "Target the full settlement dirty price."
-  },
-  {
-    "path": "#/$defs/d_af1cbfbbe87bff81e3b3/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OasPriceBasis/oneOf/1",
-    "const": "forward_accrued_clean",
-    "description": "Target clean price plus only the forward accrued amount from valuation to settlement."
   },
   {
     "path": "#/$defs/d_b0a5fc543381da6a5722",

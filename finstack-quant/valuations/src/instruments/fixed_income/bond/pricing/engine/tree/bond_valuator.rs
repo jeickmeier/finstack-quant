@@ -6,6 +6,7 @@ use crate::instruments::common_impl::pricing::rates_credit::continuous_frp_weigh
 use finstack_quant_core::dates::DateExt;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Duration};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::Result;
 use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
 use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
@@ -964,8 +965,8 @@ impl BondValuator {
     /// Price the bond using a calibrated Hull-White trinomial tree with OAS.
     ///
     /// Uses `HullWhiteTree::backward_induction` with the bond's cashflow and
-    /// call/put schedules applied at each node. The OAS is applied as an
-    /// additional parallel shift to the short rate when discounting.
+    /// call/put schedules applied at each node. The OAS is added to each
+    /// node's short rate on `oas_compounding` when discounting.
     ///
     /// # Arguments
     ///
@@ -979,21 +980,48 @@ impl BondValuator {
     /// # Errors
     ///
     /// Propagates tree backward-induction validation failures.
-    pub(crate) fn price_with_hw_tree(&self, hw_tree: &HullWhiteTree, oas_bp: f64) -> Result<f64> {
+    pub(crate) fn price_with_hw_tree(
+        &self,
+        hw_tree: &HullWhiteTree,
+        oas_bp: f64,
+        oas_compounding: Compounding,
+    ) -> Result<f64> {
         let final_step = hw_tree.num_steps();
         let comp = hw_tree.config().compounding;
         let oas_rate = oas_bp / 10_000.0;
 
-        let terminal_cf = self.terminal_value(final_step, oas_rate);
-        let terminal_values = vec![terminal_cf; hw_tree.num_nodes(final_step)];
+        if oas_compounding == Compounding::Continuous {
+            let terminal_cf = self.terminal_value(final_step, oas_rate);
+            let terminal_values = vec![terminal_cf; hw_tree.num_nodes(final_step)];
 
-        hw_tree.backward_induction(&terminal_values, |step, _node_idx, continuation| {
-            // The HW tree's backward_induction already discounts by the short
-            // rate r(step, node). Apply the OAS as additional discounting
-            // over this step's (possibly non-uniform) interval.
-            let oas_adjusted = continuation * comp.tree_df(oas_rate, hw_tree.dt_at_step(step));
+            return hw_tree.backward_induction(
+                &terminal_values,
+                |step, _node_idx, continuation| {
+                    // The HW tree's backward_induction already discounts by the
+                    // short rate r(step, node). Apply the OAS as additional
+                    // discounting over this step's (possibly non-uniform) interval.
+                    let oas_adjusted =
+                        continuation * comp.tree_df(oas_rate, hw_tree.dt_at_step(step));
 
-            self.cashflow_at_oas(step, oas_rate) + self.apply_exercise(step, oas_adjusted)
+                    self.cashflow_at_oas(step, oas_rate) + self.apply_exercise(step, oas_adjusted)
+                },
+            );
+        }
+
+        // A periodic OAS is added to each node's short rate on its own
+        // compounding, so the continuous shift differs node by node.
+        let node_shift = |step: usize, node_idx: usize| -> f64 {
+            let dt = hw_tree.dt_at_step(step.min(final_step.saturating_sub(1)));
+            let continuous = comp.tree_to_continuous(hw_tree.rate_at_node(step, node_idx), dt);
+            oas_compounding.continuous_spread_shift(continuous, oas_rate)
+        };
+        let terminal_values: Vec<f64> = (0..hw_tree.num_nodes(final_step))
+            .map(|node_idx| self.terminal_value(final_step, node_shift(final_step, node_idx)))
+            .collect();
+        hw_tree.backward_induction(&terminal_values, |step, node_idx, continuation| {
+            let shift = node_shift(step, node_idx);
+            let oas_adjusted = continuation * (-shift * hw_tree.dt_at_step(step)).exp();
+            self.cashflow_at_oas(step, shift) + self.apply_exercise(step, oas_adjusted)
         })
     }
 
@@ -1003,12 +1031,13 @@ impl BondValuator {
     /// rollback required for stochastic factors while preserving the same
     /// risky-continuation, FRP recovery, exercise, and payment ordering.
     ///
-    /// `oas_bp` is a continuously compounded spread in basis points, matching
-    /// the internal quote conversion used by [`TreePricer`].
+    /// `oas_bp` is a spread in basis points on `oas_compounding`, added to
+    /// each interval's short rate on that basis.
     pub(crate) fn price_deterministic_rates_credit(
         &self,
         tree: &RatesCreditTree,
         oas_bp: f64,
+        oas_compounding: Compounding,
     ) -> Result<f64> {
         if tree.get_config().rate_vol != 0.0 || tree.get_config().hazard_vol != 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -1040,18 +1069,27 @@ impl BondValuator {
         let last = tree_times.len() - 1;
         let oas_rate = oas_bp / 10_000.0;
         let recovery_rate = tree.recovery_rate().clamp(0.0, 1.0);
-        let mut value = self.terminal_value(last, oas_rate);
+        let terminal_rate = if last > 0 {
+            tree.rate_at_node(last - 1, 0)?
+        } else {
+            0.0
+        };
+        let mut value = self.terminal_value(
+            last,
+            oas_compounding.continuous_spread_shift(terminal_rate, oas_rate),
+        );
 
         for step in (0..last).rev() {
             let dt = tree_times[step + 1] - tree_times[step];
             let short_rate = tree.rate_at_node(step, 0)?;
+            let oas_shift = oas_compounding.continuous_spread_shift(short_rate, oas_rate);
             let hazard = tree.hazard_at_node(step, 0)?.max(0.0);
-            let interval_discount = (-(short_rate + oas_rate) * dt).exp();
+            let interval_discount = (-(short_rate + oas_shift) * dt).exp();
             let survival = (-hazard * dt).exp();
             let recovery_weight = continuous_frp_weight(interval_discount, survival)?;
             let recovery = recovery_rate * self.outstanding_principal_at(step) * recovery_weight;
             let risky_continuation = survival * interval_discount * value + recovery;
-            value = self.cashflow_at_oas(step, oas_rate)
+            value = self.cashflow_at_oas(step, oas_shift)
                 + self.apply_exercise(step, risky_continuation);
         }
 
@@ -1062,7 +1100,14 @@ impl BondValuator {
     /// build this valuator. This is the zero-short-rate-volatility limit of the
     /// risk-free tree and avoids inventing volatility merely to satisfy a
     /// stochastic tree constructor.
-    pub(crate) fn price_deterministic_discount_curve(&self, oas_bp: f64) -> Result<f64> {
+    ///
+    /// `oas_bp` is a spread in basis points on `oas_compounding`, added to
+    /// each step's forward rate on that basis.
+    pub(crate) fn price_deterministic_discount_curve(
+        &self,
+        oas_bp: f64,
+        oas_compounding: Compounding,
+    ) -> Result<f64> {
         if !oas_bp.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "deterministic bond OAS must be finite, got {oas_bp}"
@@ -1076,8 +1121,9 @@ impl BondValuator {
 
         let last = self.time_steps.len() - 1;
         let oas_rate = oas_bp / 10_000.0;
-        let mut value = self.terminal_value(last, oas_rate);
-        for step in (0..last).rev() {
+        // Continuous OAS shift over the step starting at `step`: the spread is
+        // added to that step's forward rate on the quote compounding.
+        let step_shift = |step: usize| -> Result<(f64, f64, f64)> {
             let current_df = self.step_discount_factors[step];
             let next_df = self.step_discount_factors[step + 1];
             if !current_df.is_finite()
@@ -1090,9 +1136,25 @@ impl BondValuator {
                 )));
             }
             let dt = self.time_steps[step + 1] - self.time_steps[step];
-            let interval_df = next_df / current_df * (-oas_rate * dt).exp();
-            value = self.cashflow_at_oas(step, oas_rate)
-                + self.apply_exercise(step, interval_df * value);
+            let step_df = next_df / current_df;
+            let shift = if oas_compounding == Compounding::Continuous || dt <= 0.0 {
+                oas_rate
+            } else {
+                oas_compounding.continuous_spread_shift(-step_df.ln() / dt, oas_rate)
+            };
+            Ok((step_df, dt, shift))
+        };
+        let terminal_shift = if last > 0 {
+            step_shift(last - 1)?.2
+        } else {
+            oas_compounding.continuous_spread_shift(0.0, oas_rate)
+        };
+        let mut value = self.terminal_value(last, terminal_shift);
+        for step in (0..last).rev() {
+            let (step_df, dt, shift) = step_shift(step)?;
+            let interval_df = step_df * (-shift * dt).exp();
+            value =
+                self.cashflow_at_oas(step, shift) + self.apply_exercise(step, interval_df * value);
         }
         Ok(value)
     }
@@ -1300,7 +1362,7 @@ mod tests {
         .expect("calibration");
 
         let actual = valuator
-            .price_deterministic_rates_credit(&tree, 0.0)
+            .price_deterministic_rates_credit(&tree, 0.0, Compounding::Continuous)
             .expect("scalar price");
         let recovery =
             0.4 * 100.0 * continuous_frp_weight(discount, survival).expect("recovery weight");
@@ -1536,7 +1598,7 @@ mod tests {
         assert_eq!(valuator.outstanding_principal_vec[0], 800.0);
         assert_eq!(valuator.call_vec[0], Some(720.0));
         let price = valuator
-            .price_deterministic_discount_curve(0.0)
+            .price_deterministic_discount_curve(0.0, Compounding::Continuous)
             .expect("price");
         assert_eq!(price, 970.0);
     }

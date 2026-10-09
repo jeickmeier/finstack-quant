@@ -76,29 +76,6 @@ pub enum VolSurfaceExtrapolation {
 const OAS_QUOTE_COMPOUNDING_PATH: &str =
     "instrument_pricing_overrides.model_config.oas_quote_compounding";
 
-/// Convert a quoted OAS in decimal form to the internal continuous convention.
-///
-/// # Arguments
-///
-/// * `compounding` - OAS quote basis from `model_config.oas_quote_compounding`;
-///   only `continuous` (the tree's internal short-rate shift) and
-///   `{"periodic": 2}` (semiannual bond-equivalent) are supported.
-/// * `spread` - Quoted OAS as a decimal (0.01 = 100bp).
-///
-/// # Errors
-///
-/// Returns a validation error for any other compounding basis.
-pub(crate) fn oas_continuous_from_quote_decimal(
-    compounding: Compounding,
-    spread: f64,
-) -> finstack_quant_core::Result<f64> {
-    validate_oas_quote_compounding(compounding)?;
-    Ok(match compounding {
-        Compounding::Continuous => spread,
-        _ => 2.0 * (1.0 + spread / 2.0).ln(),
-    })
-}
-
 /// Reject OAS quote bases other than continuous and semiannual.
 fn validate_oas_quote_compounding(compounding: Compounding) -> finstack_quant_core::Result<()> {
     if compounding == Compounding::Continuous || compounding == Compounding::SEMI_ANNUAL {
@@ -107,18 +84,6 @@ fn validate_oas_quote_compounding(compounding: Compounding) -> finstack_quant_co
     Err(finstack_quant_core::Error::Validation(format!(
         "{OAS_QUOTE_COMPOUNDING_PATH} must be \"continuous\" or {{\"periodic\": 2}}, got {compounding}"
     )))
-}
-
-/// Price/accrual convention used for OAS inversion targets.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum OasPriceBasis {
-    /// Target the full settlement dirty price.
-    #[default]
-    SettlementDirty,
-    /// Target clean price plus only the forward accrued amount from valuation to settlement.
-    ForwardAccruedClean,
 }
 
 // Shared numeric validation helper
@@ -628,11 +593,12 @@ pub struct ModelConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asw_forward_curve_id: Option<CurveId>,
     /// Quote compounding convention for OAS inputs and outputs.
+    ///
+    /// The OAS is added to each short rate on this basis: a semiannual
+    /// (`{"periodic": 2}`) OAS discounts at `1 + (z + oas) / 2` per half
+    /// year, the bond-equivalent convention of the Bloomberg OAS screen.
     #[serde(default)]
     pub oas_quote_compounding: Compounding,
-    /// Price/accrual target convention for OAS inversion.
-    #[serde(default)]
-    pub oas_price_basis: OasPriceBasis,
     /// Optional independent-estimator count for Monte Carlo pricers.
     ///
     /// When set, overrides the selected pricer's default simulation size.

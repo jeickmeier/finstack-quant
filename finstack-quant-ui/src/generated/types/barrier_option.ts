@@ -887,11 +887,11 @@ export interface D_572Ad1Befb7D94914652 {
    */
   merton_mc_config?: DBffef9E684Ff0C351C83 | null;
   /**
-   * Price/accrual target convention for OAS inversion.
-   */
-  oas_price_basis?: "settlement_dirty" | "forward_accrued_clean";
-  /**
    * Quote compounding convention for OAS inputs and outputs.
+   *
+   * The OAS is added to each short rate on this basis: a semiannual
+   * (`{"periodic": 2}`) OAS discounts at `1 + (z + oas) / 2` per half
+   * year, the bond-equivalent convention of the Bloomberg OAS screen.
    */
   oas_quote_compounding?:
     | "continuous"

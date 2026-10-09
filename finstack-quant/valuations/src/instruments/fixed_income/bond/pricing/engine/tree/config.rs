@@ -1,7 +1,6 @@
 //! Pricing-engine components for fixed-income bonds.
 //!
 use super::super::super::super::types::Bond;
-use crate::instruments::pricing_overrides::OasPriceBasis;
 use crate::instruments::rates::hw1f::{resolve_hw1f_params, Hw1fParamFamily};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::Compounding;
@@ -191,8 +190,6 @@ pub struct TreePricerConfig {
     pub tree_discount_curve_id: Option<CurveId>,
     /// Quote convention used for OAS inputs and outputs.
     pub oas_quote_compounding: Compounding,
-    /// Price/accrual target convention for OAS inversion.
-    pub oas_price_basis: OasPriceBasis,
     /// Per-node compounding convention for the short-rate tree.
     pub tree_compounding: Compounding,
 }
@@ -212,7 +209,6 @@ impl Default for TreePricerConfig {
             tree_model: TreeModelChoice::default(),
             tree_discount_curve_id: None,
             oas_quote_compounding: Compounding::Continuous,
-            oas_price_basis: OasPriceBasis::SettlementDirty,
             tree_compounding: Compounding::default(),
         }
     }
@@ -449,7 +445,6 @@ fn tree_config_with_model(bond: &Bond, tree_model: TreeModelChoice) -> TreePrice
         tree_model,
         tree_discount_curve_id: model.tree_discount_curve_id.clone(),
         oas_quote_compounding: model.oas_quote_compounding,
-        oas_price_basis: model.oas_price_basis,
         tree_compounding,
     }
 }

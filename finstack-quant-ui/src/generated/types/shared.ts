@@ -16199,13 +16199,6 @@ export type DA561434Dff1275F40D83 =
  */
 export type DAe5D75Ed4E313Ae3Bc25 = "z_spread" | "ytm" | "implied_vol" | "base_correlation" | "oas";
 /**
- * Price/accrual convention used for OAS inversion targets.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_af1cbfbbe87bff81e3b3".
- */
-export type DAf1Cbfbbe87Bff81E3B3 = "settlement_dirty" | "forward_accrued_clean";
-/**
  * Exact decimal encoded only as a JSON string.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -17590,11 +17583,11 @@ export interface D_572Ad1Befb7D94914652 {
    */
   merton_mc_config?: DBffef9E684Ff0C351C83 | null;
   /**
-   * Price/accrual target convention for OAS inversion.
-   */
-  oas_price_basis?: "settlement_dirty" | "forward_accrued_clean";
-  /**
    * Quote compounding convention for OAS inputs and outputs.
+   *
+   * The OAS is added to each short rate on this basis: a semiannual
+   * (`{"periodic": 2}`) OAS discounts at `1 + (z + oas) / 2` per half
+   * year, the bond-equivalent convention of the Bloomberg OAS screen.
    */
   oas_quote_compounding?:
     | "continuous"
@@ -58140,11 +58133,11 @@ export interface D_572Ad1Befb7D949146521 {
    */
   merton_mc_config?: DBffef9E684Ff0C351C83 | null;
   /**
-   * Price/accrual target convention for OAS inversion.
-   */
-  oas_price_basis?: "settlement_dirty" | "forward_accrued_clean";
-  /**
    * Quote compounding convention for OAS inputs and outputs.
+   *
+   * The OAS is added to each short rate on this basis: a semiannual
+   * (`{"periodic": 2}`) OAS discounts at `1 + (z + oas) / 2` per half
+   * year, the bond-equivalent convention of the Bloomberg OAS screen.
    */
   oas_quote_compounding?:
     | "continuous"

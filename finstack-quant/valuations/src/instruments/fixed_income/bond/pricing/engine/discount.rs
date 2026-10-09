@@ -78,13 +78,10 @@ impl BondEngine {
                 "discounting OAS must be finite, got {oas_quote_decimal}"
             )));
         }
-        let continuous_oas =
-            crate::instruments::pricing_overrides::oas_continuous_from_quote_decimal(
-                bond.instrument_pricing_overrides
-                    .model_config
-                    .oas_quote_compounding,
-                oas_quote_decimal,
-            )?;
+        let compounding = bond
+            .instrument_pricing_overrides
+            .model_config
+            .oas_quote_compounding;
         let flows = bond.pricing_dated_cashflows(context, as_of)?;
         let discount = context.get_discount(bond.discount_curve_id.as_str())?;
         let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::default();
@@ -94,11 +91,15 @@ impl BondEngine {
                 date,
                 finstack_quant_core::dates::DayCountContext::default(),
             )?;
-            pv.add(
-                amount.amount()
-                    * discount.df_between_dates(as_of, date)?
-                    * (-continuous_oas * time).exp(),
-            );
+            // The spread is added to the zero rate to each cashflow date on
+            // the quote compounding.
+            let curve_df = discount.df_between_dates(as_of, date)?;
+            let oas_shift = if time > 0.0 && curve_df > 0.0 {
+                compounding.continuous_spread_shift(-curve_df.ln() / time, oas_quote_decimal)
+            } else {
+                compounding.continuous_spread_shift(0.0, oas_quote_decimal)
+            };
+            pv.add(amount.amount() * curve_df * (-oas_shift * time).exp());
         }
         Ok(pv.total())
     }

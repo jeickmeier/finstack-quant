@@ -41,18 +41,7 @@ pub(crate) fn oas_decimal_from_quote_overrides(
             context.curves.as_ref(),
             context.as_of,
         )?;
-    let dirty_target_at_quote = match config.oas_price_basis {
-        crate::instruments::pricing_overrides::OasPriceBasis::SettlementDirty => dirty_at_quote,
-        crate::instruments::pricing_overrides::OasPriceBasis::ForwardAccruedClean => {
-            let schedule = bond.full_cashflow_schedule(context.curves.as_ref())?;
-            let accrued_at_as_of = crate::cashflow::accrual::accrued_interest_amount(
-                &schedule,
-                context.as_of,
-                &bond.accrual_config(),
-            )?;
-            dirty_at_quote - accrued_at_as_of
-        }
-    };
+    let dirty_target_at_quote = dirty_at_quote;
     let mut trial_template = bond.clone();
     crate::instruments::fixed_income::bond::pricing::quote_conversions::clear_price_driving_overrides(
         &mut trial_template,

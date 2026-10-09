@@ -1,3 +1,4 @@
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::{Error, Result};
 
 use crate::trees::tree_framework::{
@@ -11,33 +12,41 @@ impl ShortRateTree {
     /// Backward induction over the Black-Karasinski trinomial lattice.
     ///
     /// Honors the per-node transition probabilities, the Hull & White edge
-    /// branch switching, and the configured per-node compounding. OAS is an
-    /// independently compounded continuous spread, so periodic node-rate
-    /// conventions do not distort its discount factor.
+    /// branch switching, and the configured per-node compounding. The OAS is
+    /// added to each node rate on `oas_compounding` and applied as that
+    /// node's continuous shift.
     fn price_bk_trinomial<V: TreeValuator>(
         &self,
         lattice: &BkTrinomialLattice,
         oas_bp: f64,
+        oas_compounding: Compounding,
         valuator: &V,
     ) -> Result<f64> {
         let steps = self.config.steps;
         let dt = self.time_steps[1] - self.time_steps[0];
         let comp = self.config.compounding;
-        let oas_shift = oas_bp / 10_000.0;
+        let oas = oas_bp / 10_000.0;
         let j_max = lattice.j_max;
+        let oas_shift_at = |rate: f64| -> f64 {
+            oas_compounding.continuous_spread_shift(comp.tree_to_continuous(rate, dt), oas)
+        };
 
-        let state_for = |step: usize, rate: f64| -> NodeState {
+        let state_for = |step: usize, rate: f64, oas_shift: f64| -> NodeState {
             NodeState {
                 step,
-                oas_bp,
-                interest_rate: Some(rate),
+                oas_bp: if oas_compounding == Compounding::Continuous {
+                    oas_bp
+                } else {
+                    oas_shift * 10_000.0
+                },
+                interest_rate: Some(rate + oas_shift),
                 ..NodeState::default()
             }
         };
 
         let mut values: Vec<f64> = Vec::with_capacity(self.rates[steps].len());
         for &r in self.rates[steps].iter() {
-            let state = state_for(steps, r + oas_shift);
+            let state = state_for(steps, r, oas_shift_at(r));
             values.push(valuator.value_at_maturity(&state)?);
         }
 
@@ -69,8 +78,9 @@ impl ShortRateTree {
                 }
 
                 let r = self.rates[step][j];
+                let oas_shift = oas_shift_at(r);
                 let continuation = expected_value * comp.tree_df(r, dt) * (-oas_shift * dt).exp();
-                let state = state_for(step, r + oas_shift);
+                let state = state_for(step, r, oas_shift);
                 scratch.push(valuator.value_at_node(&state, continuation, dt)?);
             }
             std::mem::swap(&mut values, &mut scratch);
@@ -83,7 +93,8 @@ impl ShortRateTree {
 }
 
 impl ShortRateTree {
-    /// Price an instrument by backward induction over the calibrated lattice.
+    /// Price an instrument by backward induction over the calibrated lattice
+    /// with a continuously compounded option-adjusted spread.
     ///
     /// Works for every [`ShortRateModel`]: Ho-Lee and Black-Derman-Toy roll
     /// back on the binomial lattice, Black-Karasinski on its trinomial one.
@@ -104,6 +115,38 @@ impl ShortRateTree {
     /// lattice is inconsistent with its configuration, or the valuator fails.
     #[must_use = "pricing result should not be discarded"]
     pub fn price<V: TreeValuator>(&self, oas_bp: f64, valuator: &V) -> Result<f64> {
+        self.price_with_oas_compounding(oas_bp, Compounding::Continuous, valuator)
+    }
+
+    /// Price an instrument by backward induction with an option-adjusted
+    /// spread quoted on `oas_compounding`.
+    ///
+    /// The spread is added to each node's short rate restated on
+    /// `oas_compounding` (see [`Compounding::continuous_spread_shift`]), so
+    /// a semiannual bond-equivalent OAS discounts each node at
+    /// `1 + (z + oas) / 2` per half year. The valuator receives the node's
+    /// continuous shift as [`NodeState::oas_bp`].
+    ///
+    /// # Arguments
+    ///
+    /// * `oas_bp` - Option-adjusted spread in basis points on
+    ///   `oas_compounding`. Zero prices on the calibrated curve.
+    /// * `oas_compounding` - Compounding basis of `oas_bp`;
+    ///   [`Compounding::Continuous`] reproduces [`Self::price`].
+    /// * `valuator` - Instrument payoff and exercise logic applied at each
+    ///   node.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the tree has not been calibrated, its stored
+    /// lattice is inconsistent with its configuration, or the valuator fails.
+    #[must_use = "pricing result should not be discarded"]
+    pub fn price_with_oas_compounding<V: TreeValuator>(
+        &self,
+        oas_bp: f64,
+        oas_compounding: Compounding,
+        valuator: &V,
+    ) -> Result<f64> {
         if self.rates.is_empty() {
             tracing::debug!("ShortRateTree::price called before calibration (rates is empty)");
             return Err(Error::internal(
@@ -124,7 +167,7 @@ impl ShortRateTree {
             let lattice = self.bk_trinomial.as_ref().ok_or_else(|| {
                 Error::internal("Black-Karasinski tree has no calibrated trinomial lattice")
             })?;
-            return self.price_bk_trinomial(lattice, oas_bp, valuator);
+            return self.price_bk_trinomial(lattice, oas_bp, oas_compounding, valuator);
         }
 
         // Clone rates (cheap Arc clone) to avoid lifetime issues with closures
@@ -148,7 +191,26 @@ impl ShortRateTree {
                 } else {
                     return 0.0;
                 };
-                compounding.tree_to_continuous(r, dt_pricing) + oas_bp / 10000.0
+                let continuous = compounding.tree_to_continuous(r, dt_pricing);
+                continuous + oas_compounding.continuous_spread_shift(continuous, oas_bp / 10_000.0)
+            });
+        let rates_clone3 = std::sync::Arc::clone(&self.rates);
+        let node_oas_bp: Box<dyn Fn(usize, usize) -> f64> =
+            Box::new(move |step: usize, node: usize| -> f64 {
+                let r = if step < rates_clone3.len() && node < rates_clone3[step].len() {
+                    rates_clone3[step][node]
+                } else {
+                    return oas_bp;
+                };
+                // A continuous spread is the same at every node; hand the
+                // quoted value through unchanged rather than round-tripping it.
+                if oas_compounding == Compounding::Continuous {
+                    return oas_bp;
+                }
+                oas_compounding.continuous_spread_shift(
+                    compounding.tree_to_continuous(r, dt_pricing),
+                    oas_bp / 10_000.0,
+                ) * 10_000.0
             });
 
         // Ho-Lee and binomial BDT lattices are calibrated with equal
@@ -162,7 +224,7 @@ impl ShortRateTree {
             lattice: RecombiningLattice::ShortRate {
                 node_rate: &*state_gen,
                 discount_rate: &*rate_gen,
-                oas_bp,
+                oas_bp: &*node_oas_bp,
             },
         })
     }

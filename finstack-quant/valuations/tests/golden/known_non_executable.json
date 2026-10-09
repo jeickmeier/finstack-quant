@@ -3,12 +3,12 @@
   "fixtures": [
     {
       "path": "pricing/bloomberg/bond/bhccn_10_2032_callable_bloomberg.json",
-      "description": "BHCCN Bloomberg proprietary-tree benchmark gap",
+      "description": "BHCCN Bloomberg option-free price gap",
       "metrics": [
         {
           "metric": "embedded_option_value",
-          "reason": "The Bloomberg proprietary callable-tree option value cannot be reconciled by widening the source-backed tolerance.",
-          "evidence": "With the straight leg valued on the same BDT lattice as the callable (model_config.bdt_sigma), Finstack option value is -18312.684639 versus Bloomberg -19800.00, a 7.5% proprietary-tree model gap, while OAS remains within the established 3bp convention tolerance."
+          "reason": "The residual is in the option-free leg, not the call valuation: about half comes from interpolating the S23 curve between its 5Y and 7Y pillars (flat-forward here, linear in yield reproduces Bloomberg's reported spread), the rest is not identified.",
+          "evidence": "With the semiannual OAS added to each lattice rate and solved on the settlement dirty price, OAS is 4.7695% versus Bloomberg 4.771% and the option value is -19500.82 versus Bloomberg -19800.00 (1.5%). At Bloomberg's OAS the callable bond prices at 103.392 versus the 103.3975 market, and the option-free bond at 105.341 versus the 105.382 implied by Bloomberg's 8.815% option-free yield."
         }
       ]
     },

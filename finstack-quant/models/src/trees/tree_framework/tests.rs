@@ -69,10 +69,11 @@ fn spot_lattice_hands_spot_and_flat_rate_to_the_valuator() {
 fn short_rate_lattice_hands_node_rate_and_oas_to_the_valuator() {
     let node_rate = |step: usize, node: usize| 0.01 * (step + node) as f64;
     let discount_rate = |_step: usize, _node: usize| 0.0;
+    let oas_bp = |_step: usize, _node: usize| 125.0;
     let seen = StateProbe::price(RecombiningLattice::ShortRate {
         node_rate: &node_rate,
         discount_rate: &discount_rate,
-        oas_bp: 125.0,
+        oas_bp: &oas_bp,
     });
     let node = |step: usize, rate: f64| NodeState {
         step,

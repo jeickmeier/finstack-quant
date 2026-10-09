@@ -28,9 +28,9 @@ pub enum RecombiningLattice<'a> {
         /// Continuously compounded discounting rate at `(step, node)`,
         /// including any option-adjusted spread
         discount_rate: &'a dyn Fn(usize, usize) -> f64,
-        /// Option-adjusted spread in basis points, passed to the valuator as
-        /// [`NodeState::oas_bp`]
-        oas_bp: f64,
+        /// Continuously compounded option-adjusted spread in basis points at
+        /// `(step, node)`, passed to the valuator as [`NodeState::oas_bp`]
+        oas_bp: &'a dyn Fn(usize, usize) -> f64,
     },
 }
 
@@ -85,7 +85,7 @@ pub fn price_recombining_tree<V: TreeValuator>(inputs: RecombiningInputs<'_, V>)
         }
     };
 
-    let state_for = |step: usize, node_value: f64| -> NodeState {
+    let state_for = |step: usize, node: usize, node_value: f64| -> NodeState {
         match inputs.lattice {
             RecombiningLattice::Spot { interest_rate, .. } => NodeState {
                 step,
@@ -95,7 +95,7 @@ pub fn price_recombining_tree<V: TreeValuator>(inputs: RecombiningInputs<'_, V>)
             },
             RecombiningLattice::ShortRate { oas_bp, .. } => NodeState {
                 step,
-                oas_bp,
+                oas_bp: oas_bp(step, node),
                 interest_rate: Some(node_value),
                 ..NodeState::default()
             },
@@ -131,8 +131,8 @@ pub fn price_recombining_tree<V: TreeValuator>(inputs: RecombiningInputs<'_, V>)
     let mut level = Vec::with_capacity(inputs.steps + 1);
     level_values(inputs.steps, &mut level);
     let mut values = Vec::with_capacity(inputs.steps + 1);
-    for &node_value in &level {
-        let terminal_state = state_for(inputs.steps, node_value);
+    for (i, &node_value) in level.iter().enumerate() {
+        let terminal_state = state_for(inputs.steps, i, node_value);
         values.push(inputs.valuator.value_at_maturity(&terminal_state)?);
     }
 
@@ -141,7 +141,7 @@ pub fn price_recombining_tree<V: TreeValuator>(inputs: RecombiningInputs<'_, V>)
         for (i, &node_value) in level.iter().enumerate() {
             let continuation =
                 get_df(step, i) * (inputs.prob_up * values[i + 1] + inputs.prob_down * values[i]);
-            let node_state = state_for(step, node_value);
+            let node_state = state_for(step, i, node_value);
             values[i] = inputs
                 .valuator
                 .value_at_node(&node_state, continuation, dt)?;

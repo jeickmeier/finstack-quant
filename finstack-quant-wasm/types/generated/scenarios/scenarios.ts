@@ -612,10 +612,6 @@ export type ThresholdDirection = "above" | "below";
  */
 export type CreditStateVariable = "hazard_rate" | "distance_to_default" | "leverage";
 /**
- * Price/accrual convention used for OAS inversion targets.
- */
-export type OasPriceBasis = "settlement_dirty" | "forward_accrued_clean";
-/**
  * Compounding convention for interest rates.
  *
  * Used to specify how interest rates should be quoted or converted.
@@ -5686,11 +5682,11 @@ export interface ModelConfig {
    */
   merton_mc_config?: MertonMcOverride | null;
   /**
-   * Price/accrual target convention for OAS inversion.
-   */
-  oas_price_basis?: OasPriceBasis;
-  /**
    * Quote compounding convention for OAS inputs and outputs.
+   *
+   * The OAS is added to each short rate on this basis: a semiannual
+   * (`{"periodic": 2}`) OAS discounts at `1 + (z + oas) / 2` per half
+   * year, the bond-equivalent convention of the Bloomberg OAS screen.
    */
   oas_quote_compounding?: Compounding;
   /**

@@ -1553,8 +1553,7 @@
             "tree_discount_curve_id": "USD-OAS-S23",
             "oas_quote_compounding": {
               "periodic": 2
-            },
-            "oas_price_basis": "forward_accrued_clean"
+            }
           }
         },
         "call_put": {
@@ -1663,7 +1662,7 @@
     },
     "oas": {
       "abs": 0.0003,
-      "tolerance_reason": "Bloomberg OAS screen is source-backed; tolerance matches the semiannual OAS quote convention. The 2026-06 moderate-fix pass (signed-residual OAS tree solver, hazard-curve opt-in, strict post-as_of cashflow convention) moved the computed OAS to 47.48bp versus the 47.71bp screen; a 3bp band admits this documented convention residual."
+      "tolerance_reason": "Bloomberg OAS screen is source-backed and quoted semiannually. The OAS is added to each lattice short rate on a semiannual basis and solved against the settlement dirty price; the computed 47.69bp is 0.15bp from the 47.71bp screen. The 3bp band is retained from the earlier convention."
     },
     "asw_market": {
       "abs": 0.0001,
@@ -1687,7 +1686,7 @@
     },
     "embedded_option_value": {
       "abs": 10.0,
-      "tolerance_reason": "Bloomberg option value is source-backed; residual gap (~14%) is inherent to BDT model differences (step alignment, calibration details) vs Bloomberg's proprietary lognormal tree while OAS matches within 1bp."
+      "tolerance_reason": "Bloomberg option value is source-backed and displayed to 0.01 price points (50 on 1MM face). Finstack is -19500.82 versus -19800: the callable leg reprices the market, and the option-free leg is 105.341 versus the 105.382 implied by Bloomberg's 8.815% option-free yield."
     },
     "vega": {
       "abs": 0.02,

@@ -647,20 +647,35 @@ impl OasPricer<'_> {
     ///
     /// # Arguments
     ///
-    /// * `oas_bp` - OAS in basis points on the configured quote compounding;
-    ///   it is converted to a continuous shift of the short rate.
+    /// * `oas_bp` - OAS in basis points on the configured quote compounding.
+    ///   It is added to each lattice node's short rate on that basis, so a
+    ///   semiannual OAS discounts at `1 + (z + oas) / 2` per half year.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for a periodic OAS quote on the stochastic
+    /// rates-credit lattice or its LSMC variant, which apply the spread as a
+    /// single continuous shift.
     pub(crate) fn price(&self, oas_bp: f64) -> Result<TreePriceOutcome> {
-        let oas = crate::instruments::pricing_overrides::oas_continuous_from_quote_decimal(
-            self.quote_compounding,
-            oas_bp / 10_000.0,
-        )? * 10_000.0;
+        let compounding = self.quote_compounding;
+        let continuous_only = |model: &str| -> Result<f64> {
+            if compounding == finstack_quant_core::math::Compounding::Continuous {
+                Ok(oas_bp)
+            } else {
+                Err(Error::Validation(format!(
+                    "a {compounding} OAS quote is not supported by the {model} model; \
+                     quote the OAS as continuous or use a rates-only short-rate tree"
+                )))
+            }
+        };
         let amount = match &self.model {
             PreparedTree::Zero => 0.0,
             PreparedTree::Deterministic(valuator) => {
-                valuator.price_deterministic_discount_curve(oas)?
+                valuator.price_deterministic_discount_curve(oas_bp, compounding)?
             }
             PreparedTree::RatesCreditLsmc(tree) => {
-                let config = BondLsmcConfig::for_bond(&self.bond, oas)?;
+                let config =
+                    BondLsmcConfig::for_bond(&self.bond, continuous_only("rates-credit LSMC")?)?;
                 let lsmc = price_bond_lsmc(tree, &self.bond, self.market, self.as_of, &config)?;
                 return Ok(TreePriceOutcome {
                     amount: lsmc.estimate.mean.amount(),
@@ -668,10 +683,14 @@ impl OasPricer<'_> {
                 });
             }
             PreparedTree::RatesCredit(tree, valuator) => {
-                valuator.price_deterministic_rates_credit(tree, oas)?
+                valuator.price_deterministic_rates_credit(tree, oas_bp, compounding)?
             }
-            PreparedTree::HullWhite(tree, valuator) => valuator.price_with_hw_tree(tree, oas)?,
-            PreparedTree::ShortRate { tree, valuator } => tree.price(oas, valuator)?,
+            PreparedTree::HullWhite(tree, valuator) => {
+                valuator.price_with_hw_tree(tree, oas_bp, compounding)?
+            }
+            PreparedTree::ShortRate { tree, valuator } => {
+                tree.price_with_oas_compounding(oas_bp, compounding, valuator)?
+            }
         };
         Ok(TreePriceOutcome::deterministic(amount))
     }

@@ -887,15 +887,10 @@
           ],
           "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (at `instrument_pricing_overrides.model_config.merton_mc_config`\nor via the Rust builder), the `MertonMc` pricer in the registry uses this\nmodel and grid; the path count, antithetic flag and seed label come from\n`mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config."
         },
-        "oas_price_basis": {
-          "$ref": "#/$defs/d_af1cbfbbe87bff81e3b3",
-          "default": "settlement_dirty",
-          "description": "Price/accrual target convention for OAS inversion."
-        },
         "oas_quote_compounding": {
           "$ref": "#/$defs/d_5c13df5a55f1da604df2",
           "default": "continuous",
-          "description": "Quote compounding convention for OAS inputs and outputs."
+          "description": "Quote compounding convention for OAS inputs and outputs.\n\nThe OAS is added to each short rate on this basis: a semiannual\n(`{\"periodic\": 2}`) OAS discounts at `1 + (z + oas) / 2` per half\nyear, the bond-equivalent convention of the Bloomberg OAS screen."
         },
         "rate_credit_correlation": {
           "description": "Instantaneous correlation between the short-rate and hazard-rate\nshocks on the rates-credit lattice, in `[-1, 1]`.\n\n`None` and `0.0` both mean independent factors. A non-zero value is\nonly meaningful when **both** factor volatilities are positive;\notherwise it is rejected as an inert input rather than ignored.\nRequires `credit_curve_id`.\n\nFeasibility depends on the mean-reversion settings — see\n[`Self::hazard_mean_reversion`].",
@@ -1411,21 +1406,6 @@
         {
           "const": "oas",
           "description": "OAS breakeven, in **basis points** (sensitivity: CS01).\n\nNote that under [`BreakevenMode::Iterative`] the solve applies a\nparallel discount-curve shift. For an instrument with embedded\noptionality that is a duration-space answer, not a true OAS shift,\nbecause OAS is defined relative to the option model.",
-          "type": "string"
-        }
-      ]
-    },
-    "d_af1cbfbbe87bff81e3b3": {
-      "description": "Price/accrual convention used for OAS inversion targets.",
-      "oneOf": [
-        {
-          "const": "settlement_dirty",
-          "description": "Target the full settlement dirty price.",
-          "type": "string"
-        },
-        {
-          "const": "forward_accrued_clean",
-          "description": "Target clean price plus only the forward accrued amount from valuation to settlement.",
           "type": "string"
         }
       ]
