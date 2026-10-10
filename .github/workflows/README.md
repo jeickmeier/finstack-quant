@@ -23,6 +23,7 @@ upstream scan action).
 | `release.yml` | successful `Build` run on `master`; manual with `publish: true` | Builds wheels, sdist, and WASM packages, then cuts a GitHub Release. |
 | `ui-gallery.yml` | PRs touching `finstack-quant-ui/` or the docs-site gallery; manual; called by `registry-publish.yml` | Builds the WASM packages, then runs `ui-check`, `ui-docs-build`, `ui-e2e`, `ui-publish-check`, and the isolated `ui-install` consumer check. |
 | `registry-publish.yml` | manual | Reruns `ui-gallery.yml`, then on `master` deploys the component registry and gallery to GitHub Pages and verifies the published registry from an empty consumer. |
+
 ### build.yml
 
 `prime-cache` is a single-writer job that populates the mise cache; every other
