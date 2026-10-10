@@ -710,8 +710,13 @@ fn cube_convention_and_vol_lookups_are_bit_stable() {
     };
     use std::sync::Arc;
 
-    // (number of pinned values, FNV-1a style fold of their bit patterns)
-    const EXPECTED: (usize, u64) = (1044, 5_268_942_217_510_307_716);
+    // (number of pinned values, FNV-1a style fold of their bit patterns).
+    // SABR evaluation calls platform libm, so macOS and the Linux libm on
+    // GitHub Actions each have one fold. A third fold means a lookup moved.
+    const PINS: [(usize, u64); 2] = [
+        (1044, 5_268_942_217_510_307_716),
+        (1044, 11_059_714_388_996_499_812),
+    ];
     let nodes = |beta: f64, shift: Option<f64>| -> Vec<SabrParameterData> {
         [
             (0.030, -0.2, 0.4),
@@ -795,5 +800,9 @@ fn cube_convention_and_vol_lookups_are_bit_stable() {
     let fold = actual.iter().fold(0xcbf2_9ce4_8422_2325_u64, |hash, bits| {
         (hash ^ bits).wrapping_mul(0x0000_0100_0000_01b3)
     });
-    assert_eq!((actual.len(), fold), EXPECTED);
+    let got = (actual.len(), fold);
+    assert!(
+        PINS.contains(&got),
+        "vol-cube lookups moved off the macOS and Linux libm pins: {got:?}"
+    );
 }

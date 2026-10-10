@@ -2079,7 +2079,8 @@ mod tests {
     }
 
     /// Seeded GBM Asian convenience prices (mean and standard error) are
-    /// pinned bit for bit for calls and puts.
+    /// pinned for calls and puts. Platform libm yields one pattern on macOS
+    /// and another on the Linux libm used by GitHub Actions.
     #[test]
     fn gbm_asian_call_and_put_are_bit_stable() {
         const EXPECTED: &[u64] = &[
@@ -2186,6 +2187,47 @@ mod tests {
             actual.push(greeks.vega.mean.to_bits());
             actual.push(greeks.vega.stderr.to_bits());
         }
-        assert_eq!(actual, EXPECTED, "{actual:#x?}");
+        const LINUX: &[u64] = &[
+            0x40195cdbec2b01bf,
+            0x3fdc249afb33387a,
+            0x40176ee1abd3fb0f,
+            0x3fd593ce944bf326,
+            0x4027c98e1c4e20d5,
+            0x3fe31c6bc20af5c4,
+            0x40027bb6f761ef02,
+            0x3fcb758de16af18e,
+            0x3fff484575b19363,
+            0x3fd05d4dc80f367f,
+            0x402ec1b62a42dd34,
+            0x3fe04e9f5a5800d4,
+            0x401bd9967d816613,
+            0x3fce5f17b4811b73,
+            0x40155dfccc84298d,
+            0x3fc45f08a6f61ea8,
+            0x402a9e8a223bfe8b,
+            0x3fcbdb8abd307aed,
+            0x400061190e6e3a56,
+            0x3fc0720e85396db7,
+            0x3fff670343656928,
+            0x3fc56479aab3b6e9,
+            0x402d4a5a81aee856,
+            0x3fb5f30fcc19ac92,
+            0x4019f174aceea57e,
+            0x3fe50d0985e19da9,
+            0x3fe521515a7bdef2,
+            0x3fc142f4470e821b,
+            0x3fcebd9d3d2cc02e,
+            0x3fc5c2462919b2c4,
+            0x40143d71cec94890,
+            0x3fdb41a13d264d1e,
+            0xbfd3e8b6c02d1c01,
+            0x3facdadbb65e9911,
+            0x3f9cbc02b2a93ef6,
+            0x3fb4c48e3872a8e9,
+        ];
+        assert!(
+            actual.as_slice() == EXPECTED || actual.as_slice() == LINUX,
+            "GBM Asian prices moved off the macOS and Linux libm pins:\n{actual:#x?}"
+        );
     }
 }

@@ -726,13 +726,23 @@ mod tests {
 
     /// Exact bit patterns of the barrier PDE pricer (continuous and discrete
     /// monitoring), captured before the `TimeStepper` trait was replaced by
-    /// the concrete `ThetaStepper`.
+    /// the concrete `ThetaStepper`. macOS and the Linux libm on GitHub
+    /// Actions each have one pattern.
     #[rustfmt::skip]
     const BARRIER_PDE_PIN: &[u64] = &[
         0x40223cefad505edf, 0x4026ccb20dcfa67a, 0x3fb5b3baf9065e23, 0x3fd7c45b213973e4,
         0x4009e4687b5f3ea3, 0x3feea3021fe081d0, 0x401d85c591709605, 0x401c610bed6e6292,
         0x3fe60bef814818eb, 0x3ffa7352f64660c7, 0x401b391122781543, 0x401d2bd07148443b,
         0x40275548b49fed21, 0x4025674b21ed1b05, 0x3fe51c02da16ced0, 0x3fc5fabdb96b3ba1,
+    ];
+
+    /// Linux libm (GitHub Actions) twin of `BARRIER_PDE_PIN`.
+    #[rustfmt::skip]
+    const LINUX_BARRIER_PDE_PIN: &[u64] = &[
+        0x40223cefad505ebd, 0x4026ccb20dcfa68b, 0x3fb5b3baf9065e4e, 0x3fd7c45b2139740d,
+        0x4009e4687b5f3e37, 0x3feea3021fe08221, 0x401d85c5917095fa, 0x401c610bed6e62b4,
+        0x3fe60bef814818eb, 0x3ffa7352f64660c7, 0x401b39112278152d, 0x401d2bd07148442f,
+        0x40275548b49fed21, 0x4025674b21ed1b05, 0x3fe51c02da16cfe7, 0x3fc5fabdb96b3aff,
     ];
 
     fn barrier_pde_pin_values() -> Vec<u64> {
@@ -778,7 +788,10 @@ mod tests {
     #[test]
     fn barrier_pde_stepper_bit_pin() {
         let values = barrier_pde_pin_values();
-        assert_eq!(values.as_slice(), BARRIER_PDE_PIN);
+        assert!(
+            values.as_slice() == BARRIER_PDE_PIN || values.as_slice() == LINUX_BARRIER_PDE_PIN,
+            "barrier PDE prices moved off the macOS and Linux libm pins:\n{values:#x?}"
+        );
     }
 
     /// W-01: Rannacher startup must remove the Crank-Nicolson oscillation near

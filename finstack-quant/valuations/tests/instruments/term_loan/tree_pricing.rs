@@ -624,9 +624,9 @@ fn off_cycle_immediate_par_call_includes_accrued() {
     );
 }
 
-/// Bit-exact settlement values at a non-zero quoted OAS on both the
-/// short-rate lattice and the rates-credit lattice: the OAS reaches the
-/// valuator and the induction unchanged.
+/// Settlement values at a non-zero quoted OAS on both the short-rate lattice
+/// and the rates-credit lattice: the OAS reaches the valuator and the
+/// induction unchanged. Prices are pinned per libm.
 #[test]
 fn term_loan_tree_prices_are_bit_pinned() {
     use finstack_quant_core::market_data::term_structures::HazardCurve;
@@ -656,9 +656,15 @@ fn term_loan_tree_prices_are_bit_pinned() {
         .unwrap()
         .amount();
 
-    assert_eq!(
-        [short_rate.to_bits(), rates_credit.to_bits()],
-        [4_711_601_891_810_740_306_u64, 4_711_280_227_318_290_590],
-        "short_rate={short_rate} rates_credit={rates_credit}"
+    let got = [short_rate.to_bits(), rates_credit.to_bits()];
+    // Short-rate settlement matches on both hosts. The rates-credit lattice
+    // moves by a few ulps between macOS and the Linux libm on GitHub Actions.
+    const PINS: [[u64; 2]; 2] = [
+        [4_711_601_891_810_740_306, 4_711_280_227_318_290_590],
+        [4_711_601_891_810_740_306, 4_711_280_227_318_290_584],
+    ];
+    assert!(
+        PINS.contains(&got),
+        "term loan tree prices moved off the macOS and Linux libm pins: short_rate={short_rate} rates_credit={rates_credit} bits={got:?}"
     );
 }

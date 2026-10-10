@@ -423,6 +423,7 @@ mod tests {
 
     /// Exact bit patterns of Black-Scholes solves, captured before the
     /// `TimeStepper` trait was replaced by the concrete `ThetaStepper`.
+    /// macOS and the Linux libm on GitHub Actions each have one pattern.
     #[rustfmt::skip]
     const STEPPER_PIN: &[u64] = &[
         0x3ff6366c68d18b32, 0x40214f8aac72c01d, 0x403b59e51713de88, 0x404c81aa0e56efa0,
@@ -449,6 +450,35 @@ mod tests {
         0x4032e04f34f7e9a7, 0x401ae2f32d9ff928, 0x3ff2a2cb7e7d85fb, 0xc0442da5a7216e60,
         0x40342ee4a22395ec, 0x401bd14bfc1c2b36, 0x3ff2facd60064bea, 0xc04535972bf2c624,
         0x4033f35f86b6e3f4, 0x401b8e845050e90d, 0x3ff2cbefeac01da1, 0xc0450809593226e8,
+    ];
+
+    /// Linux libm (GitHub Actions) twin of `STEPPER_PIN`.
+    #[rustfmt::skip]
+    const LINUX_STEPPER_PIN: &[u64] = &[
+        0x3ff6366c68d18b48, 0x40214f8aac72c029, 0x403b59e51713de90, 0x404c81aa0e56efc8,
+        0x3ff6366f1556e042, 0x40214fa8dbb0a16a, 0x403b5bf7d6418de2, 0x404c823a31f89cd0,
+        0x3ff6366d12f7fffc, 0x40214f9972ef008a, 0x403b5b603e8ff42c, 0x404c81fa2b19c340,
+        0x3ff6368a75152376, 0x40214f6d22c78c2d, 0x403b59e36da82955, 0x404c81a4a17ba7a0,
+        0x3ff6368d22dba085, 0x40214f8b55d0ae3d, 0x403b5bf63db00f7e, 0x404c8234d0cb9e88,
+        0x3ff6368b1f42efc7, 0x40214f7be9b9e6fb, 0x403b5b5e9bb86aa9, 0x404c81f4c07de2c8,
+        0x3ff6364e6aeb48d6, 0x40214fa833a2fb48, 0x403b59e6c14e5470, 0x404c81af7aea6200,
+        0x3ff6365116c6574a, 0x40214fc660174bca, 0x403b5bf97076b044, 0x404c823f94de56d8,
+        0x3ff6364f150a649a, 0x40214fb6f9a90c32, 0x403b5b61e234bd64, 0x404c81ff956d64b8,
+        0x3ff63c7044a0ef75, 0x402149d7a22afdd6, 0x403b599778831b14, 0x404c809eec0d8718,
+        0x3ff63c73f0094c99, 0x402149f948faa706, 0x403b5bb742f18dc6, 0x404c8139f71860c0,
+        0x3ff63c715795d73e, 0x402149e8bb0a0c1f, 0x403b5b1d28c32980, 0x404c80f748c58060,
+        0x4032dfb90db5bc8c, 0x401aed9809ee3a7e, 0x3ff2a510a9967317, 0xc0442c8c73d28374,
+        0x40343105d78930a1, 0x401be0a04bd2cb57, 0x3ff2ff4c007a406a, 0xc0453807dd345d8c,
+        0x4033f41cd2146244, 0x401b9b46f3427610, 0x3ff2cdda3bb2d586, 0xc04509bbd0756e80,
+        0x4032dfbc0823a91f, 0x401aed60e80f2ea6, 0x3ff2a5038ed17b91, 0xc0442c922a2b58f8,
+        0x403430f88ae94d63, 0x401bdfd6ac8ec24b, 0x3ff2fe72a5295224, 0xc04537f36c1d9dd0,
+        0x4033f415a0742b28, 0x401b9af42ea3fc58, 0x3ff2cdbefd8c706b, 0xc04509aec57431ec,
+        0x4032dfb6142da79b, 0x401aedcf26d76b66, 0x3ff2a51dd1484248, 0xc0442c86bdc1837c,
+        0x403431190b0fcdc8, 0x401be1ceee9ee56c, 0x3ff300f285c43882, 0xc0453818151fac18,
+        0x4033f424012d3a7c, 0x401b9b999dbd3005, 0x3ff2cdf576dd1ed8, 0xc04509c8d2c67d98,
+        0x4032e04f34f7e9de, 0x401ae2f32d9ff954, 0x3ff2a2cb7e7d8604, 0xc0442da5a7216e88,
+        0x40342ee4a22395f5, 0x401bd14bfc1c2b3f, 0x3ff2facd60064be6, 0xc04535972bf2c628,
+        0x4033f35f86b6e40b, 0x401b8e845050e920, 0x3ff2cbefeac01da6, 0xc0450809593226e8,
     ];
 
     fn stepper_pin_values() -> Vec<u64> {
@@ -504,7 +534,10 @@ mod tests {
     #[test]
     fn stepper_bit_pin() {
         let values = stepper_pin_values();
-        assert_eq!(values.as_slice(), STEPPER_PIN);
+        assert!(
+            values.as_slice() == STEPPER_PIN || values.as_slice() == LINUX_STEPPER_PIN,
+            "PDE stepper moved off the macOS and Linux libm pins:\n{values:#x?}"
+        );
     }
 
     struct LinearBoundaryDiffusion;

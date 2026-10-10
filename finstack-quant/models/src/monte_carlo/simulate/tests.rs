@@ -257,7 +257,9 @@ fn bit_hash(summary: &PathSummary) -> u64 {
 }
 
 /// The hashes and terminal spots were recorded from the GBM-only path
-/// simulator that `simulate_paths` replaced.
+/// simulator that `simulate_paths` replaced. Stream A is pinned per libm
+/// (macOS, and Ubuntu 24.04 as used by GitHub Actions). Stream B is the same
+/// bits on both hosts.
 #[test]
 fn gbm_default_scheme_is_pinned_bit_for_bit() {
     let pinned = |r, q, sigma, spot, expiry, num_steps, num_paths, seed| {
@@ -275,12 +277,26 @@ fn gbm_default_scheme_is_pinned_bit_for_bit() {
     };
 
     let a = pinned(0.04, 0.01, 0.25, 100.0, 1.3, 17, 32, 19);
-    assert_eq!(bit_hash(&a), 0x7e9a_6884_54fb_d37c);
-    assert_eq!(a.values[31 * 18 + 17].to_bits(), 0x4060_5556_4027_5291);
-
     let b = pinned(-0.01, 0.03, 0.6, 42.5, 0.37, 1, 5, 7_919);
-    assert_eq!(bit_hash(&b), 0x2b4a_52ec_fdb1_426b);
-    assert_eq!(b.values[4 * 2 + 1].to_bits(), 0x4040_f04d_39a6_c0fb);
+    let stream_a = (bit_hash(&a), a.values[31 * 18 + 17].to_bits());
+    let stream_b = (bit_hash(&b), b.values[4 * 2 + 1].to_bits());
+    // (fingerprint of every time and value, one terminal spot).
+    const STREAM_A: [(u64, u64); 2] = [
+        (0x7e9a_6884_54fb_d37c, 0x4060_5556_4027_5291),
+        (0x0b78_49fa_54a0_493b, 0x4060_5556_4027_5290),
+    ];
+    const STREAM_B: (u64, u64) = (0x2b4a_52ec_fdb1_426b, 0x4040_f04d_39a6_c0fb);
+    assert!(
+        STREAM_A.contains(&stream_a),
+        "GBM stream A moved off the macOS and Linux libm pins: hash={:#x} spot={:#x}",
+        stream_a.0,
+        stream_a.1
+    );
+    assert_eq!(
+        stream_b, STREAM_B,
+        "GBM stream B moved: hash={:#x} spot={:#x}",
+        stream_b.0, stream_b.1
+    );
 }
 
 // ---------------------------------------------------------------------------

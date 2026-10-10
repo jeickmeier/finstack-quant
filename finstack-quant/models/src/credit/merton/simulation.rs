@@ -302,24 +302,36 @@ mod tests {
     }
 
     /// Pins the seed-to-path mapping of the seeded entry point (core PCG64,
-    /// normal draw order, antithetic pairing). A change here changes every
-    /// host's simulated asset paths for a given seed.
+    /// normal draw order, antithetic pairing). Platform `exp` yields one
+    /// fingerprint on macOS and another on the Linux libm used by GitHub
+    /// Actions. A third fingerprint means the seeded stream moved.
     #[test]
     fn merton_seed_to_stream_mapping_is_bit_stable() {
         let gbm = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
         let paths = gbm.simulate_paths(8, 12, 1.0, 7, true).unwrap();
         let plain = gbm.simulate_paths(5, 6, 2.0, 11, false).unwrap();
-        assert_eq!(
-            (
-                fingerprint(&paths.times),
-                fingerprint(&paths.asset_values),
-                fingerprint(&plain.asset_values),
-            ),
+        let got = (
+            fingerprint(&paths.times),
+            fingerprint(&paths.asset_values),
+            fingerprint(&plain.asset_values),
+        );
+        // (times, antithetic assets, plain assets). The times grid is pure
+        // arithmetic, so that fingerprint matches on both hosts.
+        const PINS: [(u64, u64, u64); 2] = [
             (
                 5_718_244_427_887_314_902,
                 9_843_094_568_569_784_566,
-                9_861_744_696_887_898_460
-            )
+                9_861_744_696_887_898_460,
+            ),
+            (
+                5_718_244_427_887_314_902,
+                6_510_477_273_109_661_970,
+                9_861_744_696_887_898_460,
+            ),
+        ];
+        assert!(
+            PINS.contains(&got),
+            "Merton seed stream moved off the macOS and Linux libm pins: {got:?}"
         );
     }
 

@@ -110,8 +110,8 @@ fn call_friction_raises_callable_price_toward_straight() {
     );
 }
 
-/// Bit-exact callable-bond values at a non-zero OAS: the OAS reaches the
-/// valuator and the short-rate induction unchanged.
+/// Callable-bond values at a non-zero OAS: the OAS reaches the valuator and
+/// the short-rate induction unchanged. Tree prices are pinned per libm.
 #[test]
 fn callable_bond_tree_prices_are_bit_pinned() {
     use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::price_from_oas;
@@ -167,14 +167,28 @@ fn callable_bond_tree_prices_are_bit_pinned() {
         );
     }
 
-    assert_eq!(
-        bits,
+    // Ho-Lee, BDT, Black-Karasinski, then the bond-pricer BDT and Hull-White
+    // values. The first and last move by one ulp between macOS and the Linux
+    // libm on GitHub Actions.
+    const PINS: [[u64; 5]; 2] = [
         [
-            4_652_395_558_412_783_183_u64,
+            4_652_395_558_412_783_183,
             4_652_417_570_083_781_352,
             4_652_420_412_340_861_640,
             4_652_412_935_098_629_595,
             4_652_317_577_597_138_786,
-        ]
+        ],
+        [
+            4_652_395_558_412_783_184,
+            4_652_417_570_083_781_352,
+            4_652_420_412_340_861_640,
+            4_652_412_935_098_629_595,
+            4_652_317_577_597_138_787,
+        ],
+    ];
+    let got: [u64; 5] = bits.try_into().expect("five tree prices");
+    assert!(
+        PINS.contains(&got),
+        "callable bond tree prices moved off the macOS and Linux libm pins: {got:?}"
     );
 }

@@ -662,8 +662,9 @@ mod simulation_tests {
     }
 
     /// Pins the seed-to-path mapping of the seeded entry points (PCG64 via
-    /// `seed_from_u64`, Gillespie draw order). A change here changes every
-    /// host's simulated ratings for a given seed.
+    /// `seed_from_u64`, Gillespie draw order). Platform `exp`/`ln` yields one
+    /// fingerprint on macOS and another on the Linux libm used by GitHub
+    /// Actions. A third fingerprint means the seeded stream moved.
     #[test]
     fn migration_seed_to_stream_mapping_is_bit_stable() {
         let sim = MigrationSimulator::new(two_state_gen(), 20.0).unwrap();
@@ -675,9 +676,16 @@ mod simulation_tests {
         }));
         let empirical = sim.empirical_matrix(200, 7).unwrap();
         let rows = fingerprint(empirical.to_rows().into_iter().flatten().map(f64::to_bits));
-        assert_eq!(
-            (events, rows),
-            (9_101_374_654_972_199_437, 13_862_920_643_627_307_770)
+        let got = (events, rows);
+        // The empirical-matrix fingerprint matches on both hosts. Event times
+        // from the Gillespie exponential draws do not.
+        const PINS: [(u64, u64); 2] = [
+            (9_101_374_654_972_199_437, 13_862_920_643_627_307_770),
+            (11_662_597_431_205_528_484, 13_862_920_643_627_307_770),
+        ];
+        assert!(
+            PINS.contains(&got),
+            "migration seed stream moved off the macOS and Linux libm pins: {got:?}"
         );
     }
 

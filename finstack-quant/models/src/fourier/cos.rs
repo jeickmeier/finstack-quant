@@ -1044,7 +1044,8 @@ mod tests {
 
     /// Bit-level pin of the three COS entry points (call and put, default and
     /// explicit term counts), and of the error kind and message the host
-    /// bindings report for rejected inputs and numerical failures.
+    /// bindings report for rejected inputs and numerical failures. Prices are
+    /// pinned per libm: macOS and the Linux libm on GitHub Actions.
     #[test]
     fn cos_entry_points_are_bit_stable() {
         const EXPECTED: &[u64] = &[
@@ -1129,7 +1130,66 @@ mod tests {
                 }
             }
         }
-        assert_eq!(actual, EXPECTED, "{actual:#x?}");
+        const LINUX: &[u64] = &[
+            0x402667d6de59772a,
+            0x40253784f95ea332,
+            0x402752c709a9d508,
+            0x402667d6de59772a,
+            0x40253785dbdd3452,
+            0x402752c709a9cada,
+            0x402667d6de59772a,
+            0x40253784f9293620,
+            0x402752c709a9d508,
+            0x40194d925cdc5161,
+            0x4016ecee92e6a971,
+            0x401b2372b37d0d1c,
+            0x40194d925cdc5161,
+            0x4016ecf057e3cbb0,
+            0x401b2372b37cf8c0,
+            0x40194d925cdc5161,
+            0x4016ecee927bcf4e,
+            0x401b2372b37d0d1c,
+            0x40342bd353add40f,
+            0x40344e24c14b082a,
+            0x40345c6dc30fd427,
+            0x40342bd353add40f,
+            0x40344de94c1ac1ff,
+            0x40345c6dc31f2f6e,
+            0x40342bd353add40f,
+            0x40344e2223eaa30d,
+            0x40345c6dc30fd427,
+            0x3fb27b08023d20ab,
+            0x3fca663acfb89df3,
+            0x3fd0c55dd90f4e43,
+            0x3fb27b08023d20ab,
+            0x3fca488037958877,
+            0x3fd0c55ddce61fee,
+            0x3fb27b08023d20ab,
+            0x3fca64ec1f860fbf,
+            0x3fd0c55dd90f4e43,
+            0x40102e73cf60ae60,
+            0x40082fb3da41bcc0,
+            0x4011e176f987e998,
+            0x40102e73cf60ae60,
+            0x40082fb3d9a7a2c0,
+            0x4011e176f987ea18,
+            0x40102e73cf60ae60,
+            0x40082fb3da41bcc0,
+            0x4011e176f987e998,
+            0x40470e5baa28e2ba,
+            0x40468b886de0e8ba,
+            0x404744bc0f6dca21,
+            0x40470e5baa28e2ba,
+            0x40468b886dd7471a,
+            0x404744bc0f6dca31,
+            0x40470e5baa28e2ba,
+            0x40468b886de0e8ba,
+            0x404744bc0f6dca21,
+        ];
+        assert!(
+            actual.as_slice() == EXPECTED || actual.as_slice() == LINUX,
+            "COS prices moved off the macOS and Linux libm pins:\n{actual:#x?}"
+        );
 
         // What `core_to_py` and the WASM `to_js_err` report.
         let host_view = |vol: f64, expiry: f64, n_terms: Option<usize>| {
