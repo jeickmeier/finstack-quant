@@ -1,11 +1,11 @@
-# .github
+# GitHub Actions
 
-GitHub Actions workflows and issue templates.
+CI workflows and issue templates for finstack-quant.
 
 CI does not reimplement the build. Almost every job provisions the pinned
 toolchain with `jdx/mise-action@v4` and then runs a canonical `mise` task, so
 those jobs run exactly the commands you can run locally. Toolchain versions live
-in [`../mise.toml`](../mise.toml); nothing here pins a compiler.
+in [`../../mise.toml`](../../mise.toml); nothing here pins a compiler.
 
 Three jobs are deliberately outside that pattern and cannot be reproduced by a
 `mise` task: the two OSV-Scanner jobs (reusable upstream workflows) and Semver
@@ -15,11 +15,14 @@ Checks (raw `cargo semver-checks` against `origin/master`).
 
 | File | Triggers | What it runs |
 | --- | --- | --- |
-| `workflows/build.yml` | push to `master`; PR opened/synchronize/reopened | The PR gate. Lint, tests on all three surfaces, release build, supply chain, publish checks, semver, and four representative benchmarks. |
-| `workflows/benchmarks.yml` | Wednesdays 06:00 UTC; manual | Full Rust Criterion suite and report. |
-| `workflows/docs.yml` | push to `master`; Mondays 06:00 UTC; manual | Documentation gates, kept out of `build.yml` so a slow rustdoc build never blocks a PR. |
-| `workflows/slow-rust-tests.yml` | Sundays 06:00 UTC; manual | `mise run rust-test-slow` — the `#[ignore]`d suite, 120-minute budget. |
-| `workflows/release.yml` | successful `Build` run on `master`; manual with `publish: true` | Builds wheels, sdist, and WASM packages, then cuts a GitHub Release. |
+| `build.yml` | push to `master`; PR opened/synchronize/reopened | The PR gate. Lint, tests on all three surfaces, release build, supply chain, publish checks, semver, and four representative benchmarks. |
+| `benchmarks.yml` | Wednesdays 06:00 UTC; manual | Full Rust Criterion suite and report. |
+| `docs.yml` | push to `master`; Mondays 06:00 UTC; manual | Documentation gates, kept out of `build.yml` so a slow rustdoc build never blocks a PR. |
+| `slow-rust-tests.yml` | Sundays 06:00 UTC; manual | `mise run rust-test-slow` — the `#[ignore]`d suite, 120-minute budget. |
+| `release.yml` | successful `Build` run on `master`; manual with `publish: true` | Builds wheels, sdist, and WASM packages, then cuts a GitHub Release. |
+| `ui-gallery.yml` | PRs touching `finstack-quant-ui/` or the docs-site gallery; manual; called by `registry-publish.yml` | Builds the WASM packages, then runs `ui-check`, `ui-docs-build`, `ui-e2e`, `ui-publish-check`, and the isolated `ui-install` consumer check. |
+| `registry-publish.yml` | manual | Reruns `ui-gallery.yml`, then on `master` deploys the component registry and gallery to GitHub Pages and verifies the published registry from an empty consumer. |
+| `sonar.yml` | push to `master`; PR opened/synchronize/reopened; manual | SonarQube scan only. No toolchain, tests, or coverage generation. |
 
 ### build.yml
 
@@ -81,7 +84,7 @@ to PyPI or npm.
 
 ## Issue templates
 
-`ISSUE_TEMPLATE/` holds the stock GitHub `bug_report.md`, `feature_request.md`,
+[`../ISSUE_TEMPLATE/`](../ISSUE_TEMPLATE/) holds the stock GitHub `bug_report.md`, `feature_request.md`,
 and an unfilled `custom.md`. They are not tailored to this project — the bug
 template still asks for browser and smartphone details.
 
@@ -100,6 +103,7 @@ The local mirrors are partial, so know what they do and do not cover:
   non-mutating drift gate so uncommitted generated files fail the Lint job.
 - `mise run all-doc` mirrors `docs.yml`.
 - `slow-rust-tests.yml` is `mise run rust-test-slow`; `release.yml` has no local
-  equivalent.
+  equivalent. `sonar.yml` is the SonarQube scanner only and does not run a
+  `mise` task.
 - `benchmarks.yml` runs the complete benchmark suite weekly; local scoped
   benchmark tasks remain available for focused measurements.

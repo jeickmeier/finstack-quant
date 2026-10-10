@@ -76,6 +76,7 @@ include = [
 [tool.coverage.run]
 source = ["finstack-quant-py/finstack_quant"]
 omit = ["finstack-quant-py/tests/*"]
+relative_files = true
 
 [tool.coverage.report]
 exclude_lines = [

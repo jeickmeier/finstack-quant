@@ -192,8 +192,8 @@ print(settle)           # 2025-01-06
 ```
 
 `finstack-quant-py` builds the Python package `finstack_quant`. It exposes the
-same thirteen domains — `analytics`, `attribution`, `cashflows`, `core`,
-`covenants`, `features`, `margin`, `models`, `portfolio`,
+same fourteen domains — `analytics`, `attribution`, `calibration`, `cashflows`,
+`core`, `covenants`, `features`, `margin`, `models`, `portfolio`,
 `scenarios`, `statements`, `statements_analytics`, `valuations` — plus
 `reporting` (a pure-Python presentation layer with no Rust crate) and `schema`
 (a compiled submodule). Submodules load lazily, and `finstack_quant.__version__`
@@ -218,12 +218,29 @@ console.log(amount.toString());
 
 The published entry point is
 [`finstack-quant-wasm/index.js`](finstack-quant-wasm/index.js), which re-exports
-the thirteen namespaces assembled in `finstack-quant-wasm/exports/`. TypeScript
+the fourteen domain namespaces plus `schema` assembled in
+`finstack-quant-wasm/exports/`. TypeScript
 declarations live in
 [`finstack-quant-wasm/index.d.ts`](finstack-quant-wasm/index.d.ts). The
 `wasm-pack` output under `pkg/` and `pkg-node/` is generated build output, not
 the public API. See
 [`finstack-quant-wasm/README.md`](finstack-quant-wasm/README.md).
+
+### UI components and docs site
+
+[`finstack-quant-ui/`](finstack-quant-ui/README.md) is a shadcn-style
+component registry: offline JSON Schema bundles, generated wire interfaces,
+lossless adapters, and React components that render `finstack-quant-wasm`
+results. It holds no financial logic. [`docs-site/`](docs-site/README.md) is the
+static documentation reader and registry gallery. It executes the Python
+curriculum against a freshly built extension at publish time.
+
+```bash
+mise run wasm-pkg
+mise run ui-sync
+mise run ui-check       # generation drift, types, and focused tests
+mise run ui-docs-build  # export the gallery
+```
 
 ## Conventions
 
@@ -443,6 +460,7 @@ benchmark path; see
 | [`docs/SERDE_STABILITY.md`](docs/SERDE_STABILITY.md) | Wire-format and schema-version policy |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history, including breaking changes |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development setup, principles, binding-change checklist |
+| [`.github/workflows/README.md`](.github/workflows/README.md) | CI workflows, jobs, and their local `mise` equivalents |
 | [`AGENTS.md`](AGENTS.md) | Repository operating rules for automated contributors |
 | [`.agents/rules/`](.agents/rules/) | Rust, Python, and WASM code, testing, and documentation standards |
 | [`finstack-quant-py/README.md`](finstack-quant-py/README.md) | Python package layout, stubs, parity checks, pitfalls |

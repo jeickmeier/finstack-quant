@@ -294,14 +294,19 @@ run = [
 ]
 
 [tasks.rust-test-cov]
-description = "Run Rust tests with HTML coverage report"
+description = "Run Rust tests with HTML and SonarQube LCOV coverage reports"
 run = """
-mkdir -p target/llvm-cov/profraw
-LLVM_PROFILE_FILE="$PWD/target/llvm-cov/profraw/default_%m_%p.profraw" \
-  cargo llvm-cov --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm \
-    --ignore-filename-regex '(tests?/|target/|\\.cargo/|.*finstack-quant-py/.*|.*finstack-quant-wasm/.*)' \
-    --html --output-dir target/llvm-cov
+mkdir -p coverage/rust
+cargo llvm-cov --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm \
+  --ignore-filename-regex '(tests?/|target/|\\.cargo/|.*finstack-quant-py/.*|.*finstack-quant-wasm/.*)' \
+  --remap-path-prefix \
+  --html --output-dir target/llvm-cov
+cargo llvm-cov report \
+  --ignore-filename-regex '(tests?/|target/|\\.cargo/|.*finstack-quant-py/.*|.*finstack-quant-wasm/.*)' \
+  --remap-path-prefix \
+  --lcov --output-path coverage/rust/lcov.info
 echo "HTML report: target/llvm-cov/html/index.html"
+echo "LCOV report: coverage/rust/lcov.info"
 """
 
 [tasks.rust-lint-crate]
@@ -533,10 +538,12 @@ uv run --no-sync pytest -v
 """
 
 [tasks.python-test-cov]
-description = "Build dev Python bindings, then run Python tests with HTML coverage report"
+description = "Build dev Python bindings, then run Python tests with HTML and SonarQube Cobertura coverage reports"
 run = """
+mkdir -p coverage/python
 mise run python-build
-uv run --no-sync pytest -v --cov=finstack-quant-py/finstack_quant --cov-report=term-missing --cov-report=html:target/python-cov
+uv run --no-sync pytest -v --cov=finstack-quant-py/finstack_quant --cov-report=term-missing --cov-report=html:target/python-cov --cov-report=xml:coverage/python/coverage.xml
+echo "Cobertura report: coverage/python/coverage.xml"
 """
 
 [tasks.python-fmt]
@@ -619,14 +626,19 @@ run = [
 ]
 
 [tasks.wasm-test-cov]
-description = "Run WASM binding tests with HTML coverage report"
+description = "Run WASM binding tests with HTML and SonarQube LCOV coverage reports"
 run = """
-mkdir -p target/wasm-cov/profraw
-LLVM_PROFILE_FILE="$PWD/target/wasm-cov/profraw/default_%m_%p.profraw" \
-  cargo llvm-cov -p finstack-quant-wasm --lib \
-    --ignore-filename-regex '(tests?/|target/|\\.cargo/)' \
-    --html --output-dir target/wasm-cov
+mkdir -p coverage/wasm
+cargo llvm-cov -p finstack-quant-wasm --lib \
+  --ignore-filename-regex '(tests?/|target/|\\.cargo/)' \
+  --remap-path-prefix \
+  --html --output-dir target/wasm-cov
+cargo llvm-cov report -p finstack-quant-wasm \
+  --ignore-filename-regex '(tests?/|target/|\\.cargo/)' \
+  --remap-path-prefix \
+  --lcov --output-path coverage/wasm/lcov.info
 echo "HTML report: target/wasm-cov/html/index.html"
+echo "LCOV report: coverage/wasm/lcov.info"
 """
 
 [tasks.wasm-fmt]
