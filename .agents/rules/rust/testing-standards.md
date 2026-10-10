@@ -45,7 +45,7 @@ These standards apply to all Rust crates in the Finstack Quant workspace (`finst
 
 - **Goal**: ≥80% per crate; near‑100% on thin public API layers and critical safety code (currency checks, serde, rounding contexts).
 - **Exclusions**: Boilerplate error/display impls, defensive branches that cannot be triggered without UB, and platform shims may be reasonably under‑covered.
-- **Measurement**: Use project coverage tooling (e.g., `mise run rust-test-cov` / `test-python-cov` / `test-wasm-cov`) and watch trend lines; coverage should not regress meaningfully without justification.
+- **Measurement**: Use project coverage tooling (`mise run rust-test-cov` / `mise run python-test-cov`) and watch trend lines; coverage should not regress meaningfully without justification.
 
 ### Assertions and tolerances
 

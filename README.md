@@ -419,9 +419,8 @@ rest are narrower (`goldens-*`, `wheel-*`, `pre-commit-*`, `materialization-*`,
 | `mise run ui-test` | Run the UI Vitest suite |
 | `mise run wasm-gen-bindings` | Export TypeScript types from Rust |
 | `mise run goldens-test` | Run the Rust and Python golden-test layers |
-| `mise run rust-test-cov` | Rust tests with an HTML coverage report |
-| `mise run python-test-cov` | Python tests with an HTML coverage report |
-| `mise run wasm-test-cov` | WASM binding tests with an HTML coverage report |
+| `mise run rust-test-cov` | `rust-test` suite with HTML and LCOV (`coverage/rust/lcov.info`) coverage reports |
+| `mise run python-test-cov` | Full Python suite with HTML and Cobertura (`coverage/python/coverage.xml`) coverage reports |
 | `mise run wheel-local` | Build a Python wheel for the current platform |
 
 Do not run `cargo test` directly: it pulls in doc tests, which are owned by

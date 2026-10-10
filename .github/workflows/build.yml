@@ -126,13 +126,15 @@ jobs:
   test-rust:
     name: Test Rust
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    # Coverage instrumentation slows the suite.
+    timeout-minutes: 90
     needs: prime-cache
 
     env:
       CARGO_BUILD_JOBS: 4
       CARGO_INCREMENTAL: 0
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
+      # llvm-cov reads coverage data from the test binaries; keep them unstripped.
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0"
 
     steps:
       - name: Checkout repository
@@ -155,8 +157,16 @@ jobs:
           shared-key: test-rust
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
-      - name: Run Rust lib and integration tests
-        run: mise run rust-test
+      - name: Run Rust lib and integration tests with coverage
+        run: mise run rust-test-cov
+
+      - name: Upload Rust coverage
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-rust
+          path: coverage/rust/lcov.info
+          if-no-files-found: error
+          retention-days: 7
 
   # ============================================
   # Rust release build — current toolchain production-build ownership
@@ -241,8 +251,16 @@ jobs:
           echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
           uv sync --no-install-project
 
-      - name: Build extension and run Python tests
-        run: mise run python-test-all
+      - name: Build extension and run Python tests with coverage
+        run: mise run python-test-cov
+
+      - name: Upload Python coverage
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-python
+          path: coverage/python/coverage.xml
+          if-no-files-found: error
+          retention-days: 7
 
   # ============================================
   # Test WASM — wasm-pack build + test
@@ -512,3 +530,43 @@ jobs:
             -p finstack-quant-valuations \
             -p finstack-quant-portfolio \
             --baseline-rev origin/master
+
+  # ============================================
+  # SonarQube — scan only; imports coverage from the test jobs
+  # ============================================
+  sonarqube:
+    name: SonarQube
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [test-rust, test-python]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          # Full history improves blame and new-code detection.
+          fetch-depth: 0
+
+      - name: Download Rust coverage
+        uses: actions/download-artifact@v5
+        with:
+          name: coverage-rust
+          path: coverage/rust
+
+      - name: Download Python coverage
+        uses: actions/download-artifact@v5
+        with:
+          name: coverage-python
+          path: coverage/python
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

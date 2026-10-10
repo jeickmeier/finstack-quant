@@ -7,23 +7,22 @@ toolchain with `jdx/mise-action@v4` and then runs a canonical `mise` task, so
 those jobs run exactly the commands you can run locally. Toolchain versions live
 in [`../../mise.toml`](../../mise.toml); nothing here pins a compiler.
 
-Three jobs are deliberately outside that pattern and cannot be reproduced by a
-`mise` task: the two OSV-Scanner jobs (reusable upstream workflows) and Semver
-Checks (raw `cargo semver-checks` against `origin/master`).
+Four jobs are deliberately outside that pattern and cannot be reproduced by a
+`mise` task: the two OSV-Scanner jobs (reusable upstream workflows), Semver
+Checks (raw `cargo semver-checks` against `origin/master`), and SonarQube (the
+upstream scan action).
 
 ## Workflows
 
 | File | Triggers | What it runs |
 | --- | --- | --- |
-| `build.yml` | push to `master`; PR opened/synchronize/reopened | The PR gate. Lint, tests on all three surfaces, release build, supply chain, publish checks, semver, and four representative benchmarks. |
+| `build.yml` | push to `master`; PR opened/synchronize/reopened | The PR gate. Lint, tests on all three surfaces, release build, supply chain, publish checks, semver, four representative benchmarks, and the SonarQube scan. |
 | `benchmarks.yml` | Wednesdays 06:00 UTC; manual | Full Rust Criterion suite and report. |
 | `docs.yml` | push to `master`; Mondays 06:00 UTC; manual | Documentation gates, kept out of `build.yml` so a slow rustdoc build never blocks a PR. |
 | `slow-rust-tests.yml` | Sundays 06:00 UTC; manual | `mise run rust-test-slow` — the `#[ignore]`d suite, 120-minute budget. |
 | `release.yml` | successful `Build` run on `master`; manual with `publish: true` | Builds wheels, sdist, and WASM packages, then cuts a GitHub Release. |
 | `ui-gallery.yml` | PRs touching `finstack-quant-ui/` or the docs-site gallery; manual; called by `registry-publish.yml` | Builds the WASM packages, then runs `ui-check`, `ui-docs-build`, `ui-e2e`, `ui-publish-check`, and the isolated `ui-install` consumer check. |
 | `registry-publish.yml` | manual | Reruns `ui-gallery.yml`, then on `master` deploys the component registry and gallery to GitHub Pages and verifies the published registry from an empty consumer. |
-| `sonar.yml` | push to `master`; PR opened/synchronize/reopened; manual | SonarQube scan only. No toolchain, tests, or coverage generation. |
-
 ### build.yml
 
 `prime-cache` is a single-writer job that populates the mise cache; every other
@@ -33,14 +32,15 @@ races on the shared `mise.toml`-derived key. Jobs then fan out in parallel:
 | Job | Command | Notes |
 | --- | --- | --- |
 | Lint | `mise run pre-commit-run`, then `mise run gen-check` | `SKIP: cargo-deny` — the supply-chain job owns it. Clippy covers lib/bins/tests/examples (`--all-features`), not Criterion benches. |
-| Test Rust | `mise run rust-test` | cargo-nextest, lib + integration targets. |
+| Test Rust | `mise run rust-test-cov` | The `rust-test` nextest targets under `cargo llvm-cov`; uploads `coverage/rust/lcov.info`. |
 | Rust release build | `mise run rust-build-prod` | Release compile without debug info. |
-| Test Python | `mise run python-test-all` | maturin dev build, then the full pytest suite. |
+| Test Python | `mise run python-test-cov` | maturin dev build, then the full pytest suite with coverage; uploads `coverage/python/coverage.xml`. |
 | Test WASM | `mise run wasm-test` | wasm-bindgen tests plus the Node facade suite. |
 | Supply-chain Security | `mise run rust-audit` | `cargo deny check` — advisories, licenses, bans. |
 | Rust Publish Checks | `mise run rust-publish-checks` | Publish order and first-crate dry run. |
 | OSV-Scanner | reusable workflow | PR-diff scan on pull requests, full scan on push. Covers `Cargo.lock`, `uv.lock`, and `finstack-quant-wasm/package-lock.json`. |
 | Semver Checks | `cargo semver-checks check-release` | PRs only; starts after `prime-cache` alongside lint and tests. Checks `finstack-quant-core`, `finstack-quant-valuations`, `finstack-quant-portfolio` against `origin/master`. |
+| SonarQube | `SonarSource/sonarqube-scan-action` | Scan only, after Test Rust and Test Python. Downloads their coverage artifacts; runs no tests and no clippy (`sonar.rust.clippy.enabled=false`, Lint owns clippy). |
 | Rust Benchmark Regression | `scripts/pr_benchmarks.py` | PRs only; compares four exact cases on base and head with Rust 1.97.1 and thin LTO, and rejects missing or stale outputs. The weekly full suite retains fat LTO. |
 
 Two details worth knowing before editing:
@@ -103,7 +103,6 @@ The local mirrors are partial, so know what they do and do not cover:
   non-mutating drift gate so uncommitted generated files fail the Lint job.
 - `mise run all-doc` mirrors `docs.yml`.
 - `slow-rust-tests.yml` is `mise run rust-test-slow`; `release.yml` has no local
-  equivalent. `sonar.yml` is the SonarQube scanner only and does not run a
-  `mise` task.
+  equivalent.
 - `benchmarks.yml` runs the complete benchmark suite weekly; local scoped
   benchmark tasks remain available for focused measurements.
