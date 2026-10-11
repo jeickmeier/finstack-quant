@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { byCodeUnit } from "./order.mjs";
 const read = async (file) => JSON.parse(await readFile(file, "utf8"));
 /** Registry items pin the workspace WASM package; it is unpublished, so installs resolve it by path. */
 export async function wasmVersion(cwd) {
@@ -50,7 +51,7 @@ export function itemMetadata(item, graph, inputs) {
     meta: {
       version: inputs.version,
       wasmVersion: inputs.wasmVersion,
-      schemaIds: [...ids].sort(),
+      schemaIds: [...ids].sort(byCodeUnit),
     },
   };
 }

@@ -330,17 +330,3 @@ pub fn register(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyMonteCarloResults>()?;
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::percentile_column;
-
-    #[test]
-    fn percentile_columns_are_percent_labels() {
-        assert_eq!(percentile_column(0.05), "p5");
-        assert_eq!(percentile_column(0.5), "p50");
-        assert_eq!(percentile_column(0.95), "p95");
-        assert_eq!(percentile_column(0.975), "p97.5");
-        assert_eq!(percentile_column(0.01), "p1");
-    }
-}

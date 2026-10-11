@@ -19,7 +19,7 @@ def main() -> int:
         anchors.add(slug)
         return f'<a id="{slug}"></a>\n\n{match[0]}'
 
-    source = re.sub(r"^(#{1,6})\s+(.+)$", heading_anchor, source, flags=re.M)
+    source = re.sub(r"^(#{1,6})[ \t]+(.+)$", heading_anchor, source, flags=re.M)
     body = markdown2html_mistune(source)
     target = SITE / "public/references.html"
     target.parent.mkdir(parents=True, exist_ok=True)

@@ -24,7 +24,7 @@ GENERIC_DESCRIPTION_RE = re.compile(
 )
 DOC_COMMENT_RE = re.compile(r"^\s*/// ?(.*)$")
 FUNCTION_RE = re.compile(r"^\s*pub\s+(?:async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
-IMPL_RE = re.compile(r"^\s*impl(?:<[^>]+>)?\s+[^;{]+\{")
+IMPL_RE = re.compile(r"^\s*impl(?:<[^>]+>)?\s[^;{]+\{")
 WASM_BINDGEN_RE = re.compile(r"#\[wasm_bindgen(?:\([^]]*\))?\]")
 
 

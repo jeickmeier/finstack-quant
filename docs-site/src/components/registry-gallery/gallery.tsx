@@ -209,7 +209,7 @@ export function RegistryGallery() {
                     : "max-h-[1100px] overflow-auto border border-border p-4"
                 }
                 data-preview
-                tabIndex={0}
+                tabIndex={block ? undefined : 0}
                 role="region"
                 aria-label={`${name} preview`}
               >

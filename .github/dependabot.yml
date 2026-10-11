@@ -1,0 +1,11 @@
+version: 2
+updates:
+  # Workflows pin actions to full commit SHAs; Dependabot keeps the pins and
+  # their `# vX` comments current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]

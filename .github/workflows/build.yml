@@ -31,10 +31,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
         env:
@@ -64,7 +64,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up swap space
         uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
@@ -72,20 +72,20 @@ jobs:
           swap-size-gb: 10
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
           cache_save: false
 
       - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: lint
           # Warm cache from master so PRs restore without competing to save.
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: Ensure rustfmt and clippy components
         run: rustup component add rustfmt clippy
@@ -101,10 +101,10 @@ jobs:
         run: |
           uv venv --python 3.12
           echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
-          uv sync --no-install-project
+          uv sync --locked --no-build --no-install-project
 
       - name: Cache pre-commit environments
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
@@ -138,7 +138,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up swap space
         uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
@@ -146,13 +146,13 @@ jobs:
           swap-size-gb: 10
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
           cache_save: false
 
       - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: test-rust
           save-if: ${{ github.ref == 'refs/heads/master' }}
@@ -161,7 +161,7 @@ jobs:
         run: mise run rust-test-cov
 
       - name: Upload Rust coverage
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: coverage-rust
           path: coverage/rust/lcov.info
@@ -184,7 +184,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up swap space
         uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
@@ -192,13 +192,13 @@ jobs:
           swap-size-gb: 10
 
       - name: Provision current toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
           cache_save: false
 
       - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: rust-release
           save-if: ${{ github.ref == 'refs/heads/master' }}
@@ -223,7 +223,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up swap space
         uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
@@ -231,31 +231,31 @@ jobs:
           swap-size-gb: 10
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
           cache_save: false
 
       - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: test-python
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: Set up Python environment
         run: |
           uv venv --python 3.12
           echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
-          uv sync --no-install-project
+          uv sync --locked --no-build --no-install-project
 
       - name: Build extension and run Python tests with coverage
         run: mise run python-test-cov
 
       - name: Upload Python coverage
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: coverage-python
           path: coverage/python/coverage.xml
@@ -284,7 +284,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up swap space
         uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
@@ -292,13 +292,13 @@ jobs:
           swap-size-gb: 10
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
           cache_save: false
 
       - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: test-wasm
           save-if: ${{ github.ref == 'refs/heads/master' }}
@@ -340,7 +340,7 @@ jobs:
 
     steps:
       - name: Checkout PR head to stage benchmark runner
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
@@ -355,18 +355,18 @@ jobs:
           swap-size-gb: 10
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
           cache_save: false
 
       - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: rust-benchmarks
 
       - name: Checkout PR base
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ github.event.pull_request.base.sha }}
 
@@ -376,19 +376,19 @@ jobs:
       # Preserve target/criterion, including the named `pr-base` baseline, while
       # switching tracked source files to the exact PR head revision.
       - name: Checkout PR head
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           clean: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: Set up Python environment
         run: |
           uv venv --python 3.12
           echo "${{ github.workspace }}/.venv/bin" >> "$GITHUB_PATH"
-          uv sync --no-install-project
+          uv sync --locked --no-build --no-install-project
 
       - name: Compare PR benchmarks
         run: |
@@ -397,7 +397,7 @@ jobs:
 
       - name: Upload Criterion report
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: criterion-regression-report
           path: target/criterion
@@ -414,10 +414,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
           cache_save: false
@@ -436,16 +436,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
           cache_save: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: Validate Rust crate publish order
         run: mise run rust-publish-checks
@@ -461,7 +461,7 @@ jobs:
   osv-scan-pr:
     name: Supply-chain Security (OSV-Scanner, PR diff)
     if: github.event_name == 'pull_request'
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.3.5
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@c51854704019a247608d928f370c98740469d4b5 # v2.3.5
     permissions:
       actions: read
       contents: read
@@ -477,7 +477,7 @@ jobs:
   osv-scan-full:
     name: Supply-chain Security (OSV-Scanner, full)
     if: github.event_name == 'push'
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.5
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@c51854704019a247608d928f370c98740469d4b5 # v2.3.5
     permissions:
       actions: read
       contents: read
@@ -505,7 +505,7 @@ jobs:
 
     steps:
       - name: Checkout repository (full history for baseline)
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
 
@@ -515,7 +515,7 @@ jobs:
           swap-size-gb: 10
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
           cache_save: false
@@ -542,19 +542,19 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           # Full history improves blame and new-code detection.
           fetch-depth: 0
 
       - name: Download Rust coverage
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: coverage-rust
           path: coverage/rust
 
       - name: Download Python coverage
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: coverage-python
           path: coverage/python

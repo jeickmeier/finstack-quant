@@ -628,7 +628,7 @@ pub(crate) fn note_warning(
     tracing::warn!(
         instrument_id = %instrument_id,
         factor,
-        message = %message,
+        detail = %message,
         "Attribution soft warning"
     );
     attribution.meta.notes.push(message);

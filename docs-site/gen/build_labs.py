@@ -246,7 +246,7 @@ def _lab_entry_errors(
         entry.get("source_sha256") != source_sha256
         or entry.get("fixtures_sha256") != fixtures_sha256
         or entry.get("runtime") != runtime
-        or entry.get("dependencies_sha256", {}) != notebook_dependencies(name)
+        or entry.get("dependencies_sha256", {}) != notebook_dependencies(name, NOTEBOOKS)
         or any(entry.get(key) != value for key, value in provenance.items())
     ):
         errors.append(f"Stale lab evidence: {name}")
@@ -556,7 +556,7 @@ def export_notebook(
             "assertions_executed": 0,
         },
         "fixtures_sha256": fixture_digest(),
-        "dependencies_sha256": notebook_dependencies(relative),
+        "dependencies_sha256": notebook_dependencies(relative, NOTEBOOKS),
         "runtime": runtime_identity(),
         "published": publish,
         **provenance,
@@ -712,7 +712,7 @@ def _finish_lab_build(
         snapshot["selected_sources"] != {name: after.get(name) for name in selected}
         or snapshot["fixtures"] != fixture_digest()
         or snapshot["runtime"] != runtime_identity()
-        or snapshot["dependencies"] != {name: notebook_dependencies(name) for name in selected}
+        or snapshot["dependencies"] != {name: notebook_dependencies(name, NOTEBOOKS) for name in selected}
         or snapshot["provenance"] != lab_provenance()
         or snapshot["published_notebooks"] != published_notebooks()
     ):
@@ -763,7 +763,7 @@ def main() -> int:
         "selected_sources": {name: before[name] for name in selected},
         "fixtures": fixture_digest(),
         "runtime": runtime_identity(),
-        "dependencies": {name: notebook_dependencies(name) for name in selected},
+        "dependencies": {name: notebook_dependencies(name, NOTEBOOKS) for name in selected},
         "provenance": lab_provenance(),
         "published_notebooks": published_notebooks(),
     }

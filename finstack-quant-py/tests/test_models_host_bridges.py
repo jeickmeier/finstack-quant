@@ -44,7 +44,8 @@ def test_seeded_migration_simulation_is_reproducible() -> None:
     first = simulator.simulate(0, 50, 7)
     assert first.to_json() == simulator.simulate(0, 50, 7).to_json()
     assert 0.0 < first.default_rate < 1.0
-    assert simulator.empirical_matrix(200, 7).to_matrix() == simulator.empirical_matrix(200, 7).to_matrix()
+    matrix, rerun_matrix = simulator.empirical_matrix(200, 7), simulator.empirical_matrix(200, 7)
+    assert matrix.to_matrix() == rerun_matrix.to_matrix()
 
 
 def test_master_scale_batch_mapping_reports_the_first_bad_pd() -> None:

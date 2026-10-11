@@ -1,10 +1,22 @@
 export const LEGACY_CATCH_ALL_THROW =
   '@throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.';
 
+/**
+ * Remove a leading `/**` and trailing `*\/` with their adjacent whitespace.
+ *
+ * @param {string} documentationText
+ * @returns {string}
+ */
+export function stripCommentDelimiters(documentationText) {
+  let body = documentationText;
+  if (body.startsWith('/**')) body = body.slice(3).trimStart();
+  if (body.endsWith('*/')) body = body.slice(0, -2).trimEnd();
+  return body;
+}
+
 export function documentationBlocks(documentationText) {
   if (!documentationText) return [];
-  const lines = documentationText
-    .replace(/^\/\*\*\s*|\s*\*\/$/g, '')
+  const lines = stripCommentDelimiters(documentationText)
     .split('\n')
     .map((line) => line.replace(/^\s*\* ?/, '').trimEnd());
   while (lines.length && !lines[0].trim()) lines.shift();

@@ -190,11 +190,13 @@ def test_lvar_bangia_validation_failure_is_value_error() -> None:
 
 
 def test_optimization_status_equality_and_hash() -> None:
-    assert OptimizationStatus.optimal() == OptimizationStatus.optimal()
-    assert hash(OptimizationStatus.optimal()) == hash(OptimizationStatus.optimal())
-    assert OptimizationStatus.optimal() != OptimizationStatus.unbounded()
-    assert OptimizationStatus.infeasible(["a"]) == OptimizationStatus.infeasible(["a"])
-    assert OptimizationStatus.infeasible(["a"]) != OptimizationStatus.infeasible(["b"])
+    optimal, same_optimal = OptimizationStatus.optimal(), OptimizationStatus.optimal()
+    assert optimal == same_optimal
+    assert hash(optimal) == hash(same_optimal)
+    assert optimal != OptimizationStatus.unbounded()
+    infeasible, same_infeasible = OptimizationStatus.infeasible(["a"]), OptimizationStatus.infeasible(["a"])
+    assert infeasible == same_infeasible
+    assert infeasible != OptimizationStatus.infeasible(["b"])
 
 
 # MD11: Portfolio.validate_materialization Python twin

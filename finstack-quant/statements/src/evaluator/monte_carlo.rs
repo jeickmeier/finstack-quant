@@ -567,8 +567,8 @@ impl MonteCarloAccumulator {
 #[cfg(test)]
 mod tests {
     use super::{
-        normalize_percentiles, MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults,
-        PathResult,
+        normalize_percentiles, percentile_label, MonteCarloAccumulator, MonteCarloConfig,
+        MonteCarloResults, PathResult,
     };
     use crate::builder::ModelBuilder;
     use crate::error::Result;
@@ -589,6 +589,15 @@ mod tests {
             accumulator.push_path(path_idx, path_results, warnings)?;
         }
         accumulator.finish()
+    }
+
+    #[test]
+    fn percentile_labels_are_percent_labels() {
+        assert_eq!(percentile_label(0.05), "p5");
+        assert_eq!(percentile_label(0.5), "p50");
+        assert_eq!(percentile_label(0.95), "p95");
+        assert_eq!(percentile_label(0.975), "p97.5");
+        assert_eq!(percentile_label(0.01), "p1");
     }
 
     #[test]

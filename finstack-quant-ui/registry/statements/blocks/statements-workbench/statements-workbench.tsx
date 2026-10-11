@@ -267,7 +267,7 @@ export function StatementsWorkbench({
     if (value === null) delete values[periodId];
     else if (!value.trim()) return "Enter an exact value.";
     else if (node.value_type?.type === "monetary") {
-      if (!/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(value.trim()))
+      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value.trim()))
         return "Enter a decimal amount in base units.";
       values[periodId] = {
         amount: value.trim(),

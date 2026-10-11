@@ -411,12 +411,11 @@ fn simulate_gillespie<R: Rng>(
         }
         // If floating-point rounding left u2 >= total, assign the last valid state.
         if next_state == state {
-            // Find last non-zero off-diagonal.
-            for j in (0..n).rev() {
-                if j != state && gen.data[(state, j)] > 0.0 {
-                    next_state = j;
-                    break;
-                }
+            if let Some(j) = (0..n)
+                .rev()
+                .find(|&j| j != state && gen.data[(state, j)] > 0.0)
+            {
+                next_state = j;
             }
         }
 

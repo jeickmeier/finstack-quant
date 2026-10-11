@@ -73,7 +73,8 @@ def test_structural_spec_constructors_and_equality() -> None:
     assert credit.DynamicRecoverySpec.floored_inverse(0.4, 100.0, 0.3).recovery_at_notional(400.0) == pytest.approx(0.3)
     assert credit.DynamicRecoverySpec.linear_decline(0.4, 100.0, 0.1, 0.2).kind == "linear_decline"
     assert credit.DynamicRecoverySpec.inverse_power(0.4, 100.0, 1.0) != inverse
-    assert credit.DynamicRecoverySpec.constant(0.4) == credit.DynamicRecoverySpec.constant(0.4)
+    constant, same_constant = credit.DynamicRecoverySpec.constant(0.4), credit.DynamicRecoverySpec.constant(0.4)
+    assert constant == same_constant
 
     tabular = credit.EndogenousHazardSpec.tabular([2.0, 6.0], [0.01, 0.05])
     assert tabular.kind == "tabular"
@@ -89,7 +90,8 @@ def test_structural_spec_constructors_and_equality() -> None:
     with pytest.raises(ValueError, match="hazard_rate, distance_to_default, leverage"):
         credit.ToggleExerciseModel.threshold("ebitda", 1.0, "above")
 
-    assert credit.MertonBarrierType.terminal() == credit.MertonBarrierType.terminal()
+    terminal, same_terminal = credit.MertonBarrierType.terminal(), credit.MertonBarrierType.terminal()
+    assert terminal == same_terminal
     assert repr(credit.MertonBarrierType.terminal()) == "MertonBarrierType.terminal()"
     assert (
         repr(credit.MertonBarrierType.first_passage(0.02))

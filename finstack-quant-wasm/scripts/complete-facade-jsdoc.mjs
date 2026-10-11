@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import ts from 'typescript';
-import { stripLegacyBoilerplate } from './typescript-docs-shared.mjs';
+import { stripCommentDelimiters, stripLegacyBoilerplate } from './typescript-docs-shared.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const option = process.argv.find((value) => value.startsWith('--declaration='));
@@ -103,7 +103,7 @@ function insertSummary(documentationText, value) {
 function appendTags(documentationText, tags) {
   if (!tags.length) return documentationText;
   if (!documentationText.includes('\n')) {
-    const summaryText = documentationText.replace(/^\/\*\*\s*|\s*\*\/$/g, '').trim();
+    const summaryText = stripCommentDelimiters(documentationText).trim();
     return `/**\n * ${summaryText}\n${tags.map((tag) => ` * ${tag}\n`).join('')} */`;
   }
   return documentationText.replace(/\*\/$/, `${tags.map((tag) => ` * ${tag}\n`).join('')} */`);
@@ -121,8 +121,7 @@ function isPrivateMember(node) {
 
 function formatDocumentation(documentationText, node) {
   const indent = documentationIndent(node);
-  const body = documentationText
-    .replace(/^\/\*\*\s*|\s*\*\/$/g, '')
+  const body = stripCommentDelimiters(documentationText)
     .split('\n')
     .map((line) => line.replace(/^\s*\* ?/, '').trimEnd());
   while (body.length && !body[0].trim()) body.shift();

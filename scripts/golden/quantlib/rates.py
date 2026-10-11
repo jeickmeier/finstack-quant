@@ -273,7 +273,7 @@ def build_sofr_future() -> dict[str, Any]:
     ql.Settings.instance().evaluationDate = ql_date(VALUATION_DATE)
     quoted_price = 95.7
     helper = ql.SofrFutureRateHelper(quoted_price, ql.June, 2026, ql.Quarterly, 0.0)
-    if helper.quote().value() != quoted_price:
+    if not math.isclose(helper.quote().value(), quoted_price):
         raise RuntimeError("QuantLib SOFR future helper did not retain its input quote")
     expected = {
         "convexity_adjustment": 0.0,

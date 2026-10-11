@@ -75,7 +75,7 @@ def kv_table(rows: list[tuple[str, str, str]]) -> str:
     True
     """
     body = "".join(
-        f'<tr><td class="k">{fmt._escape_html(k)}</td><td class="v {cls}">{fmt._escape_html(v)}</td></tr>'
+        f'<tr><th scope="row" class="k">{fmt._escape_html(k)}</th><td class="v {cls}">{fmt._escape_html(v)}</td></tr>'
         for k, v, cls in rows
     )
     return f'<table class="kv"><tbody>{body}</tbody></table>'

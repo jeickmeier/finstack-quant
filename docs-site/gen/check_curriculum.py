@@ -280,7 +280,7 @@ def _visible_mdx(text: str) -> str:
     visible = []
     fence = None
     for line in text.splitlines(keepends=True):
-        match = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line.rstrip("\r\n"))
+        match = re.match(r"^ {0,3}(`{3,}+|~{3,}+)(.*)$", line.rstrip("\r\n"))
         if fence is None:
             if match:
                 fence = match[1]

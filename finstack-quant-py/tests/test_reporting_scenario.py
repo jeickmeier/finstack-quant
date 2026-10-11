@@ -65,7 +65,8 @@ def test_scenario_tearsheet_all_optional_absent_still_builds() -> None:
 
 def test_scenario_tearsheet_deterministic() -> None:
     kw = {"tornado": _TORNADO, "scenarios": _SCENARIOS, "monte_carlo": _MC, "generated": dt.date(2026, 6, 22)}
-    assert scenario_tearsheet(**kw).to_html() == scenario_tearsheet(**kw).to_html()
+    first, second = scenario_tearsheet(**kw), scenario_tearsheet(**kw)
+    assert first.to_html() == second.to_html()
 
 
 def test_scenario_tearsheet_rejects_unknown_section() -> None:

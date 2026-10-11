@@ -44,7 +44,8 @@ def test_save_writes_file(tmp_path: Path) -> None:
 
 
 def test_output_is_deterministic() -> None:
-    assert _sheet().to_html() == _sheet().to_html()
+    first, second = _sheet(), _sheet()
+    assert first.to_html() == second.to_html()
 
 
 def test_tooltip_assets_present() -> None:

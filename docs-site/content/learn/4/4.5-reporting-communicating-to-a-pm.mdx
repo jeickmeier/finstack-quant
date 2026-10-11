@@ -64,7 +64,7 @@ report=TearSheet(INSTITUTIONAL,"Analyst common book",[
     Section("Decision and conditions","<p>Hold pending confirmation of the private loan's executable liquidity. Size any hedge from qualified curve and credit sensitivities; positive bump P&amp;L sets the sign.</p>"),
     Section("Holdings and currency reconciliation",frame.to_html(index=False)),
     Section("Credit risk by qualified key",pd.DataFrame(list(credit.items()),columns=["key","USD per bp"]).to_html(index=False)),
-    Section("Liquidity evidence",liquidity_panel()[["source","daily_capacity"]].to_html()),
+    Section("Liquidity evidence",liquidity_panel()[["source","daily_capacity"]].reset_index().to_html(index=False)),
 ],kpis=[KPI("Native common-book PV",f"{total:,.2f} USD"),KPI("Positions",str(len(rows)))],generated=AS_OF,subtitle="Teaching fixture; no CLO sleeve in this common book")
 report.save("analyst-pm-report.html")
 print(frame.to_string(index=False))

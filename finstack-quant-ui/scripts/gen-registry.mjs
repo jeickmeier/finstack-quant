@@ -7,6 +7,7 @@ import { wasmVersion, withoutMetadata } from "./registry-metadata.mjs";
 
 import ts from "typescript";
 import { shadcnItems } from "./shadcn.mjs";
+import { byCodeUnit } from "./order.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const read = (path) => readFile(`${root}${path}`, "utf8").then(JSON.parse);
@@ -171,7 +172,7 @@ for (const entry of items) {
   if (stock.size)
     entry.registryDependencies = [
       ...(entry.registryDependencies ?? []),
-      ...[...stock].sort(),
+      ...[...stock].sort(byCodeUnit),
     ];
 }
 const output = await prettier.format(

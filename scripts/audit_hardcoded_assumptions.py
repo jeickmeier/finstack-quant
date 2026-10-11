@@ -149,7 +149,7 @@ CATEGORY_PATTERNS: dict[str, tuple[str, ...]] = {
 }
 
 NUMBER_RE = re.compile(
-    r"(?<![A-Za-z0-9_])[-+]?(?:\d+\.\d+|\d+)(?:e[-+]?\d+)?(?![A-Za-z0-9_])",
+    r"(?<![A-Za-z0-9_])[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?(?![A-Za-z0-9_])",
     re.IGNORECASE,
 )
 STRING_RE = re.compile(r'"[^"\n]{2,}"|\'[^\'\n]{2,}\'')

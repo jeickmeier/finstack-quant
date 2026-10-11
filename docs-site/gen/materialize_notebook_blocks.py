@@ -13,7 +13,7 @@ from common import CONTENT, NOTEBOOKS, cell_source as raw_cell_source, contained
 from publication_source import assertion_count, without_assertions
 from run_lesson_snippets import extract_blocks
 
-MARKER = re.compile(r"^[ \t]*(?:<!--\s*(/?notebook-block\b.*?)\s*-->|\{/\*\s*(/?notebook-block\b.*?)\s*\*/\})[ \t]*$")
+MARKER = re.compile(r"^[ \t]*(?:<!--\s*(/?notebook-block\b.*?)-->|\{/\*\s*(/?notebook-block\b.*?)\*/\})[ \t]*$")
 MARKER_START = re.compile(r"^[ \t]*(?:<!--|\{/\*)\s*/?notebook-block\b")
 CELL_ID = re.compile(r"[a-z0-9][a-z0-9_-]*\Z")
 

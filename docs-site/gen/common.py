@@ -102,7 +102,7 @@ def markdown_heading_slug(heading: str) -> str:
 def reference_anchors(text: str) -> set[str]:
     """Collect explicit and standard Markdown heading anchors."""
     anchors = set(re.findall(r'<a\s+(?:id|name)=["\']([^"\']+)', text))
-    for heading in re.findall(r"^#{1,6}\s+(.+)$", text, re.M):
+    for heading in re.findall(r"^#{1,6}[ \t]+(.+)$", text, re.M):
         anchors.add(markdown_heading_slug(heading))
     return anchors
 

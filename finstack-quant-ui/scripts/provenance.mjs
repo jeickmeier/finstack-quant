@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import ts from "typescript";
 import { schemaAt } from "../src/schema.mjs";
+import { byCodeUnit } from "./order.mjs";
 
 const base = "https://finstack_quant.dev/schemas/";
 const market = `${base}market_data/1/market_context_state.schema.json`;
@@ -261,7 +262,7 @@ export async function generateProvenance(repo, contracts, fixtureManifest) {
   }
   const instrumentRoots = [...contracts.keys()]
     .filter((uri) => /\/instrument\/1\/[^/]+\/[^/]+\.schema\.json$/.test(uri))
-    .sort();
+    .sort(byCodeUnit);
   const entries = displays.map(({ api, schema, pointer, ...entry }) => ({
     ...entry,
     ...(api ? { api: apiSource(api) } : {}),

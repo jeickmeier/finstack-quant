@@ -1079,7 +1079,6 @@ class TestAccrual:
     def test_accrual_method_is_hashable(self) -> None:
         from finstack_quant.cashflows.accrual import AccrualMethod
 
-        assert hash(AccrualMethod.LINEAR) == hash(AccrualMethod.LINEAR)
         assert AccrualMethod.LINEAR in {AccrualMethod.LINEAR}
         assert AccrualMethod.LINEAR != AccrualMethod.COMPOUNDED
 

@@ -271,7 +271,7 @@ def cds_tranche(idx: int) -> tuple[str, dict]:
     iid = f"CDX-TR-{idx}"
     attach_detach = [(0.0, 3.0), (3.0, 7.0), (7.0, 10.0)]
     a, d = attach_detach[idx % 3]
-    coupon = 500.0 if a == 0.0 else 100.0
+    coupon = 500.0 if idx % 3 == 0 else 100.0
     return iid, {
         "type": "cds_tranche",
         "spec": {
@@ -720,107 +720,121 @@ def acme_bond() -> dict:
     }
 
 
+def _years_to(date_text: str) -> int:
+    """Whole calendar years from the fixture as-of date to an ISO date."""
+    return int(date_text[:4]) - AS_OF.year
+
+
+def _describe_bond(s: dict) -> str:
+    tenor = _years_to(s["maturity"])
+    cf = s["cashflow_spec"]
+    if "fixed" in cf:
+        cpn = float(cf["fixed"]["rate"]) * 100
+        return f"Fixed {tenor}Y {cpn:.1f}%"
+    sp = cf["floating"]["rate_spec"]["spread_bp"]
+    return f"FRN {tenor}Y SOFR+{sp}bp"
+
+
+def _describe_term_loan(s: dict) -> str:
+    tenor = _years_to(s["maturity"])
+    rate = s["rate"]
+    if "fixed" in rate:
+        return f"TL Fixed {tenor}Y {rate['fixed']['rate'] * 10_000:.0f}bp"
+    flt = rate["floating"]
+    sp = flt["spread_bp"]
+    floor = flt.get("index_floor_bp", "0")
+    return f"TL Flt {tenor}Y SOFR+{sp}bp (fl {floor}bp)"
+
+
+def _describe_revolver(s: dict) -> str:
+    drawn = float(s["drawn"]["amount"]) / 1e6
+    commit = float(s["commitment"]["amount"]) / 1e6
+    return f"Revolver {_years_to(s['maturity'])}Y {drawn:.0f}/{commit:.0f}M"
+
+
+def _describe_cds(s: dict, label: str) -> str:
+    tenor = _years_to(s["premium_leg"]["end"])
+    spread = float(s["premium_leg"]["coupon_bp"])
+    side = s["side"][:3].title()
+    return f"{label} {side} {tenor}Y {spread:.0f}bp"
+
+
+def _describe_cds_tranche(s: dict) -> str:
+    a, d = float(s["attach_pct"]), float(s["detach_pct"])
+    return f"CDX Tr {a:.0f}-{d:.0f}%"
+
+
+def _describe_cds_option(s: dict) -> str:
+    strike = s["strike"]
+    opt = s["option_type"].title()
+    if "clean_price_pct" in strike:
+        return f"CDS Opt {opt} K={float(strike['clean_price_pct']):.1f}"
+    strike_bp = float(strike["spread"]) * 10000
+    return f"CDS Opt {opt} K={strike_bp:.0f}bp"
+
+
+def _describe_structured_credit(s: dict) -> str:
+    deal = s["deal_type"]
+    cpn = s["tranches"]["tranches"][0]["coupon"]
+    if "fixed" in cpn:
+        rate = float(cpn["fixed"]["rate"]) * 100
+        return f"{deal} Snr {rate:.1f}%"
+    return f"{deal} Snr"
+
+
+def _describe_irs(s: dict) -> str:
+    tenor = _years_to(s["fixed_leg"]["end"])
+    rate = float(s["fixed_leg"]["rate"]) * 100
+    return f"IRS {s['side'].title()} {tenor}Y {rate:.1f}%"
+
+
+def _describe_swaption(s: dict) -> str:
+    fixed_leg = s["underlying_fixed_leg"]
+    strike = float(fixed_leg["rate"]) * 100
+    return f"Swpn {s['option_type'].title()} {_years_to(fixed_leg['end'])}Y K={strike:.1f}%"
+
+
+def _describe_ir_future(s: dict) -> str:
+    terms = s["terms"]
+    price = float(terms["entry_price"])
+    return f"SOFR Fut {terms['last_trading_date'][:7]} {terms['position'][:1].upper()} @{price:.2f}"
+
+
+def _describe_variance_swap(s: dict) -> str:
+    side = s["side"][:3].title()
+    strike_vol = (float(s["strike_variance"]) ** 0.5) * 100
+    return f"VarSwap {s['underlying_ticker']} {side} {_years_to(s['maturity'])}Y σ={strike_vol:.0f}%"
+
+
+def _describe_convertible(s: dict) -> str:
+    cpn = float(s["cashflow_spec"]["fixed"]["rate"]) * 100
+    return f"CB {s['spot_id']} {_years_to(s['maturity'])}Y {cpn:.1f}%"
+
+
+_DESCRIBERS = {
+    "bond": _describe_bond,
+    "term_loan": _describe_term_loan,
+    "revolving_credit": _describe_revolver,
+    "credit_default_swap": lambda s: _describe_cds(s, "CDS"),
+    "cds_index": lambda s: _describe_cds(s, "CDX IG"),
+    "cds_tranche": _describe_cds_tranche,
+    "cds_option": _describe_cds_option,
+    "structured_credit": _describe_structured_credit,
+    "interest_rate_swap": _describe_irs,
+    "swaption": _describe_swaption,
+    "interest_rate_future": _describe_ir_future,
+    "equity": lambda s: f"{s['ticker']} {s['quantity']:.0f}sh",
+    "variance_swap": _describe_variance_swap,
+    "fx_swap": lambda s: f"FX {s['base_currency']}/{s['quote_currency']} {s['far_date'][:7]}",
+    "convertible_bond": _describe_convertible,
+}
+
+
 def instrument_description(instrument_spec: dict) -> str:
     """One-line analyst-readable label for a portfolio position."""
     itype = instrument_spec["type"]
-    s = instrument_spec["spec"]
-    ref_year = AS_OF.year
-
-    if itype == "bond":
-        tenor = int(s["maturity"][:4]) - ref_year
-        cf = s["cashflow_spec"]
-        if "fixed" in cf:
-            cpn = float(cf["fixed"]["rate"]) * 100
-            return f"Fixed {tenor}Y {cpn:.1f}%"
-        sp = cf["floating"]["rate_spec"]["spread_bp"]
-        return f"FRN {tenor}Y SOFR+{sp}bp"
-
-    if itype == "term_loan":
-        tenor = int(s["maturity"][:4]) - ref_year
-        rate = s["rate"]
-        if "fixed" in rate:
-            return f"TL Fixed {tenor}Y {rate['fixed']['rate'] * 10_000:.0f}bp"
-        flt = rate["floating"]
-        sp = flt["spread_bp"]
-        floor = flt.get("index_floor_bp", "0")
-        return f"TL Flt {tenor}Y SOFR+{sp}bp (fl {floor}bp)"
-
-    if itype == "revolving_credit":
-        tenor = int(s["maturity"][:4]) - ref_year
-        drawn = float(s["drawn"]["amount"]) / 1e6
-        commit = float(s["commitment"]["amount"]) / 1e6
-        return f"Revolver {tenor}Y {drawn:.0f}/{commit:.0f}M"
-
-    if itype == "credit_default_swap":
-        tenor = int(s["premium_leg"]["end"][:4]) - ref_year
-        spread = float(s["premium_leg"]["coupon_bp"])
-        side = s["side"][:3].title()
-        return f"CDS {side} {tenor}Y {spread:.0f}bp"
-
-    if itype == "cds_index":
-        tenor = int(s["premium_leg"]["end"][:4]) - ref_year
-        spread = float(s["premium_leg"]["coupon_bp"])
-        side = s["side"][:3].title()
-        return f"CDX IG {side} {tenor}Y {spread:.0f}bp"
-
-    if itype == "cds_tranche":
-        a, d = float(s["attach_pct"]), float(s["detach_pct"])
-        return f"CDX Tr {a:.0f}-{d:.0f}%"
-
-    if itype == "cds_option":
-        strike = s["strike"]
-        opt = s["option_type"].title()
-        if "clean_price_pct" in strike:
-            return f"CDS Opt {opt} K={float(strike['clean_price_pct']):.1f}"
-        strike_bp = float(strike["spread"]) * 10000
-        return f"CDS Opt {opt} K={strike_bp:.0f}bp"
-
-    if itype == "structured_credit":
-        deal = s["deal_type"]
-        tr = s["tranches"]["tranches"][0]
-        cpn = tr["coupon"]
-        if "fixed" in cpn:
-            rate = float(cpn["fixed"]["rate"]) * 100
-            return f"{deal} Snr {rate:.1f}%"
-        return f"{deal} Snr"
-
-    if itype == "interest_rate_swap":
-        tenor = int(s["fixed_leg"]["end"][:4]) - ref_year
-        rate = float(s["fixed_leg"]["rate"]) * 100
-        side = s["side"].title()
-        return f"IRS {side} {tenor}Y {rate:.1f}%"
-
-    if itype == "swaption":
-        fixed_leg = s["underlying_fixed_leg"]
-        swap_tenor = int(fixed_leg["end"][:4]) - ref_year
-        strike = float(fixed_leg["rate"]) * 100
-        opt = s["option_type"].title()
-        return f"Swpn {opt} {swap_tenor}Y K={strike:.1f}%"
-
-    if itype == "interest_rate_future":
-        exp = s["terms"]["last_trading_date"][:7]
-        pos = s["terms"]["position"][:1].upper()
-        price = float(s["terms"]["entry_price"])
-        return f"SOFR Fut {exp} {pos} @{price:.2f}"
-
-    if itype == "equity":
-        return f"{s['ticker']} {s['quantity']:.0f}sh"
-
-    if itype == "variance_swap":
-        tenor = int(s["maturity"][:4]) - ref_year
-        side = s["side"][:3].title()
-        strike_vol = (float(s["strike_variance"]) ** 0.5) * 100
-        return f"VarSwap {s['underlying_ticker']} {side} {tenor}Y σ={strike_vol:.0f}%"
-
-    if itype == "fx_swap":
-        return f"FX {s['base_currency']}/{s['quote_currency']} {s['far_date'][:7]}"
-
-    if itype == "convertible_bond":
-        tenor = int(s["maturity"][:4]) - ref_year
-        cpn = float(s["cashflow_spec"]["fixed"]["rate"]) * 100
-        return f"CB {s['spot_id']} {tenor}Y {cpn:.1f}%"
-
-    return itype
+    describe = _DESCRIBERS.get(itype)
+    return itype if describe is None else describe(instrument_spec["spec"])
 
 
 INSTRUMENT_FACTORIES = [

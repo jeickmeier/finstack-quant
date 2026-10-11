@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import prettier from "prettier";
 import { linkSchema, schemaAt, sharedDefsId } from "../src/schema.mjs";
+import { byCodeUnit } from "./order.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const read = async (name) =>
   JSON.parse(await readFile(path.join(root, name), "utf8"));
@@ -190,7 +191,7 @@ for (const entry of roots) {
       .map((f) => f.source),
     constructs: Object.fromEntries(
       [...new Set(constructs.map((item) => item.kind))]
-        .sort()
+        .sort(byCodeUnit)
         .map((kind) => [
           kind,
           constructs

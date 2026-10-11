@@ -7,6 +7,7 @@ import { bundleRoot, json, readContracts } from "./schema.mjs";
 import { converterSchema, linkSchema } from "../src/schema.mjs";
 import { generateProvenance } from "./provenance.mjs";
 import { externalize, planSharedDefs, sharedRefNames } from "./share-defs.mjs";
+import { byCodeUnit } from "./order.mjs";
 
 export const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 export const repoRoot = resolve(packageRoot, "..");
@@ -34,7 +35,7 @@ export async function discoverFixtures(repo, contracts) {
   ]) {
     const paths = [];
     for await (const path of glob(pattern, { cwd: repo })) paths.push(path);
-    for (const source of paths.sort()) {
+    for (const source of paths.sort(byCodeUnit)) {
       const text = await readFile(resolve(repo, source), "utf8");
       const value = JSON.parse(text);
       const contract =
@@ -268,7 +269,7 @@ export async function generate(repo = repoRoot) {
       }
       const used = [...referenced]
         .filter((defName) => new RegExp(`\\b${defName}\\b`).test(types))
-        .sort();
+        .sort(byCodeUnit);
       if (used.length)
         types = types.replace(
           banner,

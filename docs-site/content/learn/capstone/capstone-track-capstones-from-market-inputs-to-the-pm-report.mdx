@@ -329,7 +329,7 @@ stress.insert(calibrate(index_calibration).market.get_hazard("CDX-HAZ"))
 stress.insert(HazardCurve("CONVERT-RISKY",AS_OF,[(1.0,.055)],recovery_rate=0.))
 stress.insert_price("CONVERT",80.,"USD")
 stressed_deal=deepcopy(holding["deal"])
-stressed_deal["instrument"]["spec"].update({"default_spec":{"cdr":.05,"curve":None},
+stressed_deal["instrument"]["spec"].update({"default_spec":{"curve":"constant","cdr":.05},
     "recovery_spec":{"rate":.25,"recovery_lag":6}})
 bbb_stress=structured_credit_tranche_metrics(json.dumps(stressed_deal),"BBB",stress,AS_OF).pv*holding["quantity"]
 stressed=value_portfolio(book,stress,metrics=[])
@@ -411,7 +411,7 @@ waterfall_table=pd.DataFrame(waterfall_rows)
 print(waterfall_table.to_string(index=False));print({"BBB_first_loss_CDR_base":first_loss_base,"BBB_first_loss_CDR_lower_recovery":first_loss_stress})
 # One-period stressed trace has immediate recovery so every distribution shares one known date.
 trace=tracks.clo_deal(one_period=True);ts=trace["instrument"]["spec"]
-ts.update(default_spec={"cdr":.05},recovery_spec={"rate":.25,"recovery_lag":0})
+ts.update(default_spec={"curve":"constant","cdr":.05},recovery_spec={"rate":.25,"recovery_lag":0})
 flows=json.loads(instrument_cashflows(json.dumps(trace),market,AS_OF,"discounting").to_json())["flows"]
 cash_flows=[flow for flow in flows if flow["date"]>AS_OF.isoformat() and flow["kind"]!="defaulted_notional"]
 trace_df=market.get_discount("USD-OIS").df(90/365)

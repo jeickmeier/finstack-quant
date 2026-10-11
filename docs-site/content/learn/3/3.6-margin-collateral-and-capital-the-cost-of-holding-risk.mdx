@@ -127,7 +127,7 @@ for row in mapping[mapping.framework == "SIMM"].itertuples():
 simm_result = SimmCalculator("v2_6").calculate_from_sensitivities(simm, "USD", AS_OF)
 frtb = FrtbSensitivities("USD")
 for row in mapping[mapping.framework == "FRTB"].itertuples():
-    frtb.add_girr_delta(row.tenor, row.amount, row.currency)
+    frtb.add_girr_delta(row.currency, row.tenor, row.amount)
 capital = FrtbSbaEngine().calculate(frtb)
 
 # Independently reconcile one 5Y IR bucket, below the concentration threshold.
@@ -247,7 +247,7 @@ print("VM initial and controlled+50k mark move:",initial_vm.to_json(),next_vm.to
 # This is a simplified native charge, not a complete regulatory subcurve treatment.
 # Capital is distinct from IM. Explicit two-trade GIRR and credit-spread delta scope.
 capital_sens=FrtbSensitivities("USD")
-for row in full_mapping[full_mapping.framework=="FRTB"].itertuples():capital_sens.add_girr_delta(row.tenor,row.amount,row.currency)
+for row in full_mapping[full_mapping.framework=="FRTB"].itertuples():capital_sens.add_girr_delta(row.currency,row.tenor,row.amount)
 for row in full_mapping[(full_mapping.framework=="SIMM") & (full_mapping.factor=="ACME-HZD par CDS")].itertuples():capital_sens.add_csr_nonsec_delta("ACME",16,row.tenor,"cds",100*row.amount)
 capital_result=FrtbSbaEngine().calculate(capital_sens)
 print("FRTB BCBSd457 embedded parameter vintage; two-trade delta-only charge:",capital_result.total,capital_result.binding_scenario)

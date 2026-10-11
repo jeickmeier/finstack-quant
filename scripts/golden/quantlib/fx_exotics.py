@@ -182,7 +182,7 @@ def _fx_barrier_option(
             )
         )
     )
-    rebate = None if rebate_per_unit == 0.0 else {"amount": str(int(rebate_per_unit * notional)), "currency": "USD"}
+    rebate = None if not rebate_per_unit else {"amount": str(int(rebate_per_unit * notional)), "currency": "USD"}
     spec: dict[str, Any] = {
         "id": instrument_id,
         "strike": strike,

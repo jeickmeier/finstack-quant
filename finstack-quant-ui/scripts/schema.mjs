@@ -12,6 +12,7 @@ import {
   schemaAt,
   sharedDefsId,
 } from "../src/schema.mjs";
+import { byCodeUnit } from "./order.mjs";
 
 export const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const supported = new Set([
@@ -49,7 +50,7 @@ export async function readContracts(repo) {
     cwd: repo,
   }))
     indexes.push(path);
-  for (const path of indexes.sort()) {
+  for (const path of indexes.sort(byCodeUnit)) {
     const index = JSON.parse(await readFile(resolve(repo, path), "utf8"));
     if (index.schema_index_version !== 1)
       throw new Error(`Unsupported schema index: ${path}`);

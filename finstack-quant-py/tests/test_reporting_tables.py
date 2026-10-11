@@ -11,6 +11,7 @@ def test_kv_table_renders_rows() -> None:
     minidom.parseString(html)  # noqa: S318
     assert "Sharpe" in html and "1.42" in html  # noqa: PT018
     assert 'class="v neg"' in html
+    assert '<th scope="row" class="k">Sharpe</th>' in html
 
 
 def test_heatmap_grid_shape() -> None:

@@ -47,7 +47,7 @@ def main() -> None:
     usd = Currency("USD")
     cash = Money(100.0, usd)
     _require(cash.currency == usd, "Money did not preserve its Currency")
-    _require(cash.amount == 100.0, f"Money amount changed during construction: {cash.amount}")
+    _require(math.isclose(cash.amount, 100.0), f"Money amount changed during construction: {cash.amount}")
 
     spot = 100.0
     strike = 100.0

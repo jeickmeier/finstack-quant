@@ -59,9 +59,7 @@ from datetime import date, timedelta
 import pandas as pd
 from pytest import approx
 from _shared.analyst_history import performance_history, history_events, history_market, history_spec, history_quotes
-from finstack_quant.portfolio import (
-    Portfolio, aggregate_full_cashflows, value_portfolio, twrr_modified_dietz, twrr_linked, mwr_xirr,
-)
+from finstack_quant.portfolio import (Portfolio, aggregate_full_cashflows, value_portfolio, twrr_modified_dietz, twrr_linked, mwr_xirr)
 history = performance_history()
 history_dates = (date.fromisoformat(history[0]['start']), *(date.fromisoformat(period['end']) for period in history))
 events = history_events()

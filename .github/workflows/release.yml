@@ -23,8 +23,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 # Managed toolchain versions are pinned in mise.toml.
 # CI uses jdx/mise-action@v4 to provision them, then runs raw commands.
+
+# A fork pull request from a branch named `master` also completes Build, so
+# every workflow_run job also requires a push to this repository.
 
 jobs:
   # ── Python Wheels ───────────────────────────────────────────────
@@ -33,6 +39,8 @@ jobs:
     if: |
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
        github.event.workflow_run.head_branch == 'master') ||
       (github.event_name == 'workflow_dispatch' &&
        github.event.inputs.publish == 'true')
@@ -66,7 +74,7 @@ jobs:
           - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.14", timeout: 120, lto: fat,  codegen_units: 1 }
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
 
@@ -76,7 +84,7 @@ jobs:
         run: '"HOME=$env:USERPROFILE" | Out-File -FilePath $env:GITHUB_ENV -Append'
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
           # Wheels only need the pinned stable compiler. A full `mise install`
@@ -90,12 +98,12 @@ jobs:
           MISE_JOBS: "1"
 
       - name: Set up matrix Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: ${{ matrix.python }}
 
       - name: Build wheel
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1
         with:
           target: ${{ matrix.target }}
           args: >-
@@ -123,7 +131,7 @@ jobs:
         if: matrix.os != 'linux-arm64'
         run: python scripts/smoke_python_wheel.py
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: wheel-${{ matrix.os }}-py${{ matrix.python }}
           path: dist/*.whl
@@ -134,20 +142,22 @@ jobs:
     if: |
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
        github.event.workflow_run.head_branch == 'master') ||
       (github.event_name == 'workflow_dispatch' &&
        github.event.inputs.publish == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
-      - uses: PyO3/maturin-action@v1
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1
         with:
           command: sdist
           args: --out dist
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: sdist
           path: dist/*.tar.gz
@@ -158,18 +168,20 @@ jobs:
     if: |
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
        github.event.workflow_run.head_branch == 'master') ||
       (github.event_name == 'workflow_dispatch' &&
        github.event.inputs.publish == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
           # wasm-pack and Node package the release. The cargo CLIs and nightly
@@ -214,7 +226,7 @@ jobs:
           npm pack --ignore-scripts
           mv finstack-quant-wasm-*.tgz ../dist/
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: wasm-builds
           path: |
@@ -231,6 +243,8 @@ jobs:
     if: |
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
        github.event.workflow_run.head_branch == 'master') ||
       (github.event_name == 'workflow_dispatch' &&
        github.event.inputs.publish == 'true')
@@ -268,7 +282,7 @@ jobs:
             echo "make_latest=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           path: dist
           merge-multiple: true
@@ -277,7 +291,7 @@ jobs:
         run: ls -lhR dist/
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           name: ${{ steps.release.outputs.tag }}
           tag_name: ${{ steps.release.outputs.tag }}

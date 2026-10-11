@@ -408,7 +408,7 @@ for fid in factor_ids:
 # descriptor string such as '{"n_steps": 12}' are both accepted.
 cov_12 = fcf.covariance_at(VolHorizon.n_steps(12))
 one_step_variance = cov_one.variance(factor_ids[0])
-ratio = cov_12.variance(factor_ids[0]) / one_step_variance if one_step_variance != 0.0 else float("nan")
+ratio = cov_12.variance(factor_ids[0]) / one_step_variance if one_step_variance else float("nan")
 print(f"\nNSteps(12) / OneStep ratio (should be 12.0): {ratio:.4f}")
 
 # Per-issuer idiosyncratic vol

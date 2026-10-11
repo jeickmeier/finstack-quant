@@ -4,6 +4,7 @@ import path from "node:path";
 import { converter, parse, wcagContrast } from "culori";
 import ts from "typescript";
 import postcss from "postcss";
+import { byCodeUnit } from "./order.mjs";
 
 export function checkContrast(palette) {
   for (const [key, value] of Object.entries(palette)) {
@@ -144,8 +145,8 @@ export async function checkTokens(root) {
     ),
   );
   if (
-    Object.keys(tokens.light).sort().join() !==
-    Object.keys(tokens.dark).sort().join()
+    Object.keys(tokens.light).sort(byCodeUnit).join() !==
+    Object.keys(tokens.dark).sort(byCodeUnit).join()
   )
     throw new Error("Light/dark token keys differ");
   for (const mode of ["light", "dark"]) {

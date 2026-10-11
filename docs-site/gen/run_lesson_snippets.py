@@ -80,7 +80,7 @@ def extract_blocks(text: str, source: str = "<lesson>") -> list[Block]:
     lines: list[str] = []
     start = 0
     for number, line in enumerate(text.splitlines(), 1):
-        match = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        match = re.match(r"^ {0,3}(`{3,}+|~{3,}+)(.*)$", line)
         if fence is None:
             if match:
                 fence, info, start = match[1], match[2].strip(), number + 1
@@ -205,7 +205,7 @@ def validate_output_references(text: str, lesson_id: str, blocks: list[Block], s
     prose = []
     fence = None
     for line in text.splitlines():
-        match = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        match = re.match(r"^ {0,3}(`{3,}+|~{3,}+)(.*)$", line)
         if fence is None:
             if match:
                 fence = match[1]

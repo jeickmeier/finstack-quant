@@ -26,8 +26,8 @@
 .fq-ts .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:26px; }
 .fq-ts .statgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:0 30px; margin-top:6px; }
 .fq-ts table.kv { width:100%; border-collapse:collapse; font-size:12.5px; }
-.fq-ts table.kv td { padding:6px 0; border-bottom:1px solid #e4e1d8; }
-.fq-ts table.kv td.k { color:#7a8190; }
+.fq-ts table.kv th, .fq-ts table.kv td { padding:6px 0; border-bottom:1px solid #e4e1d8; }
+.fq-ts table.kv th.k { color:#7a8190; text-align:left; font-weight:inherit; }
 .fq-ts table.kv td.v { text-align:right; font-family:"Iowan Old Style",Georgia,serif; font-weight:600; color:#10243f; }
 .fq-ts table.kv td.v.pos { color:#1b6b4f; } .fq-ts table.kv td.v.neg { color:#9b2335; }
 .fq-ts table.hm { width:100%; border-collapse:collapse; font-family:"Iowan Old Style",Georgia,serif; font-size:11.5px; }
@@ -145,54 +145,49 @@
 </table><div class="secttl">Liquidity evidence</div><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
-      <th></th>
+      <th>position_id</th>
       <th>source</th>
       <th>daily_capacity</th>
-    </tr>
-    <tr>
-      <th>position_id</th>
-      <th></th>
-      <th></th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <th>USD-CORP</th>
+      <td>USD-CORP</td>
       <td>synthetic OTC</td>
       <td>0.10</td>
     </tr>
     <tr>
-      <th>EUR-GOVT</th>
+      <td>EUR-GOVT</td>
       <td>synthetic OTC</td>
       <td>1.00</td>
     </tr>
     <tr>
-      <th>USD-CASH</th>
+      <td>USD-CASH</td>
       <td>cash deposit; contractual maturity</td>
       <td>NaN</td>
     </tr>
     <tr>
-      <th>EUR-CASH</th>
+      <td>EUR-CASH</td>
       <td>cash deposit; contractual maturity</td>
       <td>NaN</td>
     </tr>
     <tr>
-      <th>USD-PAYER-IRS</th>
+      <td>USD-PAYER-IRS</td>
       <td>synthetic OTC</td>
       <td>0.25</td>
     </tr>
     <tr>
-      <th>SPX-CALL</th>
+      <td>SPX-CALL</td>
       <td>synthetic option position capacity</td>
       <td>0.50</td>
     </tr>
     <tr>
-      <th>ACME-CDS</th>
+      <td>ACME-CDS</td>
       <td>synthetic OTC</td>
       <td>0.20</td>
     </tr>
     <tr>
-      <th>BORROWER-TL</th>
+      <td>BORROWER-TL</td>
       <td>unavailable capacity; no quote</td>
       <td>NaN</td>
     </tr>

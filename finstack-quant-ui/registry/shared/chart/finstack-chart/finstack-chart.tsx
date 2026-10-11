@@ -160,6 +160,7 @@ export function FinstackChart<T, X extends ChartValue, Y extends ChartValue>(
             props.renderTooltipBody
               ? (context) => (
                   <div
+                    role="presentation"
                     onKeyDown={(event) => {
                       // The native host handles Enter/arrows on its container. Keep custom
                       // controls' browser defaults; Escape still reaches native dismissal.

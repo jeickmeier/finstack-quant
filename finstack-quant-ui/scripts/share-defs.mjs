@@ -1,4 +1,5 @@
 import { sharedDefsId } from "../src/schema.mjs";
+import { byCodeUnit } from "./order.mjs";
 
 const wideDefCount = 80;
 
@@ -6,7 +7,7 @@ function canonical(value) {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value && typeof value === "object")
     return `{${Object.keys(value)
-      .sort()
+      .sort(byCodeUnit)
       .map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`)
       .join(",")}}`;
   return JSON.stringify(value);
@@ -57,7 +58,7 @@ export function planSharedDefs(schemas) {
       }
     }
   }
-  const ordered = [...names].sort();
+  const ordered = [...names].sort(byCodeUnit);
   const shared = {
     $id: sharedDefsId,
     $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -124,7 +125,7 @@ export function sharedRefNames(schema) {
     }
   };
   visit(schema);
-  return [...names].sort();
+  return [...names].sort(byCodeUnit);
 }
 
 function localRefNames(node, names = []) {

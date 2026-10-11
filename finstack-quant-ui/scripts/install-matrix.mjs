@@ -40,6 +40,7 @@ const evidence =
   (await mkdtemp(path.join(tmpdir(), "finstack-install-evidence-")));
 await mkdir(evidence, { recursive: true });
 console.log(`Independent install evidence: ${evidence}`);
+const npmCache = await mkdtemp(path.join(tmpdir(), "finstack-npm-cache-"));
 const transport = await serveLocalRegistry(root),
   browser = await chromium.launch({ headless: true }),
   results = [];
@@ -69,7 +70,7 @@ const run = (args, cwd, log) =>
         npm_config_ignore_scripts: "true",
         npm_config_install_links: "true",
         npm_config_save_exact: "true",
-        npm_config_cache: "/tmp/component-registry-npm-cache",
+        npm_config_cache: npmCache,
       },
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 600000,
@@ -459,6 +460,7 @@ try {
 } finally {
   await browser.close();
   await transport.close();
+  await rm(npmCache, { recursive: true, force: true });
 }
 const failures = results.filter((result) => result.verdict !== "pass");
 console.log(

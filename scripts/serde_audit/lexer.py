@@ -457,7 +457,7 @@ def _split_top_level(value: str) -> list[str]:
 
 
 def _expand_use_tree(value: str) -> tuple[str, ...]:
-    value = re.sub(r"\s+as\s+", "@AS@", value)
+    value = re.sub(r"(?<!\s)\s+as\s+", "@AS@", value)
     value = re.sub(r"\s+", "", value)
     open_index = value.find("{")
     if open_index < 0:

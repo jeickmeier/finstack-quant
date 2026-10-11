@@ -25,6 +25,7 @@
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { compile } from 'json-schema-to-typescript';
+import { byCodeUnit } from './order.mjs';
 
 const PACKAGE = new URL('../', import.meta.url);
 const WORKSPACE = new URL('../finstack-quant/', PACKAGE);
@@ -50,7 +51,7 @@ const stale = [];
 const expected = new Set();
 
 // Info strings rustdoc treats as Rust code (a bare fence is Rust too).
-const RUST_FENCE = /^(|rust|no_run|ignore|should_panic|compile_fail|edition\d+)$/;
+const RUST_FENCE = /^(?:rust|no_run|ignore|should_panic|compile_fail|edition\d+)?$/;
 
 /**
  * Remove Rust code from a Rustdoc description.
@@ -124,7 +125,7 @@ function withoutRustExamples(value) {
 
 async function emit(url, text) {
   expected.add(url.href);
-  if (/^\s*\*\s*```rust\b/m.test(text))
+  if (/^[ \t]*\*[ \t]*```rust\b/m.test(text))
     throw new Error(`${url.pathname}: a Rust code example reached the TypeScript declarations`);
   if (CHECK) {
     const current = await readFile(url, 'utf8').catch(() => null);
@@ -266,9 +267,9 @@ function bundle(crate) {
       define(name, rewrite(schema, artifact.type_name), artifact.path);
     define(artifact.type_name, rewrite(root, artifact.type_name), artifact.path);
   }
-  const names = [...defs.keys()].sort();
+  const names = [...defs.keys()].sort(byCodeUnit);
   const schema = { $defs: Object.fromEntries(names.map((name) => [name, defs.get(name).schema])) };
-  return { schema, imports: [...imports].sort() };
+  return { schema, imports: [...imports].sort(byCodeUnit) };
 }
 
 const ROOT = '__FinstackContractBundle';

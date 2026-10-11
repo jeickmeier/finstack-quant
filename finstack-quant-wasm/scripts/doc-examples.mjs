@@ -10,6 +10,7 @@
 // gates; use it only for a sample that shows what not to write.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { byCodeUnit } from './order.mjs';
 
 const PACKAGE = new URL('../', import.meta.url);
 
@@ -33,7 +34,7 @@ const NAMESPACES = Object.keys(
   JSON.parse(readFileSync(new URL('facade-surface.json', PACKAGE), 'utf8'))
 )
   .filter((name) => !name.includes('.'))
-  .sort();
+  .sort(byCodeUnit);
 
 /** Setup assumed by a sample that has no `import` statement of its own. */
 export const PRELUDE = `import init, { ${NAMESPACES.join(', ')} } from "finstack-quant-wasm";\nawait init();\n`;
@@ -49,7 +50,7 @@ export const PRELUDE = `import init, { ${NAMESPACES.join(', ')} } from "finstack
  */
 export function fencedBlocks(text, inComments) {
   const strip = inComments ? (line) => line.replace(/^\s*\* ?/, '') : (line) => line;
-  const fence = inComments ? /^\s*\*\s?```\s*(.*)$/ : /^\s*```\s*(.*)$/;
+  const fence = inComments ? /^\s*\*\s?```(.*)$/ : /^\s*```(.*)$/;
   const blocks = [];
   let open = null;
   text.split('\n').forEach((raw, index) => {
@@ -92,7 +93,7 @@ export function collectExamples() {
       line: block.line,
       language: block.language,
       name: `${label.replace(/[^A-Za-z0-9]+/g, '_')}_L${block.line}`,
-      code: /^\s*import\s/m.test(block.code) ? block.code : PRELUDE + block.code,
+      code: /^[ \t]*import\s/m.test(block.code) ? block.code : PRELUDE + block.code,
     }));
   });
 }

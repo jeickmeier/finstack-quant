@@ -100,7 +100,7 @@ export function createService(native: {
   const instruments = native.valuations.instruments;
   return {
     initialize(url) {
-      initialize(url);
+      void initialize(url);
       return result(() => ({
         state: "ready" as const,
         worker: typeof document === "undefined",

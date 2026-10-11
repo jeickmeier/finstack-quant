@@ -553,14 +553,13 @@ async function main() {
     'daily'
   );
 
+  const constructCurrency = () => new w.Currency('USD');
   for (let i = 0; i < 20; i++) {
     w.mean(statsArr);
-    new w.Currency('EUR');
+    constructCurrency();
   }
 
-  bench('core', 'Currency constructor', 5000, () => {
-    new w.Currency('USD');
-  });
+  bench('core', 'Currency constructor', 5000, constructCurrency);
 
   bench('core', 'Money add / sub', 8000, () => {
     moneyA.checkedAdd(moneyB);

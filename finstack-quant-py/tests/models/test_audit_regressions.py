@@ -114,8 +114,9 @@ def test_sabr_parameters_round_trip_compare_and_pickle() -> None:
     assert SabrParameters.from_json(fitted.to_json()) == fitted
     assert pickle.loads(pickle.dumps(fitted)) == fitted  # noqa: S301 - round-trips our own bytes
     assert copy.deepcopy(fitted) == fitted
-    assert SabrParameters(0.2, 1.0, 0.3, -0.3) == SabrParameters(0.2, 1.0, 0.3, -0.3)
-    assert SabrParameters(0.2, 1.0, 0.3, -0.3) != SabrParameters(0.2, 1.0, 0.3, -0.3, shift=0.01)
+    params, same_params = SabrParameters(0.2, 1.0, 0.3, -0.3), SabrParameters(0.2, 1.0, 0.3, -0.3)
+    assert params == same_params
+    assert params != SabrParameters(0.2, 1.0, 0.3, -0.3, shift=0.01)
     with pytest.raises(ValueError, match="greater than zero"):
         SabrParameters.from_json('{"alpha": -0.2, "beta": 1.0, "nu": 0.3, "rho": -0.3}')
 

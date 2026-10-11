@@ -6,6 +6,7 @@ import {
   documentationBlocks,
   documentationFromBlocks,
   LEGACY_CATCH_ALL_THROW,
+  stripCommentDelimiters,
 } from './typescript-docs-shared.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -113,8 +114,7 @@ function normalizeParameterTags(documentationText, node) {
 function convertRustArguments(documentationText, node) {
   if (!documentationText) return documentationText;
   const facadeName = facadeParameterNames(node);
-  const body = documentationText
-    .replace(/^\/\*\*\s*|\s*\*\/$/g, '')
+  const body = stripCommentDelimiters(documentationText)
     .split('\n')
     .map((line) => line.replace(/^\s*\* ?/, '').trimEnd());
   const converted = [];
@@ -138,7 +138,7 @@ function convertRustArguments(documentationText, node) {
     }
     if (skippingSection) continue;
     if (inArguments) {
-      const argument = stripped.match(/^\*\s*`([A-Za-z_][A-Za-z0-9_]*)`\s*-\s*(.+)$/);
+      const argument = stripped.match(/^\*\s*`([A-Za-z_][A-Za-z0-9_]*)`\s*-\s*(\S.*)$/);
       if (argument) {
         const name = facadeName(argument[1]);
         if (name) converted.push(`@param ${name} - ${argument[2]}`);
@@ -160,8 +160,7 @@ function documentationIndent(node) {
 
 function formatDocumentation(documentationText, node) {
   const indent = documentationIndent(node);
-  const body = documentationText
-    .replace(/^\/\*\*\s*|\s*\*\/$/g, '')
+  const body = stripCommentDelimiters(documentationText)
     .split('\n')
     .map((line) => line.replace(/^\s*\* ?/, '').trimEnd());
   while (body.length && !body[0].trim()) body.shift();
@@ -208,24 +207,25 @@ function tagsFromRustdoc(documentationText, facadeName) {
       flushSection();
       continue;
     }
-    const parameter = stripped.match(/^@param\s+([A-Za-z_][A-Za-z0-9_]*)\s*-\s*(.+)$/);
+    const parameter = stripped.match(/^@param\s+([A-Za-z_][A-Za-z0-9_]*)\s*-\s*(\S.*)$/);
     if (parameter) {
       flushSection();
       const name = facadeName(parameter[1]);
       if (name) tags.push(`@param ${name} - ${parameter[2]}`);
       continue;
     }
-    const argument = stripped.match(/^\*\s*`([A-Za-z_][A-Za-z0-9_]*)`\s*-\s*(.+)$/);
+    const argument = stripped.match(/^\*\s*`([A-Za-z_][A-Za-z0-9_]*)`\s*-\s*(\S.*)$/);
     if (argument) {
       flushSection();
       const name = facadeName(argument[1]);
       if (name) tags.push(`@param ${name} - ${argument[2]}`);
       continue;
     }
-    const jsdoc = stripped.match(/^@(returns|throws|example)\b\s*(.*)$/);
+    const jsdoc = stripped.match(/^@(returns|throws|example)\b(.*)$/);
     if (jsdoc) {
       flushSection();
-      tags.push(`@${jsdoc[1]}${jsdoc[2] ? ` ${jsdoc[2]}` : ''}`);
+      const text = jsdoc[2].trimStart();
+      tags.push(`@${jsdoc[1]}${text ? ` ${text}` : ''}`);
       continue;
     }
     if (section) {
@@ -250,8 +250,7 @@ function parameterTagName(tag) {
 function stripRustdocHeadings(documentationText) {
   if (!documentationText) return documentationText;
   if (!/# (?:Arguments|Returns|Errors)\b/.test(documentationText)) return documentationText;
-  const body = documentationText
-    .replace(/^\/\*\*\s*|\s*\*\/$/g, '')
+  const body = stripCommentDelimiters(documentationText)
     .split('\n')
     .map((line) => line.replace(/^\s*\* ?/, '').trimEnd());
   const kept = [];

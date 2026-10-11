@@ -21,7 +21,8 @@ async function dataUrl(url: string) {
       return new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(reader.error);
+        reader.onerror = () =>
+          reject(reader.error ?? new Error("Figure font could not be read"));
         reader.readAsDataURL(blob);
       });
     });

@@ -96,8 +96,8 @@ class Theme:
 {s} .grid2 {{ display:grid; grid-template-columns:1fr 1fr; gap:26px; }}
 {s} .statgrid {{ display:grid; grid-template-columns:repeat(3,1fr); gap:0 30px; margin-top:6px; }}
 {s} table.kv {{ width:100%; border-collapse:collapse; font-size:12.5px; }}
-{s} table.kv td {{ padding:6px 0; border-bottom:1px solid {self.faint}; }}
-{s} table.kv td.k {{ color:{self.muted}; }}
+{s} table.kv th, {s} table.kv td {{ padding:6px 0; border-bottom:1px solid {self.faint}; }}
+{s} table.kv th.k {{ color:{self.muted}; text-align:left; font-weight:inherit; }}
 {s} table.kv td.v {{ text-align:right; font-family:{self.font_num}; font-weight:600; color:{self.ink}; }}
 {s} table.kv td.v.pos {{ color:{self.pos}; }} {s} table.kv td.v.neg {{ color:{self.neg}; }}
 {s} table.hm {{ width:100%; border-collapse:collapse; font-family:{self.font_num}; font-size:11.5px; }}

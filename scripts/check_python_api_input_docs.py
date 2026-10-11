@@ -26,7 +26,7 @@ LEGACY_EXAMPLE_PROMPT_RE = re.compile(
     r"[A-Za-z_][A-Za-z0-9_.]*\.__name__|"
     r"isinstance\([A-Za-z_][A-Za-z0-9_.]*,\s*(?:type|object)\))$"
 )
-EXAMPLE_SETUP_PROMPT_RE = re.compile(r"^(?:from\s+\S+\s+import\s+.+|import\s+.+)$")
+EXAMPLE_SETUP_PROMPT_RE = re.compile(r"^(?:from\s+\S+\s+import\s.+|import\s.+)$")
 DOES_NOT_RAISE_RE = re.compile(
     r"does not\s+raise|never\s+raises|does not\s+throw",
     re.IGNORECASE,

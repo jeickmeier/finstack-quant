@@ -1,6 +1,7 @@
 import { loadRegistry } from "shadcn/registry";
 import { spawn } from "node:child_process";
-import { readFile, writeFile, rm, mkdir, cp } from "node:fs/promises";
+import { readFile, writeFile, rm, mkdir, mkdtemp, cp } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { serveLocalRegistry } from "./local-registry.mjs";
@@ -21,6 +22,7 @@ const names = isDocs
     ];
 const cssPath = path.join(consumer, JSON.parse(original).tailwind.css);
 const originalCss = isDocs ? await readFile(cssPath, "utf8") : null;
+const npmCache = await mkdtemp(path.join(tmpdir(), "finstack-npm-cache-"));
 const server = await serveLocalRegistry(root);
 try {
   const config = JSON.parse(original);
@@ -45,7 +47,7 @@ try {
           ...process.env,
           npm_config_ignore_scripts: "true",
           npm_config_save_exact: "true",
-          npm_config_cache: "/tmp/component-registry-npm-cache",
+          npm_config_cache: npmCache,
         },
       },
     );
@@ -66,4 +68,5 @@ try {
   if (originalCss !== null) await writeFile(cssPath, originalCss);
   await writeFile(configPath, original);
   await server.close();
+  await rm(npmCache, { recursive: true, force: true });
 }

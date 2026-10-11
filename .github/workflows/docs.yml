@@ -47,7 +47,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up swap space
         uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
@@ -55,7 +55,7 @@ jobs:
           swap-size-gb: 10
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
           cache_save: false
@@ -70,19 +70,19 @@ jobs:
         run: rustup toolchain install nightly --profile minimal
 
       - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: rust-docs
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: Set up Python environment
         run: |
           uv venv --python 3.12
           echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
-          uv sync --no-install-project
+          uv sync --locked --no-build --no-install-project
 
       - name: Build docs and run doctests
         run: mise run rust-doc
@@ -98,10 +98,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           cache: true
           cache_save: false
@@ -110,13 +110,13 @@ jobs:
           MISE_JOBS: "1"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: Set up Python environment
         run: |
           uv venv --python 3.12
           echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
-          uv sync --no-install-project
+          uv sync --locked --no-build --no-install-project
 
       - name: Install WASM dependencies
         run: npm ci --ignore-scripts
