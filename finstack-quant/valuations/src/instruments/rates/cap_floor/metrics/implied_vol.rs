@@ -88,7 +88,8 @@ impl MetricCalculator for ImpliedVolCalculator {
 
         // Use curve-consistent helpers for forward rate and discount factor
         // (same as in the main pricing implementation)
-        let forward_rate = projection.forward;
+        let forward_rate = projection.forward - projection.additive_spread;
+        let strike = strike - projection.additive_spread;
         let mut quote_option = option.clone();
         quote_option
             .instrument_pricing_overrides

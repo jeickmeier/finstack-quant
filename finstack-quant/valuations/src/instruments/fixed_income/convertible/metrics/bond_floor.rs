@@ -5,9 +5,9 @@
 //! conversion option entirely. It represents the "straight bond" value -- what
 //! the instrument would be worth if it had no equity conversion feature.
 //!
-//! The cash component uses the main tree's discrete recovery blend of
-//! forward discount factors: `df_cash = df_credit * (1 - R) + df_risk_free * R`.
-//! This retains the canonical grid's discounting and coupon timing exactly.
+//! The floor uses the main tree's survival-weighted debt payments plus explicit
+//! recovery of outstanding principal, including PIK and prior amortization.
+//! Payment-date corrections preserve contractual cashflow discounting.
 //!
 //! # Use Cases
 //!

@@ -12,6 +12,95 @@ mod cases {
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use time::Month;
 
+    #[test]
+    fn coupon_accrual_is_independent_of_payment_adjustment() {
+        use time::macros::date;
+        let mut deal = StructuredCredit::example().expect("example");
+        deal.closing_date = date!(2024 - 03 - 30);
+        deal.first_payment_date = date!(2024 - 06 - 30);
+        deal.maturity = date!(2024 - 06 - 30);
+        deal.pool.reinvestment_period = None;
+        deal.cleanup_call_decimal = None;
+        deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        for asset in &mut deal.pool.assets {
+            asset.maturity = deal.maturity;
+        }
+        for tranche in &mut deal.tranches.tranches {
+            tranche.maturity = deal.maturity;
+        }
+        let market = MarketContext::new();
+        let run = |deal: &StructuredCredit| {
+            simulate_with_source(
+                deal,
+                &market,
+                deal.closing_date,
+                &mut DeterministicPoolFlowSource,
+            )
+            .expect("simulation")
+        };
+        deal.business_day_convention = Some(BusinessDayConvention::Unadjusted);
+        let unadjusted = run(&deal);
+        deal.business_day_convention = Some(BusinessDayConvention::ModifiedFollowing);
+        let adjusted = run(&deal);
+        for (id, expected) in unadjusted.tranches {
+            let actual = &adjusted.tranches[&id];
+            assert!(
+                (actual.total_interest.amount() - expected.total_interest.amount()).abs() < 1e-6,
+                "{id}: {} vs {}",
+                actual.total_interest,
+                expected.total_interest
+            );
+        }
+    }
+
+    #[test]
+    fn contractual_maturity_pays_bullet_when_payment_rolls_backward() {
+        use time::macros::date;
+        let mut deal = StructuredCredit::example().expect("example");
+        deal.closing_date = date!(2024 - 03 - 30);
+        deal.first_payment_date = date!(2024 - 06 - 30);
+        deal.maturity = date!(2024 - 06 - 30);
+        deal.pool.reinvestment_period = None;
+        deal.cleanup_call_decimal = None;
+        deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        for asset in &mut deal.pool.assets {
+            asset.maturity = deal.maturity;
+        }
+        for tranche in &mut deal.tranches.tranches {
+            tranche.maturity = deal.maturity;
+        }
+        let run = simulate_with_source(
+            &deal,
+            &MarketContext::new(),
+            deal.closing_date,
+            &mut DeterministicPoolFlowSource,
+        )
+        .expect("bullet simulation");
+        let principal: f64 = run
+            .tranches
+            .values()
+            .map(|tranche| tranche.total_principal.amount())
+            .sum();
+        let opening: f64 = deal
+            .pool
+            .assets
+            .iter()
+            .map(|asset| asset.balance.amount())
+            .sum();
+        assert!(
+            (principal - opening).abs() < 1e-6,
+            "{principal} vs {opening}"
+        );
+        for tranche in run.tranches.values() {
+            assert!(tranche
+                .principal_flows
+                .iter()
+                .all(|(date, _)| *date == date!(2024 - 06 - 28)));
+        }
+    }
+
     fn production_trigger_deal(
         consequence: crate::instruments::fixed_income::structured_credit::TriggerConsequence,
     ) -> StructuredCredit {
@@ -1439,6 +1528,7 @@ mod cases {
         let flows1 = calculate_pool_flows_with_rates(RatedPoolFlowRequest {
             state: &mut state,
             pay_date: pay1,
+            accrual_end: pay1,
             prev_date: closing,
             months_per_period,
             context: &market,
@@ -1466,6 +1556,7 @@ mod cases {
         let flows2 = calculate_pool_flows_with_rates(RatedPoolFlowRequest {
             state: &mut state,
             pay_date: pay2,
+            accrual_end: pay2,
             prev_date: pay1,
             months_per_period,
             context: &market,
@@ -1598,6 +1689,7 @@ mod cases {
             let flows = calculate_pool_flows_with_rates(RatedPoolFlowRequest {
                 state: &mut state,
                 pay_date: pay,
+                accrual_end: pay,
                 prev_date: prev,
                 months_per_period: 1.0,
                 context: &market,
@@ -1709,6 +1801,7 @@ mod cases {
             let flows = calculate_pool_flows_with_rates(RatedPoolFlowRequest {
                 state: &mut state,
                 pay_date: pay,
+                accrual_end: pay,
                 prev_date: prev,
                 months_per_period: 1.0,
                 context: &market,
@@ -2305,6 +2398,7 @@ mod cases {
                 interest_collections: Money::from((200_000_i64, ccy)),
                 principal_collections: Money::from((300_000_i64, ccy)),
                 payment_date: pay,
+                accrual_end: pay,
                 period_start: cleanup_test_date(),
                 valuation_date: cleanup_test_date(),
                 pool_balance: Money::from((10_000_000_i64, ccy)),
@@ -2360,6 +2454,7 @@ mod cases {
                 interest_collections: Money::from((200_000_i64, ccy)),
                 principal_collections: Money::from((300_000_i64, ccy)),
                 payment_date: Date::from_calendar_date(2024, Month::April, 1).expect("date"),
+                accrual_end: Date::from_calendar_date(2024, Month::April, 1).expect("date"),
                 period_start: cleanup_test_date(),
                 valuation_date: cleanup_test_date(),
                 pool_balance: Money::from((10_000_000_i64, ccy)),
@@ -2462,6 +2557,7 @@ mod cases {
                     interest_collections: Money::from((500_000_i64, ccy)),
                     principal_collections: Money::from((0_i64, ccy)),
                     payment_date: Date::from_calendar_date(2024, Month::April, 1).expect("date"),
+                    accrual_end: Date::from_calendar_date(2024, Month::April, 1).expect("date"),
                     period_start: cleanup_test_date(),
                     valuation_date: cleanup_test_date(),
                     pool_balance: Money::from((10_000_000_i64, ccy)),
@@ -2735,6 +2831,7 @@ mod cases {
             let flows = calculate_pool_flows_with_rates(RatedPoolFlowRequest {
                 state: &mut state,
                 pay_date: pay1,
+                accrual_end: pay1,
                 prev_date: closing,
                 months_per_period,
                 context: &market,

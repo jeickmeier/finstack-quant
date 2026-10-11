@@ -1,18 +1,14 @@
 //! Option-Adjusted Spread (OAS) for convertible bonds.
 //!
-//! OAS is the constant spread added to the zero-recovery risky discount rate
-//! of the cash component such that the Tsiveriotis-Zhang tree-based model
-//! price equals the market-quoted clean price. It isolates the residual credit
-//! component after removing the value of embedded equity conversion, call, and
-//! put options.
+//! OAS solves a parallel decimal intensity adjustment when the instrument has
+//! an issuer hazard curve. The full defaultable-equity model is repriced,
+//! including survival, recovery and survival-conditioned equity drift, against
+//! the settlement-date dirty value implied by the clean quote. This is an
+//! intensity-space quotation, not a CDS quote-recalibration sensitivity.
 //!
-//! When a `credit_curve_id` (issuer hazard curve) is configured, OAS shifts
-//! every hazard rate of that curve by the spread (a direct intensity shift, so
-//! the risky discount factor scales by `exp(-s·t)`), affecting the cash/debt
-//! component while leaving equity drift unchanged. A hazard rate cannot go
-//! negative, so the solver's lower bound is minus the smallest hazard rate.
-//! When no credit curve is set, the risk-free discount curve is bumped as a
-//! fallback, which also shifts the equity component's drift.
+//! Without a hazard curve the solver adjusts the risk-free discount curve,
+//! including equity carry. Negative intensities are prohibited, so the lower
+//! intensity bound is minus the minimum base hazard rate.
 //!
 //! # Dependencies
 //!
@@ -26,7 +22,7 @@
 use std::cell::Cell;
 
 use crate::instruments::fixed_income::convertible::pricing::{
-    calculate_accrued_interest, price_convertible_bond,
+    calculate_accrued_interest, price_convertible_bond, settlement_dirty_price,
 };
 use crate::instruments::fixed_income::convertible::ConvertibleBond;
 use crate::metrics::{bump_discount_curve_parallel, MetricCalculator, MetricContext};
@@ -67,20 +63,6 @@ impl MetricCalculator for OasCalculator {
         // on the production tree (no discretization basis baked into the spread).
         let base_market = context.curves.as_ref();
 
-        // The quoted clean price is a *settlement-date* price, so the model PV
-        // (computed at `as_of`) is forward-valued to settlement before comparison.
-        // With the default `settlement_days = None`, settle == as_of and this
-        // factor is 1.0 (no change); it only matters when a settlement lag is set.
-        let settle =
-            crate::instruments::fixed_income::convertible::pricing::settlement_date(bond, as_of)?;
-        let settle_df = if settle > as_of {
-            base_market
-                .get_discount(bond.discount_curve_id.as_str())?
-                .df_between_dates(as_of, settle)?
-        } else {
-            1.0
-        };
-
         // Validate the unbumped pricing path before entering the solver. This
         // surfaces missing curves / vol surfaces / equity IDs with their real
         // error messages instead of letting the solver report opaque "did not
@@ -102,7 +84,8 @@ impl MetricCalculator for OasCalculator {
         };
 
         // Shift the issuer hazard curve when available (affects the cash/debt
-        // component only in TZ). Fall back to the discount curve when no credit
+        // component, default recovery and survival-conditioned equity drift).
+        // Adjust the discount curve when no credit
         // curve is set.
         let hazard = bond
             .credit_curve_id
@@ -132,8 +115,10 @@ impl MetricCalculator for OasCalculator {
                     return f64::NAN;
                 }
             };
-            match price_convertible_bond(bond, &bumped, as_of) {
-                Ok(pv) => pv.amount() / settle_df - target_dirty,
+            match price_convertible_bond(bond, &bumped, as_of)
+                .and_then(|pv| settlement_dirty_price(bond, &bumped, as_of, pv.amount()))
+            {
+                Ok(dirty) => dirty - target_dirty,
                 Err(e) => {
                     record_err(e);
                     f64::NAN
@@ -172,6 +157,10 @@ impl MetricCalculator for OasCalculator {
             .max_iterations(100)
             .bracket_bounds(lower_spread, 0.50); // Curve-policy floor to +5000bp in decimal
 
+        let price_tolerance = 1e-10 * target_dirty.abs().max(1.0);
+        if objective(0.0).abs() <= price_tolerance {
+            return Ok(0.0);
+        }
         match solver.solve(objective, 0.0) {
             Ok(oas) => Ok(oas),
             Err(mut solver_err) => {
@@ -270,6 +259,7 @@ mod tests {
             div_yield_id: Some("AAPL-DIVYIELD".into()),
             call_put: None,
             soft_call_trigger: None,
+            resolved_settlement: None,
             cashflow_spec: crate::instruments::fixed_income::bond::CashflowSpec::Fixed(
                 fixed_coupon,
             ),

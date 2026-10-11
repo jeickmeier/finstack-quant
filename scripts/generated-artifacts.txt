@@ -31,7 +31,7 @@ finstack-quant-ui/src/generated/examples/commodity_asian_option.json
 finstack-quant-ui/src/generated/examples/commodity_forward.json
 finstack-quant-ui/src/generated/examples/commodity_future.json
 finstack-quant-ui/src/generated/examples/commodity_future_option.json
-finstack-quant-ui/src/generated/examples/commodity_option.json
+finstack-quant-ui/src/generated/examples/commodity_spot_option.json
 finstack-quant-ui/src/generated/examples/commodity_spread_option.json
 finstack-quant-ui/src/generated/examples/commodity_swap.json
 finstack-quant-ui/src/generated/examples/commodity_swaption.json
@@ -111,7 +111,7 @@ finstack-quant-ui/src/generated/instrument/commodity_asian_option.ts
 finstack-quant-ui/src/generated/instrument/commodity_forward.ts
 finstack-quant-ui/src/generated/instrument/commodity_future.ts
 finstack-quant-ui/src/generated/instrument/commodity_future_option.ts
-finstack-quant-ui/src/generated/instrument/commodity_option.ts
+finstack-quant-ui/src/generated/instrument/commodity_spot_option.ts
 finstack-quant-ui/src/generated/instrument/commodity_spread_option.ts
 finstack-quant-ui/src/generated/instrument/commodity_swap.ts
 finstack-quant-ui/src/generated/instrument/commodity_swaption.ts
@@ -191,7 +191,7 @@ finstack-quant-ui/src/generated/meta/commodity_asian_option.ts
 finstack-quant-ui/src/generated/meta/commodity_forward.ts
 finstack-quant-ui/src/generated/meta/commodity_future.ts
 finstack-quant-ui/src/generated/meta/commodity_future_option.ts
-finstack-quant-ui/src/generated/meta/commodity_option.ts
+finstack-quant-ui/src/generated/meta/commodity_spot_option.ts
 finstack-quant-ui/src/generated/meta/commodity_spread_option.ts
 finstack-quant-ui/src/generated/meta/commodity_swap.ts
 finstack-quant-ui/src/generated/meta/commodity_swaption.ts
@@ -278,7 +278,7 @@ finstack-quant-ui/src/generated/schemas/commodity_asian_option.json
 finstack-quant-ui/src/generated/schemas/commodity_forward.json
 finstack-quant-ui/src/generated/schemas/commodity_future.json
 finstack-quant-ui/src/generated/schemas/commodity_future_option.json
-finstack-quant-ui/src/generated/schemas/commodity_option.json
+finstack-quant-ui/src/generated/schemas/commodity_spot_option.json
 finstack-quant-ui/src/generated/schemas/commodity_spread_option.json
 finstack-quant-ui/src/generated/schemas/commodity_swap.json
 finstack-quant-ui/src/generated/schemas/commodity_swaption.json
@@ -362,7 +362,7 @@ finstack-quant-ui/src/generated/types/commodity_asian_option.ts
 finstack-quant-ui/src/generated/types/commodity_forward.ts
 finstack-quant-ui/src/generated/types/commodity_future.ts
 finstack-quant-ui/src/generated/types/commodity_future_option.ts
-finstack-quant-ui/src/generated/types/commodity_option.ts
+finstack-quant-ui/src/generated/types/commodity_spot_option.ts
 finstack-quant-ui/src/generated/types/commodity_spread_option.ts
 finstack-quant-ui/src/generated/types/commodity_swap.ts
 finstack-quant-ui/src/generated/types/commodity_swaption.ts
@@ -478,7 +478,7 @@ finstack-quant/valuations/tests/instruments/json_examples/commodity_asian_option
 finstack-quant/valuations/tests/instruments/json_examples/commodity_forward.json
 finstack-quant/valuations/tests/instruments/json_examples/commodity_future.json
 finstack-quant/valuations/tests/instruments/json_examples/commodity_future_option.json
-finstack-quant/valuations/tests/instruments/json_examples/commodity_option.json
+finstack-quant/valuations/tests/instruments/json_examples/commodity_spot_option.json
 finstack-quant/valuations/tests/instruments/json_examples/commodity_spread_option.json
 finstack-quant/valuations/tests/instruments/json_examples/commodity_swap.json
 finstack-quant/valuations/tests/instruments/json_examples/commodity_swaption.json

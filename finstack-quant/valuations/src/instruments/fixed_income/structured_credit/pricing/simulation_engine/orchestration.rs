@@ -383,7 +383,6 @@ pub(crate) struct PreparedDealSimulation {
     /// Payment business-day convention.
     pub(crate) convention: BusinessDayConvention,
     /// Months per payment period.
-    pub(crate) months_per_period: f64,
     /// Frozen initial-state pieces shared by every path's [`SimulationState`].
     pub(crate) state_template: StateTemplate,
 }
@@ -440,8 +439,8 @@ pub(crate) fn prepare_deal_simulation(
     // here rather than pricing a silently-broken structure.
     instrument.validate_custom_waterfall()?;
 
-    let months_per_period = match instrument.frequency.months() {
-        Some(m) => m as f64,
+    match instrument.frequency.months() {
+        Some(_) => (),
         None => {
             return Err(finstack_quant_core::Error::Validation(
                 "Structured credit instruments require month-based payment frequencies".to_string(),
@@ -545,7 +544,6 @@ pub(crate) fn prepare_deal_simulation(
         waterfall,
         calendar,
         convention,
-        months_per_period,
         state_template,
     }))
 }
@@ -662,7 +660,10 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
                 redemption: redemption_due,
             },
             context,
-            prepared.months_per_period,
+            contractual_months(
+                contractual_period.accrual_start,
+                contractual_period.accrual_end,
+            )?,
             source,
         )?;
 
@@ -880,4 +881,40 @@ pub(crate) fn aggregate_tranche_cashflows(
     all_flows.sort_by_key(|(d, _)| *d);
 
     Ok(all_flows)
+}
+
+/// Calendar-month exposure: whole contractual months plus the actual fraction
+/// of the next calendar month. Annual CPR/CDR survival is raised to months/12.
+fn contractual_months(start: Date, end: Date) -> Result<f64> {
+    if end <= start {
+        return Err(finstack_quant_core::Error::Validation(
+            "pool accrual end must follow start".into(),
+        ));
+    }
+    let mut whole = (end.year() - start.year()) * 12 + end.month() as i32 - start.month() as i32;
+    if start.add_months(whole)? > end {
+        whole -= 1;
+    }
+    let anchor = start.add_months(whole)?;
+    let next = start.add_months(whole + 1)?;
+    Ok(f64::from(whole) + (end - anchor).whole_days() as f64 / (next - anchor).whole_days() as f64)
+}
+
+#[cfg(test)]
+mod duration_tests {
+    use super::contractual_months;
+    use time::macros::date;
+    #[test]
+    fn mortality_uses_contractual_stub_duration() {
+        let month =
+            contractual_months(date!(2024 - 01 - 31), date!(2024 - 02 - 29)).expect("month");
+        let quarter =
+            contractual_months(date!(2024 - 01 - 31), date!(2024 - 04 - 30)).expect("quarter");
+        let stub = contractual_months(date!(2024 - 01 - 01), date!(2024 - 01 - 16)).expect("stub");
+        assert_eq!(month, 1.0);
+        assert_eq!(quarter, 3.0);
+        assert!((stub - 15.0 / 31.0).abs() < 1e-12);
+        let annual_cdr = 0.12_f64;
+        assert!((1.0 - (1.0 - annual_cdr).powf(month / 12.0) - 0.01059624).abs() < 1e-8);
+    }
 }

@@ -156,27 +156,35 @@ impl TrsReturnModel for FiIndexReturnModel<'_> {
             t_end,
             ..
         } = *inputs;
-        // Period in progress (including one ending exactly on `as_of`): the
-        // realized index move since the reset enters through the live index
-        // level, and only the remaining accrual to period end is projected
-        // at the carry yield.
-        if t_start < 0.0 && t_end >= 0.0 {
-            let reset_level = self.trs.initial_level.ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "FiIndexTotalReturnSwap '{}': the return period starting {} is in \
-                     progress; set initial_level to the index level at that reset",
-                    self.trs.id.as_str(),
-                    period_start
-                ))
-            })?;
+        let fixing = |date: Date| -> Result<f64> {
+            let level = if let Some(id) = &self.trs.fixing_series_id {
+                context.get_series(id)?.value_on_exact(date)?
+            } else if date == self.trs.schedule.start {
+                self.trs.initial_level.ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "FI TRS requires initial_level or a fixing series for {date}"
+                    ))
+                })?
+            } else {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "FI TRS requires a fixing series with an exact endpoint level on {date}"
+                )));
+            };
+            if !level.is_finite() || level <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "FI TRS endpoint level on {date} must be positive and finite"
+                )));
+            }
+            Ok(level)
+        };
+        if period_end <= inputs.as_of {
+            return Ok(fixing(period_end)? / fixing(period_start)? - 1.0);
+        }
+        if t_start < 0.0 {
+            let reset_level = fixing(period_start)?;
             let index_level = extract_index_level(self.trs, context)?;
             return Ok(index_level * (self.index_yield * t_end).exp() / reset_level - 1.0);
         }
-        // Carry model: the index earns its yield as total return. A period
-        // that ended before `as_of` but is still awaiting payment has no
-        // recorded end fixing in this model, so its accrual stays at the
-        // projected carry and remains in the PV until the payment date.
-        //
         // Year fraction computed using the schedule's day count convention
         // (same convention used for the financing leg accrual).
         let ctx = finstack_quant_core::dates::DayCountContext::default();
@@ -234,10 +242,53 @@ pub(crate) fn pv_total_return_leg(
         notional: trs.notional,
         discount_curve_id: trs.financing_leg.discount_curve_id.as_str(),
         // The notional alone sizes both legs of an FI index TRS.
-        contract_size: 1.0,
         initial_level: trs.initial_level,
     };
 
     let model = FiIndexReturnModel { trs, index_yield };
     TrsEngine::pv_total_return_leg_with_model(params, context, as_of, &model)
+}
+
+/// Project both legs using the same period calculations as present value.
+pub(crate) fn net_cashflows(
+    trs: &FiIndexTotalReturnSwap,
+    context: &MarketContext,
+    as_of: Date,
+) -> Result<Vec<(Date, Money)>> {
+    trs.validate()?;
+    let model = FiIndexReturnModel {
+        trs,
+        index_yield: extract_index_yield(trs, context)?,
+    };
+    let params = TotalReturnLegParams {
+        schedule: &trs.schedule,
+        notional: trs.notional,
+        discount_curve_id: trs.financing_leg.discount_curve_id.as_str(),
+        initial_level: trs.initial_level,
+    };
+    let mut flows = std::collections::BTreeMap::<Date, f64>::new();
+    let sign = if trs.side == crate::instruments::common_impl::parameters::legs::PayReceive::Receive
+    {
+        1.0
+    } else {
+        -1.0
+    };
+    for (date, amount) in
+        TrsEngine::cashflows_total_return_leg_with_model(params, context, as_of, &model)?
+    {
+        *flows.entry(date).or_default() += sign * amount.amount();
+    }
+    for (date, amount) in TrsEngine::cashflows_financing_leg(
+        &trs.financing_leg,
+        &trs.schedule,
+        trs.notional,
+        context,
+        as_of,
+    )? {
+        *flows.entry(date).or_default() -= sign * amount.amount();
+    }
+    flows
+        .into_iter()
+        .map(|(date, amount)| Ok((date, Money::new(amount, trs.notional.currency())?)))
+        .collect()
 }

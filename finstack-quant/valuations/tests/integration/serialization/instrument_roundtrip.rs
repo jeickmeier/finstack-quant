@@ -182,9 +182,9 @@ fn all_examples_roundtrip() {
     assert_roundtrip(&id, json_loader::InstrumentJson::QuantoOption(ex));
     //
     // Commodity
-    let ex = CommodityOption::example().expect("example");
+    let ex = CommoditySpotOption::example().expect("example");
     let id = ex.id.as_str().to_string();
-    assert_roundtrip(&id, json_loader::InstrumentJson::CommodityOption(ex));
+    assert_roundtrip(&id, json_loader::InstrumentJson::CommoditySpotOption(ex));
     let ex = CommodityAsianOption::example().expect("example");
     let id = ex.id.as_str().to_string();
     assert_roundtrip(&id, json_loader::InstrumentJson::CommodityAsianOption(ex));

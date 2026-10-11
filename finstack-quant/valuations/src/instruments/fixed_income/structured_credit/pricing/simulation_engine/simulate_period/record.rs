@@ -67,7 +67,7 @@ pub(super) fn record_tranche_flows(
                         current_balance.amount(),
                         TrancheAccrualDates {
                             start: period_start,
-                            payment: pay_date,
+                            end: inputs.period.accrual_end,
                             valuation: as_of,
                         },
                         context,
@@ -188,7 +188,7 @@ pub(super) fn record_tranche_flows(
                     current_balance.amount(),
                     TrancheAccrualDates {
                         start: period_start,
-                        payment: pay_date,
+                        end: inputs.period.accrual_end,
                         valuation: as_of,
                     },
                     context,

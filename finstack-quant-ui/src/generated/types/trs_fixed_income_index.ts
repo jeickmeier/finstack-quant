@@ -739,7 +739,7 @@ export interface D_29A90D894679A1E11782 {
 /**
  * Fixed-income index total-return swap priced with a carry analytic.
  *
- * For each scheduled period, the total-return leg uses
+ * For each wholly future scheduled period, the total-return leg uses
  * `exp(y × accrual_fraction) - 1`, where `y` is an annual continuously
  * compounded decimal yield and the accrual fraction uses the schedule day
  * count. Both legs are discounted with `financing.discount_curve_id`; the
@@ -753,10 +753,11 @@ export interface D_29A90D894679A1E11782 {
  * mark-to-market, stochastic credit, constituent decomposition, early
  * termination, and bespoke fees. The period in progress on the valuation
  * date is valued from the live index level (`underlying.index_id`) against
- * `initial_level`, then carried at the index yield to period end; a period
- * that has ended but is not yet paid stays in the PV at its projected carry.
+ * its historical reset level, then carried at the index yield to period end; a period
+ * that has ended but is not yet paid uses the exact historical start and end
+ * levels from `fixing_series_id`. Missing historical endpoints are errors.
  * Cashflow-schedule APIs
- * return payment dates with zero amounts; use
+ * return projected or fixed net payments using the same calculations as
  * [`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected
  * leg values.
  *
@@ -806,14 +807,19 @@ export interface D_29A90D894679A1E11782 {
 export interface D_73Fdb35378247123D02D {
   attributes: Attributes;
   financing_leg: D_57Dc608Fb91A32Cf109E;
+  /**
+   * Market time-series identifier containing positive total-return index levels
+   * on contractual reset dates, including the final accrual boundary. Historical
+   * endpoints require exact observations; no yield-based history is inferred.
+   */
+  fixing_series_id?: string | null;
   id: Id2;
   /**
-   * Index level at the reset of the return period in progress, in the
+   * Index level at the first contractual reset, in the
    * index's own units.
    *
-   * Required when the valuation date falls inside a return period; the
-   * realized return to date is `index_level / initial_level`. Unused for
-   * unseasoned trades. Must be positive and finite when set.
+   * Used only at inception when no fixing series is supplied; the
+   * realized return to date is `index_level / initial_level`. Subsequent resets require `fixing_series_id`. Must be positive and finite when set.
    */
   initial_level?: number | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides;

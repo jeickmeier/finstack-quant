@@ -89,6 +89,8 @@ mod tests {
         let mut bond = InflationLinkedBond::example().expect("example");
         // `example()` uses ActActIsma which needs an explicit period frequency;
         // use a self-contained day count for the metric test.
+        bond.deflation_protection =
+            crate::instruments::fixed_income::inflation_linked_bond::DeflationProtection::None;
         bond.day_count = finstack_quant_core::dates::DayCount::Thirty360;
         bond.discount_curve_id = CurveId::new("US-CPI-DISC");
         bond.inflation_index_id = CurveId::new("US-CPI");

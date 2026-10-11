@@ -2,9 +2,7 @@
 
 use crate::instruments::test_support::commodity_curves::flat_price_curve;
 use crate::instruments::test_support::date::date;
-use crate::instruments::test_support::discount_forward_curves::{
-    flat_discount_with_tenor, flat_forward_with_tenor,
-};
+use crate::instruments::test_support::discount_forward_curves::flat_discount_with_tenor;
 use crate::instruments::test_support::volatility::flat_vol_surface;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::bumps::{
@@ -13,7 +11,7 @@ use finstack_quant_core::market_data::bumps::{
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::commodity::commodity_option::CommodityOption;
+use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations::instruments::Instrument;
@@ -24,12 +22,12 @@ use finstack_quant_valuations::metrics::{standard_registry, MetricContext, Metri
 use std::sync::Arc;
 
 #[test]
-fn test_commodity_option_core_greeks_registered() -> finstack_quant_core::Result<()> {
+fn test_commodity_spot_option_core_greeks_registered() -> finstack_quant_core::Result<()> {
     let as_of = date(2025, 1, 1);
     let expiry = date(2026, 1, 1);
 
     let discount_curve = flat_discount_with_tenor("USD-OIS", as_of, 0.03, 2.0);
-    let forward_curve = flat_forward_with_tenor("CL-FWD", as_of, 0.0, 2.0);
+    let forward_curve = flat_price_curve("CL-FWD", as_of, 100.0, 2.0);
     let vol_surface = flat_vol_surface("CL-VOL", &[1.0], &[80.0, 100.0, 120.0], 0.20);
 
     let market = MarketContext::new()
@@ -38,7 +36,7 @@ fn test_commodity_option_core_greeks_registered() -> finstack_quant_core::Result
         .insert_surface(vol_surface)
         .insert_price("CL-SPOT", MarketScalar::Unitless(100.0));
 
-    let option = CommodityOption::builder()
+    let option = CommoditySpotOption::builder()
         .id(InstrumentId::new("CL-CALL-GREeks"))
         .underlying(CommodityUnderlyingParams::new(
             "Energy",
@@ -90,8 +88,8 @@ fn test_commodity_option_core_greeks_registered() -> finstack_quant_core::Result
 }
 
 #[test]
-fn commodity_option_volga_is_per_vol_point_squared() -> finstack_quant_core::Result<()> {
-    let (option, market, as_of) = atm_commodity_option(OptionType::Call);
+fn commodity_spot_option_volga_is_per_vol_point_squared() -> finstack_quant_core::Result<()> {
+    let (option, market, as_of) = atm_commodity_spot_option(OptionType::Call);
     let pv = option.value(&market, as_of)?;
     let mut ctx = MetricContext::new(
         Arc::new(option.clone()),
@@ -152,7 +150,7 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
         .insert_surface(vol_surface)
         .insert_price("CL-SPOT", MarketScalar::Unitless(95.0)); // Spot different from forward
 
-    let option = CommodityOption::builder()
+    let option = CommoditySpotOption::builder()
         .id(InstrumentId::new("CL-CALL-FWD-GREEKS"))
         .underlying(CommodityUnderlyingParams::new(
             "Energy",
@@ -298,10 +296,10 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
 
 /// Build a 1Y ATM commodity option (spot = forward = strike = 100, 20% flat
 /// vol) and its market, for exercising registered Greeks/risk metrics.
-fn atm_commodity_option(
+fn atm_commodity_spot_option(
     option_type: OptionType,
 ) -> (
-    CommodityOption,
+    CommoditySpotOption,
     MarketContext,
     finstack_quant_core::dates::Date,
 ) {
@@ -309,7 +307,7 @@ fn atm_commodity_option(
     let expiry = date(2026, 1, 1);
 
     let discount_curve = flat_discount_with_tenor("USD-OIS", as_of, 0.03, 2.0);
-    let forward_curve = flat_forward_with_tenor("CL-FWD", as_of, 0.0, 2.0);
+    let forward_curve = flat_price_curve("CL-FWD", as_of, 100.0, 2.0);
     let vol_surface = flat_vol_surface("CL-VOL", &[1.0], &[80.0, 100.0, 120.0], 0.20);
     let market = MarketContext::new()
         .insert(discount_curve)
@@ -317,7 +315,7 @@ fn atm_commodity_option(
         .insert_surface(vol_surface)
         .insert_price("CL-SPOT", MarketScalar::Unitless(100.0));
 
-    let option = CommodityOption::builder()
+    let option = CommoditySpotOption::builder()
         .id(InstrumentId::new("CL-OPT-METRICS"))
         .underlying(CommodityUnderlyingParams::new(
             "Energy",
@@ -348,11 +346,11 @@ fn atm_commodity_option(
 /// call must have positive delta, a long put negative delta, and any long
 /// option positive vega.
 #[test]
-fn test_commodity_option_delta_and_vega_signs() -> finstack_quant_core::Result<()> {
+fn test_commodity_spot_option_delta_and_vega_signs() -> finstack_quant_core::Result<()> {
     let registry = standard_registry();
 
     // Call: positive delta, positive vega.
-    let (call, market, as_of) = atm_commodity_option(OptionType::Call);
+    let (call, market, as_of) = atm_commodity_spot_option(OptionType::Call);
     let pv = call.value(&market, as_of)?;
     let mut ctx = MetricContext::new(
         Arc::new(call),
@@ -374,7 +372,7 @@ fn test_commodity_option_delta_and_vega_signs() -> finstack_quant_core::Result<(
     );
 
     // Put: negative delta.
-    let (put, market_p, as_of_p) = atm_commodity_option(OptionType::Put);
+    let (put, market_p, as_of_p) = atm_commodity_spot_option(OptionType::Put);
     let pv_p = put.value(&market_p, as_of_p)?;
     let mut ctx_p = MetricContext::new(
         Arc::new(put),
@@ -399,9 +397,9 @@ fn test_commodity_option_delta_and_vega_signs() -> finstack_quant_core::Result<(
 /// Both must compute to finite values and the bucketed aggregate must reconcile
 /// with the parallel DV01.
 #[test]
-fn test_commodity_option_dv01_and_bucketed_dv01() -> finstack_quant_core::Result<()> {
+fn test_commodity_spot_option_dv01_and_bucketed_dv01() -> finstack_quant_core::Result<()> {
     let registry = standard_registry();
-    let (call, market, as_of) = atm_commodity_option(OptionType::Call);
+    let (call, market, as_of) = atm_commodity_spot_option(OptionType::Call);
     let pv = call.value(&market, as_of)?;
     let mut ctx = MetricContext::new(
         Arc::new(call),
@@ -430,13 +428,13 @@ fn test_commodity_option_dv01_and_bucketed_dv01() -> finstack_quant_core::Result
 }
 
 #[test]
-fn commodity_option_zero_vol_delta_matches_resolved_forward_payoff(
+fn commodity_spot_option_zero_vol_delta_matches_resolved_forward_payoff(
 ) -> finstack_quant_core::Result<()> {
     use finstack_quant_valuations::instruments::{GreekBumps, OptionGreeksProvider};
     for kind in [OptionType::Call, OptionType::Put] {
         for f in [80.0, 100.0, 120.0] {
             for explicit_quote in [false, true] {
-                let (mut option, base_market, as_of) = atm_commodity_option(kind);
+                let (mut option, base_market, as_of) = atm_commodity_spot_option(kind);
                 option.quantity = 1000.0;
                 option.multiplier = 2.0;
                 option
@@ -517,4 +515,125 @@ fn commodity_option_zero_vol_delta_matches_resolved_forward_payoff(
         }
     }
     Ok(())
+}
+
+#[test]
+fn resolved_delivery_greeks_are_independent_of_selected_optional_model() {
+    use finstack_quant_valuations::instruments::{CommoditySpotOptionExercise, PricingOptions};
+    use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
+    let (mut option, market, as_of) = atm_commodity_spot_option(OptionType::Call);
+    let delivery = as_of + time::Duration::days(10);
+    option.exercise_style = ExerciseStyle::American;
+    option.exercise = Some(CommoditySpotOptionExercise {
+        date: as_of,
+        spot: 110.0,
+        settlement_date: delivery,
+        exercised: true,
+    });
+    for settlement in [SettlementType::Cash, SettlementType::Physical] {
+        option.settlement = settlement;
+        let expected_delta = if settlement == SettlementType::Physical {
+            market
+                .get_discount("USD-OIS")
+                .unwrap()
+                .df_between_dates(as_of, delivery)
+                .unwrap()
+                * option.quantity
+                * option.multiplier
+        } else {
+            0.0
+        };
+        for model in [ModelKey::Black76, ModelKey::MonteCarloSchwartzSmith] {
+            let result = standard_pricer_registry()
+                .price_with_metrics(
+                    &option,
+                    model,
+                    &market,
+                    as_of,
+                    &[MetricId::Delta, MetricId::Gamma, MetricId::Vega],
+                    PricingOptions::default(),
+                )
+                .unwrap();
+            assert!((result.measures[&MetricId::Delta] - expected_delta).abs() < 1e-10);
+            assert_eq!(result.measures[&MetricId::Gamma], 0.0);
+            assert_eq!(result.measures[&MetricId::Vega], 0.0);
+        }
+    }
+}
+
+#[test]
+fn composite_resolved_claims_preserve_value_and_risk_through_snapshot_replay() {
+    use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::{
+        CommoditySpotOptionExercise, CompositeInstrument, CompositeLegSpec, CompositeSpec,
+        InstrumentJson, RebalanceRule, WeightingMethod,
+    };
+    let (mut cash, market, as_of) = atm_commodity_spot_option(OptionType::Call);
+    let delivery = as_of + time::Duration::days(10);
+    cash.id = "CASH-CLAIM".into();
+    cash.exercise_style = ExerciseStyle::American;
+    cash.exercise = Some(CommoditySpotOptionExercise {
+        date: as_of,
+        spot: 110.0,
+        settlement_date: delivery,
+        exercised: true,
+    });
+    cash.settlement = SettlementType::Cash;
+    let mut physical = cash.clone();
+    physical.id = "PHYSICAL-CLAIM".into();
+    physical.settlement = SettlementType::Physical;
+    let market = market.insert(flat_price_curve("CL-FWD", as_of, 90.0, 2.0));
+    let df = market
+        .get_discount("USD-OIS")
+        .unwrap()
+        .df_between_dates(as_of, delivery)
+        .unwrap();
+    let expected_pv = 25.0 * cash.quantity * cash.multiplier * df;
+    let expected_delta = -0.5 * cash.quantity * cash.multiplier * df;
+    let composite = CompositeSpec::new(
+        "SETTLEMENT-CLAIMS",
+        Currency::USD,
+        Money::new(100_000.0, Currency::USD).unwrap(),
+        vec![
+            CompositeLegSpec::new(
+                cash.id.clone(),
+                InstrumentJson::CommoditySpotOption(cash),
+                2.0,
+            ),
+            CompositeLegSpec::new(
+                physical.id.clone(),
+                InstrumentJson::CommoditySpotOption(physical),
+                -0.5,
+            ),
+        ],
+        WeightingMethod::FixedQuantity,
+        RebalanceRule::Manual,
+    )
+    .initialize_fixed(as_of)
+    .unwrap()
+    .instrument;
+    let replay: CompositeInstrument =
+        serde_json::from_str(&serde_json::to_string(&composite).unwrap()).unwrap();
+    let market_replay: MarketContext =
+        serde_json::from_str(&serde_json::to_string(&market).unwrap()).unwrap();
+    for (instrument, market) in [(&composite, &market), (&replay, &market_replay)] {
+        let value = instrument.value(market, as_of).unwrap().amount();
+        assert!((value - expected_pv).abs() < 1e-10 * expected_pv.abs().max(1.0));
+        // Composite delta is deliberately not an additive scalar across arbitrary
+        // underlyings. Reprice this shared forward coordinate explicitly.
+        let bumped = market
+            .clone()
+            .insert(flat_price_curve("CL-FWD", as_of, 91.0, 2.0));
+        let bumped_value = instrument.value(&bumped, as_of).unwrap().amount();
+        assert!(
+            (bumped_value - value - expected_delta).abs() < 1e-10 * expected_delta.abs().max(1.0)
+        );
+        assert_eq!(
+            instrument
+                .value(market, delivery + time::Duration::days(1))
+                .unwrap()
+                .amount(),
+            0.0
+        );
+    }
 }

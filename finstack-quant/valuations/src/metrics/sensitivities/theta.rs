@@ -271,6 +271,36 @@ pub(crate) fn collect_period_cash_cached(
     )
 }
 
+/// Eligible economic payments by date, with the same filtering and FX basis
+/// as period-cash aggregation. Used to accumulate intermediate cash at yield.
+pub(crate) fn period_cash_by_date_cached(
+    context: &mut crate::metrics::MetricContext,
+    end_date: Date,
+) -> Result<Vec<(Date, f64)>> {
+    let curves = std::sync::Arc::clone(&context.curves);
+    let start_date = context.as_of;
+    let currency = context.base_value.currency();
+    let skip = opening_notional_draw_date(context.instrument.as_ref());
+    let same_day = context.instrument.includes_valuation_date_cashflows();
+    context
+        .tagged_cashflows_cached()?
+        .iter()
+        .map(|flow| {
+            collect_cashflows_from_flows(
+                std::slice::from_ref(flow),
+                &curves,
+                start_date,
+                end_date,
+                currency,
+                skip,
+                same_day,
+            )
+            .map(|cash| (flow.date, cash.total.amount()))
+        })
+        .filter(|result| !matches!(result, Ok((_, amount)) if *amount == 0.0))
+        .collect()
+}
+
 fn opening_notional_draw_date(instrument: &dyn crate::instruments::Instrument) -> Option<Date> {
     if let Some(bond) = instrument.as_any().downcast_ref::<Bond>() {
         return Some(bond.issue_date);

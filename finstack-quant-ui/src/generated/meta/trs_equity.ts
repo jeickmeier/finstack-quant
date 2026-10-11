@@ -42,7 +42,6 @@ export default [
             },
             "side": "receive",
             "underlying": {
-              "contract_size": 1,
               "currency": "USD",
               "div_yield_id": "SPX-DIV",
               "spot_id": "SPX-SPOT",
@@ -991,12 +990,6 @@ export default [
     "path": "#/$defs/d_3907a55cf33393b0f707",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/EquityUnderlyingParams",
     "description": "Equity underlying parameters for options and equity-linked swaps."
-  },
-  {
-    "path": "#/$defs/d_3907a55cf33393b0f707/properties/contract_size",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/EquityUnderlyingParams/properties/contract_size",
-    "description": "Contract size (shares per contract)",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_3907a55cf33393b0f707/properties/currency",
@@ -6035,7 +6028,7 @@ export default [
     "path": "#/$defs/d_f80f2b90e7af690c5898/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
-    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian."
+    "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil."
   },
   {
     "path": "#/$defs/d_fd618cd5743ec18a168f",

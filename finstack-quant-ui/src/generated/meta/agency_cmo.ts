@@ -1085,6 +1085,29 @@ export default [
     "description": "Use the leverage ratio."
   },
   {
+    "path": "#/$defs/d_65cfec08bebc669f8ef9",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacSchedule",
+    "description": "Original contractual PAC schedule. Pricing never regenerates these targets."
+  },
+  {
+    "path": "#/$defs/d_65cfec08bebc669f8ef9/properties/collar",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacSchedule/properties/collar",
+    "description": "PAC collar",
+    "ref": "#/$defs/PacCollar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacCollar"
+  },
+  {
+    "path": "#/$defs/d_65cfec08bebc669f8ef9/properties/payments",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacSchedule/properties/payments",
+    "description": "Strictly increasing dated principal targets fixed at construction."
+  },
+  {
+    "path": "#/$defs/d_65cfec08bebc669f8ef9/properties/payments/items",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacSchedule/properties/payments/items",
+    "ref": "#/$defs/PacPayment",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacPayment"
+  },
+  {
     "path": "#/$defs/d_66287e2bb5dfa8d61987",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/CmoTranche",
     "description": "CMO tranche definition."
@@ -1115,19 +1138,19 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
-    "path": "#/$defs/d_66287e2bb5dfa8d61987/properties/pac_collar",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/CmoTranche/properties/pac_collar",
-    "description": "PAC collar (if PAC tranche)"
+    "path": "#/$defs/d_66287e2bb5dfa8d61987/properties/pac_schedule",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/CmoTranche/properties/pac_schedule",
+    "description": "Original dated PAC principal targets and collar; required only for PAC tranches."
   },
   {
-    "path": "#/$defs/d_66287e2bb5dfa8d61987/properties/pac_collar/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/CmoTranche/properties/pac_collar/anyOf/0",
-    "ref": "#/$defs/PacCollar",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacCollar"
+    "path": "#/$defs/d_66287e2bb5dfa8d61987/properties/pac_schedule/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/CmoTranche/properties/pac_schedule/anyOf/0",
+    "ref": "#/$defs/PacSchedule",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacSchedule"
   },
   {
-    "path": "#/$defs/d_66287e2bb5dfa8d61987/properties/pac_collar/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/CmoTranche/properties/pac_collar/anyOf/1"
+    "path": "#/$defs/d_66287e2bb5dfa8d61987/properties/pac_schedule/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/CmoTranche/properties/pac_schedule/anyOf/1"
   },
   {
     "path": "#/$defs/d_66287e2bb5dfa8d61987/properties/priority",
@@ -4442,7 +4465,25 @@ export default [
     "path": "#/$defs/d_f80f2b90e7af690c5898/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
-    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian."
+    "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil."
+  },
+  {
+    "path": "#/$defs/d_f9a55f4b2f28378c6e86",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacPayment",
+    "description": "Dated contractual PAC principal target, in the tranche currency's major units."
+  },
+  {
+    "path": "#/$defs/d_f9a55f4b2f28378c6e86/properties/date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacPayment/properties/date",
+    "description": "Contractual payment date, including the collateral's payment delay.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_f9a55f4b2f28378c6e86/properties/principal",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacPayment/properties/principal",
+    "description": "Planned principal payment, finite and nonnegative.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_fd618cd5743ec18a168f",

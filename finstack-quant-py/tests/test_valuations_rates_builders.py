@@ -158,10 +158,9 @@ def test_compounding_keyword_accepts_string_and_dict() -> None:
         _float_leg(compounding="not_a_variant")
 
 
-def test_par_method_keyword() -> None:
-    leg = _fixed_leg(par_method="discount_ratio")
-    assert leg.par_method == "discount_ratio"
-    assert _fixed_leg().par_method is None
+def test_removed_par_method_keyword_is_rejected() -> None:
+    with pytest.raises(TypeError):
+        _fixed_leg(par_method="discount_ratio")
 
 
 def test_swap_getters_return_typed_values() -> None:

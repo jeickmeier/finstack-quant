@@ -552,7 +552,7 @@ impl BasisSwap {
         let overnight_calendar = if overnight {
             Some(
                 crate::instruments::common_impl::pricing::overnight::resolve_overnight_fixing_calendar(
-                    Some(self.resolve_leg_calendar("cashflow", leg)?),
+                    Some(leg.fixing_calendar_id.as_deref().unwrap_or(self.resolve_leg_calendar("cashflow", leg)?)),
                     self.notional.currency(),
                     "BasisSwap",
                 )?,
@@ -682,7 +682,7 @@ impl BasisSwap {
                     roll_rule: crate::cashflow::builder::specs::RollRule::None,
                 },
             });
-        builder.build(Some(market))
+        builder.build_as_of(market, as_of)
     }
 
     fn overnight_leg_schedule(
@@ -700,7 +700,7 @@ impl BasisSwap {
         let calendar_id = self.resolve_leg_calendar("cashflow", leg)?;
         let calendar =
             crate::instruments::common_impl::pricing::overnight::resolve_overnight_fixing_calendar(
-                Some(calendar_id),
+                Some(leg.fixing_calendar_id.as_deref().unwrap_or(calendar_id)),
                 self.notional.currency(),
                 "BasisSwap",
             )?;
@@ -1676,6 +1676,125 @@ mod tests {
             .find(|cf| cf.kind == crate::cashflow::primitives::CFKind::FloatReset)
             .expect("overnight coupon");
         let calendar = calendar_by_id("usny").expect("usny");
+        let periods = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start,
+                end,
+                frequency: Tenor::quarterly(),
+                stub: StubKind::ShortFront,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                calendar_id: "usny",
+                end_of_month: false,
+                day_count: DayCount::Act360,
+                payment_lag_days: 0,
+                reset_lag_days: Some(0),
+                adjust_accrual_dates: false,
+                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+            },
+        )
+        .expect("periods");
+        let first_period = periods.first().expect("first period");
+        let (accrual_start, accrual_end) =
+            crate::instruments::common_impl::pricing::overnight::adjust_overnight_accrual_boundaries(
+                first_period.accrual_start,
+                first_period.accrual_end,
+                BusinessDayConvention::ModifiedFollowing,
+                calendar,
+            )
+            .expect("accrual window");
+        let expected = project_overnight_coupon(OvernightCouponProjectionInput {
+            curve: OvernightProjectionCurve::Forward(&ois),
+            fixings: None,
+            fixing_id: "USD-SOFR-OIS",
+            as_of: start,
+            accrual_start,
+            accrual_end,
+            day_count: DayCount::Act360,
+            coupon_frequency: Some(Tenor::quarterly()),
+            coupon_period: (accrual_start, accrual_end),
+            compounding: &FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+            fixing_calendar: calendar,
+            compounded_spread: 0.0,
+            need_observation_exposures: false,
+        })
+        .expect("shared engine");
+        let expected_amount = 10_000_000.0 * (expected.compound_factor - 1.0);
+        assert!(
+            (first.amount.amount() - expected_amount).abs() < 1e-6,
+            "basis overnight coupon {} != shared engine {expected_amount}",
+            first.amount.amount()
+        );
+    }
+
+    #[test]
+    fn overnight_rfr_honors_distinct_fixing_calendar() {
+        use crate::instruments::common_impl::pricing::overnight::{
+            project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
+        };
+        use crate::instruments::rates::irs::FloatingLegCompounding;
+        use finstack_quant_core::dates::calendar_by_id;
+
+        let start = date(2025, 1, 2);
+        let end = date(2026, 1, 2);
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(start)
+            .knots(vec![(0.0, 1.0), (1.0, 0.96)])
+            .build()
+            .expect("discount");
+        let ois = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 365.0)
+            .base_date(start)
+            .knots(vec![(0.0, 0.04), (1.0, 0.08)])
+            .build()
+            .expect("ois forward");
+        let term = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+            .base_date(start)
+            .knots(vec![(0.0, 0.041), (1.0, 0.041)])
+            .build()
+            .expect("term forward");
+        let market = MarketContext::new()
+            .insert(disc)
+            .insert(ois.clone())
+            .insert(term);
+
+        let primary = FloatLegSpec {
+            end_of_month: false,
+            fixing_calendar_id: Some("weekends_only".into()),
+            forward_curve_id: CurveId::new("USD-SOFR-OIS"),
+            discount_curve_id: CurveId::new("USD-OIS"),
+            start,
+            end,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            calendar_id: Some("usny".into()),
+            stub: StubKind::ShortFront,
+            spread_bp: Decimal::ZERO,
+            payment_lag_days: 0,
+            reset_lag_days: 0,
+            compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+        };
+        let reference = FloatLegSpec {
+            forward_curve_id: CurveId::new("USD-SOFR-3M"),
+            compounding: FloatingLegCompounding::Simple,
+            ..primary.clone()
+        };
+        let swap = BasisSwap::new(
+            "SOFR-OIS-3M",
+            Money::from((10_000_000_i64, Currency::USD)),
+            primary,
+            reference,
+        )
+        .expect("overnight vs term basis");
+
+        let schedule = swap
+            .floating_leg_schedule(&swap.primary_leg, &market, start)
+            .expect("overnight schedule");
+        let first = schedule
+            .get_flows()
+            .iter()
+            .find(|cf| cf.kind == crate::cashflow::primitives::CFKind::FloatReset)
+            .expect("overnight coupon");
+        let calendar = calendar_by_id("weekends_only").expect("fixing calendar");
         let periods = crate::cashflow::builder::periods::build_periods(
             crate::cashflow::builder::periods::BuildPeriodsParams {
                 start,

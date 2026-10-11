@@ -242,7 +242,10 @@ impl RevolvingCreditPricer {
                 for i in 0..future_grid.len() {
                     let curr_date = future_grid[i];
                     let curr_sp = survival_at_grid[i];
-                    let curr_exposure = exposure_at_grid[i];
+                    let (before_event_exposure, curr_exposure) = exposure_at_grid[i];
+                    let before_event_date = curr_date.previous_day().ok_or_else(|| {
+                        finstack_quant_core::Error::Validation("Recovery date underflow".into())
+                    })?;
 
                     // Default probability conditional on survival to as_of.
                     let prob_default = ((prev_sp - curr_sp) / sp_as_of).max(0.0);
@@ -250,15 +253,15 @@ impl RevolvingCreditPricer {
                     let df_prev = df_asof_to(prev_date)?;
                     let df_curr = df_asof_to(curr_date)?;
                     let df_avg = (df_prev + df_curr) / 2.0;
-                    let exposure_avg = (prev_exposure + curr_exposure) / 2.0;
-                    let undrawn_avg = (facility.commitment_at(curr_date).amount()
-                        - facility.lc_outstanding_at(curr_date).amount()
+                    let exposure_avg = (prev_exposure + before_event_exposure) / 2.0;
+                    let undrawn_avg = (facility.commitment_at(before_event_date).amount()
+                        - facility.lc_outstanding_at(before_event_date).amount()
                         - exposure_avg)
                         .max(0.0);
 
                     // Letters of credit drawn at default: funded at par,
                     // recovered at R, like the loan-equivalent draw.
-                    let lc_draw = facility.lc_exposure_at_default(curr_date);
+                    let lc_draw = facility.lc_exposure_at_default(before_event_date);
                     total_pv += df_avg
                         * prob_default
                         * (exposure_avg * facility.recovery_rate
@@ -478,6 +481,10 @@ impl RevolvingCreditPricer {
             dates.extend(events.iter().map(|e| e.date));
         }
 
+        dates.extend(facility.commitment_steps.iter().map(|event| event.date));
+        if let Some(lc) = &facility.lc {
+            dates.extend(lc.events.iter().map(|event| event.date));
+        }
         let mut d = as_of.add_months(1)?;
         while d < facility.maturity {
             dates.insert(d);
@@ -485,7 +492,10 @@ impl RevolvingCreditPricer {
         }
         dates.insert(facility.maturity);
 
-        Ok(dates.into_iter().filter(|&d| d > as_of).collect())
+        Ok(dates
+            .into_iter()
+            .filter(|&d| d > as_of && d <= facility.maturity)
+            .collect())
     }
 
     /// Compute exposure (drawn balance) at each grid date.
@@ -497,7 +507,7 @@ impl RevolvingCreditPricer {
         as_of: Date,
         grid: &[Date],
         path_schedule: &PathAwareCashflowSchedule,
-    ) -> Result<Vec<f64>> {
+    ) -> Result<Vec<(f64, f64)>> {
         if let Some(ref path_data) = path_schedule.path_data {
             grid.iter()
                 .map(|&date| {
@@ -508,18 +518,28 @@ impl RevolvingCreditPricer {
                         &path_data.time_points,
                         &path_data.utilization_path,
                     )?;
-                    Ok(util * facility.commitment_at(date).amount())
+                    let before = date.previous_day().ok_or_else(|| {
+                        finstack_quant_core::Error::Validation("Recovery date underflow".into())
+                    })?;
+                    Ok((
+                        util * facility.commitment_at(before).amount(),
+                        util * facility.commitment_at(date).amount(),
+                    ))
                 })
                 .collect()
         } else {
             grid.iter()
                 .map(|&date| {
-                    Ok(
+                    let before = date.previous_day().ok_or_else(|| {
+                        finstack_quant_core::Error::Validation("Recovery date underflow".into())
+                    })?;
+                    let balance = |date| {
                         super::super::cashflow_engine::calculate_drawn_balance_at_date(
                             facility, as_of, date,
-                        )?
-                        .amount(),
-                    )
+                        )
+                        .map(|amount| amount.amount())
+                    };
+                    Ok((balance(before)?, balance(date)?))
                 })
                 .collect()
         }

@@ -33,6 +33,7 @@ pub(crate) fn register_swaption_metrics(
             (Delta, DeltaCalculator),
             (Gamma, GammaCalculator),
             (Vega, VegaCalculator),
+            (HwSigmaVega, vega::HwSigmaVegaCalculator),
             (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
             // Theta is now registered universally in metrics::standard_registry()
             // Rho bumps ONLY the discount/funding curve (holding the forward swap

@@ -206,10 +206,10 @@ pub(super) fn tranche_period_interest_due(
     let accrual =
         tranche
             .day_count
-            .year_fraction(dates.start, dates.payment, DayCountContext::default())?;
+            .year_fraction(dates.start, dates.end, DayCountContext::default())?;
     let raw = tranche.coupon.try_rate_for_period(
         dates.start,
-        dates.payment,
+        dates.end,
         accrual,
         dates.valuation,
         context,
@@ -234,7 +234,7 @@ pub(super) fn tranche_period_interest_due(
 #[derive(Clone, Copy)]
 pub(super) struct TrancheAccrualDates {
     pub(super) start: Date,
-    pub(super) payment: Date,
+    pub(super) end: Date,
     pub(super) valuation: Date,
 }
 

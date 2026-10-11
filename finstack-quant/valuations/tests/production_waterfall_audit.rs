@@ -39,6 +39,7 @@ fn execute(
             interest_collections: usd(interest),
             principal_collections: usd(principal),
             payment_date: date!(2024 - 04 - 01),
+            accrual_end: date!(2024 - 04 - 01),
             period_start: date!(2024 - 01 - 01),
             valuation_date: date!(2024 - 01 - 01),
             pool_balance: usd(100_000_000.0),

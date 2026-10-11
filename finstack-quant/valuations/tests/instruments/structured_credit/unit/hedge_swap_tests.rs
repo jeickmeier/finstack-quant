@@ -195,6 +195,7 @@ fn ic_context(market: &MarketContext) -> WaterfallContext<'_> {
         interest_collections: usd(1_500_000.0),
         principal_collections: usd(0.0),
         payment_date: date!(2024 - 04 - 01),
+        accrual_end: date!(2024 - 04 - 01),
         period_start: CLOSE,
         valuation_date: CLOSE,
         pool_balance: usd(100_000_000.0),

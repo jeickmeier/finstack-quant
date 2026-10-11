@@ -12,6 +12,8 @@ pub(crate) struct PoolFlowRequest<'a, 's> {
     pub(super) state: &'a mut SimulationState<'s>,
     pub(super) instrument: &'a StructuredCredit,
     pub(super) pay_date: Date,
+    /// Unadjusted contractual end; payment may roll before maturity.
+    pub(super) accrual_end: Date,
     pub(super) prev_date: Date,
     pub(super) seasoning_months: u32,
     pub(super) months_per_period: f64,
@@ -244,6 +246,7 @@ impl PoolFlowSource for DeterministicPoolFlowSource {
         calculate_pool_flows_with_rates(RatedPoolFlowRequest {
             state: request.state,
             pay_date: request.pay_date,
+            accrual_end: request.accrual_end,
             prev_date: request.prev_date,
             months_per_period: request.months_per_period,
             context: request.context,
@@ -394,6 +397,7 @@ impl PoolFlowSource for OasPathFlowSource {
         calculate_pool_flows_with_rates(RatedPoolFlowRequest {
             state: request.state,
             pay_date: request.pay_date,
+            accrual_end: request.accrual_end,
             prev_date: request.prev_date,
             months_per_period: request.months_per_period,
             context: request.context,
@@ -813,6 +817,7 @@ impl PoolFlowSource for StochasticPathFlowSource {
         calculate_pool_flows_with_rates(RatedPoolFlowRequest {
             state: request.state,
             pay_date: request.pay_date,
+            accrual_end: request.accrual_end,
             prev_date: request.prev_date,
             months_per_period: request.months_per_period,
             context: request.context,

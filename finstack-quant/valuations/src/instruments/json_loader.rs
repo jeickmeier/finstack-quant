@@ -121,7 +121,7 @@ pub(crate) fn instrument_summary(tag: &str) -> &'static str {
         "cms_swap" => "Swap paying a constant-maturity swap rate.",
         "commodity_asian_option" => "Commodity option on an average settlement price.",
         "commodity_forward" => "Forward on a commodity reference price.",
-        "commodity_option" => "Option on a commodity forward or future.",
+        "commodity_spot_option" => "Option on spot commodity with observed-spot exercise and explicit cash or physical settlement.",
         "commodity_spread_option" => "Option on the spread between two commodity legs.",
         "commodity_swap" => "Fixed-versus-floating commodity swap on an average price.",
         "commodity_swaption" => "Option to enter a commodity swap.",
@@ -244,7 +244,7 @@ macro_rules! with_instrument_json_registry {
             plain: FxBarrierOption(FxBarrierOption) => "fx_barrier_option" @ "fx" = FxBarrierOption::example();
             plain: FxVarianceSwap(FxVarianceSwap) => "fx_variance_swap" @ "fx" = FxVarianceSwap::example();
             plain: QuantoOption(QuantoOption) => "quanto_option" @ "fx" = QuantoOption::example();
-            plain: CommodityOption(CommodityOption) => "commodity_option" @ "commodity" = CommodityOption::example();
+            plain: CommoditySpotOption(CommoditySpotOption) => "commodity_spot_option" @ "commodity" = CommoditySpotOption::example();
             plain: CommodityAsianOption(CommodityAsianOption) => "commodity_asian_option" @ "commodity" = CommodityAsianOption::example();
             plain: CommodityForward(CommodityForward) => "commodity_forward" @ "commodity" = CommodityForward::example();
             plain: CommoditySwap(CommoditySwap) => "commodity_swap" @ "commodity" = CommoditySwap::example();

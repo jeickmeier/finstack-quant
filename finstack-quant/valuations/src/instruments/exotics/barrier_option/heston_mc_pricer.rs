@@ -102,7 +102,9 @@ impl BarrierOptionHestonMcPricer {
             )?;
         let v0 = heston_params.v0;
         let sigma = v0.sqrt();
-        let process = HestonProcess::new(heston_params);
+        let process = HestonProcess::new(heston_params).with_drift_schedule(std::sync::Arc::new(
+            super::pricer::barrier_drift(inst, market, as_of, q)?,
+        ));
         let discretization = QeHeston::new();
 
         let grid_config = PathDependentPricerConfig {

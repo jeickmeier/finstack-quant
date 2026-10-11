@@ -284,3 +284,99 @@ fn test_explicit_discounting_with_attached_credit_uses_z_spread_cs01_fallback() 
     assert!(cs01.is_finite() && cs01.abs() > 1e-6);
     assert!((bucketed_cs01 - cs01).abs() <= 1e-10 * cs01.abs().max(1.0));
 }
+
+#[test]
+fn cross_credit_rates_recalibrates_after_discount_shock_and_converges() {
+    use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+    use finstack_quant_valuations::recalibration::{
+        HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
+    };
+    use std::sync::Arc;
+    let as_of = date!(2025 - 01 - 01);
+    let market = build_market(as_of);
+    let bond = build_credit_bond(as_of);
+    let provider = finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
+    let corner = |rate: f64, spread: f64| {
+        let rate_market = market
+            .bump([MarketBump::Curve {
+                id: "USD-OIS".into(),
+                spec: BumpSpec::parallel_bp(rate),
+            }])
+            .unwrap();
+        let rebuilt = provider
+            .rebuild_hazard_curve(&HazardRecalibrationRequest {
+                hazard: market.get_hazard("USD-CREDIT").unwrap(),
+                source_market: Arc::new(market.clone()),
+                target_market: Arc::new(rate_market.clone()),
+                discount_curve_id: "USD-OIS".into(),
+                doc_clause: None,
+                cds_valuation_convention: None,
+                deal_quote_override: None,
+                action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(spread)),
+            })
+            .unwrap();
+        bond.value(&rate_market.insert(rebuilt.as_ref().clone()), as_of)
+            .unwrap()
+            .amount()
+    };
+    let derivative =
+        |h: f64| (corner(h, h) - corner(h, -h) - corner(-h, h) + corner(-h, -h)) / (4.0 * h * h);
+    // Reverse the shock order while retaining the bumped quote recipe. A
+    // subsequent rate shock must replay those quotes against its new discount
+    // curve, rather than keep the first calibrated hazard nodes fixed.
+    let reverse_corner = |rate: f64, spread: f64| {
+        let credit = provider
+            .rebuild_hazard_curve(&HazardRecalibrationRequest {
+                hazard: market.get_hazard("USD-CREDIT").unwrap(),
+                source_market: Arc::new(market.clone()),
+                target_market: Arc::new(market.clone()),
+                discount_curve_id: "USD-OIS".into(),
+                doc_clause: None,
+                cds_valuation_convention: None,
+                deal_quote_override: None,
+                action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(spread)),
+            })
+            .unwrap();
+        let credit_market = market.clone().insert(credit.as_ref().clone());
+        let rate_market = credit_market
+            .bump([MarketBump::Curve {
+                id: "USD-OIS".into(),
+                spec: BumpSpec::parallel_bp(rate),
+            }])
+            .unwrap();
+        let rebuilt = provider
+            .rebuild_hazard_curve(&HazardRecalibrationRequest {
+                hazard: credit,
+                source_market: Arc::new(credit_market),
+                target_market: Arc::new(rate_market.clone()),
+                discount_curve_id: "USD-OIS".into(),
+                doc_clause: None,
+                cds_valuation_convention: None,
+                deal_quote_override: None,
+                action: HazardRecalibrationAction::DependencyMarketReplay,
+            })
+            .unwrap();
+        bond.value(&rate_market.insert(rebuilt.as_ref().clone()), as_of)
+            .unwrap()
+            .amount()
+    };
+    let expected = derivative(1.0);
+    let fine = derivative(0.5);
+    for h in [1.0, 0.5] {
+        let reversed = (reverse_corner(h, h) - reverse_corner(-h, h) - reverse_corner(h, -h)
+            + reverse_corner(-h, -h))
+            / (4.0 * h * h);
+        assert!((reversed - derivative(h)).abs() < 1e-8);
+    }
+    let actual = bond
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::CrossGammaRatesCredit],
+            crate::instruments::test_support::credit::pricing_options(),
+        )
+        .unwrap()
+        .measures["cross_gamma_rates_credit"];
+    assert!((actual - expected).abs() < 1e-8, "{actual} != {expected}");
+    assert!((fine - expected).abs() < 0.01 * expected.abs().max(1e-5));
+}

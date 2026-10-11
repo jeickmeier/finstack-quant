@@ -2197,8 +2197,8 @@ export type InstrumentJson =
       type: "quanto_option";
     }
   | {
-      spec: CommodityOption;
-      type: "commodity_option";
+      spec: CommoditySpotOption;
+      type: "commodity_spot_option";
     }
   | {
       spec: CommodityAsianOption;
@@ -2436,10 +2436,6 @@ export type InflationLag =
       days: number;
     }
   | "none";
-/**
- * Method for calculating par rates in swaps
- */
-export type ParRateMethod = "forward_based" | "discount_ratio";
 /**
  * Clearing status for OTC derivatives.
  *
@@ -4069,7 +4065,7 @@ export type InstrumentType =
   | "bond_future"
   | "commodity_forward"
   | "commodity_swap"
-  | "commodity_option"
+  | "commodity_spot_option"
   | "commodity_asian_option"
   | "commodity_swaption"
   | "commodity_spread_option"
@@ -5372,9 +5368,9 @@ export interface CmoTranche {
    */
   original_face: Money;
   /**
-   * PAC collar (if PAC tranche)
+   * Original dated PAC principal targets and collar; required only for PAC tranches.
    */
-  pac_collar?: PacCollar | null;
+  pac_schedule?: PacSchedule | null;
   /**
    * Payment priority (1 = highest for sequential)
    */
@@ -5383,6 +5379,19 @@ export interface CmoTranche {
    * Tranche type
    */
   tranche_type: CmoTrancheType;
+}
+/**
+ * Original contractual PAC schedule. Pricing never regenerates these targets.
+ */
+export interface PacSchedule {
+  /**
+   * PAC collar
+   */
+  collar: PacCollar;
+  /**
+   * Strictly increasing dated principal targets fixed at construction.
+   */
+  payments: PacPayment[];
 }
 /**
  * PAC collar boundaries.
@@ -5398,6 +5407,19 @@ export interface PacCollar {
    * 300% PSA).
    */
   upper_speed_multiplier: number;
+}
+/**
+ * Dated contractual PAC principal target, in the tranche currency's major units.
+ */
+export interface PacPayment {
+  /**
+   * Contractual payment date, including the collateral's payment delay.
+   */
+  date: DateWire;
+  /**
+   * Planned principal payment, finite and nonnegative.
+   */
+  principal: number;
 }
 /**
  * TBA (To-Be-Announced) forward trade.
@@ -8884,15 +8906,10 @@ export interface ConvertibleBond {
    */
   conversion: ConversionSpec;
   /**
-   * Issuer hazard curve identifier (a `HazardCurve`, as on every credit
-   * instrument). When `None`, the cash component is discounted at the
-   * risk-free `discount_curve_id` (no credit spread).
-   *
-   * The pricer derives the zero-recovery risky discount factor
-   * `risky_df = rf_df × S(t)` from the curve's survival probabilities and
-   * blends it with risk-free discounting as `risky × (1 − R) + rf × R`
-   * using [`Self::recovery_rate`]. The hazard curve's own recovery rate is
-   * used only to convert spread bumps into hazard shifts for CS01.
+   * Issuer hazard curve identifier. Absence specifies no default risk.
+   * All continuation claims are survival-weighted. Default pays the explicit
+   * recovery fraction of outstanding principal and extinguishes equity;
+   * conditional stock drift includes the hazard compensator.
    */
   credit_curve_id?: Id | null;
   /**
@@ -8930,19 +8947,18 @@ export interface ConvertibleBond {
    */
   notional: Money;
   /**
-   * Assumed recovery rate on default, as a fraction (e.g., 0.40 = 40%).
-   *
-   * Used in the Tsiveriotis-Zhang credit model to blend risky and risk-free
-   * discounting on the cash component. A recovery rate of 0 reduces to the
-   * standard zero-recovery TZ model. Typical values:
-   * - **Investment grade**: 0.40 (ISDA standard assumption)
-   * - **High yield**: 0.25-0.35
-   * - **Distressed**: 0.10-0.20
-   *
-   * Required when `credit_curve_id` is set; otherwise absence means that no
-   * credit adjustment is requested.
+   * Fraction of outstanding principal paid immediately on default, in
+   * `[0, 1]`; includes capitalized PIK and excludes prior amortization.
+   * Default extinguishes coupons and the conversion right. Required with a
+   * credit curve; recovery is an explicit cashflow, not a discount blend.
    */
   recovery_rate?: number | null;
+  /**
+   * Recorded exercise awaiting delivery. At or after `exercise_date`, only
+   * this claim remains; after delivery its value is zero. Mandatory exercise
+   * without a record settles on its contractual conversion date.
+   */
+  resolved_settlement?: ConvertibleSettlement | null;
   /**
    * Scenario-only pricing adjustments.
    */
@@ -9080,6 +9096,37 @@ export interface PriceTrigger {
   threshold_pct: number;
 }
 /**
+ * Resolved exercise claim after debt has been converted, called, put, or redeemed.
+ *
+ * These contractual amounts replace the debt and its future coupons. Any
+ * earned but unpaid coupon must be included in `cash`. Shares are delivered
+ * ex-dividend on `delivery_date`. Same-day completed exercise needs no record;
+ * use this state to retain a delayed delivery without replaying the option.
+ */
+export interface ConvertibleSettlement {
+  /**
+   * Fixed cash consideration including any retained coupon, in bond currency.
+   */
+  cash: Money;
+  /**
+   * Contractual delivery/payment date; not earlier than exercise.
+   */
+  delivery_date: DateWire;
+  /**
+   * Date the holder's exercise decision extinguished the debt.
+   */
+  exercise_date: DateWire;
+  /**
+   * Part of `cash` eligible for principal recovery on default; excludes
+   * uncapitalized coupon accrual. Must be between zero and `cash`.
+   */
+  recovery_basis: Money;
+  /**
+   * Fixed number of shares to deliver, finite and nonnegative.
+   */
+  shares: number;
+}
+/**
  * Inflation-Linked Bond instrument
  */
 export interface InflationLinkedBond {
@@ -9119,6 +9166,15 @@ export interface InflationLinkedBond {
    * it enters only through real-yield style metrics computed from real flows.
    */
   discount_curve_id: Id;
+  /**
+   * Black lognormal volatility of the contractual reference-CPI/base-CPI ratio.
+   * The surface uses expiry in Act/365F years to the last required publication
+   * and a Strike axis in ratio units (the par floor strikes at 1.0). The
+   * supplied forward ratio and volatility are under the payment-date measure.
+   * Required for a protected payment whose reference CPI is not yet known;
+   * an explicitly supplied zero-volatility surface selects deterministic pricing.
+   */
+  floor_vol_surface_id?: Id | null;
   /**
    * Coupon frequency
    */
@@ -9449,10 +9505,6 @@ export interface FixedLegSpec {
    * Payment frequency
    */
   frequency: Tenor;
-  /**
-   * Optional par-rate calculation method override
-   */
-  par_method?: ParRateMethod | null;
   /**
    * Payment lag in business days after period end (default: 0).
    *
@@ -10515,7 +10567,9 @@ export interface InterestRateFuture {
    */
   terms: ListedFutureTerms;
   /**
-   * Optional volatility surface identifier for convexity adjustment
+   * Normal-rate volatility surface for automatic term-rate convexity only.
+   * Overnight automatic convexity instead requires explicit Hull-White
+   * mean reversion and short-rate sigma in `instrument_pricing_overrides.model_config`.
    */
   vol_surface_id?: Id | null;
 }
@@ -10533,7 +10587,8 @@ export interface FutureContractSpecs {
    *
    * - `Some(0.0)`: Explicitly disable model-based adjustment (strict mode)
    * - `Some(x)`: Use fixed adjustment of `x` (e.g., from broker quote)
-   * - `None`: Compute adjustment from volatility surface (requires `vol_surface_id`)
+   * - `None`: Term futures use `vol_surface_id`; overnight futures use explicit
+   *   `hw1f_mean_reversion` and `hw1f_sigma` in instrument model configuration.
    *
    * # Market Practice
    *
@@ -13665,7 +13720,8 @@ export interface QuantoOption {
   vol_surface_id: Id;
 }
 /**
- * Commodity option (option on commodity forward or spot).
+ * Option on spot commodity. Options on a specified futures contract use
+ * [`crate::instruments::CommodityFutureOption`], including futures delivery.
  *
  * # Pricing
  *
@@ -13681,8 +13737,8 @@ export interface QuantoOption {
  * # American Option Assumptions
  *
  * For American exercise, the model requires a spot price to build the binomial tree.
- * If `spot_id` is provided, it uses that spot price. Otherwise, the forward
- * price is used as a proxy for spot, which may underestimate early exercise value.
+ * `spot_id` must identify an observed spot for early exercise and Monte Carlo.
+ * The commodity forward is never substituted for the spot underlying.
  * The convenience yield (cost-of-carry) is implied from the forward/spot ratio:
  * `q = r - ln(F/S)/T`
  *
@@ -13696,7 +13752,7 @@ export interface QuantoOption {
  * The curve must be added via `MarketContext::insert_price_curve()`.
  * If `quoted_forward` is provided, it overrides the curve lookup.
  */
-export interface CommodityOption {
+export interface CommoditySpotOption {
   /**
    * Attributes for tagging and selection.
    * Attributes for scenario selection and tagging
@@ -13724,6 +13780,10 @@ export interface CommodityOption {
    * Discount curve ID for present value.
    */
   discount_curve_id: Id;
+  /**
+   * Recorded exercise or expiry; required after expiry while settlement remains unpaid.
+   */
+  exercise?: CommoditySpotOptionExercise | null;
   /**
    * Optional Bermudan exercise schedule.
    *
@@ -13785,9 +13845,10 @@ export interface CommodityOption {
   /**
    * Settlement type (physical or cash).
    *
-   * Defaults to cash settlement when omitted in serialized payloads.
+   * Cash fixes the payoff on exercise; physical retains the marked delivery
+   * claim until its recorded settlement date.
    */
-  settlement?: SettlementType;
+  settlement: SettlementType;
   /**
    * Optional spot price ID (for spot-based pricing and American options).
    */
@@ -13808,6 +13869,27 @@ export interface CommodityOption {
    * Volatility surface ID for implied vol.
    */
   vol_surface_id: Id;
+}
+/**
+ * Recorded exercise or expiry of a spot commodity option.
+ */
+export interface CommoditySpotOptionExercise {
+  /**
+   * Exercise date, or expiry observation date for an unexercised option.
+   */
+  date: DateWire;
+  /**
+   * True for exercise/assignment; false records expiration without exercise.
+   */
+  exercised: boolean;
+  /**
+   * Actual cash-payment or physical-delivery date, on or after exercise.
+   */
+  settlement_date: DateWire;
+  /**
+   * Positive observed commodity spot price in strike units.
+   */
+  spot: number;
 }
 /**
  * Commodity Asian option: option on the arithmetic or geometric average of
@@ -15518,10 +15600,6 @@ export interface TrsScheduleSpec {
  */
 export interface EquityUnderlyingParams {
   /**
-   * Contract size (shares per contract)
-   */
-  contract_size: number;
-  /**
    * Base currency for pricing
    */
   currency: Currency;
@@ -15541,7 +15619,7 @@ export interface EquityUnderlyingParams {
 /**
  * Fixed-income index total-return swap priced with a carry analytic.
  *
- * For each scheduled period, the total-return leg uses
+ * For each wholly future scheduled period, the total-return leg uses
  * `exp(y × accrual_fraction) - 1`, where `y` is an annual continuously
  * compounded decimal yield and the accrual fraction uses the schedule day
  * count. Both legs are discounted with `financing.discount_curve_id`; the
@@ -15555,10 +15633,11 @@ export interface EquityUnderlyingParams {
  * mark-to-market, stochastic credit, constituent decomposition, early
  * termination, and bespoke fees. The period in progress on the valuation
  * date is valued from the live index level (`underlying.index_id`) against
- * `initial_level`, then carried at the index yield to period end; a period
- * that has ended but is not yet paid stays in the PV at its projected carry.
+ * its historical reset level, then carried at the index yield to period end; a period
+ * that has ended but is not yet paid uses the exact historical start and end
+ * levels from `fixing_series_id`. Missing historical endpoints are errors.
  * Cashflow-schedule APIs
- * return payment dates with zero amounts; use
+ * return projected or fixed net payments using the same calculations as
  * [`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected
  * leg values.
  *
@@ -15574,16 +15653,21 @@ export interface FiIndexTotalReturnSwap {
    */
   financing_leg: FinancingLegSpec;
   /**
+   * Market time-series identifier containing positive total-return index levels
+   * on contractual reset dates, including the final accrual boundary. Historical
+   * endpoints require exact observations; no yield-based history is inferred.
+   */
+  fixing_series_id?: string | null;
+  /**
    * Unique instrument identifier.
    */
   id: Id;
   /**
-   * Index level at the reset of the return period in progress, in the
+   * Index level at the first contractual reset, in the
    * index's own units.
    *
-   * Required when the valuation date falls inside a return period; the
-   * realized return to date is `index_level / initial_level`. Unused for
-   * unseasoned trades. Must be positive and finite when set.
+   * Used only at inception when no fixing series is supplied; the
+   * realized return to date is `index_level / initial_level`. Subsequent resets require `fixing_series_id`. Must be positive and finite when set.
    */
   initial_level?: number | null;
   /**
@@ -20141,21 +20225,6 @@ export interface VarResult {
    * Full P&L distribution from historical simulation (sorted, worst first)
    */
   pnl_distribution: number[];
-  /**
-   * True when the Taylor approximation skipped one or more FX-spot shocks
-   * (no FX-delta Taylor term exists). The FX component of those scenarios
-   * is excluded, so VaR/ES understate FX risk; prefer full revaluation for
-   * FX-exposed portfolios. Always false for full revaluation.
-   */
-  skipped_fx: boolean;
-  /**
-   * True when the Taylor approximation skipped one or more `ImpliedVol`
-   * point shocks for a vol-exposed instrument (only aggregate Vega is
-   * available, not bucketed vol). The vega component of those scenarios is
-   * excluded, so VaR/ES understate vol risk. Always false for full
-   * revaluation.
-   */
-  skipped_vol: boolean;
   /**
    * Value-at-Risk at specified confidence level.
    *

@@ -126,8 +126,8 @@
   },
   {
     "kind": "instrument",
-    "source": "finstack-quant/valuations/tests/instruments/json_examples/commodity_option.json",
-    "schema": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json"
+    "source": "finstack-quant/valuations/tests/instruments/json_examples/commodity_spot_option.json",
+    "schema": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json"
   },
   {
     "kind": "instrument",

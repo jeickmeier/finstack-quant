@@ -3,7 +3,7 @@
 //! Covers:
 //! - [`CommodityForward`]: outright forward PV vs tenor.
 //! - [`CommoditySwap`]: fixed-float swap with monthly resets vs tenor.
-//! - [`CommodityOption`]: Black-76 vanilla option vs tenor.
+//! - [`CommoditySpotOption`]: Black-76 vanilla option vs tenor.
 //! - [`CommodityAsianOption`]: arithmetic/geometric averaging (observation count hot path).
 //! - [`CommoditySpreadOption`]: Kirk's approximation for two-leg spreads.
 //! - [`CommoditySwaption`]: option on commodity swap via Black-76 swaption model.
@@ -19,7 +19,7 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::commodity::commodity_asian_option::CommodityAsianOption;
 use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
-use finstack_quant_valuations::instruments::commodity::commodity_option::CommodityOption;
+use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
 use finstack_quant_valuations::instruments::commodity::commodity_spread_option::CommoditySpreadOption;
 use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
 use finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;
@@ -151,8 +151,8 @@ fn commodity_swap_contract(label: &str, end: Date) -> CommoditySwap {
         .expect("commodity swap for benchmark")
 }
 
-fn commodity_call_option(label: &str, expiry: Date) -> CommodityOption {
-    CommodityOption::builder()
+fn commodity_call_option(label: &str, expiry: Date) -> CommoditySpotOption {
+    CommoditySpotOption::builder()
         .id(InstrumentId::new(label))
         .underlying(wti_underlying())
         .strike(75.0)
@@ -210,8 +210,8 @@ fn bench_commodity_swap_pv(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_commodity_option_pv(c: &mut Criterion) {
-    let mut group = c.benchmark_group("commodity_option_pv");
+fn bench_commodity_spot_option_pv(c: &mut Criterion) {
+    let mut group = c.benchmark_group("commodity_spot_option_pv");
     let market = create_commodity_market();
     let as_of = base_date();
 
@@ -229,8 +229,8 @@ fn bench_commodity_option_pv(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_commodity_option_greeks(c: &mut Criterion) {
-    let mut group = c.benchmark_group("commodity_option_greeks");
+fn bench_commodity_spot_option_greeks(c: &mut Criterion) {
+    let mut group = c.benchmark_group("commodity_spot_option_greeks");
     let market = create_commodity_market();
     let as_of = base_date();
 
@@ -451,8 +451,8 @@ criterion_group!(
     commodity_benches,
     bench_commodity_forward_pv,
     bench_commodity_swap_pv,
-    bench_commodity_option_pv,
-    bench_commodity_option_greeks,
+    bench_commodity_spot_option_pv,
+    bench_commodity_spot_option_greeks,
     bench_commodity_asian_option_obs_count,
     bench_commodity_asian_option_method,
     bench_commodity_spread_option_pv,

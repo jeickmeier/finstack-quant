@@ -421,11 +421,11 @@ fn call_put_from_py(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<CallPu
 /// Convertible bond (typed wrapper for Rust ``ConvertibleBond``).
 ///
 /// Debt with an embedded equity conversion option, priced on a
-/// Tsiveriotis–Fernandes style tree: the cash component discounts at the
-/// risk-free ``discount_curve_id`` times the survival probability of the
-/// issuer hazard curve ``credit_curve_id`` (blended by ``recovery_rate``;
-/// risk-free when no credit curve is set), the equity component on the
-/// risk-free curve. Conversion, call/put, soft-call and
+/// defaultable-equity tree with fractional recovery of live principal.
+/// Default extinguishes equity and pays ``recovery_rate`` times the recovery
+/// basis; survival-conditioned equity drift compensates for jump-to-zero risk.
+/// ``credit_curve_id`` is the issuer hazard curve; without it default is absent.
+/// Conversion, call/put, soft-call and
 /// coupon terms are typed (``ConversionSpec``, ``CallPutSchedule``) or
 /// dict/JSON inputs.
 ///
@@ -723,6 +723,16 @@ impl PyConvertibleBond {
     #[getter]
     fn recovery_rate(&self) -> Option<f64> {
         self.inner.recovery_rate
+    }
+
+    /// Recorded exercise and delayed cash/share delivery in canonical serde form, or ``None``.
+    #[getter]
+    fn resolved_settlement<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .resolved_settlement
+            .as_ref()
+            .map(|claim| serde_to_py(py, claim))
+            .transpose()
     }
 
     /// Coupon/cashflow specification in serde form (``{"fixed": {...}}``,
@@ -1137,7 +1147,7 @@ impl PyConvertibleBondBuilder {
     /// ----------
     /// value : float
     ///     Recovery rate as a fraction (e.g. ``0.40`` = 40%). Used in the
-    ///     Tsiveriotis-Zhang credit model; only relevant when
+    ///     fractional recovery of live principal model; only relevant when
     ///     ``credit_curve_id`` is set.
     ///
     /// Returns
@@ -1154,6 +1164,40 @@ impl PyConvertibleBondBuilder {
             recovery_rate,
             float_repr(value),
             |b: ConvertibleBondBuilderInner| b.recovery_rate(value)
+        )
+    }
+
+    /// Record the claim remaining after exercise extinguishes the debt.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : dict | str
+    ///     Canonical ``ConvertibleSettlement``: ISO ``exercise_date`` and
+    ///     ``delivery_date``, nonnegative ``shares``, and currency-tagged ``cash``
+    ///     and ``recovery_basis``. Cash includes retained coupons; recovery basis
+    ///     excludes uncapitalized coupon accrual. Omission leaves debt unresolved.
+    ///
+    /// Returns
+    /// -------
+    /// ConvertibleBondBuilder
+    ///     This builder for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was consumed or the record cannot be deserialized.
+    #[pyo3(text_signature = "($self, value)")]
+    fn resolved_settlement<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'py>,
+        value: &Bound<'py, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let claim = serde_from_py(py, value, "resolved_settlement")?;
+        builder_set!(
+            slf,
+            resolved_settlement,
+            "{...}".to_string(),
+            |b: ConvertibleBondBuilderInner| b.resolved_settlement(claim)
         )
     }
 

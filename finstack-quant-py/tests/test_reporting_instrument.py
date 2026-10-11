@@ -146,13 +146,14 @@ def test_metric_cells_follow_rust_units_not_a_python_table() -> None:
     """PYPY-003: the unit family is read from Rust ``metric_units()``."""
     import datetime
 
-    from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
+    from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext, ScalarTimeSeries
     from finstack_quant.valuations.instruments import InterestRateSwap, price_instrument
 
     curve_base = datetime.date(2023, 1, 2)
     market = MarketContext()
     market = market.insert(DiscountCurve.flat("USD-OIS", curve_base, 0.04))
     market = market.insert(ForwardCurve.flat("USD-SOFR-3M", 0.25, curve_base, 0.04))
+    market.insert_series(ScalarTimeSeries("FIXING:USD-SOFR-3M", [(datetime.date(2023, 12, 28), 0.04)]))
     result = price_instrument(
         InterestRateSwap.example(), market, datetime.date(2024, 1, 2), metrics=["annuity", "par_rate", "dv01"]
     )

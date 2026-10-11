@@ -28,7 +28,6 @@
               "count": 6,
               "unit": "months"
             },
-            "par_method": null,
             "payment_lag_days": 0,
             "rate": "0.03",
             "start": "2027-01-17",
@@ -3792,21 +3791,6 @@
       "title": "Instrument Pricing Overrides",
       "type": "object"
     },
-    "d_c558256197eb64ce415b": {
-      "description": "Method for calculating par rates in swaps",
-      "oneOf": [
-        {
-          "const": "forward_based",
-          "description": "Use forward-curve based float PV over the schedule (market standard)",
-          "type": "string"
-        },
-        {
-          "const": "discount_ratio",
-          "description": "Use discount-curve ratio for bootstrapping",
-          "type": "string"
-        }
-      ]
-    },
     "d_cc8ed166abbb10ad4451": {
       "additionalProperties": false,
       "description": "Specification for endogenous (leverage-dependent) hazard rate.\n\nModels the relationship between a firm's leverage and its instantaneous\nhazard rate, enabling a feedback loop where PIK accrual increases the\nnotional (and hence leverage), which drives the hazard rate higher.\nDeserialization validates the parameters and rejects incomplete or\ninconsistent tabular calibrations before they can be evaluated.",
@@ -4034,17 +4018,6 @@
         "frequency": {
           "$ref": "#/$defs/d_47e5e74524615b78a19f",
           "description": "Payment frequency"
-        },
-        "par_method": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_c558256197eb64ce415b"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional par-rate calculation method override"
         },
         "payment_lag_days": {
           "default": 0,
@@ -4305,7 +4278,7 @@
         },
         {
           "const": "taylor_approximation",
-          "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian.",
+          "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil.",
           "type": "string"
         }
       ]

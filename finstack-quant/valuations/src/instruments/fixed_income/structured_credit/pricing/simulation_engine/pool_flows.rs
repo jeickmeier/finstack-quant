@@ -187,6 +187,8 @@ fn settle_charged_off_advances(
 pub(super) struct RatedPoolFlowRequest<'a, 's> {
     pub(super) state: &'a mut SimulationState<'s>,
     pub(super) pay_date: Date,
+    /// Unadjusted contractual end; payment may roll before maturity.
+    pub(super) accrual_end: Date,
     pub(super) prev_date: Date,
     pub(super) months_per_period: f64,
     pub(super) context: &'a MarketContext,
@@ -449,7 +451,7 @@ pub(super) fn calculate_pool_flows_with_rates(
         let rate = request.card.map_or(rate, |card| card.portfolio_yield);
 
         // Mid-period maturities accrue interest only through maturity.
-        let interest_end = state.pool_state.maturities[i].min(request.pay_date);
+        let interest_end = state.pool_state.maturities[i].min(request.accrual_end);
 
         let accrual_factor = state.pool_state.day_counts[i].year_fraction(
             request.prev_date,
@@ -590,7 +592,7 @@ pub(super) fn calculate_pool_flows_with_rates(
         // (post-default) balance as a balloon payment and zero out the asset.
         // Interest was already computed above (capped at maturity date, with
         // the default haircut applied).
-        if request.pay_date >= state.pool_state.maturities[i] {
+        if request.accrual_end >= state.pool_state.maturities[i] {
             // Balances still delinquent at maturity never pay: charge them off
             // (with recovery) and pay the performing balance as the balloon.
             let matured_delinquent = if delinquency.is_some() {

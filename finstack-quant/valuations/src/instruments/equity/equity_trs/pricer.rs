@@ -290,7 +290,6 @@ pub(crate) fn pv_total_return_leg(
         schedule: &trs.schedule,
         notional: trs.notional,
         discount_curve_id: trs.financing_leg.discount_curve_id.as_str(),
-        contract_size: trs.underlying.contract_size,
         initial_level: Some(initial),
     };
 

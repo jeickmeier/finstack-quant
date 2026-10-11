@@ -70,7 +70,6 @@ fn seasoned_ois_swap(start: Date) -> InterestRateSwap {
             payment_lag_days: 0,
             end_of_month: false,
             stub: StubKind::ShortFront,
-            par_method: None,
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),

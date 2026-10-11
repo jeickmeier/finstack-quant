@@ -168,6 +168,7 @@ fn run_waterfall(
         interest_collections,
         principal_collections,
         payment_date,
+        accrual_end: payment_date,
         period_start,
         valuation_date: period_start,
         pool_balance,

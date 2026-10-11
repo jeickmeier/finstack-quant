@@ -605,8 +605,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         .with_exercise_style(ExerciseStyle::European)
         .with_settlement(SettlementType::Cash);
         let underlying_params = EquityUnderlyingParams::new("AAPL", "EQUITY-SPOT", Currency::USD)
-            .with_div_yield_id("EQUITY-DIVYIELD")
-            .with_contract_size(contract_size);
+            .with_div_yield_id("EQUITY-DIVYIELD");
         let option = EquityOption::new(
             option_id.clone(),
             &option_params,
@@ -762,7 +761,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             stub: StubKind::None,
             start: expiry,
             end: swap_end,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         };
@@ -1148,6 +1147,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             div_yield_id: Some("AAPL-DIVYIELD".into()),
             call_put: None,
             soft_call_trigger: None,
+            resolved_settlement: None,
             settlement_days: None,
             recovery_rate: None,
             cashflow_spec:

@@ -675,7 +675,7 @@ def commodity_inputs() -> dict[str, dict[str, Any]]:
         },
     }
     vanilla = {
-        "type": "commodity_option",
+        "type": "commodity_spot_option",
         "spec": {
             "id": "WTI-CALL",
             "attributes": {},
@@ -690,6 +690,7 @@ def commodity_inputs() -> dict[str, dict[str, Any]]:
             "option_type": "call",
             "quantity": 1000.0,
             "settlement": "cash",
+            "spot_id": "WTI-SPOT",
             "strike": 75.0,
             "underlying_ticker": "CL",
             "unit": "BBL",
@@ -991,6 +992,8 @@ def build_market(stage: str, as_of: date = AS_OF, *, core_stage: str | None = No
             market.insert(PriceCurve(f"{ticker}-FORWARD", as_of, list(zip((0.0, 0.5, 1.0, 2.0), prices, strict=True))))
             strikes = [1.0, 3.0, 6.0] if ticker == "NG" else [20.0, 75.0, 150.0]
             market.insert(VolSurface(f"{ticker}-VOL", [0.25, 0.5, 1.0, 2.0], strikes, [[sigma] * 3] * 4))
+        # Explicit synthetic observed spot for spot-option simulation.
+        market.insert_price("WTI-SPOT", 75.0, "USD")
         market.insert_price("SPX", 5200.0, "USD")
         market.insert_price("SPX-DIVYIELD", 0.015)
         strikes = [5200.0 * math.exp(-3.0 + i * 0.05) for i in range(121)]

@@ -11,7 +11,7 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 #[allow(unused_imports)]
 use finstack_quant_core::math::norm_cdf;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::commodity::commodity_option::CommodityOption;
+use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations::instruments::Instrument;
@@ -57,11 +57,15 @@ fn test_black76_futures_based_pricing() {
     let vol_surface = flat_vol_surface("CL-VOL", &[1.0], &[80.0, 100.0, 120.0], 0.20);
 
     let market = MarketContext::new()
+        .insert_price(
+            "CL-SPOT",
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+        )
         .insert(discount_curve)
         .insert(price_curve)
         .insert_surface(vol_surface);
 
-    let option = CommodityOption::builder()
+    let option = CommoditySpotOption::builder()
         .id(InstrumentId::new("CL-CALL-TEST"))
         .underlying(CommodityUnderlyingParams::new(
             "Energy",
@@ -73,6 +77,7 @@ fn test_black76_futures_based_pricing() {
         .option_type(OptionType::Call)
         .exercise_style(ExerciseStyle::European)
         .expiry(expiry)
+        .spot_id("CL-SPOT".into())
         .quantity(1.0)
         .multiplier(1.0)
         .settlement(SettlementType::Cash)
@@ -103,7 +108,7 @@ fn test_black76_futures_based_pricing() {
 }
 
 #[test]
-fn test_futures_based_american_matches_european() {
+fn test_flat_forward_spot_american_close_to_european() {
     let as_of = date(2025, 1, 1);
     let expiry = date(2026, 1, 1);
 
@@ -113,12 +118,16 @@ fn test_futures_based_american_matches_european() {
     let vol_surface = flat_vol_surface("CL-VOL", &[1.0], &[90.0, 100.0, 110.0], 0.25);
 
     let market = MarketContext::new()
+        .insert_price(
+            "CL-SPOT",
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+        )
         .insert(discount_curve)
         .insert(price_curve)
         .insert_surface(vol_surface);
 
     let build = |style| {
-        CommodityOption::builder()
+        CommoditySpotOption::builder()
             .id(InstrumentId::new("CL-CALL-BASE"))
             .underlying(CommodityUnderlyingParams::new(
                 "Energy",
@@ -130,6 +139,7 @@ fn test_futures_based_american_matches_european() {
             .option_type(OptionType::Call)
             .exercise_style(style)
             .expiry(expiry)
+            .spot_id("CL-SPOT".into())
             .quantity(1.0)
             .multiplier(1.0)
             .settlement(SettlementType::Cash)
@@ -149,7 +159,7 @@ fn test_futures_based_american_matches_european() {
     let pv_eur = european.value(&market, as_of).expect("price european");
     let pv_amer = american.value(&market, as_of).expect("price american");
 
-    // American call on futures should be close to European (no early exercise value)
+    // At this near-ATM flat-forward point, the observed-spot tree is close to Black.
     // Allow wider tolerance for tree vs closed-form numerical differences
     assert!(
         (pv_amer.amount() - pv_eur.amount()).abs() < 0.1,
@@ -160,7 +170,7 @@ fn test_futures_based_american_matches_european() {
 }
 
 #[test]
-fn test_futures_based_bermudan_prices_between_european_and_american() {
+fn test_spot_bermudan_prices_between_european_and_american() {
     let as_of = date(2025, 1, 1);
     let expiry = date(2026, 1, 1);
 
@@ -169,12 +179,16 @@ fn test_futures_based_bermudan_prices_between_european_and_american() {
     let vol_surface = flat_vol_surface("CL-VOL", &[1.0], &[90.0, 100.0, 110.0], 0.25);
 
     let market = MarketContext::new()
+        .insert_price(
+            "CL-SPOT",
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+        )
         .insert(discount_curve)
         .insert(price_curve)
         .insert_surface(vol_surface);
 
     let build = |style| {
-        CommodityOption::builder()
+        CommoditySpotOption::builder()
             .id(InstrumentId::new("CL-CALL-BERM"))
             .underlying(CommodityUnderlyingParams::new(
                 "Energy",
@@ -192,6 +206,7 @@ fn test_futures_based_bermudan_prices_between_european_and_american() {
                 expiry,
             ]))
             .expiry(expiry)
+            .spot_id("CL-SPOT".into())
             .quantity(1.0)
             .multiplier(1.0)
             .settlement(SettlementType::Cash)
@@ -238,13 +253,17 @@ fn test_spot_based_american_put_above_european() {
     let vol_surface = flat_vol_surface("CL-VOL", &[1.0], &[80.0, 100.0, 120.0], 0.30);
 
     let market = MarketContext::new()
+        .insert_price(
+            "CL-SPOT",
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+        )
         .insert(discount_curve)
         .insert(price_curve)
         .insert_surface(vol_surface)
         .insert_price("CL-SPOT", MarketScalar::Unitless(90.0));
 
     let build = |style| {
-        CommodityOption::builder()
+        CommoditySpotOption::builder()
             .id(InstrumentId::new("CL-PUT-BASE"))
             .underlying(CommodityUnderlyingParams::new(
                 "Energy",
@@ -256,6 +275,7 @@ fn test_spot_based_american_put_above_european() {
             .option_type(OptionType::Put)
             .exercise_style(style)
             .expiry(expiry)
+            .spot_id("CL-SPOT".into())
             .quantity(1.0)
             .multiplier(1.0)
             .settlement(SettlementType::Cash)
@@ -289,12 +309,16 @@ fn test_post_expiry_returns_zero() {
     let vol_surface = flat_vol_surface("CL-VOL", &[1.0], &[80.0, 100.0, 120.0], 0.20);
 
     let market = MarketContext::new()
+        .insert_price(
+            "CL-SPOT",
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+        )
         .insert(discount_curve)
         .insert(price_curve)
         .insert_surface(vol_surface);
 
     // ITM call option (forward 100 > strike 90)
-    let itm_call = CommodityOption::builder()
+    let itm_call = CommoditySpotOption::builder()
         .id(InstrumentId::new("CL-CALL-EXPIRED"))
         .underlying(CommodityUnderlyingParams::new(
             "Energy",
@@ -306,6 +330,15 @@ fn test_post_expiry_returns_zero() {
         .option_type(OptionType::Call)
         .exercise_style(ExerciseStyle::European)
         .expiry(expiry)
+        .exercise(
+            finstack_quant_valuations::instruments::CommoditySpotOptionExercise {
+                date: expiry,
+                spot: 100.0,
+                settlement_date: expiry,
+                exercised: true,
+            },
+        )
+        .spot_id("CL-SPOT".into())
         .quantity(1.0)
         .multiplier(1.0)
         .settlement(SettlementType::Cash)
@@ -330,7 +363,7 @@ fn test_post_expiry_returns_zero() {
     );
 
     // ITM put option
-    let itm_put = CommodityOption::builder()
+    let itm_put = CommoditySpotOption::builder()
         .id(InstrumentId::new("CL-PUT-EXPIRED"))
         .underlying(CommodityUnderlyingParams::new(
             "Energy",
@@ -342,6 +375,15 @@ fn test_post_expiry_returns_zero() {
         .option_type(OptionType::Put)
         .exercise_style(ExerciseStyle::European)
         .expiry(expiry)
+        .exercise(
+            finstack_quant_valuations::instruments::CommoditySpotOptionExercise {
+                date: expiry,
+                spot: 100.0,
+                settlement_date: expiry,
+                exercised: true,
+            },
+        )
+        .spot_id("CL-SPOT".into())
         .quantity(1.0)
         .multiplier(1.0)
         .settlement(SettlementType::Cash)
@@ -375,12 +417,16 @@ fn test_at_expiry_returns_intrinsic() {
     let vol_surface = flat_vol_surface("CL-VOL", &[1.0], &[80.0, 100.0, 120.0], 0.20);
 
     let market = MarketContext::new()
+        .insert_price(
+            "CL-SPOT",
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+        )
         .insert(discount_curve)
         .insert(price_curve)
         .insert_surface(vol_surface);
 
     // ITM call: forward 100 > strike 90, intrinsic = 10
-    let itm_call = CommodityOption::builder()
+    let itm_call = CommoditySpotOption::builder()
         .id(InstrumentId::new("CL-CALL-AT-EXPIRY"))
         .underlying(CommodityUnderlyingParams::new(
             "Energy",
@@ -392,6 +438,7 @@ fn test_at_expiry_returns_intrinsic() {
         .option_type(OptionType::Call)
         .exercise_style(ExerciseStyle::European)
         .expiry(expiry)
+        .spot_id("CL-SPOT".into())
         .quantity(1.0)
         .multiplier(1.0)
         .settlement(SettlementType::Cash)
@@ -415,7 +462,7 @@ fn test_at_expiry_returns_intrinsic() {
     );
 
     // OTM call: forward 100 < strike 110, intrinsic = 0
-    let otm_call = CommodityOption::builder()
+    let otm_call = CommoditySpotOption::builder()
         .id(InstrumentId::new("CL-CALL-OTM-AT-EXPIRY"))
         .underlying(CommodityUnderlyingParams::new(
             "Energy",
@@ -427,6 +474,7 @@ fn test_at_expiry_returns_intrinsic() {
         .option_type(OptionType::Call)
         .exercise_style(ExerciseStyle::European)
         .expiry(expiry)
+        .spot_id("CL-SPOT".into())
         .quantity(1.0)
         .multiplier(1.0)
         .settlement(SettlementType::Cash)
@@ -468,6 +516,10 @@ fn test_put_call_parity_european() {
     );
 
     let market = MarketContext::new()
+        .insert_price(
+            "CL-SPOT",
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+        )
         .insert(discount_curve)
         .insert(price_curve)
         .insert_surface(vol_surface);
@@ -475,7 +527,7 @@ fn test_put_call_parity_european() {
     // Test put-call parity at multiple strikes (ITM, ATM, OTM)
     for &strike in &[65.0, 75.0, 80.0, 85.0, 95.0] {
         let build = |opt_type| {
-            CommodityOption::builder()
+            CommoditySpotOption::builder()
                 .id(InstrumentId::new("PCP-TEST"))
                 .underlying(CommodityUnderlyingParams::new(
                     "Energy",
@@ -487,6 +539,7 @@ fn test_put_call_parity_european() {
                 .option_type(opt_type)
                 .exercise_style(ExerciseStyle::European)
                 .expiry(expiry)
+                .spot_id("CL-SPOT".into())
                 .quantity(1.0)
                 .multiplier(1.0)
                 .settlement(SettlementType::Cash)
@@ -567,18 +620,26 @@ fn test_non_flat_vol_surface_skew() {
     let flat_surface = flat_vol_surface("CL-VOL", &expiries, &strikes, 0.25);
 
     let skewed_market = MarketContext::new()
+        .insert_price(
+            "CL-SPOT",
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+        )
         .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
         .insert(flat_price_curve("CL-FWD", as_of, 80.0, 1.0))
         .insert_surface(skewed_surface);
 
     let flat_market = MarketContext::new()
+        .insert_price(
+            "CL-SPOT",
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+        )
         .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
         .insert(flat_price_curve("CL-FWD", as_of, 80.0, 1.0))
         .insert_surface(flat_surface);
 
     // Build ATM call (strike = 80, same vol in both surfaces)
     let build_option = |strike, opt_type| {
-        CommodityOption::builder()
+        CommoditySpotOption::builder()
             .id(InstrumentId::new("SKEW-TEST"))
             .underlying(CommodityUnderlyingParams::new(
                 "Energy",
@@ -590,6 +651,7 @@ fn test_non_flat_vol_surface_skew() {
             .option_type(opt_type)
             .exercise_style(ExerciseStyle::European)
             .expiry(expiry)
+            .spot_id("CL-SPOT".into())
             .quantity(1.0)
             .multiplier(1.0)
             .settlement(SettlementType::Cash)

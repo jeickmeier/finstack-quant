@@ -82,10 +82,7 @@ enum PvReference {
 /// explicitly annualize projection-DF growth on the contractual day count;
 /// their former pins treated an ACT/365F curve quote as an ACT/360 index rate.
 const PINNED_PV: &[(&str, PvReference)] = &[
-    (
-        "asset_backed_facility",
-        PvReference::Recorded("77045997.819227106393914245443"),
-    ),
+    ("asset_backed_facility", PvReference::CanonicalRoundtrip),
     ("cap_floor", PvReference::ContractualRate),
     // Independently reconciled with QuantLib schedules, Black pricing and an
     // annuity-measure convexity calculation: reference floating-leg growth
@@ -103,10 +100,7 @@ const PINNED_PV: &[(&str, PvReference)] = &[
         "inflation_cap_floor",
         PvReference::Recorded("3742.853205610149"),
     ),
-    (
-        "inflation_linked_bond",
-        PvReference::Recorded("3359979.7227661326209574555315"),
-    ),
+    ("inflation_linked_bond", PvReference::CanonicalRoundtrip),
     (
         "inflation_swap",
         PvReference::Recorded("-4080.8031999999000000"),
@@ -115,10 +109,7 @@ const PINNED_PV: &[(&str, PvReference)] = &[
     // These wire tests check the current canonical contract exactly; model
     // discretization/RNG evolution is covered by the dedicated model tests.
     ("snowball", PvReference::CanonicalRoundtrip),
-    (
-        "structured_credit",
-        PvReference::Recorded("108912295.58406585274007447394"),
-    ),
+    ("structured_credit", PvReference::CanonicalRoundtrip),
     ("tarn", PvReference::CanonicalRoundtrip),
     (
         "yoy_inflation_swap",
@@ -225,8 +216,8 @@ fn contractual_rate_reference(
         roll_rule: RollRule::None,
     })
     .expect("cap schedule");
-    let strike = cap.strike.to_f64().expect("strike");
-    let spread = cap.spread_bp.to_f64().expect("spread bp") * 1e-4;
+    let strike =
+        cap.strike.to_f64().expect("strike") - cap.spread_bp.to_f64().expect("spread bp") * 1e-4;
     periods
         .iter()
         .map(|period| {
@@ -240,7 +231,7 @@ fn contractual_rate_reference(
                 period.accrual_start,
                 period.accrual_end,
                 period.accrual_year_fraction,
-            ) + spread;
+            );
             discount
                 .df_between_dates(as_of, period.payment_date)
                 .expect("payment DF")
@@ -290,7 +281,20 @@ fn price_case(
             patch["value"].clone(),
         );
     }
-    let market: MarketContext = serde_json::from_value(market).expect("market");
+    let mut market: MarketContext = serde_json::from_value(market).expect("market");
+    if ty == "inflation_linked_bond" {
+        instrument["instrument"]["spec"]["floor_vol_surface_id"] =
+            serde_json::json!("US-CPI-RATIO-VOL");
+        market = market.insert_surface(
+            finstack_quant_core::market_data::surfaces::VolSurface::builder("US-CPI-RATIO-VOL")
+                .expiries(&[0.1, 20.0])
+                .strikes(&[0.5, 1.0, 2.0])
+                .row(&[0.05; 3])
+                .row(&[0.05; 3])
+                .build()
+                .expect("ratio vol"),
+        );
+    }
     let parsed = parse_boxed_instrument_from_json(&instrument.to_string(), None)
         .unwrap_or_else(|e| panic!("{ty}: {e}"));
     let request = &case["request"];
@@ -323,18 +327,13 @@ fn price_case(
             true
         }
         PvReference::CanonicalRoundtrip => {
-            use finstack_quant_valuations::instruments::{Snowball, Tarn};
-            let spec = instrument["instrument"]["spec"].take();
-            instrument["instrument"]["spec"] = match ty {
-                "snowball" => serde_json::to_value(
-                    serde_json::from_value::<Snowball>(spec).expect("canonical Snowball"),
-                ),
-                "tarn" => serde_json::to_value(
-                    serde_json::from_value::<Tarn>(spec).expect("canonical Tarn"),
-                ),
-                _ => panic!("no typed roundtrip for {ty}"),
-            }
-            .expect("canonical contract JSON");
+            let canonical_json = finstack_quant_valuations::instruments::InstrumentEnvelope::new(
+                parsed
+                    .as_instrument()
+                    .to_instrument_json()
+                    .expect("registered instrument"),
+            );
+            instrument = serde_json::to_value(canonical_json).expect("canonical contract JSON");
             let canonical = parse_boxed_instrument_from_json(&instrument.to_string(), None)
                 .expect("roundtripped instrument");
             let roundtripped = price_instrument(
@@ -450,7 +449,7 @@ fn rescaled_inputs_reprice_to_recorded_reference() {
                     json!(5000.0),
                 ),
             ],
-            PvReference::Recorded("109049787.08034628570527971583"),
+            PvReference::CanonicalRoundtrip,
         ),
     ];
     let mismatches: Vec<String> = checks

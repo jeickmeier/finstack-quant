@@ -700,7 +700,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Equal principal installments on coupon accrual boundaries in `(start, end]`.\nThe installment is fixed from outstanding after all start-date movements,\nincluding PIK and explicit principal events. The final installment pays\nthe live remaining balance, including subsequent PIK or principal changes.\nPrincipal changes economically on each accrual boundary; cash settles on\nthat coupon's adjusted, lagged payment date.",
+          "description": "Equal principal installments on coupon accrual boundaries in `(start, end]`.\nThe installment is fixed from outstanding after all start-date movements,\nincluding PIK and explicit principal events. Each subsequent funded draw\nadds equal installments over the remaining boundaries after its draw date.\nThe final installment pays the live remaining balance, including subsequent PIK.\nPrincipal changes economically on each accrual boundary; cash settles on\nthat coupon's adjusted, lagged payment date.",
           "properties": {
             "linear_between": {
               "additionalProperties": false,
@@ -5489,16 +5489,16 @@
           "$ref": "#/$defs/Money",
           "description": "Original face amount"
         },
-        "pac_collar": {
+        "pac_schedule": {
           "anyOf": [
             {
-              "$ref": "#/$defs/PacCollar"
+              "$ref": "#/$defs/PacSchedule"
             },
             {
               "type": "null"
             }
           ],
-          "description": "PAC collar (if PAC tranche)"
+          "description": "Original dated PAC principal targets and collar; required only for PAC tranches."
         },
         "priority": {
           "description": "Payment priority (1 = highest for sequential)",
@@ -6755,9 +6755,9 @@
       ],
       "type": "object"
     },
-    "CommodityOption": {
+    "CommoditySpotOption": {
       "additionalProperties": false,
-      "description": "Commodity option (option on commodity forward or spot).\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\nAnalytical delta measures currency per unit change in the resolved forward,\nholding discount factors and volatility fixed. At zero volatility or expiry,\nthe intrinsic-payoff derivative is used; delta is defined as zero exactly at\nthe strike, where the mathematical derivative does not exist.\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\nIf `spot_id` is provided, it uses that spot price. Otherwise, the forward\nprice is used as a proxy for spot, which may underestimate early exercise value.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup.",
+      "description": "Option on spot commodity. Options on a specified futures contract use\n[`crate::instruments::CommodityFutureOption`], including futures delivery.\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\nAnalytical delta measures currency per unit change in the resolved forward,\nholding discount factors and volatility fixed. At zero volatility or expiry,\nthe intrinsic-payoff derivative is used; delta is defined as zero exactly at\nthe strike, where the mathematical derivative does not exist.\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\n`spot_id` must identify an observed spot for early exercise and Monte Carlo.\nThe commodity forward is never substituted for the spot underlying.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -6791,6 +6791,17 @@
         "discount_curve_id": {
           "$ref": "#/$defs/Id",
           "description": "Discount curve ID for present value."
+        },
+        "exercise": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommoditySpotOptionExercise"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Recorded exercise or expiry; required after expiry while settlement remains unpaid."
         },
         "exercise_dates": {
           "description": "Optional Bermudan exercise schedule.\n\nRequired when `exercise_style == ExerciseStyle::Bermudan`.",
@@ -6862,8 +6873,7 @@
         },
         "settlement": {
           "$ref": "#/$defs/SettlementType",
-          "default": "cash",
-          "description": "Settlement type (physical or cash).\n\nDefaults to cash settlement when omitted in serialized payloads."
+          "description": "Settlement type (physical or cash).\n\nCash fixes the payoff on exercise; physical retains the marked delivery\nclaim until its recorded settlement date."
         },
         "spot_id": {
           "anyOf": [
@@ -6904,9 +6914,40 @@
         "expiry",
         "quantity",
         "multiplier",
+        "settlement",
         "forward_curve_id",
         "discount_curve_id",
         "vol_surface_id"
+      ],
+      "type": "object"
+    },
+    "CommoditySpotOptionExercise": {
+      "additionalProperties": false,
+      "description": "Recorded exercise or expiry of a spot commodity option.",
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Exercise date, or expiry observation date for an unexercised option."
+        },
+        "exercised": {
+          "description": "True for exercise/assignment; false records expiration without exercise.",
+          "type": "boolean"
+        },
+        "settlement_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Actual cash-payment or physical-delivery date, on or after exercise."
+        },
+        "spot": {
+          "description": "Positive observed commodity spot price in strike units.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "date",
+        "spot",
+        "settlement_date",
+        "exercised"
       ],
       "type": "object"
     },
@@ -7752,7 +7793,7 @@
               "type": "null"
             }
           ],
-          "description": "Issuer hazard curve identifier (a `HazardCurve`, as on every credit\ninstrument). When `None`, the cash component is discounted at the\nrisk-free `discount_curve_id` (no credit spread).\n\nThe pricer derives the zero-recovery risky discount factor\n`risky_df = rf_df × S(t)` from the curve's survival probabilities and\nblends it with risk-free discounting as `risky × (1 − R) + rf × R`\nusing [`Self::recovery_rate`]. The hazard curve's own recovery rate is\nused only to convert spread bumps into hazard shifts for CS01."
+          "description": "Issuer hazard curve identifier. Absence specifies no default risk.\nAll continuation claims are survival-weighted. Default pays the explicit\nrecovery fraction of outstanding principal and extinguishes equity;\nconditional stock drift includes the hazard compensator."
         },
         "discount_curve_id": {
           "$ref": "#/$defs/Id",
@@ -7794,12 +7835,23 @@
           "description": "Principal amount."
         },
         "recovery_rate": {
-          "description": "Assumed recovery rate on default, as a fraction (e.g., 0.40 = 40%).\n\nUsed in the Tsiveriotis-Zhang credit model to blend risky and risk-free\ndiscounting on the cash component. A recovery rate of 0 reduces to the\nstandard zero-recovery TZ model. Typical values:\n- **Investment grade**: 0.40 (ISDA standard assumption)\n- **High yield**: 0.25-0.35\n- **Distressed**: 0.10-0.20\n\nRequired when `credit_curve_id` is set; otherwise absence means that no\ncredit adjustment is requested.",
+          "description": "Fraction of outstanding principal paid immediately on default, in\n`[0, 1]`; includes capitalized PIK and excludes prior amortization.\nDefault extinguishes coupons and the conversion right. Required with a\ncredit curve; recovery is an explicit cashflow, not a discount blend.",
           "format": "double",
           "type": [
             "number",
             "null"
           ]
+        },
+        "resolved_settlement": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConvertibleSettlement"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Recorded exercise awaiting delivery. At or after `exercise_date`, only\nthis claim remains; after delivery its value is zero. Mandatory exercise\nwithout a record settles on its contractual conversion date."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -7845,6 +7897,41 @@
         "vol_surface_id",
         "cashflow_spec",
         "attributes"
+      ],
+      "type": "object"
+    },
+    "ConvertibleSettlement": {
+      "additionalProperties": false,
+      "description": "Resolved exercise claim after debt has been converted, called, put, or redeemed.\n\nThese contractual amounts replace the debt and its future coupons. Any\nearned but unpaid coupon must be included in `cash`. Shares are delivered\nex-dividend on `delivery_date`. Same-day completed exercise needs no record;\nuse this state to retain a delayed delivery without replaying the option.",
+      "properties": {
+        "cash": {
+          "$ref": "#/$defs/Money",
+          "description": "Fixed cash consideration including any retained coupon, in bond currency."
+        },
+        "delivery_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Contractual delivery/payment date; not earlier than exercise."
+        },
+        "exercise_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Date the holder's exercise decision extinguished the debt."
+        },
+        "recovery_basis": {
+          "$ref": "#/$defs/Money",
+          "description": "Part of `cash` eligible for principal recovery on default; excludes\nuncapitalized coupon accrual. Must be between zero and `cash`."
+        },
+        "shares": {
+          "description": "Fixed number of shares to deliver, finite and nonnegative.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "exercise_date",
+        "delivery_date",
+        "shares",
+        "cash",
+        "recovery_basis"
       ],
       "type": "object"
     },
@@ -11440,11 +11527,6 @@
       "additionalProperties": false,
       "description": "Equity underlying parameters for options and equity-linked swaps.",
       "properties": {
-        "contract_size": {
-          "description": "Contract size (shares per contract)",
-          "format": "double",
-          "type": "number"
-        },
         "currency": {
           "$ref": "#/$defs/Currency",
           "description": "Base currency for pricing"
@@ -11472,7 +11554,6 @@
       "required": [
         "ticker",
         "spot_id",
-        "contract_size",
         "currency"
       ],
       "type": "object"
@@ -11766,7 +11847,7 @@
     },
     "FiIndexTotalReturnSwap": {
       "additionalProperties": false,
-      "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\n`initial_level`, then carried at the index yield to period end; a period\nthat has ended but is not yet paid stays in the PV at its projected carry.\nCashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FiIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield_id(\"US-CORP-YIELD\")\n            .with_duration_id(\"US-CORP-DURATION\"),\n    )\n    .financing_leg(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
+      "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each wholly future scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\nits historical reset level, then carried at the index yield to period end; a period\nthat has ended but is not yet paid uses the exact historical start and end\nlevels from `fixing_series_id`. Missing historical endpoints are errors.\nCashflow-schedule APIs\nreturn projected or fixed net payments using the same calculations as\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FiIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield_id(\"US-CORP-YIELD\")\n            .with_duration_id(\"US-CORP-DURATION\"),\n    )\n    .financing_leg(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -11776,12 +11857,19 @@
           "$ref": "#/$defs/FinancingLegSpec",
           "description": "Financing leg specification (curves, spread, day count)."
         },
+        "fixing_series_id": {
+          "description": "Market time-series identifier containing positive total-return index levels\non contractual reset dates, including the final accrual boundary. Historical\nendpoints require exact observations; no yield-based history is inferred.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "id": {
           "$ref": "#/$defs/Id",
           "description": "Unique instrument identifier."
         },
         "initial_level": {
-          "description": "Index level at the reset of the return period in progress, in the\nindex's own units.\n\nRequired when the valuation date falls inside a return period; the\nrealized return to date is `index_level / initial_level`. Unused for\nunseasoned trades. Must be positive and finite when set.",
+          "description": "Index level at the first contractual reset, in the\nindex's own units.\n\nUsed only at inception when no fixing series is supplied; the\nrealized return to date is `index_level / initial_level`. Subsequent resets require `fixing_series_id`. Must be positive and finite when set.",
           "format": "double",
           "type": [
             "number",
@@ -12059,17 +12147,6 @@
         "frequency": {
           "$ref": "#/$defs/Tenor",
           "description": "Payment frequency"
-        },
-        "par_method": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ParRateMethod"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional par-rate calculation method override"
         },
         "payment_lag_days": {
           "default": 0,
@@ -13078,7 +13155,7 @@
       "description": "Contract specifications for interest rate futures.\n\nEncapsulates exchange-defined contract parameters and optional convexity\nadjustment for pricing.",
       "properties": {
         "convexity_adjustment": {
-          "description": "Optional pre-computed convexity adjustment (in rate terms).\n\n# Usage\n\n- `Some(0.0)`: Explicitly disable model-based adjustment (strict mode)\n- `Some(x)`: Use fixed adjustment of `x` (e.g., from broker quote)\n- `None`: Compute adjustment from volatility surface (requires `vol_surface_id`)\n\n# Market Practice\n\nFor calibration, use `Some(0.0)` and let the curve fitting process\nimplicitly absorb the convexity. For pricing with a pre-built curve,\neither:\n- Use a fixed adjustment from broker/vendor data\n- Provide a volatility surface for model-based calculation",
+          "description": "Optional pre-computed convexity adjustment (in rate terms).\n\n# Usage\n\n- `Some(0.0)`: Explicitly disable model-based adjustment (strict mode)\n- `Some(x)`: Use fixed adjustment of `x` (e.g., from broker quote)\n- `None`: Term futures use `vol_surface_id`; overnight futures use explicit\n  `hw1f_mean_reversion` and `hw1f_sigma` in instrument model configuration.\n\n# Market Practice\n\nFor calibration, use `Some(0.0)` and let the curve fitting process\nimplicitly absorb the convexity. For pricing with a pre-built curve,\neither:\n- Use a fixed adjustment from broker/vendor data\n- Provide a volatility surface for model-based calculation",
           "format": "double",
           "type": [
             "number",
@@ -14855,6 +14932,17 @@
           "$ref": "#/$defs/Id",
           "description": "Discount curve identifier. This **must** be a NOMINAL curve (e.g.\n\"USD-OIS\"): the cashflow schedule contains inflation-projected nominal\namounts (real amount × projected index ratio), so discounting on a real\ncurve would double-count inflation. The real curve is never used for PV;\nit enters only through real-yield style metrics computed from real flows."
         },
+        "floor_vol_surface_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Black lognormal volatility of the contractual reference-CPI/base-CPI ratio.\nThe surface uses expiry in Act/365F years to the last required publication\nand a Strike axis in ratio units (the par floor strikes at 1.0). The\nsupplied forward ratio and volatility are under the payment-date measure.\nRequired for a protected payment whose reference CPI is not yet known;\nan explicitly supplied zero-volatility surface selects deterministic pricing."
+        },
         "frequency": {
           "$ref": "#/$defs/Tenor",
           "description": "Coupon frequency"
@@ -16021,13 +16109,13 @@
         },
         {
           "additionalProperties": false,
-          "description": "Canonical `commodity_option` instrument payload.",
+          "description": "Canonical `commodity_spot_option` instrument payload.",
           "properties": {
             "spec": {
-              "$ref": "#/$defs/CommodityOption"
+              "$ref": "#/$defs/CommoditySpotOption"
             },
             "type": {
-              "const": "commodity_option",
+              "const": "commodity_spot_option",
               "type": "string"
             }
           },
@@ -16853,7 +16941,7 @@
           "type": "string"
         },
         {
-          "const": "commodity_option",
+          "const": "commodity_spot_option",
           "description": "Commodity option (option on commodity forward or spot).",
           "type": "string"
         },
@@ -17106,7 +17194,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional volatility surface identifier for convexity adjustment"
+          "description": "Normal-rate volatility surface for automatic term-rate convexity only.\nOvernight automatic convexity instead requires explicit Hull-White\nmean reversion and short-rate sigma in `instrument_pricing_overrides.model_config`."
         }
       },
       "required": [
@@ -19472,20 +19560,47 @@
       ],
       "type": "object"
     },
-    "ParRateMethod": {
-      "description": "Method for calculating par rates in swaps",
-      "oneOf": [
-        {
-          "const": "forward_based",
-          "description": "Use forward-curve based float PV over the schedule (market standard)",
-          "type": "string"
+    "PacPayment": {
+      "additionalProperties": false,
+      "description": "Dated contractual PAC principal target, in the tranche currency's major units.",
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Contractual payment date, including the collateral's payment delay."
         },
-        {
-          "const": "discount_ratio",
-          "description": "Use discount-curve ratio for bootstrapping",
-          "type": "string"
+        "principal": {
+          "description": "Planned principal payment, finite and nonnegative.",
+          "format": "double",
+          "type": "number"
         }
-      ]
+      },
+      "required": [
+        "date",
+        "principal"
+      ],
+      "type": "object"
+    },
+    "PacSchedule": {
+      "additionalProperties": false,
+      "description": "Original contractual PAC schedule. Pricing never regenerates these targets.",
+      "properties": {
+        "collar": {
+          "$ref": "#/$defs/PacCollar",
+          "description": "PAC collar"
+        },
+        "payments": {
+          "description": "Strictly increasing dated principal targets fixed at construction.",
+          "items": {
+            "$ref": "#/$defs/PacPayment"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "payments",
+        "collar"
+      ],
+      "type": "object"
     },
     "PayReceive": {
       "description": "Direction for instrument legs (universal for IRS, CDS, variance swaps, etc.)\n\nFor interest rate swaps: Pay = pay fixed/receive floating, Receive = receive fixed/pay floating\nFor credit default swaps: Pay = buy protection (pay premium), Receive = sell protection (receive premium)\nFor variance swaps: Pay = short variance, Receive = long variance",
@@ -26832,7 +26947,7 @@
         },
         {
           "const": "taylor_approximation",
-          "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian.",
+          "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil.",
           "type": "string"
         }
       ]

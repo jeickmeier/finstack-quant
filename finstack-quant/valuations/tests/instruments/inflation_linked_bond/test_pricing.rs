@@ -26,13 +26,27 @@ fn adjusted_final_payment_remains_live_after_raw_maturity() {
         .knots([(0.0, 1.0), (2.0, (-0.10_f64).exp())])
         .build()
         .unwrap();
-    let market = MarketContext::new().insert(discount.clone()).insert(
-        InflationCurve::builder("US-CPI")
-            .base_date(base)
-            .base_cpi(300.0)
-            .knots([(0.0, 300.0), (2.0, 300.0)])
-            .build()
-            .unwrap(),
+    let market = MarketContext::new()
+        .insert_surface(zero_floor_vol())
+        .insert(discount.clone())
+        .insert(
+            InflationCurve::builder("US-CPI")
+                .base_date(base)
+                .base_cpi(300.0)
+                .knots([(0.0, 300.0), (2.0, 300.0)])
+                .build()
+                .unwrap(),
+        );
+    let market = market.insert_inflation_index(
+        finstack_quant_core::market_data::scalars::InflationIndex::new(
+            "US-CPI",
+            (1..=12).map(|month| (d(2025, month, 1), 300.0)).collect(),
+            Currency::USD,
+        )
+        .unwrap()
+        .with_interpolation(
+            finstack_quant_core::market_data::scalars::InflationInterpolation::Linear,
+        ),
     );
     for (convention, payment) in [
         (BusinessDayConvention::Following, d(2026, 2, 2)),
@@ -162,6 +176,7 @@ fn test_npv_increases_with_inflation() {
                 .unwrap();
 
         finstack_quant_core::market_data::context::MarketContext::new()
+            .insert_surface(zero_floor_vol())
             .insert(disc)
             .insert(curve)
     };
@@ -187,6 +202,7 @@ fn test_npv_increases_with_inflation() {
                 .unwrap();
 
         finstack_quant_core::market_data::context::MarketContext::new()
+            .insert_surface(zero_floor_vol())
             .insert(disc)
             .insert(curve)
     };
@@ -232,6 +248,7 @@ fn test_npv_decreases_with_higher_discount_rate() {
             .unwrap();
 
     let ctx_low = finstack_quant_core::market_data::context::MarketContext::new()
+        .insert_surface(zero_floor_vol())
         .insert(disc_low)
         .insert(inflation_curve);
 
@@ -245,6 +262,7 @@ fn test_npv_decreases_with_higher_discount_rate() {
             .unwrap();
 
     let ctx_high = finstack_quant_core::market_data::context::MarketContext::new()
+        .insert_surface(zero_floor_vol())
         .insert(disc_high)
         .insert(inflation_curve2);
 
@@ -321,7 +339,16 @@ fn test_npv_with_deflation_protection() {
     .with_interpolation(finstack_quant_core::market_data::scalars::InflationInterpolation::Linear);
 
     let ctx = finstack_quant_core::market_data::context::MarketContext::new()
+        .insert_surface(zero_floor_vol())
         .insert(disc)
+        .insert(
+            finstack_quant_core::market_data::term_structures::InflationCurve::builder("US-CPI-U")
+                .base_date(as_of)
+                .base_cpi(290.0)
+                .knots([(0.0, 290.0), (2.0, 290.0)])
+                .build()
+                .unwrap(),
+        )
         .insert_inflation_index(index);
 
     // Act
@@ -505,6 +532,7 @@ fn test_pv_matches_projected_index_ratio_times_nominal_df() {
         .indexation_method(IndexationMethod::Tips)
         .lag(InflationLag::None)
         .deflation_protection(DeflationProtection::MaturityOnly)
+        .floor_vol_surface_id(finstack_quant_core::types::CurveId::new("CPI-ZERO-VOL"))
         .business_day_convention(BusinessDayConvention::Following)
         .stub(StubKind::None)
         .discount_curve_id(CurveId::new("USD-OIS"))
@@ -528,7 +556,10 @@ fn test_pv_matches_projected_index_ratio_times_nominal_df() {
         .knots([(0.0, 100.0), (1.0, 102.0), (2.0, 104.04)])
         .build()
         .unwrap();
-    let ctx = MarketContext::new().insert(discount).insert(inflation);
+    let ctx = MarketContext::new()
+        .insert_surface(zero_floor_vol())
+        .insert(discount)
+        .insert(inflation);
 
     let pv = bond.value(&ctx, as_of).unwrap().amount();
 

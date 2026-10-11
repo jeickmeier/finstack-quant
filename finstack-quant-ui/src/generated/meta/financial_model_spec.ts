@@ -657,7 +657,7 @@ export default [
   {
     "path": "#/$defs/d_174ce9631272c7d7f4f7/properties/credit_curve_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleBond/properties/credit_curve_id",
-    "description": "Issuer hazard curve identifier (a `HazardCurve`, as on every credit\ninstrument). When `None`, the cash component is discounted at the\nrisk-free `discount_curve_id` (no credit spread).\n\nThe pricer derives the zero-recovery risky discount factor\n`risky_df = rf_df × S(t)` from the curve's survival probabilities and\nblends it with risk-free discounting as `risky × (1 − R) + rf × R`\nusing [`Self::recovery_rate`]. The hazard curve's own recovery rate is\nused only to convert spread bumps into hazard shifts for CS01."
+    "description": "Issuer hazard curve identifier. Absence specifies no default risk.\nAll continuation claims are survival-weighted. Default pays the explicit\nrecovery fraction of outstanding principal and extinguishes equity;\nconditional stock drift includes the hazard compensator."
   },
   {
     "path": "#/$defs/d_174ce9631272c7d7f4f7/properties/credit_curve_id/anyOf/0",
@@ -736,8 +736,23 @@ export default [
   {
     "path": "#/$defs/d_174ce9631272c7d7f4f7/properties/recovery_rate",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleBond/properties/recovery_rate",
-    "description": "Assumed recovery rate on default, as a fraction (e.g., 0.40 = 40%).\n\nUsed in the Tsiveriotis-Zhang credit model to blend risky and risk-free\ndiscounting on the cash component. A recovery rate of 0 reduces to the\nstandard zero-recovery TZ model. Typical values:\n- **Investment grade**: 0.40 (ISDA standard assumption)\n- **High yield**: 0.25-0.35\n- **Distressed**: 0.10-0.20\n\nRequired when `credit_curve_id` is set; otherwise absence means that no\ncredit adjustment is requested.",
+    "description": "Fraction of outstanding principal paid immediately on default, in\n`[0, 1]`; includes capitalized PIK and excludes prior amortization.\nDefault extinguishes coupons and the conversion right. Required with a\ncredit curve; recovery is an explicit cashflow, not a discount blend.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_174ce9631272c7d7f4f7/properties/resolved_settlement",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleBond/properties/resolved_settlement",
+    "description": "Recorded exercise awaiting delivery. At or after `exercise_date`, only\nthis claim remains; after delivery its value is zero. Mandatory exercise\nwithout a record settles on its contractual conversion date."
+  },
+  {
+    "path": "#/$defs/d_174ce9631272c7d7f4f7/properties/resolved_settlement/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleBond/properties/resolved_settlement/anyOf/0",
+    "ref": "#/$defs/ConvertibleSettlement",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleSettlement"
+  },
+  {
+    "path": "#/$defs/d_174ce9631272c7d7f4f7/properties/resolved_settlement/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleBond/properties/resolved_settlement/anyOf/1"
   },
   {
     "path": "#/$defs/d_174ce9631272c7d7f4f7/properties/scenario_pricing_overrides",
@@ -3264,7 +3279,7 @@ export default [
   {
     "path": "#/$defs/d_4910c56c185343dd68e0/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/AmortizationSpec/oneOf/5",
-    "description": "Equal principal installments on coupon accrual boundaries in `(start, end]`.\nThe installment is fixed from outstanding after all start-date movements,\nincluding PIK and explicit principal events. The final installment pays\nthe live remaining balance, including subsequent PIK or principal changes.\nPrincipal changes economically on each accrual boundary; cash settles on\nthat coupon's adjusted, lagged payment date."
+    "description": "Equal principal installments on coupon accrual boundaries in `(start, end]`.\nThe installment is fixed from outstanding after all start-date movements,\nincluding PIK and explicit principal events. Each subsequent funded draw\nadds equal installments over the remaining boundaries after its draw date.\nThe final installment pays the live remaining balance, including subsequent PIK.\nPrincipal changes economically on each accrual boundary; cash settles on\nthat coupon's adjusted, lagged payment date."
   },
   {
     "path": "#/$defs/d_4910c56c185343dd68e0/oneOf/5/properties/linear_between",
@@ -3454,6 +3469,45 @@ export default [
     "description": "Receive the primary leg (fixed rate in IRS, protection premium in CDS, long variance)"
   },
   {
+    "path": "#/$defs/d_532d79936e466cf90d8a",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleSettlement",
+    "description": "Resolved exercise claim after debt has been converted, called, put, or redeemed.\n\nThese contractual amounts replace the debt and its future coupons. Any\nearned but unpaid coupon must be included in `cash`. Shares are delivered\nex-dividend on `delivery_date`. Same-day completed exercise needs no record;\nuse this state to retain a delayed delivery without replaying the option."
+  },
+  {
+    "path": "#/$defs/d_532d79936e466cf90d8a/properties/cash",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleSettlement/properties/cash",
+    "description": "Fixed cash consideration including any retained coupon, in bond currency.",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_532d79936e466cf90d8a/properties/delivery_date",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleSettlement/properties/delivery_date",
+    "description": "Contractual delivery/payment date; not earlier than exercise.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_532d79936e466cf90d8a/properties/exercise_date",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleSettlement/properties/exercise_date",
+    "description": "Date the holder's exercise decision extinguished the debt.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_532d79936e466cf90d8a/properties/recovery_basis",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleSettlement/properties/recovery_basis",
+    "description": "Part of `cash` eligible for principal recovery on default; excludes\nuncapitalized coupon accrual. Must be between zero and `cash`.",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_532d79936e466cf90d8a/properties/shares",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleSettlement/properties/shares",
+    "description": "Fixed number of shares to deliver, finite and nonnegative.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_540b029baeeb4469863b",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarginStep",
     "description": "Dated margin step (covenant penalty, scheduled change or pricing-grid move).\n\nShifts the interest margin by `delta_bp` from `date` onward (effective-from\ndate). Steps are cumulative. A negative `delta_bp` steps the margin down (a\nleverage-grid improvement); term loans accept only non-negative steps."
@@ -3471,23 +3525,6 @@ export default [
     "description": "Change in margin, in basis points (`100` = 1%); negative steps down.",
     "ref": "#/$defs/DecimalWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DecimalWire"
-  },
-  {
-    "path": "#/$defs/d_54276f30e34c6f41bcca",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ParRateMethod",
-    "description": "Method for calculating par rates in swaps"
-  },
-  {
-    "path": "#/$defs/d_54276f30e34c6f41bcca/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ParRateMethod/oneOf/0",
-    "const": "forward_based",
-    "description": "Use forward-curve based float PV over the schedule (market standard)"
-  },
-  {
-    "path": "#/$defs/d_54276f30e34c6f41bcca/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ParRateMethod/oneOf/1",
-    "const": "discount_ratio",
-    "description": "Use discount-curve ratio for bootstrapping"
   },
   {
     "path": "#/$defs/d_557de6d70142abc041e8",
@@ -8058,7 +8095,7 @@ export default [
     "path": "#/$defs/d_e2eda29a60f5dc6bf382/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
-    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian."
+    "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil."
   },
   {
     "path": "#/$defs/d_e5a9e3252f11bc2a9d20",
@@ -8375,21 +8412,6 @@ export default [
     "description": "Payment frequency",
     "ref": "#/$defs/Tenor",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Tenor"
-  },
-  {
-    "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/par_method",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec/properties/par_method",
-    "description": "Optional par-rate calculation method override"
-  },
-  {
-    "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/par_method/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec/properties/par_method/anyOf/0",
-    "ref": "#/$defs/ParRateMethod",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ParRateMethod"
-  },
-  {
-    "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/par_method/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec/properties/par_method/anyOf/1"
   },
   {
     "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/payment_lag_days",

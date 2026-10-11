@@ -78,7 +78,7 @@ fn create_monthly_swap(tenor_years: i32) -> InterestRateSwap {
             stub: finstack_quant_core::dates::StubKind::None,
             start,
             end,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -127,7 +127,7 @@ fn create_ois_swap(tenor_years: i32) -> InterestRateSwap {
             stub: finstack_quant_core::dates::StubKind::None,
             start,
             end,
-            par_method: None,
+
             payment_lag_days: 2,
             end_of_month: false,
         })

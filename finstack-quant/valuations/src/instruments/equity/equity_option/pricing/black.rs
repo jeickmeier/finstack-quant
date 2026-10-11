@@ -127,7 +127,10 @@ pub(crate) fn compute_greeks(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<EquityOptionGreeks> {
-    if resolve_lifecycle_value(inst, curves, as_of)?.is_some() {
+    if let Some(lifecycle_value) = resolve_lifecycle_value(inst, curves, as_of)? {
+        if inst.quantity == 0.0 {
+            return Ok(EquityOptionGreeks::default());
+        }
         let delta = match (inst.exercise, inst.settlement) {
             (Some(exercise), SettlementType::Physical)
                 if exercise.exercised && as_of <= exercise.settlement_date =>
@@ -165,8 +168,63 @@ pub(crate) fn compute_greeks(
             }
             _ => 0.0,
         };
+        let mut rho = 0.0;
+        let mut theta = 0.0;
+        if let Some(exercise) = inst
+            .exercise
+            .filter(|e| e.exercised && as_of < e.settlement_date)
+        {
+            let disc = curves.get_discount(inst.discount_curve_id.as_str())?;
+            let t = year_fraction(inst.day_count, as_of, exercise.settlement_date)?;
+            let df = disc.df_between_dates(as_of, exercise.settlement_date)?;
+            let r = -df.ln() / t;
+            let days = inst.metric_pricing_overrides.theta_days_per_year();
+            match inst.settlement {
+                SettlementType::Cash => {
+                    rho = -t * lifecycle_value.amount() * 1e-4;
+                    theta = r * lifecycle_value.amount() / days;
+                }
+                SettlementType::Physical => {
+                    let direction = if inst.option_type == OptionType::Call {
+                        1.0
+                    } else {
+                        -1.0
+                    };
+                    let strike_pv = inst.strike * df;
+                    let mut rate_exposure = t * strike_pv;
+                    let mut time_exposure = -r * strike_pv;
+                    let dividends: Vec<_> = inst
+                        .discrete_dividends
+                        .iter()
+                        .filter(|(date, _)| *date > as_of && *date <= exercise.settlement_date)
+                        .collect();
+                    if dividends.is_empty() {
+                        let spot = crate::instruments::common_impl::helpers::scalar_price_amount(
+                            curves.get_price(&inst.spot_id)?,
+                            inst.currency,
+                        )?;
+                        let prepaid =
+                            lifecycle_value.amount() / (inst.quantity * direction) + strike_pv;
+                        let q = -(prepaid / spot).ln() / t;
+                        time_exposure -= q * prepaid;
+                    } else {
+                        for (date, amount) in dividends {
+                            let dt = year_fraction(inst.day_count, as_of, *date)?;
+                            let dividend_df = disc.df_between_dates(as_of, *date)?;
+                            let pv = amount * dividend_df;
+                            rate_exposure += dt * pv;
+                            time_exposure += dividend_df.ln() / dt * pv;
+                        }
+                    }
+                    rho = direction * inst.quantity * rate_exposure * 1e-4;
+                    theta = direction * inst.quantity * time_exposure / days;
+                }
+            }
+        }
         return Ok(EquityOptionGreeks {
             delta,
+            rho,
+            theta,
             ..Default::default()
         });
     }
@@ -279,6 +337,14 @@ pub(crate) fn compute_greeks(
             let tree = BinomialTree::leisen_reimer(steps);
             let (params, dividends) = early_exercise_market_params(inst, curves, as_of)?;
             let price_fn = |market_params: &OptionMarketParams| -> Result<f64> {
+                let elapsed = params.time_to_expiry - market_params.time_to_expiry;
+                let dividends: Vec<_> = dividends
+                    .iter()
+                    .filter_map(|(time, amount)| {
+                        let remaining = time - elapsed;
+                        (remaining > 0.0).then_some((remaining, *amount))
+                    })
+                    .collect();
                 if dividends.is_empty() {
                     tree.price_american(market_params)
                 } else {
@@ -323,6 +389,21 @@ pub(crate) fn compute_greeks(
                 ));
             }
             let price_fn = |market_params: &OptionMarketParams| -> Result<f64> {
+                let elapsed = params.time_to_expiry - market_params.time_to_expiry;
+                let dividends: Vec<_> = dividends
+                    .iter()
+                    .filter_map(|(time, amount)| {
+                        let remaining = time - elapsed;
+                        (remaining > 0.0).then_some((remaining, *amount))
+                    })
+                    .collect();
+                let exercise_times: Vec<_> = exercise_times
+                    .iter()
+                    .filter_map(|time| {
+                        let remaining = time - elapsed;
+                        (remaining > 0.0).then_some(remaining)
+                    })
+                    .collect();
                 if dividends.is_empty() {
                     tree.price_bermudan(market_params, &exercise_times)
                 } else {

@@ -161,8 +161,8 @@ fn calculate_var(
 /// >>> from finstack_quant.valuations.instruments import VarResult
 /// >>> result = VarResult.from_json(
 /// ...     '{"var": -10.0, "expected_shortfall": -12.0, "pnl_distribution": [-12.0, 3.0],'
-/// ...     ' "num_scenarios": 2, "confidence_level": 0.95, "skipped_fx": false,'
-/// ...     ' "skipped_vol": false}')
+/// ...     ' "num_scenarios": 2, "confidence_level": 0.95}')
+///
 /// >>> (result.var, list(result.to_dataframe()["pnl"]))
 /// (-10.0, [-12.0, 3.0])
 #[pyclass(
@@ -210,18 +210,6 @@ impl PyVarResult {
     #[getter]
     fn confidence_level(&self) -> f64 {
         self.inner.confidence_level
-    }
-
-    /// ``True`` when the Taylor method skipped FX-spot shocks (VaR understates FX risk).
-    #[getter]
-    fn skipped_fx(&self) -> bool {
-        self.inner.skipped_fx
-    }
-
-    /// ``True`` when the Taylor method skipped implied-vol point shocks.
-    #[getter]
-    fn skipped_vol(&self) -> bool {
-        self.inner.skipped_vol
     }
 
     /// The P&L distribution as a one-column pandas ``DataFrame``.

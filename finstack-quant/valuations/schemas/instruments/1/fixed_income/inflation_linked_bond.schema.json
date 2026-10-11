@@ -137,6 +137,17 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve identifier. This **must** be a NOMINAL curve (e.g.\n\"USD-OIS\"): the cashflow schedule contains inflation-projected nominal\namounts (real amount × projected index ratio), so discounting on a real\ncurve would double-count inflation. The real curve is never used for PV;\nit enters only through real-yield style metrics computed from real flows."
         },
+        "floor_vol_surface_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Black lognormal volatility of the contractual reference-CPI/base-CPI ratio.\nThe surface uses expiry in Act/365F years to the last required publication\nand a Strike axis in ratio units (the par floor strikes at 1.0). The\nsupplied forward ratio and volatility are under the payment-date measure.\nRequired for a protected payment whose reference CPI is not yet known;\nan explicitly supplied zero-volatility surface selects deterministic pricing."
+        },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
           "description": "Coupon frequency"

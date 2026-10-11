@@ -243,6 +243,9 @@ impl CmsSwapReplicationPricer {
 
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
         let vol_surface = market.get_surface(inst.vol_surface_id.as_str())?;
+        vol_surface.require_secondary_axis(
+            finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+        )?;
         // Fixed-leg payments per year of the reference swap, matching the
         // Hagan path's frequency argument.
         let payments_per_year = inst.reference_swap().payments_per_year()?;
@@ -359,6 +362,9 @@ pub(super) fn cms_coupon_rate(
     convexity_scale: f64,
 ) -> Result<f64> {
     let vol_surface = market.get_surface(inst.vol_surface_id.as_str())?;
+    vol_surface.require_secondary_axis(
+        finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+    )?;
 
     // Seasoned coupon: the CMS rate fixed in the past. Value it off the
     // recorded fixing — never re-project from the live curve, which books
@@ -1287,5 +1293,41 @@ mod tests {
              replication pricer, got {:?}",
             result.ok()
         );
+    }
+    #[test]
+    fn cms_products_reject_tenor_axis_surfaces() {
+        use crate::instruments::rates::cms_option::{
+            pricer::CmsOptionPricer, replication_pricer::CmsReplicationPricer, CmsOption,
+        };
+        use finstack_quant_core::market_data::surfaces::{VolSurface, VolSurfaceAxis};
+        let as_of = date(2025, 1, 1);
+        let swap = single_fixing_cms_swap(10, date(2026, 1, 1), date(2026, 4, 1));
+        let surface = |id| {
+            VolSurface::builder(id)
+                .expiries(&[1.0, 5.0])
+                .strikes(&[2.0, 10.0])
+                .secondary_axis(VolSurfaceAxis::Tenor)
+                .row(&[0.1, 0.4])
+                .row(&[0.1, 0.4])
+                .build()
+                .unwrap()
+        };
+        let mut market =
+            cms_market_with_vol(as_of, 0.2).insert_surface(surface(swap.vol_surface_id.clone()));
+        let option = CmsOption::example().unwrap();
+        market = market.insert_surface(surface(option.vol_surface_id.clone()));
+        for result in [
+            CmsSwapPricer::new().price_internal_with_convexity(&swap, &market, as_of, 1.0),
+            CmsSwapReplicationPricer::new().price_internal(&swap, &market, as_of),
+            CmsOptionPricer::new().price_internal_with_convexity(&option, &market, as_of, 1.0),
+        ] {
+            let error = result.unwrap_err().to_string();
+            assert!(error.contains("axis"), "{error}");
+        }
+        let error = CmsReplicationPricer::new()
+            .price_dyn(&option, &market, as_of)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("axis"), "{error}");
     }
 }

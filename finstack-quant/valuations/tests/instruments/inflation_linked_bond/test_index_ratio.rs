@@ -295,7 +295,9 @@ fn test_index_ratio_from_market_routes_to_index() {
     let (ctx, index) = market_context_with_index();
 
     // Act
-    let ratio_from_market = ilb.index_ratio_from_market(d(2025, 4, 1), &ctx).unwrap();
+    let ratio_from_market = ilb
+        .index_ratio_from_market(d(2025, 4, 1), &ctx, d(2025, 4, 1))
+        .unwrap();
     let ratio_from_index = ilb.index_ratio(d(2025, 4, 1), &index).unwrap();
 
     // Assert - should be identical
@@ -313,7 +315,9 @@ fn test_index_ratio_from_market_routes_to_curve() {
     let ilb = sample_tips();
     let (ctx, curve) = market_context_with_curve();
 
-    let ratio_from_market = ilb.index_ratio_from_market(d(2025, 7, 1), &ctx).unwrap();
+    let ratio_from_market = ilb
+        .index_ratio_from_market(d(2025, 7, 1), &ctx, curve.base_date())
+        .unwrap();
     let ratio_from_curve = ilb.index_ratio_from_curve(d(2025, 7, 1), &curve).unwrap();
 
     relative_eq(

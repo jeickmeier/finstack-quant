@@ -62,42 +62,6 @@ impl std::str::FromStr for PayReceive {
     }
 }
 
-/// Method for calculating par rates in swaps
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum ParRateMethod {
-    /// Use forward-curve based float PV over the schedule (market standard)
-    ForwardBased,
-    /// Use discount-curve ratio for bootstrapping
-    DiscountRatio,
-}
-
-impl std::fmt::Display for ParRateMethod {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParRateMethod::ForwardBased => write!(f, "forward_based"),
-            ParRateMethod::DiscountRatio => write!(f, "discount_ratio"),
-        }
-    }
-}
-
-impl std::str::FromStr for ParRateMethod {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "forward_based" => Ok(Self::ForwardBased),
-            "discount_ratio" => Ok(Self::DiscountRatio),
-            _ => Err(format!(
-                "Unknown par rate method: '{}'. Valid: forward_based, discount_ratio",
-                s
-            )),
-        }
-    }
-}
-
 /// Specification for fixed rate legs in interest rate swaps
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -138,8 +102,6 @@ pub struct FixedLegSpec {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub end: Date,
-    /// Optional par-rate calculation method override
-    pub par_method: Option<ParRateMethod>,
     /// Payment lag in business days after period end (default: 0).
     ///
     /// Bloomberg OIS swaps typically use 2 business days payment lag.
@@ -578,7 +540,7 @@ mod tests {
             stub: StubKind::ShortFront,
             start,
             end,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         }

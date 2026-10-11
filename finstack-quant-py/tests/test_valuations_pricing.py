@@ -425,7 +425,6 @@ def _bermudan_swaption_json() -> str:
                 "payment_lag_days": 0,
                 "calendar_id": None,
                 "discount_curve_id": "USD-OIS",
-                "par_method": None,
             },
             "underlying_float_leg": {
                 "spread_bp": "0",
@@ -717,3 +716,30 @@ def test_supported_requested_metrics_are_still_returned(golden: str, metrics: li
     result = _golden_pricing_call(golden, metrics)()
     for metric in metrics:
         assert metric in result.metric_keys(), metric
+
+
+def test_commodity_spot_cash_claim_survives_json_replay() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).parents[2]
+    envelope = json.loads(
+        (root / "finstack-quant/valuations/tests/instruments/json_examples/commodity_spot_option.json").read_text()
+    )
+    spec = envelope["instrument"]["spec"]
+    spec.update(
+        exercise_style="american",
+        spot_id="WTI-SPOT",
+        exercise={"date": "2024-01-15", "spot": 85.0, "settlement_date": "2024-01-20", "exercised": True},
+    )
+    market = json.loads((root / "finstack-quant-ui/tests/valuations/instruments/pricing-market.json").read_text())
+    curve = next(c for c in market["curves"] if c["id"] == "USD-OIS")
+    curve.update(base="2024-01-15", knot_points=[[0.0, 1.0], [1.0, 1.0]])
+    # A resolved cash claim needs only its discount curve, not an optionality market.
+    market["curves"] = [curve]
+    market["surfaces"] = []
+    market["prices"] = {}
+    encoded = validate_instrument_json(json.dumps(envelope))
+    value = price_instrument(encoded, json.dumps(market), "2024-01-15", model="black76")
+    assert float(value.price) == pytest.approx(10_000.0, abs=1e-8)
+    paid = price_instrument(encoded, json.dumps(market), "2024-01-21", model="black76")
+    assert float(paid.price) == 0.0

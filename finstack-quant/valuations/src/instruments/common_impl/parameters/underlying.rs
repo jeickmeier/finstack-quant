@@ -67,8 +67,6 @@ pub struct EquityUnderlyingParams {
     pub spot_id: PriceId,
     /// Optional dividend yield identifier
     pub div_yield_id: Option<PriceId>,
-    /// Contract size (shares per contract)
-    pub contract_size: f64,
     /// Base currency for pricing
     pub currency: Currency,
 }
@@ -80,7 +78,6 @@ impl EquityUnderlyingParams {
             ticker: ticker.into(),
             spot_id: spot_id.into(),
             div_yield_id: None,
-            contract_size: 1.0,
             currency,
         }
     }
@@ -91,13 +88,7 @@ impl EquityUnderlyingParams {
         self
     }
 
-    /// Set contract size
-    pub fn with_contract_size(mut self, size: f64) -> Self {
-        self.contract_size = size;
-        self
-    }
-
-    /// Validate identifiers, contract scale, and market-data routing fields.
+    /// Validate identifiers and market-data routing fields.
     ///
     /// # Arguments
     ///
@@ -120,11 +111,6 @@ impl EquityUnderlyingParams {
         {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{context} dividend-yield identifier cannot be empty"
-            )));
-        }
-        if !self.contract_size.is_finite() || self.contract_size < 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "{context} contract_size must be non-negative and finite"
             )));
         }
         Ok(())

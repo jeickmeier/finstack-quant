@@ -91,9 +91,6 @@ impl PyFixedLegSpec {
     ///     Calendar used for business day adjustments.
     /// stub : str | StubKind, default "short_front"
     ///     Stub period handling rule.
-    /// par_method : str, optional
-    ///     Par-rate method override: ``"forward_based"`` or
-    ///     ``"discount_ratio"``. ``None`` keeps the pricer default.
     /// payment_lag_days : int, default 0
     ///     Payment lag in business days after period end.
     /// end_of_month : bool, default False
@@ -126,11 +123,11 @@ impl PyFixedLegSpec {
     #[new]
     #[pyo3(signature = (discount_curve_id, rate, frequency, day_count, start, end, *,
                         business_day_convention = "modified_following", calendar_id = None,
-                        stub = None, par_method = None, payment_lag_days = 0, end_of_month = false))]
+                        stub = None, payment_lag_days = 0, end_of_month = false))]
     #[pyo3(
         text_signature = "(discount_curve_id, rate, frequency, day_count, start, end, *, \
 business_day_convention='modified_following', calendar_id=None, stub='short_front', \
-par_method=None, payment_lag_days=0, end_of_month=False)"
+payment_lag_days=0, end_of_month=False)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -144,7 +141,6 @@ par_method=None, payment_lag_days=0, end_of_month=False)"
         business_day_convention: &str,
         calendar_id: Option<String>,
         stub: Option<&Bound<'_, PyAny>>,
-        par_method: Option<&str>,
         payment_lag_days: i32,
         end_of_month: bool,
     ) -> PyResult<Self> {
@@ -164,9 +160,6 @@ par_method=None, payment_lag_days=0, end_of_month=False)"
             stub: stub_kind_from_py(stub, "stub")?,
             start: py_to_date(start)?,
             end: py_to_date(end)?,
-            par_method: par_method
-                .map(|value| enum_from_str(value, "par_method"))
-                .transpose()?,
             payment_lag_days,
             end_of_month,
         };
@@ -277,16 +270,6 @@ par_method=None, payment_lag_days=0, end_of_month=False)"
         date_to_py(py, self.inner.end)
     }
 
-    /// Par-rate method override (``"forward_based"`` / ``"discount_ratio"``) or ``None``.
-    #[getter]
-    fn par_method(&self) -> PyResult<Option<String>> {
-        self.inner
-            .par_method
-            .as_ref()
-            .map(enum_to_py_string)
-            .transpose()
-    }
-
     /// Payment lag in business days after period end.
     #[getter]
     fn payment_lag_days(&self) -> i32 {
@@ -303,7 +286,7 @@ par_method=None, payment_lag_days=0, end_of_month=False)"
     pub(crate) fn __repr__(&self) -> String {
         format!(
             "FixedLegSpec(discount_curve_id={:?}, rate={}, frequency={}, day_count={}, start={}, end={}, \
-business_day_convention={:?}, calendar_id={}, stub={:?}, par_method={}, \
+business_day_convention={:?}, calendar_id={}, stub={:?}, \
 payment_lag_days={}, end_of_month={})",
             self.inner.discount_curve_id.as_str(),
             decimal_repr(self.inner.rate),
@@ -314,12 +297,6 @@ payment_lag_days={}, end_of_month={})",
             enum_to_py_string(&self.inner.business_day_convention).unwrap_or_default(),
             opt_repr(self.inner.calendar_id.as_ref().map(|c| format!("{c:?}"))),
             enum_to_py_string(&self.inner.stub).unwrap_or_default(),
-            opt_repr(
-                self.inner
-                    .par_method
-                    .as_ref()
-                    .map(|m| format!("{:?}", enum_to_py_string(m).unwrap_or_default()))
-            ),
             self.inner.payment_lag_days,
             super::convert::bool_repr(self.inner.end_of_month),
         )

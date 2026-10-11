@@ -744,6 +744,9 @@ getters!(JsConvertibleBond, "ConvertibleBond", |i| {
         /// Assumed recovery rate on default as a fraction.
         /// @returns The recovery, or `null`.
         recovery_rate as recoveryRate => json(i.recovery_rate),
+        /// Recorded exercise and delayed delivery replacing the debt and its coupons.
+        /// @returns Canonical settlement record with ISO dates, shares and currency-tagged cash/recovery basis, or `null` while unresolved.
+        resolved_settlement as resolvedSettlement => json(i.resolved_settlement),
         /// Coupon/cashflow specification in serde form, the same shape as `Bond.cashflow_spec`.
         /// @returns `{"fixed": {...}}`, `{"floating": {...}}`, `{"step_up": {...}}` or `{"amortizing": {...}}`; a zero-coupon convertible is a fixed spec with rate `"0"`.
         cashflow_spec as cashflowSpec => json(i.cashflow_spec),
@@ -841,6 +844,11 @@ setters!(JsConvertibleBondBuilder, "ConvertibleBondBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         recovery_rate as recoveryRate => num,
+        /// Record the claim remaining after exercise extinguishes the debt.
+        /// @param value - Canonical `ConvertibleSettlement` object or JSON string with ISO `exercise_date` and `delivery_date`, nonnegative `shares`, and currency-tagged `cash` and `recovery_basis`. Cash includes retained coupons; recovery basis excludes uncapitalized accrual. Omission leaves debt unresolved.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws for malformed input or a consumed builder; `build()` validates dates, currencies and amounts.
+        resolved_settlement as resolvedSettlement => json,
         /// Set the coupon/cashflow specification.
         /// @param value - Rust `CashflowSpec` as a plain object or JSON object string (the same shape as `Bond.cashflow_spec`, e.g. `{"fixed": {"coupon_type": "cash", "rate": "0.05", ...schedule}}`); a zero-coupon convertible uses a fixed spec with rate `"0"`.
         /// @returns The builder, for chaining.

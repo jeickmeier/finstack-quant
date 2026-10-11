@@ -2,7 +2,7 @@
 //!
 //! Computes sensitivity to weight changes for each constituent.
 //! For each constituent, bumps its weight and adjusts other weights proportionally
-//! to maintain sum = 1.0, then measures the impact on basket NAV.
+//! to preserve the original total weight, then measures the impact on basket NAV.
 //!
 //! # Formula
 //! ```text
@@ -34,33 +34,30 @@ impl MetricCalculator for WeightRiskCalculator {
         for (idx, constituent) in basket.constituents.iter().enumerate() {
             let label = constituent.id.clone();
 
-            let bumped_weight = (constituent.weight + WEIGHT_BUMP).clamp(0.0, 1.0);
-            let weight_change = bumped_weight - constituent.weight;
-
-            // If no change (clamped), skip
-            if weight_change.abs() < 1e-10 {
-                series.push((label, 0.0));
-                continue;
+            if constituent.units.is_some() || basket.constituents.iter().any(|c| c.units.is_some())
+            {
+                return Err(finstack_quant_core::Error::Validation(
+                    "WeightRisk requires weight-based constituents; explicit units do not define a financed weight direction".into(),
+                ));
             }
-
-            // Adjust other weights proportionally to maintain sum = 1.0
-            let mut bumped_basket = basket.clone();
-            bumped_basket.constituents[idx].weight = bumped_weight;
-
+            let weight_change = WEIGHT_BUMP;
             let total_other_weight: f64 = basket
                 .constituents
                 .iter()
                 .enumerate()
-                .filter_map(|(i, c)| if i != idx { Some(c.weight) } else { None })
+                .filter_map(|(i, c)| (i != idx).then_some(c.weight))
                 .sum();
-
-            // Redistribute the weight change proportionally among other constituents
-            if total_other_weight > 1e-10 {
-                let scale_factor = (1.0 - bumped_weight) / total_other_weight;
-                for (i, c) in bumped_basket.constituents.iter_mut().enumerate() {
-                    if i != idx {
-                        c.weight *= scale_factor;
-                    }
+            if total_other_weight.abs() <= f64::EPSILON {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "WeightRisk cannot fund a {WEIGHT_BUMP} reallocation into '{}' from the other weights", constituent.id
+                )));
+            }
+            let mut bumped_basket = basket.clone();
+            bumped_basket.constituents[idx].weight += weight_change;
+            let scale_factor = (total_other_weight - weight_change) / total_other_weight;
+            for (i, c) in bumped_basket.constituents.iter_mut().enumerate() {
+                if i != idx {
+                    c.weight *= scale_factor;
                 }
             }
 

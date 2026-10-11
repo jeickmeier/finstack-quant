@@ -2,7 +2,6 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
-use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::money::Money;
@@ -58,56 +57,20 @@ fn build_market(as_of: Date, rate: f64, hazard_rate: f64) -> MarketContext {
         .insert(build_hazard_curve("USD-CREDIT", as_of, hazard_rate))
 }
 
-fn repriced_bond_value(
-    bond: &Bond,
-    market: &MarketContext,
-    as_of: Date,
-    rate_direction: f64,
-    credit_direction: f64,
-) -> f64 {
-    let bumped = market
-        .bump([
-            MarketBump::Curve {
-                id: CurveId::new("USD-OIS"),
-                spec: BumpSpec::parallel_bp(rate_direction),
-            },
-            MarketBump::Curve {
-                id: CurveId::new("USD-CREDIT"),
-                spec: BumpSpec::parallel_bp(credit_direction),
-            },
-        ])
-        .expect("market bump should succeed");
-    bond.value(&bumped, as_of)
-        .expect("bond repricing should succeed")
-        .amount()
-}
-
 #[test]
-fn cross_gamma_rates_credit_matches_manual_four_corner_repricing() {
+fn cross_gamma_credit_rejects_unreplayable_hazard_curve() {
     let as_of = date!(2025 - 01 - 01);
     let bond = build_test_bond(as_of);
     let market = build_market(as_of, 0.04, 0.02);
-
-    let result = bond
+    let error = bond
         .price_with_metrics(
             &market,
             as_of,
             &[MetricId::CrossGammaRatesCredit],
             finstack_quant_valuations::instruments::PricingOptions::default(),
         )
-        .expect("cross gamma metric should compute");
-    let metric_value = result.measures[&MetricId::CrossGammaRatesCredit];
-
-    let manual_value = (repriced_bond_value(&bond, &market, as_of, 1.0, 1.0)
-        - repriced_bond_value(&bond, &market, as_of, 1.0, -1.0)
-        - repriced_bond_value(&bond, &market, as_of, -1.0, 1.0)
-        + repriced_bond_value(&bond, &market, as_of, -1.0, -1.0))
-        / 4.0;
-
-    assert!(
-        (metric_value - manual_value).abs() < 1e-8,
-        "registry metric {metric_value} should match manual four-corner value {manual_value}",
-    );
+        .unwrap_err();
+    assert!(error.to_string().contains("lossless calibration recipe"));
 }
 
 #[test]

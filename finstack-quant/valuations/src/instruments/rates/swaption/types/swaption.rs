@@ -158,7 +158,7 @@ pub(super) fn vanilla_underlier(
         stub: StubKind::None,
         start: underlier.underlying_start_date,
         end: underlier.underlying_maturity,
-        par_method: None,
+
         payment_lag_days: 0,
         end_of_month: false,
     };

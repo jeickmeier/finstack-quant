@@ -138,6 +138,7 @@ fn context<'a>(market: &'a MarketContext, interest: f64, principal: f64) -> Wate
         interest_collections: usd(interest),
         principal_collections: usd(principal),
         payment_date: d(2024, 4, 1),
+        accrual_end: d(2024, 4, 1),
         period_start: d(2024, 1, 1),
         valuation_date: d(2024, 1, 1),
         pool_balance: usd(100_000_000.0),

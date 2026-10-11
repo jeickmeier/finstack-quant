@@ -6,7 +6,7 @@
     "description": "Synthetic 5Y inflation-linked bond on deterministic real and CPI curves.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack Quant canonical pricing calculation on deterministic synthetic market inputs Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved. Re-blessed 2026-06-16: expected outputs recaptured from the current canonical Python golden runner for this formula self-test after deterministic pricing output drift; no external benchmark source is asserted by this fixture.",
+    "source_detail": "Finstack Quant canonical pricing calculation on deterministic synthetic market inputs Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved. Re-blessed 2026-06-16: expected outputs recaptured from the current canonical Python golden runner for this formula self-test after deterministic pricing output drift; no external benchmark source is asserted by this fixture. 2026-10-11 contractual-input remediation: explicit synthetic published monthly CPI follows the existing log-linear projection knots (300 before the base date), with assumed releases on the following month 15th. An explicit zero ratio-volatility surface selects this deterministic fixture. Nominal projected cashflows now use the existing nominal USD-OIS discount curve, rather than the real USD-TIPS curve. NPV and central 1 bp nominal DV01 independently verified by summing actual/365 coupon periods times monthly-interpolated lagged CPI and log-linear nominal discount factors; zero volatility makes the terminal floor deterministic. Yield-derived metrics remain internal regression anchors.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "jeickmeier",
@@ -34,7 +34,340 @@
           }
         }
       },
-      "market_data": [],
+      "market_data": [
+        {
+          "kind": "inflation_fixings",
+          "id": "US-CPI",
+          "currency": "USD",
+          "observations": [
+            [
+              "2023-01-01",
+              300.0
+            ],
+            [
+              "2023-02-01",
+              300.0
+            ],
+            [
+              "2023-03-01",
+              300.0
+            ],
+            [
+              "2023-04-01",
+              300.0
+            ],
+            [
+              "2023-05-01",
+              300.0
+            ],
+            [
+              "2023-06-01",
+              300.0
+            ],
+            [
+              "2023-07-01",
+              300.0
+            ],
+            [
+              "2023-08-01",
+              300.0
+            ],
+            [
+              "2023-09-01",
+              300.0
+            ],
+            [
+              "2023-10-01",
+              300.0
+            ],
+            [
+              "2023-11-01",
+              300.0
+            ],
+            [
+              "2023-12-01",
+              300.0
+            ],
+            [
+              "2024-01-01",
+              300.0
+            ],
+            [
+              "2024-02-01",
+              300.2768218831584
+            ],
+            [
+              "2024-03-01",
+              300.74963710879234
+            ],
+            [
+              "2024-04-01",
+              301.25588359172815
+            ],
+            [
+              "2024-05-01",
+              301.74661089395534
+            ],
+            [
+              "2024-06-01",
+              302.2545355650252
+            ],
+            [
+              "2024-07-01",
+              302.7468896098835
+            ],
+            [
+              "2024-08-01",
+              303.25649803221825
+            ],
+            [
+              "2024-09-01",
+              303.76696426929215
+            ],
+            [
+              "2024-10-01",
+              304.26178196747065
+            ],
+            [
+              "2024-11-01",
+              304.7739403810052
+            ],
+            [
+              "2024-12-01",
+              305.2703983813243
+            ],
+            [
+              "2025-01-01",
+              305.78425458082177
+            ],
+            [
+              "2025-02-01",
+              306.30284690121243
+            ],
+            [
+              "2025-03-01",
+              306.77453794231263
+            ],
+            [
+              "2025-04-01",
+              307.2976146454157
+            ],
+            [
+              "2025-05-01",
+              307.80466708928947
+            ],
+            [
+              "2025-06-01",
+              308.32950025028344
+            ],
+            [
+              "2025-07-01",
+              308.8382553436175
+            ],
+            [
+              "2025-08-01",
+              309.3648508605754
+            ],
+            [
+              "2025-09-01",
+              309.8923442677191
+            ],
+            [
+              "2025-10-01",
+              310.40367811155653
+            ],
+            [
+              "2025-11-01",
+              310.9329428075992
+            ],
+            [
+              "2025-12-01",
+              311.4459936775624
+            ],
+            [
+              "2026-01-01",
+              311.97703561037787
+            ],
+            [
+              "2026-02-01",
+              312.5095414053832
+            ],
+            [
+              "2026-03-01",
+              312.99166039213907
+            ],
+            [
+              "2026-04-01",
+              313.52630261900447
+            ]
+          ],
+          "interpolation": "linear",
+          "lag": "none",
+          "seasonality": null,
+          "publication_dates": [
+            {
+              "reference_month": "2023-01-01",
+              "publication_date": "2023-02-15"
+            },
+            {
+              "reference_month": "2023-02-01",
+              "publication_date": "2023-03-15"
+            },
+            {
+              "reference_month": "2023-03-01",
+              "publication_date": "2023-04-15"
+            },
+            {
+              "reference_month": "2023-04-01",
+              "publication_date": "2023-05-15"
+            },
+            {
+              "reference_month": "2023-05-01",
+              "publication_date": "2023-06-15"
+            },
+            {
+              "reference_month": "2023-06-01",
+              "publication_date": "2023-07-15"
+            },
+            {
+              "reference_month": "2023-07-01",
+              "publication_date": "2023-08-15"
+            },
+            {
+              "reference_month": "2023-08-01",
+              "publication_date": "2023-09-15"
+            },
+            {
+              "reference_month": "2023-09-01",
+              "publication_date": "2023-10-15"
+            },
+            {
+              "reference_month": "2023-10-01",
+              "publication_date": "2023-11-15"
+            },
+            {
+              "reference_month": "2023-11-01",
+              "publication_date": "2023-12-15"
+            },
+            {
+              "reference_month": "2023-12-01",
+              "publication_date": "2024-01-15"
+            },
+            {
+              "reference_month": "2024-01-01",
+              "publication_date": "2024-02-15"
+            },
+            {
+              "reference_month": "2024-02-01",
+              "publication_date": "2024-03-15"
+            },
+            {
+              "reference_month": "2024-03-01",
+              "publication_date": "2024-04-15"
+            },
+            {
+              "reference_month": "2024-04-01",
+              "publication_date": "2024-05-15"
+            },
+            {
+              "reference_month": "2024-05-01",
+              "publication_date": "2024-06-15"
+            },
+            {
+              "reference_month": "2024-06-01",
+              "publication_date": "2024-07-15"
+            },
+            {
+              "reference_month": "2024-07-01",
+              "publication_date": "2024-08-15"
+            },
+            {
+              "reference_month": "2024-08-01",
+              "publication_date": "2024-09-15"
+            },
+            {
+              "reference_month": "2024-09-01",
+              "publication_date": "2024-10-15"
+            },
+            {
+              "reference_month": "2024-10-01",
+              "publication_date": "2024-11-15"
+            },
+            {
+              "reference_month": "2024-11-01",
+              "publication_date": "2024-12-15"
+            },
+            {
+              "reference_month": "2024-12-01",
+              "publication_date": "2025-01-15"
+            },
+            {
+              "reference_month": "2025-01-01",
+              "publication_date": "2025-02-15"
+            },
+            {
+              "reference_month": "2025-02-01",
+              "publication_date": "2025-03-15"
+            },
+            {
+              "reference_month": "2025-03-01",
+              "publication_date": "2025-04-15"
+            },
+            {
+              "reference_month": "2025-04-01",
+              "publication_date": "2025-05-15"
+            },
+            {
+              "reference_month": "2025-05-01",
+              "publication_date": "2025-06-15"
+            },
+            {
+              "reference_month": "2025-06-01",
+              "publication_date": "2025-07-15"
+            },
+            {
+              "reference_month": "2025-07-01",
+              "publication_date": "2025-08-15"
+            },
+            {
+              "reference_month": "2025-08-01",
+              "publication_date": "2025-09-15"
+            },
+            {
+              "reference_month": "2025-09-01",
+              "publication_date": "2025-10-15"
+            },
+            {
+              "reference_month": "2025-10-01",
+              "publication_date": "2025-11-15"
+            },
+            {
+              "reference_month": "2025-11-01",
+              "publication_date": "2025-12-15"
+            },
+            {
+              "reference_month": "2025-12-01",
+              "publication_date": "2026-01-15"
+            },
+            {
+              "reference_month": "2026-01-01",
+              "publication_date": "2026-02-15"
+            },
+            {
+              "reference_month": "2026-02-01",
+              "publication_date": "2026-03-15"
+            },
+            {
+              "reference_month": "2026-03-01",
+              "publication_date": "2026-04-15"
+            },
+            {
+              "reference_month": "2026-04-01",
+              "publication_date": "2026-05-15"
+            }
+          ]
+        }
+      ],
       "prior_market": [
         {
           "kind": "inflation_curve",
@@ -159,6 +492,24 @@
           "rate_calibration": null,
           "calibration_ois_cutoff_days": null,
           "fx_policy": null
+        },
+        {
+          "kind": "vol_surface",
+          "id": "US-CPI-FLOOR-VOL",
+          "expiries": [
+            1.0,
+            10.0
+          ],
+          "strikes": [
+            1.0
+          ],
+          "secondary_axis": "strike",
+          "quote_type": "black_lognormal",
+          "interpolation_mode": "vol",
+          "vols_row_major": [
+            0.0,
+            0.0
+          ]
         }
       ]
     }
@@ -190,7 +541,7 @@
         "business_day_convention": "following",
         "stub": "short_back",
         "calendar_id": "nyse",
-        "discount_curve_id": "USD-TIPS",
+        "discount_curve_id": "USD-OIS",
         "inflation_index_id": "US-CPI",
         "attributes": {
           "tags": [
@@ -203,17 +554,18 @@
             "quoted_clean_price_pct": 101.25
           }
         },
-        "day_count": "act_365f"
+        "day_count": "act_365f",
+        "floor_vol_surface_id": "US-CPI-FLOOR-VOL"
       }
     }
   },
   "expected": {
-    "npv": 1140623.636410162,
-    "real_yield": 0.009932285187926632,
-    "breakeven_inflation": 0.00461768569475729,
+    "npv": 1007818.4104879099,
+    "real_yield": 0.009932285187926633,
+    "breakeven_inflation": 0.030557382160386393,
     "index_ratio": 1.0416393040407212,
     "real_duration": 4.825167336952283,
-    "dv01": -553.9022319256328
+    "dv01": -488.19315078580985
   },
   "tolerances": {
     "npv": {

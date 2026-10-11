@@ -115,6 +115,39 @@ impl PriceTrigger {
     }
 }
 
+/// Resolved exercise claim after debt has been converted, called, put, or redeemed.
+///
+/// These contractual amounts replace the debt and its future coupons. Any
+/// earned but unpaid coupon must be included in `cash`. Shares are delivered
+/// ex-dividend on `delivery_date`. Same-day completed exercise needs no record;
+/// use this state to retain a delayed delivery without replaying the option.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ConvertibleSettlement {
+    /// Date the holder's exercise decision extinguished the debt.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub exercise_date: Date,
+    /// Contractual delivery/payment date; not earlier than exercise.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub delivery_date: Date,
+    /// Fixed number of shares to deliver, finite and nonnegative.
+    pub shares: f64,
+    /// Fixed cash consideration including any retained coupon, in bond currency.
+    pub cash: Money,
+    /// Part of `cash` eligible for principal recovery on default; excludes
+    /// uncapitalized coupon accrual. Must be between zero and `cash`.
+    pub recovery_basis: Money,
+}
+
 /// Convertible bond instrument with embedded equity conversion option.
 ///
 /// This fixed income instrument combines debt characteristics (coupons, principal)
@@ -150,15 +183,10 @@ pub struct ConvertibleBond {
     pub maturity: Date,
     /// Discount curve identifier for the debt component (risk-free or funding).
     pub discount_curve_id: CurveId,
-    /// Issuer hazard curve identifier (a `HazardCurve`, as on every credit
-    /// instrument). When `None`, the cash component is discounted at the
-    /// risk-free `discount_curve_id` (no credit spread).
-    ///
-    /// The pricer derives the zero-recovery risky discount factor
-    /// `risky_df = rf_df × S(t)` from the curve's survival probabilities and
-    /// blends it with risk-free discounting as `risky × (1 − R) + rf × R`
-    /// using [`Self::recovery_rate`]. The hazard curve's own recovery rate is
-    /// used only to convert spread bumps into hazard shifts for CS01.
+    /// Issuer hazard curve identifier. Absence specifies no default risk.
+    /// All continuation claims are survival-weighted. Default pays the explicit
+    /// recovery fraction of outstanding principal and extinguishes equity;
+    /// conditional stock drift includes the hazard compensator.
     pub credit_curve_id: Option<CurveId>,
     /// Conversion terms for equity conversion.
     pub conversion: ConversionSpec,
@@ -189,6 +217,12 @@ pub struct ConvertibleBond {
     /// k-of-n-days observation window; the realized path is not tracked.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub soft_call_trigger: Option<PriceTrigger>,
+    /// Recorded exercise awaiting delivery. At or after `exercise_date`, only
+    /// this claim remains; after delivery its value is zero. Mandatory exercise
+    /// without a record settles on its contractual conversion date.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_settlement: Option<ConvertibleSettlement>,
     /// Number of business days from trade date to settlement date.
     ///
     /// When set, accrued interest and clean price are computed relative to the
@@ -200,17 +234,10 @@ pub struct ConvertibleBond {
     /// If `None`, settlement is assumed same-day (as_of = settlement date).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settlement_days: Option<u32>,
-    /// Assumed recovery rate on default, as a fraction (e.g., 0.40 = 40%).
-    ///
-    /// Used in the Tsiveriotis-Zhang credit model to blend risky and risk-free
-    /// discounting on the cash component. A recovery rate of 0 reduces to the
-    /// standard zero-recovery TZ model. Typical values:
-    /// - **Investment grade**: 0.40 (ISDA standard assumption)
-    /// - **High yield**: 0.25-0.35
-    /// - **Distressed**: 0.10-0.20
-    ///
-    /// Required when `credit_curve_id` is set; otherwise absence means that no
-    /// credit adjustment is requested.
+    /// Fraction of outstanding principal paid immediately on default, in
+    /// `[0, 1]`; includes capitalized PIK and excludes prior amortization.
+    /// Default extinguishes coupons and the conversion right. Required with a
+    /// credit curve; recovery is an explicit cashflow, not a discount blend.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recovery_rate: Option<f64>,
     /// Coupon leg (fixed, floating, step-up or amortizing), the same type as
@@ -510,6 +537,46 @@ impl ConvertibleBond {
         validation::validate_date_range_strict(self.issue_date, self.maturity, "convertible bond")?;
         validation::validate_money_finite(self.notional, "convertible bond notional")?;
         validation::validate_money_gt(self.notional, 0.0, "convertible bond notional")?;
+
+        if let Some(settlement) = &self.resolved_settlement {
+            validate_conversion_date(
+                settlement.exercise_date,
+                self.issue_date,
+                self.maturity,
+                "resolved exercise",
+            )?;
+            validation::validate_date_range_non_strict(
+                settlement.exercise_date,
+                settlement.delivery_date,
+                "convertible delivery",
+            )?;
+            if !settlement.shares.is_finite()
+                || settlement.shares < 0.0
+                || !settlement.cash.amount().is_finite()
+                || settlement.cash.amount() < 0.0
+            {
+                return Err(finstack_quant_core::Error::Validation(
+                    "convertible delivery amounts must be finite and nonnegative".into(),
+                ));
+            }
+            if settlement.recovery_basis.amount() < 0.0
+                || settlement.recovery_basis.amount() > settlement.cash.amount()
+            {
+                return Err(finstack_quant_core::Error::Validation("convertible settlement recovery basis must be between zero and cash consideration".into()));
+            }
+            if settlement.recovery_basis.currency() != self.notional.currency() {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: self.notional.currency(),
+                    actual: settlement.recovery_basis.currency(),
+                });
+            }
+            if settlement.cash.currency() != self.notional.currency() {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: self.notional.currency(),
+                    actual: settlement.cash.currency(),
+                });
+            }
+        }
 
         match (self.conversion.ratio, self.conversion.price) {
             (None, None) => {
@@ -1116,9 +1183,59 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
     fn raw_cashflow_schedule(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
-        _as_of: Date,
+        as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let schedule = pricing::build_convertible_schedule(self, curves)?;
+        if let Some(claim) = &self.resolved_settlement {
+            self.validate()?;
+            if as_of < claim.exercise_date {
+                return Err(Error::Validation(
+                    "resolved convertible settlement cannot be reported before exercise".into(),
+                ));
+            }
+            let flows = if claim.delivery_date > as_of && claim.cash.amount() > 0.0 {
+                vec![finstack_quant_core::cashflow::CashFlow::new(
+                    claim.delivery_date,
+                    None,
+                    claim.cash,
+                    finstack_quant_core::cashflow::CFKind::Notional,
+                    0.0,
+                    None,
+                )]
+            } else {
+                Vec::new()
+            };
+            return CashFlowSchedule::from_flows(
+                flows,
+                crate::cashflow::builder::Notional::par(
+                    claim.cash.amount(),
+                    self.notional.currency(),
+                )?,
+                self.cashflow_spec.day_count(),
+                crate::cashflow::builder::CashFlowMeta {
+                    issue_date: Some(claim.exercise_date),
+                    maturity: Some(claim.delivery_date),
+                    ..Default::default()
+                },
+            );
+        }
+        let mut schedule = pricing::build_convertible_schedule(self, curves)?;
+        let mandatory = match self.conversion.policy {
+            ConversionPolicy::MandatoryOn(date) => Some(date),
+            ConversionPolicy::MandatoryVariable {
+                conversion_date, ..
+            } => Some(conversion_date),
+            _ => None,
+        };
+        if let Some(date) = mandatory.filter(|date| *date < as_of) {
+            schedule.retain_flows(|flow| {
+                flow.date > as_of
+                    && !flow.kind.is_principal_like()
+                    && flow
+                        .accrual
+                        .as_ref()
+                        .is_some_and(|period| period.end <= date)
+            });
+        }
         Ok(schedule
             .with_representation(crate::cashflow::builder::CashflowRepresentation::Contractual))
     }

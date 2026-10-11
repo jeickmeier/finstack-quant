@@ -11,7 +11,7 @@ use crate::instruments::fixed_income::convertible::{
 };
 use finstack_quant_core::math::map_date_to_step;
 
-/// Convertible bond valuator implementing the TZ logic
+/// Contractual debt events and exercise decisions for the defaultable-equity tree.
 pub(super) struct ConvertibleBondValuator {
     /// Conversion ratio (shares per bond) - used for standard conversion policies.
     conversion_ratio: f64,
@@ -19,6 +19,14 @@ pub(super) struct ConvertibleBondValuator {
     pub(super) face_value: f64,
     /// Coupon cashflows mapped to tree steps
     pub(super) coupon_map: HashMap<usize, f64>,
+    /// Scheduled principal payments, distinct from coupons and PIK capitalization.
+    pub(super) principal_map: HashMap<usize, f64>,
+    /// Principal after scheduled events at each node; terminal entry is the
+    /// amount exchangeable for shares immediately before final redemption.
+    pub(super) principal_by_step: Vec<f64>,
+    /// Discounted recovery of principal over each step, conditional on survival
+    /// to the step start. Default extinguishes the stock and the bond.
+    pub(super) recovery_by_step: Vec<f64>,
     /// Call prices mapped to tree steps (step -> price).
     /// For exercise periods, every step within the period maps to the call price.
     call_map: HashMap<usize, f64>,
@@ -37,15 +45,8 @@ pub(super) struct ConvertibleBondValuator {
     /// Per-step risk-free discount factors: `rf_step_dfs[i] = curve.df(t_{i+1}) / curve.df(t_i)`.
     /// Uses the full discount curve term structure instead of a flat rate.
     pub(super) rf_step_dfs: Vec<f64>,
-    /// Per-step risky discount factors (includes credit spread, adjusted for recovery).
-    ///
-    /// With recovery rate R:
-    /// `risky_fwd_adj = risky_fwd * (1 - R) + rf_fwd * R`
-    ///
-    /// At R=0 this equals `rf_fwd × S(t_{i+1}) / S(t_i)` from the issuer hazard
-    /// curve (zero-recovery TZ model).
-    /// At R=1 this equals the risk-free forward (no credit effect).
-    pub(super) risky_step_dfs: Vec<f64>,
+    /// Conditional survival factors; all continuation claims require survival.
+    pub(super) survival_factors: Vec<f64>,
     /// Equity volatility (stored for soft-call trigger adjustment).
     volatility: f64,
     /// Whether the bond carries dividend protection (`AdjustPrice` or
@@ -104,22 +105,82 @@ impl ConvertibleBondValuator {
             step_dates.push(base_date + time::Duration::days(offset_days));
         }
 
-        // Process coupon cashflows (exclude reset-only events) on the model clock
+        let rf_curve = market_context.get_discount(bond.discount_curve_id.as_str())?;
+        let hazard = bond
+            .credit_curve_id
+            .as_ref()
+            .map(|id| market_context.get_hazard(id.as_str()))
+            .transpose()?;
+        let survival_between = |start: Date, end: Date| -> Result<f64> {
+            if let Some(curve) = &hazard {
+                let survival = curve.survival_at_dates(&[start, end])?;
+                if survival[0] <= 0.0 {
+                    return Err(Error::Validation(
+                        "convertible requires positive survival at valuation".into(),
+                    ));
+                }
+                Ok(survival[1] / survival[0])
+            } else {
+                Ok(1.0)
+            }
+        };
         let mut coupon_map: HashMap<usize, f64> = HashMap::default();
-        for cf in cashflow_schedule.coupons() {
-            if cf.date <= base_date {
+        let mut principal_map: HashMap<usize, f64> = HashMap::default();
+        for cf in cashflow_schedule.get_flows() {
+            if cf.date <= base_date
+                || !finstack_quant_cashflows::primitives::is_cash_settlement_kind(cf.kind)
+            {
                 continue;
             }
-            let bounded_step = map_date_to_step(
+            let step = map_date_to_step(
                 base_date,
-                cf.date,
+                cf.date.min(bond.maturity),
                 bond.maturity,
                 steps,
                 DayCount::Act365F,
                 day_count_ctx,
             )?;
-            *coupon_map.entry(bounded_step).or_insert(0.0) += cf.amount.amount();
+            // Preserve the contractual payment PV when a date is rounded onto
+            // the equity grid, including final coupons paid after maturity.
+            let correction = rf_curve.df_between_dates(base_date, cf.date)?
+                * survival_between(base_date, cf.date)?
+                / (rf_curve.df_between_dates(base_date, step_dates[step])?
+                    * survival_between(base_date, step_dates[step])?);
+            let target = if cf.kind.is_principal_like() {
+                &mut principal_map
+            } else {
+                &mut coupon_map
+            };
+            let tail_recovery = if cf.kind.is_principal_like() && cf.date > bond.maturity {
+                bond.recovery_rate.unwrap_or(0.0)
+                    * crate::instruments::common_impl::pricing::rates_credit::continuous_frp_weight(
+                        rf_curve.df_between_dates(bond.maturity, cf.date)?,
+                        survival_between(bond.maturity, cf.date)?,
+                    )?
+            } else {
+                0.0
+            };
+            *target.entry(step).or_insert(0.0) += cf.amount.amount() * (correction + tail_recovery);
         }
+        let balance_path = cashflow_schedule.outstanding_by_date()?;
+        let mut principal_by_step: Vec<f64> = cashflow_schedule
+            .outstanding_at_dates(&step_dates)?
+            .into_iter()
+            .map(|balance| balance.amount().max(0.0))
+            .collect();
+        // At final conversion, the holder exchanges the residual redemption
+        // claim. Earlier scheduled amortization is paid outside exercise.
+        principal_by_step[steps] = cashflow_schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| {
+                cf.kind.is_principal_like()
+                    && finstack_quant_cashflows::primitives::is_cash_settlement_kind(cf.kind)
+                    && cf.amount.amount() > 0.0
+                    && cf.get_balance_date() >= bond.maturity
+            })
+            .map(|cf| cf.amount.amount())
+            .sum();
 
         // One accrual index serves every call/put exercise date below.
         let accrual = super::engine::accrual_index(bond, cashflow_schedule)?;
@@ -131,7 +192,6 @@ impl ConvertibleBondValuator {
         if let Some(ref call_put) = bond.call_put {
             for call in &call_put.calls {
                 if call.end >= base_date && call.start <= bond.maturity {
-                    let floor_price = bond.notional.amount() * (call.price_pct_of_par / 100.0);
                     let start_step = map_date_to_step(
                         base_date,
                         call.start.max(base_date),
@@ -169,6 +229,7 @@ impl ConvertibleBondValuator {
                         .skip(start_step)
                     {
                         let accrued = accrual.accrued_at(exercise_date)?;
+                        let floor_price = principal_by_step[s] * call.price_pct_of_par / 100.0;
                         let call_price = if let Some((curve, spread)) = &reference_curve {
                             let mut pv_remaining = 0.0;
                             for cashflow in cashflow_schedule
@@ -199,7 +260,6 @@ impl ConvertibleBondValuator {
 
             for put in &call_put.puts {
                 if put.end >= base_date && put.start <= bond.maturity {
-                    let put_price = bond.notional.amount() * (put.price_pct_of_par / 100.0);
                     let start_step = map_date_to_step(
                         base_date,
                         put.start.max(base_date),
@@ -226,7 +286,8 @@ impl ConvertibleBondValuator {
                         .take(end_step + 1)
                         .skip(start_step)
                     {
-                        let dirty_put_price = put_price + accrual.accrued_at(exercise_date)?;
+                        let dirty_put_price = principal_by_step[s] * put.price_pct_of_par / 100.0
+                            + accrual.accrued_at(exercise_date)?;
                         put_map
                             .entry(s)
                             .and_modify(|p| *p = p.max(dirty_put_price))
@@ -263,45 +324,46 @@ impl ConvertibleBondValuator {
             (None, None) => 0.0,
         };
 
-        // Survival probabilities S(t) at every step date from the issuer
-        // hazard curve; `None` prices the cash component at the risk-free rate.
-        let survival = bond
-            .credit_curve_id
-            .as_ref()
-            .map(|credit_curve_id| {
-                market_context
-                    .get_hazard(credit_curve_id.as_str())?
-                    .survival_at_dates(&step_dates)
-            })
-            .transpose()?;
-
         let mut rf_step_dfs = Vec::with_capacity(steps);
-        let mut risky_step_dfs = Vec::with_capacity(steps);
-
-        for i in 0..steps {
-            let step_start = step_dates[i];
-            let step_end = step_dates[i + 1];
-            let rf_fwd = rf_curve.df_between_dates(step_start, step_end)?;
-            rf_step_dfs.push(rf_fwd);
-
-            if let Some(survival) = &survival {
-                if survival[i] <= 0.0 {
-                    return Err(Error::Validation(format!(
-                        "Convertible bond {} hazard curve implies zero survival by {step_start}",
-                        bond.id.as_str()
-                    )));
-                }
-                // Zero-recovery risky forward DF: rf_fwd × S(end) / S(start).
-                let raw_risky_fwd = rf_fwd * (survival[i + 1] / survival[i]);
-                // Blend risky and risk-free using recovery:
-                //   adjusted = risky * (1 - R) + rf * R
-                // At R=0: pure zero-recovery TZ model.
-                // At R=1: cash component discounted at risk-free (no credit effect).
-                let risky_fwd = raw_risky_fwd * (1.0 - recovery) + rf_fwd * recovery;
-                risky_step_dfs.push(risky_fwd);
-            } else {
-                risky_step_dfs.push(rf_fwd);
+        let mut survival_factors = Vec::with_capacity(steps);
+        let mut recovery_by_step = Vec::with_capacity(steps);
+        for dates in step_dates.windows(2) {
+            let start = dates[0];
+            let end = dates[1];
+            rf_step_dfs.push(rf_curve.df_between_dates(start, end)?);
+            survival_factors.push(survival_between(start, end)?);
+            // Split default integration at actual principal events. In
+            // particular, never average in an amortization or PIK event that
+            // has not yet happened.
+            let mut boundaries = vec![start];
+            boundaries.extend(
+                balance_path
+                    .iter()
+                    .filter_map(|(date, _)| (*date > start && *date < end).then_some(*date)),
+            );
+            boundaries.push(end);
+            let mut recovery_pv = 0.0;
+            for interval in boundaries.windows(2) {
+                let left = interval[0];
+                let right = interval[1];
+                let principal = balance_path
+                    .iter()
+                    .rev()
+                    .find(|(date, _)| *date <= left)
+                    .map_or(bond.notional.amount(), |(_, balance)| balance.amount())
+                    .max(0.0);
+                let weight =
+                    crate::instruments::common_impl::pricing::rates_credit::continuous_frp_weight(
+                        rf_curve.df_between_dates(left, right)?,
+                        survival_between(left, right)?,
+                    )?;
+                recovery_pv += recovery
+                    * principal
+                    * weight
+                    * rf_curve.df_between_dates(start, left)?
+                    * survival_between(start, left)?;
             }
+            recovery_by_step.push(recovery_pv);
         }
 
         if let ConversionPolicy::MandatoryVariable {
@@ -328,6 +390,9 @@ impl ConvertibleBondValuator {
             conversion_ratio,
             face_value: bond.notional.amount(),
             coupon_map,
+            principal_map,
+            principal_by_step,
+            recovery_by_step,
             call_map,
             put_map,
             conversion_window: Self::conversion_window(
@@ -341,7 +406,7 @@ impl ConvertibleBondValuator {
             conversion_price,
             soft_call_trigger: bond.soft_call_trigger.clone(),
             rf_step_dfs,
-            risky_step_dfs,
+            survival_factors,
             volatility,
             dividend_protected: bond.conversion.dividend_adjustment.is_protected(),
         })
@@ -474,7 +539,7 @@ impl ConvertibleBondValuator {
     /// max-ratio, par-delivery, and min-ratio branches all scale by
     /// `ratio_accretion` while the regime boundaries stay at their contractual
     /// spot levels.
-    pub(super) fn conversion_value(&self, spot: f64, ratio_accretion: f64) -> f64 {
+    pub(super) fn conversion_value(&self, spot: f64, ratio_accretion: f64, step: usize) -> f64 {
         let base = match &self.conversion_policy {
             ConversionPolicy::MandatoryVariable {
                 upper_conversion_price,
@@ -491,7 +556,7 @@ impl ConvertibleBondValuator {
             }
             _ => spot * self.conversion_ratio,
         };
-        base * ratio_accretion
+        base * ratio_accretion * self.principal_by_step[step] / self.face_value
     }
 
     /// Get call price at a given step (if callable)

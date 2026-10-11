@@ -32,11 +32,11 @@
     "exampleId": "SGX-IRON-ORE-DEC26"
   },
   {
-    "type": "commodity_option",
-    "title": "commodity_option",
+    "type": "commodity_spot_option",
+    "title": "commodity_spot_option",
     "group": "commodity",
     "schemaGroup": "commodity",
-    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/commodity_option.json",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/commodity_spot_option.json",
     "exampleId": "WTI-OPT-2025M06"
   },
   {

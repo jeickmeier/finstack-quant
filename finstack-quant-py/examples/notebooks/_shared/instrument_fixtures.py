@@ -445,7 +445,7 @@ def irs(idx: int) -> tuple[str, dict]:
                 "stub": "none",
                 "start": "2025-04-15",
                 "end": f"{mat_year}-04-15",
-                "par_method": None,
+
             },
             "float_leg": {
                 "discount_curve_id": "USD-OIS",
@@ -492,7 +492,7 @@ def swaption(idx: int) -> tuple[str, dict]:
                 "stub": "none",
                 "start": "2025-07-17",
                 "end": f"{swap_end_year}-07-17",
-                "par_method": None,
+
                 "end_of_month": False,
                 "payment_lag_days": 0,
             },

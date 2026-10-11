@@ -10,7 +10,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 
 use super::irr_helpers::{
-    cached_full_schedule, exercisable_call_candidates, outstanding_before, solve_irr_to_exercise,
+    cached_full_schedule, exercisable_call_candidates, solve_irr_to_exercise,
     target_price_from_quote_or_model,
 };
 
@@ -44,16 +44,13 @@ impl MetricCalculator for YtwCalculator {
                 context.base_value,
             )?
         };
-        let out_path = schedule.outstanding_by_date()?;
 
         // Candidate exercises: each exercisable call and final maturity.
         let mut candidates: Vec<(Date, Money)> = Vec::with_capacity(candidate_calls.len() + 1);
         candidates.extend(candidate_calls);
 
-        // Always include maturity: pre-redemption outstanding
-        // (at maturity itself, outstanding is 0 after the final redemption)
-        let final_out = outstanding_before(&out_path, maturity, currency);
-        candidates.push((maturity, final_out));
+        // The canonical schedule already includes final redemption.
+        candidates.push((maturity, Money::from((0_i64, currency))));
 
         // Re-borrow the loan for the IRR solver (only immutable borrows of
         // context outstanding at this point).

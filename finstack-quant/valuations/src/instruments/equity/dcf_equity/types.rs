@@ -944,34 +944,50 @@ impl DiscountedCashFlow {
     /// calculated on the fair market value that shareholders actually receive,
     /// which is the standard private-company valuation convention.
     ///
-    /// In an implied-valuation setting the price is circular (the price used
-    /// for ITM classification and buyback depends on the diluted share count
-    /// it produces), so the calculation iterates
-    /// `price → diluted shares → price` to a self-consistent fixed point:
-    /// the returned count satisfies `price = equity_value / diluted` with
-    /// dilution evaluated at that same price.
+    /// Solve `B*p + sum(Q*max(p-K, 0)) = equity_value` on sorted strike
+    /// intervals, then verify the residual. No iterative convergence is assumed.
     ///
-    /// Returns `None` if `shares_outstanding` is not set.
+    /// # Arguments
+    /// * `equity_value` - Post-discount equity value in the instrument currency,
+    ///   before treasury-stock dilution. Non-positive values retain basic shares.
+    ///
+    /// Returns `None` when basic shares are absent or invalid, security inputs
+    /// are invalid, or finite arithmetic cannot satisfy the valuation equation.
     pub fn diluted_shares(&self, equity_value: f64) -> Option<f64> {
         let basic = self.shares_outstanding?;
-        if basic <= 0.0 {
+        if !basic.is_finite() || basic <= 0.0 || !equity_value.is_finite() {
+            return None;
+        }
+        let mut securities: Vec<_> = self.dilution_securities.iter().collect();
+        if securities.iter().any(|security| {
+            !security.quantity.is_finite()
+                || security.quantity < 0.0
+                || !security.exercise_price.is_finite()
+                || security.exercise_price < 0.0
+        }) {
+            return None;
+        }
+        if equity_value <= 0.0 {
             return Some(basic);
         }
-        let mut price_per_share = equity_value / basic;
-        if price_per_share <= 0.0 {
-            return Some(basic);
-        }
-        let mut diluted = basic;
-        for _ in 0..64 {
-            let next = self.diluted_shares_at_price(basic, price_per_share);
-            let converged = (next - diluted).abs() <= 1e-12 * basic;
-            diluted = next;
-            price_per_share = equity_value / diluted;
-            if converged {
+        securities.sort_by(|left, right| left.exercise_price.total_cmp(&right.exercise_price));
+        let mut shares = basic;
+        let mut proceeds = 0.0;
+        let mut price = equity_value / basic;
+        for security in securities {
+            if price <= security.exercise_price {
                 break;
             }
+            shares += security.quantity;
+            proceeds += security.quantity * security.exercise_price;
+            price = (equity_value + proceeds) / shares;
+            if !price.is_finite() || price < security.exercise_price {
+                return None;
+            }
         }
-        Some(diluted)
+        let diluted = self.diluted_shares_at_price(basic, price);
+        let residual = (price * diluted - equity_value).abs();
+        (diluted.is_finite() && residual <= 1e-10 * equity_value.abs().max(1.0)).then_some(diluted)
     }
 
     /// Treasury-stock-method diluted share count at a given price per share:
@@ -2051,6 +2067,34 @@ mod tests {
             eps,
             pps
         );
+    }
+
+    #[test]
+    fn large_warrant_issue_solves_piecewise_equity_equation() {
+        let mut dcf = build_simple_dcf_gordon();
+        dcf.shares_outstanding = Some(100.0);
+        dcf.dilution_securities = vec![DilutionSecurity {
+            name: "Warrants".into(),
+            quantity: 1000.0,
+            exercise_price: 5.0,
+        }];
+        let shares = dcf.diluted_shares(1000.0).expect("diluted shares");
+        assert!((shares - 183.33333333333333).abs() < 1e-10);
+        assert!((1000.0 / shares - 6000.0 / 1100.0).abs() < 1e-12);
+        assert_eq!(dcf.diluted_shares(500.0), Some(100.0));
+        dcf.dilution_securities.push(DilutionSecurity {
+            name: "RSUs".into(),
+            quantity: 20.0,
+            exercise_price: 0.0,
+        });
+        dcf.dilution_securities.push(DilutionSecurity {
+            name: "OTM".into(),
+            quantity: 1e6,
+            exercise_price: 100.0,
+        });
+        let shares = dcf.diluted_shares(1000.0).expect("multiple classes");
+        let price = 1000.0 / shares;
+        assert!((120.0 * price + 1000.0 * (price - 5.0).max(0.0) - 1000.0).abs() < 1e-9);
     }
 
     #[test]

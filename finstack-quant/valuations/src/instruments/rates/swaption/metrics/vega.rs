@@ -40,6 +40,11 @@ pub(crate) struct VegaCalculator;
 impl MetricCalculator for VegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &Swaption = context.instrument_as()?;
+        if context.pricing_model() == Some(crate::pricer::ModelKey::HullWhite1F) {
+            return Err(finstack_quant_core::Error::Validation(
+                "HullWhite1F swaption pricing consumes explicit short-rate parameters; use hw_sigma_vega, not Black surface vega".into(),
+            ));
+        }
         let strike = option.strike_f64()?;
 
         // Use consolidated helper to get pre-computed inputs
@@ -61,5 +66,47 @@ impl MetricCalculator for VegaCalculator {
         let vega = vega_raw / super::config::VOL_PCT_SCALE;
         // Scale by notional and annuity for cash vega
         Ok(vega * option.notional.amount() * inputs.annuity)
+    }
+}
+
+/// Short-rate sigma sensitivity of the selected European HW model, per 0.01.
+pub(crate) struct HwSigmaVegaCalculator;
+
+impl MetricCalculator for HwSigmaVegaCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        use crate::instruments::rates::hw1f::{
+            resolve_hw1f_params, Hw1fParamFamily, HW_SIGMA_BUMP,
+        };
+        if context.pricing_model() != Some(crate::pricer::ModelKey::HullWhite1F) {
+            return Err(finstack_quant_core::Error::Validation(
+                "hw_sigma_vega requires HullWhite1F pricing".into(),
+            ));
+        }
+        let option: &Swaption = context.instrument_as()?;
+        let params = resolve_hw1f_params(
+            Hw1fParamFamily::Swaption,
+            option.get_discount_curve_id().as_str(),
+            &option.instrument_pricing_overrides.model_config,
+            None,
+            "swaption sigma vega",
+            &context.curves,
+        )?;
+        let h = HW_SIGMA_BUMP.min(params.sigma * 0.5);
+        if h <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "hw_sigma_vega requires positive sigma".into(),
+            ));
+        }
+        let price = |shift: f64| {
+            let mut bumped = option.clone();
+            bumped
+                .instrument_pricing_overrides
+                .model_config
+                .hw1f_mean_reversion = Some(params.kappa);
+            bumped.instrument_pricing_overrides.model_config.hw1f_sigma =
+                Some(params.sigma + shift);
+            context.reprice_instrument_raw(&bumped, &context.curves, context.as_of)
+        };
+        Ok((price(h)? - price(-h)?) / (2.0 * h) * 0.01)
     }
 }

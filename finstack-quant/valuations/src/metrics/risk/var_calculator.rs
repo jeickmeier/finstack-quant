@@ -7,11 +7,8 @@
 //!
 //! - VaR and Expected Shortfall interpretation: `docs/REFERENCES.md#mcneil-frey-embrechts-qrm`
 
-use crate::instruments::common_impl::helpers::instrument_to_arc;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::metrics::risk::MarketHistory;
-use crate::metrics::sensitivities::config::format_bucket_label_cow;
-use crate::metrics::{standard_registry, MetricContext, MetricId};
 use crate::pricer::PricingDispatch;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -20,7 +17,6 @@ use finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator};
 use finstack_quant_core::money::fx::FxConversionPolicy;
 use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
 use std::sync::Arc;
 
@@ -39,12 +35,12 @@ pub enum VarMethod {
 
     /// Taylor approximation using sensitivities (Greeks).
     ///
-    /// Faster method - approximates P&L using pre-computed sensitivities.
-    /// Good for linear instruments and large portfolios, but may be
-    /// inaccurate for highly non-linear instruments (deep OTM options).
-    /// Equity Greeks are associated with their actual market-scalar identifier.
-    /// Instruments with multiple underlying spots or ambiguous scalar ownership
-    /// require full revaluation; aggregate gamma is not a multi-asset Hessian.
+    /// Computes first and second directional derivatives by selected-model
+    /// repricing along each exact historical shock. Curve interpolation support,
+    /// quote calibration, surface nodes, and reporting-currency FX all remain
+    /// part of the direction. It may be inaccurate for large nonlinear shocks
+    /// and need not be faster than full revaluation. At zero volatility a
+    /// second-order forward stencil replaces the central stencil.
     TaylorApproximation,
 }
 
@@ -176,19 +172,6 @@ pub struct VarResult {
 
     /// Confidence level used
     pub confidence_level: f64,
-
-    /// True when the Taylor approximation skipped one or more FX-spot shocks
-    /// (no FX-delta Taylor term exists). The FX component of those scenarios
-    /// is excluded, so VaR/ES understate FX risk; prefer full revaluation for
-    /// FX-exposed portfolios. Always false for full revaluation.
-    pub skipped_fx: bool,
-
-    /// True when the Taylor approximation skipped one or more `ImpliedVol`
-    /// point shocks for a vol-exposed instrument (only aggregate Vega is
-    /// available, not bucketed vol). The vega component of those scenarios is
-    /// excluded, so VaR/ES understate vol risk. Always false for full
-    /// revaluation.
-    pub skipped_vol: bool,
 }
 
 impl VarResult {
@@ -222,8 +205,6 @@ impl VarResult {
                 pnl_distribution,
                 num_scenarios,
                 confidence_level,
-                skipped_fx: false,
-                skipped_vol: false,
             });
         }
 
@@ -269,16 +250,7 @@ impl VarResult {
             pnl_distribution,
             num_scenarios,
             confidence_level,
-            skipped_fx: false,
-            skipped_vol: false,
         })
-    }
-
-    /// Stamp Taylor-approximation skip flags onto this result.
-    fn with_taylor_skips(mut self, skipped: TaylorSkipFlags) -> Self {
-        self.skipped_fx = skipped.skipped_fx;
-        self.skipped_vol = skipped.skipped_vol;
-        self
     }
 }
 
@@ -528,52 +500,6 @@ fn calculate_var_full_revaluation(
     VarResult::from_distribution(pnls, config.confidence_level)
 }
 
-// Taylor Approximation
-
-#[derive(Default)]
-struct BucketedSeries {
-    per_curve: HashMap<String, HashMap<String, f64>>,
-    fallback: HashMap<String, f64>,
-}
-
-impl BucketedSeries {
-    fn get(&self, curve_id: &str, bucket: &str) -> Option<f64> {
-        if let Some(curve) = self.per_curve.get(curve_id) {
-            if let Some(value) = curve.get(bucket) {
-                return Some(*value);
-            }
-        }
-        self.fallback.get(bucket).copied()
-    }
-}
-
-struct TaylorSensitivities {
-    currency: Currency,
-    dv01: BucketedSeries,
-    cs01: BucketedSeries,
-    ir_convexity: f64,
-    equity: HashMap<String, EquitySensitivity>,
-    vega_rel: f64,
-}
-
-struct EquitySensitivity {
-    delta: f64,
-    gamma: f64,
-}
-
-impl Default for TaylorSensitivities {
-    fn default() -> Self {
-        Self {
-            currency: Currency::USD,
-            dv01: BucketedSeries::default(),
-            cs01: BucketedSeries::default(),
-            ir_convexity: 0.0,
-            equity: HashMap::default(),
-            vega_rel: 0.0,
-        }
-    }
-}
-
 fn resolve_reporting_currency_from_values(
     values: &[Money],
     requested: Option<Currency>,
@@ -632,407 +558,154 @@ fn convert_money_to_reporting(
     Ok(value.amount() * rate)
 }
 
-fn compute_taylor_sensitivities(
+/// Keep only dependencies of this instrument. FX conversion into the reporting
+/// currency is itself a dependency, even for a fixed local-currency cash claim.
+fn relevant_taylor_scenario(
     instrument: &dyn Instrument,
-    base_market: &MarketContext,
-    as_of: Date,
-    base_value: Money,
-    dispatch: &PricingDispatch,
-    provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
-) -> Result<TaylorSensitivities> {
-    let instrument_type = instrument.key();
-    let equity_spot_id = taylor_equity_spot_id(instrument)?;
-    let registry = standard_registry();
-    let instrument_arc = instrument_to_arc(instrument);
-    let mut context = MetricContext::new(
-        instrument_arc,
-        Arc::new(base_market.clone()),
-        as_of,
-        base_value,
-        MetricContext::default_config(),
-    );
-    context.set_metric_pricing_overrides(instrument.get_metric_pricing_overrides().cloned());
-    context.set_pricer_dispatch(dispatch.clone());
-    context.set_recalibration_provider(provider);
-
-    let candidate_metrics = [
-        MetricId::BucketedDv01,
-        MetricId::Dv01,
-        MetricId::BucketedCs01,
-        MetricId::Cs01,
-        MetricId::IrConvexity,
-        MetricId::Delta,
-        MetricId::Gamma,
-        MetricId::IndexDelta,
-        MetricId::EquityShares,
-        MetricId::Vega,
-    ];
-    let metrics: Vec<MetricId> = candidate_metrics
-        .into_iter()
-        .filter(|metric_id| registry.is_applicable(metric_id, instrument_type))
-        .collect();
-
-    let computed = registry.compute(&metrics, &mut context)?;
-
-    let dv01 = collect_bucketed_series(&context.computed_series, &MetricId::BucketedDv01);
-    let cs01 = collect_bucketed_series(&context.computed_series, &MetricId::BucketedCs01);
-
-    let ir_convexity = required_metric(
-        &computed,
-        &MetricId::IrConvexity,
-        registry.is_applicable(&MetricId::IrConvexity, instrument_type),
-        instrument.id(),
-    )?;
-
-    let has_delta = registry.is_applicable(&MetricId::Delta, instrument_type);
-    let has_gamma = registry.is_applicable(&MetricId::Gamma, instrument_type);
-    let has_index_delta = registry.is_applicable(&MetricId::IndexDelta, instrument_type);
-    let has_equity_shares = registry.is_applicable(&MetricId::EquityShares, instrument_type);
-    let has_vega = registry.is_applicable(&MetricId::Vega, instrument_type);
-
-    let delta = if let Some(equity) = instrument
-        .as_any()
-        .downcast_ref::<crate::instruments::Equity>()
-    {
-        // Cash-equity value is linear in its source quote. This also preserves
-        // conversion from a foreign-currency quote without dividing a rounded
-        // present value by spot (or dividing by a valid zero equity price).
-        match equity_spot_id.as_deref() {
-            Some(spot_id) => match base_market.get_price(spot_id)? {
-                finstack_quant_core::market_data::scalars::MarketScalar::Price(quote) => {
-                    convert_money_to_reporting(
-                        Money::new(equity.effective_quantity(), quote.currency())?,
-                        base_value.currency(),
-                        base_market,
-                        as_of,
-                        "Historical VaR equity delta",
-                    )?
-                }
-                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(_) => {
-                    equity.effective_quantity()
-                }
-            },
-            None => 0.0,
-        }
-    } else if has_delta {
-        required_metric(&computed, &MetricId::Delta, true, instrument.id())?
-    } else if has_index_delta {
-        required_metric(&computed, &MetricId::IndexDelta, true, instrument.id())?
-    } else if has_equity_shares {
-        required_metric(&computed, &MetricId::EquityShares, true, instrument.id())?
-    } else {
-        0.0
-    };
-
-    let gamma = if has_gamma {
-        required_metric(&computed, &MetricId::Gamma, true, instrument.id())?
-    } else {
-        0.0
-    };
-
-    let vega_rel = if has_vega {
-        required_metric(&computed, &MetricId::Vega, true, instrument.id())?
-    } else {
-        0.0
-    };
-
-    let mut equity = HashMap::default();
-    if let Some(spot_id) = equity_spot_id {
-        if !has_delta && !has_index_delta && !has_equity_shares {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Historical VaR Taylor approximation lacks a spot delta for '{}' on '{}'; use full revaluation",
-                instrument.id(), spot_id
-            )));
-        }
-        equity.insert(spot_id, EquitySensitivity { delta, gamma });
-    }
-
-    Ok(TaylorSensitivities {
-        currency: base_value.currency(),
-        dv01,
-        cs01,
-        ir_convexity,
-        equity,
-        vega_rel,
-    })
-}
-
-/// Resolve the sole underlying for aggregate spot Greeks, without using display
-/// tickers or instrument IDs. Typed volatility dependencies distinguish spots
-/// from auxiliary scalars such as dividend yields. Without such metadata, only
-/// an unambiguous single scalar is supported.
-fn taylor_equity_spot_id(instrument: &dyn Instrument) -> Result<Option<String>> {
-    if let Some(equity) = instrument
-        .as_any()
-        .downcast_ref::<crate::instruments::Equity>()
-    {
-        return Ok(if equity.quoted_spot.is_some() {
-            None
-        } else {
-            equity.spot_id.as_ref().map(|id| id.as_str().to_owned())
-        });
-    }
-
-    let dependencies = instrument.market_dependencies()?;
-    let mut spots: Vec<String> = dependencies
-        .volatility_dependencies
+    currency: Currency,
+    reporting_currency: Currency,
+    scenario: &super::MarketScenario,
+) -> Result<super::MarketScenario> {
+    use super::RiskFactorType;
+    let deps = instrument.market_dependencies()?;
+    let shifts: Vec<super::RiskFactorShift> = scenario
+        .shifts
         .iter()
-        .filter_map(|dependency| dependency.spot_id.as_ref().map(|id| id.as_str().to_owned()))
+        .filter(|shift| match &shift.factor {
+            RiskFactorType::DiscountRate { curve_id, .. } => {
+                deps.curves.discount_curves.contains(curve_id)
+            }
+            RiskFactorType::ForwardRate { curve_id, .. } => {
+                deps.curves.forward_curves.contains(curve_id)
+            }
+            RiskFactorType::CreditSpread { curve_id, .. } => {
+                deps.curves.credit_curves.contains(curve_id)
+            }
+            RiskFactorType::EquitySpot { ticker } => deps.market_scalar_ids.contains(ticker),
+            RiskFactorType::ImpliedVol { vol_surface_id, .. } => deps
+                .volatility_dependencies
+                .iter()
+                .any(|d| &d.vol_surface_id == vol_surface_id),
+            RiskFactorType::FxSpot { base, quote } => {
+                currency != reporting_currency
+                    || deps.fx_pairs.iter().any(|p| {
+                        (p.base == *base && p.quote == *quote)
+                            || (p.base == *quote && p.quote == *base)
+                    })
+            }
+        })
+        .cloned()
         .collect();
-    if spots.is_empty() {
-        spots = dependencies.market_scalar_ids;
-    }
-    spots.sort();
-    spots.dedup();
-    match spots.len() {
-        0 => Ok(None),
-        1 => Ok(spots.pop()),
-        _ => Err(finstack_quant_core::Error::Validation(format!(
-            "Historical VaR Taylor approximation cannot assign aggregate equity Greeks for '{}' to multiple market scalars ({}); use full revaluation",
-            instrument.id(), spots.join(", ")
-        ))),
-    }
-}
-
-/// Tolerance (in basis points) for treating a set of rate-bucket shifts as a
-/// parallel curve move. If every bucket shift lies within this band of the
-/// first observed shift, the move is considered an exact parallel move and the
-/// second-order convexity term uses the common shift; otherwise the term uses
-/// the mean-square shift (see `taylor_pnl_for_scenario`).
-const PARALLEL_SHIFT_TOLERANCE_BP: f64 = 1e-6;
-
-/// Records risk-factor kinds the Taylor VaR approximation could not represent
-/// for a scenario and therefore **skipped** (rather than hard-failing the whole
-/// portfolio). The caller aggregates these across scenarios and emits a single
-/// diagnostic so the limitation is surfaced instead of silently dropped.
-#[derive(Default, Debug, Clone, Copy)]
-struct TaylorSkipFlags {
-    /// An `FxSpot` shock was skipped (no FX-delta Taylor term is available).
-    skipped_fx: bool,
-    /// An `ImpliedVol` point shock was skipped for an instrument carrying
-    /// aggregate Vega (no bucketed-vol Taylor term is available).
-    skipped_vol: bool,
-}
-
-impl TaylorSkipFlags {
-    fn merge(&mut self, other: TaylorSkipFlags) {
-        self.skipped_fx |= other.skipped_fx;
-        self.skipped_vol |= other.skipped_vol;
-    }
-
-    /// Emit a single `tracing::warn!` describing what was skipped, if anything.
-    fn warn_if_any(&self, context_name: &str) {
-        if self.skipped_fx {
-            tracing::warn!(
-                context = context_name,
-                "Taylor VaR skipped FX-spot shocks (no FX-delta Taylor term); \
-                 the FX component of those scenarios is excluded from VaR. \
-                 Use full-revaluation VaR for an FX-exposed portfolio."
-            );
-        }
-        if self.skipped_vol {
-            tracing::warn!(
-                context = context_name,
-                "Taylor VaR skipped ImpliedVol point shocks for vol-exposed \
-                 instruments (only aggregate Vega is available, not bucketed \
-                 vol). The vega component of those scenarios is excluded from \
-                 VaR. Use full-revaluation VaR for a vol-exposed portfolio."
-            );
-        }
-    }
-}
-
-fn taylor_pnl_for_scenario(
-    sensitivities: &TaylorSensitivities,
-    base_market: &MarketContext,
-    scenario: &crate::metrics::risk::MarketScenario,
-    spot_cache: &mut HashMap<String, f64>,
-    skipped: &mut TaylorSkipFlags,
-) -> Result<f64> {
-    let mut pnl = 0.0;
-    let mut rate_shift_count = 0u32;
-    // Track the first rate-bucket shift and whether all subsequent rate
-    // shifts match it (within tolerance), i.e. the move is a parallel shift.
-    let mut first_rate_shift_bp = 0.0;
-    let mut rate_shifts_parallel = true;
-    // Sum of squared bucket shifts in DECIMAL-rate units: `ir_convexity` is
-    // d²PV/dr² per (decimal rate)² (see `IrConvexityCalculator`, which divides
-    // by h² with h in decimals), so the second-order term must square the
-    // decimal shift. Squaring the bp shift would overstate it by 10⁸.
-    let mut sum_rate_shift_sq_dec = 0.0_f64;
-
-    for shift in &scenario.shifts {
-        match &shift.factor {
-            crate::metrics::risk::RiskFactorType::DiscountRate {
-                curve_id,
-                tenor_years,
-            }
-            | crate::metrics::risk::RiskFactorType::ForwardRate {
-                curve_id,
-                tenor_years,
-            } => {
-                let bucket = format_bucket_label_cow(*tenor_years);
-                let dv01 = sensitivities
-                    .dv01
-                    .get(curve_id.as_str(), bucket.as_ref())
-                    .ok_or_else(|| {
-                        missing_taylor_sensitivity_error("DV01", curve_id.as_str(), bucket.as_ref())
-                    })?;
-                let shift_bp = shift.shift * 10_000.0;
-                pnl += dv01 * shift_bp;
-                sum_rate_shift_sq_dec += shift.shift * shift.shift;
-                if rate_shift_count == 0 {
-                    first_rate_shift_bp = shift_bp;
-                } else if (shift_bp - first_rate_shift_bp).abs() > PARALLEL_SHIFT_TOLERANCE_BP {
-                    rate_shifts_parallel = false;
-                }
-                rate_shift_count += 1;
-            }
-            crate::metrics::risk::RiskFactorType::CreditSpread {
-                curve_id,
-                tenor_years,
-            } => {
-                let bucket = format_bucket_label_cow(*tenor_years);
-                let cs01 = sensitivities
-                    .cs01
-                    .get(curve_id.as_str(), bucket.as_ref())
-                    .ok_or_else(|| {
-                        missing_taylor_sensitivity_error("CS01", curve_id.as_str(), bucket.as_ref())
-                    })?;
-                pnl += cs01 * shift.shift * 10_000.0;
-            }
-            crate::metrics::risk::RiskFactorType::EquitySpot { ticker } => {
-                if let Some(equity) = sensitivities.equity.get(ticker) {
-                    let spot = if let Some(spot) = spot_cache.get(ticker) {
-                        *spot
-                    } else {
-                        let spot = spot_from_market(base_market, ticker)?;
-                        spot_cache.insert(ticker.clone(), spot);
-                        spot
-                    };
-                    let d_spot = spot * shift.shift;
-                    pnl += equity.delta * d_spot + 0.5 * equity.gamma * d_spot * d_spot;
-                }
-            }
-            crate::metrics::risk::RiskFactorType::FxSpot { .. } => {
-                // No FX-delta Taylor term is available. Rather than hard-fail
-                // the whole VaR job, skip this factor's P&L contribution and
-                // flag it so the caller can surface the degradation. The
-                // first-order rate/credit/equity terms still apply.
-                skipped.skipped_fx = true;
-            }
-            crate::metrics::risk::RiskFactorType::ImpliedVol { .. } => {
-                if sensitivities.vega_rel.abs() > 0.0 {
-                    // Only aggregate Vega is available, not bucketed vol, so a
-                    // point ImpliedVol shock cannot be turned into a Taylor
-                    // term. Skip it (do not hard-fail the portfolio) and flag
-                    // the degradation for the caller's diagnostic.
-                    skipped.skipped_vol = true;
-                }
-            }
-        }
-    }
-
-    // Second-order rate term: 0.5 * convexity * (shift_bp)^2.
-    //
-    // `ir_convexity` is an aggregate (parallel-shift) quantity — there is no
-    // per-bucket convexity metric, so a true `Σ 0.5·C_bucket·Δr_bucket²` is
-    // not available here. The previous behavior dropped the convexity term
-    // entirely on any non-parallel scenario; because ordinary key-rate noise
-    // disqualifies the parallel test, that meant convexity P&L was silently
-    // dropped on essentially every historical scenario, making Taylor VaR
-    // optimistic.
-    //
-    // Instead we always apply the second-order term, choosing the squared
-    // shift magnitude so it is exact for a parallel move and stays correctly
-    // signed (never cancels) for a non-parallel move:
-    //
-    //   * parallel move      → use `Δr²` (the common shift) — exact.
-    //   * non-parallel move  → use the **mean-square** bucket shift
-    //     `⟨Δr²⟩ = Σ Δr_b² / n`. This reduces to `Δr²` when all buckets move
-    //     together and, unlike a signed average, does not vanish for a
-    //     steepener/twist (+10bp/−10bp ⇒ ⟨Δr²⟩ = 100, not 0). It is an
-    //     approximation of the unavailable per-bucket sum, but a conservative,
-    //     non-zero one — far better than dropping the term.
-    if sensitivities.ir_convexity.abs() > 0.0 && rate_shift_count > 0 {
-        // `ir_convexity` is per (decimal rate)², so the squared shift must be
-        // in decimal² units (1bp = 1e-4 decimal).
-        let first_rate_shift_dec = first_rate_shift_bp * 1e-4;
-        let shift_sq_dec = if rate_shifts_parallel {
-            first_rate_shift_dec * first_rate_shift_dec
-        } else {
-            sum_rate_shift_sq_dec / f64::from(rate_shift_count)
-        };
-        pnl += 0.5 * sensitivities.ir_convexity * shift_sq_dec;
-    }
-
-    Ok(pnl)
-}
-
-fn missing_taylor_sensitivity_error(
-    metric: &str,
-    curve_id: &str,
-    bucket: &str,
-) -> finstack_quant_core::Error {
-    finstack_quant_core::Error::Validation(format!(
-        "Historical VaR Taylor approximation missing {metric} sensitivity for curve '{curve_id}' bucket '{bucket}'"
-    ))
-}
-
-fn required_metric(
-    computed: &HashMap<MetricId, f64>,
-    metric_id: &MetricId,
-    required: bool,
-    instrument_id: &str,
-) -> Result<f64> {
-    if !required {
-        return Ok(0.0);
-    }
-
-    computed.get(metric_id).copied().ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!(
-            "Historical VaR missing required metric '{}' for instrument '{}'",
-            metric_id.as_str(),
-            instrument_id,
-        ))
-    })
-}
-
-fn collect_bucketed_series(
-    series_map: &HashMap<MetricId, Vec<(String, f64)>>,
-    base_id: &MetricId,
-) -> BucketedSeries {
-    let mut result = BucketedSeries::default();
-
-    for (metric_id, series) in series_map {
-        if metric_id == base_id {
-            result.fallback = series.iter().cloned().collect();
-        } else if let Some(components) = metric_id.decode_components(base_id) {
-            let [curve_id] = components.as_slice() else {
+    // Replay aggregates volatility shifts at the same node before checking
+    // its domain. Preserve that net direction when selecting feasible steps.
+    let mut net: Vec<super::RiskFactorShift> = Vec::with_capacity(shifts.len());
+    for shift in shifts {
+        if matches!(shift.factor, RiskFactorType::ImpliedVol { .. }) {
+            if let Some(existing) = net.iter_mut().find(|value| value.factor == shift.factor) {
+                existing.shift += shift.shift;
                 continue;
-            };
-            let entry = result
-                .per_curve
-                .entry(curve_id.to_string())
-                .or_insert_with(HashMap::default);
-            for (bucket, value) in series {
-                entry.insert(bucket.clone(), *value);
             }
         }
+        net.push(shift);
     }
-
-    result
+    Ok(super::MarketScenario::new(scenario.date, net))
 }
 
-fn spot_from_market(market: &MarketContext, ticker: &str) -> Result<f64> {
-    let scalar = market.get_price(ticker)?;
-    let spot = crate::metrics::core::finite_difference::scalar_numeric_value(scalar);
-    if !spot.is_finite() || spot < 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Historical VaR requires nonnegative finite spot for equity factor '{ticker}'"
-        )));
+/// A scalar parameter multiplies the exact dated scenario, preserving every
+/// curve triangle, quote-replay binding, and volatility node. Differentiating
+/// along this direction automatically includes its Hessian cross terms.
+fn directional_taylor_pnl(
+    scenario: &super::MarketScenario,
+    market: &MarketContext,
+    base: f64,
+    mut price: impl FnMut(&super::MarketScenario) -> Result<f64>,
+) -> Result<f64> {
+    use super::RiskFactorType;
+    let mut normalized_size: f64 = 1.0;
+    let mut symmetric_limit = f64::INFINITY;
+    for shift in &scenario.shifts {
+        if !shift.shift.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "Taylor scenario shifts must be finite".into(),
+            ));
+        }
+        if shift.shift == 0.0 {
+            continue;
+        }
+        let unit = match &shift.factor {
+            RiskFactorType::DiscountRate { .. }
+            | RiskFactorType::ForwardRate { .. }
+            | RiskFactorType::CreditSpread { .. } => 1e-4,
+            _ => 0.01,
+        };
+        normalized_size = normalized_size.max(shift.shift.abs() / unit);
+        match &shift.factor {
+            RiskFactorType::ImpliedVol {
+                vol_surface_id,
+                expiry_years,
+                strike,
+            } => {
+                let surface = market.get_surface(vol_surface_id)?;
+                let row = surface
+                    .expiries()
+                    .iter()
+                    .position(|v| v.to_bits() == expiry_years.to_bits());
+                let col = surface
+                    .strikes()
+                    .iter()
+                    .position(|v| v.to_bits() == strike.to_bits());
+                let (Some(row), Some(col)) = (row, col) else {
+                    return Err(finstack_quant_core::Error::Validation(format!("Taylor volatility point ({expiry_years}, {strike}) must exactly match a grid node on '{vol_surface_id}'")));
+                };
+                let vol = surface.vols()[row * surface.strikes().len() + col];
+                if vol + shift.shift < 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "Taylor volatility scenario would be negative".into(),
+                    ));
+                }
+                symmetric_limit = symmetric_limit.min(vol / shift.shift.abs());
+            }
+            RiskFactorType::EquitySpot { .. } | RiskFactorType::FxSpot { .. } => {
+                if shift.shift <= -1.0 {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "Taylor relative-price scenario must leave a positive price".into(),
+                    ));
+                }
+                symmetric_limit = symmetric_limit.min(1.0 / shift.shift.abs());
+            }
+            _ => {}
+        }
     }
-    Ok(spot)
+    let scaled = |scale: f64| {
+        super::MarketScenario::new(
+            scenario.date,
+            scenario
+                .shifts
+                .iter()
+                .map(|shift| super::RiskFactorShift {
+                    factor: shift.factor.clone(),
+                    shift: shift.shift * scale,
+                })
+                .collect(),
+        )
+    };
+    let mut h = 1.0 / normalized_size;
+    if symmetric_limit > 0.0 {
+        h = h.min(symmetric_limit * 0.5);
+        let up = price(&scaled(h))?;
+        let down = price(&scaled(-h))?;
+        Ok((up - down) / (2.0 * h) + 0.5 * (up - 2.0 * base + down) / (h * h))
+    } else {
+        // A zero-volatility node admits only positive volatility shocks.
+        // Four points give second-order first AND second derivatives.
+        h /= 3.0;
+        let p1 = price(&scaled(h))?;
+        let p2 = price(&scaled(2.0 * h))?;
+        let p3 = price(&scaled(3.0 * h))?;
+        let first = (-11.0 * base + 18.0 * p1 - 9.0 * p2 + 2.0 * p3) / (6.0 * h);
+        let second = (2.0 * base - 5.0 * p1 + 4.0 * p2 - p3) / (h * h);
+        Ok(first + 0.5 * second)
+    }
 }
 
 fn calculate_var_taylor(
@@ -1044,84 +717,54 @@ fn calculate_var_taylor(
     dispatch: &PricingDispatch,
     provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 ) -> Result<VarResult> {
-    let _span = tracing::debug_span!(
-        "historical_var.taylor",
-        instrument_count = instruments.len(),
-        scenario_count = history.len(),
-    )
-    .entered();
-
-    let mut sensitivities: Vec<TaylorSensitivities> = Vec::with_capacity(instruments.len());
-    let mut base_values: Vec<Money> = Vec::with_capacity(instruments.len());
-    for instrument in instruments {
-        let base_value = reprice_with_dispatch(*instrument, base_market, as_of, dispatch)?;
-        base_values.push(base_value);
-        sensitivities.push(compute_taylor_sensitivities(
-            *instrument,
-            base_market,
-            as_of,
-            base_value,
-            dispatch,
-            provider.clone(),
-        )?);
-    }
+    let base_values: Vec<_> = instruments
+        .iter()
+        .map(|instrument| reprice_with_dispatch(*instrument, base_market, as_of, dispatch))
+        .collect::<Result<_>>()?;
     let reporting_currency = resolve_reporting_currency_from_values(
         &base_values,
         config.reporting_currency,
         "Historical VaR",
     )?;
-
-    let mut spot_cache: HashMap<String, f64> = HashMap::default();
     let mut pnls = Vec::with_capacity(history.len());
-    let mut skipped = TaylorSkipFlags::default();
-
-    // Only sensitivities not already in the reporting currency need the
-    // scenario-shifted market for FX conversion; if every leg is already in the
-    // reporting currency the per-scenario `scenario.apply` rebuild is skipped.
-    let needs_fx_conversion = sensitivities
-        .iter()
-        .any(|sens| sens.currency != reporting_currency);
-
     for scenario in history.iter() {
-        // Build the scenario-shifted market once per scenario so P&L is
-        // converted to the reporting currency at the scenario's FX rates,
-        // matching the full-revaluation path.
-        let scenario_market = if needs_fx_conversion {
-            Some(scenario.apply(base_market, provider.as_deref())?)
-        } else {
-            None
-        };
-        let conversion_market = scenario_market.as_ref().unwrap_or(base_market);
-        let mut acc = NeumaierAccumulator::new();
-        for sens in &sensitivities {
-            let mut sens_skipped = TaylorSkipFlags::default();
-            let pnl_local = taylor_pnl_for_scenario(
-                sens,
-                base_market,
-                scenario,
-                &mut spot_cache,
-                &mut sens_skipped,
-            )?;
-            skipped.merge(sens_skipped);
-            let term = convert_money_to_reporting(
-                Money::new(pnl_local, sens.currency)?,
+        let mut total = NeumaierAccumulator::new();
+        for (instrument, base_money) in instruments.iter().zip(&base_values) {
+            let scenario = relevant_taylor_scenario(
+                *instrument,
+                base_money.currency(),
                 reporting_currency,
-                conversion_market,
-                as_of,
-                "Historical VaR",
+                scenario,
             )?;
-            acc.add(term);
+            if scenario.shifts.iter().all(|s| s.shift == 0.0) {
+                continue;
+            }
+            let currency = base_money.currency();
+            let reporting_value = |market: &MarketContext| {
+                let raw = dispatch.price_raw(*instrument, market, as_of)?;
+                let fx = convert_money_to_reporting(
+                    Money::new(1.0, currency)?,
+                    reporting_currency,
+                    market,
+                    as_of,
+                    "Historical VaR",
+                )?;
+                Ok(raw * fx)
+            };
+            let base = reporting_value(base_market)?;
+            total.add(directional_taylor_pnl(
+                &scenario,
+                base_market,
+                base,
+                |scaled| {
+                    let market = scaled.apply(base_market, provider.as_deref())?;
+                    reporting_value(&market)
+                },
+            )?);
         }
-        pnls.push(acc.total());
+        pnls.push(total.total());
     }
-
-    // A single FX/vol-exposed instrument no longer kills the whole portfolio's
-    // VaR job — its unsupported factors are skipped, logged here, and stamped
-    // on the result so callers can see the degradation.
-    skipped.warn_if_any("historical_var.taylor.portfolio");
-
     VarResult::from_distribution(pnls, config.confidence_level)
-        .map(|result| result.with_taylor_skips(skipped))
 }
 
 #[cfg(test)]
@@ -1142,6 +785,7 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
     use std::sync::Arc;
@@ -1280,14 +924,14 @@ mod tests {
     }
 
     #[test]
-    fn taylor_multifactor_instrument_rejects_unkeyed_greeks() -> Result<()> {
+    fn taylor_multifactor_instrument_accepts_empty_direction() -> Result<()> {
         let as_of = sample_as_of();
         let basket = crate::instruments::Basket::example()?;
         let market = usd_ois_market(as_of)?
             .insert_price("AAPL-SPOT", MarketScalar::Unitless(100.0))
             .insert_price("UST10Y-PRICE", MarketScalar::Unitless(100.0));
         let history = MarketHistory::new(as_of, 1, vec![MarketScenario::new(as_of, vec![])]);
-        let error = calculate_var(
+        let result = calculate_var(
             &[&basket as &dyn Instrument],
             &market,
             &history,
@@ -1296,11 +940,8 @@ mod tests {
             PricingDispatch::InstrumentDefault,
             None,
         )
-        .expect_err("multiple scalar exposures cannot use an aggregate delta");
-        assert!(
-            error.to_string().contains("multiple market scalars"),
-            "{error}"
-        );
+        .expect("empty direction has zero risk for a multi-asset basket");
+        assert_eq!(result.pnl_distribution, vec![0.0]);
         Ok(())
     }
 
@@ -1379,21 +1020,6 @@ mod tests {
             &[0.20, 0.23, 0.24, 0.25]
         );
         Ok(())
-    }
-
-    #[test]
-    fn bucketed_series_uses_decoded_curve_coordinates() {
-        let mut series = HashMap::default();
-        for (curve, value) in [("USD-OIS", 1.0), ("USD_x2dOIS", 2.0), ("USD::OIS", 3.0)] {
-            series.insert(
-                MetricId::composite(&MetricId::BucketedDv01, &[curve]),
-                vec![("5y".to_string(), value)],
-            );
-        }
-        let collected = collect_bucketed_series(&series, &MetricId::BucketedDv01);
-        assert_eq!(collected.per_curve["USD-OIS"]["5y"], 1.0);
-        assert_eq!(collected.per_curve["USD_x2dOIS"]["5y"], 2.0);
-        assert_eq!(collected.per_curve["USD::OIS"]["5y"], 3.0);
     }
 
     #[test]
@@ -1824,585 +1450,6 @@ mod tests {
         Ok(())
     }
 
-    /// Audit item #7: an `FxSpot` shock has no Taylor term, but it must DEGRADE
-    /// GRACEFULLY — the factor is skipped and `TaylorSkipFlags::skipped_fx` is
-    /// raised — instead of hard-failing the whole VaR job. The first-order
-    /// rate term in the same scenario must still be applied.
-    #[test]
-    fn test_taylor_fx_shock_skips_gracefully_and_keeps_rate_term() {
-        let as_of = sample_as_of();
-        let scenario = MarketScenario::new(
-            as_of,
-            vec![
-                RiskFactorShift {
-                    factor: RiskFactorType::FxSpot {
-                        base: Currency::EUR,
-                        quote: Currency::USD,
-                    },
-                    shift: 0.05,
-                },
-                RiskFactorShift {
-                    factor: RiskFactorType::DiscountRate {
-                        curve_id: CurveId::new("USD-OIS"),
-                        tenor_years: 5.0,
-                    },
-                    shift: 0.0010,
-                },
-            ],
-        );
-        let mut dv01_buckets = HashMap::default();
-        dv01_buckets.insert("5y".to_string(), -100.0);
-        let mut dv01_by_curve = HashMap::default();
-        dv01_by_curve.insert("USD-OIS".to_string(), dv01_buckets);
-        let sensitivities = TaylorSensitivities {
-            currency: Currency::USD,
-            dv01: BucketedSeries {
-                per_curve: dv01_by_curve,
-                fallback: HashMap::default(),
-            },
-            ..Default::default()
-        };
-
-        let mut skipped = TaylorSkipFlags::default();
-        let pnl = taylor_pnl_for_scenario(
-            &sensitivities,
-            &MarketContext::new(),
-            &scenario,
-            &mut HashMap::default(),
-            &mut skipped,
-        )
-        .expect("FX shock must degrade gracefully, not hard-fail");
-
-        // FX factor skipped (no contribution); rate factor still applied:
-        // -100 * 10bp = -1000.
-        assert!(
-            (pnl - (-1000.0)).abs() < 1e-9,
-            "skipped FX factor must not zero out the rate term, got {pnl}"
-        );
-        assert!(
-            skipped.skipped_fx,
-            "skipping the FX-spot shock must be flagged"
-        );
-        assert!(!skipped.skipped_vol, "no vol factor was present");
-    }
-
-    /// Audit item #7: an aggregate-Vega vol-point shock can no longer be turned
-    /// into a Taylor term, but it must DEGRADE GRACEFULLY — the factor is
-    /// skipped (contributes zero P&L) and `TaylorSkipFlags::skipped_vol` is
-    /// raised — instead of hard-failing the whole VaR job.
-    ///
-    /// Re-blessed (self-calculated regression): the previous test asserted
-    /// `taylor_pnl_for_scenario` returned `Err`; the fix degrades gracefully.
-    #[test]
-    fn test_taylor_vol_pnl_skips_aggregate_vega_for_vol_point() {
-        let as_of = sample_as_of();
-        let base_market = MarketContext::new().insert_surface(
-            VolSurface::from_grid(
-                "EQ-VOL",
-                &[1.0, 2.0],
-                &[100.0, 120.0],
-                &[0.20, 0.20, 0.20, 0.20],
-            )
-            .expect("valid flat volatility surface for Vega scaling test"),
-        );
-        let scenario = MarketScenario::new(
-            as_of,
-            vec![RiskFactorShift {
-                factor: RiskFactorType::ImpliedVol {
-                    vol_surface_id: CurveId::new("EQ-VOL"),
-                    expiry_years: 1.0,
-                    strike: 100.0,
-                },
-                shift: 0.01,
-            }],
-        );
-        let sensitivities = TaylorSensitivities {
-            vega_rel: 250.0,
-            ..Default::default()
-        };
-
-        let mut skipped = TaylorSkipFlags::default();
-        let pnl = taylor_pnl_for_scenario(
-            &sensitivities,
-            &base_market,
-            &scenario,
-            &mut HashMap::default(),
-            &mut skipped,
-        )
-        .expect("vol-point shock must degrade gracefully, not hard-fail");
-
-        assert_eq!(pnl, 0.0, "skipped vol factor contributes zero P&L");
-        assert!(
-            skipped.skipped_vol,
-            "skipping an aggregate-Vega vol-point shock must be flagged"
-        );
-        assert!(!skipped.skipped_fx, "no FX factor was present");
-    }
-
-    #[test]
-    fn taylor_sensitivity_build_preserves_calculator_error() {
-        let as_of = sample_as_of();
-        let bond = standard_bond("MISSING-CURVE-BOND", as_of, date!(2029 - 01 - 01));
-        let Err(err) = compute_taylor_sensitivities(
-            &bond,
-            &MarketContext::new(),
-            as_of,
-            Money::from((100_i64, Currency::USD)),
-            &PricingDispatch::InstrumentDefault,
-            None,
-        ) else {
-            panic!("Taylor sensitivity build should fail on missing market inputs")
-        };
-
-        let msg = err.to_string();
-        assert!(
-            !msg.contains("Historical VaR missing required metric"),
-            "Taylor sensitivity errors should preserve calculator context, got: {msg}"
-        );
-        assert!(
-            msg.contains("USD-TREASURY") || msg.contains("curve") || msg.contains("not found"),
-            "Taylor sensitivity error should identify the missing curve, got: {msg}"
-        );
-    }
-
-    #[test]
-    fn taylor_rate_shift_errors_when_curve_bucket_sensitivity_is_missing() {
-        let as_of = sample_as_of();
-        let base_market = MarketContext::new();
-        let scenario = MarketScenario::new(
-            as_of,
-            vec![RiskFactorShift {
-                factor: RiskFactorType::DiscountRate {
-                    curve_id: CurveId::new("USD-LIBOR-3M"),
-                    tenor_years: 7.0,
-                },
-                shift: 0.0001,
-            }],
-        );
-        let sensitivities = TaylorSensitivities {
-            ..Default::default()
-        };
-
-        let err = taylor_pnl_for_scenario(
-            &sensitivities,
-            &base_market,
-            &scenario,
-            &mut HashMap::default(),
-            &mut TaylorSkipFlags::default(),
-        )
-        .expect_err("Taylor VaR must not use a cross-curve parallel DV01 fallback");
-
-        assert!(
-            err.to_string().contains("USD-LIBOR-3M"),
-            "missing sensitivity error should identify the curve, got: {err}"
-        );
-    }
-
-    #[test]
-    fn taylor_rate_shift_errors_when_same_curve_bucket_is_missing() {
-        let as_of = sample_as_of();
-        let base_market = MarketContext::new();
-        let scenario = MarketScenario::new(
-            as_of,
-            vec![RiskFactorShift {
-                factor: RiskFactorType::DiscountRate {
-                    curve_id: CurveId::new("USD-LIBOR-3M"),
-                    tenor_years: 7.0,
-                },
-                shift: 0.0001,
-            }],
-        );
-        let mut curve_buckets = HashMap::default();
-        curve_buckets.insert("5y".to_string(), 30.0);
-        let mut dv01_by_curve = HashMap::default();
-        dv01_by_curve.insert("USD-LIBOR-3M".to_string(), curve_buckets);
-        let sensitivities = TaylorSensitivities {
-            dv01: BucketedSeries {
-                per_curve: dv01_by_curve,
-                fallback: HashMap::default(),
-            },
-            ..Default::default()
-        };
-
-        let err = taylor_pnl_for_scenario(
-            &sensitivities,
-            &base_market,
-            &scenario,
-            &mut HashMap::default(),
-            &mut TaylorSkipFlags::default(),
-        )
-        .expect_err("missing tenor bucket should not fall back to same-curve total");
-
-        assert!(
-            err.to_string().contains("USD-LIBOR-3M") && err.to_string().contains("7y"),
-            "missing sensitivity error should identify curve and bucket, got: {err}"
-        );
-    }
-
-    /// Audit item #7: a vol-exposed FX option no longer kills the Taylor VaR
-    /// job. The unsupported `ImpliedVol` point shock is skipped and the job
-    /// still produces a `VarResult` (here a degenerate all-zero distribution,
-    /// because the only risk factor present was the skipped vol shock).
-    ///
-    /// Re-blessed (self-calculated regression): the previous test asserted
-    /// `calculate_var_dyn` returned `Err`; the fix degrades gracefully.
-    #[test]
-    fn test_taylor_vol_shock_skips_gracefully_for_fx_option() -> Result<()> {
-        use crate::instruments::fx::fx_option::{
-            FxDeltaConvention, FxDeltaConventionKind, FxOption,
-        };
-        use crate::instruments::{Attributes, InstrumentPricingOverrides, OptionType};
-        use finstack_quant_core::currency::Currency;
-        use finstack_quant_core::dates::DayCount;
-        use finstack_quant_core::market_data::context::MarketContext;
-        use finstack_quant_core::market_data::scalars::MarketScalar;
-        use finstack_quant_core::market_data::surfaces::VolSurface;
-        use finstack_quant_core::market_data::term_structures::DiscountCurve;
-        use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
-        use finstack_quant_core::money::Money;
-        use finstack_quant_core::types::{CurveId, InstrumentId};
-        use std::sync::Arc;
-        use time::macros::date;
-
-        let as_of = date!(2025 - 01 - 02);
-        let expiry = date!(2025 - 07 - 02);
-        let option = FxOption::builder()
-            .id(InstrumentId::new("FX-VAR-OPTION"))
-            .base_currency(Currency::EUR)
-            .quote_currency(Currency::USD)
-            .strike(1.15)
-            .option_type(OptionType::Call)
-            .delta_convention(
-                FxDeltaConvention::new(FxDeltaConventionKind::Forward, Currency::USD, "test")
-                    .expect("valid delta convention"),
-            )
-            .expiry(expiry)
-            .day_count(DayCount::Act365F)
-            .notional(Money::from((1_000_000_i64, Currency::EUR)))
-            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
-            .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
-            .vol_surface_id(CurveId::new("EURUSD-VOL"))
-            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-            .attributes(Attributes::new())
-            .build()
-            .expect("valid FX option");
-
-        let provider = SimpleFxProvider::new();
-        provider
-            .set_quote(Currency::EUR, Currency::USD, 1.17)
-            .expect("valid rate");
-        let fx = FxMatrix::new(Arc::new(provider));
-
-        let usd_disc = DiscountCurve::builder("USD-OIS")
-            .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
-            .build()
-            .expect("valid USD curve");
-        let eur_disc = DiscountCurve::builder("EUR-OIS")
-            .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 1.0), (1.0, (-0.01_f64).exp())])
-            .build()
-            .expect("valid EUR curve");
-        let vol_surface = VolSurface::builder("EURUSD-VOL")
-            .expiries(&[0.5, 1.0])
-            .strikes(&[1.0, 1.15, 1.3])
-            .row(&[0.20, 0.20, 0.20])
-            .row(&[0.20, 0.20, 0.20])
-            .build()
-            .expect("valid FX vol surface");
-
-        let base_market = MarketContext::new()
-            .insert(usd_disc)
-            .insert(eur_disc)
-            .insert_surface(vol_surface)
-            .insert_price("FX_VOL_OVERRIDE", MarketScalar::Unitless(0.20))
-            .insert_fx(fx);
-
-        let scenario = crate::metrics::risk::MarketScenario::new(
-            as_of,
-            vec![crate::metrics::risk::RiskFactorShift {
-                factor: crate::metrics::risk::RiskFactorType::ImpliedVol {
-                    vol_surface_id: CurveId::new("EURUSD-VOL"),
-                    expiry_years: 0.5,
-                    strike: 1.15,
-                },
-                shift: 0.01,
-            }],
-        );
-        let history = MarketHistory::new(as_of, 1, vec![scenario]);
-
-        // The job must succeed (graceful degradation), not hard-fail. The vol
-        // shock is the only risk factor and it is skipped, so the Taylor P&L
-        // distribution is all-zero and VaR/ES come back as 0.
-        let result = calculate_var(
-            &[&option as &dyn Instrument],
-            &base_market,
-            &history,
-            as_of,
-            &VarConfig::var_95().with_method(VarMethod::TaylorApproximation),
-            PricingDispatch::InstrumentDefault,
-            None,
-        )
-        .expect("Taylor VaR must degrade gracefully for a vol-exposed instrument");
-
-        assert_eq!(
-            result.num_scenarios, 1,
-            "the single scenario must still be processed"
-        );
-        assert!(
-            result.var.is_finite() && result.expected_shortfall.is_finite(),
-            "degraded Taylor VaR must still produce finite VaR/ES"
-        );
-        assert!(
-            result.var.abs() < 1e-9,
-            "with only the skipped vol factor, Taylor VaR collapses to zero, got {}",
-            result.var
-        );
-
-        Ok(())
-    }
-
-    /// BUG 1 + audit item #2 regression: a non-parallel (steepener) rate
-    /// scenario must produce a non-zero Taylor P&L driven by first-order DV01,
-    /// AND the aggregate-convexity second-order term must still be applied
-    /// (via the mean-square bucket shift) rather than silently dropped.
-    ///
-    /// Re-blessed twice: (1) the convexity term must be applied on
-    /// non-parallel scenarios via the mean-square shift rather than dropped;
-    /// (2) `ir_convexity` is per (decimal rate)², so the squared shift is in
-    /// decimal² units — the earlier bp² expectation overstated the term 10⁸×.
-    #[test]
-    fn test_taylor_steepener_reflects_first_order_and_convexity() {
-        let as_of = sample_as_of();
-        // Bond DV01 buckets supplied directly so the test is deterministic and
-        // independent of curve calibration.
-        let mut dv01_buckets = HashMap::default();
-        dv01_buckets.insert("2y".to_string(), -40.0);
-        dv01_buckets.insert("10y".to_string(), -120.0);
-        let mut dv01_by_curve = HashMap::default();
-        dv01_by_curve.insert("USD-OIS".to_string(), dv01_buckets);
-
-        // Non-zero aggregate convexity: contributes via the mean-square shift
-        // even for a steepener. Units are currency per (decimal rate)²:
-        // 5e9 ≡ 50 per bp².
-        let sensitivities = TaylorSensitivities {
-            currency: Currency::USD,
-            dv01: BucketedSeries {
-                per_curve: dv01_by_curve,
-                fallback: HashMap::default(),
-            },
-            ir_convexity: 5.0e9,
-            ..Default::default()
-        };
-
-        // Steepener: +10bp at 2y, -10bp at 10y. Signed average ~= 0, but the
-        // mean-square shift is 100 bp².
-        let steepener = MarketScenario::new(
-            as_of,
-            vec![
-                RiskFactorShift {
-                    factor: RiskFactorType::DiscountRate {
-                        curve_id: CurveId::new("USD-OIS"),
-                        tenor_years: 2.0,
-                    },
-                    shift: 0.0010,
-                },
-                RiskFactorShift {
-                    factor: RiskFactorType::DiscountRate {
-                        curve_id: CurveId::new("USD-OIS"),
-                        tenor_years: 10.0,
-                    },
-                    shift: -0.0010,
-                },
-            ],
-        );
-
-        let pnl = taylor_pnl_for_scenario(
-            &sensitivities,
-            &MarketContext::new(),
-            &steepener,
-            &mut HashMap::default(),
-            &mut TaylorSkipFlags::default(),
-        )
-        .expect("steepener Taylor P&L should compute");
-
-        // First-order: (-40 * 10bp) + (-120 * -10bp) = -400 + 1200 = 800.
-        // Convexity (mean-square, decimal units):
-        //   0.5 * 5e9 * (⟨Δr²⟩ = ((1e-3)² + (1e-3)²)/2 = 1e-6) = 2_500.
-        // Total = 3_300.
-        assert!(
-            (pnl - 3_300.0).abs() < 1e-6,
-            "steepener Taylor P&L should be first-order DV01 (800) plus the \
-             mean-square convexity term (2_500) = 3_300, got {pnl}"
-        );
-        assert!(
-            pnl.abs() > 1.0,
-            "steepener Taylor P&L must not silently zero out, got {pnl}"
-        );
-
-        // Sanity: a genuine parallel shift DOES apply the convexity term.
-        let parallel = MarketScenario::new(
-            as_of,
-            vec![
-                RiskFactorShift {
-                    factor: RiskFactorType::DiscountRate {
-                        curve_id: CurveId::new("USD-OIS"),
-                        tenor_years: 2.0,
-                    },
-                    shift: 0.0010,
-                },
-                RiskFactorShift {
-                    factor: RiskFactorType::DiscountRate {
-                        curve_id: CurveId::new("USD-OIS"),
-                        tenor_years: 10.0,
-                    },
-                    shift: 0.0010,
-                },
-            ],
-        );
-        let parallel_pnl = taylor_pnl_for_scenario(
-            &sensitivities,
-            &MarketContext::new(),
-            &parallel,
-            &mut HashMap::default(),
-            &mut TaylorSkipFlags::default(),
-        )
-        .expect("parallel Taylor P&L should compute");
-        // First-order: (-40 - 120) * 10bp = -1600.
-        // Convexity (decimal units): 0.5 * 5e9 * (1e-3)² = 2_500.
-        assert!(
-            (parallel_pnl - (-1600.0 + 2_500.0)).abs() < 1e-6,
-            "parallel shift should include the convexity term, got {parallel_pnl}"
-        );
-    }
-
-    /// Degradation visibility: when the Taylor method skips an FX-spot shock
-    /// (no FX-delta term), the resulting `VarResult` must carry the skip flag
-    /// so callers (including bindings, which see only the result payload) know
-    /// the VaR understates FX risk. Full revaluation must report no skips.
-    #[test]
-    fn test_taylor_var_result_carries_skip_flags() -> Result<()> {
-        let as_of = sample_as_of();
-        let bond = standard_bond("SKIP-FLAG-BOND", as_of, date!(2029 - 01 - 01));
-        // Full revaluation applies the FX shock to the market, so the base
-        // market needs an FX matrix even though the bond itself is USD-only.
-        let provider = finstack_quant_core::money::fx::SimpleFxProvider::new();
-        provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
-            .expect("valid rate");
-        let base_market = usd_ois_market(as_of)?.insert_fx(
-            finstack_quant_core::money::fx::FxMatrix::new(Arc::new(provider)),
-        );
-
-        // One scenario mixing a rate shift (supported) with an FX shock
-        // (unsupported by the Taylor expansion).
-        let scenario = MarketScenario::new(
-            as_of,
-            vec![
-                RiskFactorShift {
-                    factor: RiskFactorType::DiscountRate {
-                        curve_id: CurveId::new("USD-OIS"),
-                        tenor_years: 5.0,
-                    },
-                    shift: 0.0005,
-                },
-                RiskFactorShift {
-                    factor: RiskFactorType::FxSpot {
-                        base: Currency::EUR,
-                        quote: Currency::USD,
-                    },
-                    shift: 0.05,
-                },
-            ],
-        );
-        let history = MarketHistory::new(as_of, 1, vec![scenario]);
-
-        let taylor = calculate_var(
-            &[&bond as &dyn Instrument],
-            &base_market,
-            &history,
-            as_of,
-            &VarConfig::var_95().with_method(VarMethod::TaylorApproximation),
-            PricingDispatch::InstrumentDefault,
-            None,
-        )?;
-        assert!(
-            taylor.skipped_fx,
-            "Taylor VaR must flag the skipped FX-spot factor on the result"
-        );
-        assert!(!taylor.skipped_vol, "no vol factor was present");
-
-        let full = calculate_var(
-            &[&bond as &dyn Instrument],
-            &base_market,
-            &history,
-            as_of,
-            &VarConfig::var_95(),
-            PricingDispatch::InstrumentDefault,
-            None,
-        )?;
-        assert!(
-            !full.skipped_fx && !full.skipped_vol,
-            "full revaluation skips nothing"
-        );
-        Ok(())
-    }
-
-    /// Units regression: `ir_convexity` is produced per (decimal rate)² —
-    /// `IrConvexityCalculator` divides by `h²` with `h = bump_bp * 1e-4` — so
-    /// the Taylor second-order term must square the DECIMAL shift, not the
-    /// bp shift. Squaring the bp shift overstates the term by (10⁴)² = 10⁸.
-    #[test]
-    fn test_taylor_convexity_term_uses_decimal_rate_units() {
-        let as_of = sample_as_of();
-        let mut dv01_buckets = HashMap::default();
-        dv01_buckets.insert("5y".to_string(), -100.0);
-        let mut dv01_by_curve = HashMap::default();
-        dv01_by_curve.insert("USD-OIS".to_string(), dv01_buckets);
-
-        // Convexity in currency per (decimal rate)²: 2e8 ≡ 2.0 per bp².
-        let sensitivities = TaylorSensitivities {
-            currency: Currency::USD,
-            dv01: BucketedSeries {
-                per_curve: dv01_by_curve,
-                fallback: HashMap::default(),
-            },
-            ir_convexity: 2.0e8,
-            ..Default::default()
-        };
-
-        // Single 10bp (0.0010 decimal) parallel shift at one bucket.
-        let scenario = MarketScenario::new(
-            as_of,
-            vec![RiskFactorShift {
-                factor: RiskFactorType::DiscountRate {
-                    curve_id: CurveId::new("USD-OIS"),
-                    tenor_years: 5.0,
-                },
-                shift: 0.0010,
-            }],
-        );
-
-        let pnl = taylor_pnl_for_scenario(
-            &sensitivities,
-            &MarketContext::new(),
-            &scenario,
-            &mut HashMap::default(),
-            &mut TaylorSkipFlags::default(),
-        )
-        .expect("Taylor P&L should compute");
-
-        // First-order: -100 per bp × 10bp = -1000.
-        // Second-order: 0.5 × 2e8 × (0.0010)² = 100.
-        // A bp² squaring bug would instead add 0.5 × 2e8 × 10² = 1e10.
-        assert!(
-            (pnl - (-900.0)).abs() < 1e-6,
-            "convexity term must use decimal-rate units: expected -900, got {pnl}"
-        );
-    }
-
     /// BUG 2 regression: the Taylor path must convert scenario P&L to the
     /// reporting currency using the scenario-shifted FX rates, not the base
     /// market's.
@@ -2730,6 +1777,87 @@ mod tests {
         println!("Portfolio VaR: ${:.2}", portfolio_var.var.abs());
         println!("Diversification benefit: ${:.2}", diversification_benefit);
 
+        Ok(())
+    }
+    #[test]
+    fn directional_taylor_keeps_nonstandard_tenor_and_unrelated_curves() -> Result<()> {
+        let as_of = sample_as_of();
+        let mut usd = standard_bond("USD", as_of, date!(2028 - 01 - 01));
+        usd.discount_curve_id = "USD-OIS".into();
+        let mut eur = standard_bond("EUR-CURVE", as_of, date!(2028 - 01 - 01));
+        eur.discount_curve_id = "EUR-OIS".into();
+        let market = usd_ois_market(as_of)?.insert(
+            DiscountCurve::builder("EUR-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (10.0, 0.8)])
+                .build()?,
+        );
+        let scenario = MarketScenario::new(
+            as_of,
+            vec![
+                RiskFactorShift {
+                    factor: RiskFactorType::DiscountRate {
+                        curve_id: "USD-OIS".into(),
+                        tenor_years: 1.4,
+                    },
+                    shift: 0.0005,
+                },
+                RiskFactorShift {
+                    factor: RiskFactorType::DiscountRate {
+                        curve_id: "EUR-OIS".into(),
+                        tenor_years: 2.3,
+                    },
+                    shift: -0.0004,
+                },
+            ],
+        );
+        let history = MarketHistory::new(as_of, 1, vec![scenario]);
+        let taylor = calculate_var(
+            &[&usd, &eur],
+            &market,
+            &history,
+            as_of,
+            &VarConfig::var_95().with_method(VarMethod::TaylorApproximation),
+            PricingDispatch::InstrumentDefault,
+            None,
+        )?;
+        let full = calculate_var(
+            &[&usd, &eur],
+            &market,
+            &history,
+            as_of,
+            &VarConfig::var_95(),
+            PricingDispatch::InstrumentDefault,
+            None,
+        )?;
+        assert!((taylor.pnl_distribution[0] - full.pnl_distribution[0]).abs() < 1e-4);
+        let usd_only =
+            relevant_taylor_scenario(&usd, Currency::USD, Currency::USD, &history.scenarios[0])?;
+        assert_eq!(usd_only.shifts.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn directional_taylor_has_zero_curvature_for_fixed_discount_linear_forward() -> Result<()> {
+        let as_of = sample_as_of();
+        let scenario = MarketScenario::new(
+            as_of,
+            vec![RiskFactorShift {
+                factor: RiskFactorType::ForwardRate {
+                    curve_id: "F".into(),
+                    tenor_years: 1.4,
+                },
+                shift: 0.001,
+            }],
+        );
+        // A simple term-index coupon with held discount has PV = N*alpha*D*L.
+        // No discount shock is supplied, so its exact directional Hessian is zero.
+        let coefficient = 1_000_000.0 * 0.25 * 0.97;
+        let value =
+            directional_taylor_pnl(&scenario, &MarketContext::new(), coefficient * 0.04, |s| {
+                Ok(coefficient * (0.04 + s.shifts[0].shift))
+            })?;
+        assert!((value - coefficient * 0.001).abs() < 1e-8);
         Ok(())
     }
 }

@@ -40,7 +40,7 @@ numeric-serde helpers that keep instrument invariants uniform.
 
 | File | Contents |
 |------|----------|
-| `legs.rs` | `PayReceive`, `ParRateMethod`, `FixedLegSpec`, `FloatLegSpec`, `PremiumLegSpec`, `ProtectionLegSpec`, `FinancingLegSpec`, `TotalReturnLegSpec` |
+| `legs.rs` | `PayReceive`, `FixedLegSpec`, `FloatLegSpec`, `PremiumLegSpec`, `ProtectionLegSpec`, `FinancingLegSpec`, `TotalReturnLegSpec` |
 | `underlying.rs` | `FxUnderlyingParams`, `EquityUnderlyingParams`, `CommodityUnderlyingParams`, `IndexUnderlyingParams` |
 | `market.rs` | `OptionType`, `ExerciseStyle`, `SettlementType`, `CreditParams` |
 | `conventions.rs` | `BondConvention`, `CommodityConvention` |
@@ -79,7 +79,7 @@ Everything below is re-exported by `instruments/mod.rs`; the module paths under
   `instruments/mod.rs` (`FixedLegSpec`, `FloatLegSpec`,
   `PremiumLegSpec`, `ProtectionLegSpec`, `FinancingLegSpec`,
   `TotalReturnLegSpec`, `PayReceive`,
-  `ParRateMethod`, `OptionType`, `ExerciseStyle`, `SettlementType`,
+  `OptionType`, `ExerciseStyle`, `SettlementType`,
   `CreditParams`, `OptionMarketParams`,
   `BondConvention` and the four `*UnderlyingParams`).
 - `instruments::pricing` — glob of `common_impl::pricing`'s public items.
@@ -102,7 +102,7 @@ everything in `helpers.rs`, `validation.rs`, `numeric.rs`,
 Three of those appear in the type of a `pub` field on a public item and are
 therefore visible in rustdoc and in the JSON schema but not nameable by a
 downstream crate: `exotics::RangeAccrualTerms::quanto: Option<QuantoSpec>`,
-`commodity::{CommodityForward, CommodityOption}::convention:
+`commodity::{CommodityForward, CommoditySpotOption}::convention:
 Option<CommodityConvention>`, and
 `instruments::pricing_overrides::ModelConfig::vol_model:
 Option<VolatilityModel>`. Adding a `pub` field whose type lives only under

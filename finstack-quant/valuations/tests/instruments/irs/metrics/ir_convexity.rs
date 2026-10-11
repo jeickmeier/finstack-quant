@@ -53,7 +53,7 @@ fn create_standard_swap(as_of: Date, end: Date, side: PayReceive) -> InterestRat
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
             stub: StubKind::None,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,

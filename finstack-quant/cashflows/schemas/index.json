@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/amortization_spec.schema.json",
-      "bytes": 7006,
+      "bytes": 7089,
       "kind": "component",
       "path": "schemas/cashflow/1/amortization_spec.schema.json",
       "summary": "How principal is repaid over the schedule.",
@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule.schema.json",
-      "bytes": 31764,
+      "bytes": 31847,
       "kind": "output",
       "path": "schemas/cashflow/1/cashflow_schedule.schema.json",
       "summary": "Ordered classified cashflows with their notional, day count and schedule metadata.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
-      "bytes": 77848,
+      "bytes": 77931,
       "kind": "input",
       "path": "schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
       "summary": "Notional, dates, coupon program, fees and principal events that build a schedule.",

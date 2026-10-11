@@ -781,3 +781,20 @@ test('CFCC-010: compounding presets and default-model survival helpers come from
     kind('validation', /surviving_balance_fraction/)
   );
 });
+
+test('explicit observation cutoff requires and consumes post-anchor fixings', () => {
+  const market = core.MarketContext.fromJson(MARKET_JSON);
+  const spec = structuredClone(floatingSpec);
+  spec.rate_spec.spread_bp = '0';
+  const builder = () =>
+    cashflows.CashFlowSchedule.builder()
+      .principal(usd('1000000'), ISSUE, '2026-01-15')
+      .floatingCf(spec);
+  assert.throws(() => builder().buildAsOf(market, '2025-02-01'), /fixing|FIXING/);
+  market.insertSeries(new core.ScalarTimeSeries('FIXING:USD-SOFR-3M', [['2025-01-15', 0.06]]));
+  const result = builder().buildAsOf(market, '2025-02-01');
+  const coupon = result.getFlows().find((flow) => flow.kind === 'float_reset');
+  assert.ok(coupon);
+  assert.ok(Math.abs(coupon.rate - 0.06) < 1e-12);
+  assert.ok(Math.abs(Number(coupon.amount.amount) - 15000) < 1e-8);
+});

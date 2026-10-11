@@ -1,4 +1,4 @@
-//! Heterogeneous capped loss by conditional convolution on a fixed loss grid.
+//! Heterogeneous capped loss by exact states for small pools and grid convolution.
 use super::config::{
     CdsTranchePricer, PoolExposure, CDF_CLIP, GRID_STEP, HOMOGENEITY_TOLERANCE,
     MAX_CONVOLUTION_WORK, MAX_GRID_POINTS, NUMERICAL_TOLERANCE,
@@ -105,6 +105,43 @@ impl CdsTranchePricer {
                 PoolExposure::Recovery => recovery,
             })
             .collect();
+        // Small bespoke pools can retain every contractual loss state within
+        // the same storage limit as the convolution grid. This avoids rounding
+        // a concentrated issuer across the tranche attachment/detachment kink.
+        if let Some(states) = u32::try_from(count)
+            .ok()
+            .and_then(|bits| 1_usize.checked_shl(bits))
+            .filter(|&states| states <= MAX_GRID_POINTS)
+        {
+            let mut capped_losses = vec![0.0; states];
+            for i in 0..count {
+                let offset = 1_usize << i;
+                let loss = weights[i] * exposures[i];
+                for state in 0..offset {
+                    capped_losses[state + offset] = (capped_losses[state] + loss).min(cap);
+                }
+            }
+            let probabilities = RefCell::new(vec![0.0; states]);
+            return self.integrate_factors(&|factors| {
+                let mut probabilities = probabilities.borrow_mut();
+                probabilities[0] = 1.0;
+                for i in 0..count {
+                    let offset = 1_usize << i;
+                    let p = conditional_p(i, factors);
+                    for state in 0..offset {
+                        let mass = probabilities[state];
+                        probabilities[state + offset] = mass * p;
+                        probabilities[state] = mass * (1.0 - p);
+                    }
+                }
+                Ok(finstack_quant_core::math::neumaier_sum(
+                    probabilities
+                        .iter()
+                        .zip(&capped_losses)
+                        .map(|(p, loss)| p * loss),
+                ))
+            });
+        }
         // The PMF spans every reachable loss, including the mass above the cap.
         // Fractional-bin interpolation can round each name upward. Bound the
         // sum of those rounded supports, not just the rounded aggregate loss,

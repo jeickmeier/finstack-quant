@@ -10,7 +10,7 @@ import pytest
 from finstack_quant.core.money import Money
 
 if TYPE_CHECKING:
-    from finstack_quant.cashflows.builder import CashFlowSchedule
+    from finstack_quant.cashflows.builder import CashFlowBuilder, CashFlowSchedule
 
 
 class TestPrimitives:
@@ -1565,3 +1565,44 @@ def test_cashflow_metadata_dataframe_roundtrip() -> None:
     assert delayed.principal_date == dt.date(2025, 1, 31)
     assert delayed.get_balance_date() == dt.date(2025, 1, 31)
     assert CashFlow.from_json(delayed.to_json()).principal_date == dt.date(2025, 1, 31)
+
+
+def test_build_as_of_uses_fixings_after_curve_anchor() -> None:
+    from decimal import Decimal
+
+    from finstack_quant.cashflows.builder import CashFlowSchedule, FloatingCouponSpec, FloatingRateSpec, ScheduleParams
+    from finstack_quant.cashflows.primitives import CFKind
+    from finstack_quant.core.market_data import ForwardCurve, MarketContext, ScalarTimeSeries
+
+    market = MarketContext().insert(
+        ForwardCurve(
+            id="USD-SOFR-3M",
+            tenor=0.25,
+            knots=[(0.0, 0.04), (2.0, 0.04)],
+            base_date=dt.date(2025, 1, 1),
+        )
+    )
+    spec = FloatingCouponSpec(
+        rate_spec=FloatingRateSpec(forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("0"), reset_frequency="3M"),
+        schedule=ScheduleParams.quarterly_act360(),
+    )
+
+    def builder() -> CashFlowBuilder:
+        return (
+            CashFlowSchedule
+            .builder()
+            .principal(
+                Money(1_000_000.0, "USD"),
+                dt.date(2025, 1, 15),
+                dt.date(2026, 1, 15),
+            )
+            .floating_cf(spec)
+        )
+
+    with pytest.raises((KeyError, ValueError), match=r"fixing|FIXING"):
+        builder().build_as_of(market, dt.date(2025, 2, 1))
+    market.insert_series(ScalarTimeSeries("FIXING:USD-SOFR-3M", [(dt.date(2025, 1, 13), 0.06)]))
+    schedule = builder().build_as_of(market, dt.date(2025, 2, 1))
+    coupon = next(flow for flow in schedule.get_flows() if flow.kind == CFKind.FLOAT_RESET)
+    assert coupon.rate == pytest.approx(0.06, abs=1e-12)
+    assert coupon.amount.amount == pytest.approx(15_000.0, abs=1e-8)

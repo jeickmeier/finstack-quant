@@ -108,17 +108,18 @@ fn observed_overnight_rate(
     fwd: &ForwardCurve,
     fixings: Option<&ScalarTimeSeries>,
     forward_curve_id: &str,
+    as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
     let fwd_base = fwd.base_date();
-    if obs_date < fwd_base {
+    if obs_date < as_of {
         return match fixings {
             Some(series) => {
-                require_fixing_value_exact(Some(series), forward_curve_id, obs_date, fwd_base)
+                require_fixing_value_exact(Some(series), forward_curve_id, obs_date, as_of)
             }
             None => Err(pre_base_observation_error(obs_date, fwd)),
         };
     }
-    if obs_date == fwd_base {
+    if obs_date == as_of {
         if let Some(fixing) = fixings.and_then(|series| series.value_on_exact(obs_date).ok()) {
             return Ok(fixing);
         }
@@ -176,6 +177,7 @@ fn observed_overnight_rate(
 /// cannot.
 fn require_supplied_historical_fixings(
     observation: &FloatingRateObservation,
+    observation_date: Option<Date>,
     curve: Option<&ForwardCurve>,
     fixings: Option<&ScalarTimeSeries>,
     forward_curve_id: &str,
@@ -183,9 +185,10 @@ fn require_supplied_historical_fixings(
     let (Some(curve), Some(fixings)) = (curve, fixings) else {
         return Ok(());
     };
+    let as_of = observation_date.unwrap_or(curve.base_date());
     let require_historical = |date| {
-        if date < curve.base_date() {
-            require_fixing_value_exact(Some(fixings), forward_curve_id, date, curve.base_date())?;
+        if date < as_of {
+            require_fixing_value_exact(Some(fixings), forward_curve_id, date, as_of)?;
         }
         Ok(())
     };
@@ -379,6 +382,8 @@ pub(crate) fn emit_fixed_coupons_on(
 #[derive(Clone, Copy)]
 pub(crate) struct ResolvedFloatMarket<'a> {
     /// Forward curves, one per float schedule.
+    /// Explicit observation cutoff; absent for curve-base projection builds.
+    pub(crate) observation_date: Option<Date>,
     pub(crate) curves: &'a [Option<std::sync::Arc<ForwardCurve>>],
     /// Historical fixing series (`FIXING:{forward_curve_id}`), one per float schedule.
     pub(crate) fixings: &'a [Option<ScalarTimeSeries>],
@@ -467,10 +472,11 @@ fn project_segment_indices(
     period: &SchedulePeriod,
     segments: &[FloatingAccrualSegment],
     observation: &FloatingRateObservation,
-    curve: Option<&ForwardCurve>,
-    fixings: Option<&ScalarTimeSeries>,
+    resolved: (Option<&ForwardCurve>, Option<&ScalarTimeSeries>),
+    observation_date: Option<Date>,
     projected_fixings: &mut Vec<crate::fixings::ProjectedFixing>,
 ) -> finstack_quant_core::Result<Vec<(f64, f64)>> {
+    let (curve, fixings) = resolved;
     let forward_curve_id = schedule.spec.rate_spec.forward_curve_id.as_str();
     let series_id = fixing_series_id(forward_curve_id);
     let curve = curve.ok_or_else(|| {
@@ -481,17 +487,13 @@ fn project_segment_indices(
             ),
         })
     })?;
+    let as_of = observation_date.unwrap_or(curve.base_date());
     match observation {
         FloatingRateObservation::Term { reset_date, .. } => {
-            let same_day_fixing_exists = *reset_date == curve.base_date()
+            let same_day_fixing_exists = *reset_date == as_of
                 && fixings.is_some_and(|series| series.value_on_exact(*reset_date).is_ok());
-            let index_rate = if *reset_date < curve.base_date() || same_day_fixing_exists {
-                require_fixing_value_exact(
-                    fixings,
-                    forward_curve_id,
-                    *reset_date,
-                    curve.base_date(),
-                )?
+            let index_rate = if *reset_date < as_of || same_day_fixing_exists {
+                require_fixing_value_exact(fixings, forward_curve_id, *reset_date, as_of)?
             } else {
                 super::super::rate_helpers::project_index_rate(
                     *reset_date,
@@ -532,6 +534,7 @@ fn project_segment_indices(
                     curve,
                     fixings,
                     forward_curve_id,
+                    as_of,
                 )?;
                 raw_fixings.insert(slice.observation_date, rate);
                 projected_fixings.push(crate::fixings::ProjectedFixing {
@@ -743,8 +746,8 @@ pub(crate) fn emit_float_coupons_on(
                 period,
                 &segments,
                 &observation,
-                resolved_curve.as_deref(),
-                resolved_fixing.as_ref(),
+                (resolved_curve.as_deref(), resolved_fixing.as_ref()),
+                market.observation_date,
                 projected_fixings,
             ) {
                 Ok(indices) => {
@@ -759,6 +762,7 @@ pub(crate) fn emit_float_coupons_on(
                 Err(error) => {
                     require_supplied_historical_fixings(
                         &observation,
+                        market.observation_date,
                         resolved_curve.as_deref(),
                         resolved_fixing.as_ref(),
                         spec.rate_spec.forward_curve_id.as_str(),
@@ -933,14 +937,28 @@ mod tests {
             ScalarTimeSeries::new("FIXING:TEST-ON", vec![(past, 0.041), (base, 0.042)], None)
                 .expect("observed ACT/360 fixings");
         for (date, expected) in [(past, 0.041), (base, 0.042)] {
-            let actual =
-                observed_overnight_rate(date, 1, 1.0 / 360.0, &curve, Some(&fixings), "TEST-ON")
-                    .expect("observed fixing");
+            let actual = observed_overnight_rate(
+                date,
+                1,
+                1.0 / 360.0,
+                &curve,
+                Some(&fixings),
+                "TEST-ON",
+                curve.base_date(),
+            )
+            .expect("observed fixing");
             assert!((actual - expected).abs() < 1e-14);
         }
-        let projected =
-            observed_overnight_rate(future, 1, 1.0 / 360.0, &curve, Some(&fixings), "TEST-ON")
-                .expect("projected ACT/360 fixing");
+        let projected = observed_overnight_rate(
+            future,
+            1,
+            1.0 / 360.0,
+            &curve,
+            Some(&fixings),
+            "TEST-ON",
+            curve.base_date(),
+        )
+        .expect("projected ACT/360 fixing");
         assert!((projected - 0.04 * 360.0 / 365.0).abs() < 1e-14);
     }
 
@@ -972,6 +990,7 @@ mod tests {
                     &curve,
                     None,
                     "TEST-ON",
+                    curve.base_date(),
                 )
             })
             .expect_err("Act/Act ISMA requires frequency context");
@@ -1011,6 +1030,7 @@ mod tests {
                     &curve,
                     None,
                     "TEST-ON",
+                    curve.base_date(),
                 )
             })
             .expect_err("Act/Act ISMA requires frequency context");

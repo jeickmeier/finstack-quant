@@ -116,7 +116,6 @@ def _payer_swap_hand_written_json() -> str:
                     "stub": "short_front",
                     "start": "2024-01-15",
                     "end": "2029-01-15",
-                    "par_method": None,
                     "payment_lag_days": 0,
                     "end_of_month": False,
                 },

@@ -433,6 +433,7 @@ fn executor_allocates_floating_interest_on_the_shifted_path() {
                 .expect("valid money fixture"),
             principal_collections: Money::new(0.0, Currency::USD).expect("valid money fixture"),
             payment_date,
+            accrual_end: payment_date,
             period_start,
             valuation_date: test_date(),
             pool_balance: Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),

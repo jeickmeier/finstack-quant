@@ -171,7 +171,7 @@ pub(super) struct EffectiveStructure {
 pub(super) type ProjectionInputs = (
     std::sync::Arc<CreditIndexData>,
     Date,
-    Vec<Date>,
+    Vec<crate::cashflow::builder::SchedulePeriod>,
     Vec<ElWdPoint>,
 );
 
@@ -193,6 +193,8 @@ pub(super) enum DiscountAt {
     WithinPeriod {
         /// Period start date.
         start: Date,
+        /// Contractual protection end, independent of the coupon payment date.
+        end: Date,
         /// Survival-weighted default-time fraction of the period, in `[0, 1]`.
         fraction: f64,
     },

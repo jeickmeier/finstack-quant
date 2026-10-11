@@ -1,10 +1,10 @@
 //! Commodity option pricer engine.
 //!
-//! Provides deterministic PV for `CommodityOption` using Black-76 for
+//! Provides deterministic PV for `CommoditySpotOption` using Black-76 for
 //! European exercise, binomial tree for American exercise, and Monte Carlo
 //! with Schwartz-Smith two-factor dynamics.
 
-use crate::instruments::commodity::commodity_option::CommodityOption;
+use crate::instruments::commodity::commodity_spot_option::CommoditySpotOption;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::pricer::{expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError};
 use crate::results::ValuationResult;
@@ -17,11 +17,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 /// reports the estimator standard error, path counts, seed and time grid in
 /// `ValuationDetails::MonteCarlo`. Parameters come from registration, with
 /// the instrument path-count override taking precedence.
-pub struct CommodityOptionMcPricer {
+pub struct CommoditySpotOptionMcPricer {
     mc_params: super::types::CommodityMcParams,
 }
 
-impl CommodityOptionMcPricer {
+impl CommoditySpotOptionMcPricer {
     /// Create a new Schwartz-Smith MC pricer.
     ///
     /// # Arguments
@@ -31,10 +31,10 @@ impl CommodityOptionMcPricer {
     }
 }
 
-impl Pricer for CommodityOptionMcPricer {
+impl Pricer for CommoditySpotOptionMcPricer {
     fn key(&self) -> PricerKey {
         PricerKey::new(
-            InstrumentType::CommodityOption,
+            InstrumentType::CommoditySpotOption,
             ModelKey::MonteCarloSchwartzSmith,
         )
     }
@@ -45,7 +45,8 @@ impl Pricer for CommodityOptionMcPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
-        let option = expect_inst::<CommodityOption>(instrument, InstrumentType::CommodityOption)?;
+        let option =
+            expect_inst::<CommoditySpotOption>(instrument, InstrumentType::CommoditySpotOption)?;
 
         // Instrument-level mc_paths override takes precedence over the pricer
         // registration defaults (consistent with autocallable/asian/lookback/etc.).

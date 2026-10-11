@@ -643,3 +643,73 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
         "deterministic overnight MC PV must be finite"
     );
 }
+
+#[test]
+fn stochastic_utilization_coupon_integral_converges_to_independent_ou_mean() {
+    use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer;
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2026 - 01 - 01);
+    let market = MarketContext::new().insert(build_flat_discount_curve(0.0, start, "USD-OIS"));
+    let commitment = 1_000_000.0;
+    // With zero discount/default and E[u(t)] = u(0) = theta = 0.5,
+    // expected principal flows telescope to the opening balance and coupon
+    // expectation is 0.04 * commitment * integral_0^1 0.5 dt.
+    let reference = commitment * 0.5 * 1.04;
+    let budget = commitment * 1e-4;
+    let mut values = Vec::new();
+    for frequency in [Tenor::semi_annual(), Tenor::quarterly(), Tenor::monthly()] {
+        for seed in ["ou-grid-a", "ou-grid-b"] {
+            let mut facility = RevolvingCredit::builder()
+                .id("OU-INDEPENDENT-REFERENCE".into())
+                .commitment(Money::new(commitment, Currency::USD).unwrap())
+                .drawn(Money::new(commitment * 0.5, Currency::USD).unwrap())
+                .issue_date(start)
+                .maturity(end)
+                .rate(RateSpec::Fixed { rate: 0.04 })
+                .day_count(DayCount::Act365F)
+                .frequency(frequency)
+                .fees(RevolvingCreditFees::default())
+                .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
+                    StochasticUtilizationSpec {
+                        utilization_process: UtilizationProcess::MeanReverting {
+                            theta: 0.5,
+                            kappa: 0.8,
+                            sigma: 0.03,
+                            spread_sensitivity: 0.0,
+                        },
+                        mc_config: None,
+                    },
+                )))
+                .discount_curve_id("USD-OIS".into())
+                .recovery_rate(0.0)
+                .leq(0.0)
+                .build()
+                .unwrap();
+            let config = &mut facility.instrument_pricing_overrides.model_config;
+            config.mc_paths = Some(20_000);
+            config.mc_antithetic = Some(false);
+            config.mc_seed_scenario = Some(seed.into());
+            let result =
+                RevolvingCreditPricer::price_with_paths(&facility, &market, start).unwrap();
+            let estimate = result.mc_result.estimate;
+            let half_width = 2.5758293035489004 * estimate.stderr;
+            assert!(
+                half_width < budget,
+                "99% OU coupon half-width {half_width} exceeds {budget}"
+            );
+            assert!(
+                (estimate.mean.amount() - reference).abs() < budget,
+                "frequency={frequency:?}, seed={seed}: PV={}, reference={reference}, stderr={}",
+                estimate.mean.amount(),
+                estimate.stderr
+            );
+            values.push(estimate.mean.amount());
+        }
+    }
+    let low = values.iter().copied().fold(f64::INFINITY, f64::min);
+    let high = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    assert!(
+        high - low < budget,
+        "OU refinement {values:?} exceeds {budget}"
+    );
+}

@@ -114,7 +114,8 @@ pub(crate) fn price_cap_floor(
             resolved_inputs.time_to_fixing.max(MIN_VOL_LOOKUP_TIME)
         };
 
-        let forward = projection.forward;
+        let forward = projection.forward - projection.additive_spread;
+        let strike = strike - projection.additive_spread;
         let df = resolved_inputs.discount_factor;
         let quote = if effective_t_fix > 0.0 {
             resolve_caplet_volatility(cap_floor, curves, effective_t_fix, strike)?

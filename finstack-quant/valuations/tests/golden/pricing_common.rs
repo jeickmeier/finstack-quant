@@ -248,6 +248,61 @@ mod tests {
         .expect("parse structured-credit golden fixture")
     }
 
+    #[test]
+    fn ibm_asw_projection_reconstructs_the_captured_stripped_curve() {
+        let fixture: GoldenFixture = serde_json::from_str(include_str!(
+            "data/pricing/bloomberg/bond/ibm_eur_2034_callable_bloomberg.json"
+        ))
+        .expect("parse IBM fixture");
+        let market = resolve_market(&fixture.pricing().expect("pricing body").market)
+            .expect("resolve IBM market");
+        let stripped = market.get_discount("EUR-SWAP-514").expect("captured DFs");
+        let projection = market.get_forward("EUR-EURIBOR-6M").expect("projection");
+        assert_eq!(projection.base_date(), stripped.base_date());
+        // The captured stripped-curve times are ACT/365F; the index curve
+        // uses ACT/360. Market/par quotes are not tenor forward rates.
+        for &time in stripped.knots() {
+            let actual = projection.df(time * 365.0 / 360.0).expect("projection DF");
+            let expected = stripped.df(time);
+            assert!(
+                (actual - expected).abs() < 1e-12,
+                "projection must reproduce captured DF at {time}: {actual} != {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn ibm_asw_matches_bloomberg_without_omitting_accrued_coupon() {
+        let fixture: GoldenFixture = serde_json::from_str(include_str!(
+            "data/pricing/bloomberg/bond/ibm_eur_2034_callable_bloomberg.json"
+        ))
+        .expect("parse IBM fixture");
+        let pricing = fixture.pricing().expect("pricing body");
+        let market = resolve_market(&pricing.market).expect("resolve IBM market");
+        let result = price_instrument_from_json(
+            &pricing.instrument.to_string(),
+            &market,
+            &fixture.metadata.valuation_date,
+            &pricing.model,
+            &["asw_market".to_string()],
+            None,
+            None,
+        )
+        .expect("price IBM ASW");
+        let actual = result.measures["asw_market"];
+        let expected = fixture.expected["asw_market"];
+        let tolerance = fixture.tolerances["asw_market"]
+            .abs
+            .expect("source tolerance");
+        assert!(
+            (actual - expected).abs() <= tolerance,
+            "IBM ASW: {} bp vs {} bp (budget {} bp)",
+            actual * 10_000.0,
+            expected * 10_000.0,
+            tolerance * 10_000.0,
+        );
+    }
+
     /// The Bloomberg SWPM screenshots behind this fixture show five annual
     /// payments per leg, both legs paying on the same lagged dates and a first
     /// ACT/360 accrual of 365 days. Assert that schedule shape from the
@@ -644,8 +699,8 @@ mod tests {
         .expect("registry DV01 should price");
         let registry_dv01 = registry_result.measures["dv01"];
 
-        assert_close(discount, -3_082.891_359_959_729, 1e-6);
-        assert_close(sofr_3m, 2_797.264_641_730_115, 1e-6);
+        assert_close(discount, -3_083.076_104_730_368, 1e-6);
+        assert_close(sofr_3m, 2_796.256_580_974_907, 1e-6);
         // Take the combined target from the fixture rather than repeating the
         // literal here, so a re-blessed fixture cannot leave this test stale.
         assert_close(combined, fixture.expected["dv01"], 1e-6);

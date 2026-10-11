@@ -464,13 +464,13 @@ no_market_dependencies = false
 rationale = "The complete persisted quanto_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
-tag = "commodity_option"
-fixture = "json_examples/commodity_option.json"
+tag = "commodity_spot_option"
+fixture = "json_examples/commodity_spot_option.json"
 lossless = false
-partial_eq_blocker = "CommodityOption.underlying: CommodityUnderlyingParams"
+partial_eq_blocker = "CommoditySpotOption.underlying: CommodityUnderlyingParams"
 required_keys = ["id"]
 no_market_dependencies = false
-rationale = "CommodityOption.underlying: CommodityUnderlyingParams lacks PartialEq across unit, currency, and market identifiers."
+rationale = "CommoditySpotOption.underlying: CommodityUnderlyingParams lacks PartialEq across unit, currency, and market identifiers."
 
 [[instrument]]
 tag = "commodity_asian_option"

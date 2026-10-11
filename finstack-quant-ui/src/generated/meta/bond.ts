@@ -698,7 +698,7 @@ export default [
   {
     "path": "#/$defs/d_2aa2f1b15784c3fa7d81/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json#/$defs/AmortizationSpec/oneOf/5",
-    "description": "Equal principal installments on coupon accrual boundaries in `(start, end]`.\nThe installment is fixed from outstanding after all start-date movements,\nincluding PIK and explicit principal events. The final installment pays\nthe live remaining balance, including subsequent PIK or principal changes.\nPrincipal changes economically on each accrual boundary; cash settles on\nthat coupon's adjusted, lagged payment date."
+    "description": "Equal principal installments on coupon accrual boundaries in `(start, end]`.\nThe installment is fixed from outstanding after all start-date movements,\nincluding PIK and explicit principal events. Each subsequent funded draw\nadds equal installments over the remaining boundaries after its draw date.\nThe final installment pays the live remaining balance, including subsequent PIK.\nPrincipal changes economically on each accrual boundary; cash settles on\nthat coupon's adjusted, lagged payment date."
   },
   {
     "path": "#/$defs/d_2aa2f1b15784c3fa7d81/oneOf/5/properties/linear_between",
@@ -5738,7 +5738,7 @@ export default [
     "path": "#/$defs/d_f80f2b90e7af690c5898/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
-    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian."
+    "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil."
   },
   {
     "path": "#/$defs/d_f9f50d7783abde820988",

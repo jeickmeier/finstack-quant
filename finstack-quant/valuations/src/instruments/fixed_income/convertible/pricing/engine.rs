@@ -17,7 +17,7 @@ use crate::instruments::fixed_income::convertible::{
 };
 use crate::metrics::bump_discount_curve_parallel;
 
-use super::tsiveriotis_zhang::{terminal_payoff, TsiveriotisZhangEngine, TzMarketInputs};
+use super::credit_tree::{terminal_payoff, CreditTreeEngine, CreditTreeMarketInputs};
 use super::valuator::ConvertibleBondValuator;
 
 /// Compute the conversion value for any conversion policy given the spot price.
@@ -273,6 +273,126 @@ pub(super) fn prepare_for_pricing(
     })
 }
 
+/// Resolve an already-exercised contract without recreating its debt or options.
+fn resolved_value(
+    bond: &ConvertibleBond,
+    market: &MarketContext,
+    as_of: Date,
+) -> Result<Option<Money>> {
+    if let Some(claim) = &bond.resolved_settlement {
+        if as_of < claim.exercise_date {
+            return Err(Error::Validation(
+                "resolved convertible settlement cannot be valued before its exercise date".into(),
+            ));
+        }
+        if as_of >= claim.delivery_date {
+            return Ok(Some(Money::new(0.0, bond.notional.currency())?));
+        }
+        let discount = market.get_discount(bond.discount_curve_id.as_str())?;
+        let df = discount.df_between_dates(as_of, claim.delivery_date)?;
+        let survival = if let Some(id) = &bond.credit_curve_id {
+            let curve = market.get_hazard(id.as_str())?;
+            let sp = curve.survival_at_dates(&[as_of, claim.delivery_date])?;
+            if sp[0] <= 0.0 {
+                return Err(Error::Validation(
+                    "convertible requires positive survival".into(),
+                ));
+            }
+            sp[1] / sp[0]
+        } else {
+            1.0
+        };
+        // Pending fixed cash has its own contractual principal; the extinguished
+        // bond notional must never be recovered again.
+        let recovery = bond.recovery_rate.unwrap_or(0.0)
+            * crate::instruments::common_impl::pricing::rates_credit::continuous_frp_weight(
+                df, survival,
+            )?;
+        let shares_value = if claim.shares > 0.0 {
+            let spot = match market.get_price(&bond.spot_id)? {
+                MarketScalar::Unitless(value) => *value,
+                MarketScalar::Price(value) if value.currency() == bond.notional.currency() => {
+                    value.amount()
+                }
+                MarketScalar::Price(value) => {
+                    return Err(Error::CurrencyMismatch {
+                        expected: bond.notional.currency(),
+                        actual: value.currency(),
+                    })
+                }
+            };
+            let tau =
+                DayCount::Act365F.year_fraction(as_of, claim.delivery_date, Default::default())?;
+            claim.shares * spot * (-resolve_dividend_yield(market, bond)? * tau).exp()
+        } else {
+            0.0
+        };
+        return Ok(Some(Money::new(
+            shares_value
+                + claim.cash.amount() * df * survival
+                + claim.recovery_basis.amount() * recovery,
+            bond.notional.currency(),
+        )?));
+    }
+    let mandatory_date = match bond.conversion.policy {
+        ConversionPolicy::MandatoryOn(date) => Some(date),
+        ConversionPolicy::MandatoryVariable {
+            conversion_date, ..
+        } => Some(conversion_date),
+        _ => None,
+    };
+    let ended = mandatory_date
+        .filter(|date| *date < as_of)
+        .or_else(|| (as_of > bond.maturity).then_some(bond.maturity));
+    let Some(ended) = ended else {
+        return Ok(None);
+    };
+    // A same-day conversion/redemption has already settled. Retain only earned
+    // coupons whose contractual accrual ended before exercise but pay later.
+    let schedule = build_convertible_schedule(bond, market)?;
+    let discount = market.get_discount(bond.discount_curve_id.as_str())?;
+    let hazard = bond
+        .credit_curve_id
+        .as_ref()
+        .map(|id| market.get_hazard(id.as_str()))
+        .transpose()?;
+    let mut value = 0.0;
+    for cf in schedule.get_flows().iter().filter(|cf| {
+        cf.date > as_of && finstack_quant_cashflows::primitives::is_cash_settlement_kind(cf.kind)
+    }) {
+        let earned_coupon = cf
+            .accrual
+            .as_ref()
+            .is_some_and(|period| period.end <= ended)
+            && !cf.kind.is_principal_like();
+        let pending_redemption = mandatory_date.is_none() && cf.kind.is_principal_like();
+        if earned_coupon || pending_redemption {
+            let survival = if let Some(curve) = &hazard {
+                let sp = curve.survival_at_dates(&[as_of, cf.date])?;
+                if sp[0] <= 0.0 {
+                    return Err(Error::Validation(
+                        "convertible requires positive survival".into(),
+                    ));
+                }
+                sp[1] / sp[0]
+            } else {
+                1.0
+            };
+            let df = discount.df_between_dates(as_of, cf.date)?;
+            let recovery = if pending_redemption {
+                bond.recovery_rate.unwrap_or(0.0)
+                    * crate::instruments::common_impl::pricing::rates_credit::continuous_frp_weight(
+                        df, survival,
+                    )?
+            } else {
+                0.0
+            };
+            value += cf.amount.amount() * (df * survival + recovery);
+        }
+    }
+    Ok(Some(Money::new(value, bond.notional.currency())?))
+}
+
 /// Internal pricing function that reuses pre-computed `PricingInputs`.
 ///
 /// Avoids redundant `prepare_for_pricing` when the caller already has the inputs
@@ -283,26 +403,53 @@ fn price_convertible_bond_with_inputs(
     inputs: &PricingInputs,
     as_of: Date,
 ) -> Result<Money> {
-    if as_of > bond.maturity {
-        return Ok(Money::from((0_i64, bond.notional.currency())));
+    if let Some(value) = resolved_value(bond, market_context, as_of)? {
+        return Ok(value);
     }
 
     if inputs.time_to_maturity <= 0.0 {
-        let maturity_coupon: f64 = inputs
-            .cashflow_schedule
-            .coupons()
-            .filter(|cf| cf.date == bond.maturity)
-            .map(|cf| cf.amount.amount())
-            .sum();
-
+        let discount = market_context.get_discount(bond.discount_curve_id.as_str())?;
+        let hazard = bond
+            .credit_curve_id
+            .as_ref()
+            .map(|id| market_context.get_hazard(id.as_str()))
+            .transpose()?;
+        let mut maturity_coupon = 0.0;
+        let mut redemption_pv = 0.0;
+        let mut principal = 0.0;
+        for cf in inputs.cashflow_schedule.get_flows().iter().filter(|cf| {
+            cf.date >= as_of
+                && finstack_quant_cashflows::primitives::is_cash_settlement_kind(cf.kind)
+        }) {
+            let survival = if let Some(curve) = &hazard {
+                let sp = curve.survival_at_dates(&[as_of, cf.date])?;
+                if sp[0] <= 0.0 {
+                    return Err(Error::Validation(
+                        "convertible requires positive survival".into(),
+                    ));
+                }
+                sp[1] / sp[0]
+            } else {
+                1.0
+            };
+            let df = discount.df_between_dates(as_of, cf.date)?;
+            if cf.kind.is_principal_like() {
+                principal += cf.amount.amount();
+                redemption_pv += cf.amount.amount() * (df * survival + bond.recovery_rate.unwrap_or(0.0)
+                    * crate::instruments::common_impl::pricing::rates_credit::continuous_frp_weight(df, survival)?);
+            } else {
+                maturity_coupon += cf.amount.amount() * df * survival;
+            }
+        }
         let redemption_value = bond
             .call_put
             .iter()
             .flat_map(|schedule| &schedule.puts)
-            .filter(|put| put.start <= bond.maturity && bond.maturity <= put.end)
-            .map(|put| bond.notional.amount() * put.price_pct_of_par / 100.0)
-            .fold(bond.notional.amount(), f64::max);
-        let conversion_value = compute_conversion_value(bond, inputs.spot)?;
+            .filter(|put| put.start <= as_of && as_of <= put.end)
+            .map(|put| principal * put.price_pct_of_par / 100.0)
+            .fold(redemption_pv, f64::max);
+        let conversion_value =
+            compute_conversion_value(bond, inputs.spot)? * principal / bond.notional.amount();
 
         let is_mandatory = matches!(
             bond.conversion.policy,
@@ -352,13 +499,13 @@ fn price_convertible_bond_with_inputs(
         inputs.volatility,
     )?;
 
-    let engine = TsiveriotisZhangEngine {
+    let engine = CreditTreeEngine {
         valuator: &valuator,
         steps,
         time_to_maturity: inputs.time_to_maturity,
     };
 
-    let (pv_amount, _) = engine.price(TzMarketInputs {
+    let (pv_amount, _) = engine.price(CreditTreeMarketInputs {
         spot: inputs.spot,
         volatility: inputs.volatility,
         risk_free_rate: inputs.risk_free_rate,
@@ -376,8 +523,8 @@ fn price_convertible_bond_with_inputs(
 ///   required market-data identifiers.
 /// * `market` - Market context supplying discount curve, equity spot,
 ///   volatility, credit, and other pricing inputs.
-/// * `as_of` - Valuation date; dates after maturity return zero in the bond's
-///   notional currency.
+/// * `as_of` - Valuation date. After exercise only recorded delivery claims and
+///   earned unpaid coupons remain; settled claims return zero.
 ///
 /// The Cox-Ross-Rubinstein binomial lattice step count is
 /// `bond.instrument_pricing_overrides.model_config.tree_steps` (default
@@ -389,23 +536,37 @@ pub fn price_convertible_bond(
 ) -> Result<Money> {
     bond.validate_for_pricing()?;
     tree_steps(bond)?;
-    if as_of > bond.maturity {
-        return Ok(Money::from((0_i64, bond.notional.currency())));
+    if let Some(value) = resolved_value(bond, market, as_of)? {
+        return Ok(value);
     }
     let inputs = prepare_for_pricing(bond, market, as_of)?;
     price_convertible_bond_with_inputs(bond, market, &inputs, as_of)
 }
 
 /// Value the straight cash component on the canonical convertible tree grid.
-/// Uses the same coupon mapping and per-step recovery blend as the main engine,
+/// Uses the same debt-event mapping and explicit principal recovery as the main engine,
 /// excluding conversion and issuer/holder exercise rights.
 pub(crate) fn price_bond_floor(
     bond: &ConvertibleBond,
     market_context: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
-    if as_of >= bond.maturity {
-        return Ok(0.0);
+    if let Some(value) = resolved_value(bond, market_context, as_of)? {
+        return Ok(value.amount());
+    }
+    if as_of == bond.maturity {
+        let schedule = build_convertible_schedule(bond, market_context)?;
+        let curve = market_context.get_discount(bond.discount_curve_id.as_str())?;
+        return schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| {
+                cf.date >= as_of
+                    && finstack_quant_cashflows::primitives::is_cash_settlement_kind(cf.kind)
+            })
+            .try_fold(0.0, |value, cf| {
+                Ok(value + cf.amount.amount() * curve.df_between_dates(as_of, cf.date)?)
+            });
     }
     let inputs = prepare_for_pricing(bond, market_context, as_of)?;
     let steps = tree_steps(bond)?;
@@ -418,13 +579,17 @@ pub(crate) fn price_bond_floor(
         market_context,
         inputs.volatility,
     )?;
-    let mut discount = 1.0;
-    let mut value = valuator.coupon_map.get(&0).copied().unwrap_or(0.0);
-    for (step, step_discount) in valuator.risky_step_dfs.iter().enumerate() {
-        discount *= step_discount;
-        value += valuator.coupon_map.get(&(step + 1)).copied().unwrap_or(0.0) * discount;
+    let payment = |step| {
+        valuator.coupon_map.get(&step).copied().unwrap_or(0.0)
+            + valuator.principal_map.get(&step).copied().unwrap_or(0.0)
+    };
+    let mut value = payment(steps);
+    for step in (0..steps).rev() {
+        value = payment(step)
+            + value * valuator.rf_step_dfs[step] * valuator.survival_factors[step]
+            + valuator.recovery_by_step[step];
     }
-    Ok(value + bond.notional.amount() * discount)
+    Ok(value)
 }
 
 /// Calculate Greeks for a convertible bond using central finite differences.
@@ -668,6 +833,48 @@ pub fn settlement_date(bond: &ConvertibleBond, as_of: Date) -> Result<Date> {
         crate::cashflow::builder::calendar::resolve_calendar_strict(schedule.calendar_id.as_str())?;
     let advanced = as_of.add_business_days(days, calendar)?;
     adjust(advanced, schedule.business_day_convention, calendar)
+}
+
+/// Forward a valuation-date PV to the buyer's settlement-date dirty price.
+/// Excludes contractual cash paid on or before settlement, including principal.
+/// Uses the same survival assumptions as pricing for intervening payments.
+pub(crate) fn settlement_dirty_price(
+    bond: &ConvertibleBond,
+    market: &MarketContext,
+    as_of: Date,
+    present_value: f64,
+) -> Result<f64> {
+    let settle = settlement_date(bond, as_of)?;
+    if settle == as_of {
+        return Ok(present_value);
+    }
+    let discount = market.get_discount(bond.discount_curve_id.as_str())?;
+    let hazard = bond
+        .credit_curve_id
+        .as_ref()
+        .map(|id| market.get_hazard(id.as_str()))
+        .transpose()?;
+    let schedule = build_convertible_schedule(bond, market)?;
+    let mut interim = 0.0;
+    for cf in schedule.get_flows().iter().filter(|cf| {
+        cf.date > as_of
+            && cf.date <= settle
+            && finstack_quant_cashflows::primitives::is_cash_settlement_kind(cf.kind)
+    }) {
+        let survival = if let Some(curve) = &hazard {
+            let sp = curve.survival_at_dates(&[as_of, cf.date])?;
+            if sp[0] <= 0.0 {
+                return Err(Error::Validation(
+                    "convertible requires positive survival".into(),
+                ));
+            }
+            sp[1] / sp[0]
+        } else {
+            1.0
+        };
+        interim += cf.amount.amount() * discount.df_between_dates(as_of, cf.date)? * survival;
+    }
+    Ok((present_value - interim) / discount.df_between_dates(as_of, settle)?)
 }
 
 /// Calculate accrued interest for a convertible bond.

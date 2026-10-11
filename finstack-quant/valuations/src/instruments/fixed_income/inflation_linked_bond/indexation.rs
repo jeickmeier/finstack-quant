@@ -12,126 +12,12 @@ use finstack_quant_core::market_data::scalars::{
     InflationIndex, InflationInterpolation, InflationLag,
 };
 use finstack_quant_core::market_data::term_structures::InflationCurve;
-use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use std::sync::Arc;
 use time::Duration;
 
 use super::types::{IndexationMethod, InflationLinkedBond};
 
-/// Market source of reference CPI for an inflation-linked bond.
-///
-/// Resolved from the market context under the bond's `inflation_index_id`:
-/// published fixings (index), a projected curve, or both (hybrid: published
-/// months read from the index, later months from the curve).
-#[derive(Clone)]
-pub(super) enum InflationSource {
-    Index(Arc<InflationIndex>),
-    Curve(Arc<InflationCurve>),
-    Hybrid {
-        index: Arc<InflationIndex>,
-        curve: Arc<InflationCurve>,
-    },
-}
-
-impl InflationSource {
-    /// Resolve the inflation source registered under `id`.
-    pub(super) fn from_market(curves: &MarketContext, id: &CurveId) -> Result<Self> {
-        let index = curves.get_inflation_index(id.as_str()).ok();
-        let curve = curves.get_inflation_curve(id.as_str()).ok();
-        match (index, curve) {
-            (Some(index), Some(curve)) => Ok(Self::Hybrid { index, curve }),
-            (Some(index), None) => Ok(Self::Index(index)),
-            (None, Some(curve)) => Ok(Self::Curve(curve)),
-            (None, None) => Err(finstack_quant_core::InputError::NotFound {
-                id: id.as_str().to_string(),
-            }
-            .into()),
-        }
-    }
-
-    /// Unfloored index ratio `RefCPI(date) / base_cpi` for `bond`.
-    pub(super) fn ratio(&self, bond: &InflationLinkedBond, date: Date) -> Result<f64> {
-        match self {
-            Self::Index(index) => bond.index_ratio(date, index.as_ref()),
-            Self::Curve(curve) => bond.index_ratio_from_curve(date, curve.as_ref()),
-            Self::Hybrid { index, curve } => {
-                let expected_interp = bond.validate_index_conventions(index.as_ref())?;
-                let (first_published, last_published) = index.date_range()?;
-                let cpi_on = |reference_date: Date| -> Result<f64> {
-                    let monthly = matches!(bond.lag, InflationLag::Months(_));
-                    let before_first = if monthly {
-                        (reference_date.year(), reference_date.month())
-                            < (first_published.year(), first_published.month())
-                    } else {
-                        reference_date < first_published
-                    };
-                    let published = if monthly {
-                        (reference_date.year(), reference_date.month())
-                            <= (last_published.year(), last_published.month())
-                    } else {
-                        reference_date <= last_published
-                    };
-                    if before_first {
-                        return Err(finstack_quant_core::InputError::NotFound {
-                            id: format!(
-                                "inflation index '{}' observation on or before {}",
-                                index.id, reference_date
-                            ),
-                        }
-                        .into());
-                    }
-                    if published {
-                        if monthly {
-                            index.ref_cpi_months_lag(
-                                reference_date.replace_day(1).map_err(|_| {
-                                    finstack_quant_core::InputError::InvalidDateRange
-                                })?,
-                                0,
-                            )
-                        } else {
-                            index.value_on(reference_date)
-                        }
-                    } else {
-                        curve.cpi_on_date(reference_date)
-                    }
-                };
-
-                let current_index = match bond.lag {
-                    InflationLag::Months(months)
-                        if expected_interp == InflationInterpolation::Linear =>
-                    {
-                        let (anchor0, anchor1, weight) =
-                            InflationLinkedBond::ref_cpi_anchors(date, months.into())?;
-                        let cpi0 = cpi_on(anchor0)?;
-                        if weight == 0.0 {
-                            cpi0
-                        } else {
-                            let cpi1 = cpi_on(anchor1)?;
-                            cpi0 + weight * (cpi1 - cpi0)
-                        }
-                    }
-                    InflationLag::Months(months) => cpi_on(
-                        InflationLinkedBond::step_reference_month(date, months.into())?,
-                    )?,
-                    InflationLag::Days(days) => cpi_on(date - Duration::days(i64::from(days)))?,
-                    _ => cpi_on(date)?,
-                };
-                if bond.base_cpi <= 0.0 {
-                    return Err(finstack_quant_core::InputError::NonPositiveValue.into());
-                }
-                Ok(current_index / bond.base_cpi)
-            }
-        }
-    }
-}
-
 impl InflationLinkedBond {
-    /// Resolve the bond's inflation source from the market context.
-    pub(super) fn inflation_source(&self, curves: &MarketContext) -> Result<InflationSource> {
-        InflationSource::from_market(curves, &self.inflation_index_id)
-    }
-
     /// Calculate the raw index ratio for a given date (CPI(date) / CPI(base)).
     ///
     /// Returns the **unfloored** ratio. Deflation protection is applied when
@@ -311,9 +197,109 @@ impl InflationLinkedBond {
         Ok((anchor0, anchor1, weight))
     }
 
-    /// Calculate index ratio sourcing inflation data from the market context
-    pub fn index_ratio_from_market(&self, date: Date, market: &MarketContext) -> Result<f64> {
-        let source = self.inflation_source(market)?;
-        source.ratio(self, date)
+    /// Resolve CPI using publication-aware historical fixings and future projections.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Contractual indexation date; the bond's observation lag and
+    ///   reference-month interpolation are applied once.
+    /// * `market` - CPI fixings and projection curve under `inflation_index_id`.
+    ///   Published anchors require historical observations; unpublished anchors
+    ///   use the projection even when a future fixing is already stored.
+    /// * `as_of` - Valuation date determining which observations are published.
+    pub fn index_ratio_from_market(
+        &self,
+        date: Date,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<f64> {
+        Ok(self.reference_inflation(date, market, as_of)?.value / self.base_cpi)
+    }
+
+    pub(super) fn reference_inflation(
+        &self,
+        date: Date,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<crate::instruments::common_impl::helpers::InflationReferenceValue> {
+        let interpolation = if self.daily_interpolated_indexation() {
+            InflationInterpolation::Linear
+        } else {
+            InflationInterpolation::Step
+        };
+        if let Ok(index) = market.get_inflation_index(self.inflation_index_id.as_str()) {
+            self.validate_index_conventions(index.as_ref())?;
+        }
+        crate::instruments::common_impl::helpers::resolve_reference_inflation(
+            market,
+            self.inflation_index_id.as_str(),
+            date,
+            as_of,
+            self.lag,
+            interpolation,
+        )
+    }
+    /// Expected indexed payment multiplier under its payment-date measure.
+    pub(super) fn payment_index_ratio(
+        &self,
+        date: Date,
+        market: &MarketContext,
+        as_of: Date,
+        protected: bool,
+    ) -> Result<f64> {
+        let reference = self.reference_inflation(date, market, as_of)?;
+        let forward = reference.value / self.base_cpi;
+        if !protected {
+            return Ok(forward);
+        }
+        if reference.is_known {
+            return Ok(forward.max(1.0));
+        }
+        let id = self.floor_vol_surface_id.as_ref().ok_or_else(|| finstack_quant_core::Error::Validation(
+            format!("InflationLinkedBond '{}' requires floor_vol_surface_id for unpublished protected CPI on {date}", self.id)))?;
+        let fixing_date = match reference.publication_date {
+            Some(date) => date,
+            None => match self.lag {
+                InflationLag::Months(months) => {
+                    let (first, second, weight) = Self::ref_cpi_anchors(date, u32::from(months))?;
+                    if self.daily_interpolated_indexation() && weight > 0.0 {
+                        second
+                    } else {
+                        first
+                    }
+                }
+                InflationLag::Days(days) => date
+                    .checked_sub(Duration::days(i64::from(days)))
+                    .ok_or(finstack_quant_core::InputError::InvalidDateRange)?,
+                InflationLag::None => date,
+                _ => {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "unsupported inflation lag".into(),
+                    ))
+                }
+            },
+        };
+        let expiry = finstack_quant_core::dates::DayCount::Act365F.year_fraction(
+            as_of,
+            fixing_date,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )?;
+        let surface = market.get_surface(id.as_str())?;
+        surface.require_quote_type(
+            finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+        )?;
+        surface.require_secondary_axis(
+            finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+        )?;
+        let sigma = finstack_quant_models::volatility::get_surface_vol(&surface, expiry, 1.0)?;
+        let floor = finstack_quant_models::closed_form::black76_price(
+            forward,
+            1.0,
+            1.0,
+            expiry,
+            sigma,
+            finstack_quant_models::OptionType::Put,
+        )?;
+        Ok(forward + floor)
     }
 }

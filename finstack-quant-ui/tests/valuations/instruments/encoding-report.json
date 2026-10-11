@@ -79,7 +79,8 @@
           "#/$defs/d_7c91ed386870962882de/properties/collateral_wac",
           "#/$defs/d_66287e2bb5dfa8d61987/properties/coupon",
           "#/$defs/d_b67a73e0467888ad8dcc/properties/lower_speed_multiplier",
-          "#/$defs/d_b67a73e0467888ad8dcc/properties/upper_speed_multiplier"
+          "#/$defs/d_b67a73e0467888ad8dcc/properties/upper_speed_multiplier",
+          "#/$defs/d_f9a55f4b2f28378c6e86/properties/principal"
         ],
         "internal-union": [
           {
@@ -360,11 +361,14 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_66287e2bb5dfa8d61987/properties/pac_collar",
+            "pointer": "#/$defs/d_66287e2bb5dfa8d61987/properties/pac_schedule",
             "keyword": "anyOf"
           }
         ],
-        "object-array": ["#/$defs/d_f7da310742dae5c82e98/properties/tranches"],
+        "object-array": [
+          "#/$defs/d_f7da310742dae5c82e98/properties/tranches",
+          "#/$defs/d_65cfec08bebc669f8ef9/properties/payments"
+        ],
         "optional-property-record": [
           "#/$defs/d_2c88e4d1e2e4f7c22e02",
           "#/$defs/d_c08279a20372931820e0",
@@ -4270,7 +4274,7 @@
           "#/$defs/AsianOption/properties/fixing_dates",
           "#/$defs/AsianOption/properties/past_fixings",
           "#/$defs/Monitoring/oneOf/1/properties/observation_dates",
-          "#/$defs/CommodityOption/properties/exercise_dates",
+          "#/$defs/CommoditySpotOption/properties/exercise_dates",
           "#/$defs/CommodityAsianOption/properties/fixing_dates",
           "#/$defs/CommodityAsianOption/properties/past_fixings",
           "#/$defs/CommoditySwap/properties/past_fixings",
@@ -4608,6 +4612,7 @@
           "#/$defs/ConversionSpec/properties/price",
           "#/$defs/ConversionSpec/properties/ratio",
           "#/$defs/ConvertibleBond/properties/recovery_rate",
+          "#/$defs/ConvertibleSettlement/properties/shares",
           "#/$defs/InflationLinkedBond/properties/base_cpi",
           "#/$defs/LoanCall/properties/price_pct_of_par",
           "#/$defs/RateSpec/oneOf/0/properties/fixed/properties/rate",
@@ -4655,6 +4660,7 @@
           "#/$defs/CmoTranche/properties/coupon",
           "#/$defs/PacCollar/properties/lower_speed_multiplier",
           "#/$defs/PacCollar/properties/upper_speed_multiplier",
+          "#/$defs/PacPayment/properties/principal",
           "#/$defs/DollarRoll/properties/back_price",
           "#/$defs/DollarRoll/properties/coupon",
           "#/$defs/DollarRoll/properties/front_price",
@@ -4753,7 +4759,8 @@
           "#/$defs/QuantoOption/properties/payoff_fx_rate",
           "#/$defs/QuantoOption/properties/quantity",
           "#/$defs/QuantoOption/properties/strike",
-          "#/$defs/CommodityOption/properties/quoted_forward",
+          "#/$defs/CommoditySpotOptionExercise/properties/spot",
+          "#/$defs/CommoditySpotOption/properties/quoted_forward",
           "#/$defs/CommodityAsianOption/properties/past_fixings/items/prefixItems/1",
           "#/$defs/CommodityForward/properties/contract_price",
           "#/$defs/CommodityForward/properties/quoted_forward",
@@ -4795,7 +4802,6 @@
           "#/$defs/EquityTotalReturnSwap/properties/dividend_tax_rate",
           "#/$defs/EquityTotalReturnSwap/properties/initial_level",
           "#/$defs/EquityTotalReturnSwap/properties/past_fixings/items/prefixItems/1",
-          "#/$defs/EquityUnderlyingParams/properties/contract_size",
           "#/$defs/FiIndexTotalReturnSwap/properties/initial_level",
           "#/$defs/ClawbackSpec/properties/holdback_decimal",
           "#/$defs/PeFundWaterfallTranche/oneOf/1/properties/preferred_irr/properties/hurdle_irr",
@@ -5377,7 +5383,7 @@
           "#/$defs/CdsIndex/properties/upfront",
           "#/$defs/CdsTranche/properties/upfront",
           "#/$defs/EquityOption/properties/exercise_dates",
-          "#/$defs/CommodityOption/properties/exercise_dates",
+          "#/$defs/CommoditySpotOption/properties/exercise_dates",
           "#/$defs/RealEstateAsset/properties/capex_schedule",
           "#/$defs/PoolAsset/properties/delinquency_buckets",
           "#/$defs/AssetPool/properties/rep_lines",
@@ -5399,7 +5405,7 @@
           "#/$defs/AgencyCmo/properties/collateral_wam_months",
           "#/$defs/CdsIndex/properties/num_constituents",
           "#/$defs/FxSpot/properties/settlement_days",
-          "#/$defs/CommodityOption/properties/premium_settlement_days",
+          "#/$defs/CommoditySpotOption/properties/premium_settlement_days",
           "#/$defs/CommodityForward/properties/settlement_days",
           "#/$defs/CommoditySwap/properties/index_lag_days",
           "#/$defs/RangeAccrual/properties/past_observations_in_range",
@@ -5492,7 +5498,7 @@
           "#/$defs/Ndf/properties/quoted_spot",
           "#/$defs/QuantoOption/properties/payoff_fx_rate",
           "#/$defs/QuantoOption/properties/quantity",
-          "#/$defs/CommodityOption/properties/quoted_forward",
+          "#/$defs/CommoditySpotOption/properties/quoted_forward",
           "#/$defs/CommodityForward/properties/contract_price",
           "#/$defs/CommodityForward/properties/quoted_forward",
           "#/$defs/CommodityFutureFixing/oneOf/0/properties/realized_price",
@@ -5583,6 +5589,7 @@
           "#/$defs/FxVarianceSwap/properties/open_series_id",
           "#/$defs/CommodityForward/properties/contract_month",
           "#/$defs/CommodityForward/properties/exchange",
+          "#/$defs/FiIndexTotalReturnSwap/properties/fixing_series_id",
           "#/$defs/FundEvent/properties/deal_id",
           "#/$defs/Metadata/properties/manager_id",
           "#/$defs/Metadata/properties/master_servicer_id",
@@ -5747,11 +5754,19 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/ConvertibleBond/properties/resolved_settlement",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/ConvertibleBond/properties/soft_call_trigger",
             "keyword": "anyOf"
           },
           {
             "pointer": "#/$defs/InflationLinkedBond/properties/calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/InflationLinkedBond/properties/floor_vol_surface_id",
             "keyword": "anyOf"
           },
           {
@@ -5840,7 +5855,7 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/CmoTranche/properties/pac_collar",
+            "pointer": "#/$defs/CmoTranche/properties/pac_schedule",
             "keyword": "anyOf"
           },
           {
@@ -5869,10 +5884,6 @@
           },
           {
             "pointer": "#/$defs/FixedLegSpec/properties/calendar_id",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/FixedLegSpec/properties/par_method",
             "keyword": "anyOf"
           },
           {
@@ -6200,11 +6211,15 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/CommodityOption/properties/convention",
+            "pointer": "#/$defs/CommoditySpotOption/properties/convention",
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/CommodityOption/properties/spot_id",
+            "pointer": "#/$defs/CommoditySpotOption/properties/exercise",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CommoditySpotOption/properties/spot_id",
             "keyword": "anyOf"
           },
           {
@@ -6755,6 +6770,7 @@
           "#/$defs/RevolvingCredit/properties/margin_steps",
           "#/$defs/RevolvingCredit/properties/scheduled_fees",
           "#/$defs/CmoWaterfall/properties/tranches",
+          "#/$defs/PacSchedule/properties/payments",
           "#/$defs/EligibleCollateralSchedule/properties/eligible",
           "#/$defs/FundingLeg/oneOf/0/properties/periods",
           "#/$defs/FundingLeg/oneOf/1/properties/periods",
@@ -6938,7 +6954,7 @@
           "#/$defs/RepoMarginSpec/properties/settlement_lag",
           "#/$defs/CdsIndex/properties/num_constituents",
           "#/$defs/FxSpot/properties/settlement_days",
-          "#/$defs/CommodityOption/properties/premium_settlement_days",
+          "#/$defs/CommoditySpotOption/properties/premium_settlement_days",
           "#/$defs/CommodityForward/properties/settlement_days",
           "#/$defs/CallAssumption/properties/after_early_amortization_months",
           "#/$defs/EligibilityRule/properties/max_days_past_due",
@@ -7005,7 +7021,6 @@
           { "pointer": "#/$defs/SifmaSettlementClass", "keyword": "oneOf" },
           { "pointer": "#/$defs/TbaTerm", "keyword": "oneOf" },
           { "pointer": "#/$defs/CmoTrancheType", "keyword": "oneOf" },
-          { "pointer": "#/$defs/ParRateMethod", "keyword": "oneOf" },
           { "pointer": "#/$defs/CollateralAssetClass", "keyword": "oneOf" },
           { "pointer": "#/$defs/ImMethodology", "keyword": "oneOf" },
           { "pointer": "#/$defs/MarginTenor", "keyword": "oneOf" },
@@ -7454,10 +7469,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_b2304c53f63497441bfc/properties/par_method",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/d_732a5eeede1f58d40372/properties/calendar_id",
             "keyword": "anyOf"
           },
@@ -7516,7 +7527,6 @@
           { "pointer": "#/$defs/d_01cd6b2e4ad257352fdb", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_c0401254ec268b317b65", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_69148dfad1155676d8a6", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_afe350e063ef18dd6cec", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_d6ae92239615ff48c588", "keyword": "oneOf" }
         ]
       }
@@ -14332,15 +14342,15 @@
       }
     },
     {
-      "type": "commodity_option",
-      "schema": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json",
+      "type": "commodity_spot_option",
+      "schema": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json",
       "fixtures": [
-        "finstack-quant/valuations/tests/instruments/json_examples/commodity_option.json"
+        "finstack-quant/valuations/tests/instruments/json_examples/commodity_spot_option.json"
       ],
       "constructs": {
         "array": [
           "#/$defs/d_2c88e4d1e2e4f7c22e02/properties/tags",
-          "#/$defs/d_1e0fa57668926accf1a2/properties/exercise_dates",
+          "#/$defs/d_6990e6c5e63d5457943c/properties/exercise_dates",
           "#/$defs/d_cdb8fddc0106047270c4/properties/times",
           "#/$defs/d_cdb8fddc0106047270c4/properties/values"
         ],
@@ -14524,6 +14534,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "double": [
+          "#/$defs/d_26775289dc7630c4c860/properties/spot",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
           "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_asw_market",
@@ -14556,8 +14567,8 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
           "#/$defs/d_7e19cc4df9954b864180",
-          "#/$defs/d_11e839ded3b42bb303e7",
-          "#/$defs/d_1e0fa57668926accf1a2/properties/quoted_forward",
+          "#/$defs/d_5a4a97342eade5678c12",
+          "#/$defs/d_6990e6c5e63d5457943c/properties/quoted_forward",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
@@ -14566,7 +14577,7 @@
           { "pointer": "#/$defs/d_5c13df5a55f1da604df2", "keyword": "oneOf" }
         ],
         "nullable-array": [
-          "#/$defs/d_1e0fa57668926accf1a2/properties/exercise_dates"
+          "#/$defs/d_6990e6c5e63d5457943c/properties/exercise_dates"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -14574,7 +14585,7 @@
         "nullable-integer": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
-          "#/$defs/d_1e0fa57668926accf1a2/properties/premium_settlement_days"
+          "#/$defs/d_6990e6c5e63d5457943c/properties/premium_settlement_days"
         ],
         "nullable-number": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -14606,7 +14617,7 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
-          "#/$defs/d_1e0fa57668926accf1a2/properties/quoted_forward",
+          "#/$defs/d_6990e6c5e63d5457943c/properties/quoted_forward",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
@@ -14615,7 +14626,11 @@
         ],
         "nullable-union": [
           {
-            "pointer": "#/$defs/d_1e0fa57668926accf1a2/properties/convention",
+            "pointer": "#/$defs/d_6990e6c5e63d5457943c/properties/convention",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_6990e6c5e63d5457943c/properties/exercise",
             "keyword": "anyOf"
           },
           {
@@ -14667,7 +14682,7 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_1e0fa57668926accf1a2/properties/spot_id",
+            "pointer": "#/$defs/d_6990e6c5e63d5457943c/properties/spot_id",
             "keyword": "anyOf"
           }
         ],
@@ -14688,13 +14703,13 @@
         "uint32": [
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
-          "#/$defs/d_1e0fa57668926accf1a2/properties/premium_settlement_days"
+          "#/$defs/d_6990e6c5e63d5457943c/properties/premium_settlement_days"
         ],
         "unit-union": [
-          { "pointer": "#/$defs/d_2e99fddbe4971f773a8e", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_132c0970533550baccde", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_be98333e68c25ab5ae57", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_c0401254ec268b317b65", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_8c04a01e469950d147da", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_ed594b756b5481bfccc3", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_02a11b30ee627630f221", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_948cdc4db846a21357a4", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_4ac4dad3ab3a5d25d3f9", "keyword": "oneOf" },
@@ -14705,8 +14720,8 @@
           { "pointer": "#/$defs/d_ec4e993309e09fe83294", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_f80f2b90e7af690c5898", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_b556bbeb1ecf96c44c5a", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_95c9bbe13fca10df3b83", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_d14396b683f11e7633df", "keyword": "oneOf" }
+          { "pointer": "#/$defs/d_93c0349e3a5a9763e83f", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_abdca7350ca02551965b", "keyword": "oneOf" }
         ]
       }
     },
@@ -15888,7 +15903,7 @@
           "#/$defs/AsianOption/properties/fixing_dates",
           "#/$defs/AsianOption/properties/past_fixings",
           "#/$defs/Monitoring/oneOf/1/properties/observation_dates",
-          "#/$defs/CommodityOption/properties/exercise_dates",
+          "#/$defs/CommoditySpotOption/properties/exercise_dates",
           "#/$defs/CommodityAsianOption/properties/fixing_dates",
           "#/$defs/CommodityAsianOption/properties/past_fixings",
           "#/$defs/CommoditySwap/properties/past_fixings",
@@ -16226,6 +16241,7 @@
           "#/$defs/ConversionSpec/properties/price",
           "#/$defs/ConversionSpec/properties/ratio",
           "#/$defs/ConvertibleBond/properties/recovery_rate",
+          "#/$defs/ConvertibleSettlement/properties/shares",
           "#/$defs/InflationLinkedBond/properties/base_cpi",
           "#/$defs/LoanCall/properties/price_pct_of_par",
           "#/$defs/RateSpec/oneOf/0/properties/fixed/properties/rate",
@@ -16273,6 +16289,7 @@
           "#/$defs/CmoTranche/properties/coupon",
           "#/$defs/PacCollar/properties/lower_speed_multiplier",
           "#/$defs/PacCollar/properties/upper_speed_multiplier",
+          "#/$defs/PacPayment/properties/principal",
           "#/$defs/DollarRoll/properties/back_price",
           "#/$defs/DollarRoll/properties/coupon",
           "#/$defs/DollarRoll/properties/front_price",
@@ -16371,7 +16388,8 @@
           "#/$defs/QuantoOption/properties/payoff_fx_rate",
           "#/$defs/QuantoOption/properties/quantity",
           "#/$defs/QuantoOption/properties/strike",
-          "#/$defs/CommodityOption/properties/quoted_forward",
+          "#/$defs/CommoditySpotOptionExercise/properties/spot",
+          "#/$defs/CommoditySpotOption/properties/quoted_forward",
           "#/$defs/CommodityAsianOption/properties/past_fixings/items/prefixItems/1",
           "#/$defs/CommodityForward/properties/contract_price",
           "#/$defs/CommodityForward/properties/quoted_forward",
@@ -16413,7 +16431,6 @@
           "#/$defs/EquityTotalReturnSwap/properties/dividend_tax_rate",
           "#/$defs/EquityTotalReturnSwap/properties/initial_level",
           "#/$defs/EquityTotalReturnSwap/properties/past_fixings/items/prefixItems/1",
-          "#/$defs/EquityUnderlyingParams/properties/contract_size",
           "#/$defs/FiIndexTotalReturnSwap/properties/initial_level",
           "#/$defs/BasketConstituent/properties/units",
           "#/$defs/BasketConstituent/properties/weight",
@@ -16995,7 +17012,7 @@
           "#/$defs/CdsIndex/properties/upfront",
           "#/$defs/CdsTranche/properties/upfront",
           "#/$defs/EquityOption/properties/exercise_dates",
-          "#/$defs/CommodityOption/properties/exercise_dates",
+          "#/$defs/CommoditySpotOption/properties/exercise_dates",
           "#/$defs/RealEstateAsset/properties/capex_schedule",
           "#/$defs/PoolAsset/properties/delinquency_buckets",
           "#/$defs/AssetPool/properties/rep_lines",
@@ -17017,7 +17034,7 @@
           "#/$defs/AgencyCmo/properties/collateral_wam_months",
           "#/$defs/CdsIndex/properties/num_constituents",
           "#/$defs/FxSpot/properties/settlement_days",
-          "#/$defs/CommodityOption/properties/premium_settlement_days",
+          "#/$defs/CommoditySpotOption/properties/premium_settlement_days",
           "#/$defs/CommodityForward/properties/settlement_days",
           "#/$defs/CommoditySwap/properties/index_lag_days",
           "#/$defs/RangeAccrual/properties/past_observations_in_range",
@@ -17110,7 +17127,7 @@
           "#/$defs/Ndf/properties/quoted_spot",
           "#/$defs/QuantoOption/properties/payoff_fx_rate",
           "#/$defs/QuantoOption/properties/quantity",
-          "#/$defs/CommodityOption/properties/quoted_forward",
+          "#/$defs/CommoditySpotOption/properties/quoted_forward",
           "#/$defs/CommodityForward/properties/contract_price",
           "#/$defs/CommodityForward/properties/quoted_forward",
           "#/$defs/CommodityFutureFixing/oneOf/0/properties/realized_price",
@@ -17201,6 +17218,7 @@
           "#/$defs/FxVarianceSwap/properties/open_series_id",
           "#/$defs/CommodityForward/properties/contract_month",
           "#/$defs/CommodityForward/properties/exchange",
+          "#/$defs/FiIndexTotalReturnSwap/properties/fixing_series_id",
           "#/$defs/BasketConstituent/properties/ticker",
           "#/$defs/FundEvent/properties/deal_id",
           "#/$defs/Metadata/properties/manager_id",
@@ -17365,11 +17383,19 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/ConvertibleBond/properties/resolved_settlement",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/ConvertibleBond/properties/soft_call_trigger",
             "keyword": "anyOf"
           },
           {
             "pointer": "#/$defs/InflationLinkedBond/properties/calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/InflationLinkedBond/properties/floor_vol_surface_id",
             "keyword": "anyOf"
           },
           {
@@ -17458,7 +17484,7 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/CmoTranche/properties/pac_collar",
+            "pointer": "#/$defs/CmoTranche/properties/pac_schedule",
             "keyword": "anyOf"
           },
           {
@@ -17487,10 +17513,6 @@
           },
           {
             "pointer": "#/$defs/FixedLegSpec/properties/calendar_id",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/FixedLegSpec/properties/par_method",
             "keyword": "anyOf"
           },
           {
@@ -17818,11 +17840,15 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/CommodityOption/properties/convention",
+            "pointer": "#/$defs/CommoditySpotOption/properties/convention",
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/CommodityOption/properties/spot_id",
+            "pointer": "#/$defs/CommoditySpotOption/properties/exercise",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CommoditySpotOption/properties/spot_id",
             "keyword": "anyOf"
           },
           {
@@ -18373,6 +18399,7 @@
           "#/$defs/RevolvingCredit/properties/margin_steps",
           "#/$defs/RevolvingCredit/properties/scheduled_fees",
           "#/$defs/CmoWaterfall/properties/tranches",
+          "#/$defs/PacSchedule/properties/payments",
           "#/$defs/EligibleCollateralSchedule/properties/eligible",
           "#/$defs/FundingLeg/oneOf/0/properties/periods",
           "#/$defs/FundingLeg/oneOf/1/properties/periods",
@@ -18556,7 +18583,7 @@
           "#/$defs/RepoMarginSpec/properties/settlement_lag",
           "#/$defs/CdsIndex/properties/num_constituents",
           "#/$defs/FxSpot/properties/settlement_days",
-          "#/$defs/CommodityOption/properties/premium_settlement_days",
+          "#/$defs/CommoditySpotOption/properties/premium_settlement_days",
           "#/$defs/CommodityForward/properties/settlement_days",
           "#/$defs/CallAssumption/properties/after_early_amortization_months",
           "#/$defs/EligibilityRule/properties/max_days_past_due",
@@ -18623,7 +18650,6 @@
           { "pointer": "#/$defs/SifmaSettlementClass", "keyword": "oneOf" },
           { "pointer": "#/$defs/TbaTerm", "keyword": "oneOf" },
           { "pointer": "#/$defs/CmoTrancheType", "keyword": "oneOf" },
-          { "pointer": "#/$defs/ParRateMethod", "keyword": "oneOf" },
           { "pointer": "#/$defs/CollateralAssetClass", "keyword": "oneOf" },
           { "pointer": "#/$defs/ImMethodology", "keyword": "oneOf" },
           { "pointer": "#/$defs/MarginTenor", "keyword": "oneOf" },
@@ -18807,6 +18833,7 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
           "#/$defs/d_7e19cc4df9954b864180",
           "#/$defs/d_5d5c46a56f1a2114a2ed/properties/recovery_rate",
+          "#/$defs/d_50ecc2e8ab08ab1ff417/properties/shares",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
@@ -19136,6 +19163,10 @@
           },
           {
             "pointer": "#/$defs/d_e49387f97c0f9d510642/properties/reporting_currency",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_5d5c46a56f1a2114a2ed/properties/resolved_settlement",
             "keyword": "anyOf"
           },
           {
@@ -29002,6 +29033,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_cf0ae253da617678cc3e/properties/floor_vol_surface_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
             "keyword": "anyOf"
           },
@@ -30782,10 +30817,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_dccff34d4d8a7a8ae68b/properties/par_method",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/d_02a84814797c76e9a7fc/properties/calendar_id",
             "keyword": "anyOf"
           },
@@ -30903,7 +30934,6 @@
           { "pointer": "#/$defs/d_01cd6b2e4ad257352fdb", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_c0401254ec268b317b65", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_69148dfad1155676d8a6", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_86adce12bb0a0fd5d9ff", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_e7e928551c49addcdac7", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_02a11b30ee627630f221", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_948cdc4db846a21357a4", "keyword": "oneOf" },
@@ -37317,10 +37347,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/FixedLegSpec/properties/par_method",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/FloatLegSpec/properties/calendar_id",
             "keyword": "anyOf"
           },
@@ -37903,7 +37929,6 @@
           { "pointer": "#/$defs/d_69148dfad1155676d8a6", "keyword": "oneOf" },
           { "pointer": "#/$defs/SwapPriority", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_c0401254ec268b317b65", "keyword": "oneOf" },
-          { "pointer": "#/$defs/ParRateMethod", "keyword": "oneOf" },
           { "pointer": "#/$defs/StubKind", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_02a11b30ee627630f221", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_948cdc4db846a21357a4", "keyword": "oneOf" },
@@ -38313,10 +38338,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_d76aba90a93f590ce184/properties/par_method",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/d_173bb13d95b6e8cec0d7/properties/calendar_id",
             "keyword": "anyOf"
           },
@@ -38374,7 +38395,6 @@
           { "pointer": "#/$defs/d_01cd6b2e4ad257352fdb", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_c0401254ec268b317b65", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_69148dfad1155676d8a6", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_c558256197eb64ce415b", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_48ee955e3f749b41ec36", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_0da16f48ff9941483821", "keyword": "oneOf" }
         ]
@@ -39674,8 +39694,7 @@
           "#/$defs/d_7e19cc4df9954b864180",
           "#/$defs/d_785f04c4ffd82f89f1ab/properties/past_fixings/items/prefixItems/1",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
-          "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp",
-          "#/$defs/d_3907a55cf33393b0f707/properties/contract_size"
+          "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
         "int32": ["#/$defs/d_176cce21985eadf0161c/properties/payment_lag_days"],
         "internal-union": [
@@ -40521,6 +40540,7 @@
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
         "nullable-string": [
+          "#/$defs/d_73fdb35378247123d02d/properties/fixing_series_id",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario",
           "#/$defs/d_6c21eb710465cd65057e/properties/min_rating"
         ],

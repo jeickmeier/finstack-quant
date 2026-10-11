@@ -6,91 +6,85 @@
     "description": "Bloomberg YAS/OAS/ASW IBM EUR 3.45% 2034 callable corporate bond captured from screens on 2026-05-03.",
     "valuation_date": "2026-04-30",
     "source": "bloomberg-screen",
-    "source_detail": "Bloomberg DES/YAS/OAS/ASW for IBM 3.45 02/03/34 Corp, EUR senior unsecured callable corporate bond, settlement 2026-05-06, price 97.484, curve 514 / 45 EUR vs 6M EURIBOR swap curve, DBR 2.2 02/15/34 benchmark. The canonical typed market inputs are supplied with no calibration steps. Pricing tolerance contracts preserved.",
+    "source_detail": "Bloomberg DES/YAS/OAS/ASW for IBM 3.45 02/03/34 Corp, EUR senior unsecured callable corporate bond, settlement 2026-05-06, price 97.484, curve 514 / 45 EUR vs 6M EURIBOR swap curve, DBR 2.2 02/15/34 benchmark. The canonical typed market inputs are supplied with no calibration steps. Pricing tolerance contracts preserved. The EUR-EURIBOR-6M projection curve is reconstructed from the captured SWYC stripped discount factors (image named coupon_info.png), with an ACT/360 projection grid and settlement base matching those observations. Cash/FRA/swap market rates are not interpreted as forward-rate knots; no expected output is used in the reconstruction.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-03",
-    "last_reviewed_by": "jeickmeier",
-    "last_reviewed_on": "2026-05-09",
+    "last_reviewed_by": "codex",
+    "last_reviewed_on": "2026-10-11",
     "review_interval_months": 6,
-    "regen_command": "manual Bloomberg DES/YAS/OAS/ASW screen transcription; see provenance.screenshots",
+    "regen_command": "Manual Bloomberg screen transcription; rebuild projection only: uv run --no-sync python scripts/golden/ibm_asw_projection.py --write",
     "screenshots": [
       {
         "path": "screenshots/ibm_eur_2034_callable__description.png",
-        "screen": "DES",
+        "screen": "CFA",
         "captured_on": "2026-05-03",
-        "description": "Bond description with identifiers, coupon, maturity, rating, call type, first settlement date, and minimum piece"
+        "description": "Cash Flow Analysis present values at price 97.620, with curve YCGT0013 spot rates"
       },
       {
         "path": "screenshots/ibm_eur_2034_callable__cashflows.png",
-        "screen": "DES",
+        "screen": "YAS",
         "captured_on": "2026-05-03",
-        "description": "Bond coupon cashflow schedule with annual coupons and principal redemption"
+        "description": "Yield and Spread Analysis at price 97.484, including ASW 81.6 bp and accrued interest"
       },
       {
         "path": "screenshots/ibm_eur_2034_callable__call_schedule.png",
-        "screen": "DES",
+        "screen": "SWYC",
         "captured_on": "2026-05-03",
-        "description": "Call schedule showing first callable date and call price"
+        "description": "EUR vs 6M EURIBOR market quotes: deposits, serial FRAs, and swaps"
       },
       {
         "path": "screenshots/ibm_eur_2034_callable__coupon_info.png",
-        "screen": "DES",
+        "screen": "SWYC",
         "captured_on": "2026-05-03",
-        "description": "Coupon information showing normal first and last coupon"
+        "description": "Stripped EUR vs 6M EURIBOR curve with dated discount factors; source of the projection reconstruction"
       },
       {
         "path": "screenshots/ibm_eur_2034_callable__yield_spread.png",
-        "screen": "YAS",
+        "screen": "DES",
         "captured_on": "2026-05-03",
-        "description": "Yield and spread analysis with price, yield, settlement, spreads, duration, convexity, DV01, accrued, and invoice"
+        "description": "Coupon information: normal first and last coupons"
       },
       {
         "path": "screenshots/ibm_eur_2034_callable__oas.png",
-        "screen": "OAS1",
+        "screen": "CFA",
         "captured_on": "2026-05-03",
-        "description": "Option-adjusted spread analysis with OAS, volatility, option value, vega, call schedule, and OAS risk table"
+        "description": "Annual contractual bond coupons and principal redemption"
       },
       {
         "path": "screenshots/ibm_eur_2034_callable__asw_pricing.png",
-        "screen": "ASW",
+        "screen": "OAS1",
         "captured_on": "2026-05-03",
-        "description": "Asset swap pricing tab with bond terms, swap terms, z-spread, yield, ASW spread, MMS spread, and swapped spread detail"
+        "description": "Option-adjusted spread and volatility analysis"
       },
       {
         "path": "screenshots/ibm_eur_2034_callable__present_values.png",
         "screen": "ASW",
         "captured_on": "2026-05-03",
-        "description": "Asset swap deal summary with constituent bond, swap payer, swap receiver, and asset swap fields"
+        "description": "Asset-swap deal summary, leg conventions, first coupon 2.158% and ASW 81.6 bp"
       },
       {
         "path": "screenshots/ibm_eur_2034_callable__asw_cashflows.png",
         "screen": "ASW",
         "captured_on": "2026-05-03",
-        "description": "Asset swap cashflow table with leg cashflows, discount factors, PVs, accrued interest, and settlement cash"
+        "description": "Asset-swap pricing inputs, 2026-02-03 effective date, and swapped-spread breakdown"
       },
       {
         "path": "screenshots/ibm_eur_2034_callable__cashflow_analysis.png",
-        "screen": "YAS",
+        "screen": "ASW",
         "captured_on": "2026-05-03",
-        "description": "Cash flow analysis tab with coupon and principal schedule at Bloomberg price 97.620"
-      },
-      {
-        "path": "screenshots/ibm_eur_2034_callable__present_values.png",
-        "screen": "YAS",
-        "captured_on": "2026-05-03",
-        "description": "Present values tab with spot rates, per-cashflow PVs, and curve YCGT0013"
+        "description": "Asset-swap leg cashflows, discount factors, PVs, and settlement accrued-interest amounts"
       },
       {
         "path": "screenshots/ibm_eur_2034_callable__swap_curve_builder.png",
-        "screen": "SWYC",
+        "screen": "DES",
         "captured_on": "2026-05-03",
-        "description": "EUR vs 6M EURIBOR swap curve builder with cash, serial FRA, and swap market rates"
+        "description": "Bond identifiers, coupon, maturity, issue and first settlement dates"
       },
       {
         "path": "screenshots/ibm_eur_2034_callable__swap_curve_stripped.png",
-        "screen": "SWYC",
+        "screen": "DES",
         "captured_on": "2026-05-03",
-        "description": "EUR vs 6M EURIBOR stripped curve analysis with dates, market rates, zero rates, and discount factors"
+        "description": "Bond call schedule beginning 2033-11-03"
       }
     ]
   },
@@ -383,107 +377,657 @@
         {
           "kind": "forward_curve",
           "id": "EUR-EURIBOR-6M",
-          "base": "2026-04-30",
+          "base": "2026-05-06",
           "reset_lag": 2,
           "day_count": "act_360",
           "tenor": 0.5,
           "knot_points": [
             [
               0.0,
-              0.02524
+              0.0256171378162363
             ],
             [
               0.5,
-              0.02611
+              0.02545716586708496
+            ],
+            [
+              0.5083333333333337,
+              0.027212158876967315
+            ],
+            [
+              0.5972222222222222,
+              0.028795444280215347
+            ],
+            [
+              0.6777777777777783,
+              0.027748476346605436
+            ],
+            [
+              0.7638888888888894,
+              0.03091373695491147
+            ],
+            [
+              0.8416666666666668,
+              0.029027733643358245
+            ],
+            [
+              0.9277777777777778,
+              0.031066778213469915
             ],
             [
               1.0,
-              0.02705
+              0.031037328334739264
+            ],
+            [
+              1.0111111111111113,
+              0.028490881391850128
+            ],
+            [
+              1.266666666666666,
+              0.029364644950832307
+            ],
+            [
+              1.5,
+              0.02927402025645481
+            ],
+            [
+              1.5222222222222235,
+              0.0279378842081099
             ],
             [
               2.0,
-              0.02845
+              0.027763768608082905
+            ],
+            [
+              2.0277777777777777,
+              0.02797466843780339
+            ],
+            [
+              2.5,
+              0.02798549287359599
             ],
             [
               3.0,
-              0.02873
+              0.027807600661855995
+            ],
+            [
+              3.0416666666666665,
+              0.0284845437068445
+            ],
+            [
+              3.5,
+              0.028501380772521345
+            ],
+            [
+              4.0,
+              0.028322466516029748
+            ],
+            [
+              4.055555555555555,
+              0.029014661151785342
+            ],
+            [
+              4.5,
+              0.029037958463622587
             ],
             [
               5.0,
-              0.0284655
+              0.028858053799992685
+            ],
+            [
+              5.069444444444445,
+              0.030259314018432786
+            ],
+            [
+              5.5,
+              0.03029099148035961
+            ],
+            [
+              6.0,
+              0.030102844397931542
+            ],
+            [
+              6.086111111111114,
+              0.03131740331962033
+            ],
+            [
+              6.5,
+              0.031359487677379734
             ],
             [
               7.0,
-              0.0288452
+              0.031164634481692266
+            ],
+            [
+              7.100000000000002,
+              0.03235752123208867
+            ],
+            [
+              7.5,
+              0.03240970325042022
+            ],
+            [
+              8.0,
+              0.032208839524554334
+            ],
+            [
+              8.11388888888889,
+              0.03335444293434955
+            ],
+            [
+              8.5,
+              0.03341760400736794
+            ],
+            [
+              9.0,
+              0.03321176343315001
+            ],
+            [
+              9.12777777777778,
+              0.03365124252813187
+            ],
+            [
+              9.5,
+              0.033723393344212794
             ],
             [
               10.0,
-              0.029117
+              0.033523135007053076
+            ],
+            [
+              10.14444444444445,
+              0.03449322430466213
+            ],
+            [
+              10.5,
+              0.03457894548029349
+            ],
+            [
+              11.0,
+              0.034376638424673006
+            ],
+            [
+              11.158333333333339,
+              0.03514037291039717
+            ],
+            [
+              11.5,
+              0.035237922565832386
+            ],
+            [
+              12.0,
+              0.03503637571659526
+            ],
+            [
+              12.172222222222228,
+              0.03414576070299395
+            ],
+            [
+              12.5,
+              0.03424598345633821
+            ],
+            [
+              13.0,
+              0.03424598345633809
+            ],
+            [
+              13.5,
+              0.03424598345633809
+            ],
+            [
+              14.0,
+              0.03424598345633821
+            ],
+            [
+              14.5,
+              0.03424598345633809
+            ],
+            [
+              15.0,
+              0.03413124472263867
+            ],
+            [
+              15.30277777777777,
+              0.03228873555867631
+            ],
+            [
+              15.5,
+              0.032446747107243115
+            ],
+            [
+              16.0,
+              0.032446747107243115
+            ],
+            [
+              16.5,
+              0.03244674710724334
+            ],
+            [
+              17.0,
+              0.032446747107243115
+            ],
+            [
+              17.5,
+              0.032446747107243115
+            ],
+            [
+              18.0,
+              0.032446747107243115
+            ],
+            [
+              18.5,
+              0.03244674710724334
+            ],
+            [
+              19.0,
+              0.032446747107243115
+            ],
+            [
+              19.5,
+              0.032446747107243115
             ],
             [
               20.0,
-              0.031434
+              0.032424941372209456
+            ],
+            [
+              20.45833333333331,
+              0.030015015958502107
+            ],
+            [
+              20.5,
+              0.030222335572371375
+            ],
+            [
+              21.0,
+              0.0302223355723716
+            ],
+            [
+              21.5,
+              0.030222335572371375
+            ],
+            [
+              22.0,
+              0.0302223355723716
+            ],
+            [
+              22.5,
+              0.030222335572371375
+            ],
+            [
+              23.0,
+              0.0302223355723716
+            ],
+            [
+              23.5,
+              0.030222335572371375
+            ],
+            [
+              24.0,
+              0.0302223355723716
+            ],
+            [
+              24.5,
+              0.030222335572371375
+            ],
+            [
+              25.0,
+              0.030159310512250837
+            ],
+            [
+              25.361111111111125,
+              0.02636830395212726
+            ],
+            [
+              25.5,
+              0.02649408730100319
+            ],
+            [
+              26.0,
+              0.02649408730100319
+            ],
+            [
+              26.5,
+              0.02649408730100319
+            ],
+            [
+              27.0,
+              0.02649408730100319
+            ],
+            [
+              27.5,
+              0.026494087301003416
+            ],
+            [
+              28.0,
+              0.026494087301002965
+            ],
+            [
+              28.5,
+              0.026494087301003416
+            ],
+            [
+              29.0,
+              0.026494087301002965
+            ],
+            [
+              29.5,
+              0.02649408730100319
             ],
             [
               30.0,
-              0.03249
+              0.026471775208242867
+            ],
+            [
+              30.43611111111113,
+              0.02233164584986994
+            ],
+            [
+              30.5,
+              0.02244069250719689
+            ],
+            [
+              31.0,
+              0.02244069250719689
+            ],
+            [
+              31.5,
+              0.02244069250719689
+            ],
+            [
+              32.0,
+              0.02244069250719689
+            ],
+            [
+              32.5,
+              0.02244069250719689
+            ],
+            [
+              33.0,
+              0.02244069250719689
+            ],
+            [
+              33.5,
+              0.02244069250719689
+            ],
+            [
+              34.0,
+              0.022440692507197116
+            ],
+            [
+              34.5,
+              0.022440692507196665
+            ],
+            [
+              35.0,
+              0.022440692507197116
+            ],
+            [
+              35.5,
+              0.022440692507196665
+            ],
+            [
+              36.0,
+              0.022440692507197116
+            ],
+            [
+              36.5,
+              0.022440692507197116
+            ],
+            [
+              37.0,
+              0.022440692507196665
+            ],
+            [
+              37.5,
+              0.022440692507197116
+            ],
+            [
+              38.0,
+              0.022440692507196665
+            ],
+            [
+              38.5,
+              0.022440692507197116
+            ],
+            [
+              39.0,
+              0.022440692507196665
+            ],
+            [
+              39.5,
+              0.022440692507197116
+            ],
+            [
+              40.0,
+              0.022440692507196665
+            ],
+            [
+              40.5,
+              0.022335800243310763
+            ],
+            [
+              40.580555555555584,
+              0.016813759724016452
+            ],
+            [
+              41.0,
+              0.016825124794811068
+            ],
+            [
+              41.5,
+              0.016825124794811516
+            ],
+            [
+              42.0,
+              0.016825124794811516
+            ],
+            [
+              42.5,
+              0.016825124794811516
+            ],
+            [
+              43.0,
+              0.016825124794811516
+            ],
+            [
+              43.5,
+              0.016825124794811068
+            ],
+            [
+              44.0,
+              0.016825124794811516
+            ],
+            [
+              44.5,
+              0.016825124794811516
+            ],
+            [
+              45.0,
+              0.016825124794811516
+            ],
+            [
+              45.5,
+              0.016825124794811068
+            ],
+            [
+              46.0,
+              0.016825124794811516
+            ],
+            [
+              46.5,
+              0.016825124794811516
+            ],
+            [
+              47.0,
+              0.016825124794811516
+            ],
+            [
+              47.5,
+              0.016825124794811068
+            ],
+            [
+              48.0,
+              0.016825124794811516
+            ],
+            [
+              48.5,
+              0.016825124794811516
+            ],
+            [
+              49.0,
+              0.016825124794811516
+            ],
+            [
+              49.5,
+              0.016825124794811516
             ],
             [
               50.0,
-              0.028814
+              0.016825124794811068
+            ],
+            [
+              50.5,
+              0.016786759791439766
+            ],
+            [
+              50.72777777777781,
+              0.016786759791439766
             ]
           ],
           "interp_style": "linear",
           "extrapolation": "flat_forward",
-          "rate_calibration": {
-            "currency": "EUR",
-            "method": "bootstrap",
-            "curve_day_count": "act_360",
-            "ois_compounding": null,
-            "role": {
-              "projection": {
-                "discount_curve_id": "EUR-SWAP-514"
-              }
-            },
-            "quotes": [
-              {
-                "deposit": {
-                  "rate": 0.02524,
-                  "pillar": {
-                    "tenor": {
-                      "count": 6,
-                      "unit": "months"
-                    }
-                  },
-                  "index_id": "EUR-EURIBOR-6M"
-                }
-              },
-              {
-                "basis": {
-                  "spread_decimal": 0.0,
-                  "pillar": {
-                    "tenor": {
-                      "count": 1,
-                      "unit": "years"
-                    }
-                  },
-                  "index_id": "EUR-EURIBOR-6M"
-                }
-              },
-              {
-                "basis": {
-                  "spread_decimal": 0.0,
-                  "pillar": {
-                    "tenor": {
-                      "count": 2,
-                      "unit": "years"
-                    }
-                  },
-                  "index_id": "EUR-EURIBOR-6M"
-                }
-              }
-            ]
-          }
+          "rate_calibration": null,
+          "projection_grid": [
+            0.0,
+            0.5,
+            0.5083333333333337,
+            0.5972222222222222,
+            0.6777777777777783,
+            0.7638888888888894,
+            0.8416666666666668,
+            0.9277777777777778,
+            1.0,
+            1.0111111111111113,
+            1.266666666666666,
+            1.5,
+            1.5222222222222235,
+            2.0,
+            2.0277777777777777,
+            2.5,
+            3.0,
+            3.0416666666666665,
+            3.5,
+            4.0,
+            4.055555555555555,
+            4.5,
+            5.0,
+            5.069444444444445,
+            5.5,
+            6.0,
+            6.086111111111114,
+            6.5,
+            7.0,
+            7.100000000000002,
+            7.5,
+            8.0,
+            8.11388888888889,
+            8.5,
+            9.0,
+            9.12777777777778,
+            9.5,
+            10.0,
+            10.14444444444445,
+            10.5,
+            11.0,
+            11.158333333333339,
+            11.5,
+            12.0,
+            12.172222222222228,
+            12.5,
+            13.0,
+            13.5,
+            14.0,
+            14.5,
+            15.0,
+            15.30277777777777,
+            15.5,
+            16.0,
+            16.5,
+            17.0,
+            17.5,
+            18.0,
+            18.5,
+            19.0,
+            19.5,
+            20.0,
+            20.45833333333331,
+            20.5,
+            21.0,
+            21.5,
+            22.0,
+            22.5,
+            23.0,
+            23.5,
+            24.0,
+            24.5,
+            25.0,
+            25.361111111111125,
+            25.5,
+            26.0,
+            26.5,
+            27.0,
+            27.5,
+            28.0,
+            28.5,
+            29.0,
+            29.5,
+            30.0,
+            30.43611111111113,
+            30.5,
+            31.0,
+            31.5,
+            32.0,
+            32.5,
+            33.0,
+            33.5,
+            34.0,
+            34.5,
+            35.0,
+            35.5,
+            36.0,
+            36.5,
+            37.0,
+            37.5,
+            38.0,
+            38.5,
+            39.0,
+            39.5,
+            40.0,
+            40.5,
+            40.580555555555584,
+            41.0,
+            41.5,
+            42.0,
+            42.5,
+            43.0,
+            43.5,
+            44.0,
+            44.5,
+            45.0,
+            45.5,
+            46.0,
+            46.5,
+            47.0,
+            47.5,
+            48.0,
+            48.5,
+            49.0,
+            49.5,
+            50.0,
+            50.5,
+            50.72777777777781
+          ]
         },
         {
           "kind": "discount_curve",

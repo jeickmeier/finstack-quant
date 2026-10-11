@@ -102,7 +102,7 @@ mod types;
 pub use compounding::FloatingLegCompounding;
 pub use types::{
     ConventionSwapParams, FixedLegSpec, FloatLegSpec, InterestRateSwap, InterestRateSwapBuilder,
-    IrsLegConventions, ParRateMethod, PayReceive,
+    IrsLegConventions, PayReceive,
 };
 
 /// Error for a swap float leg set to `simple_average`, which the swap

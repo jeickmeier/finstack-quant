@@ -938,7 +938,7 @@ fn fi_trs_period_in_progress_requires_initial_level() {
 }
 
 /// A period that has ended but is still awaiting its lagged payment stays in
-/// the PV at its carry accrual N × (e^{y·90/360} − 1).
+/// the PV at its realized endpoint return, independent of the current yield.
 #[test]
 fn fi_trs_keeps_completed_unpaid_period_in_pv() {
     use finstack_quant_cashflows::builder::ScheduleParams;
@@ -948,9 +948,36 @@ fn fi_trs_keeps_completed_unpaid_period_in_pv() {
     let mut params = ScheduleParams::quarterly_act360();
     params.payment_lag_days = 2;
     trs.schedule = TrsScheduleSpec::from_params(d(2025, 1, 2), d(2025, 4, 2), params);
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+    trs.fixing_series_id = Some("HY-HISTORY".into());
+    let market = market.insert_series(
+        ScalarTimeSeries::new(
+            "HY-HISTORY",
+            vec![(d(2025, 1, 2), 100.0), (d(2025, 4, 2), 108.0)],
+            None,
+        )
+        .expect("levels"),
+    );
     let pv = trs
         .pv_total_return_leg(&market, d(2025, 4, 3))
         .expect("completed-unpaid pv");
-    let expected = 10_000_000.0 * ((0.05_f64 * 90.0 / 360.0).exp() - 1.0);
+    let expected = 800_000.0;
     assert!((pv.amount() - expected).abs() < 1e-6, "pv {}", pv.amount());
+    let changed = market
+        .clone()
+        .insert_price("HY-INDEX-YIELD", MarketScalar::Unitless(0.20));
+    assert_eq!(
+        trs.pv_total_return_leg(&changed, d(2025, 4, 3))
+            .expect("fixed")
+            .amount(),
+        pv.amount()
+    );
+    assert_eq!(
+        trs.pv_total_return_leg(&market, d(2025, 4, 4))
+            .expect("paid")
+            .amount(),
+        0.0
+    );
+    trs.fixing_series_id = None;
+    assert!(trs.pv_total_return_leg(&market, d(2025, 4, 3)).is_err());
 }

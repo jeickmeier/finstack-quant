@@ -24,26 +24,26 @@
           "unit": "BBL",
           "vol_surface_id": "WTI-VOL"
         },
-        "type": "commodity_option"
+        "type": "commodity_spot_option"
       },
       "schema": "finstack_quant.instrument/1"
     }
   ],
   "properties": {
     "instrument": {
-      "$ref": "#/$defs/d_db1fcc5c6a61e550e867"
+      "$ref": "#/$defs/d_24d6afbb949d55f73647"
     },
     "schema": {
-      "$ref": "#/$defs/d_268b4bcaad562a693ba9"
+      "$ref": "#/$defs/d_383e1515751b52d5fb56"
     }
   },
   "required": [
     "schema",
     "instrument"
   ],
-  "title": "commodity_option",
+  "title": "commodity_spot_option",
   "type": "object",
-  "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json",
+  "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json",
   "$defs": {
     "d_00292b2cd9779815232f": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -280,11 +280,50 @@
         }
       ]
     },
-    "d_11e839ded3b42bb303e7": {
-      "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
-      "exclusiveMinimum": 0,
-      "format": "double",
-      "type": "number"
+    "d_132c0970533550baccde": {
+      "description": "Standard commodity market conventions by product type.\n\nEach variant provides market-standard defaults for settlement days,\nbusiness day convention, and calendar. Use when constructing commodity\nforwards, options, or swaps without explicitly specifying these parameters.\n\n# Market Standards Reference\n\n| Convention | Settlement | BDC | Calendar | Exchange |\n|------------|------------|-----|----------|----------|\n| WTI Crude | T+2 | Following | NYMEX | NYMEX/CME |\n| Brent Crude | T+2 | Following | ICE | ICE |\n| Natural Gas | T+2 | Following | NYMEX | NYMEX/CME |\n| Gold | T+2 | Modified Following | COMEX | CME |\n| Silver | T+2 | Modified Following | COMEX | CME |\n| Copper | T+2 | Following | LME | LME |\n| Corn/Wheat | T+2 | Following | CBOT | CME |\n| Power | T+1 | Modified Following | NERC | Various |\n\n# Sources\n\n- CME Group rulebooks\n- ICE Futures exchange rules\n- LME trading procedures",
+      "oneOf": [
+        {
+          "const": "wti_crude",
+          "description": "WTI Crude Oil: T+2, Following, NYMEX calendar",
+          "type": "string"
+        },
+        {
+          "const": "brent_crude",
+          "description": "Brent Crude Oil: T+2, Following, ICE calendar",
+          "type": "string"
+        },
+        {
+          "const": "natural_gas",
+          "description": "Henry Hub Natural Gas: T+2, Following, NYMEX calendar",
+          "type": "string"
+        },
+        {
+          "const": "gold",
+          "description": "COMEX Gold: T+2, Modified Following, COMEX calendar",
+          "type": "string"
+        },
+        {
+          "const": "silver",
+          "description": "COMEX Silver: T+2, Modified Following, COMEX calendar",
+          "type": "string"
+        },
+        {
+          "const": "copper",
+          "description": "LME Copper: T+2, Following, LME calendar",
+          "type": "string"
+        },
+        {
+          "const": "agricultural",
+          "description": "CBOT Agricultural (Corn, Wheat, Soybeans): T+2, Following, CBOT calendar",
+          "type": "string"
+        },
+        {
+          "const": "power",
+          "description": "Power/Electricity: T+1, Modified Following, NERC calendar",
+          "type": "string"
+        }
+      ]
     },
     "d_16451e0bf3b6b78178d8": {
       "additionalProperties": false,
@@ -380,165 +419,52 @@
       },
       "type": "object"
     },
-    "d_1e0fa57668926accf1a2": {
+    "d_24d6afbb949d55f73647": {
       "additionalProperties": false,
-      "description": "Commodity option (option on commodity forward or spot).\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\nAnalytical delta measures currency per unit change in the resolved forward,\nholding discount factors and volatility fixed. At zero volatility or expiry,\nthe intrinsic-payoff derivative is used; delta is defined as zero exactly at\nthe strike, where the mathematical derivative does not exist.\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\nIf `spot_id` is provided, it uses that spot price. Otherwise, the forward\nprice is used as a proxy for spot, which may underestimate early exercise value.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup.",
       "properties": {
-        "attributes": {
-          "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
-          "default": {},
-          "description": "Attributes for tagging and selection.\nAttributes for scenario selection and tagging"
+        "spec": {
+          "$ref": "#/$defs/d_6990e6c5e63d5457943c"
         },
-        "commodity_type": {
-          "description": "Commodity type (e.g., \"Energy\", \"Metal\", \"Agricultural\")",
+        "type": {
+          "const": "commodity_spot_option",
           "type": "string"
-        },
-        "convention": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_2e99fddbe4971f773a8e"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional market convention for this commodity.\n\nWhen set, provides default premium settlement days and calendar."
-        },
-        "currency": {
-          "$ref": "#/$defs/d_be98333e68c25ab5ae57",
-          "description": "Base currency for pricing"
-        },
-        "day_count": {
-          "$ref": "#/$defs/d_c0401254ec268b317b65",
-          "default": "act_365f",
-          "description": "Day count convention for time to expiry."
-        },
-        "discount_curve_id": {
-          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Discount curve ID for present value."
-        },
-        "exercise_dates": {
-          "description": "Optional Bermudan exercise schedule.\n\nRequired when `exercise_style == ExerciseStyle::Bermudan`.",
-          "items": {
-            "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
-          },
-          "type": [
-            "array",
-            "null"
-          ]
-        },
-        "exercise_style": {
-          "$ref": "#/$defs/d_8c04a01e469950d147da",
-          "default": "european",
-          "description": "Exercise style (European or American)."
-        },
-        "expiry": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Option expiry date."
-        },
-        "forward_curve_id": {
-          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Forward/futures curve ID for price interpolation."
-        },
-        "id": {
-          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Unique instrument identifier."
-        },
-        "instrument_pricing_overrides": {
-          "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Instrument-owned pricing inputs."
-        },
-        "metric_pricing_overrides": {
-          "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-time pricing configuration."
-        },
-        "multiplier": {
-          "$ref": "#/$defs/d_11e839ded3b42bb303e7",
-          "description": "Contract multiplier (typically 1.0 for OTC options)."
-        },
-        "option_type": {
-          "$ref": "#/$defs/d_95c9bbe13fca10df3b83",
-          "description": "Option type (call or put)."
-        },
-        "premium_settlement_days": {
-          "description": "Premium settlement lag in business days after trade date.\n\nStandard: T+1 for most exchange-traded options, T+2 for OTC.\nIf not set and `convention` is provided, uses convention default.\nOtherwise defaults to 1 (T+1).",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "quantity": {
-          "$ref": "#/$defs/d_11e839ded3b42bb303e7",
-          "description": "Contract quantity in units."
-        },
-        "quoted_forward": {
-          "description": "Optional quoted forward price (overrides curve lookup).",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "scenario_pricing_overrides": {
-          "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only pricing adjustments."
-        },
-        "settlement": {
-          "$ref": "#/$defs/d_d14396b683f11e7633df",
-          "default": "cash",
-          "description": "Settlement type (physical or cash).\n\nDefaults to cash settlement when omitted in serialized payloads."
-        },
-        "spot_id": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional spot price ID (for spot-based pricing and American options)."
-        },
-        "strike": {
-          "$ref": "#/$defs/d_11e839ded3b42bb303e7",
-          "description": "Strike price per unit."
-        },
-        "underlying_ticker": {
-          "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",
-          "type": "string"
-        },
-        "unit": {
-          "description": "Unit of measurement (e.g., \"BBL\", \"OZ\", \"MT\", \"MMBTU\")",
-          "type": "string"
-        },
-        "vol_surface_id": {
-          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Volatility surface ID for implied vol."
         }
       },
       "required": [
-        "id",
-        "commodity_type",
-        "underlying_ticker",
-        "unit",
-        "currency",
-        "strike",
-        "option_type",
-        "expiry",
-        "quantity",
-        "multiplier",
-        "forward_curve_id",
-        "discount_curve_id",
-        "vol_surface_id"
+        "type",
+        "spec"
       ],
       "type": "object"
     },
-    "d_268b4bcaad562a693ba9": {
-      "const": "finstack_quant.instrument/1",
-      "description": "Canonical schema marker for persisted instrument envelopes.",
-      "type": "string"
+    "d_26775289dc7630c4c860": {
+      "additionalProperties": false,
+      "description": "Recorded exercise or expiry of a spot commodity option.",
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Exercise date, or expiry observation date for an unexercised option."
+        },
+        "exercised": {
+          "description": "True for exercise/assignment; false records expiration without exercise.",
+          "type": "boolean"
+        },
+        "settlement_date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Actual cash-payment or physical-delivery date, on or after exercise."
+        },
+        "spot": {
+          "description": "Positive observed commodity spot price in strike units.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "date",
+        "spot",
+        "settlement_date",
+        "exercised"
+      ],
+      "type": "object"
     },
     "d_2701caf4934336a2dd86": {
       "description": "Toggle exercise model for PIK/cash decision.",
@@ -644,51 +570,6 @@
       },
       "title": "Attributes",
       "type": "object"
-    },
-    "d_2e99fddbe4971f773a8e": {
-      "description": "Standard commodity market conventions by product type.\n\nEach variant provides market-standard defaults for settlement days,\nbusiness day convention, and calendar. Use when constructing commodity\nforwards, options, or swaps without explicitly specifying these parameters.\n\n# Market Standards Reference\n\n| Convention | Settlement | BDC | Calendar | Exchange |\n|------------|------------|-----|----------|----------|\n| WTI Crude | T+2 | Following | NYMEX | NYMEX/CME |\n| Brent Crude | T+2 | Following | ICE | ICE |\n| Natural Gas | T+2 | Following | NYMEX | NYMEX/CME |\n| Gold | T+2 | Modified Following | COMEX | CME |\n| Silver | T+2 | Modified Following | COMEX | CME |\n| Copper | T+2 | Following | LME | LME |\n| Corn/Wheat | T+2 | Following | CBOT | CME |\n| Power | T+1 | Modified Following | NERC | Various |\n\n# Sources\n\n- CME Group rulebooks\n- ICE Futures exchange rules\n- LME trading procedures",
-      "oneOf": [
-        {
-          "const": "wti_crude",
-          "description": "WTI Crude Oil: T+2, Following, NYMEX calendar",
-          "type": "string"
-        },
-        {
-          "const": "brent_crude",
-          "description": "Brent Crude Oil: T+2, Following, ICE calendar",
-          "type": "string"
-        },
-        {
-          "const": "natural_gas",
-          "description": "Henry Hub Natural Gas: T+2, Following, NYMEX calendar",
-          "type": "string"
-        },
-        {
-          "const": "gold",
-          "description": "COMEX Gold: T+2, Modified Following, COMEX calendar",
-          "type": "string"
-        },
-        {
-          "const": "silver",
-          "description": "COMEX Silver: T+2, Modified Following, COMEX calendar",
-          "type": "string"
-        },
-        {
-          "const": "copper",
-          "description": "LME Copper: T+2, Following, LME calendar",
-          "type": "string"
-        },
-        {
-          "const": "agricultural",
-          "description": "CBOT Agricultural (Corn, Wheat, Soybeans): T+2, Following, CBOT calendar",
-          "type": "string"
-        },
-        {
-          "const": "power",
-          "description": "Power/Electricity: T+1, Modified Following, NERC calendar",
-          "type": "string"
-        }
-      ]
     },
     "d_305c1a38cfd98cc3ea44": {
       "description": "Quote input for the bond quote engine.\n\nAll spreads are expressed in **decimal** (`0.01 = 100bp`).",
@@ -858,6 +739,11 @@
         "direction"
       ],
       "type": "object"
+    },
+    "d_383e1515751b52d5fb56": {
+      "const": "finstack_quant.instrument/1",
+      "description": "Canonical schema marker for persisted instrument envelopes.",
+      "type": "string"
     },
     "d_46455be5cce6b8020e50": {
       "description": "Asset dynamics specification for the Merton model.\n\nControls the stochastic process assumed for the firm's asset value.",
@@ -1158,6 +1044,12 @@
       },
       "type": "object"
     },
+    "d_5a4a97342eade5678c12": {
+      "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
+      "exclusiveMinimum": 0,
+      "format": "double",
+      "type": "number"
+    },
     "d_5c13df5a55f1da604df2": {
       "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor a common discount factor below one, annual and simple rates both exceed\nthe continuous rate. Their ordering depends on the maturity `t` in years:\n`r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and\n`r_simple > r_annual` for `t > 1`.",
       "oneOf": [
@@ -1212,6 +1104,172 @@
           "type": "string"
         }
       ]
+    },
+    "d_6990e6c5e63d5457943c": {
+      "additionalProperties": false,
+      "description": "Option on spot commodity. Options on a specified futures contract use\n[`crate::instruments::CommodityFutureOption`], including futures delivery.\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\nAnalytical delta measures currency per unit change in the resolved forward,\nholding discount factors and volatility fixed. At zero volatility or expiry,\nthe intrinsic-payoff derivative is used; delta is defined as zero exactly at\nthe strike, where the mathematical derivative does not exist.\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\n`spot_id` must identify an observed spot for early exercise and Monte Carlo.\nThe commodity forward is never substituted for the spot underlying.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup.",
+      "properties": {
+        "attributes": {
+          "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
+          "default": {},
+          "description": "Attributes for tagging and selection.\nAttributes for scenario selection and tagging"
+        },
+        "commodity_type": {
+          "description": "Commodity type (e.g., \"Energy\", \"Metal\", \"Agricultural\")",
+          "type": "string"
+        },
+        "convention": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_132c0970533550baccde"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional market convention for this commodity.\n\nWhen set, provides default premium settlement days and calendar."
+        },
+        "currency": {
+          "$ref": "#/$defs/d_be98333e68c25ab5ae57",
+          "description": "Base currency for pricing"
+        },
+        "day_count": {
+          "$ref": "#/$defs/d_c0401254ec268b317b65",
+          "default": "act_365f",
+          "description": "Day count convention for time to expiry."
+        },
+        "discount_curve_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Discount curve ID for present value."
+        },
+        "exercise": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_26775289dc7630c4c860"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Recorded exercise or expiry; required after expiry while settlement remains unpaid."
+        },
+        "exercise_dates": {
+          "description": "Optional Bermudan exercise schedule.\n\nRequired when `exercise_style == ExerciseStyle::Bermudan`.",
+          "items": {
+            "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "exercise_style": {
+          "$ref": "#/$defs/d_ed594b756b5481bfccc3",
+          "default": "european",
+          "description": "Exercise style (European or American)."
+        },
+        "expiry": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Option expiry date."
+        },
+        "forward_curve_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Forward/futures curve ID for price interpolation."
+        },
+        "id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Unique instrument identifier."
+        },
+        "instrument_pricing_overrides": {
+          "$ref": "#/$defs/d_c08279a20372931820e0",
+          "description": "Instrument-owned pricing inputs."
+        },
+        "metric_pricing_overrides": {
+          "$ref": "#/$defs/d_00292b2cd9779815232f",
+          "description": "Metric-time pricing configuration."
+        },
+        "multiplier": {
+          "$ref": "#/$defs/d_5a4a97342eade5678c12",
+          "description": "Contract multiplier (typically 1.0 for OTC options)."
+        },
+        "option_type": {
+          "$ref": "#/$defs/d_93c0349e3a5a9763e83f",
+          "description": "Option type (call or put)."
+        },
+        "premium_settlement_days": {
+          "description": "Premium settlement lag in business days after trade date.\n\nStandard: T+1 for most exchange-traded options, T+2 for OTC.\nIf not set and `convention` is provided, uses convention default.\nOtherwise defaults to 1 (T+1).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "quantity": {
+          "$ref": "#/$defs/d_5a4a97342eade5678c12",
+          "description": "Contract quantity in units."
+        },
+        "quoted_forward": {
+          "description": "Optional quoted forward price (overrides curve lookup).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
+          "description": "Scenario-only pricing adjustments."
+        },
+        "settlement": {
+          "$ref": "#/$defs/d_abdca7350ca02551965b",
+          "description": "Settlement type (physical or cash).\n\nCash fixes the payoff on exercise; physical retains the marked delivery\nclaim until its recorded settlement date."
+        },
+        "spot_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional spot price ID (for spot-based pricing and American options)."
+        },
+        "strike": {
+          "$ref": "#/$defs/d_5a4a97342eade5678c12",
+          "description": "Strike price per unit."
+        },
+        "underlying_ticker": {
+          "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",
+          "type": "string"
+        },
+        "unit": {
+          "description": "Unit of measurement (e.g., \"BBL\", \"OZ\", \"MT\", \"MMBTU\")",
+          "type": "string"
+        },
+        "vol_surface_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Volatility surface ID for implied vol."
+        }
+      },
+      "required": [
+        "id",
+        "commodity_type",
+        "underlying_ticker",
+        "unit",
+        "currency",
+        "strike",
+        "option_type",
+        "expiry",
+        "quantity",
+        "multiplier",
+        "settlement",
+        "forward_curve_id",
+        "discount_curve_id",
+        "vol_surface_id"
+      ],
+      "type": "object"
     },
     "d_6c25a9bef63bd477f037": {
       "description": "Recovery model specification.",
@@ -1452,22 +1510,17 @@
       ],
       "type": "object"
     },
-    "d_8c04a01e469950d147da": {
-      "description": "Exercise schedule convention for option models.",
+    "d_93c0349e3a5a9763e83f": {
+      "description": "Option payoff direction used by analytical and numerical model engines.",
       "oneOf": [
         {
-          "const": "european",
-          "description": "Exercise only at expiry.",
+          "const": "call",
+          "description": "Call option.",
           "type": "string"
         },
         {
-          "const": "american",
-          "description": "Exercise at any eligible time through expiry.",
-          "type": "string"
-        },
-        {
-          "const": "bermudan",
-          "description": "Exercise on a finite schedule of eligible dates.",
+          "const": "put",
+          "description": "Put option.",
           "type": "string"
         }
       ]
@@ -1495,21 +1548,6 @@
     "d_94cb251104de5cf587b6": {
       "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
       "type": "string"
-    },
-    "d_95c9bbe13fca10df3b83": {
-      "description": "Option payoff direction used by analytical and numerical model engines.",
-      "oneOf": [
-        {
-          "const": "call",
-          "description": "Call option.",
-          "type": "string"
-        },
-        {
-          "const": "put",
-          "description": "Put option.",
-          "type": "string"
-        }
-      ]
     },
     "d_9b99d9188ef6cc4cff48": {
       "description": "Map from leverage to hazard rate.",
@@ -1606,6 +1644,21 @@
       ],
       "title": "Id",
       "type": "string"
+    },
+    "d_abdca7350ca02551965b": {
+      "description": "Settlement type for options",
+      "oneOf": [
+        {
+          "const": "physical",
+          "description": "Physical delivery",
+          "type": "string"
+        },
+        {
+          "const": "cash",
+          "description": "Cash settlement",
+          "type": "string"
+        }
+      ]
     },
     "d_ae5d75ed4e313ae3bc25": {
       "description": "Which valuation parameter to solve the breakeven for.\n\n# Result units\n\nThe breakeven metric is a bare `f64` whose unit depends on the target. Read\nthe per-variant docs before interpreting a value:\n\n| Target             | Sensitivity     | Result unit          |\n|--------------------|-----------------|----------------------|\n| `ZSpread`          | CS01            | basis points         |\n| `Ytm`              | DV01            | basis points         |\n| `Oas`              | CS01            | basis points         |\n| `ImpliedVol`       | Vega            | vol points (1 = 1%)  |\n| `BaseCorrelation`  | Correlation01   | correlation points   |",
@@ -3506,21 +3559,6 @@
       ],
       "type": "object"
     },
-    "d_d14396b683f11e7633df": {
-      "description": "Settlement type for options",
-      "oneOf": [
-        {
-          "const": "physical",
-          "description": "Physical delivery",
-          "type": "string"
-        },
-        {
-          "const": "cash",
-          "description": "Cash settlement",
-          "type": "string"
-        }
-      ]
-    },
     "d_d30540ea90ce7eca3dee": {
       "description": "Day basis used to convert annual analytic option theta into a per-day amount.\n\nApplied by the analytic-theta pricers (EquityOption, FxOption,\nFxDigitalOption) through `metric_pricing_overrides.theta_day_basis`.",
       "oneOf": [
@@ -3652,23 +3690,6 @@
         }
       ]
     },
-    "d_db1fcc5c6a61e550e867": {
-      "additionalProperties": false,
-      "properties": {
-        "spec": {
-          "$ref": "#/$defs/d_1e0fa57668926accf1a2"
-        },
-        "type": {
-          "const": "commodity_option",
-          "type": "string"
-        }
-      },
-      "required": [
-        "type",
-        "spec"
-      ],
-      "type": "object"
-    },
     "d_e42076b4d2ef6e393ce5": {
       "description": "Which structural parameter to calibrate in the MC engine.",
       "oneOf": [
@@ -3749,6 +3770,26 @@
         {
           "const": "iterative",
           "description": "Brent root-find with a full reprice at the horizon date.\n\nCaptures convexity *and* the horizon change in sensitivity. Not\nsupported for [`BreakevenTarget::BaseCorrelation`], nor for\ncredit-curve instruments under `ZSpread`/`Oas` — see\n[`BreakevenTarget`] and the calculator docs for why.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_ed594b756b5481bfccc3": {
+      "description": "Exercise schedule convention for option models.",
+      "oneOf": [
+        {
+          "const": "european",
+          "description": "Exercise only at expiry.",
+          "type": "string"
+        },
+        {
+          "const": "american",
+          "description": "Exercise at any eligible time through expiry.",
+          "type": "string"
+        },
+        {
+          "const": "bermudan",
+          "description": "Exercise on a finite schedule of eligible dates.",
           "type": "string"
         }
       ]
@@ -3842,7 +3883,7 @@
         },
         {
           "const": "taylor_approximation",
-          "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian.",
+          "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil.",
           "type": "string"
         }
       ]

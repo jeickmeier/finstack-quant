@@ -265,7 +265,7 @@ fn register_commodity_instrument_metrics(
         crate::instruments::commodity::commodity_future::metrics::register_commodity_future_metrics,
         crate::instruments::commodity::commodity_future_option::metrics::register_commodity_future_option_metrics,
         crate::instruments::commodity::commodity_swap::metrics::register_commodity_swap_metrics,
-        crate::instruments::commodity::commodity_option::metrics::register_commodity_option_metrics,
+        crate::instruments::commodity::commodity_spot_option::metrics::register_commodity_spot_option_metrics,
         crate::instruments::commodity::commodity_asian_option::metrics::register_commodity_asian_option_metrics,
         crate::instruments::commodity::commodity_swaption::metrics::register_commodity_swaption_metrics,
         crate::instruments::commodity::commodity_spread_option::metrics::register_commodity_spread_option_metrics,

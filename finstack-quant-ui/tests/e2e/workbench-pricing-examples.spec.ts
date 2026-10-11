@@ -22,7 +22,7 @@ const examples = [
   },
   { type: "equity_option", id: "SPX-CALL-4500", model: "black76", featured: 3 },
   {
-    type: "commodity_option",
+    type: "commodity_spot_option",
     id: "WTI-OPT-2025M06",
     model: "monte_carlo_schwartz_smith",
     featured: 1,

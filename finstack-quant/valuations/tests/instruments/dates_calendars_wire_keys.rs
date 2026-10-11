@@ -20,7 +20,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 };
 use finstack_quant_valuations::instruments::{
     AssetBackedFacility, BermudanSwaption, CallableRangeAccrual, CdsOption, CdsTranche,
-    CmsSpreadOption, CommodityOption, CommoditySwaption, EquityOption, RevolvingCredit,
+    CmsSpreadOption, CommoditySpotOption, CommoditySwaption, EquityOption, RevolvingCredit,
     StructuredCredit,
 };
 use serde::de::DeserializeOwned;
@@ -100,7 +100,7 @@ fn retired_option_expiry_date_key_is_rejected() {
 }
 
 #[test]
-// schema-rejection-test: BermudanSwaption `bermudan_schedule`, EquityOption and CommodityOption `exercise_schedule`
+// schema-rejection-test: BermudanSwaption `bermudan_schedule`, EquityOption and CommoditySpotOption `exercise_schedule`
 fn retired_bermudan_exercise_keys_are_rejected() {
     let schedule = serde_json::to_value(BermudanSwaption::example().expect("example"))
         .expect("serialize")
@@ -120,7 +120,7 @@ fn retired_bermudan_exercise_keys_are_rejected() {
         json!(["2025-06-20"]),
     );
     assert_rejects_at(
-        &CommodityOption::example().expect("example"),
+        &CommoditySpotOption::example().expect("example"),
         "",
         "exercise_schedule",
         json!(["2025-06-20"]),

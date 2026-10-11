@@ -300,7 +300,7 @@ fn test_single_curve_forward_honors_explicit_fixed_leg_payment_cashflows() {
         stub: StubKind::ShortFront,
         start: swap_start,
         end: swap_end,
-        par_method: None,
+
         payment_lag_days: 2,
         end_of_month: false,
     };

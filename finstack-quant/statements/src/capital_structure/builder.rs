@@ -159,7 +159,7 @@ fn build_swap_internal(
         stub: StubKind::None,
         start: start_date,
         end: maturity_date,
-        par_method: None,
+
         payment_lag_days: 0,
         end_of_month: false,
     };

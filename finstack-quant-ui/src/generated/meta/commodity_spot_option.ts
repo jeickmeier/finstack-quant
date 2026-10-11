@@ -2,7 +2,7 @@
 export default [
   {
     "path": "#",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#",
     "description": "Canonical single-instrument v1 envelope generated from its serde type.",
     "examples": [
       {
@@ -26,12 +26,12 @@ export default [
             "unit": "BBL",
             "vol_surface_id": "WTI-VOL"
           },
-          "type": "commodity_option"
+          "type": "commodity_spot_option"
         },
         "schema": "finstack_quant.instrument/1"
       }
     ],
-    "title": "commodity_option"
+    "title": "commodity_spot_option"
   },
   {
     "path": "#/$defs/d_00292b2cd9779815232f",
@@ -301,11 +301,57 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikMode"
   },
   {
-    "path": "#/$defs/d_11e839ded3b42bb303e7",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/PositiveF64Wire",
-    "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
-    "exclusiveMinimum": 0,
-    "format": "double"
+    "path": "#/$defs/d_132c0970533550baccde",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention",
+    "description": "Standard commodity market conventions by product type.\n\nEach variant provides market-standard defaults for settlement days,\nbusiness day convention, and calendar. Use when constructing commodity\nforwards, options, or swaps without explicitly specifying these parameters.\n\n# Market Standards Reference\n\n| Convention | Settlement | BDC | Calendar | Exchange |\n|------------|------------|-----|----------|----------|\n| WTI Crude | T+2 | Following | NYMEX | NYMEX/CME |\n| Brent Crude | T+2 | Following | ICE | ICE |\n| Natural Gas | T+2 | Following | NYMEX | NYMEX/CME |\n| Gold | T+2 | Modified Following | COMEX | CME |\n| Silver | T+2 | Modified Following | COMEX | CME |\n| Copper | T+2 | Following | LME | LME |\n| Corn/Wheat | T+2 | Following | CBOT | CME |\n| Power | T+1 | Modified Following | NERC | Various |\n\n# Sources\n\n- CME Group rulebooks\n- ICE Futures exchange rules\n- LME trading procedures"
+  },
+  {
+    "path": "#/$defs/d_132c0970533550baccde/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/0",
+    "const": "wti_crude",
+    "description": "WTI Crude Oil: T+2, Following, NYMEX calendar"
+  },
+  {
+    "path": "#/$defs/d_132c0970533550baccde/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/1",
+    "const": "brent_crude",
+    "description": "Brent Crude Oil: T+2, Following, ICE calendar"
+  },
+  {
+    "path": "#/$defs/d_132c0970533550baccde/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/2",
+    "const": "natural_gas",
+    "description": "Henry Hub Natural Gas: T+2, Following, NYMEX calendar"
+  },
+  {
+    "path": "#/$defs/d_132c0970533550baccde/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/3",
+    "const": "gold",
+    "description": "COMEX Gold: T+2, Modified Following, COMEX calendar"
+  },
+  {
+    "path": "#/$defs/d_132c0970533550baccde/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/4",
+    "const": "silver",
+    "description": "COMEX Silver: T+2, Modified Following, COMEX calendar"
+  },
+  {
+    "path": "#/$defs/d_132c0970533550baccde/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/5",
+    "const": "copper",
+    "description": "LME Copper: T+2, Following, LME calendar"
+  },
+  {
+    "path": "#/$defs/d_132c0970533550baccde/oneOf/6",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/6",
+    "const": "agricultural",
+    "description": "CBOT Agricultural (Corn, Wheat, Soybeans): T+2, Following, CBOT calendar"
+  },
+  {
+    "path": "#/$defs/d_132c0970533550baccde/oneOf/7",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/7",
+    "const": "power",
+    "description": "Power/Electricity: T+1, Modified Following, NERC calendar"
   },
   {
     "path": "#/$defs/d_16451e0bf3b6b78178d8",
@@ -389,207 +435,49 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_1e0fa57668926accf1a2",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption",
-    "description": "Commodity option (option on commodity forward or spot).\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\nAnalytical delta measures currency per unit change in the resolved forward,\nholding discount factors and volatility fixed. At zero volatility or expiry,\nthe intrinsic-payoff derivative is used; delta is defined as zero exactly at\nthe strike, where the mathematical derivative does not exist.\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\nIf `spot_id` is provided, it uses that spot price. Otherwise, the forward\nprice is used as a proxy for spot, which may underestimate early exercise value.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup."
+    "path": "#/$defs/d_24d6afbb949d55f73647",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/commodity_spot_option"
   },
   {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/attributes",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/attributes",
-    "default": {},
-    "description": "Attributes for tagging and selection.\nAttributes for scenario selection and tagging",
-    "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
+    "path": "#/$defs/d_24d6afbb949d55f73647/properties/spec",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/commodity_spot_option/properties/spec",
+    "ref": "#/$defs/CommoditySpotOption",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption"
   },
   {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/commodity_type",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/commodity_type",
-    "description": "Commodity type (e.g., \"Energy\", \"Metal\", \"Agricultural\")"
+    "path": "#/$defs/d_24d6afbb949d55f73647/properties/type",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/commodity_spot_option/properties/type",
+    "const": "commodity_spot_option"
   },
   {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/convention",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/convention",
-    "description": "Optional market convention for this commodity.\n\nWhen set, provides default premium settlement days and calendar."
+    "path": "#/$defs/d_26775289dc7630c4c860",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOptionExercise",
+    "description": "Recorded exercise or expiry of a spot commodity option."
   },
   {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/convention/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/convention/anyOf/0",
-    "ref": "#/$defs/CommodityConvention",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityConvention"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/convention/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/convention/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/currency",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/currency",
-    "description": "Base currency for pricing",
-    "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/day_count",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/day_count",
-    "default": "act_365f",
-    "description": "Day count convention for time to expiry.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/discount_curve_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/discount_curve_id",
-    "description": "Discount curve ID for present value.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/exercise_dates",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/exercise_dates",
-    "description": "Optional Bermudan exercise schedule.\n\nRequired when `exercise_style == ExerciseStyle::Bermudan`."
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/exercise_dates/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/exercise_dates/items",
+    "path": "#/$defs/d_26775289dc7630c4c860/properties/date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOptionExercise/properties/date",
+    "description": "Exercise date, or expiry observation date for an unexercised option.",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/exercise_style",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/exercise_style",
-    "default": "european",
-    "description": "Exercise style (European or American).",
-    "ref": "#/$defs/ExerciseStyle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/ExerciseStyle"
+    "path": "#/$defs/d_26775289dc7630c4c860/properties/exercised",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOptionExercise/properties/exercised",
+    "description": "True for exercise/assignment; false records expiration without exercise."
   },
   {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/expiry",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/expiry",
-    "description": "Option expiry date.",
+    "path": "#/$defs/d_26775289dc7630c4c860/properties/settlement_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOptionExercise/properties/settlement_date",
+    "description": "Actual cash-payment or physical-delivery date, on or after exercise.",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/forward_curve_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/forward_curve_id",
-    "description": "Forward/futures curve ID for price interpolation.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/id",
-    "description": "Unique instrument identifier.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/instrument_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/instrument_pricing_overrides",
-    "description": "Instrument-owned pricing inputs.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/metric_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/metric_pricing_overrides",
-    "description": "Metric-time pricing configuration.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/multiplier",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/multiplier",
-    "description": "Contract multiplier (typically 1.0 for OTC options).",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/PositiveF64Wire"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/option_type",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/option_type",
-    "description": "Option type (call or put).",
-    "ref": "#/$defs/OptionType",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/OptionType"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/premium_settlement_days",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/premium_settlement_days",
-    "description": "Premium settlement lag in business days after trade date.\n\nStandard: T+1 for most exchange-traded options, T+2 for OTC.\nIf not set and `convention` is provided, uses convention default.\nOtherwise defaults to 1 (T+1).",
-    "format": "uint32",
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/quantity",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/quantity",
-    "description": "Contract quantity in units.",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/PositiveF64Wire"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/quoted_forward",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/quoted_forward",
-    "description": "Optional quoted forward price (overrides curve lookup).",
+    "path": "#/$defs/d_26775289dc7630c4c860/properties/spot",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOptionExercise/properties/spot",
+    "description": "Positive observed commodity spot price in strike units.",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/scenario_pricing_overrides",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/scenario_pricing_overrides",
-    "description": "Scenario-only pricing adjustments.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/settlement",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/settlement",
-    "default": "cash",
-    "description": "Settlement type (physical or cash).\n\nDefaults to cash settlement when omitted in serialized payloads.",
-    "ref": "#/$defs/SettlementType",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/SettlementType"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/spot_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/spot_id",
-    "description": "Optional spot price ID (for spot-based pricing and American options)."
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/spot_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/spot_id/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/spot_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/spot_id/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/strike",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/strike",
-    "description": "Strike price per unit.",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/PositiveF64Wire"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/underlying_ticker",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/underlying_ticker",
-    "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key."
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/unit",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/unit",
-    "description": "Unit of measurement (e.g., \"BBL\", \"OZ\", \"MT\", \"MMBTU\")"
-  },
-  {
-    "path": "#/$defs/d_1e0fa57668926accf1a2/properties/vol_surface_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption/properties/vol_surface_id",
-    "description": "Volatility surface ID for implied vol.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_268b4bcaad562a693ba9",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/InstrumentSchema",
-    "const": "finstack_quant.instrument/1",
-    "description": "Canonical schema marker for persisted instrument envelopes."
   },
   {
     "path": "#/$defs/d_2701caf4934336a2dd86",
@@ -688,59 +576,6 @@ export default [
   {
     "path": "#/$defs/d_2c88e4d1e2e4f7c22e02/properties/tags/items",
     "source": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#/properties/tags/items"
-  },
-  {
-    "path": "#/$defs/d_2e99fddbe4971f773a8e",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityConvention",
-    "description": "Standard commodity market conventions by product type.\n\nEach variant provides market-standard defaults for settlement days,\nbusiness day convention, and calendar. Use when constructing commodity\nforwards, options, or swaps without explicitly specifying these parameters.\n\n# Market Standards Reference\n\n| Convention | Settlement | BDC | Calendar | Exchange |\n|------------|------------|-----|----------|----------|\n| WTI Crude | T+2 | Following | NYMEX | NYMEX/CME |\n| Brent Crude | T+2 | Following | ICE | ICE |\n| Natural Gas | T+2 | Following | NYMEX | NYMEX/CME |\n| Gold | T+2 | Modified Following | COMEX | CME |\n| Silver | T+2 | Modified Following | COMEX | CME |\n| Copper | T+2 | Following | LME | LME |\n| Corn/Wheat | T+2 | Following | CBOT | CME |\n| Power | T+1 | Modified Following | NERC | Various |\n\n# Sources\n\n- CME Group rulebooks\n- ICE Futures exchange rules\n- LME trading procedures"
-  },
-  {
-    "path": "#/$defs/d_2e99fddbe4971f773a8e/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityConvention/oneOf/0",
-    "const": "wti_crude",
-    "description": "WTI Crude Oil: T+2, Following, NYMEX calendar"
-  },
-  {
-    "path": "#/$defs/d_2e99fddbe4971f773a8e/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityConvention/oneOf/1",
-    "const": "brent_crude",
-    "description": "Brent Crude Oil: T+2, Following, ICE calendar"
-  },
-  {
-    "path": "#/$defs/d_2e99fddbe4971f773a8e/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityConvention/oneOf/2",
-    "const": "natural_gas",
-    "description": "Henry Hub Natural Gas: T+2, Following, NYMEX calendar"
-  },
-  {
-    "path": "#/$defs/d_2e99fddbe4971f773a8e/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityConvention/oneOf/3",
-    "const": "gold",
-    "description": "COMEX Gold: T+2, Modified Following, COMEX calendar"
-  },
-  {
-    "path": "#/$defs/d_2e99fddbe4971f773a8e/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityConvention/oneOf/4",
-    "const": "silver",
-    "description": "COMEX Silver: T+2, Modified Following, COMEX calendar"
-  },
-  {
-    "path": "#/$defs/d_2e99fddbe4971f773a8e/oneOf/5",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityConvention/oneOf/5",
-    "const": "copper",
-    "description": "LME Copper: T+2, Following, LME calendar"
-  },
-  {
-    "path": "#/$defs/d_2e99fddbe4971f773a8e/oneOf/6",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityConvention/oneOf/6",
-    "const": "agricultural",
-    "description": "CBOT Agricultural (Corn, Wheat, Soybeans): T+2, Following, CBOT calendar"
-  },
-  {
-    "path": "#/$defs/d_2e99fddbe4971f773a8e/oneOf/7",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityConvention/oneOf/7",
-    "const": "power",
-    "description": "Power/Electricity: T+1, Modified Following, NERC calendar"
   },
   {
     "path": "#/$defs/d_305c1a38cfd98cc3ea44",
@@ -871,6 +706,12 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ThresholdToggle/properties/threshold",
     "description": "Threshold value.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_383e1515751b52d5fb56",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/InstrumentSchema",
+    "const": "finstack_quant.instrument/1",
+    "description": "Canonical schema marker for persisted instrument envelopes."
   },
   {
     "path": "#/$defs/d_46455be5cce6b8020e50",
@@ -1158,6 +999,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolSurfaceExtrapolation"
   },
   {
+    "path": "#/$defs/d_5a4a97342eade5678c12",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/PositiveF64Wire",
+    "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
+    "exclusiveMinimum": 0,
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_5c13df5a55f1da604df2",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding",
     "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor a common discount factor below one, annual and simple rates both exceed\nthe continuous rate. Their ordering depends on the maturity `t` in years:\n`r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and\n`r_simple > r_annual` for `t > 1`."
@@ -1213,6 +1061,217 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/CreditStateVariable/oneOf/2",
     "const": "leverage",
     "description": "Use the leverage ratio."
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption",
+    "description": "Option on spot commodity. Options on a specified futures contract use\n[`crate::instruments::CommodityFutureOption`], including futures delivery.\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\nAnalytical delta measures currency per unit change in the resolved forward,\nholding discount factors and volatility fixed. At zero volatility or expiry,\nthe intrinsic-payoff derivative is used; delta is defined as zero exactly at\nthe strike, where the mathematical derivative does not exist.\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\n`spot_id` must identify an observed spot for early exercise and Monte Carlo.\nThe commodity forward is never substituted for the spot underlying.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup."
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/attributes",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/attributes",
+    "default": {},
+    "description": "Attributes for tagging and selection.\nAttributes for scenario selection and tagging",
+    "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/commodity_type",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/commodity_type",
+    "description": "Commodity type (e.g., \"Energy\", \"Metal\", \"Agricultural\")"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/convention",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/convention",
+    "description": "Optional market convention for this commodity.\n\nWhen set, provides default premium settlement days and calendar."
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/convention/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/convention/anyOf/0",
+    "ref": "#/$defs/CommodityConvention",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/convention/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/convention/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/currency",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/currency",
+    "description": "Base currency for pricing",
+    "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/day_count",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/day_count",
+    "default": "act_365f",
+    "description": "Day count convention for time to expiry.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/discount_curve_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/discount_curve_id",
+    "description": "Discount curve ID for present value.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/exercise",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/exercise",
+    "description": "Recorded exercise or expiry; required after expiry while settlement remains unpaid."
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/exercise_dates",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/exercise_dates",
+    "description": "Optional Bermudan exercise schedule.\n\nRequired when `exercise_style == ExerciseStyle::Bermudan`."
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/exercise_dates/items",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/exercise_dates/items",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/exercise_style",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/exercise_style",
+    "default": "european",
+    "description": "Exercise style (European or American).",
+    "ref": "#/$defs/ExerciseStyle",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/ExerciseStyle"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/exercise/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/exercise/anyOf/0",
+    "ref": "#/$defs/CommoditySpotOptionExercise",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOptionExercise"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/exercise/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/exercise/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/expiry",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/expiry",
+    "description": "Option expiry date.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/forward_curve_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/forward_curve_id",
+    "description": "Forward/futures curve ID for price interpolation.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/id",
+    "description": "Unique instrument identifier.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/instrument_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/instrument_pricing_overrides",
+    "description": "Instrument-owned pricing inputs.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/metric_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/metric_pricing_overrides",
+    "description": "Metric-time pricing configuration.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/multiplier",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/multiplier",
+    "description": "Contract multiplier (typically 1.0 for OTC options).",
+    "ref": "#/$defs/PositiveF64Wire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/PositiveF64Wire"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/option_type",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/option_type",
+    "description": "Option type (call or put).",
+    "ref": "#/$defs/OptionType",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/OptionType"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/premium_settlement_days",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/premium_settlement_days",
+    "description": "Premium settlement lag in business days after trade date.\n\nStandard: T+1 for most exchange-traded options, T+2 for OTC.\nIf not set and `convention` is provided, uses convention default.\nOtherwise defaults to 1 (T+1).",
+    "format": "uint32",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/quantity",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/quantity",
+    "description": "Contract quantity in units.",
+    "ref": "#/$defs/PositiveF64Wire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/PositiveF64Wire"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/quoted_forward",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/quoted_forward",
+    "description": "Optional quoted forward price (overrides curve lookup).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/scenario_pricing_overrides",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/scenario_pricing_overrides",
+    "description": "Scenario-only pricing adjustments.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/settlement",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/settlement",
+    "description": "Settlement type (physical or cash).\n\nCash fixes the payoff on exercise; physical retains the marked delivery\nclaim until its recorded settlement date.",
+    "ref": "#/$defs/SettlementType",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/SettlementType"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/spot_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/spot_id",
+    "description": "Optional spot price ID (for spot-based pricing and American options)."
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/spot_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/spot_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/spot_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/spot_id/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/strike",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/strike",
+    "description": "Strike price per unit.",
+    "ref": "#/$defs/PositiveF64Wire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/PositiveF64Wire"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/underlying_ticker",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/underlying_ticker",
+    "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key."
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/unit",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/unit",
+    "description": "Unit of measurement (e.g., \"BBL\", \"OZ\", \"MT\", \"MMBTU\")"
+  },
+  {
+    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/vol_surface_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/vol_surface_id",
+    "description": "Volatility surface ID for implied vol.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_6c25a9bef63bd477f037",
@@ -1416,27 +1475,21 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_8c04a01e469950d147da",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/ExerciseStyle",
-    "description": "Exercise schedule convention for option models."
+    "path": "#/$defs/d_93c0349e3a5a9763e83f",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/OptionType",
+    "description": "Option payoff direction used by analytical and numerical model engines."
   },
   {
-    "path": "#/$defs/d_8c04a01e469950d147da/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/ExerciseStyle/oneOf/0",
-    "const": "european",
-    "description": "Exercise only at expiry."
+    "path": "#/$defs/d_93c0349e3a5a9763e83f/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/OptionType/oneOf/0",
+    "const": "call",
+    "description": "Call option."
   },
   {
-    "path": "#/$defs/d_8c04a01e469950d147da/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/ExerciseStyle/oneOf/1",
-    "const": "american",
-    "description": "Exercise at any eligible time through expiry."
-  },
-  {
-    "path": "#/$defs/d_8c04a01e469950d147da/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/ExerciseStyle/oneOf/2",
-    "const": "bermudan",
-    "description": "Exercise on a finite schedule of eligible dates."
+    "path": "#/$defs/d_93c0349e3a5a9763e83f/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/OptionType/oneOf/1",
+    "const": "put",
+    "description": "Put option."
   },
   {
     "path": "#/$defs/d_948cdc4db846a21357a4",
@@ -1465,23 +1518,6 @@ export default [
     "path": "#/$defs/d_94cb251104de5cf587b6",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Id",
     "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead."
-  },
-  {
-    "path": "#/$defs/d_95c9bbe13fca10df3b83",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/OptionType",
-    "description": "Option payoff direction used by analytical and numerical model engines."
-  },
-  {
-    "path": "#/$defs/d_95c9bbe13fca10df3b83/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/OptionType/oneOf/0",
-    "const": "call",
-    "description": "Call option."
-  },
-  {
-    "path": "#/$defs/d_95c9bbe13fca10df3b83/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/OptionType/oneOf/1",
-    "const": "put",
-    "description": "Put option."
   },
   {
     "path": "#/$defs/d_9b99d9188ef6cc4cff48",
@@ -1556,6 +1592,23 @@ export default [
       "US912828XG33"
     ],
     "title": "Id"
+  },
+  {
+    "path": "#/$defs/d_abdca7350ca02551965b",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/SettlementType",
+    "description": "Settlement type for options"
+  },
+  {
+    "path": "#/$defs/d_abdca7350ca02551965b/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/SettlementType/oneOf/0",
+    "const": "physical",
+    "description": "Physical delivery"
+  },
+  {
+    "path": "#/$defs/d_abdca7350ca02551965b/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/SettlementType/oneOf/1",
+    "const": "cash",
+    "description": "Cash settlement"
   },
   {
     "path": "#/$defs/d_ae5d75ed4e313ae3bc25",
@@ -3766,23 +3819,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_d14396b683f11e7633df",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/SettlementType",
-    "description": "Settlement type for options"
-  },
-  {
-    "path": "#/$defs/d_d14396b683f11e7633df/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/SettlementType/oneOf/0",
-    "const": "physical",
-    "description": "Physical delivery"
-  },
-  {
-    "path": "#/$defs/d_d14396b683f11e7633df/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/SettlementType/oneOf/1",
-    "const": "cash",
-    "description": "Cash settlement"
-  },
-  {
     "path": "#/$defs/d_d30540ea90ce7eca3dee",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/ThetaDayBasis",
     "description": "Day basis used to convert annual analytic option theta into a per-day amount.\n\nApplied by the analytic-theta pricers (EquityOption, FxOption,\nFxDigitalOption) through `metric_pricing_overrides.theta_day_basis`."
@@ -3914,21 +3950,6 @@ export default [
     "description": "PIK when state < threshold (e.g., distance-to-default below limit)."
   },
   {
-    "path": "#/$defs/d_db1fcc5c6a61e550e867",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/commodity_option"
-  },
-  {
-    "path": "#/$defs/d_db1fcc5c6a61e550e867/properties/spec",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/commodity_option/properties/spec",
-    "ref": "#/$defs/CommodityOption",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/CommodityOption"
-  },
-  {
-    "path": "#/$defs/d_db1fcc5c6a61e550e867/properties/type",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/commodity_option/properties/type",
-    "const": "commodity_option"
-  },
-  {
     "path": "#/$defs/d_e42076b4d2ef6e393ce5",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/CalibrationParameter",
     "description": "Which structural parameter to calibrate in the MC engine."
@@ -4029,6 +4050,29 @@ export default [
     "description": "Brent root-find with a full reprice at the horizon date.\n\nCaptures convexity *and* the horizon change in sensitivity. Not\nsupported for [`BreakevenTarget::BaseCorrelation`], nor for\ncredit-curve instruments under `ZSpread`/`Oas` — see\n[`BreakevenTarget`] and the calculator docs for why."
   },
   {
+    "path": "#/$defs/d_ed594b756b5481bfccc3",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/ExerciseStyle",
+    "description": "Exercise schedule convention for option models."
+  },
+  {
+    "path": "#/$defs/d_ed594b756b5481bfccc3/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/ExerciseStyle/oneOf/0",
+    "const": "european",
+    "description": "Exercise only at expiry."
+  },
+  {
+    "path": "#/$defs/d_ed594b756b5481bfccc3/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/ExerciseStyle/oneOf/1",
+    "const": "american",
+    "description": "Exercise at any eligible time through expiry."
+  },
+  {
+    "path": "#/$defs/d_ed594b756b5481bfccc3/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/ExerciseStyle/oneOf/2",
+    "const": "bermudan",
+    "description": "Exercise on a finite schedule of eligible dates."
+  },
+  {
     "path": "#/$defs/d_ee4323acfdb49e4fe15b",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonModel",
     "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n[`RawMertonModel`], so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. The serialized field set is unchanged."
@@ -4116,7 +4160,7 @@ export default [
     "path": "#/$defs/d_f80f2b90e7af690c5898/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
-    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian."
+    "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil."
   },
   {
     "path": "#/$defs/d_fd618cd5743ec18a168f",
@@ -4137,14 +4181,14 @@ export default [
   },
   {
     "path": "#/properties/instrument",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/properties/instrument",
-    "ref": "#/$defs/commodity_option",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/commodity_option"
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/properties/instrument",
+    "ref": "#/$defs/commodity_spot_option",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/commodity_spot_option"
   },
   {
     "path": "#/properties/schema",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/properties/schema",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/properties/schema",
     "ref": "#/$defs/InstrumentSchema",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json#/$defs/InstrumentSchema"
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/InstrumentSchema"
   }
 ];

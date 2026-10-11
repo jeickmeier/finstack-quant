@@ -233,7 +233,9 @@ component registry: offline JSON Schema bundles, generated wire interfaces,
 lossless adapters, and React components that render `finstack-quant-wasm`
 results. It holds no financial logic. [`docs-site/`](docs-site/README.md) is the
 static documentation reader and registry gallery. It executes the Python
-curriculum against a freshly built extension at publish time.
+curriculum against a freshly built extension at publish time. To drop the
+registry and keep the engine and the analyst reader, follow
+[`docs/REMOVING_THE_UI.md`](docs/REMOVING_THE_UI.md).
 
 ```bash
 mise run wasm-pkg

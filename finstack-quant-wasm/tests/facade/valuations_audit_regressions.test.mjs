@@ -367,10 +367,21 @@ test('commodity MC diagnostics survive serialization and position scaling', () =
 
 test('metric missing volatility preserves not_found', () => {
   assert.throws(
-    () => price(fixtures.commodity, fixtures.market, 'monte_carlo_schwartz_smith', ['vega']),
+    () => price(fixtures.commodity, fixtures.market, 'black76', ['vega']),
     (error) => {
       assert.equal(error.kind, 'not_found');
       assert.match(error.message, /WTI-VOL/);
+      return true;
+    }
+  );
+});
+
+test('commodity MC rejects Black surface volatility risk', () => {
+  assert.throws(
+    () => price(fixtures.commodity, fixtures.market, 'monte_carlo_schwartz_smith', ['vega']),
+    (error) => {
+      assert.equal(error.kind, 'validation');
+      assert.match(error.message, /Black surface vega, vanna and volga are not supported/);
       return true;
     }
   );

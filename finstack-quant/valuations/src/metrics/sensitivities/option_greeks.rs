@@ -25,6 +25,22 @@ fn selected_equity_greek(kind: OptionGreekKind, context: &mut MetricContext) -> 
     };
     use crate::instruments::EquityOption;
 
+    let option: &EquityOption = context.instrument_as()?;
+    if option
+        .exercise
+        .as_ref()
+        .is_some_and(|exercise| exercise.date <= context.as_of)
+    {
+        let g = option.greeks(&context.curves, context.as_of)?;
+        return Ok(match kind {
+            OptionGreekKind::Delta => g.delta,
+            OptionGreekKind::Gamma => g.gamma,
+            OptionGreekKind::Vega => g.vega,
+            OptionGreekKind::Theta => g.theta,
+            OptionGreekKind::Rho => g.rho,
+            _ => 0.0,
+        });
+    }
     match kind {
         OptionGreekKind::Delta => GenericFdDelta::<EquityOption>::default().calculate(context),
         OptionGreekKind::Gamma => GenericFdGamma::<EquityOption>::default().calculate(context),
@@ -87,6 +103,65 @@ fn selected_equity_theta(context: &MetricContext) -> Result<f64> {
     daily.set_pricer_dispatch(context.clone_pricer_dispatch());
     daily.set_metric_pricing_overrides(Some(overrides));
     Ok(super::theta::GenericThetaAny.calculate(&mut daily)? * 365.0 / days_per_year)
+}
+
+/// Commodity delta/gamma retain their published forward-price coordinate.
+/// MC parameters and random numbers remain owned by the selected registry.
+fn selected_commodity_greek(kind: OptionGreekKind, context: &MetricContext) -> Result<f64> {
+    use crate::instruments::CommoditySpotOption;
+    if !matches!(kind, OptionGreekKind::Delta | OptionGreekKind::Gamma) {
+        return Err(finstack_quant_core::Error::Validation(
+            "Schwartz-Smith volatility risk requires explicit sigma_x/sigma_y parameter bumps in the registered model; Black surface vega, vanna and volga are not supported".into(),
+        ));
+    }
+    let option: &CommoditySpotOption = context.instrument_as()?;
+    let forward = option.forward_price(&context.curves, context.as_of)?;
+    let config = super::config::resolve(context)?;
+    let h = (forward * config.spot_bump_decimal)
+        .max(1e-6)
+        .min(forward * 0.5);
+    let evaluate = |shift: f64| {
+        let mut bumped = option.clone();
+        bumped.quoted_forward = Some(forward + shift);
+        context.reprice_instrument_raw(&bumped, &context.curves, context.as_of)
+    };
+    let up = evaluate(h)?;
+    let down = evaluate(-h)?;
+    if kind == OptionGreekKind::Delta {
+        Ok((up - down) / (2.0 * h))
+    } else {
+        Ok((up - 2.0 * evaluate(0.0)? + down) / (h * h))
+    }
+}
+
+/// Selected-model derivative to parallel decimal curve rates. HW single-curve
+/// products bump the discount curve; multi-curve caps bump their projection
+/// curve while holding discounting fixed. Parameters are held or recalibrated
+/// exactly as in each selected pricer's normal market-input resolution.
+pub(crate) fn selected_rate_greek(
+    context: &MetricContext,
+    curve_id: &finstack_quant_core::types::CurveId,
+    second: bool,
+) -> Result<f64> {
+    use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+    let config = super::config::resolve(context)?;
+    let bump_bp = config.rate_bump_bp;
+    let h = bump_bp * 1e-4;
+    let price = |direction: f64| {
+        let market = context.curves.bump([MarketBump::Curve {
+            id: curve_id.clone(),
+            spec: BumpSpec::parallel_bp(bump_bp * direction),
+        }])?;
+        context.reprice_raw(&market, context.as_of)
+    };
+    let up = price(1.0)?;
+    let down = price(-1.0)?;
+    if second {
+        let base = context.reprice_raw(&context.curves, context.as_of)?;
+        Ok((up - 2.0 * base + down) / (h * h))
+    } else {
+        Ok((up - down) / (2.0 * h))
+    }
 }
 
 pub(crate) struct OptionGreekCalculator<I> {
@@ -158,15 +233,44 @@ where
             return Ok(*value);
         }
 
-        if context
+        let native_model = context.instrument.default_model();
+        // Once exercise resolves the spot option, every pricing model owns the
+        // same remaining delivery claim and its contractual forward exposure.
+        let resolved_commodity = context
             .instrument
             .as_any()
-            .is::<crate::instruments::EquityOption>()
-            && context
-                .pricing_model()
-                .is_some_and(|model| model != crate::pricer::ModelKey::Black76)
+            .downcast_ref::<crate::instruments::CommoditySpotOption>()
+            .is_some_and(|option| {
+                context.as_of >= option.expiry
+                    || option
+                        .exercise
+                        .is_some_and(|event| event.date <= context.as_of)
+            });
+        if context
+            .pricing_model()
+            .is_some_and(|model| model != native_model)
+            && !resolved_commodity
         {
-            let value = selected_equity_greek(self.kind, context)?;
+            let value = if context
+                .instrument
+                .as_any()
+                .is::<crate::instruments::EquityOption>()
+            {
+                selected_equity_greek(self.kind, context)?
+            } else if context
+                .instrument
+                .as_any()
+                .is::<crate::instruments::CommoditySpotOption>()
+            {
+                selected_commodity_greek(self.kind, context)?
+            } else {
+                // A provider implements its canonical model only. New registered
+                // models must supply an explicit repricing coordinate convention.
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Native {} is unavailable for selected model {:?} on {}; use a selected-model market sensitivity",
+                    metric_id, context.pricing_model(), context.instrument.id()
+                )));
+            };
             context.computed.insert(metric_id, value);
             return Ok(value);
         }

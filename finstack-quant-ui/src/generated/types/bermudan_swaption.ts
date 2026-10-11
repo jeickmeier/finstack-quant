@@ -311,10 +311,6 @@ export type Id2 = string;
  */
 export type Date1 = string;
 /**
- * Method for calculating par rates in swaps
- */
-export type DAfe350E063Ef18Dd6Cec = "forward_based" | "discount_ratio";
-/**
  * Fixed rate (e.g., 0.05 for 5%)
  */
 export type Decimal = string;
@@ -1631,10 +1627,6 @@ export interface DB2304C53F63497441Bfc {
    */
   end_of_month?: boolean;
   frequency: Tenor;
-  /**
-   * Optional par-rate calculation method override
-   */
-  par_method?: DAfe350E063Ef18Dd6Cec | null;
   /**
    * Payment lag in business days after period end (default: 0).
    *

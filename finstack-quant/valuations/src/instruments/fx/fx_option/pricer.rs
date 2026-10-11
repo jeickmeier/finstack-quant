@@ -156,46 +156,52 @@ pub(crate) fn compute_greeks(
             )));
     }
 
-    if t <= 0.0 {
-        let spot_gt_strike = spot > inst.strike;
-        let delta_unit = match inst.option_type {
-            OptionType::Call => {
-                if spot_gt_strike {
-                    1.0
-                } else {
-                    0.0
-                }
-            }
-            OptionType::Put => {
-                if !spot_gt_strike {
-                    -1.0
-                } else {
-                    0.0
-                }
-            }
-        };
-        let scale = inst.notional.amount();
-        return Ok(FxOptionGreeks {
-            delta: delta_unit * scale,
-            ..Default::default()
-        });
-    }
-
     if !inst.strike.is_finite() {
         return Err(finstack_quant_core::Error::Validation(
-            "FX option strike must be finite".to_string(),
+            "FX option strike must be finite".into(),
         ));
     }
-
-    if inst.strike.abs() < STRIKE_ZERO_TOL {
+    if t <= 0.0 || inst.strike.abs() < STRIKE_ZERO_TOL {
+        // At the expiry kink use half of each one-sided delta, consistently
+        // across all four quoting conventions. Zero-strike puts are worthless.
+        let call_probability = if t > 0.0 || spot > inst.strike {
+            1.0
+        } else if spot < inst.strike {
+            0.0
+        } else {
+            0.5
+        };
+        let signed_probability = if inst.option_type == OptionType::Call {
+            call_probability
+        } else {
+            call_probability - 1.0
+        };
+        let foreign_df = (-r_f * t).exp();
+        let domestic_df = (-r_d * t).exp();
+        let delta = foreign_df * signed_probability;
+        let forward = spot * foreign_df / domestic_df;
+        let premium_in_base = inst.delta_convention.premium_currency == inst.base_currency;
         let scale = inst.notional.amount();
-        let exp_rf_t = (-r_f * t).exp();
-        let delta_unit = match inst.option_type {
-            OptionType::Call => exp_rf_t,
-            OptionType::Put => 0.0,
+        let pv = if t > 0.0 {
+            scale * spot * foreign_df * signed_probability
+        } else {
+            0.0
         };
         return Ok(FxOptionGreeks {
-            delta: delta_unit * scale,
+            delta: delta * scale,
+            delta_forward: signed_probability * scale,
+            delta_premium_adjusted_spot: if premium_in_base {
+                inst.strike / spot * domestic_df * signed_probability * scale
+            } else {
+                delta * scale
+            },
+            delta_premium_adjusted_forward: if premium_in_base {
+                inst.strike / forward * signed_probability * scale
+            } else {
+                signed_probability * scale
+            },
+            rho_foreign: -t * pv * 0.01,
+            theta: r_f * pv / inst.metric_pricing_overrides.theta_days_per_year(),
             ..Default::default()
         });
     }
@@ -420,5 +426,30 @@ mod delegation_tests {
         let pv = compute_pv(&option, &empty, date!(2025 - 01 - 02))
             .expect("post-expiry option must be extinguished");
         assert_eq!(pv.amount(), 0.0);
+    }
+    #[test]
+    fn limiting_payoffs_populate_all_delta_conventions_and_foreign_rho() {
+        let as_of = date!(2025 - 01 - 01);
+        let market = build_market(as_of);
+        let mut option = build_option(as_of);
+        option.strike = 1.0;
+        let g = compute_greeks(&option, &market, as_of).unwrap();
+        assert_eq!(g.delta_forward, 1_000_000.0);
+        assert_eq!(g.delta_premium_adjusted_forward, 1_000_000.0);
+        option.delta_convention.premium_currency = Currency::EUR;
+        let g = compute_greeks(&option, &market, as_of).unwrap();
+        assert!((g.delta_premium_adjusted_forward - 1_000_000.0 / 1.2).abs() < 1e-9);
+        option.expiry = date!(2026 - 01 - 01);
+        option.strike = 0.0;
+        let g = compute_greeks(&option, &market, as_of).unwrap();
+        let pv = compute_pv(&option, &market, as_of).unwrap().amount();
+        assert_eq!(g.delta_forward, 1_000_000.0);
+        assert_eq!(g.delta_premium_adjusted_forward, 0.0);
+        assert_eq!(g.delta_premium_adjusted_spot, 0.0);
+        assert!((g.rho_foreign + pv * 0.01).abs() < 1e-8);
+        option.option_type = OptionType::Put;
+        let g = compute_greeks(&option, &market, as_of).unwrap();
+        assert_eq!(g.delta_forward, 0.0);
+        assert_eq!(g.rho_foreign, 0.0);
     }
 }

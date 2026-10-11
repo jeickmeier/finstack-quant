@@ -9,11 +9,29 @@ use crate::instruments::fixed_income::cmo::types::PacCollar;
 use crate::instruments::fixed_income::mbs_passthrough::pricer::pool_month_step;
 use crate::instruments::fixed_income::structured_credit::{clamped_cpr_to_smm, psa_to_cpr};
 
-/// PAC amortization schedule.
-#[derive(Debug, Clone)]
+/// Dated contractual PAC principal target, in the tranche currency's major units.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct PacPayment {
+    /// Contractual payment date, including the collateral's payment delay.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub date: finstack_quant_core::dates::Date,
+    /// Planned principal payment, finite and nonnegative.
+    pub principal: f64,
+}
+
+/// Original contractual PAC schedule. Pricing never regenerates these targets.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PacSchedule {
-    /// Monthly scheduled principal payments
-    pub scheduled_payments: Vec<f64>,
+    /// Strictly increasing dated principal targets fixed at construction.
+    pub payments: Vec<PacPayment>,
     /// PAC collar
     pub collar: PacCollar,
 }
@@ -38,7 +56,9 @@ impl PacSchedule {
     ///
     /// * `collateral_balance` - Current balance of the underlying collateral pool
     /// * `pac_balance` - Current balance of the PAC tranche being carved
-    /// * `wam_months` - Remaining weighted average maturity in months
+    /// * `payment_dates` - Strictly increasing actual monthly payment dates at
+    ///   construction; the number of entries is the collateral's remaining WAM.
+    ///   Dates must include contractual payment delay and calendar adjustment.
     /// * `wac` - Weighted average coupon (annual)
     /// * `seasoning_months` - Current collateral age (WALA) in months;
     ///   the PSA seasoning ramp is anchored at this age, not at age 0, so
@@ -49,11 +69,26 @@ impl PacSchedule {
     pub fn generate(
         collateral_balance: f64,
         pac_balance: f64,
-        wam_months: u32,
+        payment_dates: &[finstack_quant_core::dates::Date],
         wac: f64,
         seasoning_months: u32,
         collar: PacCollar,
-    ) -> Self {
+    ) -> finstack_quant_core::Result<Self> {
+        let wam_months = u32::try_from(payment_dates.len()).map_err(|_| {
+            finstack_quant_core::Error::Validation("PAC payment count exceeds supported WAM".into())
+        })?;
+        if payment_dates.is_empty()
+            || payment_dates.windows(2).any(|dates| dates[0] >= dates[1])
+            || !collateral_balance.is_finite()
+            || collateral_balance <= 0.0
+            || !pac_balance.is_finite()
+            || pac_balance < 0.0
+            || pac_balance > collateral_balance
+            || !wac.is_finite()
+            || wac < 0.0
+        {
+            return Err(finstack_quant_core::Error::Validation("PAC generation requires ordered dates, positive collateral, nonnegative WAC, and PAC face within collateral".into()));
+        }
         // Project collateral principal at lower PSA
         let lower_principals = project_principal_stream(
             collateral_balance,
@@ -89,20 +124,55 @@ impl PacSchedule {
             })
             .collect();
 
-        Self {
-            scheduled_payments: schedule,
+        let result = Self {
+            payments: payment_dates
+                .iter()
+                .copied()
+                .zip(schedule)
+                .map(|(date, principal)| PacPayment { date, principal })
+                .collect(),
             collar,
+        };
+        result.validate()?;
+        Ok(result)
+    }
+
+    /// Return the original principal target on a contractual payment date.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Actual payment date. Dates absent from the contract have a
+    ///   zero target; no period index is restarted at valuation.
+    pub fn get_payment(&self, date: finstack_quant_core::dates::Date) -> f64 {
+        self.payments
+            .binary_search_by_key(&date, |payment| payment.date)
+            .map_or(0.0, |index| self.payments[index].principal)
+    }
+
+    /// Sum all original contractual principal targets.
+    pub fn get_total(&self) -> f64 {
+        self.payments.iter().map(|payment| payment.principal).sum()
+    }
+
+    /// Reject unordered dates, invalid principal targets or an invalid PSA collar.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if self.payments.is_empty()
+            || self
+                .payments
+                .windows(2)
+                .any(|pair| pair[0].date >= pair[1].date)
+            || self
+                .payments
+                .iter()
+                .any(|payment| !payment.principal.is_finite() || payment.principal < 0.0)
+            || !self.collar.lower_speed_multiplier.is_finite()
+            || !self.collar.upper_speed_multiplier.is_finite()
+            || self.collar.lower_speed_multiplier < 0.0
+            || self.collar.lower_speed_multiplier > self.collar.upper_speed_multiplier
+        {
+            return Err(finstack_quant_core::Error::Validation("PAC contract requires increasing dates, finite nonnegative targets, and an ordered nonnegative collar".into()));
         }
-    }
-
-    /// Get scheduled payment for a period.
-    pub fn scheduled_at(&self, period: usize) -> f64 {
-        self.scheduled_payments.get(period).cloned().unwrap_or(0.0)
-    }
-
-    /// Total scheduled principal.
-    pub fn total_scheduled(&self) -> f64 {
-        self.scheduled_payments.iter().sum()
+        Ok(())
     }
 }
 
@@ -199,17 +269,34 @@ pub fn allocate_pac_support(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::dates::{Date, DateExt};
+    fn dates(count: u32) -> Vec<Date> {
+        (0..count)
+            .map(|month| {
+                time::macros::date!(2024 - 02 - 25)
+                    .add_months(month as i32)
+                    .expect("date")
+            })
+            .collect()
+    }
 
     #[test]
     fn test_pac_schedule_generation() {
         // Collateral pool of 100k, PAC tranche of 60k carved from it.
-        let schedule =
-            PacSchedule::generate(100_000.0, 60_000.0, 360, 0.045, 0, PacCollar::standard());
+        let schedule = PacSchedule::generate(
+            100_000.0,
+            60_000.0,
+            &dates(360),
+            0.045,
+            0,
+            PacCollar::standard(),
+        )
+        .expect("PAC contract");
 
-        assert!(!schedule.scheduled_payments.is_empty());
-        assert!(schedule.total_scheduled() > 0.0);
+        assert!(!schedule.payments.is_empty());
+        assert!(schedule.get_total() > 0.0);
         // Carved PAC schedule cannot exceed the PAC balance.
-        assert!(schedule.total_scheduled() <= 60_000.0 + 1e-6);
+        assert!(schedule.get_total() <= 60_000.0 + 1e-6);
     }
 
     #[test]
@@ -223,8 +310,15 @@ mod tests {
         let lower_speed_multiplier = collar.lower_speed_multiplier;
         let upper_speed_multiplier = collar.upper_speed_multiplier;
 
-        let schedule =
-            PacSchedule::generate(collateral_balance, pac_balance, wam_months, wac, 0, collar);
+        let schedule = PacSchedule::generate(
+            collateral_balance,
+            pac_balance,
+            &dates(wam_months),
+            wac,
+            0,
+            collar,
+        )
+        .expect("PAC contract");
 
         // The carved schedule's early-period principal must equal the
         // collateral-derived minimum-principal stream (before the PAC
@@ -260,20 +354,20 @@ mod tests {
         // is a no-op. Schedule must equal the collateral-derived value and be
         // strictly larger than the PAC-balance-derived value.
         assert!(
-            (schedule.scheduled_payments[0] - collateral_min[0]).abs() < 1e-9,
+            (schedule.payments[0].principal - collateral_min[0]).abs() < 1e-9,
             "period 0: expected collateral-derived {}, got {}",
             collateral_min[0],
-            schedule.scheduled_payments[0]
+            schedule.payments[0].principal
         );
         assert!(
-            schedule.scheduled_payments[0] > pac_balance_min[0] * 1.5,
+            schedule.payments[0].principal > pac_balance_min[0] * 1.5,
             "collateral-derived principal ({}) should dwarf PAC-balance-derived ({})",
-            schedule.scheduled_payments[0],
+            schedule.payments[0].principal,
             pac_balance_min[0]
         );
 
         // Carved cumulative principal never exceeds the PAC balance.
-        assert!(schedule.total_scheduled() <= pac_balance + 1e-6);
+        assert!(schedule.get_total() <= pac_balance + 1e-6);
     }
 
     #[test]
@@ -285,30 +379,45 @@ mod tests {
         let wam_months = 330;
         let wac = 0.05;
 
-        let fresh =
-            PacSchedule::generate(balance, balance, wam_months, wac, 0, PacCollar::standard());
-        let seasoned =
-            PacSchedule::generate(balance, balance, wam_months, wac, 30, PacCollar::standard());
+        let fresh = PacSchedule::generate(
+            balance,
+            balance,
+            &dates(wam_months),
+            wac,
+            0,
+            PacCollar::standard(),
+        )
+        .expect("PAC contract");
+        let seasoned = PacSchedule::generate(
+            balance,
+            balance,
+            &dates(wam_months),
+            wac,
+            30,
+            PacCollar::standard(),
+        )
+        .expect("PAC contract");
 
         assert!(
-            seasoned.scheduled_payments[0] > fresh.scheduled_payments[0],
+            seasoned.payments[0].principal > fresh.payments[0].principal,
             "seasoned month-1 principal ({}) must exceed fresh ({}) — the PSA \
              ramp must anchor at the pool's current age",
-            seasoned.scheduled_payments[0],
-            fresh.scheduled_payments[0]
+            seasoned.payments[0].principal,
+            fresh.payments[0].principal
         );
 
         // At age ≥ 30 the ramp is flat, so adding more age changes nothing.
         let very_seasoned = PacSchedule::generate(
             balance,
             balance,
-            wam_months,
+            &dates(wam_months),
             wac,
             120,
             PacCollar::standard(),
-        );
+        )
+        .expect("PAC contract");
         assert!(
-            (very_seasoned.scheduled_payments[0] - seasoned.scheduled_payments[0]).abs() < 1e-9,
+            (very_seasoned.payments[0].principal - seasoned.payments[0].principal).abs() < 1e-9,
             "post-ramp ages must produce identical schedules"
         );
     }

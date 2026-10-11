@@ -1565,7 +1565,7 @@ by `deny_unknown_fields`. Numbers do not change.
   `underlying_maturity`); Rust/JSON.
 - `CmsSpreadOption.expiry_date` (now `expiry`); Rust/JSON.
 - `BermudanSwaption.bermudan_schedule` (now `exercise_schedule`);
-  `EquityOption.exercise_schedule` and `CommodityOption.exercise_schedule` (now
+  `EquityOption.exercise_schedule` and `CommoditySpotOption.exercise_schedule` (now
   `exercise_dates`; Python `EquityOption.exercise_schedule` getter and
   `EquityOptionBuilder.exercise_schedule` now `exercise_dates`);
   Rust/Python/JSON.
@@ -1727,12 +1727,12 @@ stays a string).
   `quanto.equity_vol_surface_id` moves to `EquityFuture.vol_surface_id`;
   `quanto.asset_currency` must equal `underlying_currency`; Rust/JSON.
 - Commodity flattened `ticker` (now `underlying_ticker`) on CommodityForward,
-  CommodityOption, CommodityAsianOption, CommoditySwap and CommoditySwaption
+  CommoditySpotOption, CommodityAsianOption, CommoditySwap and CommoditySwaption
   (`CommodityUnderlyingParams.ticker`); `CommodityFuture.underlying` (now
   `underlying_ticker`); Rust/JSON.
 - `CommoditySpreadOption.notional` and `CommoditySwaption.notional` (unit counts,
   now `quantity`); Rust/JSON.
-- `CommodityForward.spot_id`, `CommodityOption.spot_id`, `FxVarianceSwap.spot_id`,
+- `CommodityForward.spot_id`, `CommoditySpotOption.spot_id`, `FxVarianceSwap.spot_id`,
   `IndexUnderlyingParams.yield_id`/`duration_id` (FI TRS) and
   `CollateralSpec.market_value_id` are typed `PriceId` (wire unchanged); Rust.
 - `VolatilityDependency.underlying_id` (now `spot_id`); Rust/JSON.

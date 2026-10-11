@@ -1563,10 +1563,6 @@ export type OidPolicy =
       separate_amount: Money;
     };
 /**
- * Method for calculating par rates in swaps
- */
-export type ParRateMethod = "forward_based" | "discount_ratio";
-/**
  * Clearing status for OTC derivatives.
  *
  * Determines whether a trade is cleared through a CCP or remains bilateral
@@ -4493,15 +4489,10 @@ export interface ConvertibleBond {
    */
   conversion: ConversionSpec;
   /**
-   * Issuer hazard curve identifier (a `HazardCurve`, as on every credit
-   * instrument). When `None`, the cash component is discounted at the
-   * risk-free `discount_curve_id` (no credit spread).
-   *
-   * The pricer derives the zero-recovery risky discount factor
-   * `risky_df = rf_df × S(t)` from the curve's survival probabilities and
-   * blends it with risk-free discounting as `risky × (1 − R) + rf × R`
-   * using [`Self::recovery_rate`]. The hazard curve's own recovery rate is
-   * used only to convert spread bumps into hazard shifts for CS01.
+   * Issuer hazard curve identifier. Absence specifies no default risk.
+   * All continuation claims are survival-weighted. Default pays the explicit
+   * recovery fraction of outstanding principal and extinguishes equity;
+   * conditional stock drift includes the hazard compensator.
    */
   credit_curve_id?: Id | null;
   /**
@@ -4539,19 +4530,18 @@ export interface ConvertibleBond {
    */
   notional: Money;
   /**
-   * Assumed recovery rate on default, as a fraction (e.g., 0.40 = 40%).
-   *
-   * Used in the Tsiveriotis-Zhang credit model to blend risky and risk-free
-   * discounting on the cash component. A recovery rate of 0 reduces to the
-   * standard zero-recovery TZ model. Typical values:
-   * - **Investment grade**: 0.40 (ISDA standard assumption)
-   * - **High yield**: 0.25-0.35
-   * - **Distressed**: 0.10-0.20
-   *
-   * Required when `credit_curve_id` is set; otherwise absence means that no
-   * credit adjustment is requested.
+   * Fraction of outstanding principal paid immediately on default, in
+   * `[0, 1]`; includes capitalized PIK and excludes prior amortization.
+   * Default extinguishes coupons and the conversion right. Required with a
+   * credit curve; recovery is an explicit cashflow, not a discount blend.
    */
   recovery_rate?: number | null;
+  /**
+   * Recorded exercise awaiting delivery. At or after `exercise_date`, only
+   * this claim remains; after delivery its value is zero. Mandatory exercise
+   * without a record settles on its contractual conversion date.
+   */
+  resolved_settlement?: ConvertibleSettlement | null;
   /**
    * Scenario-only pricing adjustments.
    */
@@ -4687,6 +4677,37 @@ export interface PriceTrigger {
    * must exceed 100.
    */
   threshold_pct: number;
+}
+/**
+ * Resolved exercise claim after debt has been converted, called, put, or redeemed.
+ *
+ * These contractual amounts replace the debt and its future coupons. Any
+ * earned but unpaid coupon must be included in `cash`. Shares are delivered
+ * ex-dividend on `delivery_date`. Same-day completed exercise needs no record;
+ * use this state to retain a delayed delivery without replaying the option.
+ */
+export interface ConvertibleSettlement {
+  /**
+   * Fixed cash consideration including any retained coupon, in bond currency.
+   */
+  cash: Money;
+  /**
+   * Contractual delivery/payment date; not earlier than exercise.
+   */
+  delivery_date: DateWire;
+  /**
+   * Date the holder's exercise decision extinguished the debt.
+   */
+  exercise_date: DateWire;
+  /**
+   * Part of `cash` eligible for principal recovery on default; excludes
+   * uncapitalized coupon accrual. Must be between zero and `cash`.
+   */
+  recovery_basis: Money;
+  /**
+   * Fixed number of shares to deliver, finite and nonnegative.
+   */
+  shares: number;
 }
 /**
  * Revolving credit facility instrument.
@@ -5731,10 +5752,6 @@ export interface FixedLegSpec {
    * Payment frequency
    */
   frequency: Tenor;
-  /**
-   * Optional par-rate calculation method override
-   */
-  par_method?: ParRateMethod | null;
   /**
    * Payment lag in business days after period end (default: 0).
    *

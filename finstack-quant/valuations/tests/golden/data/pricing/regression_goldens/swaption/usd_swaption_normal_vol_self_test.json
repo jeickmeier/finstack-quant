@@ -634,7 +634,6 @@
           "stub": "none",
           "start": "2027-05-05",
           "end": "2032-05-05",
-          "par_method": null,
           "payment_lag_days": 2
         },
         "underlying_float_leg": {

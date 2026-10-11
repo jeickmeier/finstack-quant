@@ -16,7 +16,7 @@ rustdoc.
 |-----------|--------|---------------------------|
 | `commodity_forward/` | Physically or cash-settled forwards and futures | Cost of carry `F(T) = S · exp((r − y + u)·T)` with convenience yield `y` and storage cost `u`; `SettlementType` = `Physical` / `Cash`; optional `CommodityConvention` preset supplies settlement lag and calendar |
 | `commodity_swap/` | Fixed-for-floating price swaps | Floating leg is the business-day average of daily prices over each settlement period; NPV (payer of fixed) = floating PV − fixed PV |
-| `commodity_option/` | European and American options on a commodity | `ModelKey::Black76` for Europeans; a binomial tree on spot (or futures-implied spot) for Americans; `SchwartzSmith(SchwartzSmithParams)` two-factor Monte Carlo under `ModelKey::MonteCarloSchwartzSmith` |
+| `commodity_spot_option/` | European and American options on a commodity | `ModelKey::Black76` for Europeans; a binomial tree on spot (or futures-implied spot) for Americans; `SchwartzSmith(SchwartzSmithParams)` two-factor Monte Carlo under `ModelKey::MonteCarloSchwartzSmith` |
 | `commodity_asian_option/` | Average-price options on commodity forwards | `AveragingMethod::Geometric` → Kemna–Vorst (1990), exact closed form; `AveragingMethod::Arithmetic` → Turnbull–Wakeman (1991), roughly 1% against Monte Carlo. Forward prices are read per fixing date from the price curve; default `ModelKey::AsianTurnbullWakeman` |
 | `commodity_spread_option/` | Options on the spread between two correlated commodity prices (crack, spark, location) | Kirk (1995) approximation; payoff `max(S1 − S2 − K, 0)` for calls |
 | `commodity_swaption/` | Options to enter a commodity swap at a fixed price | Black-76 on the **annuity-weighted** forward swap rate: `call = DF · annuity · [F·N(d₁) − K·N(d₂)]` |
@@ -34,12 +34,12 @@ six leaf directories are `pub mod`; `averaging` is `pub(crate) mod`. Every
 headline type is also re-exported flat at
 `finstack_quant_valuations::instruments`:
 
-`CommodityForward`, `CommoditySwap`, `CommodityOption`,
+`CommodityForward`, `CommoditySwap`, `CommoditySpotOption`,
 `CommodityAsianOption`, `CommoditySpreadOption`, `CommoditySwaption`.
 
 Reachable only under the family path:
-`commodity_option::{CommodityMcParams,
-CommodityOptionMcPricer}`,
+`commodity_spot_option::{CommodityMcParams,
+CommoditySpotOptionMcPricer}`,
 `commodity_asian_option::CommodityAsianOptionAnalyticalPricer`, and
 `commodity_forward::SettlementType` (a re-export of the shared
 `instruments::SettlementType`, not a commodity-specific type).
@@ -65,7 +65,7 @@ Inside a leaf, `metrics/`, `pricer.rs`, `traits.rs` and `types.rs` are
   `averaging::business_day_average_price`. Missing fixings or curve gaps
   propagate as errors and are never silently substituted with a neighbouring
   price.
-- **Black-76 is the family default.** `commodity_option` (European),
+- **Black-76 is the family default.** `commodity_spot_option` (European),
   `commodity_swaption` and `commodity_spread_option` all register under
   `ModelKey::Black76`; `commodity_asian_option` defaults to
   `AsianTurnbullWakeman`. Anything else must be registered explicitly and
@@ -85,18 +85,18 @@ it:
 
 | Step | Where |
 |------|-------|
-| Pricer | `src/pricer/commodity.rs`. Five of the six leaves register through `register_generic!` over `Instrument::base_value`; `commodity_asian_option` and the Schwartz–Smith path on `commodity_option` register concrete pricers |
+| Pricer | `src/pricer/commodity.rs`. Five of the six leaves register through `register_generic!` over `Instrument::base_value`; `commodity_asian_option` and the Schwartz–Smith path on `commodity_spot_option` register concrete pricers |
 | Instrument key | `InstrumentType` variant in `src/pricer/keys.rs` |
-| JSON tag | `with_instrument_json_registry!` in `../json_loader.rs`, category `"commodity"`. Current tags: `commodity_forward`, `commodity_swap`, `commodity_option`, `commodity_asian_option`, `commodity_swaption`, `commodity_spread_option` |
+| JSON tag | `with_instrument_json_registry!` in `../json_loader.rs`, category `"commodity"`. Current tags: `commodity_forward`, `commodity_swap`, `commodity_spot_option`, `commodity_asian_option`, `commodity_swaption`, `commodity_spread_option` |
 | Metrics | `register_<name>_metrics` in the leaf's `metrics/`, called from `register_commodity_instrument_metrics` in `src/metrics/core/standard_registry.rs` |
-| Metric traits | Options that use the finite-difference greeks path implement `crate::metrics::HasExpiry` and `HasDayCount` — see `commodity_option/traits.rs` |
+| Metric traits | Options that use the finite-difference greeks path implement `crate::metrics::HasExpiry` and `HasDayCount` — see `commodity_spot_option/traits.rs` |
 | Schemas | `mise run rust-gen-schemas`, verified by `mise run rust-check-schemas` |
 
 ## Tests and benches
 
 Integration tests live in `../../../tests/instruments/`, compiled into the
 single `instruments` target. `commodity/` covers forwards and swaps;
-`commodity_option/`, `commodity_asian_option/`, `commodity_spread_option/` and
+`commodity_spot_option/`, `commodity_asian_option/`, `commodity_spread_option/` and
 `commodity_swaption/` have their own directories. Everything is additionally
 covered by the cross-cutting registry, serde and dependency-completeness
 contract tests.

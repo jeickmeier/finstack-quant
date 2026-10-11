@@ -931,17 +931,22 @@ impl<'a> EquityWaterfallEngine<'a> {
                         profit_excl = 0.0;
                     }
 
-                    let needed_gp_gross = if target_gp_share >= 1.0 - 1e-12 {
-                        remaining_amount // degenerate; give remaining in full-mode
+                    let catchup_share = match self.spec.catch_up_mode {
+                        CatchUpMode::Full => 1.0,
+                        CatchUpMode::Partial => *gp_share,
+                    };
+                    let gap = (target_gp_share * profit_excl - gp_carry_cum).max(0.0);
+                    let catchup_amount = if gap == 0.0 {
+                        0.0
+                    } else if catchup_share > target_gp_share {
+                        (gap / (catchup_share - target_gp_share)).min(remaining_amount)
                     } else {
-                        ((target_gp_share * profit_excl) - gp_carry_cum) / (1.0 - target_gp_share)
+                        // This split cannot reach the target; all remaining cash
+                        // stays in the contractual catch-up tranche.
+                        remaining_amount
                     };
-
-                    let needed_gp_gross = needed_gp_gross.max(0.0);
-                    let to_gp_gross = match self.spec.catch_up_mode {
-                        CatchUpMode::Full => needed_gp_gross.min(remaining_amount),
-                        CatchUpMode::Partial => (remaining_amount * gp_share).min(needed_gp_gross),
-                    };
+                    let to_gp_gross = catchup_amount * catchup_share;
+                    let to_lp = catchup_amount - to_gp_gross;
 
                     // Holdback flow: `gp_carry_cum` and `remaining_amount`
                     // both move by the GROSS carry, but only `to_gp_paid`
@@ -956,8 +961,8 @@ impl<'a> EquityWaterfallEngine<'a> {
                     // any remaining shortfall is recovered from paid GP carry.
                     let to_gp_paid = to_gp_gross * (1.0 - holdback_decimal);
                     gp_carry_cum += to_gp_gross;
-                    remaining_amount -= to_gp_gross;
-                    (0.0, to_gp_paid, Arc::from("Catch-Up"), gp_carry_cum)
+                    remaining_amount -= catchup_amount;
+                    (to_lp, to_gp_paid, Arc::from("Catch-Up"), gp_carry_cum)
                 }
 
                 PeFundWaterfallTranche::PromoteTier {
@@ -2426,6 +2431,36 @@ mod tests {
     }
 
     #[test]
+    fn partial_catchup_consumes_both_gp_and_lp_shares() {
+        let spec = PeFundWaterfallSpec::builder()
+            .style(WaterfallStyle::European)
+            .return_of_capital()
+            .preferred_irr(0.08)
+            .catch_up(0.5)
+            .promote_tier(0.0, 0.8, 0.2)
+            .catch_up_mode(CatchUpMode::Partial)
+            .build()
+            .expect("spec");
+        let events = vec![
+            FundEvent::contribution(
+                test_date(2021, 1, 1),
+                Money::from((100_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2022, 1, 1),
+                Money::from((109_i64, test_currency())),
+            ),
+        ];
+        let ledger = EquityWaterfallEngine::new(&spec)
+            .run(&events)
+            .expect("waterfall");
+        let gp: f64 = ledger.rows.iter().map(|row| row.to_gp.amount()).sum();
+        let lp: f64 = ledger.rows.iter().map(|row| row.to_lp.amount()).sum();
+        assert!((gp - 0.5).abs() < 1e-10, "GP {gp}");
+        assert!((gp + lp - 109.0).abs() < 1e-10);
+    }
+
+    #[test]
     fn clawback_partial_catchup_does_not_over_release() {
         // Partial catch-up caps the GP's catch-up take at gp_share of each
         // dollar, so lifetime GP entitlement is below the full-catch-up
@@ -2471,9 +2506,9 @@ mod tests {
         let t = 731.0 / 365.0;
         let pref = 100.0 * (1.08_f64).powf(t) - 100.0;
         let remaining = 20.0 - pref;
-        let needed = 0.25 * pref; // (0.2·P)/(1 − 0.2)
-        let catchup_gp = (0.5 * remaining).min(needed);
-        let promote_gp = (remaining - catchup_gp) * 0.2;
+        let catchup_amount = (0.2 * pref / (0.5 - 0.2)).min(remaining);
+        let catchup_gp = 0.5 * catchup_amount;
+        let promote_gp = (remaining - catchup_amount) * 0.2;
         let expected_gp = catchup_gp + promote_gp;
         assert!(
             (settlement.to_gp.amount() - expected_gp).abs() < 1e-3,

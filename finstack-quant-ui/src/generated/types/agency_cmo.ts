@@ -370,6 +370,10 @@ export type Id5 = string;
  */
 export type Date3 = string;
 /**
+ * ISO 8601 calendar date string.
+ */
+export type Date4 = string;
+/**
  * Canonical schema marker for persisted instrument envelopes.
  */
 export type D_97801B737Ee7439E285A = "finstack_quant.instrument/1";
@@ -1975,9 +1979,9 @@ export interface D_66287E2Bb5Dfa8D61987 {
   id: string;
   original_face: Money3;
   /**
-   * PAC collar (if PAC tranche)
+   * Original dated PAC principal targets and collar; required only for PAC tranches.
    */
-  pac_collar?: DB67A73E0467888Ad8Dcc | null;
+  pac_schedule?: D_65Cfec08Bebc669F8Ef9 | null;
   /**
    * Payment priority (1 = highest for sequential)
    */
@@ -2338,7 +2342,17 @@ export interface Money3 {
     | "ZWL";
 }
 /**
- * PAC collar boundaries.
+ * Original contractual PAC schedule. Pricing never regenerates these targets.
+ */
+export interface D_65Cfec08Bebc669F8Ef9 {
+  collar: DB67A73E0467888Ad8Dcc;
+  /**
+   * Strictly increasing dated principal targets fixed at construction.
+   */
+  payments: DF9A55F4B2F28378C6E86[];
+}
+/**
+ * PAC collar
  */
 export interface DB67A73E0467888Ad8Dcc {
   /**
@@ -2351,4 +2365,14 @@ export interface DB67A73E0467888Ad8Dcc {
    * 300% PSA).
    */
   upper_speed_multiplier: number;
+}
+/**
+ * Dated contractual PAC principal target, in the tranche currency's major units.
+ */
+export interface DF9A55F4B2F28378C6E86 {
+  date: Date4;
+  /**
+   * Planned principal payment, finite and nonnegative.
+   */
+  principal: number;
 }

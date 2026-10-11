@@ -19,7 +19,6 @@ Import path: `finstack_quant_valuations::instruments::rates::irs`
 | `FloatingLegCompounding` | Term (`Simple`) vs compounded-in-arrears / observation-shift / rate-cutoff RFR coupons. |
 | `IrsLegConventions` | Per-index conventions resolved from the `ConventionRegistry`. |
 | `ConventionSwapParams` | Argument struct for `InterestRateSwap::from_conventions`. |
-| `ParRateMethod` | `ForwardBased` (market standard) or `DiscountRatio` (bootstrapping). |
 
 ## Module layout
 
@@ -57,13 +56,9 @@ ParRate = PV_float / Annuity
 ```
 
 with a near-zero-annuity guard (`ANNUITY_EPSILON`) that returns a validation
-error rather than dividing. `ParRateMethod::DiscountRatio` uses
-`(DF(start) − DF(end)) / annuity` instead, but only when the swap is unseasoned
-(`as_of <= start`), single-curve (forward id == discount id), term-style
-(`Simple`) with no spread, and has no payment delay on either leg. When any of
-those preconditions fails the calculator **silently falls back** to the
-forward-based par rate rather than erroring, so requesting `DiscountRatio` never
-guarantees you got it.
+error rather than dividing. The numerator retains actual floating schedules,
+known fixings, spreads, and payment dates, including when the fixed leg has
+a different maturity.
 
 Leg PV accumulation uses compensated summation (Kahan / Neumaier), which
 matters on 30Y+ schedules with 60+ periods.
@@ -136,7 +131,6 @@ let swap = InterestRateSwap::builder()
         stub: StubKind::ShortFront,
         start,
         end,
-        par_method: None,
         payment_lag_days: 0,
         end_of_month: false,
     })

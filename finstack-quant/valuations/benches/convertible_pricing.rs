@@ -127,6 +127,7 @@ fn create_standard_convertible() -> ConvertibleBond {
         div_yield_id: Some("AAPL-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
+        resolved_settlement: None,
         cashflow_spec:
             finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
                 fixed_coupon,
@@ -179,6 +180,7 @@ fn create_zero_coupon_convertible() -> ConvertibleBond {
         div_yield_id: Some("AAPL-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
+        resolved_settlement: None,
         cashflow_spec:
             finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::default(), // zero coupon
         settlement_days: None,

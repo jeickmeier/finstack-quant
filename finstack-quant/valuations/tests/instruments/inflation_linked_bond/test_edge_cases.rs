@@ -220,7 +220,14 @@ fn test_extreme_deflation() {
     )
     .unwrap()
     .with_interpolation(finstack_quant_core::market_data::scalars::InflationInterpolation::Linear);
-    ctx = ctx.insert_inflation_index(index);
+    ctx = ctx.insert_inflation_index(index).insert(
+        finstack_quant_core::market_data::term_structures::InflationCurve::builder("US-CPI-U")
+            .base_date(d(2025, 1, 2))
+            .base_cpi(100.0)
+            .knots([(0.0, 100.0), (2.0, 100.0)])
+            .build()
+            .unwrap(),
+    );
 
     let as_of = d(2025, 1, 2);
 
@@ -251,7 +258,14 @@ fn test_extreme_inflation() {
     )
     .unwrap()
     .with_interpolation(finstack_quant_core::market_data::scalars::InflationInterpolation::Linear);
-    ctx = ctx.insert_inflation_index(index);
+    ctx = ctx.insert_inflation_index(index).insert(
+        finstack_quant_core::market_data::term_structures::InflationCurve::builder("US-CPI-U")
+            .base_date(d(2025, 1, 2))
+            .base_cpi(1000.0)
+            .knots([(0.0, 1000.0), (2.0, 1000.0)])
+            .build()
+            .unwrap(),
+    );
 
     let as_of = d(2025, 1, 2);
 

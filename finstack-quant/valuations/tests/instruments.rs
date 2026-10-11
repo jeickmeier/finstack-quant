@@ -207,8 +207,8 @@ mod xccy_swap;
 mod commodity;
 
 /// Commodity option tests
-#[path = "instruments/commodity_option/mod.rs"]
-mod commodity_option;
+#[path = "instruments/commodity_spot_option/mod.rs"]
+mod commodity_spot_option;
 
 /// Commodity Asian option tests
 #[path = "instruments/commodity_asian_option/mod.rs"]

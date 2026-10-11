@@ -74,7 +74,8 @@ where
 
         let time_to_fixing = resolved_inputs.time_to_fixing;
 
-        let forward = projection.forward;
+        let forward = projection.forward - projection.additive_spread;
+        let strike = strike - projection.additive_spread;
         let df = resolved_inputs.discount_factor;
         let quote =
             resolve_caplet_volatility(option, context.curves.as_ref(), time_to_fixing, strike)?;

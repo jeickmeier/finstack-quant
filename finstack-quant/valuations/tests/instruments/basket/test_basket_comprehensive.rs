@@ -1705,3 +1705,38 @@ fn basket_rejects_retired_currency_key() {
     object.insert("currency".to_string(), currency);
     assert!(serde_json::from_value::<Basket>(json).is_err());
 }
+
+#[test]
+fn weight_reallocation_preserves_partial_and_leveraged_budgets() {
+    for weights in [[0.3, 0.2], [1.2, 0.8], [-0.3, 0.2]] {
+        let mut basket = simple_equity_basket();
+        basket.expense_ratio = 0.0;
+        basket.notional = usd(100.0);
+        for (c, weight) in basket.constituents.iter_mut().zip(weights) {
+            c.weight = weight;
+            c.reference = ConstituentReference::MarketData {
+                price_id: "AAPL".into(),
+                asset_type: BasketAssetType::Equity,
+            };
+        }
+        let market = equity_market_context();
+        let as_of = date(2025, 1, 1);
+        let pv = basket.value(&market, as_of).unwrap();
+        let mut context = MetricContext::new(
+            Arc::new(basket),
+            Arc::new(market),
+            as_of,
+            pv,
+            MetricContext::default_config(),
+        );
+        standard_registry()
+            .compute(&[MetricId::WeightRisk], &mut context)
+            .unwrap();
+        for (_, risk) in &context.computed_series[&MetricId::WeightRisk] {
+            assert!(
+                risk.abs() < 1e-10,
+                "equal prices cannot create budget-preserving P&L: {risk}"
+            );
+        }
+    }
+}

@@ -569,3 +569,72 @@ fn stochastic_funding_leg_conserves_cash_for_small_draws() {
         );
     }
 }
+
+#[test]
+fn recovery_exposure_changes_after_each_deterministic_event() {
+    use finstack_quant_valuations::instruments::fixed_income::revolving_credit::DrawRepayEvent;
+    let start = date!(2025 - 01 - 01);
+    let event_date = date!(2025 - 02 - 01);
+    let end = date!(2025 - 03 - 01);
+    let market = MarketContext::new()
+        .insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(start)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (1.0, 1.0)])
+                .build()
+                .expect("discount"),
+        )
+        .insert(
+            HazardCurve::builder("USD-HZ")
+                .base_date(start)
+                .knots([(1.0, 0.12), (5.0, 0.12)])
+                .recovery_rate(0.4)
+                .build()
+                .expect("hazard"),
+        );
+    let survival = |date: Date| (-0.12 * (date - start).whole_days() as f64 / 365.0).exp();
+    for is_draw in [true, false] {
+        let mut facility = RevolvingCredit::builder()
+            .id("EVENT-RECOVERY".into())
+            .commitment(usd(100_000_000.0))
+            .drawn(usd(if is_draw { 0.0 } else { 100_000_000.0 }))
+            .issue_date(start)
+            .maturity(end)
+            .rate(RateSpec::Fixed { rate: 0.0 })
+            .day_count(DayCount::Act365F)
+            .frequency(Tenor::monthly())
+            .fees(RevolvingCreditFees::default())
+            .draw_repay_spec(DrawRepaySpec::Deterministic(vec![DrawRepayEvent {
+                date: event_date,
+                amount: usd(100_000_000.0),
+                is_draw,
+            }]))
+            .discount_curve_id("USD-OIS".into())
+            .credit_curve_id("USD-HZ".into())
+            .recovery_rate(0.4)
+            .leq(0.0)
+            .build()
+            .expect("facility");
+        let recovered = facility
+            .value(&market, start)
+            .expect("recovery PV")
+            .amount();
+        facility.recovery_rate = 0.0;
+        let no_recovery = facility
+            .value(&market, start)
+            .expect("no recovery PV")
+            .amount();
+        let probability = if is_draw {
+            survival(event_date) - survival(end)
+        } else {
+            1.0 - survival(event_date)
+        };
+        let expected = 0.4 * 100_000_000.0 * probability;
+        assert!(
+            (recovered - no_recovery - expected).abs() < 1e-6,
+            "draw={is_draw}: recovery {}, expected {expected}",
+            recovered - no_recovery
+        );
+    }
+}

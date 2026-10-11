@@ -167,6 +167,7 @@ pub fn heston_satisfies_feller(kappa: f64, theta: f64, sigma_v: f64) -> bool {
 #[derive(Debug, Clone)]
 pub struct HestonProcess {
     params: HestonPricingParams,
+    drift_schedule: Option<std::sync::Arc<super::gbm::DriftSchedule>>,
 }
 
 impl HestonProcess {
@@ -200,7 +201,30 @@ impl HestonProcess {
                 feller_ratio
             );
         }
-        Self { params }
+        Self {
+            params,
+            drift_schedule: None,
+        }
+    }
+
+    /// Attach cumulative deterministic asset carry for QE simulation.
+    ///
+    /// # Arguments
+    /// * `schedule` - Cumulative log forward growth in the simulation clock;
+    ///   its increments replace constant `(r - q) * dt` in the QE spot step.
+    pub fn with_drift_schedule(
+        mut self,
+        schedule: std::sync::Arc<super::gbm::DriftSchedule>,
+    ) -> Self {
+        self.drift_schedule = Some(schedule);
+        self
+    }
+
+    pub(crate) fn log_drift_increment(&self, start: f64, end: f64) -> f64 {
+        self.drift_schedule.as_ref().map_or(
+            (self.params.r - self.params.q) * (end - start),
+            |schedule| schedule.log_drift_increment(start, end),
+        )
     }
 
     /// Create with explicit parameters.

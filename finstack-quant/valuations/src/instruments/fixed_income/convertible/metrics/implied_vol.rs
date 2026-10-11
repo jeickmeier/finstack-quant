@@ -15,7 +15,7 @@
 use std::cell::Cell;
 
 use crate::instruments::fixed_income::convertible::pricing::{
-    calculate_accrued_interest, settlement_date,
+    calculate_accrued_interest, settlement_dirty_price,
 };
 use crate::instruments::fixed_income::convertible::ConvertibleBond;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -49,12 +49,6 @@ impl MetricCalculator for ImpliedVolCalculator {
                     .into(),
             ));
         }
-        let settle = settlement_date(bond, as_of)?;
-        let settle_df = context
-            .curves
-            .get_discount(bond.discount_curve_id.as_str())?
-            .df_between_dates(as_of, settle)?;
-
         // Validate the selected pricing path before probing its numerical domain.
         // Inversion changes only the effective equity-volatility quote; every
         // evaluation retains the caller's engine, curves and contractual fixings.
@@ -68,7 +62,10 @@ impl MetricCalculator for ImpliedVolCalculator {
             let price = context.reprice_instrument_money(&trial, &context.curves, as_of)?;
             // Price error per unit notional keeps the stopping rule independent
             // of trade scale while preserving the settlement-date quote basis.
-            let residual = (price.amount() / settle_df - target_dirty) / bond.notional.amount();
+            let residual =
+                (settlement_dirty_price(&trial, &context.curves, as_of, price.amount())?
+                    - target_dirty)
+                    / bond.notional.amount();
             if !residual.is_finite() {
                 return Err(Error::Validation(
                     "non-finite convertible implied-volatility residual".into(),
@@ -226,6 +223,7 @@ mod tests {
             div_yield_id: Some("AAPL-DIVYIELD".into()),
             call_put: None,
             soft_call_trigger: None,
+            resolved_settlement: None,
             cashflow_spec: crate::instruments::fixed_income::bond::CashflowSpec::Fixed(
                 fixed_coupon,
             ),

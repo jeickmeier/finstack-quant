@@ -4411,7 +4411,6 @@ class FixedLegSpec:
         business_day_convention: str = "modified_following",
         calendar_id: str | None = None,
         stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"] = "short_front",
-        par_method: Literal["forward_based", "discount_ratio"] | None = None,
         payment_lag_days: int = 0,
         end_of_month: bool = False,
     ) -> None:
@@ -4438,9 +4437,6 @@ class FixedLegSpec:
             Calendar used for business day adjustments.
         stub : StubKind | str, default "short_front"
             Stub period handling rule.
-        par_method : str, optional
-            Par-rate method override (``"forward_based"`` or
-            ``"discount_ratio"``); ``None`` keeps the pricer default.
         payment_lag_days : int, default 0
             Payment lag in business days after period end.
         end_of_month : bool, default False
@@ -4683,21 +4679,6 @@ class FixedLegSpec:
         -------
         float
             ``0.04`` for 4%.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-    @property
-    def par_method(self) -> str | None:
-        """
-        Par-rate method override.
-
-        Returns
-        -------
-        str | None
-            ``"forward_based"``, ``"discount_ratio"`` or ``None``.
 
         Notes
         -----
@@ -13444,11 +13425,11 @@ class ConvertibleBond:
     """
     Convertible bond (typed wrapper for the canonical Rust
     ``ConvertibleBond``): debt with an embedded equity conversion option,
-    priced on a Tsiveriotis–Fernandes style tree. The cash component discounts
-    at the risk-free ``discount_curve_id`` times the survival probability of
-    the issuer hazard curve ``credit_curve_id`` (blended by ``recovery_rate``;
-    risk-free when no credit curve is set), the equity component on the
-    risk-free curve.
+    priced on a defaultable-equity tree with fractional recovery of live
+    principal. Default extinguishes equity and pays ``recovery_rate`` times
+    the recovery basis. Survival-conditioned equity drift compensates for
+    jump-to-zero risk. ``credit_curve_id`` supplies issuer hazard; without it
+    default is absent.
 
     Construct via :meth:`ConvertibleBond.builder`,
     :meth:`ConvertibleBond.example` / :meth:`ConvertibleBond.example_mandatory`
@@ -14120,6 +14101,21 @@ class ConvertibleBond:
         """
         ...
     @property
+    def resolved_settlement(self) -> dict[str, object] | None:
+        """Recorded exercise and delayed delivery replacing debt and coupons.
+
+        Returns
+        -------
+        dict[str, object] | None
+            ISO exercise/delivery dates, shares, currency-tagged cash and recovery
+            basis; ``None`` while the debt remains unresolved.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored claim without repricing.
+        """
+        ...
+    @property
     def cashflow_spec(self) -> dict[str, object]:
         """
         Coupon/cashflow specification in serde form, the same shape as
@@ -14484,6 +14480,29 @@ class ConvertibleBondBuilder:
         ------
         ValueError
             If the builder was already consumed by ``build()``.
+        """
+        ...
+    def resolved_settlement(self, value: dict[str, object] | str) -> ConvertibleBondBuilder:
+        """Record the claim remaining after exercise extinguishes the debt.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Canonical ConvertibleSettlement dict or JSON: ISO ``exercise_date``
+            and ``delivery_date``, nonnegative ``shares``, currency-tagged
+            ``cash`` and ``recovery_basis``. Cash includes retained coupons;
+            recovery basis excludes uncapitalized accrual. Omission leaves debt
+            unresolved. Rust ``build()`` validates dates, amounts and currencies.
+
+        Returns
+        -------
+        ConvertibleBondBuilder
+            This builder for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was consumed or the record cannot be deserialized.
         """
         ...
     def cashflow_spec(self, value: dict[str, object] | str) -> ConvertibleBondBuilder:
@@ -36172,8 +36191,7 @@ class VarResult:
     >>> from finstack_quant.valuations.instruments import VarResult
     >>> result = VarResult.from_json(
     ...     '{"var": -10.0, "expected_shortfall": -12.0, "pnl_distribution": [-12.0, 3.0],'
-    ...     ' "num_scenarios": 2, "confidence_level": 0.95, "skipped_fx": false,'
-    ...     ' "skipped_vol": false}'
+    ...     ' "num_scenarios": 2, "confidence_level": 0.95}'
     ... )
     >>> (result.var, list(result.to_dataframe()["pnl"]))
     (-10.0, [-12.0, 3.0])
@@ -36254,36 +36272,6 @@ class VarResult:
         This accessor does not raise; it returns the stored value.
         """
         ...
-    @property
-    def skipped_fx(self) -> bool:
-        """
-        Whether the Taylor method skipped FX-spot shocks.
-
-        Returns
-        -------
-        bool
-            ``True`` when VaR understates FX risk; always ``False`` for full revaluation.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-    @property
-    def skipped_vol(self) -> bool:
-        """
-        Whether the Taylor method skipped implied-vol point shocks.
-
-        Returns
-        -------
-        bool
-            ``True`` when VaR understates vol risk; always ``False`` for full revaluation.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
     def to_dataframe(self) -> pd.DataFrame:
         """
         The P&L distribution as a one-column pandas ``DataFrame``.
@@ -36324,8 +36312,7 @@ class VarResult:
         >>> from finstack_quant.valuations.instruments import VarResult
         >>> text = (
         ...     '{"var": 0.0, "expected_shortfall": 0.0, "pnl_distribution": [],'
-        ...     ' "num_scenarios": 0, "confidence_level": 0.99, "skipped_fx": false,'
-        ...     ' "skipped_vol": false}'
+        ...     ' "num_scenarios": 0, "confidence_level": 0.99}'
         ... )
         >>> VarResult.from_json(text).confidence_level
         0.99

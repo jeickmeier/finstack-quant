@@ -195,3 +195,42 @@ fn positive_volatility_pde_approaches_the_deterministic_limit() {
         "limiting price error={previous_error}"
     );
 }
+
+#[test]
+fn pending_cash_exercise_keeps_rate_risk_and_accretion() {
+    use finstack_quant_valuations::instruments::{equity::EquityOptionExercise, SettlementType};
+    let as_of = date!(2025 - 01 - 06);
+    let pay = date!(2025 - 02 - 06);
+    let mut option = create_call(as_of - Duration::days(365), as_of, 90.0);
+    option.settlement = SettlementType::Cash;
+    option.exercise = Some(EquityOptionExercise::new(as_of, 100.0, pay, true));
+    let market = build_standard_market(as_of, 100.0, 0.25, 0.05, 0.0);
+    let pv = option.value(&market, as_of).unwrap().amount();
+    let tau = 31.0 / 365.0;
+    assert!((option.rho(&market, as_of).unwrap() + tau * pv * 1e-4).abs() < 1e-10);
+    assert!(
+        (option.theta(&market, as_of).unwrap()
+            - 0.05 * pv / option.metric_pricing_overrides.theta_days_per_year())
+        .abs()
+            < 1e-10
+    );
+    assert_eq!(option.delta(&market, as_of).unwrap(), 0.0);
+    assert_eq!(option.rho(&market, pay + Duration::days(1)).unwrap(), 0.0);
+}
+
+#[test]
+fn tree_theta_rolls_expiry_dividends_and_bermudan_dates() {
+    let as_of = date!(2025 - 01 - 06);
+    let expiry = date!(2026 - 01 - 06);
+    let market = build_standard_market(as_of, 100.0, 0.25, 0.05, 0.0);
+    for style in [ExerciseStyle::American, ExerciseStyle::Bermudan] {
+        let mut option = create_call(as_of, expiry, 95.0);
+        option.exercise_style = style;
+        option.discrete_dividends = vec![(expiry, 5.0)];
+        if style == ExerciseStyle::Bermudan {
+            option.exercise_dates = Some(vec![as_of + Duration::days(1), expiry]);
+        }
+        assert!(option.theta(&market, as_of).unwrap().is_finite());
+        assert!(option.delta(&market, as_of).unwrap().is_finite());
+    }
+}

@@ -29,7 +29,6 @@ fn test_equity_trs_builder_defaults() {
     assert_eq!(trs.notional.amount(), 10_000_000.0);
     assert_eq!(trs.notional.currency(), USD);
     assert_eq!(trs.side, PayReceive::Receive);
-    assert_eq!(trs.underlying.contract_size, 1.0);
 }
 
 #[test]

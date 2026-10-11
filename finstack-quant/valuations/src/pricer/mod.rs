@@ -23,7 +23,7 @@
 //! - `fixed_income`: FiIndexTRS, Convertible, InflationLinkedBond, RevolvingCredit, TermLoan, MBS, TBA, CMO
 //! - `inflation`: InflationSwap, YoYInflationSwap, InflationCapFloor
 //! - `exotics`: Basket, Asian, Barrier, Lookback, Quanto, Autocallable, CMS, Cliquet, RangeAccrual, BermudanSwaption
-//! - `commodity`: CommodityFuture, CommodityFutureOption, CommodityForward, CommoditySwap, CommodityOption, CommoditySwaption, CommoditySpreadOption
+//! - `commodity`: CommodityFuture, CommodityFutureOption, CommodityForward, CommoditySwap, CommoditySpotOption, CommoditySwaption, CommoditySpreadOption
 
 // Core submodules
 pub(crate) mod defaults;

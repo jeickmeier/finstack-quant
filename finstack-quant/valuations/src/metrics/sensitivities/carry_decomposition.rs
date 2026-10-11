@@ -87,7 +87,16 @@ impl MetricCalculator for CarryDecompositionCalculator {
             // bond over a full coupon period this is ~0; for a zero-coupon
             // bond it is the full accretion.
             let accretion = ytm_accretion_factor(context, ytm, rolled_date)?;
-            (base_pv * (accretion - 1.0) - coupon_income, false)
+            let payments = super::theta::period_cash_by_date_cached(context, rolled_date)?;
+            let mut intermediate_accretion = 0.0;
+            for (payment_date, amount) in payments {
+                let at_payment = ytm_accretion_factor(context, ytm, payment_date)?;
+                intermediate_accretion += amount * (accretion / at_payment - 1.0);
+            }
+            (
+                base_pv * (accretion - 1.0) - coupon_income - intermediate_accretion,
+                false,
+            )
         } else {
             tracing::warn!(
                 instrument_id = context.instrument.id(),
@@ -360,10 +369,13 @@ mod tests {
             .calculate(&mut context)
             .expect("ACT/365L carry");
         let coupon_income = 100.0 * 0.05 * 183.0 / 366.0;
+        // The October receipt earns the held yield for 61 days to the
+        // December horizon, on the new coupon period's 365-day denominator.
+        let accumulated_coupon = coupon_income * (1.0 + ytm / 2.0).powf(2.0 * 61.0 / 365.0);
         assert!((context.computed[&MetricId::CouponIncome] - coupon_income).abs() < 1e-12);
         assert!(
             (context.computed[&MetricId::PullToPar]
-                - (base_pv * (accretion - 1.0) - coupon_income))
+                - (base_pv * (accretion - 1.0) - accumulated_coupon))
                 .abs()
                 < 1e-10
         );
@@ -467,8 +479,8 @@ mod tests {
     /// YTM. Pull-to-par must be accretion-sized (yield income net of the
     /// coupon; a few cents per 100 for a near-par bond over a full coupon
     /// period), NOT approximately minus the whole coupon, and roll-down on a
-    /// flat self-consistent curve must vanish (up to the tiny in-horizon
-    /// coupon reinvestment residual).
+    /// flat self-consistent curve must vanish, including the in-horizon
+    /// accumulation of intermediate coupon receipts.
     #[test]
     fn test_coupon_bond_flat_curve_pull_to_par_is_accretion_and_roll_down_vanishes() {
         let as_of = date!(2025 - 01 - 20);
@@ -510,7 +522,7 @@ mod tests {
         );
         // On a self-consistent flat curve rolling down the curve is a no-op.
         assert!(
-            roll_down.abs() < 0.02,
+            roll_down.abs() < 1e-9,
             "flat self-consistent curve should have ~no roll-down, got {roll_down}"
         );
         // Identity: total = coupon + pull + roll (no funding leg configured).

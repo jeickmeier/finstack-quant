@@ -356,35 +356,35 @@
       }
     },
     {
-      "name": "contract-commodity-option",
+      "name": "contract-commodity-spot-option",
       "type": "registry:lib",
-      "title": "Commodity option contract",
-      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust commodity_option contract. Validation is structural; native validation remains required.",
+      "title": "Commodity spot option contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust commodity_spot_option contract. Validation is structural; native validation remains required.",
       "files": [
         {
-          "path": "src/generated/schemas/commodity_option.json",
+          "path": "src/generated/schemas/commodity_spot_option.json",
           "type": "registry:file",
-          "target": "lib/finstack/generated/schemas/commodity_option.json"
+          "target": "lib/finstack/generated/schemas/commodity_spot_option.json"
         },
         {
-          "path": "src/generated/types/commodity_option.ts",
+          "path": "src/generated/types/commodity_spot_option.ts",
           "type": "registry:file",
-          "target": "lib/finstack/generated/types/commodity_option.ts"
+          "target": "lib/finstack/generated/types/commodity_spot_option.ts"
         },
         {
-          "path": "src/generated/meta/commodity_option.ts",
+          "path": "src/generated/meta/commodity_spot_option.ts",
           "type": "registry:file",
-          "target": "lib/finstack/generated/meta/commodity_option.ts"
+          "target": "lib/finstack/generated/meta/commodity_spot_option.ts"
         },
         {
-          "path": "src/generated/instrument/commodity_option.ts",
+          "path": "src/generated/instrument/commodity_spot_option.ts",
           "type": "registry:file",
-          "target": "lib/finstack/generated/instrument/commodity_option.ts"
+          "target": "lib/finstack/generated/instrument/commodity_spot_option.ts"
         },
         {
-          "path": "src/generated/examples/commodity_option.json",
+          "path": "src/generated/examples/commodity_spot_option.json",
           "type": "registry:file",
-          "target": "lib/finstack/generated/examples/commodity_option.json"
+          "target": "lib/finstack/generated/examples/commodity_spot_option.json"
         }
       ],
       "registryDependencies": ["@finstack/finstack-codec"],
@@ -394,7 +394,7 @@
         "version": "0.2.0",
         "wasmVersion": "0.10.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json"
+          "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json"
         ]
       }
     },
@@ -3741,7 +3741,7 @@
         "@finstack/contract-commodity-forward",
         "@finstack/contract-commodity-future-option",
         "@finstack/contract-commodity-future",
-        "@finstack/contract-commodity-option",
+        "@finstack/contract-commodity-spot-option",
         "@finstack/contract-commodity-spread-option",
         "@finstack/contract-commodity-swap",
         "@finstack/contract-commodity-swaption",
@@ -3826,7 +3826,7 @@
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future_option.schema.json",
-          "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spread_option.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swap.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json",

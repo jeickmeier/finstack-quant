@@ -1009,3 +1009,29 @@ fn commitment_fees_are_paid_once_per_period_on_the_payment_date() {
     assert_eq!(fees[1].0, date!(2025 - 07 - 01));
     assert!((fees[1].1 - 3_125.0).abs() < 1e-6, "{fees:?}");
 }
+
+#[test]
+fn remaining_amortization_includes_same_date_pik() {
+    let mut loan = TermLoan::example().unwrap();
+    loan.issue_date = date!(2025 - 01 - 01);
+    loan.maturity = date!(2027 - 01 - 01);
+    loan.notional_limit = Money::new(100.0, Currency::USD).unwrap();
+    loan.rate = RateSpec::Fixed { rate: 0.10 };
+    loan.frequency = Tenor::annual();
+    loan.day_count = DayCount::Thirty360;
+    loan.business_day_convention = BusinessDayConvention::Unadjusted;
+    loan.coupon_type = CouponType::Pik;
+    loan.amortization = AmortizationSpec::PercentOfRemainingPerPeriod { pct: 0.5 };
+    let schedule = loan
+        .cashflow_schedule(&build_market_context(), loan.issue_date)
+        .unwrap();
+    let amort: Vec<_> = schedule
+        .get_flows()
+        .iter()
+        .filter(|cf| cf.kind == CFKind::Amortization)
+        .map(|cf| cf.amount.amount())
+        .collect();
+    assert_eq!(amort.len(), 2);
+    assert!((amort[0] - 55.0).abs() < 1e-10);
+    assert!((amort[1] - 30.25).abs() < 1e-10);
+}

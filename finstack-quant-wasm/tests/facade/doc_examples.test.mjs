@@ -56,7 +56,7 @@ for (const example of examples) {
     try {
       await assert.doesNotReject(
         import(pathToFileURL(file).href),
-        `${example.source}:${example.line} threw`,
+        `${example.source}:${example.line} threw`
       );
     } finally {
       Object.assign(console, saved);

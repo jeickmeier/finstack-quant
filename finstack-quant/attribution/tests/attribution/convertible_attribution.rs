@@ -1,8 +1,8 @@
 //! Credit-spread P&L attribution for convertible bonds.
 //!
 //! A `ConvertibleBond` carries credit risk through its issuer `HazardCurve`
-//! (`credit_curve_id`), from which the Tsiveriotis–Zhang pricer derives the
-//! risky discount factor of the cash component. These tests pin that a
+//! (`credit_curve_id`), with fractional recovery of outstanding principal.
+//! These tests pin that a
 //! credit-spread move is attributed to `credit_curves_pnl` rather than leaking
 //! into the residual.
 
@@ -10,7 +10,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use std::sync::Arc;
@@ -82,6 +82,7 @@ fn convertible_with_credit() -> Arc<dyn Instrument> {
         div_yield_id: Some("AAPL-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
+        resolved_settlement: None,
         cashflow_spec:
             finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
                 fixed_coupon,
@@ -94,9 +95,8 @@ fn convertible_with_credit() -> Arc<dyn Instrument> {
     })
 }
 
-/// Market with a risk-free `USD-OIS` curve and a flat zero-recovery issuer
-/// hazard curve `USD-CREDIT` at `credit_spread_bp` (so the hazard rate equals
-/// the spread). Only `credit_spread_bp` varies between the two test dates;
+/// Market with a risk-free `USD-OIS` curve and a zero-recovery issuer curve
+/// calibrated to flat CDS quotes at `credit_spread_bp`. Only the quotes vary;
 /// `USD-OIS`, spot and vol are held fixed so the P&L is purely a credit move.
 fn market(credit_spread_bp: f64) -> MarketContext {
     market_with_rate(credit_spread_bp, 0.03)
@@ -115,8 +115,19 @@ fn market_with_rate(credit_spread_bp: f64, rf: f64) -> MarketContext {
         .interp(InterpStyle::LogLinear)
         .build()
         .unwrap();
-    let credit_curve =
-        HazardCurve::flat("USD-CREDIT", base, credit_spread_bp / 10_000.0, 0.0).unwrap();
+    let credit_curve = super::attribution_support::calibrated_hazard_curve(
+        &ois,
+        base,
+        "USD-CREDIT",
+        "CONVERTIBLE-ISSUER",
+        0.0,
+        finstack_quant_valuations::market::conventions::ids::CdsConventionKey {
+            currency: Currency::USD,
+            doc_clause: finstack_quant_valuations::market::conventions::ids::CdsDocClause::IsdaNa,
+        },
+        &[1, 3, 5, 7, 10].map(|years| (years, credit_spread_bp)),
+    )
+    .unwrap();
     MarketContext::new()
         .insert(ois)
         .insert(credit_curve)
@@ -233,7 +244,10 @@ fn metrics_based_explains_convertible_credit_spread_move() {
         &AttributionMethod::MetricsBased.required_metrics(),
         conv.key(),
     );
-    let opts = finstack_quant_valuations::instruments::PricingOptions::default();
+    let opts = finstack_quant_valuations::instruments::PricingOptions::default()
+        .with_recalibration_provider(Arc::new(
+            finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new(),
+        ));
     let val_t0 = conv
         .price_with_metrics(&market_t0, t0(), &metrics, opts.clone())
         .unwrap();
@@ -376,9 +390,8 @@ fn taylor_market_gamma_uses_opening_conversion_state() {
         ..Default::default()
     });
     let mut changed = conversion_change_spec(method);
-    // A rates move: the issuer hazard curve is entered directly (no
-    // calibration recipe), so quote-space credit gamma is unavailable and the
-    // gamma path is exercised on the risk-free curve.
+    // A rates move with unchanged CDS quotes: rebuild the issuer curve against
+    // the new discount curve so both dependency markets remain replayable.
     changed.inputs.market_t1 =
         finstack_quant_core::market_data::context::MarketContextState::try_from(&market_with_rate(
             150.0, 0.035,

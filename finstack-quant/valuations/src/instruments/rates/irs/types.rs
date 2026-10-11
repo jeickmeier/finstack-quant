@@ -25,7 +25,7 @@ use finstack_quant_margin::types::OtcMarginSpec;
 
 use super::compounding::FloatingLegCompounding;
 
-pub use crate::instruments::common_impl::parameters::legs::{ParRateMethod, PayReceive};
+pub use crate::instruments::common_impl::parameters::legs::PayReceive;
 
 pub use crate::instruments::common_impl::parameters::legs::FixedLegSpec;
 pub use crate::instruments::common_impl::parameters::legs::FloatLegSpec;
@@ -258,7 +258,7 @@ impl InterestRateSwap {
                 stub: conv.stub,
                 start,
                 end,
-                par_method: None,
+
                 payment_lag_days: conv.payment_lag_days,
                 end_of_month: false,
             })
@@ -543,7 +543,7 @@ impl InterestRateSwap {
                 stub: StubKind::ShortFront,
                 start,
                 end,
-                par_method: None,
+
                 payment_lag_days: 0,
                 end_of_month: false,
             })

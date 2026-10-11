@@ -263,17 +263,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
           "description": "Payment frequency"
         },
-        "par_method": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ParRateMethod"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional par-rate calculation method override"
-        },
         "payment_lag_days": {
           "default": 0,
           "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
@@ -762,21 +751,6 @@
       ],
       "type": "object"
     },
-    "ParRateMethod": {
-      "description": "Method for calculating par rates in swaps",
-      "oneOf": [
-        {
-          "const": "forward_based",
-          "description": "Use forward-curve based float PV over the schedule (market standard)",
-          "type": "string"
-        },
-        {
-          "const": "discount_ratio",
-          "description": "Use discount-curve ratio for bootstrapping",
-          "type": "string"
-        }
-      ]
-    },
     "PayReceive": {
       "description": "Direction for instrument legs (universal for IRS, CDS, variance swaps, etc.)\n\nFor interest rate swaps: Pay = pay fixed/receive floating, Receive = receive fixed/pay floating\nFor credit default swaps: Pay = buy protection (pay premium), Receive = sell protection (receive premium)\nFor variance swaps: Pay = short variance, Receive = long variance",
       "oneOf": [
@@ -1011,7 +985,6 @@
               "count": 6,
               "unit": "months"
             },
-            "par_method": null,
             "payment_lag_days": 0,
             "rate": "0.04",
             "start": "2024-01-02",

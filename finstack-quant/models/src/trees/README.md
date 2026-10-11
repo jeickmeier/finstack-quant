@@ -311,7 +311,7 @@ model as `None`.
 | Instrument | Model | Location |
 |------------|-------|----------|
 | American / Bermudan equity options | `BinomialTree::leisen_reimer` | `instruments/equity/equity_option/pricing/black.rs` |
-| Commodity options | `BinomialTree::leisen_reimer` | `instruments/commodity/commodity_option/types.rs` |
+| Commodity options | `BinomialTree::leisen_reimer` | `instruments/commodity/commodity_spot_option/types.rs` |
 | Callable / putable bonds | `ShortRateTree`, `RatesCreditTree`, `HullWhiteTree` | `instruments/fixed_income/bond/pricing/engine/tree/` |
 | Term loans | `ShortRateTree`, `RatesCreditTree` | `instruments/fixed_income/term_loan/pricing/tree_engine.rs` |
 | Bermudan swaptions | `HullWhiteTree::calibrate` | `instruments/rates/swaption/` |

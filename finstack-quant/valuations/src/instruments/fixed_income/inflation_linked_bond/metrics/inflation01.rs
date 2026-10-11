@@ -8,9 +8,8 @@
 //!
 //! The bump is applied as a parallel shift to zero-coupon inflation rates. For a
 //! hybrid historical-index/projected-curve source, only the projected curve is
-//! shocked. For an index-only source, observations through `as_of` are treated as
-//! published fixings and remain unchanged; only later observations explicitly
-//! present in the index are treated as forecasts and shocked.
+//! shocked. Historical observations are never bumped. Publication dates control
+//! which CPI anchors are fixed, including when future observations are stored.
 //!
 //! # Formula
 //!
@@ -24,9 +23,8 @@
 //! consistent with the DV01/CS01 convention throughout the workspace.
 //!
 //! # Note
-//! An index-only source with no observations after `as_of` has zero projected
-//! inflation sensitivity. Production linkers should normally provide both a
-//! published index and a projected inflation curve.
+//! Fully fixed claims have zero projected inflation sensitivity. Unpublished
+//! anchors require an explicit projection curve.
 
 use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::Instrument;
@@ -55,9 +53,10 @@ pub(super) fn bumped_inflation_market(
         }]);
     }
 
-    let index = market.get_inflation_index(bond.inflation_index_id.as_str())?;
-    let bumped = index.apply_projection_bump(as_of, spec)?;
-    Ok(market.clone().insert_inflation_index(bumped))
+    // Validate that every remaining claim can be resolved without a projection.
+    // An unpublished anchor fails here rather than being shocked as a fixing.
+    bond.value(market, as_of)?;
+    Ok(market.clone())
 }
 
 impl MetricCalculator for Inflation01Calculator {
@@ -121,6 +120,8 @@ mod tests {
 
     fn sample_bond() -> InflationLinkedBond {
         let mut bond = InflationLinkedBond::example().expect("example");
+        bond.deflation_protection =
+            crate::instruments::fixed_income::inflation_linked_bond::DeflationProtection::None;
         bond.day_count = finstack_quant_core::dates::DayCount::Thirty360;
         bond.discount_curve_id = CurveId::new("US-CPI-DISC");
         bond.inflation_index_id = CurveId::new("US-CPI");
@@ -246,21 +247,16 @@ mod tests {
             .insert_inflation_index(index);
         let bond = sample_bond();
 
-        let result = bond
-            .price_with_metrics(
+        assert!(
+            bond.price_with_metrics(
                 &market,
                 as_of,
                 &[MetricId::Inflation01],
-                PricingOptions::default(),
+                PricingOptions::default()
             )
-            .expect("index-backed Inflation01");
-        let inflation01 = result
-            .measures
-            .get(MetricId::Inflation01.as_str())
-            .copied()
-            .expect("Inflation01");
-        assert!(inflation01.is_finite());
-        assert!(inflation01 > 0.0);
+            .is_err(),
+            "unpublished observations need a forecast curve"
+        );
 
         let projected_curve = InflationCurve::builder("US-CPI")
             .base_date(as_of)
@@ -283,8 +279,8 @@ mod tests {
             .copied()
             .expect("hybrid Inflation01");
         assert!(
-            hybrid_inflation01.abs() < 1e-12,
-            "the published index covers every required RefCPI anchor, so the unused projection curve must have zero Inflation01"
+            hybrid_inflation01 > 0.0,
+            "unpublished anchors must retain projection sensitivity despite future stored observations"
         );
     }
 }

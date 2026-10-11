@@ -136,7 +136,6 @@ pub struct TestEquityTrsBuilder {
     notional: Money,
     spot_id: String,
     div_yield_id: Option<PriceId>,
-    contract_size: f64,
     discount_curve_id: String,
     forward_curve_id: String,
     spread_bp: f64,
@@ -153,7 +152,6 @@ impl Default for TestEquityTrsBuilder {
             notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             spot_id: "SPX-SPOT".into(),
             div_yield_id: Some(finstack_quant_core::types::PriceId::new("SPX-DIV-YIELD")),
-            contract_size: 1.0,
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: 25.0,
@@ -209,8 +207,7 @@ impl TestEquityTrsBuilder {
 
     pub fn build(self) -> EquityTotalReturnSwap {
         let mut underlying =
-            EquityUnderlyingParams::new("TEST-EQ", self.spot_id, self.notional.currency())
-                .with_contract_size(self.contract_size);
+            EquityUnderlyingParams::new("TEST-EQ", self.spot_id, self.notional.currency());
         if let Some(div_id) = self.div_yield_id {
             underlying = underlying.with_div_yield_id(div_id);
         }

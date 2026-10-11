@@ -10,7 +10,8 @@
 //!
 //! 1. **`quoted_forward`**: If the instrument has a quoted forward override, bump that
 //! 2. **`PriceCurve`**: If a PriceCurve exists for `forward_curve_id`, bump it (parallel percent)
-//! 3. **`spot_id`**: Only as a fallback, bump spot to propagate via cost-of-carry
+//! Observed spot is required separately for early exercise and simulation;
+//! it does not substitute for the contractual delivery forward.
 //!
 //! This ensures greeks are consistent with the Black-76 pricing model, regardless of
 //! how the forward price is specified in the market data.
@@ -20,19 +21,19 @@ use crate::pricer::InstrumentType;
 use std::sync::Arc;
 
 /// Register commodity option metrics with the registry.
-pub(crate) fn register_commodity_option_metrics(
+pub(crate) fn register_commodity_spot_option_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), crate::metrics::MetricRegistryError> {
     crate::register_metrics! {
         registry: registry,
-        instrument: InstrumentType::CommodityOption,
+        instrument: InstrumentType::CommoditySpotOption,
         metrics: [
-            // Forward-based greeks implemented via provider traits on CommodityOption.
-            (Delta, crate::metrics::OptionGreekCalculator::<crate::instruments::CommodityOption>::delta()),
-            (Gamma, crate::metrics::OptionGreekCalculator::<crate::instruments::CommodityOption>::gamma()),
-            (Vega, crate::metrics::OptionGreekCalculator::<crate::instruments::CommodityOption>::vega()),
-            (Vanna, crate::metrics::OptionGreekCalculator::<crate::instruments::CommodityOption>::vanna()),
-            (Volga, crate::metrics::OptionGreekCalculator::<crate::instruments::CommodityOption>::volga()),
+            // Forward-based greeks implemented via provider traits on CommoditySpotOption.
+            (Delta, crate::metrics::OptionGreekCalculator::<crate::instruments::CommoditySpotOption>::delta()),
+            (Gamma, crate::metrics::OptionGreekCalculator::<crate::instruments::CommoditySpotOption>::gamma()),
+            (Vega, crate::metrics::OptionGreekCalculator::<crate::instruments::CommoditySpotOption>::vega()),
+            (Vanna, crate::metrics::OptionGreekCalculator::<crate::instruments::CommoditySpotOption>::vanna()),
+            (Volga, crate::metrics::OptionGreekCalculator::<crate::instruments::CommoditySpotOption>::volga()),
         ]
     }
 
@@ -41,14 +42,14 @@ pub(crate) fn register_commodity_option_metrics(
         Arc::new(crate::metrics::UnifiedDv01Calculator::new(
             crate::metrics::Dv01CalculatorConfig::parallel_combined(),
         )),
-        &[InstrumentType::CommodityOption],
+        &[InstrumentType::CommoditySpotOption],
     )?;
     registry.register_metric(
         MetricId::BucketedDv01,
         Arc::new(crate::metrics::UnifiedDv01Calculator::new(
             crate::metrics::Dv01CalculatorConfig::triangular_key_rate(),
         )),
-        &[InstrumentType::CommodityOption],
+        &[InstrumentType::CommoditySpotOption],
     )?;
     Ok(())
 }

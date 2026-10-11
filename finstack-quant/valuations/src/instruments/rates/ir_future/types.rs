@@ -27,7 +27,6 @@
 //!
 //! For STIR futures on SOFR, adjustments are typically sourced from broker screens
 //! or implied from listed options.
-use crate::constants::ONE_BASIS_POINT;
 // Params-based constructor removed; build via builder instead.
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::common_impl::listed::ListedFutureTerms;
@@ -142,7 +141,9 @@ pub struct InterestRateFuture {
     /// overnight calendar. Otherwise the currency standard is used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixing_calendar_id: Option<finstack_quant_core::types::CalendarId>,
-    /// Optional volatility surface identifier for convexity adjustment
+    /// Normal-rate volatility surface for automatic term-rate convexity only.
+    /// Overnight automatic convexity instead requires explicit Hull-White
+    /// mean reversion and short-rate sigma in `instrument_pricing_overrides.model_config`.
     pub vol_surface_id: Option<CurveId>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
@@ -190,7 +191,8 @@ pub struct FutureContractSpecs {
     ///
     /// - `Some(0.0)`: Explicitly disable model-based adjustment (strict mode)
     /// - `Some(x)`: Use fixed adjustment of `x` (e.g., from broker quote)
-    /// - `None`: Compute adjustment from volatility surface (requires `vol_surface_id`)
+    /// - `None`: Term futures use `vol_surface_id`; overnight futures use explicit
+    ///   `hw1f_mean_reversion` and `hw1f_sigma` in instrument model configuration.
     ///
     /// # Market Practice
     ///
@@ -541,6 +543,9 @@ impl InterestRateFuture {
         if let Some(adjustment) = self.contract_specs.convexity_adjustment {
             return Ok(adjustment * projection.parallel_forward_sensitivity);
         }
+        if !matches!(self.compounding, FloatingLegCompounding::Simple) {
+            return self.overnight_convexity_adjustment(context, as_of, projection.rate);
+        }
         let fwd = context.get_forward(&self.forward_curve_id)?;
         let fwd_day_count = fwd.day_count();
         let t_start = if period_start <= as_of {
@@ -559,6 +564,104 @@ impl InterestRateFuture {
             self.calculate_convexity_adjusted_rate(context, projection.rate, t_start, t_end)?
                 - projection.rate;
         Ok(adjustment * projection.parallel_forward_sensitivity)
+    }
+
+    /// Exact Gaussian moments of the daily HW bond-ratio factors. The
+    /// deterministic index/discount basis is retained in each projected factor.
+    fn overnight_convexity_adjustment(
+        &self,
+        context: &MarketContext,
+        as_of: Date,
+        projected_rate: f64,
+    ) -> finstack_quant_core::Result<f64> {
+        use crate::instruments::common_impl::pricing::overnight::{
+            project_overnight_coupon, resolve_overnight_fixing_calendar,
+            OvernightCouponProjectionInput, OvernightProjectionCurve,
+        };
+        use finstack_quant_models::rates::hull_white::{hw_b, HullWhiteParams};
+        let config = &self.instrument_pricing_overrides.model_config;
+        let (kappa, sigma) = match (config.hw1f_mean_reversion, config.hw1f_sigma) {
+            (Some(kappa), Some(sigma)) if config.hw1f_sigma_schedule.is_none() => (kappa, sigma),
+            _ => return Err(finstack_quant_core::Error::Validation(
+                "Overnight futures automatic convexity requires explicit hw1f_mean_reversion and hw1f_sigma; volatility surfaces and sigma schedules are not short-rate parameter pairs".into())),
+        };
+        let model = HullWhiteParams::constant(kappa, sigma)?;
+        let (_, start, end) = self.resolve_dates()?;
+        let tau = self
+            .day_count
+            .year_fraction(start, end, DayCountContext::default())?;
+        let forward = context.get_forward(&self.forward_curve_id)?;
+        let calendar = resolve_overnight_fixing_calendar(
+            self.fixing_calendar_id.as_deref(),
+            self.terms.currency,
+            "IR future",
+        )?;
+        let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
+            context,
+            self.resolved_index_id(),
+        )
+        .ok();
+        let compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
+        let coupon = project_overnight_coupon(OvernightCouponProjectionInput {
+            curve: OvernightProjectionCurve::Forward(forward.as_ref()),
+            fixings,
+            fixing_id: self.resolved_index_id(),
+            as_of,
+            accrual_start: start,
+            accrual_end: end,
+            day_count: self.day_count,
+            coupon_frequency: None,
+            coupon_period: (start, end),
+            compounding: &compounding,
+            fixing_calendar: calendar,
+            compounded_spread: 0.0,
+            need_observation_exposures: true,
+        })?;
+        let mut log_moment = 0.0;
+        let mut previous = Vec::<(f64, f64)>::new();
+        let mut arithmetic_adjustment = 0.0;
+        for observation in coupon
+            .observation_exposures
+            .iter()
+            .filter(|o| o.observation_start >= as_of)
+        {
+            let t = DayCount::Act365F.year_fraction(
+                as_of,
+                observation.observation_start,
+                DayCountContext::default(),
+            )?;
+            let u = DayCount::Act365F.year_fraction(
+                as_of,
+                observation.observation_end,
+                DayCountContext::default(),
+            )?;
+            let b = hw_b(kappa, t, u);
+            let variance = model.state_variance(t)?;
+            let cov_integral = 0.5 * sigma * sigma * hw_b(kappa, 0.0, t).powi(2);
+            // c is the deterministic shift in 1/P(t,u); another half of
+            // its Gaussian variance appears when taking the Q expectation.
+            let marginal_exponent = b * cov_integral + b * b * variance;
+            log_moment += marginal_exponent;
+            for &(earlier, loading) in &previous {
+                log_moment += b * loading * model.state_covariance(t, earlier)?;
+            }
+            previous.push((t, b));
+            let factor = 1.0 + observation.projected_rate * observation.rate_accrual_year_fraction;
+            arithmetic_adjustment +=
+                factor * marginal_exponent.exp_m1() * observation.factor_accrual_year_fraction
+                    / observation.rate_accrual_year_fraction
+                    / tau;
+        }
+        let adjustment = match self.compounding {
+            FloatingLegCompounding::SimpleAverage => arithmetic_adjustment,
+            _ => (1.0 + projected_rate * tau) * log_moment.exp_m1() / tau,
+        };
+        if !adjustment.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "Overnight futures convexity overflow".into(),
+            ));
+        }
+        Ok(adjustment)
     }
 
     /// Return the live quote, model price, or official final settlement price.
@@ -595,40 +698,9 @@ impl InterestRateFuture {
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         self.validate()?;
-        use finstack_quant_core::dates::DayCountContext;
-        let (_fixing_date, period_start, period_end) = self.resolve_dates()?;
-
-        // Validate both curve dependencies while the contract is live. Futures
-        // are not discounted, but the discount curve remains a declared market
-        // dependency for consistent rate-market validation.
         let _disc = market.get_discount(&self.discount_curve_id)?;
         let projection = self.rate_projection(market, as_of)?;
-        let effective_adjustment =
-            if let Some(adjustment) = self.contract_specs.convexity_adjustment {
-                adjustment * projection.parallel_forward_sensitivity
-            } else {
-                let fwd = market.get_forward(&self.forward_curve_id)?;
-                let fwd_day_count = fwd.day_count();
-                let t_start_remaining = if period_start <= as_of {
-                    0.0
-                } else {
-                    fwd_day_count.year_fraction(as_of, period_start, DayCountContext::default())?
-                };
-                let t_end_remaining = if period_end <= as_of {
-                    t_start_remaining
-                } else {
-                    fwd_day_count
-                        .year_fraction(as_of, period_end, DayCountContext::default())?
-                        .max(t_start_remaining)
-                };
-                (self.calculate_convexity_adjusted_rate(
-                    market,
-                    projection.rate,
-                    t_start_remaining,
-                    t_end_remaining,
-                )? - projection.rate)
-                    * projection.parallel_forward_sensitivity
-            };
+        let effective_adjustment = self.convexity_adjustment(market, as_of)?;
         Ok(100.0 * (1.0 - projection.rate - effective_adjustment))
     }
 
@@ -667,23 +739,10 @@ impl InterestRateFuture {
 
     /// Derive contract tick value for the instrument accrual.
     ///
-    /// tick_value ≈ Face × tau(period_start, period_end) × 1bp × (tick_size / 1bp)
+    /// Tick value is the quote-point multiplier times the tick size in price points.
     pub fn derived_tick_value(&self) -> finstack_quant_core::Result<f64> {
         self.validate()?;
-        let (_fixing_date, period_start, period_end) = self.resolve_dates()?;
-        let tau = self
-            .day_count
-            .year_fraction(
-                period_start,
-                period_end,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?
-            .max(0.0);
-        // tick_value = Face × tau × tick_size (tick_size is already in decimal form)
-        Ok(self.contract_specs.face_value
-            * tau
-            * ONE_BASIS_POINT
-            * (self.contract_specs.tick_size / ONE_BASIS_POINT))
+        Ok(self.terms.multiplier * self.contract_specs.tick_size)
     }
 
     /// Calculate convexity adjusted rate using volatility surface.
@@ -801,7 +860,12 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture 
 
     fn validate_for_pricing(&self) -> finstack_quant_core::Result<()> {
         self.validate()?;
-        if self.contract_specs.convexity_adjustment.is_none() && self.vol_surface_id.is_none() {
+        if self.contract_specs.convexity_adjustment.is_none()
+            && self.vol_surface_id.is_none()
+            && matches!(self.compounding, FloatingLegCompounding::Simple)
+            && self.terms.quoted_price.is_none()
+            && self.terms.settlement_price.is_none()
+        {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Missing vol_surface_id: IR future '{}' requires either a volatility surface or a fixed convexity_adjustment",
                 self.id.as_str()
@@ -895,6 +959,147 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use time::macros::date;
+
+    #[test]
+    fn overnight_hw_convexity_retains_future_observations_during_accrual() {
+        use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+        use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+        let start = date!(2025 - 01 - 06);
+        let end = date!(2025 - 01 - 09);
+        let base = date!(2025 - 01 - 03);
+        let mut future = InterestRateFuture::example().expect("future");
+        future.terms = listed_terms(end, 95.0);
+        future.fixing_date = Some(end);
+        future.period_start = Some(start);
+        future.period_end = Some(end);
+        future.index_id = Some(IndexId::new("TEST"));
+        future.fixing_calendar_id = Some("weekends_only".into());
+        future.contract_specs.convexity_adjustment = None;
+        future
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.1);
+        future.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.02);
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder(future.discount_curve_id.clone())
+                    .base_date(base)
+                    .knots([(0.0, 1.0), (1.0, 0.96)])
+                    .build()
+                    .expect("discount"),
+            )
+            .insert(
+                ForwardCurve::builder(future.forward_curve_id.clone(), 0.25)
+                    .base_date(base)
+                    .day_count(DayCount::Act360)
+                    .knots([(0.0, 0.04), (1.0, 0.04)])
+                    .build()
+                    .expect("forward"),
+            )
+            .insert_series(
+                ScalarTimeSeries::new(
+                    "FIXING:TEST",
+                    (0..3)
+                        .map(|day| (start + time::Duration::days(day), 0.06))
+                        .collect(),
+                    None,
+                )
+                .expect("fixings"),
+            );
+        // Independent numerical integration of OU impulse responses. These
+        // variances use neither HW model primitives nor the pricing projector.
+        let variance_integral = |horizon: f64| {
+            let n = 1000;
+            let h = horizon / n as f64;
+            let mut sum = 0.0;
+            for i in 0..=n {
+                let u = i as f64 * h;
+                let response = (1.0 - (-0.1 * (horizon - u)).exp()) / 0.1;
+                let w = if i == 0 || i == n {
+                    1.0
+                } else if i % 2 == 0 {
+                    2.0
+                } else {
+                    4.0
+                };
+                sum += w * 0.02_f64.powi(2) * response * response;
+            }
+            sum * h / 3.0
+        };
+        let tau = 3.0 / 360.0;
+        for method in [
+            FloatingLegCompounding::SimpleAverage,
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+        ] {
+            future.compounding = method;
+            for as_of in [base, start, start + time::Duration::days(1), end] {
+                let mut means = Vec::new();
+                let mut expected_product = 1.0;
+                let mut expected_sum = 0.0;
+                let mut total_shift = 0.0;
+                for day in 0..3 {
+                    let observation = start + time::Duration::days(day);
+                    if observation < as_of {
+                        expected_product *= 1.0 + 0.06 / 360.0;
+                        expected_sum += 0.06 / 360.0;
+                        continue;
+                    }
+                    let t = (observation - as_of).whole_days() as f64 / 365.0;
+                    let u = t + 1.0 / 365.0;
+                    let b = (1.0 - (-0.1_f64 / 365.0).exp()) / 0.1;
+                    let variance = 0.02_f64.powi(2) * (1.0 - (-0.2 * t).exp()) / 0.2;
+                    let shift = 0.5
+                        * (variance_integral(u) - variance_integral(t) - variance_integral(u - t));
+                    let factor = 1.0 + 0.04_f64 / 360.0;
+                    expected_sum += factor * (shift + 0.5 * b * b * variance).exp() - 1.0;
+                    expected_product *= factor;
+                    total_shift += shift;
+                    means.push((t, b));
+                }
+                let mut covariance_sum = 0.0;
+                for &(t, b) in &means {
+                    for &(u, c) in &means {
+                        let variance = 0.02_f64.powi(2) * (1.0 - (-0.2 * t.min(u)).exp()) / 0.2;
+                        covariance_sum += b * c * variance * (-0.1 * (t - u).abs()).exp();
+                    }
+                }
+                let expected_rate = if matches!(method, FloatingLegCompounding::SimpleAverage) {
+                    expected_sum / tau
+                } else {
+                    (expected_product * (total_shift + 0.5 * covariance_sum).exp() - 1.0) / tau
+                };
+                let quote = future.fair_price(&market, as_of).expect("HW quote");
+                assert!(
+                    (quote - 100.0 * (1.0 - expected_rate)).abs() < 1e-9,
+                    "{method:?} {as_of}: {quote} vs {}",
+                    100.0 * (1.0 - expected_rate)
+                );
+                let adjustment = future
+                    .convexity_adjustment(&market, as_of)
+                    .expect("adjustment");
+                if as_of < end {
+                    assert!(adjustment > 0.0);
+                } else {
+                    assert_eq!(adjustment, 0.0);
+                }
+                let mut zero = future.clone();
+                zero.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.0);
+                assert_eq!(
+                    zero.convexity_adjustment(&market, as_of)
+                        .expect("zero volatility"),
+                    0.0
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn quoted_tick_reconciles_with_one_contract_pnl() {
+        let mut future = InterestRateFuture::example().expect("future");
+        future.terms.multiplier = 2500.0;
+        future.contract_specs.tick_size = 0.0025;
+        assert_eq!(future.derived_tick_value().expect("tick"), 6.25);
+    }
 
     #[test]
     fn convexity_requires_normal_quote_metadata_even_below_sanity_bound() {

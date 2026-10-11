@@ -80,6 +80,9 @@ impl CmsOptionPricer {
         let discount_curve = curves.get_discount(inst.discount_curve_id.as_ref())?;
 
         let vol_surface = curves.get_surface(inst.vol_surface_id.as_str())?;
+        vol_surface.require_secondary_axis(
+            finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+        )?;
 
         for (i, &fixing_date) in inst.fixing_dates.iter().enumerate() {
             let payment_date = inst.payment_dates[i];
@@ -429,6 +432,75 @@ mod tests {
                 errors[1] < errors[0] * 0.15 + 1e-12,
                 "delay={delay}: {errors:?}"
             );
+        }
+    }
+    #[test]
+    fn replication_matches_independent_lognormal_density_grid_and_tail_limits() {
+        // Integrate the payment-measure density directly. The production
+        // implementation instead integrates Black swaption hedge prices and
+        // derivatives of the annuity mapping.
+        let simpson = |f: &dyn Fn(f64) -> f64, lo: f64, hi: f64, steps: usize| {
+            let h = (hi - lo) / steps as f64;
+            let sum: f64 = (1..steps)
+                .map(|i| (if i % 2 == 0 { 2.0 } else { 4.0 }) * f(lo + i as f64 * h))
+                .sum();
+            h / 3.0 * (f(lo) + f(hi) + sum)
+        };
+        let budget = 1e-5; // 0.1 bp of unit coupon notional times accrual.
+        for (vol, expiry) in [(0.2_f64, 1.0_f64), (0.6, 5.0), (0.8, 10.0)] {
+            for (tenor, delay) in [(2.0_f64, 0.25_f64), (30.0, 5.0)] {
+                let surface = VolSurface::builder("DENSITY-REFERENCE")
+                    .expiries(&[expiry])
+                    .strikes(&[0.001, 1.0])
+                    .row(&[vol, vol])
+                    .build()
+                    .unwrap();
+                let inputs = CmsOptionletInputs {
+                    forward_rate: 0.04,
+                    time_to_fixing: expiry,
+                    df_pay: 0.91,
+                    vol_surface: &surface,
+                    cms_tenor: tenor,
+                    payments_per_year: 2.0,
+                    payment_delay: delay,
+                };
+                let stddev = vol * expiry.sqrt();
+                for strike in [0.01_f64, 0.04, 0.08] {
+                    let actual =
+                        replicated_cms_optionlet(&inputs, strike, OptionType::Call).unwrap();
+                    let z_strike = ((strike / 0.04).ln() + 0.5 * stddev.powi(2)) / stddev;
+                    let density = |z: f64| {
+                        let rate = 0.04 * (stddev * z - 0.5 * stddev.powi(2)).exp();
+                        let log_base = (rate / 2.0).ln_1p();
+                        let annuity = -(-2.0 * tenor * log_base).exp_m1() / rate;
+                        let h = (-2.0 * delay * log_base).exp() / annuity;
+                        (
+                            rate,
+                            h * (-0.5 * z * z).exp() / std::f64::consts::TAU.sqrt(),
+                        )
+                    };
+                    let mut references = Vec::new();
+                    for (steps, tail) in [(256, 8.0), (512, 10.0), (1024, 12.0)] {
+                        let denominator = simpson(&|z| density(z).1, -tail, tail, steps);
+                        let numerator = simpson(
+                            &|z| {
+                                let (rate, weight) = density(z);
+                                (rate - strike).max(0.0) * weight
+                            },
+                            z_strike.max(-tail),
+                            tail,
+                            steps,
+                        );
+                        let reference = 0.91 * numerator / denominator;
+                        assert!((actual - reference).abs() < budget,
+                            "vol={vol}, expiry={expiry}, tenor={tenor}, delay={delay}, strike={strike}, steps={steps}, tail={tail}: actual={actual}, reference={reference}");
+                        references.push(reference);
+                    }
+                    assert!(references
+                        .windows(2)
+                        .all(|pair| (pair[1] - pair[0]).abs() < budget));
+                }
+            }
         }
     }
 }

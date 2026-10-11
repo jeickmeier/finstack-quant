@@ -1132,6 +1132,28 @@
         }
       ]
     },
+    "d_65cfec08bebc669f8ef9": {
+      "additionalProperties": false,
+      "description": "Original contractual PAC schedule. Pricing never regenerates these targets.",
+      "properties": {
+        "collar": {
+          "$ref": "#/$defs/d_b67a73e0467888ad8dcc",
+          "description": "PAC collar"
+        },
+        "payments": {
+          "description": "Strictly increasing dated principal targets fixed at construction.",
+          "items": {
+            "$ref": "#/$defs/d_f9a55f4b2f28378c6e86"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "payments",
+        "collar"
+      ],
+      "type": "object"
+    },
     "d_66287e2bb5dfa8d61987": {
       "additionalProperties": false,
       "description": "CMO tranche definition.",
@@ -1153,16 +1175,16 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Original face amount"
         },
-        "pac_collar": {
+        "pac_schedule": {
           "anyOf": [
             {
-              "$ref": "#/$defs/d_b67a73e0467888ad8dcc"
+              "$ref": "#/$defs/d_65cfec08bebc669f8ef9"
             },
             {
               "type": "null"
             }
           ],
-          "description": "PAC collar (if PAC tranche)"
+          "description": "Original dated PAC principal targets and collar; required only for PAC tranches."
         },
         "priority": {
           "description": "Payment priority (1 = highest for sequential)",
@@ -4177,10 +4199,30 @@
         },
         {
           "const": "taylor_approximation",
-          "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian.",
+          "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil.",
           "type": "string"
         }
       ]
+    },
+    "d_f9a55f4b2f28378c6e86": {
+      "additionalProperties": false,
+      "description": "Dated contractual PAC principal target, in the tranche currency's major units.",
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Contractual payment date, including the collateral's payment delay."
+        },
+        "principal": {
+          "description": "Planned principal payment, finite and nonnegative.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "date",
+        "principal"
+      ],
+      "type": "object"
     },
     "d_fd618cd5743ec18a168f": {
       "description": "Basis used for bond duration, convexity, and DV01-style risk metrics.",

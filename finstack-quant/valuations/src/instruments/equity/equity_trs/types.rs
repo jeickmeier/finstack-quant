@@ -315,7 +315,6 @@ impl EquityTotalReturnSwap {
                 ticker: "SPX".to_string(),
                 spot_id: "SPX-SPOT".into(),
                 div_yield_id: Some(PriceId::new("SPX-DIV")),
-                contract_size: 1.0,
                 currency: Currency::USD,
             })
             .financing_leg(FinancingLegSpec::new(
@@ -480,9 +479,9 @@ impl EquityTotalReturnSwap {
                     v
                 )));
             }
-            if *d < self.schedule.start || *d >= self.schedule.end {
+            if *d < self.schedule.start || *d > self.schedule.end {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "EquityTRS '{}' past fixing date {} must lie in [{}, {})",
+                    "EquityTRS '{}' past fixing date {} must lie in [{}, {}]",
                     self.id.as_str(),
                     d,
                     self.schedule.start,
@@ -678,6 +677,16 @@ mod validation_tests {
 
     fn base() -> EquityTotalReturnSwap {
         EquityTotalReturnSwap::example().expect("example builds")
+    }
+
+    #[test]
+    fn final_reset_fixing_is_part_of_the_contract() {
+        let mut trs = base();
+        trs.past_fixings = vec![(trs.schedule.end, 110.0)];
+        trs.validate().expect("final fixing is valid until payment");
+        assert_eq!(trs.fixing_on(trs.schedule.end), Some(110.0));
+        trs.past_fixings[0].0 = trs.schedule.end.next_day().expect("next day");
+        assert!(trs.validate().is_err());
     }
 
     #[test]

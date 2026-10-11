@@ -626,3 +626,23 @@ fn weekend_balance_splits_record_one_raw_fixing_and_materialize_without_conflict
         schedule.coupons().map(|flow| flow.amount.amount()).sum(),
     );
 }
+
+#[test]
+fn linear_between_later_draw_starts_repayment_after_its_funding_boundary() {
+    let mut value = spec("2025-01-15", "2026-01-15");
+    value["notional"]["amort"] = json!({"linear_between": {
+        "start": "2025-01-15", "end": "2026-01-15"
+    }});
+    value["principal_events"] = json!([{
+        "date": "2025-04-15", "payment_date": "2025-04-15", "kind": "notional",
+        "delta": {"amount": "600000", "currency": "USD"}
+    }]);
+    let schedule = build(value, None);
+    let amounts: Vec<_> = schedule
+        .get_flows()
+        .iter()
+        .filter(|flow| flow.kind == CFKind::Amortization)
+        .map(|flow| flow.amount.amount())
+        .collect();
+    assert_eq!(amounts, vec![250_000.0, 450_000.0, 450_000.0, 450_000.0]);
+}

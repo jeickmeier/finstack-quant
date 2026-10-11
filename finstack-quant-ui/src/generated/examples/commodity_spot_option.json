@@ -19,7 +19,7 @@
       "unit": "BBL",
       "vol_surface_id": "WTI-VOL"
     },
-    "type": "commodity_option"
+    "type": "commodity_spot_option"
   },
   "schema": "finstack_quant.instrument/1"
 }

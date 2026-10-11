@@ -43,7 +43,7 @@ const promotedTerms: Record<string, PromotedTerm> = {
     emptySource: "Volatility surface",
     kind: "market-quote",
   },
-  commodity_option: {
+  commodity_spot_option: {
     path: `${marketQuotePath}.implied_volatility`,
     label: "Implied volatility",
     unit: "decimal σ",

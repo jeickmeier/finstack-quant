@@ -54,7 +54,7 @@ fn test_irs_builder_pattern() {
             stub: StubKind::None,
             start: date!(2024 - 01 - 15),
             end: date!(2034 - 01 - 15),
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -207,7 +207,7 @@ fn test_irs_different_leg_frequencies() {
             stub: StubKind::None,
             start: date!(2024 - 01 - 01),
             end: date!(2029 - 01 - 01),
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -278,7 +278,7 @@ fn test_irs_calendar_specification() {
             stub: StubKind::None,
             start: date!(2024 - 01 - 01),
             end: date!(2029 - 01 - 01),
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -322,7 +322,7 @@ fn test_irs_stub_specification() {
             stub: StubKind::ShortFront,
             start: date!(2024 - 01 - 15),
             end: date!(2029 - 01 - 01),
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })

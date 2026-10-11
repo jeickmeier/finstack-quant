@@ -302,13 +302,13 @@ fn test_registry_price_with_unknown_pricer() {
 
 #[test]
 fn removed_option_discounting_aliases_return_unknown_pricer() {
-    use finstack_quant_valuations::instruments::commodity::CommodityOption;
+    use finstack_quant_valuations::instruments::commodity::CommoditySpotOption;
     use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
     use finstack_quant_valuations::instruments::rates::swaption::Swaption;
 
     let equity_option = EquityOption::example().expect("equity option example");
     let swaption = Swaption::example().expect("example");
-    let commodity_option = CommodityOption::example().expect("example");
+    let commodity_spot_option = CommoditySpotOption::example().expect("example");
     let registry = standard_pricer_registry();
     let market = MarketContext::new();
     let as_of = date!(2025 - 01 - 01);
@@ -320,8 +320,8 @@ fn removed_option_discounting_aliases_return_unknown_pricer() {
         ),
         (&swaption as &dyn Instrument, InstrumentType::Swaption),
         (
-            &commodity_option as &dyn Instrument,
-            InstrumentType::CommodityOption,
+            &commodity_spot_option as &dyn Instrument,
+            InstrumentType::CommoditySpotOption,
         ),
     ] {
         let error = registry
@@ -461,7 +461,7 @@ fn standard_pricer_registry_has_exact_expected_coverage() {
         (I::CommodityForward, vec![M::Discounting]),
         (I::CommoditySwap, vec![M::Discounting]),
         (
-            I::CommodityOption,
+            I::CommoditySpotOption,
             vec![M::Black76, M::MonteCarloSchwartzSmith],
         ),
         (I::CommodityAsianOption, vec![M::AsianTurnbullWakeman]),

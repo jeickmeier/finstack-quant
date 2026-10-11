@@ -32,6 +32,16 @@ pub(crate) struct GammaCalculator;
 impl MetricCalculator for GammaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &Swaption = context.instrument_as()?;
+        if context
+            .pricing_model()
+            .is_some_and(|model| model == crate::pricer::ModelKey::HullWhite1F)
+        {
+            return crate::metrics::sensitivities::option_greeks::selected_rate_greek(
+                context,
+                option.get_discount_curve_id(),
+                true,
+            );
+        }
         let strike = option.strike_f64()?;
 
         // Use consolidated helper to get pre-computed inputs

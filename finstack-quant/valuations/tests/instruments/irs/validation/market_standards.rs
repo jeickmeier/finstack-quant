@@ -22,7 +22,7 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_valuations::instruments::rates::irs::{
-    FixedLegSpec, FloatLegSpec, FloatingLegCompounding, InterestRateSwap, ParRateMethod, PayReceive,
+    FixedLegSpec, FloatLegSpec, FloatingLegCompounding, InterestRateSwap, PayReceive,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
@@ -111,132 +111,6 @@ fn test_irs_par_rate_market_standard() {
         "Par swap NPV should be ~0 (within 0.01bp), got {:.2} ({:.4}bp)",
         npv.amount(),
         npv.amount() / 100.0
-    );
-}
-
-#[test]
-fn test_par_rate_discount_ratio_matches_forward_for_new_swap() {
-    // For an unseasoned swap (as_of == start), DiscountRatio and ForwardBased
-    // par rate methods should agree.
-    let as_of = date!(2024 - 01 - 01);
-    let end = date!(2029 - 01 - 01);
-
-    let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
-    let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD-SOFR-3M");
-
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
-
-    let swap_forward = test_utils::usd_irs_swap(
-        "SWAP_PAR_FWD",
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.05,
-        as_of,
-        end,
-        PayReceive::Receive,
-    )
-    .unwrap();
-    let mut swap_discount = swap_forward.clone();
-    swap_discount.fixed_leg.par_method = Some(ParRateMethod::DiscountRatio);
-
-    let par_forward = swap_forward
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::ParRate],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap()
-        .measures["par_rate"];
-
-    let par_discount = swap_discount
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::ParRate],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap()
-        .measures["par_rate"];
-
-    let diff = (par_forward - par_discount).abs();
-    assert!(
-        diff < 5e-4, // 0.05% tolerance (~0.5bp)
-        "ForwardBased and DiscountRatio par rates should be very close for new \
-         swaps: forward={}, discount={}, diff={}",
-        par_forward,
-        par_discount,
-        diff
-    );
-}
-
-#[test]
-fn test_par_rate_discount_ratio_rejects_seasoned_swap() {
-    let start = date!(2024 - 01 - 01);
-    let as_of = date!(2024 - 06 - 01);
-    let end = date!(2029 - 01 - 01);
-
-    let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
-    // Flat forward curve based at the trade date: seasoned resets strictly
-    // before the curve base now error under the default FloatingRateFallback.
-    let fwd_curve = build_flat_forward_curve(0.05, start, "USD-SOFR-3M");
-
-    // Provide fixings for past reset dates (quarterly from Jan 1 through Apr 1)
-    let fixings = finstack_quant_core::market_data::scalars::ScalarTimeSeries::new(
-        "FIXING:USD-SOFR-3M",
-        vec![
-            (date!(2023 - 12 - 29), 0.05), // Q1 T-2 reset at 5%
-            (date!(2024 - 01 - 01), 0.05), // Q1 reset at 5%
-            (date!(2024 - 03 - 28), 0.05), // Q2 T-2 reset at 5%
-            (date!(2024 - 04 - 01), 0.05), // Q2 reset at 5%
-        ],
-        None,
-    )
-    .expect("fixings series");
-
-    let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
-        .insert_series(fixings);
-
-    let mut swap = test_utils::usd_irs_swap(
-        "SWAP_PAR_SEASONED",
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.05,
-        start,
-        end,
-        PayReceive::Receive,
-    )
-    .unwrap();
-    swap.fixed_leg.par_method = Some(ParRateMethod::DiscountRatio);
-
-    let par_forward = swap
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::ParRate],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap()
-        .measures["par_rate"];
-
-    let par_discount = swap
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::ParRate],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap()
-        .measures["par_rate"];
-
-    let diff = (par_forward - par_discount).abs();
-    assert!(
-        diff < 5e-4,
-        "For seasoned swaps, DiscountRatio should effectively fall back to \
-         ForwardBased par rate: forward={}, discount={}, diff={}",
-        par_forward,
-        par_discount,
-        diff
     );
 }
 
@@ -379,7 +253,7 @@ fn test_irs_receive_vs_pay_fixed() {
         business_day_convention: BusinessDayConvention::ModifiedFollowing,
         calendar_id: None,
         stub: StubKind::None,
-        par_method: None,
+
         payment_lag_days: 0,
         end_of_month: false,
         start: as_of,
@@ -475,7 +349,7 @@ fn test_irs_rate_sensitivity() {
         business_day_convention: BusinessDayConvention::ModifiedFollowing,
         calendar_id: None,
         stub: StubKind::None,
-        par_method: None,
+
         payment_lag_days: 0,
         end_of_month: false,
         start: as_of,
@@ -578,7 +452,7 @@ fn test_irs_leg_pvs_consistency() {
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
             stub: StubKind::None,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
@@ -655,7 +529,7 @@ fn test_daycount_convention_impact_on_annuity() {
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
             stub: StubKind::None,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
@@ -694,7 +568,7 @@ fn test_daycount_convention_impact_on_annuity() {
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
             stub: StubKind::None,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
@@ -831,7 +705,7 @@ fn test_irs_t_minus_2_fixing_calendar_isda_standard() {
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             calendar_id: Some("usny".into()),
             stub: StubKind::None,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
             start,
@@ -998,7 +872,7 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
             stub: StubKind::None,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
             start,
@@ -1036,7 +910,7 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
             stub: StubKind::None,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
             start,
@@ -1174,7 +1048,7 @@ fn test_sofr_ois_par_rate_matches_quantlib_identity() {
             stub: StubKind::None,
             start,
             end,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -1318,7 +1192,7 @@ fn test_eom_pricer_cashflow_consistency() {
             stub: StubKind::None,
             start,
             end,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: true,
         })
@@ -1357,7 +1231,7 @@ fn test_eom_pricer_cashflow_consistency() {
             stub: StubKind::None,
             start,
             end,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -1483,7 +1357,7 @@ fn test_ois_identity_with_eom() {
             stub: StubKind::ShortBack,
             start,
             end,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: true,
         })

@@ -35,7 +35,6 @@
       },
       "side": "receive",
       "underlying": {
-        "contract_size": 1.0,
         "currency": "USD",
         "div_yield_id": "SPX-DIV",
         "spot_id": "SPX-SPOT",

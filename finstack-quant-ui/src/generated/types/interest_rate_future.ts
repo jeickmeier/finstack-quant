@@ -585,7 +585,9 @@ export interface DB2E822Dc7Fb5846C6Cd8 {
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   terms: D_53Bc1E988619D30A8Fcb;
   /**
-   * Optional volatility surface identifier for convexity adjustment
+   * Normal-rate volatility surface for automatic term-rate convexity only.
+   * Overnight automatic convexity instead requires explicit Hull-White
+   * mean reversion and short-rate sigma in `instrument_pricing_overrides.model_config`.
    */
   vol_surface_id?: Id1 | null;
 }
@@ -615,7 +617,8 @@ export interface D_546D6C19E94Fe5Cda260 {
    *
    * - `Some(0.0)`: Explicitly disable model-based adjustment (strict mode)
    * - `Some(x)`: Use fixed adjustment of `x` (e.g., from broker quote)
-   * - `None`: Compute adjustment from volatility surface (requires `vol_surface_id`)
+   * - `None`: Term futures use `vol_surface_id`; overnight futures use explicit
+   *   `hw1f_mean_reversion` and `hw1f_sigma` in instrument model configuration.
    *
    * # Market Practice
    *

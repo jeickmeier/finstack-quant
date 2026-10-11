@@ -23,7 +23,6 @@
           "count": 6,
           "unit": "months"
         },
-        "par_method": null,
         "payment_lag_days": 0,
         "rate": "0.03",
         "start": "2027-01-17",

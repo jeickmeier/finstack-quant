@@ -59,6 +59,9 @@ pub(crate) fn replicated_cms_optionlet(
     strike: f64,
     option_type: OptionType,
 ) -> Result<f64> {
+    inputs.vol_surface.require_secondary_axis(
+        finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+    )?;
     if inputs.vol_surface.quote_type()
         != finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal
     {
@@ -196,6 +199,9 @@ impl CmsReplicationPricer {
         let strike = inst.strike_f64()?;
         let discount_curve = curves.get_discount(inst.discount_curve_id.as_ref())?;
         let vol_surface = curves.get_surface(inst.vol_surface_id.as_str())?;
+        vol_surface.require_secondary_axis(
+            finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+        )?;
 
         // Payments-per-year for the par annuity closed form.
         // Matches the fixed-leg payment frequency of the underlying CMS swap.

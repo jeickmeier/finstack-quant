@@ -77,15 +77,15 @@ impl RiskFactorType {
             Self::DiscountRate {
                 curve_id,
                 tenor_years,
-            } => format!("{}::disc::{:.1}y", curve_id.as_str(), tenor_years),
+            } => format!("{}::disc::{}y", curve_id.as_str(), tenor_years),
             Self::ForwardRate {
                 curve_id,
                 tenor_years,
-            } => format!("{}::fwd::{:.1}y", curve_id.as_str(), tenor_years),
+            } => format!("{}::fwd::{}y", curve_id.as_str(), tenor_years),
             Self::CreditSpread {
                 curve_id,
                 tenor_years,
-            } => format!("{}::credit::{:.1}y", curve_id.as_str(), tenor_years),
+            } => format!("{}::credit::{}y", curve_id.as_str(), tenor_years),
             Self::EquitySpot { ticker } => format!("{}::spot", ticker),
             Self::FxSpot { base, quote } => format!("{}{}::fx_spot", base, quote),
             Self::ImpliedVol {
@@ -93,7 +93,7 @@ impl RiskFactorType {
                 expiry_years,
                 strike,
             } => format!(
-                "{}::vol::{:.1}y::{}",
+                "{}::vol::{}y::{}",
                 vol_surface_id.as_str(),
                 expiry_years,
                 strike
@@ -106,6 +106,8 @@ impl RiskFactorType {
 ///
 /// This function inspects the instrument's curve dependencies and extracts
 /// risk factors at standard tenor buckets (see `STANDARD_BUCKETS_YEARS`).
+/// Volatility extraction includes every stored surface node, never an interpolated
+/// or synthetic point. Historical replay requires those exact grid coordinates.
 /// The risk factors can then be used
 /// to apply historical market shifts for VaR calculation.
 ///
@@ -210,20 +212,23 @@ where
             );
         }
     }
+    // Every actual node is a distinct replayable factor, including nodes
+    // whose expiries differ below display-label precision.
     for dependency in &dependencies.volatility_dependencies {
-        if market
-            .get_surface(dependency.vol_surface_id.as_str())
-            .is_ok()
-        {
-            push_factor(
-                &mut factors,
-                &mut seen,
-                RiskFactorType::ImpliedVol {
-                    vol_surface_id: dependency.vol_surface_id.clone(),
-                    expiry_years: 0.0,
-                    strike: dependency.reference_strike.unwrap_or(0.0),
-                },
-            );
+        if let Ok(surface) = market.get_surface(dependency.vol_surface_id.as_str()) {
+            for &expiry_years in surface.expiries() {
+                for &strike in surface.strikes() {
+                    push_factor(
+                        &mut factors,
+                        &mut seen,
+                        RiskFactorType::ImpliedVol {
+                            vol_surface_id: dependency.vol_surface_id.clone(),
+                            expiry_years,
+                            strike,
+                        },
+                    );
+                }
+            }
         }
     }
 
@@ -278,19 +283,19 @@ mod tests {
             curve_id: CurveId::from("USD-OIS"),
             tenor_years: 5.0,
         };
-        assert_eq!(factor.label(), "USD-OIS::disc::5.0y");
+        assert_eq!(factor.label(), "USD-OIS::disc::5y");
 
         let factor = RiskFactorType::CreditSpread {
             curve_id: CurveId::from("AAPL"),
             tenor_years: 10.0,
         };
-        assert_eq!(factor.label(), "AAPL::credit::10.0y");
+        assert_eq!(factor.label(), "AAPL::credit::10y");
 
         let factor = RiskFactorType::ForwardRate {
             curve_id: CurveId::from("USD-LIBOR-3M"),
             tenor_years: 2.0,
         };
-        assert_eq!(factor.label(), "USD-LIBOR-3M::fwd::2.0y");
+        assert_eq!(factor.label(), "USD-LIBOR-3M::fwd::2y");
 
         let factor = RiskFactorType::FxSpot {
             base: Currency::EUR,
@@ -441,6 +446,24 @@ mod tests {
             );
 
         let factors = extract_risk_factors(&option, &market)?;
+        let nodes: Vec<_> = factors
+            .iter()
+            .filter(|factor| matches!(factor, RiskFactorType::ImpliedVol { .. }))
+            .cloned()
+            .collect();
+        assert_eq!(nodes.len(), 4);
+        for factor in nodes {
+            let scenario = crate::metrics::risk::MarketScenario::new(
+                base_date,
+                vec![crate::metrics::risk::RiskFactorShift {
+                    factor,
+                    shift: 0.01,
+                }],
+            );
+            scenario
+                .apply(&market, None)
+                .expect("every extracted volatility node must replay");
+        }
 
         assert!(
             factors.iter().any(

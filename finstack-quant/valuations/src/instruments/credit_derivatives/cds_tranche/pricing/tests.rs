@@ -765,16 +765,27 @@ fn standard_constructor_uses_imm_cds_dates() {
     );
     assert!(tranche.calendar_id.is_none());
 
-    let dates = model
-        .generate_full_payment_schedule(&tranche, as_of)
-        .expect("IMM schedule");
+    let periods = model
+        .generate_coupon_periods(&tranche, as_of)
+        .expect("IMM periods");
     assert!(
-        dates
+        periods
             .iter()
-            .skip(1)
-            .all(|d| finstack_quant_core::dates::is_cds_date(*d)),
-        "standard() must roll with next_cds_date: {dates:?}"
+            .all(|p| finstack_quant_core::dates::is_cds_date(p.accrual_end)),
+        "contractual accrual boundaries must stay on CDS roll dates"
     );
+    let calendar = finstack_quant_core::dates::calendar_by_id("weekends_only").expect("calendar");
+    for period in periods {
+        assert_eq!(
+            period.payment_date,
+            finstack_quant_core::dates::adjust(
+                period.accrual_end,
+                tranche.business_day_convention,
+                calendar
+            )
+            .expect("payment")
+        );
+    }
 }
 
 #[test]
@@ -2336,7 +2347,10 @@ fn seasoned_first_period_default_timing_starts_at_valuation_date() {
         .find(|row| row.cashflow.kind == CFKind::DefaultedNotional)
         .expect("default row");
 
-    let DiscountAt::WithinPeriod { start, fraction } = default_row.discount_at else {
+    let DiscountAt::WithinPeriod {
+        start, fraction, ..
+    } = default_row.discount_at
+    else {
         panic!("mid-period protection should discount default row within period");
     };
     assert_eq!(start, as_of);
@@ -2417,5 +2431,219 @@ mod production_credit_audit {
             compared > 0,
             "fixture must include at least one finite-n binomial case"
         );
+    }
+}
+
+#[test]
+fn expired_protection_keeps_rolled_coupon_and_later_upfront() {
+    use time::macros::date;
+    let market = sample_market_context();
+    let mut tranche = sample_tranche();
+    tranche.start_date = Some(date!(2025 - 03 - 29));
+    tranche.maturity = date!(2025 - 06 - 29);
+    tranche.roll_rule = crate::cashflow::builder::specs::RollRule::None;
+    tranche.business_day_convention = finstack_quant_core::dates::BusinessDayConvention::Following;
+    tranche.calendar_id = Some("weekends_only".into());
+    tranche.upfront = Some((
+        date!(2025 - 07 - 02),
+        Money::from((1000_i64, Currency::USD)),
+    ));
+    let pricer = CdsTranchePricer::new();
+    let rows = pricer
+        .project_discountable_rows(&tranche, &market, tranche.maturity)
+        .expect("pending rows");
+    assert_eq!(rows.len(), 2);
+    let coupon = rows
+        .iter()
+        .find(|r| r.cashflow.kind == CFKind::Fixed)
+        .expect("coupon");
+    assert_eq!(coupon.cashflow.date, date!(2025 - 06 - 30));
+    let expected = tranche.notional.amount() * 0.05 * 92.0 / 360.0;
+    assert!((coupon.cashflow.amount.amount() - expected).abs() < 1e-6);
+    assert_eq!(
+        pricer
+            .project_discountable_rows(&tranche, &market, date!(2025 - 06 - 30))
+            .expect("on pay")
+            .len(),
+        2
+    );
+    let after_coupon = pricer
+        .project_discountable_rows(&tranche, &market, date!(2025 - 07 - 01))
+        .expect("upfront only");
+    assert_eq!(after_coupon.len(), 1);
+    assert_eq!(after_coupon[0].cashflow.kind, CFKind::Fee);
+    assert!(pricer
+        .project_discountable_rows(&tranche, &market, date!(2025 - 07 - 03))
+        .expect("settled")
+        .is_empty());
+}
+
+#[test]
+fn seasoned_aod_reduces_only_the_remaining_day_of_accrual() {
+    use time::macros::date;
+    let as_of = date!(2025 - 01 - 01);
+    let market = sample_market_context();
+    let mut index = market
+        .get_credit_index("CDX.NA.IG.42")
+        .expect("index")
+        .as_ref()
+        .clone();
+    index.index_credit_curve = Arc::new(
+        HazardCurve::builder("CDX.NA.IG.42")
+            .base_date(as_of)
+            .recovery_rate(0.4)
+            .knots([(1.0, 36.5), (10.0, 36.5)])
+            .max_hazard_rate(40.0)
+            .build()
+            .expect("hazard"),
+    );
+    let market = market
+        .insert(Arc::clone(&index.index_credit_curve))
+        .insert_credit_index("CDX.NA.IG.42", index)
+        .expect("index");
+    let mut tranche = sample_tranche();
+    tranche.start_date = Some(date!(2024 - 10 - 04));
+    tranche.maturity = date!(2025 - 01 - 02);
+    tranche.roll_rule = crate::cashflow::builder::specs::RollRule::None;
+    tranche.attach_pct = 0.0;
+    tranche.detach_pct = 100.0;
+    let rows = CdsTranchePricer::new()
+        .project_discountable_rows(&tranche, &market, as_of)
+        .expect("rows");
+    let coupon = rows
+        .iter()
+        .find(|r| r.cashflow.kind == CFKind::Fixed)
+        .expect("coupon");
+    // 89 known accrual days plus the survival integral over the remaining day.
+    let expected = tranche.notional.amount() * 0.05 / 360.0 * (89.0 - (-0.1_f64).exp_m1() / 0.1);
+    assert!(
+        (coupon.cashflow.amount.amount() - expected).abs() < 1e-5,
+        "{} vs {expected}",
+        coupon.cashflow.amount
+    );
+    let loss = rows
+        .iter()
+        .find(|r| r.cashflow.kind == CFKind::DefaultedNotional)
+        .expect("loss");
+    assert!(
+        matches!(loss.discount_at, DiscountAt::WithinPeriod { start, end, .. }
+        if start == as_of && end == tranche.maturity)
+    );
+}
+
+#[test]
+fn heterogeneous_tail_loss_matches_independent_state_enumeration_and_factor_grids() {
+    use finstack_quant_core::math::norm_cdf;
+    use time::macros::date;
+    let base = date!(2025 - 01 - 01);
+    let maturity = date!(2026 - 01 - 01);
+    let pds = [0.01_f64, 0.04, 0.12, 0.25];
+    let weights = [0.1_f64, 0.2, 0.3, 0.4];
+    let recoveries = [0.39863_f64, 0.59731, 0.19619, 0.49579];
+    let curves: Vec<_> = pds
+        .iter()
+        .enumerate()
+        .map(|(i, pd)| {
+            (
+                format!("NAME-{i}"),
+                Arc::new(
+                    HazardCurve::builder(format!("HZ-{i}"))
+                        .base_date(base)
+                        .recovery_rate(recoveries[i])
+                        .knots([(1.0, -(1.0 - pd).ln())])
+                        .build()
+                        .unwrap(),
+                ),
+            )
+        })
+        .collect();
+    let index = CreditIndexData::builder()
+        .num_constituents(4)
+        .recovery_rate(0.4)
+        .index_credit_curve(Arc::clone(&curves[0].1))
+        .base_correlation_curve(Arc::new(
+            BaseCorrelationCurve::builder("BC")
+                .knots([(3.0, 0.3), (100.0, 0.3)])
+                .build()
+                .unwrap(),
+        ))
+        .issuer_curves(curves)
+        .issuer_weights(
+            weights
+                .iter()
+                .enumerate()
+                .map(|(i, w)| (format!("NAME-{i}"), *w)),
+        )
+        .issuer_recovery_rates(
+            recoveries
+                .iter()
+                .enumerate()
+                .map(|(i, r)| (format!("NAME-{i}"), *r)),
+        )
+        .build()
+        .unwrap();
+    let thresholds: Vec<_> = pds.iter().map(|pd| standard_normal_inv_cdf(*pd)).collect();
+    let pricer = CdsTranchePricer::new();
+    for rho in [0.05_f64, 0.3, 0.8] {
+        for cap in [
+            0.03_f64,
+            weights[1] * (1.0 - recoveries[1]),
+            0.15,
+            0.35,
+            0.58,
+        ] {
+            let actual = pricer
+                .calculate_equity_tranche_capped_hetero(
+                    cap * 100.0,
+                    rho,
+                    &index,
+                    maturity,
+                    super::config::PoolExposure::Loss,
+                )
+                .unwrap();
+            let budget = cap * 1e-5;
+            let mut references = Vec::new();
+            for steps in [512, 1024, 2048] {
+                let h = 20.0 / steps as f64;
+                let mut reference = 0.0;
+                for j in 0..=steps {
+                    let z = -10.0 + j as f64 * h;
+                    let conditional: Vec<_> = thresholds
+                        .iter()
+                        .map(|x| norm_cdf((x - rho.sqrt() * z) / (1.0 - rho).sqrt()))
+                        .collect();
+                    let conditional_loss: f64 = (0..16)
+                        .map(|state| {
+                            let mut probability = 1.0;
+                            let mut loss = 0.0;
+                            for i in 0..4 {
+                                if state & (1 << i) == 0 {
+                                    probability *= 1.0 - conditional[i];
+                                } else {
+                                    probability *= conditional[i];
+                                    loss += weights[i] * (1.0 - recoveries[i]);
+                                }
+                            }
+                            probability * loss.min(cap)
+                        })
+                        .sum();
+                    let weight = if j == 0 || j == steps {
+                        1.0
+                    } else if j % 2 == 0 {
+                        2.0
+                    } else {
+                        4.0
+                    };
+                    reference += h / 3.0 * weight * conditional_loss * (-0.5 * z * z).exp()
+                        / std::f64::consts::TAU.sqrt();
+                }
+                assert!((actual - reference).abs() < budget,
+                    "rho={rho}, cap={cap}, grid={steps}: production={actual}, exact-state reference={reference}, budget={budget}");
+                references.push(reference);
+            }
+            assert!(references
+                .windows(2)
+                .all(|pair| (pair[0] - pair[1]).abs() < budget));
+        }
     }
 }

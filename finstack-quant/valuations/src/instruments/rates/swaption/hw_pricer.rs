@@ -609,4 +609,36 @@ mod tests {
             (pv_with_iv - pv_no_iv).abs()
         );
     }
+    #[test]
+    fn selected_hw_greeks_reprice_the_selected_model_without_black_surface() {
+        use crate::instruments::PricingOptions;
+        use crate::metrics::MetricId;
+        use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+        let (as_of, swaption, market) = example_single_curve();
+        let registry = crate::pricer::standard_pricer_registry();
+        let price = |bp: f64| {
+            let shifted = market
+                .bump([MarketBump::Curve {
+                    id: (swaption.get_discount_curve_id()).clone(),
+                    spec: BumpSpec::parallel_bp(bp),
+                }])
+                .unwrap();
+            registry
+                .price_raw(&swaption, ModelKey::HullWhite1F, &shifted, as_of)
+                .unwrap()
+        };
+        let base = price(0.0);
+        let up = price(1.0);
+        let down = price(-1.0);
+        let result = swaption
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Delta, MetricId::Gamma],
+                PricingOptions::default().with_model(ModelKey::HullWhite1F),
+            )
+            .unwrap();
+        assert!((result.measures["delta"] - (up - down) / 2e-4).abs() < 1e-6);
+        assert!((result.measures["gamma"] - (up - 2.0 * base + down) / 1e-8).abs() < 1e-3);
+    }
 }

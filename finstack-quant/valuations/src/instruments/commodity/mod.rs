@@ -54,7 +54,7 @@
 //!
 //! - [`CommodityForward`] for forwards and futures
 //! - [`CommoditySwap`] for fixed-float swaps
-//! - [`CommodityOption`] for commodity options
+//! - [`CommoditySpotOption`] for commodity options
 
 /// Shared business-day averaging helpers for floating legs.
 pub(crate) mod averaging;
@@ -67,7 +67,7 @@ pub mod commodity_future;
 /// Exchange-listed options on commodity futures.
 pub mod commodity_future_option;
 /// Commodity option module.
-pub mod commodity_option;
+pub mod commodity_spot_option;
 /// Commodity spread option module.
 pub mod commodity_spread_option;
 /// Commodity swap module.
@@ -80,7 +80,7 @@ pub use commodity_asian_option::CommodityAsianOption;
 pub use commodity_forward::CommodityForward;
 pub use commodity_future::{CommodityFuture, CommodityFutureFixing};
 pub use commodity_future_option::CommodityFutureOption;
-pub use commodity_option::CommodityOption;
+pub use commodity_spot_option::{CommoditySpotOption, CommoditySpotOptionExercise};
 pub use commodity_spread_option::CommoditySpreadOption;
 pub use commodity_swap::CommoditySwap;
 pub use commodity_swaption::CommoditySwaption;

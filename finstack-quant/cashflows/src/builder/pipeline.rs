@@ -25,6 +25,7 @@ use crate::primitives::{CFKind, CashFlow};
 pub(super) struct BuildContext<'a> {
     pub(super) ccy: Currency,
     pub(super) issue: Date,
+    pub(super) observation_date: Option<Date>,
     /// Payment date of the coupon window ending at maturity, including its
     /// business-day adjustment and payment lag. Equals the raw `maturity`
     /// when no coupon schedule exists.
@@ -84,6 +85,7 @@ impl<'a> DateProcessor<'a> {
             self.ctx.ccy,
             ResolvedFloatMarket {
                 curves: self.resolved_curves,
+                observation_date: self.ctx.observation_date,
                 fixings: self.resolved_fixings,
             },
             FloatEmissionOutput {
@@ -158,15 +160,25 @@ impl<'a> DateProcessor<'a> {
         &self,
         d: Date,
         state: &mut BuildState,
-    ) -> finstack_quant_core::Result<()> {
+    ) -> finstack_quant_core::Result<Decimal> {
         let first = self.ctx.principal_events.partition_point(|ev| ev.date < d);
+        let mut funded = Decimal::ZERO;
         for ev in self.ctx.principal_events[first..]
             .iter()
             .take_while(|ev| ev.date == d)
         {
             apply_principal_event(ev, &mut state.outstanding, &mut state.flows)?;
+            if ev.kind == CFKind::Notional && ev.delta.amount() > 0.0 {
+                funded = funded
+                    .checked_add(f64_to_decimal(ev.delta.amount())?)
+                    .ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "funding exceeds the supported decimal range".into(),
+                        )
+                    })?;
+            }
         }
-        Ok(())
+        Ok(funded)
     }
 
     /// Handle maturity redemption: emit final principal repayment if outstanding > 0.
@@ -212,10 +224,28 @@ impl<'a> DateProcessor<'a> {
                     )
                 })?;
         }
-        self.process_principal_events(d, &mut state)?;
+        let funded = self.process_principal_events(d, &mut state)?;
         self.emit_amortization(d, &mut state)?;
         self.emit_fees(d, &mut state)?;
         self.initialize_linear_between(d, &mut state);
+        if let PreparedAmortization::LinearBetween { start, end, .. } = &self.amort_setup.rule {
+            if funded > Decimal::ZERO && d > *start && d < *end {
+                // Each later draw repays equally over its remaining dates.
+                // Add after today's payment: a same-day draw first amortizes
+                // at the next contractual boundary, never at its funding date.
+                let remaining = self
+                    .amort_setup
+                    .amort_dates
+                    .iter()
+                    .filter(|&&date| date > d && date <= *end)
+                    .count();
+                if remaining > 0 {
+                    *state
+                        .linear_between_installment
+                        .get_or_insert(Decimal::ZERO) += funded / Decimal::from(remaining as u64);
+                }
+            }
+        }
         self.handle_maturity(d, &mut state)?;
 
         debug_assert!(

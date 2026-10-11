@@ -187,6 +187,15 @@ impl InterestRateSwap {
         // `index_tenor` is diagnostic error-context only, not a FRA window.
         use finstack_quant_core::cashflow::CFKind;
 
+        if as_of >= self.float_leg.end {
+            let dates =
+                crate::instruments::rates::irs::cashflow::float_leg_schedule_with_curves_as_of(
+                    self, None, None,
+                )?;
+            if dates.get_flows().iter().all(|flow| flow.date <= as_of) {
+                return Ok(0.0);
+            }
+        }
         let disc = context.get_discount(self.fixed_leg.discount_curve_id.as_ref())?;
         let float_sched =
             crate::instruments::rates::irs::cashflow::float_leg_schedule_with_curves_as_of(
@@ -423,7 +432,7 @@ mod tests {
                     stub: finstack_quant_core::dates::StubKind::ShortFront,
                     start,
                     end,
-                    par_method: None,
+
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
@@ -511,7 +520,7 @@ mod tests {
                     stub: finstack_quant_core::dates::StubKind::ShortFront,
                     start,
                     end,
-                    par_method: None,
+
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
@@ -598,7 +607,7 @@ mod tests {
                     stub: finstack_quant_core::dates::StubKind::ShortFront,
                     start,
                     end,
-                    par_method: None,
+
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
@@ -680,7 +689,7 @@ mod tests {
                     stub: finstack_quant_core::dates::StubKind::ShortFront,
                     start,
                     end,
-                    par_method: None,
+
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
@@ -766,7 +775,7 @@ mod tests {
                     stub: finstack_quant_core::dates::StubKind::ShortFront,
                     start,
                     end,
-                    par_method: None,
+
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
@@ -838,7 +847,7 @@ mod tests {
                     stub: finstack_quant_core::dates::StubKind::ShortFront,
                     start,
                     end,
-                    par_method: None,
+
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
@@ -939,7 +948,7 @@ mod tests {
                     stub: finstack_quant_core::dates::StubKind::ShortFront,
                     start,
                     end,
-                    par_method: None,
+
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
@@ -1027,7 +1036,7 @@ mod tests {
                     stub: finstack_quant_core::dates::StubKind::ShortFront,
                     start,
                     end,
-                    par_method: None,
+
                     payment_lag_days: 0, // No payment delay for exact identity
                     end_of_month: false,
                 },

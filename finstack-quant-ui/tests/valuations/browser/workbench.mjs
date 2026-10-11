@@ -69,9 +69,7 @@ try {
     `${server.url}${process.env.REGISTRY_WORKBENCH_PATH ?? "/"}`,
     { waitUntil: "networkidle" },
   );
-  await page
-    .getByTitle(bond.result.value.amount, { exact: true })
-    .waitFor();
+  await page.getByTitle(bond.result.value.amount, { exact: true }).waitFor();
   const results = page.getByRole("region", { name: "Results", exact: true });
   await results.getByRole("tab", { name: "Request", exact: true }).click();
   await original(

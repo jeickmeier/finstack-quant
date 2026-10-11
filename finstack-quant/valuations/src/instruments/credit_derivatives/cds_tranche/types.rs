@@ -130,7 +130,7 @@ impl CdsTranche {
             return None;
         }
 
-        let mut current = as_of.min(self.maturity);
+        let mut current = as_of.min(self.maturity - time::Duration::days(1));
         while !is_cds_date(current) {
             current -= time::Duration::days(1);
         }

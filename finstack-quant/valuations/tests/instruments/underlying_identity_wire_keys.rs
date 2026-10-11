@@ -9,7 +9,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_valuations::instruments::{
     AsianOption, BarrierOption, CommodityAsianOption, CommodityForward, CommodityFuture,
-    CommodityOption, CommoditySpreadOption, CommoditySwap, CommoditySwaption, ConvertibleBond,
+    CommoditySpotOption, CommoditySpreadOption, CommoditySwap, CommoditySwaption, ConvertibleBond,
     Equity, EquityFuture, EquityOption, FxForward, FxFuture, FxSpot, LookbackOption, Ndf,
     QuantoOption, VarianceSwap, VolatilityDependency,
 };
@@ -131,7 +131,7 @@ fn commodity_retired_ticker_keys_are_rejected() {
         "CL".into(),
     );
     assert_rejects_at(
-        &CommodityOption::example().expect("example"),
+        &CommoditySpotOption::example().expect("example"),
         "",
         "ticker",
         "CL".into(),

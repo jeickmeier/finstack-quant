@@ -943,6 +943,33 @@ class CashFlowBuilder:
         """
         ...
 
+    def build_as_of(self, market: MarketContext, as_of: datetime.date | str) -> CashFlowSchedule:
+        """Build cashflows with an explicit historical-observation cutoff.
+
+        Parameters
+        ----------
+        market : MarketContext
+            Projection curves and exact historical index fixings.
+        as_of : datetime.date
+            Earlier resets require fixings independently of curve base dates;
+            available same-day fixings take precedence over projection.
+
+        Returns
+        -------
+        CashFlowSchedule
+            Canonical cashflows containing realized and projected coupons.
+
+        Raises
+        ------
+        KeyError
+            If principal or required market data is missing.
+        ValueError
+            If dates, schedule inputs, or required historical fixings are invalid.
+        RuntimeError
+            If numerical computation fails during cashflow construction.
+        """
+        ...
+
     def __repr__(self) -> str: ...
 
 class CashFlowMeta:

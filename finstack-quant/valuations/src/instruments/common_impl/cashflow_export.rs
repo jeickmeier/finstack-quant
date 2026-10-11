@@ -622,21 +622,22 @@ fn envelope_for_priced(
         // when the lookup fails on an instrument that carries an inflation
         // link. (Instruments with no inflation bond keep the column empty by
         // design.)
-        let inflation_index_ratio =
-            match inflation_bond.map(|b| b.index_ratio_from_market(flow.date, market)) {
-                Some(Ok(ratio)) => Some(ratio),
-                Some(Err(err)) => {
-                    tracing::warn!(
-                        instrument_id = %instrument_id,
-                        date = %flow.date,
-                        %err,
-                        "cashflow export: inflation index ratio lookup failed; \
-                         exporting an empty index_ratio cell"
-                    );
-                    None
-                }
-                None => None,
-            };
+        let inflation_index_ratio = match inflation_bond
+            .map(|b| b.index_ratio_from_market(flow.date, market, as_of_date))
+        {
+            Some(Ok(ratio)) => Some(ratio),
+            Some(Err(err)) => {
+                tracing::warn!(
+                    instrument_id = %instrument_id,
+                    date = %flow.date,
+                    %err,
+                    "cashflow export: inflation index ratio lookup failed; \
+                     exporting an empty index_ratio cell"
+                );
+                None
+            }
+            None => None,
+        };
 
         rows.push(CashflowRow {
             date: flow.date,

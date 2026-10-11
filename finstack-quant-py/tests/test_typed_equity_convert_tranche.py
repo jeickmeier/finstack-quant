@@ -206,3 +206,33 @@ class TestConvertibleBondTyped:
         )
         payload = json.loads(bond.to_json())
         assert payload["instrument"]["type"] == "convertible_bond"
+
+    def test_resolved_settlement_builder_and_replay(self) -> None:
+        original = _convertible()
+        claim = {
+            "exercise_date": "2025-01-15",
+            "delivery_date": "2025-01-20",
+            "shares": 20.0,
+            "cash": {"amount": "25", "currency": "USD"},
+            "recovery_basis": {"amount": "0", "currency": "USD"},
+        }
+        bond = (
+            ConvertibleBond
+            .builder()
+            .id("RESOLVED-CONVERTIBLE")
+            .notional(original.notional)
+            .issue_date(original.issue_date)
+            .maturity(original.maturity)
+            .discount_curve_id(original.discount_curve_id)
+            .conversion(original.conversion)
+            .cashflow_spec(original.cashflow_spec)
+            .spot_id(original.spot_id)
+            .vol_surface_id(original.vol_surface_id)
+            .resolved_settlement(claim)
+            .build()
+        )
+        assert bond.resolved_settlement == claim
+        assert ConvertibleBond.from_json(bond.to_json()).resolved_settlement == claim
+        assert original.resolved_settlement is None
+        with pytest.raises(ValueError, match="resolved_settlement"):
+            ConvertibleBond.builder().resolved_settlement({"shares": 20.0})

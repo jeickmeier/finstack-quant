@@ -77,9 +77,19 @@ def test_commodity_mc_details_survive_binding_and_scale_with_position() -> None:
 
 
 def test_metric_missing_volatility_preserves_key_error() -> None:
-    # SS pricing needs only the forward and discount curve; analytic vega
-    # additionally needs the missing WTI-VOL surface, inside metric enrichment.
+    # Black pricing and its surface vega require the declared WTI-VOL surface.
     with pytest.raises(KeyError, match="WTI-VOL"):
+        price_instrument(
+            json.dumps(_FIXTURES["commodity"]),
+            json.dumps(_FIXTURES["market"]),
+            "2025-01-02",
+            "black76",
+            ["vega"],
+        )
+
+
+def test_commodity_mc_rejects_black_surface_volatility_risk() -> None:
+    with pytest.raises(ValueError, match="Black surface vega, vanna and volga are not supported"):
         price_instrument(
             json.dumps(_FIXTURES["commodity"]),
             json.dumps(_FIXTURES["market"]),

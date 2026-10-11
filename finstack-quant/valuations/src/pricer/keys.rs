@@ -136,7 +136,7 @@ pub enum InstrumentType {
     /// Commodity swap (fixed-for-floating commodity price exchange).
     CommoditySwap = 56,
     /// Commodity option (option on commodity forward or spot).
-    CommodityOption = 68,
+    CommoditySpotOption = 68,
     /// Commodity Asian option (option on arithmetic/geometric average of commodity prices).
     CommodityAsianOption = 72,
     /// Commodity swaption (option on a fixed-for-floating commodity swap).
@@ -250,7 +250,7 @@ impl InstrumentType {
             InstrumentType::BondFuture => "bond_future",
             InstrumentType::CommodityForward => "commodity_forward",
             InstrumentType::CommoditySwap => "commodity_swap",
-            InstrumentType::CommodityOption => "commodity_option",
+            InstrumentType::CommoditySpotOption => "commodity_spot_option",
             InstrumentType::CommodityAsianOption => "commodity_asian_option",
             InstrumentType::CommoditySwaption => "commodity_swaption",
             InstrumentType::CommoditySpreadOption => "commodity_spread_option",

@@ -75,6 +75,7 @@ fn create_test_bond() -> ConvertibleBond {
         div_yield_id: Some("AAPL-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
+        resolved_settlement: None,
         cashflow_spec: crate::instruments::fixed_income::bond::CashflowSpec::Fixed(fixed_coupon),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
@@ -594,6 +595,7 @@ fn test_thirty_360_day_count_corporate_convention() {
         div_yield_id: Some("AAPL-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
+        resolved_settlement: None,
         cashflow_spec: crate::instruments::fixed_income::bond::CashflowSpec::Fixed(fixed_coupon),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
@@ -973,10 +975,14 @@ fn convertible_seasoned_window_preserves_exercise_dates() {
                 .is_finite()
         );
     }
-    // Unlike a voluntary interval, a past mandatory event must not become a
-    // new present-day choice: the untransformed contract remains unsupported.
+    // Same-day mandatory delivery has completed; it must never be replayed.
     bond.conversion.policy = ConversionPolicy::MandatoryOn(opening);
-    assert!(price_convertible_bond(&bond, &market, closing).is_err());
+    assert_eq!(
+        price_convertible_bond(&bond, &market, closing)
+            .expect("completed conversion")
+            .amount(),
+        0.0
+    );
 }
 
 fn lifecycle_bond() -> ConvertibleBond {
@@ -1008,7 +1014,7 @@ fn lifecycle_market(as_of: Date, spot: f64) -> MarketContext {
 
 #[test]
 fn convertible_forced_delivery_overrides_put_and_retains_risky_coupon() {
-    use super::tsiveriotis_zhang::{TsiveriotisZhangEngine, TzMarketInputs};
+    use super::credit_tree::{CreditTreeEngine, CreditTreeMarketInputs};
     use crate::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
     use finstack_quant_core::market_data::term_structures::HazardCurve;
     use time::macros::date;
@@ -1054,14 +1060,14 @@ fn convertible_forced_delivery_overrides_put_and_retains_risky_coupon() {
                     inputs.volatility,
                 )
                 .expect("valuator");
-                let engine = TsiveriotisZhangEngine {
+                let engine = CreditTreeEngine {
                     valuator: &valuator,
                     steps,
                     time_to_maturity: inputs.time_to_maturity,
                 };
                 let expected_cash = 25.0 * (-hazard * 181.0 / 365.0).exp();
                 let (total, cash) = engine
-                    .price(TzMarketInputs {
+                    .price(CreditTreeMarketInputs {
                         spot: 50.0,
                         volatility: 0.01,
                         risk_free_rate: 0.0,
@@ -1144,4 +1150,190 @@ fn convertible_exact_maturity_matches_terminal_coupon_and_exercise_policy() {
             }
         }
     }
+}
+
+#[test]
+fn convertible_amortization_and_pik_follow_the_live_debt_schedule() {
+    use crate::instruments::fixed_income::bond::CashflowSpec;
+    use finstack_quant_cashflows::builder::AmortizationSpec;
+    use time::macros::date;
+    let as_of = date!(2025 - 01 - 01);
+    let mut bond = lifecycle_bond();
+    bond.maturity = date!(2027 - 01 - 01);
+    bond.notional = Money::from((100_i64, Currency::USD));
+    bond.conversion.ratio = Some(1e-8);
+    bond.conversion.policy = ConversionPolicy::Window {
+        start: bond.maturity,
+        end: bond.maturity,
+    };
+    let market = lifecycle_market(as_of, 1.0)
+        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
+        .insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (10.0, (-1.0_f64).exp())])
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .build()
+                .expect("discount curve"),
+        );
+    for pik in [false, true] {
+        let CashflowSpec::Fixed(mut spec) = create_test_bond().cashflow_spec else {
+            unreachable!("fixed fixture")
+        };
+        spec.schedule.frequency = Tenor::annual();
+        spec.schedule.business_day_convention = BusinessDayConvention::Unadjusted;
+        spec.schedule.day_count = DayCount::Act365F;
+        spec.rate = if pik {
+            rust_decimal::Decimal::new(1, 1)
+        } else {
+            rust_decimal::Decimal::ZERO
+        };
+        spec.coupon_type = if pik {
+            CouponType::Pik
+        } else {
+            CouponType::Cash
+        };
+        bond.cashflow_spec = CashflowSpec::amortizing(
+            CashflowSpec::Fixed(spec),
+            AmortizationSpec::PercentOfRemainingPerPeriod { pct: 0.5 },
+        );
+        for recovery in [0.0, 0.4] {
+            let hazard = 0.07;
+            bond.credit_curve_id = Some("CREDIT".into());
+            bond.recovery_rate = Some(recovery);
+            let market = market.clone().insert(
+                finstack_quant_core::market_data::term_structures::HazardCurve::flat(
+                    "CREDIT", as_of, hazard, recovery,
+                )
+                .expect("hazard"),
+            );
+            let k = 0.1 + hazard;
+            let (first, last, second_balance) = if pik {
+                (55.0, 60.5, 55.0)
+            } else {
+                (50.0, 50.0, 50.0)
+            };
+            let expected = first * (-k).exp()
+                + last * (-2.0 * k).exp()
+                + recovery * hazard / k
+                    * (100.0 * (1.0 - (-k).exp())
+                        + second_balance * ((-k).exp() - (-2.0 * k).exp()));
+            let actual = price_convertible_bond(&bond, &market, as_of)
+                .expect("amortizing price")
+                .amount();
+            assert!(
+                (actual - expected).abs() < 1e-8,
+                "PIK={pik}, R={recovery}: {actual} != {expected}"
+            );
+        }
+    }
+}
+
+#[test]
+fn convertible_completed_conversion_retains_only_delayed_delivery() {
+    use crate::instruments::fixed_income::convertible::ConvertibleSettlement;
+    use time::macros::date;
+    let event = date!(2025 - 07 - 01);
+    let as_of = date!(2025 - 07 - 02);
+    let mut bond = lifecycle_bond();
+    bond.conversion.policy = ConversionPolicy::MandatoryOn(event);
+    let market = lifecycle_market(as_of, 70.0);
+    assert_eq!(
+        price_convertible_bond(&bond, &market, as_of)
+            .expect("settled")
+            .amount(),
+        0.0
+    );
+    bond.resolved_settlement = Some(ConvertibleSettlement {
+        exercise_date: event,
+        delivery_date: date!(2025 - 07 - 05),
+        shares: 10.0,
+        cash: Money::from((25_i64, Currency::USD)),
+        recovery_basis: Money::from((0_i64, Currency::USD)),
+    });
+    let roundtrip: ConvertibleBond =
+        serde_json::from_str(&serde_json::to_string(&bond).expect("serialize"))
+            .expect("deserialize");
+    assert_eq!(
+        price_convertible_bond(&roundtrip, &market, as_of)
+            .expect("pending")
+            .amount(),
+        725.0
+    );
+    assert_eq!(
+        price_convertible_bond(&roundtrip, &market, date!(2025 - 07 - 05))
+            .expect("delivered")
+            .amount(),
+        0.0
+    );
+}
+
+#[test]
+fn convertible_coupon_survives_maturity_until_its_payment() {
+    use time::macros::date;
+    let mut bond = lifecycle_bond();
+    bond.maturity = date!(2026 - 01 - 01);
+    if let crate::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) =
+        &mut bond.cashflow_spec
+    {
+        spec.schedule.payment_lag_days = 4;
+    }
+    let as_of = date!(2026 - 01 - 02);
+    let market = lifecycle_market(as_of, 70.0);
+    let pv = price_convertible_bond(&bond, &market, as_of)
+        .expect("pending coupon")
+        .amount();
+    assert!(
+        (pv - 1025.0).abs() < 1e-10,
+        "pending final principal and coupon: {pv}"
+    );
+    assert_eq!(
+        price_convertible_bond(&bond, &market, date!(2026 - 01 - 15))
+            .expect("settled")
+            .amount(),
+        0.0
+    );
+}
+
+#[test]
+fn convertible_clean_price_excludes_cash_paid_before_settlement() {
+    use crate::instruments::{Instrument, PricingOptions};
+    use crate::metrics::MetricId;
+    use time::macros::date;
+    let as_of = date!(2025 - 06 - 30);
+    let mut bond = lifecycle_bond();
+    bond.conversion.ratio = Some(1e-8);
+    bond.settlement_days = Some(2);
+    let market = lifecycle_market(as_of, 1.0)
+        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
+        .insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (10.0, (-0.5_f64).exp())])
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .build()
+                .expect("curve"),
+        );
+    let settle = settlement_date(&bond, as_of).expect("settlement");
+    assert_eq!(settle, date!(2025 - 07 - 02));
+    let discount = market.get_discount("USD-OIS").expect("curve");
+    let expected_dirty = 1025.0
+        * discount
+            .df_between_dates(settle, bond.maturity)
+            .expect("DF");
+    let expected_clean =
+        expected_dirty - calculate_accrued_interest(&bond, &market, as_of).expect("accrued");
+    let result = bond
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::CleanPrice],
+            PricingOptions::default(),
+        )
+        .expect("clean price");
+    assert!(
+        (result.measures["clean_price"] - expected_clean).abs() < 1e-8,
+        "{} != {expected_clean}",
+        result.measures["clean_price"]
+    );
 }

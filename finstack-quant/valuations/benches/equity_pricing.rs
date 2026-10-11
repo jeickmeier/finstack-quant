@@ -146,7 +146,6 @@ fn equity_trs(tenor_years: i32) -> EquityTotalReturnSwap {
 
     let notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
     let underlying = EquityUnderlyingParams::new("SPX-TRS", "SPX-SPOT", notional.currency())
-        .with_contract_size(1.0)
         .with_div_yield_id(PriceId::new("SPX-DIV-YIELD"));
 
     let financing = FinancingLegSpec::new(

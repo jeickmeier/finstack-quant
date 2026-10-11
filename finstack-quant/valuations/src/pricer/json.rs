@@ -810,7 +810,7 @@ fn instrument_json_for_pricing<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::commodity::commodity_option::CommodityOption;
+    use crate::instruments::commodity::commodity_spot_option::CommoditySpotOption;
     use crate::instruments::credit_derivatives::cds_option::CdsOption;
     use crate::instruments::equity::equity_option::EquityOption;
     use crate::instruments::equity::pe_fund::PrivateMarketsFund;
@@ -963,11 +963,11 @@ mod tests {
 
         let equity_option = EquityOption::example().expect("equity option");
         let swaption = Swaption::example().expect("example");
-        let commodity_option = CommodityOption::example().expect("example");
+        let commodity_spot_option = CommoditySpotOption::example().expect("example");
         for instrument in [
             &equity_option as &dyn Instrument,
             &swaption as &dyn Instrument,
-            &commodity_option as &dyn Instrument,
+            &commodity_spot_option as &dyn Instrument,
         ] {
             assert_eq!(
                 resolve_model_key(instrument, "default").expect("model"),

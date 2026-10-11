@@ -323,7 +323,7 @@ fn test_metrics_index_ratio_consistency() {
     let ratio_via_framework = result.measures[MetricId::IndexRatio.as_str()];
 
     // Calculate via direct method
-    let ratio_direct = ilb.index_ratio_from_market(as_of, &ctx).unwrap();
+    let ratio_direct = ilb.index_ratio_from_market(as_of, &ctx, as_of).unwrap();
 
     // Assert - should be identical
     relative_eq(
@@ -524,6 +524,7 @@ fn test_breakeven_inflation_metric_non_flat_nominal_curve() {
         .indexation_method(IndexationMethod::Tips)
         .lag(InflationLag::None)
         .deflation_protection(DeflationProtection::MaturityOnly)
+        .floor_vol_surface_id(finstack_quant_core::types::CurveId::new("CPI-ZERO-VOL"))
         .business_day_convention(BusinessDayConvention::Following)
         .stub(StubKind::None)
         .discount_curve_id(CurveId::new("USD-OIS"))
@@ -561,7 +562,10 @@ fn test_breakeven_inflation_metric_non_flat_nominal_curve() {
         .knots([(0.0, 100.0), (11.0, 100.0)])
         .build()
         .unwrap();
-    let ctx = MarketContext::new().insert(discount).insert(inflation);
+    let ctx = MarketContext::new()
+        .insert(discount)
+        .insert(inflation)
+        .insert_surface(zero_floor_vol());
 
     let result = bond
         .price_with_metrics(

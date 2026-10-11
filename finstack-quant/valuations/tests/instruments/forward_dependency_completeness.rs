@@ -14,7 +14,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::commodity::commodity_option::CommodityOption;
+use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::MarketDependencies;
@@ -60,12 +60,13 @@ fn build_market_from_deps(
 #[test]
 fn test_forward_curve_dependencies_complete() {
     let as_of = date!(2025 - 01 - 01);
-    let mut option = CommodityOption::example().expect("example");
+    let mut option = CommoditySpotOption::example().expect("example");
     option.spot_id = Some("WTI-SPOT".into());
 
-    let deps =
-        MarketDependencies::from_instrument_json(&InstrumentJson::CommodityOption(option.clone()))
-            .expect("from_instrument_json");
+    let deps = MarketDependencies::from_instrument_json(&InstrumentJson::CommoditySpotOption(
+        option.clone(),
+    ))
+    .expect("from_instrument_json");
     let market = build_market_from_deps(&deps, as_of, option.underlying.currency);
 
     let result = option.value(&market, as_of);
@@ -77,15 +78,16 @@ fn test_forward_curve_dependencies_complete() {
 }
 
 #[test]
-fn test_missing_forward_curve_with_spot_succeeds() {
-    // When spot_id is present, commodity option can derive forward via cost-of-carry
+fn test_spot_option_requires_calibrated_forward_curve() {
+    // Spot alone does not establish commodity storage costs and convenience yield.
     let as_of = date!(2025 - 01 - 01);
-    let mut option = CommodityOption::example().expect("example");
+    let mut option = CommoditySpotOption::example().expect("example");
     option.spot_id = Some("WTI-SPOT".into());
 
-    let deps =
-        MarketDependencies::from_instrument_json(&InstrumentJson::CommodityOption(option.clone()))
-            .expect("from_instrument_json");
+    let deps = MarketDependencies::from_instrument_json(&InstrumentJson::CommoditySpotOption(
+        option.clone(),
+    ))
+    .expect("from_instrument_json");
 
     let mut market = MarketContext::new();
     for curve_id in deps.curves.discount_curves.iter() {
@@ -114,24 +116,20 @@ fn test_missing_forward_curve_with_spot_succeeds() {
     }
 
     let result = option.value(&market, as_of);
-    // Should SUCCEED - cost-of-carry fallback: F = S * exp(r * T)
-    assert!(
-        result.is_ok(),
-        "Commodity option with spot price should succeed via cost-of-carry fallback, got: {:?}",
-        result.err()
-    );
+    assert!(result.is_err(), "Missing commodity carry must be rejected");
 }
 
 #[test]
 fn test_missing_both_forward_and_spot_fails() {
     // When neither PriceCurve nor spot_id is available, pricing should fail
     let as_of = date!(2025 - 01 - 01);
-    let mut option = CommodityOption::example().expect("example");
+    let mut option = CommoditySpotOption::example().expect("example");
     option.spot_id = None; // No spot fallback
 
-    let deps =
-        MarketDependencies::from_instrument_json(&InstrumentJson::CommodityOption(option.clone()))
-            .expect("from_instrument_json");
+    let deps = MarketDependencies::from_instrument_json(&InstrumentJson::CommoditySpotOption(
+        option.clone(),
+    ))
+    .expect("from_instrument_json");
 
     let mut market = MarketContext::new();
     for curve_id in deps.curves.discount_curves.iter() {

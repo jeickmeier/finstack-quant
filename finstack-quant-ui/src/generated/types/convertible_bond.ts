@@ -636,6 +636,14 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
+ * ISO 8601 calendar date string.
+ */
+export type Date11 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date12 = string;
+/**
  * Opaque string identifier.
  */
 export type Id8 = string;
@@ -744,15 +752,10 @@ export interface D_5D5C46A56F1A2114A2Ed {
       };
   conversion: D_8D9E4Ad211395Ba91969;
   /**
-   * Issuer hazard curve identifier (a `HazardCurve`, as on every credit
-   * instrument). When `None`, the cash component is discounted at the
-   * risk-free `discount_curve_id` (no credit spread).
-   *
-   * The pricer derives the zero-recovery risky discount factor
-   * `risky_df = rf_df × S(t)` from the curve's survival probabilities and
-   * blends it with risk-free discounting as `risky × (1 − R) + rf × R`
-   * using [`Self::recovery_rate`]. The hazard curve's own recovery rate is
-   * used only to convert spread bumps into hazard shifts for CS01.
+   * Issuer hazard curve identifier. Absence specifies no default risk.
+   * All continuation claims are survival-weighted. Default pays the explicit
+   * recovery fraction of outstanding principal and extinguishes equity;
+   * conditional stock drift includes the hazard compensator.
    */
   credit_curve_id?: Id3 | null;
   discount_curve_id: Id6;
@@ -769,19 +772,18 @@ export interface D_5D5C46A56F1A2114A2Ed {
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money2;
   /**
-   * Assumed recovery rate on default, as a fraction (e.g., 0.40 = 40%).
-   *
-   * Used in the Tsiveriotis-Zhang credit model to blend risky and risk-free
-   * discounting on the cash component. A recovery rate of 0 reduces to the
-   * standard zero-recovery TZ model. Typical values:
-   * - **Investment grade**: 0.40 (ISDA standard assumption)
-   * - **High yield**: 0.25-0.35
-   * - **Distressed**: 0.10-0.20
-   *
-   * Required when `credit_curve_id` is set; otherwise absence means that no
-   * credit adjustment is requested.
+   * Fraction of outstanding principal paid immediately on default, in
+   * `[0, 1]`; includes capitalized PIK and excludes prior amortization.
+   * Default extinguishes coupons and the conversion right. Required with a
+   * credit curve; recovery is an explicit cashflow, not a discount blend.
    */
   recovery_rate?: number | null;
+  /**
+   * Recorded exercise awaiting delivery. At or after `exercise_date`, only
+   * this claim remains; after delivery its value is zero. Mandatory exercise
+   * without a record settles on its contractual conversion date.
+   */
+  resolved_settlement?: D_50Ecc2E8Ab08Ab1Ff417 | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
    * Number of business days from trade date to settlement date.
@@ -2763,6 +2765,374 @@ export interface DE49387F97C0F9D510642 {
  * Currency-tagged monetary amount.
  */
 export interface Money2 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * Resolved exercise claim after debt has been converted, called, put, or redeemed.
+ *
+ * These contractual amounts replace the debt and its future coupons. Any
+ * earned but unpaid coupon must be included in `cash`. Shares are delivered
+ * ex-dividend on `delivery_date`. Same-day completed exercise needs no record;
+ * use this state to retain a delayed delivery without replaying the option.
+ */
+export interface D_50Ecc2E8Ab08Ab1Ff417 {
+  cash: Money3;
+  delivery_date: Date11;
+  exercise_date: Date12;
+  recovery_basis: Money4;
+  /**
+   * Fixed number of shares to deliver, finite and nonnegative.
+   */
+  shares: number;
+}
+/**
+ * Currency-tagged monetary amount.
+ */
+export interface Money3 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * Currency-tagged monetary amount.
+ */
+export interface Money4 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with

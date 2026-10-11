@@ -624,6 +624,24 @@ impl JsCashFlowBuilder {
             .map_err(to_js_err)
     }
 
+    /// Build cashflows with an explicit historical-observation cutoff.
+    ///
+    /// @param market - MarketContext with projection curves and exact historical index fixings.
+    /// @param as_of - ISO-8601 valuation date: earlier resets require historical fixings; an available same-day fixing takes precedence over projection.
+    /// @returns A CashFlowSchedule with realized and projected coupons; release it with free().
+    /// @throws If a date or schedule is invalid, a required fixing is unavailable, or market data is missing.
+    #[wasm_bindgen(js_name = buildAsOf)]
+    pub fn build_as_of(
+        &self,
+        market: &JsMarketContext,
+        as_of: JsValue,
+    ) -> Result<JsCashFlowSchedule, JsValue> {
+        self.inner
+            .build_as_of(market.inner(), js_date(&as_of, "asOf")?)
+            .map(JsCashFlowSchedule::from_inner)
+            .map_err(to_js_err)
+    }
+
     /// Build the schedule with market data; the published `build(market)` calls this.
     ///
     /// @param market - `MarketContext` handle holding the forward curves and fixings the floating legs reference.

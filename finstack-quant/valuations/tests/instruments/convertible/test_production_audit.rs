@@ -244,36 +244,22 @@ fn production_convertible_cross_gamma_follows_scalar_and_override_volatility() {
 }
 
 #[test]
-fn production_convertible_cross_gamma_uses_issuer_hazard_curve() {
+fn production_convertible_cross_credit_requires_replayable_issuer_curve() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = create_standard_convertible();
     bond.credit_curve_id = Some("CREDIT".into());
     bond.recovery_rate = Some(0.4);
-    // Zero-recovery hazard curve: a 1 bp spread bump is a 1 bp hazard shift.
-    let make_market = |spread_sign: f64, vol_sign: f64| {
-        market(as_of, 0.03, 90.0, 0.4 + vol_sign * 0.01).insert(
-            HazardCurve::flat("CREDIT", as_of, 0.05 + spread_sign * 0.0001, 0.0)
-                .expect("issuer hazard"),
-        )
-    };
-    let corner = |spread_sign, vol_sign| {
-        bond.value(&make_market(spread_sign, vol_sign), as_of)
-            .expect("independent credit/vol corner")
-            .amount()
-    };
-    let expected =
-        (corner(1.0, 1.0) - corner(1.0, -1.0) - corner(-1.0, 1.0) + corner(-1.0, -1.0)) / 4.0;
-    assert!(expected.abs() > 1e-8);
-    let result = bond
+    let market = market(as_of, 0.03, 90.0, 0.4)
+        .insert(HazardCurve::flat("CREDIT", as_of, 0.05, 0.4).unwrap());
+    let error = bond
         .price_with_metrics(
-            &make_market(0.0, 0.0),
+            &market,
             as_of,
             &[MetricId::CrossGammaCreditVol],
             PricingOptions::default(),
         )
-        .expect("credit/vol cross gamma");
-    let actual = result.measures["cross_gamma_credit_vol"];
-    assert!((actual - expected).abs() < 1e-8, "{actual} vs {expected}");
+        .unwrap_err();
+    assert!(error.to_string().contains("lossless calibration recipe"));
 }
 
 #[test]
@@ -378,12 +364,12 @@ fn production_convertible_seasoned_floater_uses_fixings_and_current_accrual() {
 }
 
 #[test]
-fn production_convertible_bond_floor_uses_the_pricing_recovery_blend() {
+fn production_convertible_bond_floor_uses_fractional_recovery_of_principal() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = create_standard_convertible();
     bond.cashflow_spec =
         finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::default();
-    bond.maturity = as_of + time::Duration::days(200);
+    bond.maturity = as_of + time::Duration::days(198);
     bond.credit_curve_id = Some("CREDIT".into());
     bond.recovery_rate = Some(0.4);
     bond.metric_pricing_overrides = bond.metric_pricing_overrides.with_rate_bump_bp(1.0);
@@ -399,12 +385,16 @@ fn production_convertible_bond_floor_uses_the_pricing_recovery_blend() {
         )
         .expect("floor metric");
     let years = (bond.maturity - as_of).whole_days() as f64 / 365.0;
-    // 200 daily steps: independent product of the specified forward-DF blend.
-    let expected =
-        1000.0 * (0.6 * (-0.08_f64 / 365.0).exp() + 0.4 * (-0.03_f64 / 365.0).exp()).powi(200);
+    let analytic = |rate: f64| {
+        let combined = rate + 0.05;
+        1000.0
+            * ((-combined * years).exp()
+                + 0.4 * 0.05 / combined * (1.0 - (-combined * years).exp()))
+    };
+    let expected = analytic(0.03);
     assert!((result.value.amount() - expected).abs() < 1e-8);
     assert!((result.measures["bond_floor"] - expected).abs() < 1e-8);
-    let expected_dv01 = 0.5 * expected * ((-0.0001 * years).exp() - (0.0001 * years).exp());
+    let expected_dv01 = 0.5 * (analytic(0.0301) - analytic(0.0299));
     assert!(
         (result.measures["dv01"] - expected_dv01).abs() < 1e-8,
         "full parallel rate risk {} vs {expected_dv01}",

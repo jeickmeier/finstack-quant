@@ -1,7 +1,7 @@
 //! Pricer registrations for commodity instruments.
 //!
 //! Covers: CommodityForward, CommodityFuture, CommodityFutureOption,
-//! CommoditySwap, CommodityOption, CommodityAsianOption, CommoditySwaption,
+//! CommoditySwap, CommoditySpotOption, CommodityAsianOption, CommoditySwaption,
 //! CommoditySpreadOption.
 
 use super::{register_generic, InstrumentType, ModelKey, PricerRegistry};
@@ -38,8 +38,8 @@ pub(crate) fn register_commodity_pricers(
     // Commodity Option
     register_generic!(
         registry,
-        InstrumentType::CommodityOption,
-        crate::instruments::CommodityOption,
+        InstrumentType::CommoditySpotOption,
+        crate::instruments::CommoditySpotOption,
         ModelKey::Black76
     );
 
@@ -67,8 +67,8 @@ pub(crate) fn register_commodity_pricers(
     // Commodity Option - Monte Carlo Schwartz-Smith
 
     registry.register(
-        crate::instruments::commodity::commodity_option::pricer::CommodityOptionMcPricer::new(
-            crate::instruments::commodity::commodity_option::CommodityMcParams {
+        crate::instruments::commodity::commodity_spot_option::pricer::CommoditySpotOptionMcPricer::new(
+            crate::instruments::commodity::commodity_spot_option::CommodityMcParams {
                 params: finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithParams {
                     kappa: 1.0,
                     sigma_x: 0.3,

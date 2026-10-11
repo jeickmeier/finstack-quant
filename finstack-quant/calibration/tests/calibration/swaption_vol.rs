@@ -308,7 +308,7 @@ fn calibrated_swaption_surface_is_not_silently_reused_as_strike_surface() {
         stub: StubKind::None,
         start: expiry,
         end: swap_end,
-        par_method: None,
+
         payment_lag_days: 0,
         end_of_month: false,
     };

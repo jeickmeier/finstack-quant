@@ -391,6 +391,43 @@ impl PyCashFlowBuilder {
             .map_err(core_to_py)
     }
 
+    /// Build a schedule with an explicit historical-observation cutoff.
+    ///
+    /// Parameters
+    /// ----------
+    /// market : MarketContext
+    ///     Projection curves and exact historical index fixings.
+    /// as_of : datetime.date
+    ///     Resets before this date require fixings independently of curve base dates;
+    ///     an available same-day fixing takes precedence over projection.
+    ///
+    /// Returns
+    /// -------
+    /// CashFlowSchedule
+    ///     Canonical cashflows with realized and projected coupon amounts.
+    ///
+    /// Raises
+    /// ------
+    /// KeyError
+    ///     If required market data or principal inputs are missing.
+    /// ValueError
+    ///     If dates, schedule specifications, or required historical fixings are invalid.
+    /// RuntimeError
+    ///     If a numerical computation fails during cashflow construction.
+    fn build_as_of(
+        &self,
+        py: Python<'_>,
+        market: &Bound<'_, PyAny>,
+        as_of: &Bound<'_, PyAny>,
+    ) -> PyResult<PyCashFlowSchedule> {
+        let market = crate::bindings::extract::extract_market(py, market)?;
+        let as_of = py_to_date(as_of)?;
+        let builder = self.inner.clone();
+        py.detach(move || builder.build_as_of(&market, as_of))
+            .map(PyCashFlowSchedule::from_inner)
+            .map_err(core_to_py)
+    }
+
     /// Python-style summary of what has been configured so far.
     fn __repr__(&self) -> String {
         let principal = self.inner.get_initial_principal().map_or_else(

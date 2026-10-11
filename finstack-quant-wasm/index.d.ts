@@ -14656,6 +14656,15 @@ export interface CashFlowBuilder extends WasmOwned {
    * @throws If a setter recorded an error, the principal is unset, a referenced curve or fixing is missing (kind `not_found`), or schedule generation fails (kind `validation`).
    */
   build(market?: MarketContext | null): CashFlowSchedule;
+  /**
+   * Build cashflows with an explicit historical-observation cutoff.
+   * @param market - MarketContext with projection curves and exact historical index fixings.
+   * @param asOf - ISO-8601 valuation date: earlier resets require historical fixings; an available same-day fixing takes precedence over projection.
+   * @returns A CashFlowSchedule with realized and projected coupons; release it with free().
+   * @throws If a date or schedule is invalid, a required fixing is unavailable, or market data is missing.
+   */
+  buildAsOf(market: MarketContext, asOf: string): CashFlowSchedule;
+
 }
 
 /**
@@ -21883,6 +21892,12 @@ export interface ConvertibleBond extends WasmOwned {
    */
   readonly recoveryRate: NonNullable<generated.valuations.ConvertibleBond['recovery_rate']> | null;
   /**
+   * Recorded exercise and delayed delivery replacing the debt and its coupons.
+   * @returns Canonical settlement record, or `null` while unresolved.
+   * @throws Never; returns the stored record.
+   */
+  readonly resolvedSettlement: NonNullable<generated.valuations.ConvertibleBond['resolved_settlement']> | null;
+  /**
    * Coupon/cashflow specification in serde form, the same shape as `Bond.cashflow_spec`.
    * @returns `{"fixed": {...}}`, `{"floating": {...}}`, `{"step_up": {...}}` or `{"amortizing": {...}}`; a zero-coupon convertible is a fixed spec with rate `"0"`.
    */
@@ -22128,6 +22143,13 @@ export interface ConvertibleBondBuilder extends WasmOwned {
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
   recoveryRate(value: number): ConvertibleBondBuilder;
+  /**
+   * Record the claim remaining after exercise extinguishes the debt.
+   * @param value - Canonical settlement with ISO exercise/delivery dates, nonnegative shares, and currency-tagged cash/recovery basis. Cash includes retained coupons; recovery basis excludes uncapitalized accrual. Omission leaves debt unresolved.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws for malformed input or a consumed builder; `build()` validates dates, currencies and amounts.
+   */
+  resolvedSettlement(value: NonNullable<generated.valuations.ConvertibleBond['resolved_settlement']> | string): ConvertibleBondBuilder;
   /**
    * Set the coupon/cashflow specification.
    * @param value - Rust `CashflowSpec` as a plain object or JSON object string (the same shape as `Bond.cashflow_spec`, e.g. `{"fixed": {"coupon_type": "cash", "rate": "0.05", ...schedule}}`); a zero-coupon convertible uses a fixed spec with rate `"0"`.
@@ -24300,7 +24322,7 @@ export interface ValuationInstrumentsNamespace {
    * @param asOf - ISO-8601 valuation date for the base and every scenario revaluation.
    * @param config - Optional `VarConfig` (JSON string or plain object): `confidence_level` (decimal in `(0, 1)`), `method` (`"full_revaluation"` or `"taylor_approximation"`) and `reporting_currency` (required for mixed-currency portfolios). Omit for the Rust default: 95%, full revaluation, natural currency.
    * @param model - Optional model key applied to every instrument; omit or `"default"` for each instrument's canonical pricing path.
-   * @returns `VarResult` plain object: `var`, `expected_shortfall` (losses negative), the worst-first `pnl_distribution`, `num_scenarios`, `confidence_level`, `skipped_fx` and `skipped_vol`.
+   * @returns `VarResult` plain object: `var`, `expected_shortfall` (losses negative), the worst-first `pnl_distribution`, `num_scenarios` and `confidence_level`.
    * @throws Error - Throws with kind `validation` if an envelope, the market, history, config, `asOf` or `model` is invalid, the confidence level is outside `(0, 1)`, a non-empty portfolio has no scenarios, or a mixed-currency portfolio has no reporting currency; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if a scenario revaluation fails.
    */
   calculateVar(

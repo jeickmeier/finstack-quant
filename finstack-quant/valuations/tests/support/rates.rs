@@ -37,7 +37,7 @@ pub fn usd_irs_swap(
         stub: StubKind::None,
         start,
         end,
-        par_method: None,
+
         payment_lag_days: 0,
         end_of_month: false,
     };

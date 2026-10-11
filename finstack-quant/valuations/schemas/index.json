@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 998133,
+      "bytes": 1003370,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -146,7 +146,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-      "bytes": 33736,
+      "bytes": 33735,
       "kind": "component",
       "path": "schemas/common/1/metric_pricing_overrides.schema.json",
       "summary": "Metric-time pricing and finite-difference configuration.",
@@ -253,12 +253,12 @@
       "type_name": "SingleInstrumentEnvelope"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json",
-      "bytes": 12924,
+      "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json",
+      "bytes": 14489,
       "kind": "input",
-      "path": "schemas/instruments/1/commodity/commodity_option.schema.json",
-      "summary": "Option on a commodity forward or future.",
-      "title": "commodity_option",
+      "path": "schemas/instruments/1/commodity/commodity_spot_option.schema.json",
+      "summary": "Option on spot commodity with observed-spot exercise and explicit cash or physical settlement.",
+      "title": "commodity_spot_option",
       "type_name": "SingleInstrumentEnvelope"
     },
     {
@@ -290,7 +290,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1006046,
+      "bytes": 1011283,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -407,7 +407,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
-      "bytes": 188966,
+      "bytes": 189049,
       "kind": "input",
       "path": "schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
       "summary": "Property equity net of its financing stack.",
@@ -434,7 +434,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json",
-      "bytes": 47669,
+      "bytes": 47451,
       "kind": "input",
       "path": "schemas/instruments/1/equity/trs_equity.schema.json",
       "summary": "Equity total-return swap versus a funding leg.",
@@ -488,7 +488,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1005023,
+      "bytes": 1010260,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -542,7 +542,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json",
-      "bytes": 20008,
+      "bytes": 21347,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/agency_cmo.schema.json",
       "summary": "Agency CMO tranche carved from a collateral pool.",
@@ -569,7 +569,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
-      "bytes": 278562,
+      "bytes": 278645,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
       "summary": "Warehouse line against a collateral pool: advance rates, concentration limits, borrowing base.",
@@ -578,7 +578,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
-      "bytes": 94558,
+      "bytes": 94641,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/bond.schema.json",
       "summary": "Fixed- or floating-rate cash bond with a coupon schedule.",
@@ -587,7 +587,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
-      "bytes": 108104,
+      "bytes": 108187,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/bond_future.schema.json",
       "summary": "Exchange-traded bond future with a deliverable basket and CTD.",
@@ -596,7 +596,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json",
-      "bytes": 73612,
+      "bytes": 75434,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/convertible_bond.schema.json",
       "summary": "Corporate bond convertible into a fixed number of shares.",
@@ -614,7 +614,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json",
-      "bytes": 13378,
+      "bytes": 14101,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/inflation_linked_bond.schema.json",
       "summary": "Bond whose principal and coupons index to a price level.",
@@ -632,7 +632,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
-      "bytes": 395079,
+      "bytes": 394431,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/structured_credit.schema.json",
       "summary": "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
@@ -641,7 +641,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json",
-      "bytes": 64991,
+      "bytes": 65074,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/term_loan.schema.json",
       "summary": "Amortising leveraged loan with call protection and covenants.",
@@ -650,7 +650,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json",
-      "bytes": 45565,
+      "bytes": 46056,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/trs_fixed_income_index.schema.json",
       "summary": "Total-return swap on a fixed-income index versus a funding leg.",
@@ -767,7 +767,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1096262,
+      "bytes": 1101374,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -785,7 +785,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json",
-      "bytes": 27260,
+      "bytes": 26497,
       "kind": "input",
       "path": "schemas/instruments/1/rates/bermudan_swaption.schema.json",
       "summary": "Bermudan-exercise swaption valued on a short-rate lattice.",
@@ -866,7 +866,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json",
-      "bytes": 18993,
+      "bytes": 19225,
       "kind": "input",
       "path": "schemas/instruments/1/rates/interest_rate_future.schema.json",
       "summary": "Exchange-traded short-rate future.",
@@ -884,7 +884,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json",
-      "bytes": 52268,
+      "bytes": 51505,
       "kind": "input",
       "path": "schemas/instruments/1/rates/interest_rate_swap.schema.json",
       "summary": "Vanilla fixed-versus-floating interest-rate swap.",
@@ -902,7 +902,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json",
-      "bytes": 28955,
+      "bytes": 28192,
       "kind": "input",
       "path": "schemas/instruments/1/rates/swaption.schema.json",
       "summary": "European option to enter an interest-rate swap.",
@@ -947,7 +947,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1007654,
+      "bytes": 1012891,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",
@@ -965,7 +965,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
-      "bytes": 52040,
+      "bytes": 52123,
       "kind": "output",
       "path": "schemas/results/1/enhanced_monte_carlo_result.schema.json",
       "summary": "Revolving-credit Monte Carlo value with per-path details.",
@@ -1001,7 +1001,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/listed_product_coverage.schema.json",
-      "bytes": 17460,
+      "bytes": 17465,
       "kind": "output",
       "path": "schemas/results/1/listed_product_coverage.schema.json",
       "summary": "Listed-product catalog coverage for one exchange product.",
@@ -1100,7 +1100,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/var_result.schema.json",
-      "bytes": 3032,
+      "bytes": 2232,
       "kind": "output",
       "path": "schemas/results/1/var_result.schema.json",
       "summary": "Historical-simulation portfolio VaR, expected shortfall and P&L distribution.",

@@ -3581,6 +3581,17 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Discount curve identifier. This **must** be a NOMINAL curve (e.g.\n\"USD-OIS\"): the cashflow schedule contains inflation-projected nominal\namounts (real amount × projected index ratio), so discounting on a real\ncurve would double-count inflation. The real curve is never used for PV;\nit enters only through real-yield style metrics computed from real flows."
         },
+        "floor_vol_surface_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Black lognormal volatility of the contractual reference-CPI/base-CPI ratio.\nThe surface uses expiry in Act/365F years to the last required publication\nand a Strike axis in ratio units (the par floor strikes at 1.0). The\nsupplied forward ratio and volatility are under the payment-date measure.\nRequired for a protected payment whose reference CPI is not yet known;\nan explicitly supplied zero-volatility surface selects deterministic pricing."
+        },
         "frequency": {
           "$ref": "#/$defs/d_47e5e74524615b78a19f",
           "description": "Coupon frequency"
@@ -3975,7 +3986,7 @@
         },
         {
           "const": "taylor_approximation",
-          "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian.",
+          "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil.",
           "type": "string"
         }
       ]

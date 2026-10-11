@@ -27,7 +27,7 @@
  * - ICE Futures exchange rules
  * - LME trading procedures
  */
-export type D_2E99Fddbe4971F773A8E =
+export type D_132C0970533550Baccde =
   "wti_crude" | "brent_crude" | "natural_gas" | "gold" | "silver" | "copper" | "agricultural" | "power";
 /**
  * Base currency for pricing
@@ -214,13 +214,21 @@ export type DayCount =
  */
 export type Id = string;
 /**
- * ISO 8601 calendar date string.
+ * Exercise date, or expiry observation date for an unexercised option.
  */
 export type Date = string;
 /**
- * ISO 8601 calendar date string.
+ * Actual cash-payment or physical-delivery date, on or after exercise.
  */
 export type Date1 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date2 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date3 = string;
 /**
  * Forward/futures curve ID for price interpolation.
  */
@@ -507,21 +515,22 @@ export type Id4 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
-export type D_268B4Bcaad562A693Ba9 = "finstack_quant.instrument/1";
+export type D_383E1515751B52D5Fb56 = "finstack_quant.instrument/1";
 
 /**
  * Canonical single-instrument v1 envelope generated from its serde type.
  */
-export interface CommodityOptionWire {
-  instrument: DDb1Fcc5C6A61E550E867;
-  schema: D_268B4Bcaad562A693Ba9;
+export interface CommoditySpotOptionWire {
+  instrument: D_24D6Afbb949D55F73647;
+  schema: D_383E1515751B52D5Fb56;
 }
-export interface DDb1Fcc5C6A61E550E867 {
-  spec: D_1E0Fa57668926Accf1A2;
-  type: "commodity_option";
+export interface D_24D6Afbb949D55F73647 {
+  spec: D_6990E6C5E63D5457943C;
+  type: "commodity_spot_option";
 }
 /**
- * Commodity option (option on commodity forward or spot).
+ * Option on spot commodity. Options on a specified futures contract use
+ * [`crate::instruments::CommodityFutureOption`], including futures delivery.
  *
  * # Pricing
  *
@@ -537,8 +546,8 @@ export interface DDb1Fcc5C6A61E550E867 {
  * # American Option Assumptions
  *
  * For American exercise, the model requires a spot price to build the binomial tree.
- * If `spot_id` is provided, it uses that spot price. Otherwise, the forward
- * price is used as a proxy for spot, which may underestimate early exercise value.
+ * `spot_id` must identify an observed spot for early exercise and Monte Carlo.
+ * The commodity forward is never substituted for the spot underlying.
  * The convenience yield (cost-of-carry) is implied from the forward/spot ratio:
  * `q = r - ln(F/S)/T`
  *
@@ -552,7 +561,7 @@ export interface DDb1Fcc5C6A61E550E867 {
  * The curve must be added via `MarketContext::insert_price_curve()`.
  * If `quoted_forward` is provided, it overrides the curve lookup.
  */
-export interface D_1E0Fa57668926Accf1A2 {
+export interface D_6990E6C5E63D5457943C {
   attributes?: Attributes;
   /**
    * Commodity type (e.g., "Energy", "Metal", "Agricultural")
@@ -563,21 +572,25 @@ export interface D_1E0Fa57668926Accf1A2 {
    *
    * When set, provides default premium settlement days and calendar.
    */
-  convention?: D_2E99Fddbe4971F773A8E | null;
+  convention?: D_132C0970533550Baccde | null;
   currency: Currency;
   day_count?: DayCount;
   discount_curve_id: Id;
+  /**
+   * Recorded exercise or expiry; required after expiry while settlement remains unpaid.
+   */
+  exercise?: D_26775289Dc7630C4C860 | null;
   /**
    * Optional Bermudan exercise schedule.
    *
    * Required when `exercise_style == ExerciseStyle::Bermudan`.
    */
-  exercise_dates?: Date[] | null;
+  exercise_dates?: Date2[] | null;
   /**
    * Exercise style (European or American).
    */
   exercise_style?: "european" | "american" | "bermudan";
-  expiry: Date1;
+  expiry: Date3;
   forward_curve_id: Id1;
   id: Id2;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
@@ -610,9 +623,10 @@ export interface D_1E0Fa57668926Accf1A2 {
   /**
    * Settlement type (physical or cash).
    *
-   * Defaults to cash settlement when omitted in serialized payloads.
+   * Cash fixes the payoff on exercise; physical retains the marked delivery
+   * claim until its recorded settlement date.
    */
-  settlement?: "physical" | "cash";
+  settlement: "physical" | "cash";
   /**
    * Optional spot price ID (for spot-based pricing and American options).
    */
@@ -646,6 +660,21 @@ export interface Attributes {
    * User-defined tags for categorization.
    */
   tags?: string[];
+}
+/**
+ * Recorded exercise or expiry of a spot commodity option.
+ */
+export interface D_26775289Dc7630C4C860 {
+  date: Date;
+  /**
+   * True for exercise/assignment; false records expiration without exercise.
+   */
+  exercised: boolean;
+  settlement_date: Date1;
+  /**
+   * Positive observed commodity spot price in strike units.
+   */
+  spot: number;
 }
 /**
  * Instrument-owned pricing inputs.

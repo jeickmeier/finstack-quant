@@ -20,6 +20,7 @@ pub(crate) struct HwSwaptionCashflows {
     float: Vec<(f64, f64, f64, f64, f64)>,
     spread: f64,
     compounded: bool,
+    cash_settlement_time: f64,
 }
 
 impl HwSwaptionCashflows {
@@ -38,6 +39,7 @@ impl HwSwaptionCashflows {
             _ => return Err(finstack_quant_core::Error::Validation(
                 "Hull-White swaption trees require simple floating coupons or compounded coupons without observation shifts, lookbacks or rate cutoffs".into())),
         };
+        let cash_settlement_time = model_time(as_of, fixed.start.max(exercise));
         let fixed_params = fixed.schedule_params(false);
         let fixed_payments_per_year = fixed.frequency.payments_per_year();
         let fixed = build_periods(fixed_params)?
@@ -97,6 +99,7 @@ impl HwSwaptionCashflows {
             float,
             spread,
             compounded,
+            cash_settlement_time,
         })
     }
 
@@ -162,6 +165,7 @@ impl HwSwaptionCashflows {
         let payoff_annuity = match (terms.settlement, terms.cash_method) {
             (SettlementType::Cash, CashSettlementMethod::ParYield) => {
                 par_yield_annuity(self.fixed.len(), self.fixed_payments_per_year, swap_rate)
+                    * bond(self.cash_settlement_time)
             }
             (SettlementType::Cash, CashSettlementMethod::ZeroCoupon) => {
                 self.fixed.iter().map(|&(_, tau)| tau).sum::<f64>() * bond(self.horizon())
@@ -284,6 +288,45 @@ mod tests {
     use super::*;
 
     #[test]
+    fn par_yield_cash_claim_discounts_from_effective_date_to_exercise() {
+        let exercise = 0.5;
+        let terms = HwExerciseTerms {
+            strike: 0.02,
+            notional: 1_000_000.0,
+            option_type: OptionType::Call,
+            settlement: SettlementType::Cash,
+            cash_method: CashSettlementMethod::ParYield,
+        };
+        let mut prices = Vec::new();
+        for lag in [0.0, 1.0] {
+            let start = exercise + lag;
+            let end = start + 1.0;
+            let flows = HwSwaptionCashflows {
+                fixed: vec![(end, 1.0)],
+                fixed_payments_per_year: 1.0,
+                float: vec![(start, end, end, 1.0, start)],
+                spread: 0.0,
+                compounded: false,
+                cash_settlement_time: start,
+            };
+            let actual = flows
+                .evaluate(
+                    exercise,
+                    0.1,
+                    0.0,
+                    |date| (-0.05 * (date - exercise)).exp(),
+                    terms,
+                )
+                .2;
+            let rate = 0.05_f64.exp_m1();
+            let expected = 1_000_000.0 * (rate - 0.02) / (1.0 + rate) * (-0.05 * lag).exp();
+            assert!((actual - expected).abs() < 1e-8);
+            prices.push(actual);
+        }
+        assert!((prices[1] / prices[0] - (-0.05_f64).exp()).abs() < 1e-12);
+    }
+
+    #[test]
     fn deferred_floating_payment_matches_integrated_gaussian_covariance() {
         let (t, start, end, pay) = (1.0_f64, 2.0_f64, 3.0_f64, 3.2_f64);
         let (kappa, sigma) = (0.05_f64, 0.02_f64);
@@ -305,6 +348,7 @@ mod tests {
                 float: vec![(start, end, pay, 1.0, start)],
                 spread: 0.001,
                 compounded,
+                cash_settlement_time: start,
             };
             let last = if compounded { end } else { start };
             let n = 20_000;

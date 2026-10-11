@@ -569,6 +569,15 @@
       "quote_type": "black_lognormal",
       "interpolation_mode": "vol",
       "vols_row_major": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    },
+    {
+      "id": "US-CPI-FLOOR-VOL",
+      "expiries": [0.01, 40.0],
+      "strikes": [0.5, 1.5],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.0, 0.0, 0.0, 0.0]
     }
   ],
   "prices": {

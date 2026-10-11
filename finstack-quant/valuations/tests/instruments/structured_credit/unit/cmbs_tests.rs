@@ -464,14 +464,19 @@ fn a_fixed_extension_rate_replaces_the_index_and_spread() {
     let run =
         run_simulation_with_diagnostics(&deal, &market_with_curves(close()), close()).expect("run");
     let periods = &run.diagnostics.periods;
+    let months = deal.frequency.months().expect("month frequency") as i32;
     let k = periods
         .iter()
         .position(|p| (p.pool_balance.amount() - 3_000_000.0).abs() < 1e-6)
         .expect("the extension leaves 3M outstanding");
     let accrual = DayCount::Act360
         .year_fraction(
-            periods[k].payment_date,
-            periods[k + 1].payment_date,
+            close()
+                .add_months((k as i32 + 1) * months)
+                .expect("contract start"),
+            close()
+                .add_months((k as i32 + 2) * months)
+                .expect("contract end"),
             DayCountContext::default(),
         )
         .expect("accrual");
@@ -485,8 +490,10 @@ fn a_fixed_extension_rate_replaces_the_index_and_spread() {
     let before = periods[k - 1].interest_collections.amount();
     let before_accrual = DayCount::Act360
         .year_fraction(
-            periods[k - 2].payment_date,
-            periods[k - 1].payment_date,
+            close()
+                .add_months((k as i32 - 1) * months)
+                .expect("contract start"),
+            close().add_months(k as i32 * months).expect("contract end"),
             DayCountContext::default(),
         )
         .expect("accrual");

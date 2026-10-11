@@ -25,7 +25,7 @@ use wasm_bindgen::prelude::*;
 /// @param as_of - ISO-8601 valuation date for the base and every scenario revaluation.
 /// @param config - Optional `VarConfig` (JSON string or plain object): `confidence_level` (decimal in `(0, 1)`), `method` (`"full_revaluation"` or `"taylor_approximation"`) and `reporting_currency` (required for mixed-currency portfolios). Omit for the Rust default: 95%, full revaluation, natural currency.
 /// @param model - Optional model key applied to every instrument; omit or `"default"` for each instrument's canonical pricing path.
-/// @returns `VarResult` plain object: `var`, `expected_shortfall` (losses negative), the worst-first `pnl_distribution`, `num_scenarios`, `confidence_level`, `skipped_fx` and `skipped_vol`.
+/// @returns `VarResult` plain object: `var`, `expected_shortfall` (losses negative), the worst-first `pnl_distribution`, `num_scenarios` and `confidence_level`.
 /// @throws Error - Throws with kind `validation` if an envelope, the market, history, config, `asOf` or `model` is invalid, the confidence level is outside `(0, 1)`, a non-empty portfolio has no scenarios, or a mixed-currency portfolio has no reporting currency; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if a scenario revaluation fails.
 #[wasm_bindgen(js_name = calculateVar)]
 pub fn calculate_var(

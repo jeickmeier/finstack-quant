@@ -50,7 +50,6 @@ export default [
                 "count": 6,
                 "unit": "months"
               },
-              "par_method": null,
               "payment_lag_days": 0,
               "rate": "0.03",
               "start": "2027-01-17",
@@ -2613,23 +2612,6 @@ export default [
     "description": "OAS breakeven, in **basis points** (sensitivity: CS01).\n\nNote that under [`BreakevenMode::Iterative`] the solve applies a\nparallel discount-curve shift. For an instrument with embedded\noptionality that is a duration-space answer, not a true OAS shift,\nbecause OAS is defined relative to the option model."
   },
   {
-    "path": "#/$defs/d_afe350e063ef18dd6cec",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/ParRateMethod",
-    "description": "Method for calculating par rates in swaps"
-  },
-  {
-    "path": "#/$defs/d_afe350e063ef18dd6cec/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/ParRateMethod/oneOf/0",
-    "const": "forward_based",
-    "description": "Use forward-curve based float PV over the schedule (market standard)"
-  },
-  {
-    "path": "#/$defs/d_afe350e063ef18dd6cec/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/ParRateMethod/oneOf/1",
-    "const": "discount_ratio",
-    "description": "Use discount-curve ratio for bootstrapping"
-  },
-  {
     "path": "#/$defs/d_b0a5fc543381da6a5722",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides",
     "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price_pct` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)"
@@ -2773,21 +2755,6 @@ export default [
     "description": "Payment frequency",
     "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_b2304c53f63497441bfc/properties/par_method",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/FixedLegSpec/properties/par_method",
-    "description": "Optional par-rate calculation method override"
-  },
-  {
-    "path": "#/$defs/d_b2304c53f63497441bfc/properties/par_method/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/FixedLegSpec/properties/par_method/anyOf/0",
-    "ref": "#/$defs/ParRateMethod",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/ParRateMethod"
-  },
-  {
-    "path": "#/$defs/d_b2304c53f63497441bfc/properties/par_method/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/FixedLegSpec/properties/par_method/anyOf/1"
   },
   {
     "path": "#/$defs/d_b2304c53f63497441bfc/properties/payment_lag_days",
@@ -4546,7 +4513,7 @@ export default [
     "path": "#/$defs/d_f80f2b90e7af690c5898/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
-    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian."
+    "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil."
   },
   {
     "path": "#/$defs/d_fd618cd5743ec18a168f",

@@ -88,7 +88,7 @@ pub fn create_standard_payer_swaption(
         stub: StubKind::None,
         start: swap_start,
         end: swap_end,
-        par_method: None,
+
         payment_lag_days: 0,
         end_of_month: false,
     };

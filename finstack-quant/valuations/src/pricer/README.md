@@ -61,7 +61,7 @@ in a different crate, reached by the MC instrument pricers.
 | [`fixed_income.rs`](fixed_income.rs) | Registrations: FiIndexTotalReturnSwap, Convertible, InflationLinkedBond, RevolvingCredit, TermLoan, AgencyMbsPassthrough, AgencyTba, DollarRoll, AgencyCmo | private mod |
 | [`inflation.rs`](inflation.rs) | Registrations: InflationSwap, YoYInflationSwap, InflationCapFloor | private mod |
 | [`exotics.rs`](exotics.rs) | Registrations: Basket, AsianOption, BarrierOption, LookbackOption, QuantoOption, Autocallable, CmsOption/Swap/SpreadOption, CliquetOption, RangeAccrual, CallableRangeAccrual, Tarn, Snowball, BermudanSwaption | private mod |
-| [`commodity.rs`](commodity.rs) | Registrations: CommodityFuture, CommodityForward, CommoditySwap, CommodityOption, CommodityAsianOption, CommoditySwaption, CommoditySpreadOption | private mod |
+| [`commodity.rs`](commodity.rs) | Registrations: CommodityFuture, CommodityForward, CommoditySwap, CommoditySpotOption, CommodityAsianOption, CommoditySwaption, CommoditySpreadOption | private mod |
 
 The asset-class shards contain no logic beyond registration, apart from the two
 hand-written `Pricer` implementations in `credit.rs`. They are private modules

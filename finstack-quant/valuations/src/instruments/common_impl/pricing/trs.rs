@@ -236,8 +236,6 @@ pub struct TotalReturnLegParams<'a> {
     pub notional: Money,
     /// Discount curve identifier.
     pub discount_curve_id: &'a str,
-    /// Contract size multiplier for the underlying.
-    pub contract_size: f64,
     /// Initial level of the underlying (if known).
     pub initial_level: Option<f64>,
 }
@@ -331,9 +329,25 @@ impl TrsEngine {
         model: &impl TrsReturnModel,
     ) -> finstack_quant_core::Result<Money> {
         let disc = market.get_discount(params.discount_curve_id)?;
+        let currency = params.notional.currency();
+        let mut pv = NeumaierAccumulator::new();
+        for (date, amount) in
+            Self::cashflows_total_return_leg_with_model(params, market, as_of, model)?
+        {
+            pv.add(amount.amount() * relative_df_discount_curve(disc.as_ref(), as_of, date)?);
+        }
+        Money::new(pv.total(), currency)
+    }
+
+    pub(crate) fn cashflows_total_return_leg_with_model(
+        params: TotalReturnLegParams,
+        market: &MarketContext,
+        as_of: Date,
+        model: &impl TrsReturnModel,
+    ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         let period_schedule = params.schedule.period_schedule()?;
 
-        let mut total_pv = NeumaierAccumulator::new();
+        let mut flows = Vec::new();
         let currency = params.notional.currency();
 
         for i in 1..period_schedule.dates.len() {
@@ -370,14 +384,13 @@ impl TrsEngine {
                 )));
             }
 
-            let payment = params.notional.amount() * total_return * params.contract_size;
+            let payment = params.notional.amount() * total_return;
 
             // A completed accrual remains in PV until its lagged payment date.
-            let df = relative_df_discount_curve(disc.as_ref(), as_of, payment_date)?;
-            total_pv.add(payment * df);
+            flows.push((payment_date, Money::new(payment, currency)?));
         }
 
-        Money::new(total_pv.total(), currency)
+        Ok(flows)
     }
 
     /// Calculates the present value of the financing leg.
@@ -402,6 +415,23 @@ impl TrsEngine {
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
         let disc = market.get_discount(financing.discount_curve_id.as_str())?;
+        let currency = notional.currency();
+        let mut pv = NeumaierAccumulator::new();
+        for (date, amount) in
+            Self::cashflows_financing_leg(financing, schedule, notional, market, as_of)?
+        {
+            pv.add(amount.amount() * relative_df_discount_curve(disc.as_ref(), as_of, date)?);
+        }
+        Money::new(pv.total(), currency)
+    }
+
+    pub(crate) fn cashflows_financing_leg(
+        financing: &FinancingLegSpec,
+        schedule: &TrsScheduleSpec,
+        notional: Money,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         let fwd = market.get_forward(financing.forward_curve_id.as_str())?;
         // For compounded legs, realized fixings for in-progress periods
         // are sourced from MarketContext using the canonical `FIXING:{forward_curve_id}`
@@ -416,7 +446,7 @@ impl TrsEngine {
         .ok();
         let period_schedule = schedule.period_schedule()?;
 
-        let mut total_pv = NeumaierAccumulator::new();
+        let mut flows = Vec::new();
         let currency = notional.currency();
         let spread_decimal = financing.spread_bp.to_f64().ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
@@ -465,11 +495,10 @@ impl TrsEngine {
             let payment = projected.unsigned_coupon(notional.amount(), spread_decimal);
 
             // A completed accrual remains in PV until its lagged payment date.
-            let df = relative_df_discount_curve(disc.as_ref(), as_of, payment_date)?;
-            total_pv.add(payment * df);
+            flows.push((payment_date, Money::new(payment, currency)?));
         }
 
-        Money::new(total_pv.total(), currency)
+        Ok(flows)
     }
 
     /// Calculates the financing annuity for par spread calculation.
@@ -869,7 +898,6 @@ mod tests {
             schedule: &schedule,
             notional: Money::from((1_i64, Currency::USD)),
             discount_curve_id: "DISC",
-            contract_size: 1.0,
             initial_level: Some(1.0),
         };
         let model = SequencedReturnModel {
@@ -916,7 +944,6 @@ mod tests {
             schedule: &schedule,
             notional: Money::from((1_000_000_i64, Currency::USD)),
             discount_curve_id: "DISC",
-            contract_size: 1.0,
             initial_level: Some(100.0),
         };
         let model = FlatReturnModel { rate: 0.05 };

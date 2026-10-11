@@ -55,7 +55,7 @@ fn create_standard_swap(
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
             stub: StubKind::None,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
@@ -362,5 +362,34 @@ fn test_par_rate_short_vs_long() {
         "Par rates should be similar in flat curve: 2Y={}, 10Y={}",
         par_rate_2y,
         par_rate_10y
+    );
+}
+
+#[test]
+fn mismatched_leg_maturities_par_rate_zeroes_actual_swap_value() {
+    let as_of = date!(2024 - 01 - 01);
+    let mut swap = create_standard_swap(as_of, date!(2029 - 01 - 01), dec!(0.05));
+    swap.float_leg.end = date!(2025 - 01 - 01);
+    let market = build_flat_curves(0.05, as_of);
+    let result = swap
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::ParRate, MetricId::PvFloat, MetricId::Annuity],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("par rate");
+    let rate = result.measures["par_rate"];
+    let expected =
+        result.measures["pv_float"] / swap.notional.amount() / result.measures["annuity"];
+    assert!((rate - expected).abs() < 1e-12);
+    assert!(rate < 0.015);
+    swap.fixed_leg.rate = rust_decimal::Decimal::try_from(rate).expect("rate");
+    assert!(
+        swap.value(&market, as_of)
+            .expect("par value")
+            .amount()
+            .abs()
+            < 1e-7
     );
 }

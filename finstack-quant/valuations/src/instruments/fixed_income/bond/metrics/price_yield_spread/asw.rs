@@ -31,6 +31,87 @@ pub(crate) fn resolved_asw_forward_curve_id(bond: &Bond) -> Option<CurveId> {
         .clone()
 }
 
+/// Coupon PV and independent floating-leg PV/annuity, all per original face
+/// and discounted to the settlement date. Coupon entitlement retains the
+/// original bond accrual periods, including interest earned before settlement.
+pub(crate) fn settlement_asw_components(
+    bond: &Bond,
+    market: &MarketContext,
+    settlement: Date,
+) -> finstack_quant_core::Result<(f64, f64, f64)> {
+    let params = schedule_params(&bond.cashflow_spec)?;
+    let disc = market.get_discount(&bond.discount_curve_id)?;
+    if settlement >= bond.maturity || bond.notional.amount() <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "ASW requires positive face and remaining payments after settlement".into(),
+        ));
+    }
+    let df_settlement = disc.df_on_date_curve(settlement)?;
+    let schedule = bond.full_cashflow_schedule(market)?;
+    let ex_coupon = bond.accrual_config().ex_coupon;
+    let mut coupon_pv = 0.0;
+    for flow in schedule.get_flows().iter().filter(|flow| {
+        flow.date > settlement && flow.kind.is_interest_like() && flow.kind != CFKind::Pik
+    }) {
+        if let Some(rule) = &ex_coupon {
+            if rule.is_ex_coupon(flow.date, settlement)? {
+                continue;
+            }
+        }
+        coupon_pv += flow.amount.amount() * disc.df_on_date_curve(flow.date)?
+            / df_settlement
+            / bond.notional.amount();
+    }
+    let forward = resolved_asw_forward_curve_id(bond)
+        .map(|id| market.get_forward(&id))
+        .transpose()?;
+    let frequency = if let Some(curve) = &forward {
+        Tenor::from_years(curve.tenor(), curve.day_count())?
+    } else {
+        params.frequency
+    };
+    let calendar =
+        crate::cashflow::builder::calendar::resolve_calendar_strict(&params.calendar_id)?;
+    let float_schedule = asw_leg_schedule(
+        settlement,
+        bond.maturity,
+        frequency,
+        StubKind::ShortBack,
+        Some((params.business_day_convention, calendar)),
+    )?;
+    let (float_pv, float_annuity) = if let Some(forward) = forward {
+        floating_leg_pv_and_annuity(
+            disc.as_ref(),
+            forward.as_ref(),
+            forward.day_count(),
+            &float_schedule,
+            0.0,
+            None,
+        )?
+    } else {
+        let annuity = fixed_leg_annuity(
+            disc.as_ref(),
+            disc.day_count(),
+            Some(frequency),
+            &float_schedule,
+        )?;
+        let end = *float_schedule.last().ok_or_else(|| {
+            finstack_quant_core::Error::Validation("ASW has no floating payments".into())
+        })?;
+        (
+            disc.df_on_date_curve(float_schedule[0])? - disc.df_on_date_curve(end)?,
+            annuity,
+        )
+    };
+    let float_annuity = float_annuity / df_settlement;
+    if float_annuity.abs() < 1e-12 {
+        return Err(finstack_quant_core::Error::Validation(
+            "ASW floating-leg annuity is near zero".into(),
+        ));
+    }
+    Ok((coupon_pv, float_pv / df_settlement, float_annuity))
+}
+
 /// Asset swap par spread calculator using discount-curve annuity approximation.
 ///
 /// Par ASW is the spread such that the PV of fixed coupons at `(df * (1 + s*α))`
@@ -709,72 +790,19 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                 }
             }
         }
-        if quote_ctx.quote_date >= maturity {
-            return Err(finstack_quant_core::Error::Validation(
-                "ASW market calculation requires at least two fixed-leg schedule dates".to_string(),
-            ));
-        }
-        let sched = asw_leg_schedule(quote_ctx.quote_date, maturity, frequency, params.stub, None)?;
-        if sched.len() < 2 {
-            return Err(finstack_quant_core::Error::Validation(
-                "ASW market calculation requires at least two fixed-leg schedule dates".to_string(),
-            ));
-        }
-        let dc_fixed = day_count;
-        let forward_components = if let Some(fwd_id) = asw_forward_curve_id {
-            let fwd = context.curves.get_forward(&fwd_id)?;
-            Some(asset_swap_forward_components(
-                disc.as_ref(),
-                fwd.as_ref(),
-                dc_fixed,
-                Some(frequency),
-                &sched,
-                0.0,
-            )?)
+        let (coupon_pv, float_pv, float_annuity) =
+            settlement_asw_components(bond, &context.curves, quote_ctx.quote_date)?;
+        let dirty_at_settlement = if let Some(clean) = quoted_clean_price_pct {
+            quote_ctx.dirty_from_clean_pct(clean, notional_amt)
         } else {
-            None
+            crate::instruments::fixed_income::bond::pricing::settlement::model_dirty_at_quote_date(
+                bond,
+                &context.curves,
+                context.as_of,
+                quote_ctx.quote_date,
+                dirty_currency,
+            )?
         };
-        let (par_rate, ann) = if let Some((float_pv, fixed_ann, float_ann)) = forward_components {
-            if fixed_ann.abs() < 1e-12 {
-                (0.0, 0.0)
-            } else {
-                (float_pv / fixed_ann, float_ann)
-            }
-        } else {
-            par_rate_and_annuity_from_discount(disc.as_ref(), dc_fixed, Some(frequency), &sched)?
-        };
-        if ann.abs() < 1e-12 {
-            return Err(finstack_quant_core::Error::Validation(
-                "ASW market calculation is undefined for near-zero fixed-leg annuity".to_string(),
-            ));
-        }
-        if notional_amt.abs() < 1e-12 {
-            return Ok(0.0);
-        }
-        // Equivalent coupon from coupon PV only for custom bonds; otherwise stated coupon
-        let eq_coupon = if let Some(custom) = &context.instrument_as::<Bond>()?.custom_cashflows {
-            let pv_coupon = pv_coupon_from_custom_schedule(disc.as_ref(), custom, context.as_of)?;
-            pv_coupon / (notional_amt * ann)
-        } else {
-            coupon
-        };
-        let price_pct = dirty_currency / notional_amt;
-        let asw_mkt = if let Some((float_pv, fixed_ann, float_ann)) = forward_components {
-            (eq_coupon * fixed_ann + 1.0 - price_pct - float_pv) / float_ann
-        } else {
-            // Exact par-par form:
-            // spread = [(C - par_rate)·Ann_fixed + (1 - p)] / Ann_float.
-            // Without a forward curve the floating leg is proxied on the same
-            // schedule using the discount curve's day count.
-            let float_ann = fixed_leg_annuity(disc.as_ref(), disc.day_count(), None, &sched)?;
-            if float_ann.abs() < 1e-12 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "ASW market calculation is undefined for near-zero floating-leg annuity"
-                        .to_string(),
-                ));
-            }
-            ((eq_coupon - par_rate) * ann + (1.0 - price_pct)) / float_ann
-        };
-        Ok(asw_mkt)
+        Ok((coupon_pv + 1.0 - dirty_at_settlement / notional_amt - float_pv) / float_annuity)
     }
 }

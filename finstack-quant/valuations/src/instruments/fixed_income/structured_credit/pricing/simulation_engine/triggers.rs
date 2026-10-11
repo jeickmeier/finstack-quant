@@ -205,6 +205,7 @@ pub(super) fn advance(
             special_serviced_balance,
             period_start,
             payment_date: period.payment,
+            accrual_end: period.accrual_end,
             valuation_date: period.valuation,
             market,
             reserve_balance: state.reserve_balance,

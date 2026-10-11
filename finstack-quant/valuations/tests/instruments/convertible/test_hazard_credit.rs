@@ -1,11 +1,7 @@
 //! `ConvertibleBond.credit_curve_id` names the issuer `HazardCurve`.
 //!
-//! The Tsiveriotis-Zhang cash component is discounted at the zero-recovery
-//! risky forward `rf_fwd × S(t_{i+1}) / S(t_i)`, blended with the risk-free
-//! forward by the instrument's `recovery_rate`. These tests pin that the
-//! hazard curve reproduces the former risky-discount-curve prices, that full
-//! recovery removes all credit effect, and that a deep out-of-the-money
-//! convertible converges to the QuantLib hazard-rate bond.
+//! Default pays recovery times outstanding principal. Surviving equity has
+//! drift `r - q + lambda`; default extinguishes the equity and debt.
 
 use super::fixtures::*;
 use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec, RollRule};
@@ -20,8 +16,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
     price_convertible_bond, ConvertibleBond,
 };
-use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
-use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
 const RF: f64 = 0.03;
@@ -58,83 +52,49 @@ fn credit_bond(recovery: f64) -> ConvertibleBond {
     bond
 }
 
-/// Prices and CS01s pinned under hazard-curve credit semantics. They were
-/// first captured on the pre-change commit (ed2d9f2f3), where `USD-CREDIT`
-/// was the log-linear risky discount curve `exp(-(r + λ) t)` on the same
-/// knots, and matched these hazard-curve prices to ~1e-14 relative.
-/// Re-pinned when the Tsiveriotis-Zhang terminal cash/equity split was
-/// smoothed over each node's log-spot cell (481dd75f3, PV continuity at the
-/// conversion price): credit-risky entries moved by ~4e-4 relative, while the
-/// full-recovery rows (no credit spread, so the split has no effect) are
-/// bit-identical. Entries: (spot, recovery, PV bits, CS01 bits).
-const RISKY_DISCOUNT_PINS: [(f64, f64, u64, u64); 6] = [
-    (150.0, 0.0, 0x40996477a6ce4ad5, 0xbfc5911fb0fe4000),
-    (150.0, 0.4, 0x40999b614b6d837c, 0xbfbad226304d8000),
-    (150.0, 1.0, 0x4099f18e9684bc08, 0x0000000000000000),
-    (50.0, 0.0, 0x40900254c2e36d20, 0xbfdab6f3c36ea000),
-    (50.0, 0.4, 0x40908a890d3ebcc8, 0xbfd0a5e226994800),
-    (50.0, 1.0, 0x409160c62350f9e5, 0x0000000000000000),
-];
-
+/// With conversion only at maturity and no coupons the independent solution
+/// is a survival-discounted zero plus a Black call with rate r+lambda and
+/// continuous recovery of face. This tests the equity compensator and cash
+/// recovery together, without pinning a previous implementation's output.
 #[test]
-fn convertible_hazard_equals_equivalent_risky_curve() {
-    for (spot, recovery, pv_bits, cs01_bits) in RISKY_DISCOUNT_PINS {
-        let bond = credit_bond(recovery);
-        let market = hazard_market(spot);
-        let pv = price_convertible_bond(&bond, &market, dates::base_date())
-            .unwrap()
-            .amount();
-        // The per-step risky forwards agree to float rounding (a product of
-        // two exponentials vs one), so the lattice value agrees to ~1e-14
-        // relative; 1e-10 relative on a ~1e3 PV leaves ample room without
-        // hiding a curve-semantics difference (~1e-3 relative per 10 bp).
-        let pinned_pv = f64::from_bits(pv_bits);
-        assert!(
-            (pv - pinned_pv).abs() <= 1e-10 * pinned_pv.abs(),
-            "spot={spot} R={recovery}: {pv} vs pinned {pinned_pv}"
-        );
-
-        // CS01 now shocks the hazard curve by 1 bp of spread; with a
-        // zero-recovery curve that is the same 1 bp continuous shift the
-        // former risky discount curve took.
-        let cs01 = *bond
-            .price_with_metrics(
-                &market,
-                dates::base_date(),
-                &[MetricId::Cs01],
-                PricingOptions::default(),
-            )
-            .unwrap()
-            .measures
-            .get("cs01")
-            .unwrap();
-        let pinned_cs01 = f64::from_bits(cs01_bits);
-        // Central difference of two ~1e3 PVs: absolute noise ~1e-12.
-        assert!(
-            (cs01 - pinned_cs01).abs() <= 1e-9,
-            "spot={spot} R={recovery}: CS01 {cs01} vs pinned {pinned_cs01}"
-        );
-    }
-}
-
-#[test]
-fn full_recovery_convertible_equals_risk_free() {
-    for spot in [150.0, 50.0] {
-        let market = hazard_market(spot);
-        let with_credit = price_convertible_bond(&credit_bond(1.0), &market, dates::base_date())
-            .unwrap()
-            .amount();
-        let mut risk_free = credit_bond(0.0);
-        risk_free.credit_curve_id = None;
-        risk_free.recovery_rate = None;
-        let without_credit = price_convertible_bond(&risk_free, &market, dates::base_date())
-            .unwrap()
-            .amount();
-        // R = 1 blends to exactly the risk-free forward at every step.
-        assert!(
-            (with_credit - without_credit).abs() <= 1e-12 * without_credit.abs(),
-            "spot={spot}: {with_credit} vs {without_credit}"
-        );
+fn convertible_frp_matches_european_closed_form() {
+    use finstack_quant_core::math::norm_cdf;
+    use finstack_quant_valuations::instruments::fixed_income::convertible::ConversionPolicy;
+    for spot in [50.0, 100.0, 150.0] {
+        for recovery in [0.0, 0.4, 1.0] {
+            let mut bond = credit_bond(recovery);
+            bond.cashflow_spec =
+                finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::default();
+            bond.conversion.policy = ConversionPolicy::Window {
+                start: bond.maturity,
+                end: bond.maturity,
+            };
+            bond.instrument_pricing_overrides.model_config.tree_steps = Some(2000);
+            let market = hazard_market(spot);
+            let time = (bond.maturity - dates::base_date()).whole_days() as f64 / 365.0;
+            let rate = RF + LAMBDA;
+            let face = bond.notional.amount();
+            let ratio = bond.conversion.ratio.expect("ratio");
+            let strike = face / ratio;
+            let vol = market_params::VOL_STANDARD;
+            let dividend = market_params::DIV_YIELD;
+            let d1 = ((spot / strike).ln() + (rate - dividend + 0.5 * vol * vol) * time)
+                / (vol * time.sqrt());
+            let d2 = d1 - vol * time.sqrt();
+            let call = ratio
+                * (spot * (-dividend * time).exp() * norm_cdf(d1)
+                    - strike * (-rate * time).exp() * norm_cdf(d2));
+            let expected = face * (-rate * time).exp()
+                + call
+                + recovery * face * LAMBDA / rate * (1.0 - (-rate * time).exp());
+            let actual = price_convertible_bond(&bond, &market, dates::base_date())
+                .expect("FRP price")
+                .amount();
+            assert!(
+                (actual - expected).abs() < 0.15,
+                "spot={spot}, R={recovery}: {actual} vs {expected}"
+            );
+        }
     }
 }
 

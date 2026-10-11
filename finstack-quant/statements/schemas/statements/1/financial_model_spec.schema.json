@@ -132,7 +132,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Equal principal installments on coupon accrual boundaries in `(start, end]`.\nThe installment is fixed from outstanding after all start-date movements,\nincluding PIK and explicit principal events. The final installment pays\nthe live remaining balance, including subsequent PIK or principal changes.\nPrincipal changes economically on each accrual boundary; cash settles on\nthat coupon's adjusted, lagged payment date.",
+          "description": "Equal principal installments on coupon accrual boundaries in `(start, end]`.\nThe installment is fixed from outstanding after all start-date movements,\nincluding PIK and explicit principal events. Each subsequent funded draw\nadds equal installments over the remaining boundaries after its draw date.\nThe final installment pays the live remaining balance, including subsequent PIK.\nPrincipal changes economically on each accrual boundary; cash settles on\nthat coupon's adjusted, lagged payment date.",
           "properties": {
             "linear_between": {
               "additionalProperties": false,
@@ -2044,7 +2044,7 @@
               "type": "null"
             }
           ],
-          "description": "Issuer hazard curve identifier (a `HazardCurve`, as on every credit\ninstrument). When `None`, the cash component is discounted at the\nrisk-free `discount_curve_id` (no credit spread).\n\nThe pricer derives the zero-recovery risky discount factor\n`risky_df = rf_df × S(t)` from the curve's survival probabilities and\nblends it with risk-free discounting as `risky × (1 − R) + rf × R`\nusing [`Self::recovery_rate`]. The hazard curve's own recovery rate is\nused only to convert spread bumps into hazard shifts for CS01."
+          "description": "Issuer hazard curve identifier. Absence specifies no default risk.\nAll continuation claims are survival-weighted. Default pays the explicit\nrecovery fraction of outstanding principal and extinguishes equity;\nconditional stock drift includes the hazard compensator."
         },
         "discount_curve_id": {
           "$ref": "#/$defs/Id",
@@ -2086,12 +2086,23 @@
           "description": "Principal amount."
         },
         "recovery_rate": {
-          "description": "Assumed recovery rate on default, as a fraction (e.g., 0.40 = 40%).\n\nUsed in the Tsiveriotis-Zhang credit model to blend risky and risk-free\ndiscounting on the cash component. A recovery rate of 0 reduces to the\nstandard zero-recovery TZ model. Typical values:\n- **Investment grade**: 0.40 (ISDA standard assumption)\n- **High yield**: 0.25-0.35\n- **Distressed**: 0.10-0.20\n\nRequired when `credit_curve_id` is set; otherwise absence means that no\ncredit adjustment is requested.",
+          "description": "Fraction of outstanding principal paid immediately on default, in\n`[0, 1]`; includes capitalized PIK and excludes prior amortization.\nDefault extinguishes coupons and the conversion right. Required with a\ncredit curve; recovery is an explicit cashflow, not a discount blend.",
           "format": "double",
           "type": [
             "number",
             "null"
           ]
+        },
+        "resolved_settlement": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConvertibleSettlement"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Recorded exercise awaiting delivery. At or after `exercise_date`, only\nthis claim remains; after delivery its value is zero. Mandatory exercise\nwithout a record settles on its contractual conversion date."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -2137,6 +2148,41 @@
         "vol_surface_id",
         "cashflow_spec",
         "attributes"
+      ],
+      "type": "object"
+    },
+    "ConvertibleSettlement": {
+      "additionalProperties": false,
+      "description": "Resolved exercise claim after debt has been converted, called, put, or redeemed.\n\nThese contractual amounts replace the debt and its future coupons. Any\nearned but unpaid coupon must be included in `cash`. Shares are delivered\nex-dividend on `delivery_date`. Same-day completed exercise needs no record;\nuse this state to retain a delayed delivery without replaying the option.",
+      "properties": {
+        "cash": {
+          "$ref": "#/$defs/Money",
+          "description": "Fixed cash consideration including any retained coupon, in bond currency."
+        },
+        "delivery_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Contractual delivery/payment date; not earlier than exercise."
+        },
+        "exercise_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Date the holder's exercise decision extinguished the debt."
+        },
+        "recovery_basis": {
+          "$ref": "#/$defs/Money",
+          "description": "Part of `cash` eligible for principal recovery on default; excludes\nuncapitalized coupon accrual. Must be between zero and `cash`."
+        },
+        "shares": {
+          "description": "Fixed number of shares to deliver, finite and nonnegative.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "exercise_date",
+        "delivery_date",
+        "shares",
+        "cash",
+        "recovery_basis"
       ],
       "type": "object"
     },
@@ -3906,17 +3952,6 @@
         "frequency": {
           "$ref": "#/$defs/Tenor",
           "description": "Payment frequency"
-        },
-        "par_method": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ParRateMethod"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional par-rate calculation method override"
         },
         "payment_lag_days": {
           "default": 0,
@@ -6190,21 +6225,6 @@
         }
       ]
     },
-    "ParRateMethod": {
-      "description": "Method for calculating par rates in swaps",
-      "oneOf": [
-        {
-          "const": "forward_based",
-          "description": "Use forward-curve based float PV over the schedule (market standard)",
-          "type": "string"
-        },
-        {
-          "const": "discount_ratio",
-          "description": "Use discount-curve ratio for bootstrapping",
-          "type": "string"
-        }
-      ]
-    },
     "PayReceive": {
       "description": "Direction for instrument legs (universal for IRS, CDS, variance swaps, etc.)\n\nFor interest rate swaps: Pay = pay fixed/receive floating, Receive = receive fixed/pay floating\nFor credit default swaps: Pay = buy protection (pay premium), Receive = sell protection (receive premium)\nFor variance swaps: Pay = short variance, Receive = long variance",
       "oneOf": [
@@ -8063,7 +8083,7 @@
         },
         {
           "const": "taylor_approximation",
-          "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian.",
+          "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil.",
           "type": "string"
         }
       ]

@@ -1267,7 +1267,7 @@
           "type": "string"
         },
         {
-          "const": "commodity_option",
+          "const": "commodity_spot_option",
           "description": "Commodity option (option on commodity forward or spot).",
           "type": "string"
         },

@@ -723,7 +723,7 @@ export type InstrumentType =
   | "bond_future"
   | "commodity_forward"
   | "commodity_swap"
-  | "commodity_option"
+  | "commodity_spot_option"
   | "commodity_asian_option"
   | "commodity_swaption"
   | "commodity_spread_option"

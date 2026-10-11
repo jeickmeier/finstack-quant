@@ -274,7 +274,7 @@ impl Discretization<HestonProcess> for QeHeston {
     fn step(
         &self,
         process: &HestonProcess,
-        _t: f64,
+        t: f64,
         dt: f64,
         x: &mut [f64],
         z: &[f64],
@@ -349,11 +349,14 @@ impl Discretization<HestonProcess> for QeHeston {
                 Some(mgf) if mgf > 0.0 => {
                     // Martingale-exact K0* path.
                     let k0_star = -mgf.ln() - 0.5 * one_minus_rho2 * (c0 + c1 * v_t);
-                    (params.r - params.q) * dt + k0_star + a_pre * v_next + orthogonal_diffusion
+                    process.log_drift_increment(t, t + dt)
+                        + k0_star
+                        + a_pre * v_next
+                        + orthogonal_diffusion
                 }
                 _ => {
                     // Fallback: analytic Itô-compensated drift (plain QE).
-                    let drift = (params.r - params.q) * dt - 0.5 * int_var;
+                    let drift = process.log_drift_increment(t, t + dt) - 0.5 * int_var;
                     let variance_correction = rho_over_sigma
                         * (v_next - v_t - params.kappa * params.theta * dt
                             + params.kappa * int_var);
@@ -366,7 +369,7 @@ impl Discretization<HestonProcess> for QeHeston {
             // orthogonal term (scaled by √(1−ρ²)) here would understate the
             // spot volatility by the correlated fraction — with ρ = −0.7 that
             // is a ~29% vol shortfall.
-            (params.r - params.q) * dt - 0.5 * int_var + int_var.sqrt() * z[0]
+            process.log_drift_increment(t, t + dt) - 0.5 * int_var + int_var.sqrt() * z[0]
         };
 
         let s_next = s_t * log_increment.exp();

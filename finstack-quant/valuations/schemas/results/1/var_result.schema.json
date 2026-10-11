@@ -15,8 +15,6 @@
         3100.0,
         6400.0
       ],
-      "skipped_fx": false,
-      "skipped_vol": false,
       "var": -10840.0
     }
   ],
@@ -45,14 +43,6 @@
       },
       "type": "array"
     },
-    "skipped_fx": {
-      "description": "True when the Taylor approximation skipped one or more FX-spot shocks\n(no FX-delta Taylor term exists). The FX component of those scenarios\nis excluded, so VaR/ES understate FX risk; prefer full revaluation for\nFX-exposed portfolios. Always false for full revaluation.",
-      "type": "boolean"
-    },
-    "skipped_vol": {
-      "description": "True when the Taylor approximation skipped one or more `ImpliedVol`\npoint shocks for a vol-exposed instrument (only aggregate Vega is\navailable, not bucketed vol). The vega component of those scenarios is\nexcluded, so VaR/ES understate vol risk. Always false for full\nrevaluation.",
-      "type": "boolean"
-    },
     "var": {
       "description": "Value-at-Risk at specified confidence level.\n\nLoss convention (workspace-wide): follows the P&L sign, so losses are\nreported as **negative** numbers (zero for all-gain distributions),\nmatching `analytics::value_at_risk` and the portfolio risk engines.\nThe signed P&L at the `(1 - α)` quantile of the distribution, computed\nby linear interpolation between bracketing order statistics.",
       "format": "double",
@@ -64,9 +54,7 @@
     "expected_shortfall",
     "pnl_distribution",
     "num_scenarios",
-    "confidence_level",
-    "skipped_fx",
-    "skipped_vol"
+    "confidence_level"
   ],
   "title": "VarResult",
   "type": "object"

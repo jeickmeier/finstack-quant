@@ -58,8 +58,9 @@ pub enum AmortizationSpec {
     },
     /// Equal principal installments on coupon accrual boundaries in `(start, end]`.
     /// The installment is fixed from outstanding after all start-date movements,
-    /// including PIK and explicit principal events. The final installment pays
-    /// the live remaining balance, including subsequent PIK or principal changes.
+    /// including PIK and explicit principal events. Each subsequent funded draw
+    /// adds equal installments over the remaining boundaries after its draw date.
+    /// The final installment pays the live remaining balance, including subsequent PIK.
     /// Principal changes economically on each accrual boundary; cash settles on
     /// that coupon's adjusted, lagged payment date.
     LinearBetween {

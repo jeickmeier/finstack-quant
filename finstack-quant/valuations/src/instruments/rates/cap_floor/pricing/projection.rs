@@ -14,6 +14,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 pub(crate) struct OptionedCouponProjection {
     /// Projected equivalent annual coupon rate.
     pub forward: f64,
+    /// Deterministic spread added after projecting the stochastic index.
+    pub additive_spread: f64,
     /// Contractual date on which the optioned coupon is fully determined.
     pub fixing_date: Date,
     /// Contractual payment date after any overnight payment delay.
@@ -114,6 +116,10 @@ pub(crate) fn resolve_optioned_coupon(
         };
         return Ok(OptionedCouponProjection {
             forward: coupon_rate,
+            additive_spread: match overnight.spread_compounding {
+                OvernightSpreadCompounding::Exclude => spread,
+                OvernightSpreadCompounding::Include => 0.0,
+            },
             fixing_date: projection.fixing_date,
             payment_date: period.payment_date,
             accrual_year_fraction: projection.accrual_year_fraction,
@@ -150,6 +156,7 @@ pub(crate) fn resolve_optioned_coupon(
 
     Ok(OptionedCouponProjection {
         forward: index_forward + spread,
+        additive_spread: spread,
         fixing_date,
         payment_date: period.payment_date,
         accrual_year_fraction: period.accrual_year_fraction,
@@ -260,6 +267,38 @@ mod tests {
             .insert(discount)
             .insert(forward)
             .insert_surface(surface)
+    }
+
+    #[test]
+    fn additive_spread_and_strike_translation_preserves_black_price() {
+        let as_of = date!(2024 - 12 - 02);
+        let mut market = market(as_of);
+        let surface = VolSurface::builder("USD-CAP-VOL")
+            .expiries(&[0.1, 1.0])
+            .strikes(&[0.01, 0.04, 0.08])
+            .row(&[0.15, 0.25, 0.35])
+            .row(&[0.15, 0.25, 0.35])
+            .build()
+            .expect("Black skew");
+        market = market.insert_surface(surface);
+        for overnight in [false, true] {
+            let mut base = compounded_sofr_caplet();
+            base.vol_type = CapFloorVolType::Lognormal;
+            if !overnight {
+                base.overnight_coupon = None;
+            }
+            let mut translated = base.clone();
+            translated.spread_bp = Decimal::from(100);
+            translated.strike += Decimal::new(1, 2);
+            let first =
+                super::super::pricer::price_cap_floor(&base, &market, as_of).expect("base price");
+            let second = super::super::pricer::price_cap_floor(&translated, &market, as_of)
+                .expect("translated price");
+            assert!(
+                (first.amount() - second.amount()).abs() < 1e-8,
+                "{first} vs {second}"
+            );
+        }
     }
 
     #[test]

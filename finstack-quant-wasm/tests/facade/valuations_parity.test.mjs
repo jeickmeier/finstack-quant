@@ -737,3 +737,73 @@ test('instrument JSON helpers validate the envelope type', () => {
   assert.ok(pretty.includes('\n'));
   assert.deepEqual(JSON.parse(pretty), JSON.parse(envelope));
 });
+
+test('resolved convertible delivery survives typed builder and snapshot replay', () => {
+  const original = instruments.ConvertibleBond.example();
+  const claim = {
+    exercise_date: '2025-01-15',
+    delivery_date: '2025-01-20',
+    shares: 20,
+    cash: { amount: '25', currency: 'USD' },
+    recovery_basis: { amount: '0', currency: 'USD' },
+  };
+  const bond = instruments.ConvertibleBond.builder()
+    .id('RESOLVED-CONVERTIBLE')
+    .notional(original.notional)
+    .issueDate(original.issueDate)
+    .maturity(original.maturity)
+    .discountCurveId(original.discountCurveId)
+    .conversion(original.conversion)
+    .cashflowSpec(original.cashflowSpec)
+    .spotId(original.spotId)
+    .volSurfaceId(original.volSurfaceId)
+    .resolvedSettlement(claim)
+    .build();
+  assert.deepEqual(plain(bond.resolvedSettlement), claim);
+  assert.deepEqual(
+    plain(instruments.ConvertibleBond.fromJson(bond.toJson()).resolvedSettlement),
+    claim
+  );
+  assert.equal(original.resolvedSettlement, null);
+  assert.throws(() => instruments.ConvertibleBond.builder().resolvedSettlement({ shares: 20 }));
+});
+
+test('commodity spot cash claim survives JSON replay without an optionality market', () => {
+  const envelope = JSON.parse(
+    readFileSync(
+      new URL(
+        '../../../finstack-quant/valuations/tests/instruments/json_examples/commodity_spot_option.json',
+        import.meta.url
+      )
+    )
+  );
+  Object.assign(envelope.instrument.spec, {
+    exercise_style: 'american',
+    spot_id: 'WTI-SPOT',
+    exercise: { date: '2024-01-15', spot: 85, settlement_date: '2024-01-20', exercised: true },
+  });
+  const market = JSON.parse(
+    readFileSync(
+      new URL(
+        '../../../finstack-quant-ui/tests/valuations/instruments/pricing-market.json',
+        import.meta.url
+      )
+    )
+  );
+  const curve = market.curves.find((c) => c.id === 'USD-OIS');
+  Object.assign(curve, {
+    base: '2024-01-15',
+    knot_points: [
+      [0, 1],
+      [1, 1],
+    ],
+  });
+  market.curves = [curve];
+  market.surfaces = [];
+  market.prices = {};
+  const encoded = instruments.validateInstrumentJson(JSON.stringify(envelope));
+  const price = (date) =>
+    instruments.priceInstrument(encoded, JSON.stringify(market), date, 'black76');
+  assert.ok(Math.abs(Number(price('2024-01-15').value.amount) - 10000) < 1e-8);
+  assert.equal(Number(price('2024-01-21').value.amount), 0);
+});

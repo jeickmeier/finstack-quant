@@ -1145,13 +1145,6 @@ mod tests {
     }
 }
 
-/// Clone `instrument` into an `Arc<dyn Instrument>` for host bindings.
-pub(crate) fn instrument_to_arc(
-    instrument: &dyn crate::instruments::common_impl::traits::Instrument,
-) -> Arc<dyn crate::instruments::common_impl::traits::Instrument> {
-    Arc::from(instrument.clone_box())
-}
-
 /// Black-Scholes inputs with discount factor (DF-first approach).
 ///
 /// This struct provides the source-of-truth inputs for Black-Scholes/Garman-Kohlhagen

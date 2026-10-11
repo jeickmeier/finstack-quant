@@ -40,7 +40,7 @@ fn test_irs_at_par_npv_zero() {
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
             stub: StubKind::None,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
@@ -102,7 +102,7 @@ fn test_irs_receive_fixed_below_market() {
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
             stub: StubKind::None,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
@@ -163,7 +163,7 @@ fn test_irs_receive_fixed_above_market() {
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
             stub: StubKind::None,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
@@ -219,7 +219,7 @@ fn test_irs_pay_vs_receive_opposite_signs() {
         business_day_convention: BusinessDayConvention::ModifiedFollowing,
         calendar_id: None,
         stub: StubKind::None,
-        par_method: None,
+
         payment_lag_days: 0,
         end_of_month: false,
         start: as_of,

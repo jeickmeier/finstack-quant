@@ -229,14 +229,10 @@ fn production_waterfall_credit_enhancement_uses_current_collateral_and_cash() {
     assert!((actual - 100.0 / 3.0).abs() < 1e-12, "{actual}");
 }
 
-/// Identity pin for the retired deal-level override channel: before its
-/// removal, `StructuredCredit::example().expect("example")` overridden to a constant 23% CPR,
-/// 12% CDR and 71% recovery with a nine-month lag valued at these exact bits.
-/// The same assumptions stated on `credit_model` must reproduce them bit for
-/// bit.
+/// Public pricing must discount the actual simulated distributions, including
+/// lagged recoveries, rather than preserve a retired implementation's price.
 #[test]
-fn production_structured_credit_model_reproduces_retired_override_value() {
-    const OVERRIDE_VALUE_BITS: u64 = 0x4197_c7fb_a284_c023; // 99_745_512.6296392
+fn production_structured_credit_model_matches_dated_distributions() {
     let mut deal = StructuredCredit::example().expect("example");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.23);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.12);
@@ -246,10 +242,22 @@ fn production_structured_credit_model_reproduces_retired_override_value() {
     assert!(deal.credit_model.stochastic_default_spec.is_none());
     let as_of = deal.closing_date;
     let value = deal.value(&market(as_of), as_of).expect("value");
-    assert_eq!(
-        value.amount().to_bits(),
-        OVERRIDE_VALUE_BITS,
-        "{}",
+    let market = market(as_of);
+    let disc = market.get_discount("USD-OIS").expect("curve");
+    let run =
+        finstack_quant_valuations::instruments::fixed_income::structured_credit::run_simulation(
+            &deal, &market, as_of,
+        )
+        .expect("simulation");
+    let mut expected = 0.0;
+    for tranche in run.values() {
+        for (date, amount) in &tranche.cashflows {
+            expected += amount.amount() * disc.df_between_dates(as_of, *date).expect("discount");
+        }
+    }
+    assert!(
+        (value.amount() - expected).abs() < 1e-6,
+        "{} vs {expected}",
         value.amount()
     );
 }

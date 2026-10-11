@@ -6,7 +6,7 @@
 
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
@@ -124,11 +124,11 @@ fn simulate(deal: &StructuredCredit) -> HashMap<String, TrancheCashflows> {
 
 /// Equity residual per payment date.
 fn residuals(results: &HashMap<String, TrancheCashflows>) -> Vec<(Date, f64)> {
-    results["E"]
-        .interest_flows
-        .iter()
-        .map(|(date, amount)| (*date, amount.amount()))
-        .collect()
+    let mut dates = std::collections::BTreeMap::new();
+    for (date, amount) in &results["E"].interest_flows {
+        *dates.entry(*date).or_insert(0.0) += amount.amount();
+    }
+    dates.into_iter().collect()
 }
 
 #[test]
@@ -186,8 +186,11 @@ fn subordinated_fee_reduces_the_residual_by_its_accrual_each_period() {
         assert_eq!(*date, other_date);
         // 35 bp per annum (the registry's subordinated fee) on the flat
         // 100M pool, ACT/360 over the period.
+        let end = d(CLOSE.0, CLOSE.1, CLOSE.2)
+            .add_months((periods + 1) * 3)
+            .expect("contract end");
         let accrual = DayCount::Act360
-            .year_fraction(prior, *date, DayCountContext::default())
+            .year_fraction(prior, end, DayCountContext::default())
             .expect("accrual");
         let expected_fee = 100_000_000.0 * 0.0035 * accrual;
         assert!(
@@ -195,7 +198,7 @@ fn subordinated_fee_reduces_the_residual_by_its_accrual_each_period() {
             "on {date} the residual must fall by the accrued subordinated fee {expected_fee}, \
              got {unfeed} vs {paid}"
         );
-        prior = *date;
+        prior = end;
         periods += 1;
     }
     assert!(

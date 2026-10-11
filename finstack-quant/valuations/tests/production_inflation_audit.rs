@@ -115,7 +115,7 @@ fn b17_month_end_cpi_has_the_same_reference_month_in_index_and_hybrid_sources() 
     let expected = (300.0 + 3.0 * 15.0 / 31.0) / 300.0;
     for market in [&historical, &hybrid] {
         let actual = bond
-            .index_ratio_from_market(date!(2025 - 01 - 16), market)
+            .index_ratio_from_market(date!(2025 - 01 - 16), market, date!(2025 - 01 - 16))
             .expect("reference CPI");
         assert!((actual - expected).abs() < 1e-12, "{actual} vs {expected}");
     }

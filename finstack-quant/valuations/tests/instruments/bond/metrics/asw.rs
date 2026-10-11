@@ -213,7 +213,7 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
     let registry = standard_registry();
     let mut ctx = MetricContext::new(
         Arc::new(bond.clone()),
-        Arc::new(market),
+        Arc::new(market.clone()),
         as_of,
         Money::new(100.0, Currency::USD).expect("valid money fixture"),
         MetricContext::default_config(),
@@ -246,8 +246,32 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
         &sched,
     )
     .expect("par rate and fixed annuity");
-    let float_ann =
-        fixed_leg_annuity(&disc, disc.day_count(), None, &sched).expect("float annuity");
+    let float_dates = ScheduleBuilder::new(as_of, bond.maturity)
+        .unwrap()
+        .frequency(spec.schedule.frequency)
+        .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
+        .build()
+        .unwrap();
+    let calendar =
+        finstack_quant_core::dates::calendar::calendar_by_id(&spec.schedule.calendar_id).unwrap();
+    let float_dates: Vec<_> = float_dates
+        .into_iter()
+        .map(|date| {
+            finstack_quant_core::dates::adjust(
+                date,
+                spec.schedule.business_day_convention,
+                calendar,
+            )
+            .unwrap()
+        })
+        .collect();
+    let float_ann = fixed_leg_annuity(
+        &disc,
+        disc.day_count(),
+        Some(spec.schedule.frequency),
+        &float_dates,
+    )
+    .expect("float annuity");
 
     // The two annuities must genuinely differ for this test to bite.
     assert!(
@@ -260,7 +284,16 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
 
     // Exact par-par asset-swap formula, derived independently of the
     // implementation: spread = [(C - par)·Ann_fixed + (1 - p)] / Ann_float.
-    let expected = ((coupon - par_rate) * fixed_ann + (1.0 - price_pct)) / float_ann;
+    let coupon_pv: f64 =
+        finstack_quant_cashflows::CashflowProvider::cashflow_schedule(&bond, &market, as_of)
+            .unwrap()
+            .get_flows()
+            .iter()
+            .filter(|flow| flow.kind.is_interest_like())
+            .map(|flow| flow.amount.amount() / 100.0 * disc.df_on_date_curve(flow.date).unwrap())
+            .sum();
+    let float_pv = 1.0 - disc.df_on_date_curve(*float_dates.last().unwrap()).unwrap();
+    let expected = (coupon_pv - float_pv + 1.0 - price_pct) / float_ann;
     assert!(
         (asw_mkt - expected).abs() < 1e-12,
         "fallback ASW must match the exact par-par formula: \
@@ -360,7 +393,7 @@ fn test_asw_market_metric_rejects_matured_schedule() {
         .expect_err("matured schedule should fail");
     let msg = format!("{err}");
     assert!(
-        msg.contains("ASW market calculation requires at least two fixed-leg schedule dates"),
+        msg.contains("ASW requires positive face and remaining payments after settlement"),
         "unexpected error: {msg}"
     );
 }
@@ -581,4 +614,60 @@ fn test_asw_market_forward_rejects_matured_schedule() {
         ),
         "unexpected error: {msg}"
     );
+}
+
+#[test]
+fn seasoned_asw_keeps_full_next_coupon_and_inverts_on_same_basis() {
+    use finstack_quant_core::dates::{BusinessDayConvention, StubKind, Tenor};
+    use finstack_quant_core::types::Rate;
+    use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
+        compute_quotes, BondQuoteInput,
+    };
+    use finstack_quant_valuations::instruments::PricingOptions;
+    let as_of = date!(2025 - 07 - 01);
+    let mut bond = Bond::fixed(
+        "ASW-SEASONED",
+        Money::new(100.0, Currency::USD).unwrap(),
+        Rate::from_decimal(0.06).unwrap(),
+        date!(2025 - 01 - 01),
+        date!(2026 - 01 - 01),
+        StubKind::ShortBack,
+        "D",
+    )
+    .unwrap();
+    bond.settlement_convention = None;
+    let CashflowSpec::Fixed(spec) = &mut bond.cashflow_spec else {
+        panic!("fixed bond")
+    };
+    spec.schedule.frequency = Tenor::annual();
+    spec.schedule.day_count = DayCount::Thirty360;
+    spec.schedule.business_day_convention = BusinessDayConvention::Unadjusted;
+    let market = MarketContext::new().insert(
+        DiscountCurve::builder("D")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (5.0, 1.0)])
+            .build()
+            .unwrap(),
+    );
+    let quotes = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::DirtyPriceCurrency(106.0),
+        PricingOptions::default(),
+    )
+    .unwrap();
+    assert!(
+        quotes.asw_market.unwrap().abs() < 1e-12,
+        "all six coupon dollars remain entitled"
+    );
+    let inverse = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::AswMarket(0.0),
+        PricingOptions::default(),
+    )
+    .unwrap();
+    assert!((inverse.dirty_price_currency - 106.0).abs() < 1e-10);
 }

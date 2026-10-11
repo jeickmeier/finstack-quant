@@ -179,7 +179,6 @@ pub(crate) fn generate_cashflows(
 
     // Amortization → principal events
     match &loan.amortization {
-        super::spec::AmortizationSpec::None => {}
         super::spec::AmortizationSpec::LinearTo { .. }
         | super::spec::AmortizationSpec::StepRemaining { .. } => {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -198,35 +197,11 @@ pub(crate) fn generate_cashflows(
                 });
             }
         }
-        super::spec::AmortizationSpec::PercentOfRemainingPerPeriod { pct } => {
-            let pct = *pct;
-            // Replay actual funding, sweep, and repayment events chronologically.
-            // This is essential for delayed-draw facilities: undrawn commitment
-            // is not principal and must never be amortized.
-            let mut existing_events: Vec<(Date, f64)> = principal_events
-                .iter()
-                .map(|event| (event.date, event.delta.amount()))
-                .collect();
-            existing_events.sort_by_key(|(date, _)| *date);
-            let mut next_event = 0usize;
-            let mut running_balance = 0.0_f64;
-            for (d, payment_date) in coupon_dates.iter().copied().skip(1) {
-                while next_event < existing_events.len() && existing_events[next_event].0 <= d {
-                    running_balance = (running_balance + existing_events[next_event].1).max(0.0);
-                    next_event += 1;
-                }
-                let amort_amount = (running_balance * pct).min(running_balance);
-                let pay = Money::new(amort_amount, loan.currency)?;
-                principal_events.push(PrincipalEvent {
-                    date: d,
-                    payment_date,
-                    delta: Money::new(-pay.amount(), pay.currency())?,
-                    cash: pay,
-                    kind: CFKind::Amortization,
-                });
-                running_balance -= amort_amount;
-            }
-        }
+        // Balance-dependent rules are executed by the canonical builder after
+        // coupon PIK capitalization, never precomputed from funded draws alone.
+        super::spec::AmortizationSpec::None
+        | super::spec::AmortizationSpec::PercentOfRemainingPerPeriod { .. }
+        | super::spec::AmortizationSpec::LinearBetween { .. } => {}
         super::spec::AmortizationSpec::PercentOfOriginalPerPeriod { pct } => {
             let funding: Vec<_> = principal_events
                 .iter()
@@ -246,45 +221,6 @@ pub(crate) fn generate_cashflows(
                     date: d,
                     payment_date,
                     delta: Money::new(-pay.amount(), pay.currency())?,
-                    cash: pay,
-                    kind: CFKind::Amortization,
-                });
-            }
-        }
-        super::spec::AmortizationSpec::LinearBetween { start, end } => {
-            // Each funded draw has its own remaining contractual repayment
-            // schedule. Undrawn commitment never enters the principal base.
-            let mut repayments = BTreeMap::<(Date, Date), f64>::new();
-            for funding in principal_events
-                .iter()
-                .filter(|event| event.kind == CFKind::Notional && event.delta.amount() > 0.0)
-            {
-                let steps: Vec<_> = coupon_dates
-                    .iter()
-                    .copied()
-                    .filter(|(date, _)| *date > *start && *date <= *end && *date > funding.date)
-                    .collect();
-                if steps.is_empty() {
-                    continue;
-                }
-                let funded = funding.delta.amount();
-                let per_step = funded / steps.len() as f64;
-                let last = steps.len() - 1;
-                for (index, dates) in steps.into_iter().enumerate() {
-                    let payment = if index == last {
-                        funded - per_step * last as f64
-                    } else {
-                        per_step
-                    };
-                    *repayments.entry(dates).or_default() += payment;
-                }
-            }
-            for ((date, payment_date), amount) in repayments {
-                let pay = Money::new(amount, loan.currency)?;
-                principal_events.push(PrincipalEvent {
-                    date,
-                    payment_date,
-                    delta: Money::new(-amount, loan.currency)?,
                     cash: pay,
                     kind: CFKind::Amortization,
                 });
@@ -327,7 +263,20 @@ pub(crate) fn generate_cashflows(
             loan.issue_date,
             loan.maturity,
         )
-        .amortization(crate::cashflow::builder::AmortizationSpec::None);
+        .amortization(match &loan.amortization {
+            super::spec::AmortizationSpec::PercentOfRemainingPerPeriod { pct } => {
+                crate::cashflow::builder::AmortizationSpec::PercentOfRemainingPerPeriod {
+                    pct: *pct,
+                }
+            }
+            super::spec::AmortizationSpec::LinearBetween { start, end } => {
+                crate::cashflow::builder::AmortizationSpec::LinearBetween {
+                    start: *start,
+                    end: *end,
+                }
+            }
+            _ => crate::cashflow::builder::AmortizationSpec::None,
+        });
     for event in &principal_events {
         let _ = builder.add_principal_event(
             event.date,

@@ -192,9 +192,8 @@ pub(super) fn solve_irr_to_exercise(
     flows.push((settlement_date, -target_price.amount()));
 
     // Kind-aware flow selection from the full schedule.
-    // At the exercise date: include coupon/fee flows (holder receives accrued
-    // interest) but exclude Amortization and Notional (the explicit redemption
-    // parameter replaces them, using the pre-exercise outstanding).
+    // Scheduled cash is paid before exercise. Redemption covers the remaining
+    // claim after PIK capitalization and scheduled principal repayments.
     for cf in schedule.get_flows() {
         if cf.date <= settlement_date || cf.date > exercise_date {
             continue;
@@ -212,22 +211,12 @@ pub(super) fn solve_irr_to_exercise(
             | CFKind::UsageFee
             | CFKind::FacilityFee
             | CFKind::LcFee
-            | CFKind::FrontingFee => {
+            | CFKind::FrontingFee
+            | CFKind::Amortization
+            | CFKind::Notional => {
                 flows.push((cf.date, cf.amount.amount()));
             }
-            // Principal flows strictly BEFORE the exercise date:
-            // - Amortization: repayments received by the holder.
-            // - Notional: positive scheduled redemptions AND negative funding
-            //   legs (future DDTL draws the holder must fund). Excluding the
-            //   funding legs while crediting the redemption of the balances
-            //   they create would overstate the yield.
-            // At the exercise date, the explicit redemption parameter replaces
-            // scheduled Amortization/Notional to avoid double-counting, and
-            // draws on or after exercise are cancelled by the prepayment.
-            CFKind::Amortization | CFKind::Notional if cf.date < exercise_date => {
-                flows.push((cf.date, cf.amount.amount()));
-            }
-            // Exclude: PIK, exercise-date Amortization/Notional
+            // PIK is capitalized into the remaining exercise claim.
             _ => {}
         }
     }
@@ -252,11 +241,10 @@ pub(super) fn solve_irr_to_date(
 ) -> finstack_quant_core::Result<f64> {
     let as_of = context.as_of;
     let schedule = cached_full_schedule(context)?;
-    let out_path = schedule.outstanding_by_date()?;
-
-    // Re-borrow loan for the IRR solver after dropping the cache write borrow.
     let loan: &TermLoan = context.instrument_as()?;
-    let outstanding = outstanding_before(&out_path, exercise_date, loan.currency);
+    let (principal, cash_accrued) =
+        super::super::pricing::call::exercise_claim(loan, &schedule, exercise_date)?;
+    let outstanding = Money::new(principal + cash_accrued, loan.currency)?;
 
     solve_irr_to_exercise(
         loan,
@@ -344,50 +332,20 @@ pub(super) fn exercisable_call_candidates(
     }
 
     candidates.sort_by_key(|a| a.0);
-    let out_path = schedule.outstanding_by_date()?;
     candidates
         .into_iter()
         .map(|(exercise, call)| {
-            let outstanding = outstanding_before(&out_path, exercise, loan.currency);
-            let accrued = crate::cashflow::accrual::accrued_interest_amount(
-                schedule,
-                exercise,
-                &loan.accrual_config(),
-            )?;
+            let (outstanding, accrued) =
+                super::super::pricing::call::exercise_claim(loan, schedule, exercise)?;
             let clean = super::super::pricing::call::clean_call_price(
                 call,
                 schedule,
                 market,
                 exercise,
-                outstanding.amount(),
+                outstanding,
                 accrued,
             )?;
             Ok((exercise, Money::new(clean + accrued, loan.currency)?))
         })
         .collect()
-}
-
-/// Look up outstanding BEFORE a target date from the outstanding path.
-///
-/// Uses `<` comparison since `outstanding_by_date()` returns balances AFTER
-/// processing all flows on each date.  This gives the balance just before
-/// any events (amortization, notional, PIK) on the target date.
-///
-/// # Precondition
-///
-/// `out_path` must be sorted by date (as returned by `outstanding_by_date()`).
-pub(super) fn outstanding_before(
-    out_path: &[(Date, Money)],
-    target: Date,
-    currency: finstack_quant_core::currency::Currency,
-) -> Money {
-    let mut last = Money::from((0_i64, currency));
-    for (d, amt) in out_path {
-        if *d < target {
-            last = *amt;
-        } else {
-            break;
-        }
-    }
-    last
 }

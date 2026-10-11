@@ -111,7 +111,11 @@
         ]
       }
     ],
-    "prices": {},
+    "prices": {
+      "WTI-SPOT": {
+        "unitless": 80.0
+      }
+    },
     "series": [],
     "inflation_indices": [],
     "dividends": [],
@@ -188,9 +192,10 @@
             "mc_paths": 2000
           }
         },
-        "underlying_ticker": "CL"
+        "underlying_ticker": "CL",
+        "spot_id": "WTI-SPOT"
       },
-      "type": "commodity_option"
+      "type": "commodity_spot_option"
     },
     "schema": "finstack_quant.instrument/1"
   }

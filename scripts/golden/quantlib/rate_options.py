@@ -549,7 +549,6 @@ def _build_swaption_fixture(
                         "stub": "none",
                         "start": "2027-04-30",
                         "end": "2028-04-30",
-                        "par_method": None,
                         "payment_lag_days": 0,
                     },
                     "underlying_float_leg": {

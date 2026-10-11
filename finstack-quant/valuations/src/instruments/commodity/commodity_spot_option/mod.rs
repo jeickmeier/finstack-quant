@@ -1,7 +1,7 @@
 //! Commodity option instrument module.
 //!
 //! Supports European options priced with Black-76 and American options priced
-//! via a binomial tree on spot (or futures-implied spot).
+//! via a binomial tree on observed spot with forward-calibrated carry.
 
 /// Metrics for commodity options.
 pub(crate) mod metrics;
@@ -9,6 +9,6 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
-pub use pricer::CommodityOptionMcPricer;
+pub use pricer::CommoditySpotOptionMcPricer;
 pub use types::CommodityMcParams;
-pub use types::CommodityOption;
+pub use types::{CommoditySpotOption, CommoditySpotOptionExercise};

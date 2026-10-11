@@ -12,8 +12,8 @@ use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithParams;
-use finstack_quant_valuations::instruments::commodity::commodity_option::{
-    CommodityMcParams, CommodityOption,
+use finstack_quant_valuations::instruments::commodity::commodity_spot_option::{
+    CommodityMcParams, CommoditySpotOption,
 };
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
@@ -22,9 +22,9 @@ use finstack_quant_valuations::instruments::{
 };
 
 /// Helper to build a standard commodity option for MC tests.
-fn build_commodity_option(strike: f64, option_type: OptionType) -> CommodityOption {
+fn build_commodity_spot_option(strike: f64, option_type: OptionType) -> CommoditySpotOption {
     let expiry = date(2026, 1, 1);
-    CommodityOption::builder()
+    CommoditySpotOption::builder()
         .id(InstrumentId::new("CL-MC-TEST"))
         .underlying(CommodityUnderlyingParams::new(
             "Energy",
@@ -36,6 +36,7 @@ fn build_commodity_option(strike: f64, option_type: OptionType) -> CommodityOpti
         .option_type(option_type)
         .exercise_style(ExerciseStyle::European)
         .expiry(expiry)
+        .spot_id("CL-SPOT".into())
         .quantity(1.0)
         .multiplier(1.0)
         .settlement(SettlementType::Cash)
@@ -56,6 +57,10 @@ fn build_market(as_of: finstack_quant_core::dates::Date) -> MarketContext {
     let vol_surface = flat_vol_surface("CL-VOL", &[0.5, 1.0, 2.0], &[80.0, 100.0, 120.0], 0.20);
 
     MarketContext::new()
+        .insert_price(
+            "CL-SPOT",
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+        )
         .insert(discount_curve)
         .insert(price_curve)
         .insert_surface(vol_surface)
@@ -72,7 +77,7 @@ fn test_schwartz_smith_gbm_limit_converges_to_black76() {
     let as_of = date(2025, 1, 1);
     let market = build_market(as_of);
 
-    let call = build_commodity_option(100.0, OptionType::Call);
+    let call = build_commodity_spot_option(100.0, OptionType::Call);
 
     // Black-76 analytical price
     let analytical_pv = {
@@ -123,7 +128,7 @@ fn test_schwartz_smith_gbm_limit_converges_to_black76() {
 fn test_mc_estimates_consistent_across_path_counts() {
     let as_of = date(2025, 1, 1);
     let market = build_market(as_of);
-    let call = build_commodity_option(100.0, OptionType::Call);
+    let call = build_commodity_spot_option(100.0, OptionType::Call);
 
     let ss_model = SchwartzSmithParams {
         kappa: 2.0,
@@ -186,8 +191,8 @@ fn test_put_call_parity_mc() {
     let as_of = date(2025, 1, 1);
     let market = build_market(as_of);
 
-    let call = build_commodity_option(100.0, OptionType::Call);
-    let put = build_commodity_option(100.0, OptionType::Put);
+    let call = build_commodity_spot_option(100.0, OptionType::Call);
+    let put = build_commodity_spot_option(100.0, OptionType::Put);
 
     // Near-GBM limit with Ito correction for martingale property
     let sigma_y = 0.20;
@@ -259,7 +264,7 @@ fn test_schwartz_smith_positive_option_values() {
     };
 
     // ATM call
-    let call = build_commodity_option(100.0, OptionType::Call);
+    let call = build_commodity_spot_option(100.0, OptionType::Call);
     let call_pv = call.npv_mc(&mc_params, &market, as_of).expect("MC call");
     assert!(
         call_pv.amount() > 0.0,
@@ -268,7 +273,7 @@ fn test_schwartz_smith_positive_option_values() {
     );
 
     // ATM put
-    let put = build_commodity_option(100.0, OptionType::Put);
+    let put = build_commodity_spot_option(100.0, OptionType::Put);
     let put_pv = put.npv_mc(&mc_params, &market, as_of).expect("MC put");
     assert!(
         put_pv.amount() > 0.0,
@@ -277,7 +282,7 @@ fn test_schwartz_smith_positive_option_values() {
     );
 
     // Deep OTM call (strike = 150) should still be non-negative
-    let otm_call = build_commodity_option(150.0, OptionType::Call);
+    let otm_call = build_commodity_spot_option(150.0, OptionType::Call);
     let otm_call_pv = otm_call
         .npv_mc(&mc_params, &market, as_of)
         .expect("MC OTM call");
@@ -291,13 +296,13 @@ fn test_schwartz_smith_positive_option_values() {
 #[test]
 fn mc_result_reports_scaled_uncertainty_and_replay_metadata() {
     use finstack_quant_valuations::{
-        instruments::commodity::commodity_option::CommodityOptionMcPricer,
+        instruments::commodity::commodity_spot_option::CommoditySpotOptionMcPricer,
         pricer::Pricer,
         results::{MonteCarloValuationDetails, ValuationDetails},
     };
     let as_of = date(2025, 1, 1);
     let market = build_market(as_of);
-    let mut call = build_commodity_option(100.0, OptionType::Call);
+    let mut call = build_commodity_spot_option(100.0, OptionType::Call);
     let params = CommodityMcParams {
         params: SchwartzSmithParams {
             kappa: 2.0,
@@ -311,7 +316,7 @@ fn mc_result_reports_scaled_uncertainty_and_replay_metadata() {
         num_steps: 12,
         seed: Some(123),
     };
-    let pricer = CommodityOptionMcPricer::new(params);
+    let pricer = CommoditySpotOptionMcPricer::new(params);
     let unit = pricer.price_dyn(&call, &market, as_of).unwrap();
     let details = |result: &finstack_quant_valuations::results::ValuationResult| -> MonteCarloValuationDetails {
         match &result.details {

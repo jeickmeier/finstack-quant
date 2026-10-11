@@ -27,12 +27,12 @@ pub(super) fn record_opening_accruals(
         };
         let accrual = tranche.day_count.year_fraction(
             period.accrual_start,
-            pay_date,
+            period.accrual_end,
             DayCountContext::default(),
         )?;
         let mut rate = tranche.coupon.try_rate_for_period(
             period.accrual_start,
-            pay_date,
+            period.accrual_end,
             accrual,
             as_of,
             context,
@@ -197,6 +197,7 @@ pub(super) fn debt_interest_due(
                     )?,
                 period_start,
                 payment_date: pay_date,
+                accrual_end: inputs.period.accrual_end,
                 valuation_date: as_of,
                 market: context,
                 reserve_balance: state.reserve_balance,
@@ -228,7 +229,7 @@ pub(super) fn debt_interest_due(
                 bal,
                 TrancheAccrualDates {
                     start: period_start,
-                    payment: pay_date,
+                    end: inputs.period.accrual_end,
                     valuation: as_of,
                 },
                 context,

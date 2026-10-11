@@ -222,14 +222,8 @@ impl CdsTranchePricer {
         coupon: f64,
         include_tiny_premiums: bool,
     ) -> Result<Vec<ProjectedDiscountedRow>> {
-        if as_of >= tranche.maturity {
-            return Ok(Vec::new());
-        }
-        let (_index_data_arc, valuation_date, payment_dates, el_curve) =
+        let (_index_data_arc, _valuation_date, periods, el_curve) =
             self.prepare_projection_inputs(tranche, market_ctx, as_of)?;
-        if valuation_date >= tranche.maturity {
-            return Ok(Vec::new());
-        }
 
         let tranche_notional = tranche.notional.amount();
         let premium_sign = match tranche.side {
@@ -239,28 +233,12 @@ impl CdsTranchePricer {
         let protection_sign = -premium_sign;
 
         let mut rows =
-            Vec::with_capacity(payment_dates.len() * 2 + usize::from(tranche.upfront.is_some()));
+            Vec::with_capacity(periods.len() * 2 + usize::from(tranche.upfront.is_some()));
         let mut prev_el_fraction = self.calculate_prior_tranche_loss(tranche);
         let mut prev_wd_fraction =
             self.calculate_prior_tranche_writedown(tranche, _index_data_arc.recovery_rate);
-        let full_schedule = self.generate_full_payment_schedule(tranche, valuation_date)?;
-        let first_period_start = payment_dates.first().and_then(|first_payment| {
-            full_schedule
-                .iter()
-                .copied()
-                .filter(|date| date < first_payment)
-                .max()
-        });
-
-        // Hazard-axis payment times, used ONLY for survival quantities
-        // (within-period default timing). Discounting uses the discount
-        // curve's own axis via `DiscountAt` (see `discount_projected_rows`).
-        let payment_times: Vec<f64> = payment_dates
-            .iter()
-            .map(|&d| self.years_from_base(_index_data_arc.as_ref(), d))
-            .collect::<Result<Vec<_>>>()?;
-
-        for (i, &payment_date) in payment_dates.iter().enumerate() {
+        for (i, period) in periods.iter().enumerate() {
+            let payment_date = period.payment_date;
             let el_fraction = el_curve[i].el_fraction;
             let wd_fraction = el_curve[i].wd_fraction;
             let delta_el_fraction = (el_fraction - prev_el_fraction).max(0.0);
@@ -269,36 +247,24 @@ impl CdsTranchePricer {
             // erosion and top-down recovery writedown (senior amortization).
             let outstanding_notional =
                 tranche_notional * (1.0 - prev_el_fraction - prev_wd_fraction).max(0.0);
-            let period_start = if i == 0 {
-                let effective = tranche
-                    .contractual_start_date(valuation_date)
-                    .unwrap_or(valuation_date);
-                // A seasoned tranche accrues the next premium from the latest
-                // contractual coupon boundary, never from the original trade
-                // effective date. Bound the boundary below by the effective
-                // date for a genuine first stub.
-                first_period_start
-                    .filter(|boundary| *boundary <= valuation_date)
-                    .unwrap_or(effective)
-                    .max(effective)
+            let period_start = period.accrual_start;
+            let accrual_period = period.accrual_year_fraction;
+            let protection_start = period_start.max(as_of).min(period.accrual_end);
+            let prior_time = if protection_start <= as_of {
+                0.0
             } else {
-                payment_dates[i - 1]
+                self.years_from_base(_index_data_arc.as_ref(), protection_start)?
             };
-            let accrual_period = tranche.day_count.year_fraction(
-                period_start,
-                payment_date,
+            let payment_time = if period.accrual_end <= as_of {
+                0.0
+            } else {
+                self.years_from_base(_index_data_arc.as_ref(), period.accrual_end)?
+            };
+            let remaining_accrual = tranche.day_count.year_fraction(
+                protection_start,
+                period.accrual_end,
                 finstack_quant_core::dates::DayCountContext::default(),
             )?;
-            let payment_time = payment_times[i];
-            let prior_time = if i == 0 {
-                if period_start <= _index_data_arc.index_credit_curve.base_date() {
-                    0.0
-                } else {
-                    self.years_from_base(_index_data_arc.as_ref(), period_start)?
-                }
-            } else {
-                payment_times[i - 1]
-            };
 
             // Survival-weighted mean within-period default fraction.
             //
@@ -328,9 +294,10 @@ impl CdsTranchePricer {
             // and the recovery writedown increment (top-down) occur at
             // default time, so they receive the same treatment.
             let delta_erosion = delta_el_fraction + delta_wd_fraction;
-            let aod_adjustment = (1.0 - default_fraction) * tranche_notional * delta_erosion;
+            let aod_adjustment =
+                (1.0 - default_fraction) * remaining_accrual * tranche_notional * delta_erosion;
             let premium_amount =
-                coupon * accrual_period * (outstanding_notional - aod_adjustment).max(0.0);
+                coupon * (accrual_period * outstanding_notional - aod_adjustment).max(0.0);
 
             if include_tiny_premiums || premium_amount.abs() > f64::EPSILON {
                 rows.push(ProjectedDiscountedRow {
@@ -374,7 +341,8 @@ impl CdsTranchePricer {
                     // quantity); the DF lookup itself happens on the
                     // discount curve's axis in `discount_projected_rows`.
                     discount_at: DiscountAt::WithinPeriod {
-                        start: period_start,
+                        start: protection_start,
+                        end: period.accrual_end,
                         fraction: default_fraction,
                     },
                 });
@@ -418,14 +386,17 @@ impl CdsTranchePricer {
                 DiscountAt::PaymentDate => {
                     discount_curve.df_between_dates(as_of, row.cashflow.date)?
                 }
-                DiscountAt::WithinPeriod { start, fraction } => {
+                DiscountAt::WithinPeriod {
+                    start,
+                    end,
+                    fraction,
+                } => {
                     // Interpolate the survival-weighted default date inside
                     // the period in calendar days, then take the relative DF
                     // from as_of on the discount curve's axis. The date is
                     // clamped to [as_of, payment_date]: a stub period can
                     // start before as_of, but the EL increment only covers
                     // defaults occurring on or after the valuation date.
-                    let end = row.cashflow.date;
                     let period_days = (end - start).whole_days().max(0);
                     let offset_days = (fraction * period_days as f64).round() as i64;
                     let mid = start
@@ -456,7 +427,7 @@ impl CdsTranchePricer {
                     ),
                 })
             })?;
-        if index_data_arc.index_credit_curve.base_date() != as_of {
+        if as_of < tranche.maturity && index_data_arc.index_credit_curve.base_date() != as_of {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CDS tranche '{}' requires credit curve '{}' to be based on valuation date {}; got {}. Rebase the curve or provide a conditionally rebased credit index.",
                 tranche.id,
@@ -466,13 +437,29 @@ impl CdsTranchePricer {
             )));
         }
         let valuation_date = self.calculate_settlement_date(tranche, market_ctx, as_of)?;
-        let payment_dates = self.generate_payment_schedule(tranche, valuation_date)?;
-        let el_curve = if payment_dates.is_empty() || valuation_date >= tranche.maturity {
-            Vec::new()
-        } else {
-            self.build_el_wd_curve(tranche, index_data_arc.as_ref(), &payment_dates)?
-        };
-        Ok((index_data_arc, valuation_date, payment_dates, el_curve))
+        let periods: Vec<_> = self
+            .generate_coupon_periods(tranche, valuation_date)?
+            .into_iter()
+            .filter(|period| period.payment_date >= as_of)
+            .collect();
+        let future_dates: Vec<_> = periods
+            .iter()
+            .map(|p| p.accrual_end)
+            .filter(|date| *date > as_of)
+            .collect();
+        let future_losses =
+            self.build_el_wd_curve(tranche, index_data_arc.as_ref(), &future_dates)?;
+        let known_count = periods.iter().filter(|p| p.accrual_end <= as_of).count();
+        let mut el_curve = Vec::with_capacity(periods.len());
+        for _ in 0..known_count {
+            el_curve.push(super::config::ElWdPoint {
+                el_fraction: self.calculate_prior_tranche_loss(tranche),
+                wd_fraction: self
+                    .calculate_prior_tranche_writedown(tranche, index_data_arc.recovery_rate),
+            });
+        }
+        el_curve.extend(future_losses);
+        Ok((index_data_arc, valuation_date, periods, el_curve))
     }
 
     /// Calculate the settlement date based on ISDA conventions.

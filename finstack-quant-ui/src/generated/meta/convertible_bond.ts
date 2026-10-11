@@ -1340,6 +1340,45 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/AmortizationSpec"
   },
   {
+    "path": "#/$defs/d_50ecc2e8ab08ab1ff417",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/ConvertibleSettlement",
+    "description": "Resolved exercise claim after debt has been converted, called, put, or redeemed.\n\nThese contractual amounts replace the debt and its future coupons. Any\nearned but unpaid coupon must be included in `cash`. Shares are delivered\nex-dividend on `delivery_date`. Same-day completed exercise needs no record;\nuse this state to retain a delayed delivery without replaying the option."
+  },
+  {
+    "path": "#/$defs/d_50ecc2e8ab08ab1ff417/properties/cash",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/ConvertibleSettlement/properties/cash",
+    "description": "Fixed cash consideration including any retained coupon, in bond currency.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_50ecc2e8ab08ab1ff417/properties/delivery_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/ConvertibleSettlement/properties/delivery_date",
+    "description": "Contractual delivery/payment date; not earlier than exercise.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_50ecc2e8ab08ab1ff417/properties/exercise_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/ConvertibleSettlement/properties/exercise_date",
+    "description": "Date the holder's exercise decision extinguished the debt.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_50ecc2e8ab08ab1ff417/properties/recovery_basis",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/ConvertibleSettlement/properties/recovery_basis",
+    "description": "Part of `cash` eligible for principal recovery on default; excludes\nuncapitalized coupon accrual. Must be between zero and `cash`.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_50ecc2e8ab08ab1ff417/properties/shares",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/ConvertibleSettlement/properties/shares",
+    "description": "Fixed number of shares to deliver, finite and nonnegative.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_51885e17c080d760db74",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/PriceTrigger",
     "description": "Share-price trigger of a convertible bond: the last sale price must be at\nleast `threshold_pct` of the conversion price on `required_days_above` of\n`observation_days` consecutive trading days.\n\nUsed for the issuer's soft call (`ConvertibleBond::soft_call_trigger`) and\nthe holder's contingent conversion\n(`ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(..))`).\n\n# Industry Practice\n\nThe standard trigger is 130% of the conversion price on 20 of 30\nconsecutive trading days; some issues use 120% or 150%.\n\n# Modeling scope\n\nThe tree evaluates the trigger on the instantaneous node spot. The soft\ncall applies a Broadie-Glasserman-Kou-style barrier shift scaled by\n`required_days_above / observation_days`; contingent conversion compares\nthe node spot with the nominal level and does not model the observation\nwindow."
@@ -1645,7 +1684,7 @@ export default [
   {
     "path": "#/$defs/d_5d5c46a56f1a2114a2ed/properties/credit_curve_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/ConvertibleBond/properties/credit_curve_id",
-    "description": "Issuer hazard curve identifier (a `HazardCurve`, as on every credit\ninstrument). When `None`, the cash component is discounted at the\nrisk-free `discount_curve_id` (no credit spread).\n\nThe pricer derives the zero-recovery risky discount factor\n`risky_df = rf_df × S(t)` from the curve's survival probabilities and\nblends it with risk-free discounting as `risky × (1 − R) + rf × R`\nusing [`Self::recovery_rate`]. The hazard curve's own recovery rate is\nused only to convert spread bumps into hazard shifts for CS01."
+    "description": "Issuer hazard curve identifier. Absence specifies no default risk.\nAll continuation claims are survival-weighted. Default pays the explicit\nrecovery fraction of outstanding principal and extinguishes equity;\nconditional stock drift includes the hazard compensator."
   },
   {
     "path": "#/$defs/d_5d5c46a56f1a2114a2ed/properties/credit_curve_id/anyOf/0",
@@ -1724,8 +1763,23 @@ export default [
   {
     "path": "#/$defs/d_5d5c46a56f1a2114a2ed/properties/recovery_rate",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/ConvertibleBond/properties/recovery_rate",
-    "description": "Assumed recovery rate on default, as a fraction (e.g., 0.40 = 40%).\n\nUsed in the Tsiveriotis-Zhang credit model to blend risky and risk-free\ndiscounting on the cash component. A recovery rate of 0 reduces to the\nstandard zero-recovery TZ model. Typical values:\n- **Investment grade**: 0.40 (ISDA standard assumption)\n- **High yield**: 0.25-0.35\n- **Distressed**: 0.10-0.20\n\nRequired when `credit_curve_id` is set; otherwise absence means that no\ncredit adjustment is requested.",
+    "description": "Fraction of outstanding principal paid immediately on default, in\n`[0, 1]`; includes capitalized PIK and excludes prior amortization.\nDefault extinguishes coupons and the conversion right. Required with a\ncredit curve; recovery is an explicit cashflow, not a discount blend.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_5d5c46a56f1a2114a2ed/properties/resolved_settlement",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/ConvertibleBond/properties/resolved_settlement",
+    "description": "Recorded exercise awaiting delivery. At or after `exercise_date`, only\nthis claim remains; after delivery its value is zero. Mandatory exercise\nwithout a record settles on its contractual conversion date."
+  },
+  {
+    "path": "#/$defs/d_5d5c46a56f1a2114a2ed/properties/resolved_settlement/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/ConvertibleBond/properties/resolved_settlement/anyOf/0",
+    "ref": "#/$defs/ConvertibleSettlement",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/ConvertibleSettlement"
+  },
+  {
+    "path": "#/$defs/d_5d5c46a56f1a2114a2ed/properties/resolved_settlement/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/ConvertibleBond/properties/resolved_settlement/anyOf/1"
   },
   {
     "path": "#/$defs/d_5d5c46a56f1a2114a2ed/properties/scenario_pricing_overrides",
@@ -5185,7 +5239,7 @@ export default [
   {
     "path": "#/$defs/d_e25099d894855568a222/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/AmortizationSpec/oneOf/5",
-    "description": "Equal principal installments on coupon accrual boundaries in `(start, end]`.\nThe installment is fixed from outstanding after all start-date movements,\nincluding PIK and explicit principal events. The final installment pays\nthe live remaining balance, including subsequent PIK or principal changes.\nPrincipal changes economically on each accrual boundary; cash settles on\nthat coupon's adjusted, lagged payment date."
+    "description": "Equal principal installments on coupon accrual boundaries in `(start, end]`.\nThe installment is fixed from outstanding after all start-date movements,\nincluding PIK and explicit principal events. Each subsequent funded draw\nadds equal installments over the remaining boundaries after its draw date.\nThe final installment pays the live remaining balance, including subsequent PIK.\nPrincipal changes economically on each accrual boundary; cash settles on\nthat coupon's adjusted, lagged payment date."
   },
   {
     "path": "#/$defs/d_e25099d894855568a222/oneOf/5/properties/linear_between",
@@ -5450,7 +5504,7 @@ export default [
     "path": "#/$defs/d_f80f2b90e7af690c5898/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
-    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian."
+    "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil."
   },
   {
     "path": "#/$defs/d_f949ae850ed7798d02bd",

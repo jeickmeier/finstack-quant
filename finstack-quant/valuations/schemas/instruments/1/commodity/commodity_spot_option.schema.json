@@ -45,9 +45,9 @@
         }
       ]
     },
-    "CommodityOption": {
+    "CommoditySpotOption": {
       "additionalProperties": false,
-      "description": "Commodity option (option on commodity forward or spot).\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\nAnalytical delta measures currency per unit change in the resolved forward,\nholding discount factors and volatility fixed. At zero volatility or expiry,\nthe intrinsic-payoff derivative is used; delta is defined as zero exactly at\nthe strike, where the mathematical derivative does not exist.\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\nIf `spot_id` is provided, it uses that spot price. Otherwise, the forward\nprice is used as a proxy for spot, which may underestimate early exercise value.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup.",
+      "description": "Option on spot commodity. Options on a specified futures contract use\n[`crate::instruments::CommodityFutureOption`], including futures delivery.\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\nAnalytical delta measures currency per unit change in the resolved forward,\nholding discount factors and volatility fixed. At zero volatility or expiry,\nthe intrinsic-payoff derivative is used; delta is defined as zero exactly at\nthe strike, where the mathematical derivative does not exist.\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\n`spot_id` must identify an observed spot for early exercise and Monte Carlo.\nThe commodity forward is never substituted for the spot underlying.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -81,6 +81,17 @@
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve ID for present value."
+        },
+        "exercise": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommoditySpotOptionExercise"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Recorded exercise or expiry; required after expiry while settlement remains unpaid."
         },
         "exercise_dates": {
           "description": "Optional Bermudan exercise schedule.\n\nRequired when `exercise_style == ExerciseStyle::Bermudan`.",
@@ -152,8 +163,7 @@
         },
         "settlement": {
           "$ref": "#/$defs/SettlementType",
-          "default": "cash",
-          "description": "Settlement type (physical or cash).\n\nDefaults to cash settlement when omitted in serialized payloads."
+          "description": "Settlement type (physical or cash).\n\nCash fixes the payoff on exercise; physical retains the marked delivery\nclaim until its recorded settlement date."
         },
         "spot_id": {
           "anyOf": [
@@ -194,9 +204,40 @@
         "expiry",
         "quantity",
         "multiplier",
+        "settlement",
         "forward_curve_id",
         "discount_curve_id",
         "vol_surface_id"
+      ],
+      "type": "object"
+    },
+    "CommoditySpotOptionExercise": {
+      "additionalProperties": false,
+      "description": "Recorded exercise or expiry of a spot commodity option.",
+      "properties": {
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Exercise date, or expiry observation date for an unexercised option."
+        },
+        "exercised": {
+          "description": "True for exercise/assignment; false records expiration without exercise.",
+          "type": "boolean"
+        },
+        "settlement_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Actual cash-payment or physical-delivery date, on or after exercise."
+        },
+        "spot": {
+          "description": "Positive observed commodity spot price in strike units.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "date",
+        "spot",
+        "settlement_date",
+        "exercised"
       ],
       "type": "object"
     },
@@ -261,14 +302,14 @@
         }
       ]
     },
-    "commodity_option": {
+    "commodity_spot_option": {
       "additionalProperties": false,
       "properties": {
         "spec": {
-          "$ref": "#/$defs/CommodityOption"
+          "$ref": "#/$defs/CommoditySpotOption"
         },
         "type": {
-          "const": "commodity_option",
+          "const": "commodity_spot_option",
           "type": "string"
         }
       },
@@ -279,7 +320,7 @@
       "type": "object"
     }
   },
-  "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json",
+  "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Canonical single-instrument v1 envelope generated from its serde type.",
@@ -305,14 +346,14 @@
           "unit": "BBL",
           "vol_surface_id": "WTI-VOL"
         },
-        "type": "commodity_option"
+        "type": "commodity_spot_option"
       },
       "schema": "finstack_quant.instrument/1"
     }
   ],
   "properties": {
     "instrument": {
-      "$ref": "#/$defs/commodity_option"
+      "$ref": "#/$defs/commodity_spot_option"
     },
     "schema": {
       "$ref": "#/$defs/InstrumentSchema"
@@ -322,6 +363,6 @@
     "schema",
     "instrument"
   ],
-  "title": "commodity_option",
+  "title": "commodity_spot_option",
   "type": "object"
 }

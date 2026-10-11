@@ -378,7 +378,7 @@ fn test_quote_engine_asw_market_rejects_matured_schedule() {
     .expect_err("ASW market inversion should fail for matured schedule");
     let msg = format!("{err}");
     assert!(
-        msg.contains("ASW market price inversion requires at least two fixed-leg schedule dates"),
+        msg.contains("ASW requires positive face and remaining payments after settlement"),
         "unexpected error: {msg}"
     );
 }

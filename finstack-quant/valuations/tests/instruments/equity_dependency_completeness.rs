@@ -11,7 +11,7 @@ use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::commodity::commodity_option::CommodityOption;
+use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
 use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{
@@ -56,11 +56,11 @@ fn build_vol_surface(id: &str) -> VolSurface {
 }
 
 #[test]
-fn test_commodity_option_equity_dependencies_complete() {
+fn test_commodity_spot_option_equity_dependencies_complete() {
     let as_of = date!(2025 - 01 - 01);
     let expiry = as_of.add_months(6).expect("valid date shift");
 
-    let option = CommodityOption::builder()
+    let option = CommoditySpotOption::builder()
         .id(InstrumentId::new("WTI-OPT-DEPS"))
         .underlying(CommodityUnderlyingParams::new(
             "Energy",
@@ -92,7 +92,14 @@ fn test_commodity_option_equity_dependencies_complete() {
         market = market.insert(build_discount_curve(id.as_str(), 0.03));
     }
     for id in curve_deps.forward_curves.iter() {
-        market = market.insert(build_forward_curve(id.as_str(), 0.25, 0.04));
+        market = market.insert(
+            crate::instruments::test_support::commodity_curves::flat_price_curve(
+                id.as_str(),
+                as_of,
+                100.0,
+                2.0,
+            ),
+        );
     }
     for volatility in &market_deps.volatility_dependencies {
         market = market.insert_surface(build_vol_surface(volatility.vol_surface_id.as_str()));
@@ -117,7 +124,7 @@ fn test_missing_equity_spot_fails() {
     let as_of = date!(2025 - 01 - 01);
     let expiry = as_of.add_months(6).expect("valid date shift");
 
-    let option = CommodityOption::builder()
+    let option = CommoditySpotOption::builder()
         .id(InstrumentId::new("WTI-OPT-SPOT-MISSING"))
         .underlying(CommodityUnderlyingParams::new(
             "Energy",

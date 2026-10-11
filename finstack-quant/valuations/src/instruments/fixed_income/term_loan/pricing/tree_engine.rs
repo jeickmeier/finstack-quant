@@ -294,8 +294,6 @@ impl TermLoanValuator {
 
         let schedule =
             super::discounting::TermLoanDiscountingPricer::pricing_schedule(&loan, market, as_of)?;
-        let accrual_index =
-            crate::cashflow::accrual::AccrualIndex::build(&schedule, &loan.accrual_config())?;
         let out_path = schedule.outstanding_by_date()?;
 
         // Helper: outstanding BEFORE a target date (pre-exercise).
@@ -477,9 +475,14 @@ impl TermLoanValuator {
                 let Some(call) = active_call else {
                     continue;
                 };
-                let out = outstanding_vec[step].max(0.0);
                 let step_date = step_dates[step];
-                let accrued = accrual_index.accrued_at(step_date)?;
+                // Calendar rounding can label the penultimate sub-day node
+                // with maturity. Redemption remains booked at the terminal
+                // node; there is no remaining principal to call on maturity.
+                if step_date >= loan.maturity {
+                    continue;
+                }
+                let (out, accrued) = super::call::exercise_claim(&loan, &schedule, step_date)?;
                 let clean = super::call::clean_call_price(
                     call, &schedule, market, step_date, out, accrued,
                 )?;
@@ -664,7 +667,7 @@ impl TermLoanValuator {
             .unwrap_or_else(|| self.outstanding_at(step))
     }
 
-    /// Replace scheduled principal plus risky continuation with dirty call
+    /// Replace risky continuation after scheduled principal with dirty call
     /// proceeds when the borrower exercises. Friction raises only the
     /// exercise threshold.
     #[inline]
@@ -718,7 +721,7 @@ impl TreeValuator for TermLoanValuator {
             continuation_value
         };
 
-        Ok(coupon_fee + self.apply_call(step, risky_continuation + principal_cf, oas_rate))
+        Ok(coupon_fee + principal_cf + self.apply_call(step, risky_continuation, oas_rate))
     }
 }
 

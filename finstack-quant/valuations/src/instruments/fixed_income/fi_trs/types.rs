@@ -22,7 +22,7 @@ use rust_decimal::Decimal;
 
 /// Fixed-income index total-return swap priced with a carry analytic.
 ///
-/// For each scheduled period, the total-return leg uses
+/// For each wholly future scheduled period, the total-return leg uses
 /// `exp(y × accrual_fraction) - 1`, where `y` is an annual continuously
 /// compounded decimal yield and the accrual fraction uses the schedule day
 /// count. Both legs are discounted with `financing.discount_curve_id`; the
@@ -36,10 +36,11 @@ use rust_decimal::Decimal;
 /// mark-to-market, stochastic credit, constituent decomposition, early
 /// termination, and bespoke fees. The period in progress on the valuation
 /// date is valued from the live index level (`underlying.index_id`) against
-/// `initial_level`, then carried at the index yield to period end; a period
-/// that has ended but is not yet paid stays in the PV at its projected carry.
+/// its historical reset level, then carried at the index yield to period end; a period
+/// that has ended but is not yet paid uses the exact historical start and end
+/// levels from `fixing_series_id`. Missing historical endpoints are errors.
 /// Cashflow-schedule APIs
-/// return payment dates with zero amounts; use
+/// return projected or fixed net payments using the same calculations as
 /// [`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected
 /// leg values.
 ///
@@ -108,13 +109,18 @@ pub struct FiIndexTotalReturnSwap {
     /// Trade side: `receive` receives the total-return leg and pays financing;
     /// `pay` pays the total return and receives financing.
     pub side: PayReceive,
-    /// Index level at the reset of the return period in progress, in the
+    /// Index level at the first contractual reset, in the
     /// index's own units.
     ///
-    /// Required when the valuation date falls inside a return period; the
-    /// realized return to date is `index_level / initial_level`. Unused for
-    /// unseasoned trades. Must be positive and finite when set.
+    /// Used only at inception when no fixing series is supplied; the
+    /// realized return to date is `index_level / initial_level`. Subsequent resets require `fixing_series_id`. Must be positive and finite when set.
     pub initial_level: Option<f64>,
+    /// Market time-series identifier containing positive total-return index levels
+    /// on contractual reset dates, including the final accrual boundary. Historical
+    /// endpoints require exact observations; no yield-based history is inferred.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixing_series_id: Option<String>,
     /// Optional OTC margin specification for VM/IM.
     ///
     /// Fixed income index TRS use duration-based margin calculations.
@@ -316,7 +322,10 @@ impl crate::instruments::common_impl::traits::Instrument for FiIndexTotalReturnS
         if let Some(duration_id) = &self.underlying.duration_id {
             deps.add_market_scalar_id(duration_id);
         }
-        if self.initial_level.is_some() {
+        if let Some(id) = &self.fixing_series_id {
+            deps.add_series_id(id);
+        }
+        if self.initial_level.is_some() || self.fixing_series_id.is_some() {
             // Seasoned trades read the live index level for the period in progress.
             deps.add_market_scalar_id(self.underlying.index_id.as_str());
         }
@@ -356,20 +365,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FiIndexTotalReturnSwap
 
     fn raw_cashflow_schedule(
         &self,
-        _context: &MarketContext,
-        _as_of: Date,
+        context: &MarketContext,
+        as_of: Date,
     ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
-        // TRS cashflow amounts depend on realized returns and are therefore
-        // unknown at trade time. We return the payment-date skeleton with
-        // zero amounts so that schedule-based queries (e.g., next payment
-        // date, period count) work correctly. Consumers that need projected
-        // amounts should use `pv_total_return_leg` / `pv_financing_leg` instead.
-        let period_schedule = self.schedule.period_schedule()?;
-
-        let mut flows = Vec::new();
-        for date in period_schedule.dates.iter().skip(1) {
-            flows.push((*date, Money::from((0_i64, self.notional.currency()))));
-        }
+        let flows = super::pricer::net_cashflows(self, context, as_of)?;
 
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             flows,

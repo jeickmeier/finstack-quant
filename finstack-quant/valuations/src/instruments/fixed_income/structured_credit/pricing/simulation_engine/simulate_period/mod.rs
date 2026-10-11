@@ -75,12 +75,13 @@ pub(super) fn simulate_period(
         state.closing_seasoning_months + state.closing_date.months_until(pay_date);
 
     // Capture period start before updating prev_date (for accrual calculations)
-    let period_start = state.prev_date.unwrap_or(state.closing_date);
+    let period_start = period.accrual_start;
+    let previous_payment = state.prev_date.unwrap_or(state.closing_date);
 
     // Reserve interest accrues on the opening balance, before this period's
     // collateral draws debit the account; it is routed after the pool flows.
     let reserve_interest_amount =
-        super::reserve::reserve_interest_amount(state, period_start, pay_date)?;
+        super::reserve::reserve_interest_amount(state, previous_payment, pay_date)?;
 
     // Live available-funds cap for this period: the current collateral WAC (net
     // of the AFC fee load), read from the start-of-period pool state before this
@@ -149,6 +150,7 @@ pub(super) fn simulate_period(
         state,
         instrument,
         pay_date,
+        accrual_end: period.accrual_end,
         prev_date: period_start,
         seasoning_months,
         months_per_period,
@@ -164,7 +166,7 @@ pub(super) fn simulate_period(
     // Hedge swaps settle through the waterfall: net receipts join interest
     // proceeds below, net payments become fee recipients in the period
     // waterfall.
-    let hedge_flows = super::hedges::period_hedge_flows(state, period_start, pay_date)?;
+    let hedge_flows = super::hedges::period_hedge_flows(state, previous_payment, pay_date)?;
 
     // Principal consumed by the collateral this period: draws funded from
     // principal collections and revolver repayments diverted to replenish the
@@ -461,6 +463,7 @@ pub(super) fn simulate_period(
             interest_collections: cash.interest,
             principal_collections: cash.principal,
             payment_date: pay_date,
+            accrual_end: period.accrual_end,
             period_start,
             valuation_date: as_of,
             pool_balance: coverage_test_pool_balance,

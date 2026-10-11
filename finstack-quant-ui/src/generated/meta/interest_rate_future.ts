@@ -806,7 +806,7 @@ export default [
   {
     "path": "#/$defs/d_546d6c19e94fe5cda260/properties/convexity_adjustment",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json#/$defs/FutureContractSpecs/properties/convexity_adjustment",
-    "description": "Optional pre-computed convexity adjustment (in rate terms).\n\n# Usage\n\n- `Some(0.0)`: Explicitly disable model-based adjustment (strict mode)\n- `Some(x)`: Use fixed adjustment of `x` (e.g., from broker quote)\n- `None`: Compute adjustment from volatility surface (requires `vol_surface_id`)\n\n# Market Practice\n\nFor calibration, use `Some(0.0)` and let the curve fitting process\nimplicitly absorb the convexity. For pricing with a pre-built curve,\neither:\n- Use a fixed adjustment from broker/vendor data\n- Provide a volatility surface for model-based calculation",
+    "description": "Optional pre-computed convexity adjustment (in rate terms).\n\n# Usage\n\n- `Some(0.0)`: Explicitly disable model-based adjustment (strict mode)\n- `Some(x)`: Use fixed adjustment of `x` (e.g., from broker quote)\n- `None`: Term futures use `vol_surface_id`; overnight futures use explicit\n  `hw1f_mean_reversion` and `hw1f_sigma` in instrument model configuration.\n\n# Market Practice\n\nFor calibration, use `Some(0.0)` and let the curve fitting process\nimplicitly absorb the convexity. For pricing with a pre-built curve,\neither:\n- Use a fixed adjustment from broker/vendor data\n- Provide a volatility surface for model-based calculation",
     "format": "double"
   },
   {
@@ -1721,7 +1721,7 @@ export default [
   {
     "path": "#/$defs/d_b2e822dc7fb5846c6cd8/properties/vol_surface_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json#/$defs/InterestRateFuture/properties/vol_surface_id",
-    "description": "Optional volatility surface identifier for convexity adjustment"
+    "description": "Normal-rate volatility surface for automatic term-rate convexity only.\nOvernight automatic convexity instead requires explicit Hull-White\nmean reversion and short-rate sigma in `instrument_pricing_overrides.model_config`."
   },
   {
     "path": "#/$defs/d_b2e822dc7fb5846c6cd8/properties/vol_surface_id/anyOf/0",
@@ -4210,7 +4210,7 @@ export default [
     "path": "#/$defs/d_f80f2b90e7af690c5898/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
-    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian."
+    "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil."
   },
   {
     "path": "#/$defs/d_fd618cd5743ec18a168f",

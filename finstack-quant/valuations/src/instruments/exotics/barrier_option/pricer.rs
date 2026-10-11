@@ -182,7 +182,8 @@ impl BarrierOptionMcPricer {
         }
 
         let gbm_params = GbmParams::new(r, q, sigma)?;
-        let process = GbmProcess::new(gbm_params);
+        let process = GbmProcess::new(gbm_params)
+            .with_drift_schedule(std::sync::Arc::new(barrier_drift(inst, curves, as_of, q)?));
 
         let mut config = crate::instruments::common_impl::helpers::merged_path_config(
             &self.config,
@@ -471,6 +472,38 @@ impl Pricer for BarrierOptionAnalyticalPricer {
     }
 }
 
+/// Dated discount-curve carry, interpolated between calendar-day observations.
+pub(crate) fn barrier_drift(
+    inst: &BarrierOption,
+    market: &MarketContext,
+    as_of: Date,
+    q: f64,
+) -> finstack_quant_core::Result<finstack_quant_models::monte_carlo::process::gbm::DriftSchedule> {
+    let discount = market.get_discount(inst.discount_curve_id.as_str())?;
+    let mut times = vec![0.0];
+    let mut carry = vec![0.0];
+    let mut date = as_of;
+    while date < inst.expiry {
+        date = date.next_day().ok_or_else(|| {
+            finstack_quant_core::Error::Validation("Barrier carry date overflow".into())
+        })?;
+        let t = inst.day_count.year_fraction(
+            as_of,
+            date,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )?;
+        let m = -discount.df_between_dates(as_of, date)?.ln() - q * t;
+        let last = times.len() - 1;
+        if t > times[last] {
+            times.push(t);
+            carry.push(m);
+        } else if t > 0.0 {
+            carry[last] = m;
+        }
+    }
+    finstack_quant_models::monte_carlo::process::gbm::DriftSchedule::new(times, carry)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -547,6 +580,48 @@ mod tests {
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
+    }
+
+    #[test]
+    fn discrete_barrier_uses_intermediate_discount_curve_carry() {
+        let as_of = date(2025, 1, 1);
+        let expiry = date(2026, 1, 1);
+        let observation = as_of + time::Duration::days(182);
+        let curve = DiscountCurve::builder("USD_DISC")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (182.0 / 365.0, 0.99), (1.0, 0.8)])
+            .build()
+            .expect("nonflat curve");
+        let mut market = market(as_of, 100.0, 0.0, 0.0, 0.0).insert(curve);
+        let mut inst = down_and_out_call(expiry, 100.0, 110.0);
+        inst.barrier_type = BarrierType::UpAndOut;
+        inst.monitoring = crate::instruments::Monitoring::Discrete {
+            observation_dates: vec![observation],
+        };
+        inst.instrument_pricing_overrides.model_config.mc_paths = Some(128);
+        let pv = BarrierOptionMcPricer::new()
+            .price_internal(&inst, &market, as_of)
+            .expect("GBM");
+        // S(mid) = 100/.99 < 110; terminal S=125, discounted payoff=20.
+        assert!((pv.amount() - 20.0).abs() < 1e-9, "{}", pv.amount());
+        for (id, value) in [
+            ("HESTON_KAPPA", 1.0),
+            ("HESTON_THETA", 1e-24),
+            ("HESTON_SIGMA_V", 1e-24),
+            ("HESTON_RHO", 0.0),
+            ("HESTON_V0", 1e-24),
+        ] {
+            market = market.insert_price(id, MarketScalar::Unitless(value));
+        }
+        let pv = super::super::heston_mc_pricer::BarrierOptionHestonMcPricer::new()
+            .price_dyn(&inst, &market, as_of)
+            .expect("Heston");
+        assert!(
+            (pv.value.amount() - 20.0).abs() < 1e-9,
+            "{}",
+            pv.value.amount()
+        );
     }
 
     #[test]

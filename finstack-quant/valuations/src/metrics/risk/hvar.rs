@@ -37,18 +37,6 @@ fn cache_var_diagnostics(context: &mut MetricContext, result: &VarResult) {
         MetricId::custom("hvar_num_scenarios"),
         result.num_scenarios as f64,
     );
-    // Taylor-approximation degradation flags (0.0/1.0). Bindings consume only
-    // the measures map, so this is the sole channel through which a caller can
-    // see that FX/vol scenario components were skipped and VaR understates
-    // that risk (see `VarResult::skipped_fx` / `skipped_vol`).
-    context.computed.insert(
-        MetricId::custom("hvar_skipped_fx"),
-        f64::from(result.skipped_fx),
-    );
-    context.computed.insert(
-        MetricId::custom("hvar_skipped_vol"),
-        f64::from(result.skipped_vol),
-    );
 }
 
 /// Generic Historical VaR calculator that works with any instrument.

@@ -67,6 +67,8 @@ pub struct WaterfallContext<'a> {
     pub principal_collections: Money,
     /// Payment date for this waterfall period.
     pub payment_date: Date,
+    /// Contractual end of coupon and fee accrual, before payment adjustment.
+    pub accrual_end: Date,
     /// Start date of the accrual period.
     pub period_start: Date,
     /// Valuation date used to distinguish known resets from future projections.
@@ -218,6 +220,7 @@ pub fn execute_waterfall(
         pool_balance: context.pool_balance,
         special_serviced_balance,
         payment_date: context.payment_date,
+        accrual_end: context.accrual_end,
         valuation_date: context.valuation_date,
         market: context.market,
         tranche_balances: context.tranche_balances,
@@ -257,6 +260,7 @@ pub fn execute_waterfall(
             special_serviced_balance,
             period_start: context.period_start,
             payment_date: context.payment_date,
+            accrual_end: context.accrual_end,
             valuation_date: context.valuation_date,
             market: context.market,
             reserve_balance: context.reserve_balance,
@@ -527,6 +531,7 @@ pub(crate) struct AllocationContext<'a> {
     pub(crate) special_serviced_balance: Money,
     /// Payment date
     pub(crate) payment_date: Date,
+    pub(crate) accrual_end: Date,
     /// Valuation date for fixing lifecycle decisions.
     pub(crate) valuation_date: Date,
     /// Market context for rate lookups
@@ -603,6 +608,7 @@ fn allocate_sequential(
             ctx.special_serviced_balance,
             period_start,
             ctx.payment_date,
+            ctx.accrual_end,
             ctx.valuation_date,
             ctx.market,
             ctx.reserve_balance,
@@ -713,6 +719,7 @@ fn allocate_pro_rata(
             ctx.special_serviced_balance,
             period_start,
             ctx.payment_date,
+            ctx.accrual_end,
             ctx.valuation_date,
             ctx.market,
             ctx.reserve_balance,
@@ -1053,6 +1060,8 @@ pub(crate) struct SeniorFeeInputs<'a> {
     pub period_start: Date,
     /// Payment date.
     pub payment_date: Date,
+    /// Contractual end of coupon and fee accrual, before payment adjustment.
+    pub accrual_end: Date,
     /// Valuation date.
     pub valuation_date: Date,
     /// Market context for any index-linked fee.
@@ -1114,6 +1123,7 @@ pub(crate) fn senior_fee_accrual(
                 inputs.special_serviced_balance,
                 inputs.period_start,
                 inputs.payment_date,
+                inputs.accrual_end,
                 inputs.valuation_date,
                 inputs.market,
                 inputs.reserve_balance,
@@ -1214,6 +1224,7 @@ fn calculate_payment_amount(
     special_serviced_balance: Money,
     period_start: Date,
     payment_date: Date,
+    accrual_end: Date,
     valuation_date: Date,
     market: &MarketContext,
     reserve_balance: Money,
@@ -1235,7 +1246,7 @@ fn calculate_payment_amount(
             let accrual_fraction = if *annualized {
                 day_count.unwrap_or(DayCount::Act360).year_fraction(
                     period_start,
-                    payment_date,
+                    accrual_end,
                     DayCountContext::default(),
                 )?
             } else {
@@ -1253,7 +1264,7 @@ fn calculate_payment_amount(
             let accrual_fraction = if *annualized {
                 day_count.unwrap_or(DayCount::Act360).year_fraction(
                     period_start,
-                    payment_date,
+                    accrual_end,
                     DayCountContext::default(),
                 )?
             } else {
@@ -1286,13 +1297,13 @@ fn calculate_payment_amount(
                 .max(0.0);
             let accrual_fraction = tranche.day_count.year_fraction(
                 period_start,
-                payment_date,
+                accrual_end,
                 DayCountContext::default(),
             )?;
             let rate = shifted_tranche_rate(
                 tranche,
                 period_start,
-                payment_date,
+                accrual_end,
                 accrual_fraction,
                 valuation_date,
                 market,
@@ -1328,13 +1339,13 @@ fn calculate_payment_amount(
             // interest-due kernel (the cap tracks the shifted net WAC).
             let accrual_fraction = tranche.day_count.year_fraction(
                 period_start,
-                payment_date,
+                accrual_end,
                 DayCountContext::default(),
             )?;
             let rate = shifted_tranche_rate(
                 tranche,
                 period_start,
-                payment_date,
+                accrual_end,
                 accrual_fraction,
                 valuation_date,
                 market,
@@ -1583,6 +1594,7 @@ mod coverage_position_tests {
             interest_collections: usd(interest),
             principal_collections: usd(principal),
             payment_date,
+            accrual_end: payment_date,
             period_start,
             valuation_date: period_start,
             pool_balance: usd(pool_balance),
@@ -2246,6 +2258,7 @@ mod water_fill_tests {
                 interest_collections: Money::from((13_000_i64, ccy)),
                 principal_collections: Money::from((287_000_i64, ccy)),
                 payment_date,
+                accrual_end: payment_date,
                 period_start,
                 valuation_date: period_start,
                 pool_balance: Money::from((1_000_000_i64, ccy)),

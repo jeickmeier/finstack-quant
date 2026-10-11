@@ -53,6 +53,7 @@ pub fn sample_tips() -> InflationLinkedBond {
         .indexation_method(IndexationMethod::Tips)
         .lag(InflationLag::Months(3))
         .deflation_protection(DeflationProtection::MaturityOnly)
+        .floor_vol_surface_id(CurveId::new("CPI-ZERO-VOL"))
         .business_day_convention(BusinessDayConvention::Following)
         .stub(StubKind::ShortBack)
         .discount_curve_id(CurveId::new("USD-OIS"))
@@ -119,7 +120,9 @@ pub fn market_context_with_index() -> (MarketContext, InflationIndex) {
         .with_interpolation(InflationInterpolation::Linear);
 
     let ctx = MarketContext::new()
+        .insert_surface(zero_floor_vol())
         .insert(disc)
+        .insert(index_projection(&index))
         .insert_inflation_index(index.clone());
 
     (ctx, index)
@@ -155,7 +158,10 @@ pub fn market_context_with_curve() -> (MarketContext, InflationCurve) {
         .build()
         .unwrap();
 
-    let ctx = MarketContext::new().insert(disc).insert(curve);
+    let ctx = MarketContext::new()
+        .insert_surface(zero_floor_vol())
+        .insert(disc)
+        .insert(curve);
 
     (
         ctx,
@@ -196,7 +202,9 @@ pub fn uk_market_context() -> (MarketContext, InflationIndex) {
         .with_interpolation(InflationInterpolation::Step);
 
     let ctx = MarketContext::new()
+        .insert_surface(zero_floor_vol())
         .insert(disc)
+        .insert(index_projection(&index))
         .insert_inflation_index(index.clone());
 
     (ctx, index)
@@ -215,4 +223,35 @@ pub fn relative_diff(a: f64, b: f64) -> f64 {
     } else {
         ((a - b) / b).abs()
     }
+}
+
+/// Explicit deterministic ratio-volatility assumption for schedule tests.
+pub fn zero_floor_vol() -> finstack_quant_core::market_data::surfaces::VolSurface {
+    finstack_quant_core::market_data::surfaces::VolSurface::builder("CPI-ZERO-VOL")
+        .expiries(&[0.01, 100.0])
+        .strikes(&[0.5, 1.5])
+        .row(&[0.0, 0.0])
+        .row(&[0.0, 0.0])
+        .build()
+        .unwrap()
+}
+
+// The fixture supplies a separate forecast curve, even where the stored series
+// contains future data. Valuation must never use that data as published history.
+fn index_projection(index: &InflationIndex) -> InflationCurve {
+    let (start, count, initial, growth) = if index.id.as_str() == "UK-RPI" {
+        (d(2019, 7, 1), 664, 280.0, 0.0025)
+    } else {
+        (d(2019, 10, 1), 664, 250.0, 0.002)
+    };
+    let knots: Vec<_> = monthly_observations(start, count, initial, growth)
+        .into_iter()
+        .map(|(date, value)| ((date - start).whole_days() as f64 / 365.0, value))
+        .collect();
+    InflationCurve::builder(index.id.as_str())
+        .base_date(start)
+        .base_cpi(initial)
+        .knots(knots)
+        .build()
+        .unwrap()
 }

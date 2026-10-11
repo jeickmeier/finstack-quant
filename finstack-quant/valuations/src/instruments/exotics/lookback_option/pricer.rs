@@ -39,6 +39,7 @@ impl LookbackOptionMcPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        require_observed_extremum(inst, as_of)?;
         if as_of >= inst.expiry {
             let payoff =
                 expired_lookback_payoff(inst, terminal_lookback_spot(inst, curves, as_of)?)?;
@@ -93,7 +94,7 @@ impl LookbackOptionMcPricer {
             &inst.instrument_pricing_overrides,
         )?;
 
-        // Continuous monitoring observes every step of a uniform grid.
+        // Continuous monitoring samples bridge extrema between grid points.
         // Discrete monitoring puts each remaining contractual observation date
         // on the grid and observes the extremum only there.
         let (time_grid, monitoring) = match &inst.monitoring {
@@ -164,6 +165,12 @@ impl LookbackOptionMcPricer {
                     initial_extremum,
                 )
                 .with_monitoring(monitoring);
+                let payoff =
+                    if matches!(inst.monitoring, crate::instruments::Monitoring::Continuous) {
+                        payoff.with_continuous_monitoring(sigma)?
+                    } else {
+                        payoff
+                    };
                 pricer.price_with_grid(
                     &process,
                     spot,
@@ -197,6 +204,12 @@ impl LookbackOptionMcPricer {
                     initial_extremum,
                 )
                 .with_monitoring(monitoring);
+                let payoff =
+                    if matches!(inst.monitoring, crate::instruments::Monitoring::Continuous) {
+                        payoff.with_continuous_monitoring(sigma)?
+                    } else {
+                        payoff
+                    };
                 pricer.price_with_grid(
                     &process,
                     spot,
@@ -251,6 +264,38 @@ use finstack_quant_models::closed_form::lookback::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
     floating_strike_lookback_put,
 };
+
+fn require_observed_extremum(
+    inst: &LookbackOption,
+    as_of: Date,
+) -> finstack_quant_core::Result<()> {
+    use crate::instruments::{Monitoring, OptionType};
+    let has_history = matches!(&inst.monitoring, Monitoring::Discrete { observation_dates }
+        if observation_dates.iter().any(|date| *date < as_of));
+    let needs_max = matches!(
+        (inst.lookback_type, inst.option_type),
+        (LookbackType::FixedStrike, OptionType::Call)
+            | (LookbackType::FloatingStrike, OptionType::Put)
+    );
+    if has_history
+        && if needs_max {
+            inst.observed_max.is_none()
+        } else {
+            inst.observed_min.is_none()
+        }
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "LookbackOption '{}' requires {} for elapsed discrete monitoring dates",
+            inst.id,
+            if needs_max {
+                "observed_max"
+            } else {
+                "observed_min"
+            }
+        )));
+    }
+    Ok(())
+}
 
 fn lookback_spot(
     curves: &MarketContext,
@@ -522,6 +567,33 @@ impl Pricer for LookbackOptionAnalyticalPricer {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn seasoned_discrete_monitoring_requires_payoff_extremum() {
+        use crate::instruments::{Monitoring, OptionType};
+        use time::macros::date;
+        let mut option = super::LookbackOption::example().expect("example");
+        option.monitoring = Monitoring::Discrete {
+            observation_dates: vec![date!(2024 - 06 - 01)],
+        };
+        for kind in [
+            super::LookbackType::FixedStrike,
+            super::LookbackType::FloatingStrike,
+        ] {
+            for side in [OptionType::Call, OptionType::Put] {
+                option.lookback_type = kind;
+                option.option_type = side;
+                option.observed_min = None;
+                option.observed_max = None;
+                assert!(super::require_observed_extremum(&option, date!(2024 - 05 - 31)).is_ok());
+                assert!(super::require_observed_extremum(&option, date!(2024 - 06 - 02)).is_err());
+                assert!(super::require_observed_extremum(&option, option.expiry).is_err());
+                option.observed_min = Some(90.0);
+                option.observed_max = Some(110.0);
+                assert!(super::require_observed_extremum(&option, date!(2024 - 06 - 02)).is_ok());
+            }
+        }
+    }
+
     use super::*;
     use crate::instruments::exotics::lookback_option::{LookbackOption, LookbackType};
     use crate::instruments::{Attributes, OptionType};
@@ -887,7 +959,10 @@ mod tests {
             },
         };
 
-        let option = fixed_strike_call(expiry, strike, None);
+        let mut option = fixed_strike_call(expiry, strike, None);
+        option.monitoring = crate::instruments::Monitoring::Discrete {
+            observation_dates: vec![as_of + time::Duration::days(183), expiry],
+        };
         let mkt = market(as_of, spot, vol, rate, q);
 
         let mc_pv = mc_pricer

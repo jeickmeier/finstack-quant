@@ -359,6 +359,15 @@ export interface DCf0Ae253Da617678Cc3E {
    */
   deflation_protection: "none" | "maturity_only" | "all_payments";
   discount_curve_id: Id1;
+  /**
+   * Black lognormal volatility of the contractual reference-CPI/base-CPI ratio.
+   * The surface uses expiry in Act/365F years to the last required publication
+   * and a Strike axis in ratio units (the par floor strikes at 1.0). The
+   * supplied forward ratio and volatility are under the payment-date measure.
+   * Required for a protected payment whose reference CPI is not yet known;
+   * an explicitly supplied zero-volatility surface selects deterministic pricing.
+   */
+  floor_vol_surface_id?: Id | null;
   frequency: Tenor;
   id: Id2;
   /**

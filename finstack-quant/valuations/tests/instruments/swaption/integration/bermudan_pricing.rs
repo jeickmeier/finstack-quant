@@ -940,3 +940,73 @@ fn test_bermudan_keeps_exercise_right_on_exercise_date() {
         }
     }
 }
+
+/// Independent tree and LSMC algorithms must resolve the same exercise claim.
+#[test]
+#[ignore = "slow: covered by mise rust-test-slow"]
+fn bermudan_lsmc_grid_and_seed_acceptance() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let end = Date::from_calendar_date(2030, Month::January, 1).unwrap();
+    let first = Date::from_calendar_date(2027, Month::January, 1).unwrap();
+    let mut swaption = test_bermudan_swaption(as_of, end, first, 0.03, OptionType::Call);
+    swaption
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion = Some(0.1);
+    swaption
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_sigma = Some(0.005);
+    let market = build_market_context();
+    let tree_values: Vec<_> = [400, 800]
+        .into_iter()
+        .map(|tree_steps| {
+            BermudanSwaptionPricer::tree_with_config(BermudanSwaptionPricerConfig {
+                tree_steps,
+                ..Default::default()
+            })
+            .price_dyn(&swaption, &market, as_of)
+            .unwrap()
+            .value
+            .amount()
+        })
+        .collect();
+    let tree_budget = swaption.notional.amount() * 1e-5;
+    let mc_budget = swaption.notional.amount() * 1e-4;
+    assert!(
+        (tree_values[1] - tree_values[0]).abs() < tree_budget,
+        "tree refinement {tree_values:?} exceeds {tree_budget}"
+    );
+    let reference = tree_values[1];
+    let mut mc_values = Vec::new();
+    for steps in [2, 4] {
+        for seed in [17, 29] {
+            let pricer = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
+                mc: RateExoticMcConfig {
+                    num_paths: 262_144,
+                    seed,
+                    min_steps_between_events: steps,
+                    oos_lsmc: true,
+                    ..BermudanSwaptionPricerConfig::DEFAULT_MC
+                },
+                ..Default::default()
+            });
+            let result = pricer.price_dyn(&swaption, &market, as_of).unwrap();
+            let value = result.value.amount();
+            let half_width = 2.5758293035489004 * result.measures["mc_stderr"];
+            assert!(
+                half_width < mc_budget,
+                "LSMC 99% half-width {half_width} exceeds {mc_budget}"
+            );
+            assert!((value - reference).abs() < mc_budget,
+                "steps={steps}, seed={seed}, LSMC={value}, tree={reference}, 99% half-width={half_width}");
+            mc_values.push(value);
+        }
+    }
+    let low = mc_values.iter().copied().fold(f64::INFINITY, f64::min);
+    let high = mc_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    assert!(
+        high - low < mc_budget,
+        "LSMC refinement {mc_values:?} exceeds {mc_budget}"
+    );
+}

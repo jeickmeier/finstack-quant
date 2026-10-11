@@ -179,15 +179,15 @@ export const importHarnesses = {
       name: "contract-commodity-future",
       modules: modules.length,
     })),
-  "contract-commodity-option": () =>
+  "contract-commodity-spot-option": () =>
     Promise.all([
-      import("@/lib/finstack/generated/schemas/commodity_option.json"),
-      import("@/lib/finstack/generated/types/commodity_option"),
-      import("@/lib/finstack/generated/meta/commodity_option"),
-      import("@/lib/finstack/generated/instrument/commodity_option"),
-      import("@/lib/finstack/generated/examples/commodity_option.json"),
+      import("@/lib/finstack/generated/schemas/commodity_spot_option.json"),
+      import("@/lib/finstack/generated/types/commodity_spot_option"),
+      import("@/lib/finstack/generated/meta/commodity_spot_option"),
+      import("@/lib/finstack/generated/instrument/commodity_spot_option"),
+      import("@/lib/finstack/generated/examples/commodity_spot_option.json"),
     ]).then((modules) => ({
-      name: "contract-commodity-option",
+      name: "contract-commodity-spot-option",
       modules: modules.length,
     })),
   "contract-commodity-spread-option": () =>

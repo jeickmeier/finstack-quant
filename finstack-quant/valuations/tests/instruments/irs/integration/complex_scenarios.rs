@@ -74,7 +74,7 @@ fn create_swap(as_of: Date, end: Date, fixed_rate: f64, side: PayReceive) -> Int
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
             stub: StubKind::None,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
             start: as_of,
@@ -187,7 +187,7 @@ fn test_forward_starting_swap() {
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
             stub: StubKind::None,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
             start, // Forward start
@@ -312,7 +312,7 @@ fn test_swap_seasoned() {
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
             stub: StubKind::None,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
             start,

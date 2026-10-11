@@ -695,10 +695,6 @@ export type D_369F1A09E65Be1364D06 =
       separate_amount: DD5Bd42D8B6Ec6C31D7861;
     };
 /**
- * Method for calculating par rates in swaps
- */
-export type D_54276F30E34C6F41Bcca = "forward_based" | "discount_ratio";
-/**
  * Explicit ISDA SIMM credit risk-class and bucket assignment.
  *
  * Corporate, sovereign, and index credit exposures belong to credit
@@ -934,7 +930,7 @@ export type D_1E3Bc69510D0B2864Dce =
  * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
  * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
  */
-export type D_3F29D0342Feb1Dd850D3 = DD5Bd42D8B6Ec6C31D78627 | number;
+export type D_3F29D0342Feb1Dd850D3 = DD5Bd42D8B6Ec6C31D78629 | number;
 
 /**
  * Versioned financial statement model specification.
@@ -5054,15 +5050,10 @@ export interface D_174Ce9631272C7D7F4F7 {
       };
   conversion: DCda814224Ddf8B157Fc6;
   /**
-   * Issuer hazard curve identifier (a `HazardCurve`, as on every credit
-   * instrument). When `None`, the cash component is discounted at the
-   * risk-free `discount_curve_id` (no credit spread).
-   *
-   * The pricer derives the zero-recovery risky discount factor
-   * `risky_df = rf_df × S(t)` from the curve's survival probabilities and
-   * blends it with risk-free discounting as `risky × (1 − R) + rf × R`
-   * using [`Self::recovery_rate`]. The hazard curve's own recovery rate is
-   * used only to convert spread bumps into hazard shifts for CS01.
+   * Issuer hazard curve identifier. Absence specifies no default risk.
+   * All continuation claims are survival-weighted. Default pays the explicit
+   * recovery fraction of outstanding principal and extinguishes equity;
+   * conditional stock drift includes the hazard compensator.
    */
   credit_curve_id?: D_557De6D70142Abc041E8 | null;
   /**
@@ -5165,19 +5156,18 @@ export interface D_174Ce9631272C7D7F4F7 {
   metric_pricing_overrides?: D_3883C45B3701884Ad50B1;
   notional: DD5Bd42D8B6Ec6C31D7865;
   /**
-   * Assumed recovery rate on default, as a fraction (e.g., 0.40 = 40%).
-   *
-   * Used in the Tsiveriotis-Zhang credit model to blend risky and risk-free
-   * discounting on the cash component. A recovery rate of 0 reduces to the
-   * standard zero-recovery TZ model. Typical values:
-   * - **Investment grade**: 0.40 (ISDA standard assumption)
-   * - **High yield**: 0.25-0.35
-   * - **Distressed**: 0.10-0.20
-   *
-   * Required when `credit_curve_id` is set; otherwise absence means that no
-   * credit adjustment is requested.
+   * Fraction of outstanding principal paid immediately on default, in
+   * `[0, 1]`; includes capitalized PIK and excludes prior amortization.
+   * Default extinguishes coupons and the conversion right. Required with a
+   * credit curve; recovery is an explicit cashflow, not a discount blend.
    */
   recovery_rate?: number | null;
+  /**
+   * Recorded exercise awaiting delivery. At or after `exercise_date`, only
+   * this claim remains; after delivery its value is zero. Mandatory exercise
+   * without a record settles on its contractual conversion date.
+   */
+  resolved_settlement?: D_532D79936E466Cf90D8A | null;
   scenario_pricing_overrides?: DB559Ae4814037C7E11Ce1;
   /**
    * Number of business days from trade date to settlement date.
@@ -5661,6 +5651,406 @@ export interface DD5Bd42D8B6Ec6C31D7865 {
     | "ZWL";
 }
 /**
+ * Resolved exercise claim after debt has been converted, called, put, or redeemed.
+ *
+ * These contractual amounts replace the debt and its future coupons. Any
+ * earned but unpaid coupon must be included in `cash`. Shares are delivered
+ * ex-dividend on `delivery_date`. Same-day completed exercise needs no record;
+ * use this state to retain a delayed delivery without replaying the option.
+ */
+export interface D_532D79936E466Cf90D8A {
+  cash: DD5Bd42D8B6Ec6C31D7866;
+  /**
+   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+   */
+  delivery_date: string;
+  /**
+   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+   */
+  exercise_date: string;
+  recovery_basis: DD5Bd42D8B6Ec6C31D7867;
+  /**
+   * Fixed number of shares to deliver, finite and nonnegative.
+   */
+  shares: number;
+}
+/**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
+ */
+export interface DD5Bd42D8B6Ec6C31D7866 {
+  /**
+   * Exact decimal encoded only as a JSON string.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
+ */
+export interface DD5Bd42D8B6Ec6C31D7867 {
+  /**
+   * Exact decimal encoded only as a JSON string.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
  * Scenario-only pricing adjustments.
  */
 export interface DB559Ae4814037C7E11Ce1 {
@@ -5714,7 +6104,7 @@ export interface D_756Aabf913F51B821A96 {
    * date alone.
    */
   calendar_id?: D_557De6D70142Abc041E8 | null;
-  commitment: DD5Bd42D8B6Ec6C31D7866;
+  commitment: DD5Bd42D8B6Ec6C31D7868;
   /**
    * Scheduled commitment changes (amortizing commitments, availability
    * expiries, accordions), each in force from its date until the next.
@@ -5977,7 +6367,7 @@ export interface D_756Aabf913F51B821A96 {
     | {
         stochastic: DD3Bbe1A355Ec94307B4C;
       };
-  drawn: DD5Bd42D8B6Ec6C31D7869;
+  drawn: DD5Bd42D8B6Ec6C31D78611;
   fees: D_12Fd8E2C005F5987500B;
   frequency: DCc937Fbaa12E32D4187E5;
   /**
@@ -6154,7 +6544,7 @@ export interface D_87642A02554Ab08B56E32 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DD5Bd42D8B6Ec6C31D7866 {
+export interface DD5Bd42D8B6Ec6C31D7868 {
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -6338,7 +6728,7 @@ export interface DD5Bd42D8B6Ec6C31D7866 {
  * (`reduction_fee_bp` must be zero).
  */
 export interface DCdcefb52Fec44Ed9Ad4D {
-  amount: DD5Bd42D8B6Ec6C31D7867;
+  amount: DD5Bd42D8B6Ec6C31D7869;
   /**
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
@@ -6366,7 +6756,7 @@ export interface DCdcefb52Fec44Ed9Ad4D {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DD5Bd42D8B6Ec6C31D7867 {
+export interface DD5Bd42D8B6Ec6C31D7869 {
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -6540,7 +6930,7 @@ export interface DD5Bd42D8B6Ec6C31D7867 {
  * A single draw or repayment event.
  */
 export interface D_15F166119Ad533748A6A {
-  amount: DD5Bd42D8B6Ec6C31D7868;
+  amount: DD5Bd42D8B6Ec6C31D78610;
   /**
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
@@ -6568,7 +6958,7 @@ export interface D_15F166119Ad533748A6A {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DD5Bd42D8B6Ec6C31D7868 {
+export interface DD5Bd42D8B6Ec6C31D78610 {
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -6958,7 +7348,7 @@ export interface D_0Db717D28554658Ae7C4 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DD5Bd42D8B6Ec6C31D7869 {
+export interface DD5Bd42D8B6Ec6C31D78611 {
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -7282,14 +7672,14 @@ export interface D_738Ce1C4A1De2Cbb6225 {
    * recovered at the facility recovery rate. Defaults to `0.0`.
    */
   leq?: number;
-  outstanding: DD5Bd42D8B6Ec6C31D78611;
-  sublimit: DD5Bd42D8B6Ec6C31D78612;
+  outstanding: DD5Bd42D8B6Ec6C31D78613;
+  sublimit: DD5Bd42D8B6Ec6C31D78614;
 }
 /**
  * Issuance or expiry of a letter of credit under a facility's LC sublimit.
  */
 export interface D_706Cd4B04E5E632E9D55 {
-  amount: DD5Bd42D8B6Ec6C31D78610;
+  amount: DD5Bd42D8B6Ec6C31D78612;
   /**
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
@@ -7318,383 +7708,383 @@ export interface D_706Cd4B04E5E632E9D55 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DD5Bd42D8B6Ec6C31D78610 {
-  /**
-   * Exact decimal encoded only as a JSON string.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
- */
-export interface DD5Bd42D8B6Ec6C31D78611 {
-  /**
-   * Exact decimal encoded only as a JSON string.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
- */
 export interface DD5Bd42D8B6Ec6C31D78612 {
+  /**
+   * Exact decimal encoded only as a JSON string.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
+ */
+export interface DD5Bd42D8B6Ec6C31D78613 {
+  /**
+   * Exact decimal encoded only as a JSON string.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
+ */
+export interface DD5Bd42D8B6Ec6C31D78614 {
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -8194,7 +8584,7 @@ export interface DB559Ae4814037C7E11Ce2 {
  * consent fees the borrower pays on a known date.
  */
 export interface DA34Dcb09Eabb2F8Fad88 {
-  amount: DD5Bd42D8B6Ec6C31D78613;
+  amount: DD5Bd42D8B6Ec6C31D78615;
   /**
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
@@ -8218,7 +8608,7 @@ export interface DA34Dcb09Eabb2F8Fad88 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DD5Bd42D8B6Ec6C31D78613 {
+export interface DD5Bd42D8B6Ec6C31D78615 {
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -8991,7 +9381,7 @@ export interface D_8Dd62D29564577Ef6F97 {
    */
   maturity: string;
   metric_pricing_overrides?: D_3883C45B3701884Ad50B3;
-  notional_limit: DD5Bd42D8B6Ec6C31D78617;
+  notional_limit: DD5Bd42D8B6Ec6C31D78619;
   /**
    * Optional EIR amortization settings for reporting schedules
    */
@@ -9159,7 +9549,7 @@ export interface DB3E76292F394D4D38A21 {
  * excess cash flow, reducing outstanding principal.
  */
 export interface D_921D6786A1Addb2Dd23C {
-  amount: DD5Bd42D8B6Ec6C31D78614;
+  amount: DD5Bd42D8B6Ec6C31D78616;
   /**
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
@@ -9183,7 +9573,7 @@ export interface D_921D6786A1Addb2Dd23C {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DD5Bd42D8B6Ec6C31D78614 {
+export interface DD5Bd42D8B6Ec6C31D78616 {
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -9428,7 +9818,7 @@ export interface D_2477996Edc1959Af8D37 {
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
   availability_start: string;
-  commitment: DD5Bd42D8B6Ec6C31D78615;
+  commitment: DD5Bd42D8B6Ec6C31D78617;
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -9475,7 +9865,7 @@ export interface D_2477996Edc1959Af8D37 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DD5Bd42D8B6Ec6C31D78615 {
+export interface DD5Bd42D8B6Ec6C31D78617 {
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -9653,7 +10043,7 @@ export interface DD5Bd42D8B6Ec6C31D78615 {
  * after `date`.
  */
 export interface D_15E0A0E0C92Dbbdf6D8D {
-  amount: DD5Bd42D8B6Ec6C31D78616;
+  amount: DD5Bd42D8B6Ec6C31D78618;
   /**
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
@@ -9677,7 +10067,7 @@ export interface D_15E0A0E0C92Dbbdf6D8D {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DD5Bd42D8B6Ec6C31D78616 {
+export interface DD5Bd42D8B6Ec6C31D78618 {
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -9938,7 +10328,7 @@ export interface D_3883C45B3701884Ad50B3 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DD5Bd42D8B6Ec6C31D78617 {
+export interface DD5Bd42D8B6Ec6C31D78619 {
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -10252,7 +10642,7 @@ export interface DB5Fbe42D95B9Dc65Bd05 {
    */
   margin_spec?: DCd57B00Ea344F9A6F7Fd | null;
   metric_pricing_overrides?: D_3883C45B3701884Ad50B4;
-  notional: DD5Bd42D8B6Ec6C31D78624;
+  notional: DD5Bd42D8B6Ec6C31D78626;
   scenario_pricing_overrides?: DB559Ae4814037C7E11Ce4;
   /**
    * Direction of the swap (Pay or Receive).
@@ -10542,10 +10932,6 @@ export interface DF6Da7F7Ae3129Fc74F07 {
    */
   end_of_month?: boolean;
   frequency: DCc937Fbaa12E32D4187E7;
-  /**
-   * Optional par-rate calculation method override
-   */
-  par_method?: D_54276F30E34C6F41Bcca | null;
   /**
    * Payment lag in business days after period end (default: 0).
    *
@@ -11497,7 +11883,7 @@ export interface DD935E8Af56B4A92Db192 {
    * Standard is 10 days under BCBS-IOSCO. CCPs may use shorter periods.
    */
   mpor_days: number;
-  mta: DD5Bd42D8B6Ec6C31D78618;
+  mta: DD5Bd42D8B6Ec6C31D78620;
   /**
    * Whether IM must be held in a segregated account.
    *
@@ -11505,406 +11891,7 @@ export interface DD935E8Af56B4A92Db192 {
    * to protect it in case of the collecting party's insolvency.
    */
   segregated: boolean;
-  threshold: DD5Bd42D8B6Ec6C31D78619;
-}
-/**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
- */
-export interface DD5Bd42D8B6Ec6C31D78618 {
-  /**
-   * Exact decimal encoded only as a JSON string.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
- */
-export interface DD5Bd42D8B6Ec6C31D78619 {
-  /**
-   * Exact decimal encoded only as a JSON string.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
- * Variation margin parameters.
- *
- * Governs daily mark-to-market collateral exchange.
- */
-export interface D_9B513F9D33905Fc46547 {
-  /**
-   * Margin call frequency.
-   *
-   * Under BCBS-IOSCO, daily margin exchange is required.
-   */
-  frequency: "daily" | "weekly" | "monthly" | "on_demand";
-  independent_amount: DD5Bd42D8B6Ec6C31D78620;
-  mta: DD5Bd42D8B6Ec6C31D78621;
-  rounding: DD5Bd42D8B6Ec6C31D78622;
-  /**
-   * Settlement lag in business days (T+n).
-   *
-   * Standard is T+1 for VM under 2016 VM CSA.
-   */
-  settlement_lag: number;
-  threshold: DD5Bd42D8B6Ec6C31D78623;
+  threshold: DD5Bd42D8B6Ec6C31D78621;
 }
 /**
  * Currency-tagged monetary amount with safe arithmetic.
@@ -12283,6 +12270,29 @@ export interface DD5Bd42D8B6Ec6C31D78621 {
     | "ZWL";
 }
 /**
+ * Variation margin parameters.
+ *
+ * Governs daily mark-to-market collateral exchange.
+ */
+export interface D_9B513F9D33905Fc46547 {
+  /**
+   * Margin call frequency.
+   *
+   * Under BCBS-IOSCO, daily margin exchange is required.
+   */
+  frequency: "daily" | "weekly" | "monthly" | "on_demand";
+  independent_amount: DD5Bd42D8B6Ec6C31D78622;
+  mta: DD5Bd42D8B6Ec6C31D78623;
+  rounding: DD5Bd42D8B6Ec6C31D78624;
+  /**
+   * Settlement lag in business days (T+n).
+   *
+   * Standard is T+1 for VM under 2016 VM CSA.
+   */
+  settlement_lag: number;
+  threshold: DD5Bd42D8B6Ec6C31D78625;
+}
+/**
  * Currency-tagged monetary amount with safe arithmetic.
  *
  * Values retain decimal precision independently of ISO 4217 display precision.
@@ -12659,6 +12669,382 @@ export interface DD5Bd42D8B6Ec6C31D78623 {
     | "ZWL";
 }
 /**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
+ */
+export interface DD5Bd42D8B6Ec6C31D78624 {
+  /**
+   * Exact decimal encoded only as a JSON string.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
+ */
+export interface DD5Bd42D8B6Ec6C31D78625 {
+  /**
+   * Exact decimal encoded only as a JSON string.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
  * Metric-time pricing configuration.
  */
 export interface D_3883C45B3701884Ad50B4 {
@@ -12706,7 +13092,7 @@ export interface D_3883C45B3701884Ad50B4 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DD5Bd42D8B6Ec6C31D78624 {
+export interface DD5Bd42D8B6Ec6C31D78626 {
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -13255,7 +13641,7 @@ export interface DB925Ced0Cbd67041A76F {
    */
   maturity: string;
   metric_pricing_overrides?: D_3883C45B3701884Ad50B5;
-  notional: DD5Bd42D8B6Ec6C31D78625;
+  notional: DD5Bd42D8B6Ec6C31D78627;
   /**
    * Optional compounded-overnight coupon terms.
    *
@@ -13475,7 +13861,7 @@ export interface D_3883C45B3701884Ad50B5 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DD5Bd42D8B6Ec6C31D78625 {
+export interface DD5Bd42D8B6Ec6C31D78627 {
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -13834,7 +14220,7 @@ export interface DDcc2738B179Dc9Ea48C6 {
   id: string;
   instrument_pricing_overrides?: D_230003E250762A70Be536;
   metric_pricing_overrides?: D_3883C45B3701884Ad50B6;
-  notional: DD5Bd42D8B6Ec6C31D78626;
+  notional: DD5Bd42D8B6Ec6C31D78628;
   /**
    * Option type (payer or receiver swaption)
    */
@@ -13966,7 +14352,7 @@ export interface D_3883C45B3701884Ad50B6 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DD5Bd42D8B6Ec6C31D78626 {
+export interface DD5Bd42D8B6Ec6C31D78628 {
   /**
    * Exact decimal encoded only as a JSON string.
    */
@@ -14457,10 +14843,6 @@ export interface DF6Da7F7Ae3129Fc74F071 {
    */
   end_of_month?: boolean;
   frequency: DCc937Fbaa12E32D4187E7;
-  /**
-   * Optional par-rate calculation method override
-   */
-  par_method?: D_54276F30E34C6F41Bcca | null;
   /**
    * Payment lag in business days after period end (default: 0).
    *
@@ -15197,7 +15579,7 @@ export interface D_9699Cb3C9E4A8E981880 {
  * assert_eq!(notional.amount(), 1_000_000.0);
  * ```
  */
-export interface DD5Bd42D8B6Ec6C31D78627 {
+export interface DD5Bd42D8B6Ec6C31D78629 {
   /**
    * Exact decimal encoded only as a JSON string.
    */

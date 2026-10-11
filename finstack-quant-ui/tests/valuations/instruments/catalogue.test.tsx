@@ -78,18 +78,18 @@ it("searches grouped choices, converts only selected modules once and reuses the
   render(<Form />);
   await screen.findByRole("textbox", { name: "Amount" });
   await select("equity");
-  await select("commodity_option");
+  await select("commodity_spot_option");
   await select("bond");
-  for (const type of ["bond", "equity", "commodity_option"])
+  for (const type of ["bond", "equity", "commodity_spot_option"])
     expect(counts.get(type)).toBe(1);
   expect(
     [...counts.keys()]
       .filter((type) => instruments.some((entry) => entry.type === type))
       .sort(),
-  ).toEqual(["bond", "commodity_option", "equity"]);
+  ).toEqual(["bond", "commodity_spot_option", "equity"]);
   expect(
     JSON.parse(localStorage.getItem("finstack.recent-instruments")!),
-  ).toEqual(["bond", "commodity_option", "equity"]);
+  ).toEqual(["bond", "commodity_spot_option", "equity"]);
   expect(
     screen.getByRole("navigation", { name: "Recently used instruments" }),
   ).toBeTruthy();

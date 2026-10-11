@@ -20,7 +20,6 @@
               "count": 6,
               "unit": "months"
             },
-            "par_method": null,
             "payment_lag_days": 0,
             "rate": "0.04",
             "start": "2024-01-02",
@@ -1901,21 +1900,6 @@
         "spec"
       ],
       "type": "object"
-    },
-    "d_86adce12bb0a0fd5d9ff": {
-      "description": "Method for calculating par rates in swaps",
-      "oneOf": [
-        {
-          "const": "forward_based",
-          "description": "Use forward-curve based float PV over the schedule (market standard)",
-          "type": "string"
-        },
-        {
-          "const": "discount_ratio",
-          "description": "Use discount-curve ratio for bootstrapping",
-          "type": "string"
-        }
-      ]
     },
     "d_8a837e6f142b34e8cfd4": {
       "description": "Optimal toggle configuration using nested Monte Carlo simulation.\n\nAt each coupon date the toggle runs a small nested MC to estimate the\nequity value (call-option payoff on the firm's assets) under two\nscenarios:\n\n1. **Cash** – the firm pays out the coupon, reducing asset value by\n   the coupon amount while notional stays unchanged.\n2. **PIK** – the coupon accretes to notional (no cash outflow), so\n   asset value is preserved but the default barrier rises.\n\nPIK is elected when the estimated equity value under PIK exceeds\nthat under cash.  The nested simulation uses a simple GBM forward\nevolution of asset value with a first-passage barrier check.",
@@ -5221,17 +5205,6 @@
           "$ref": "#/$defs/d_47e5e74524615b78a19f",
           "description": "Payment frequency"
         },
-        "par_method": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_86adce12bb0a0fd5d9ff"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional par-rate calculation method override"
-        },
         "payment_lag_days": {
           "default": 0,
           "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
@@ -5528,7 +5501,7 @@
         },
         {
           "const": "taylor_approximation",
-          "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian.",
+          "description": "Taylor approximation using sensitivities (Greeks).\n\nComputes first and second directional derivatives by selected-model\nrepricing along each exact historical shock. Curve interpolation support,\nquote calibration, surface nodes, and reporting-currency FX all remain\npart of the direction. It may be inaccurate for large nonlinear shocks\nand need not be faster than full revaluation. At zero volatility a\nsecond-order forward stencil replaces the central stencil.",
           "type": "string"
         }
       ]

@@ -28,6 +28,16 @@ const HORIZONS: [(&str, &str); 3] = [
 const EXPECTED_FAILURES: &[(&str, &[&str], &str)] = &[
     // Market-held observations the rolled repricing does not yet receive.
     (
+        "registry/inflation_linked_bond",
+        &["6M"],
+        "the registry market deliberately has no CPI observations; the 6M roll crosses publication dates and theta does not synthesize published CPI history",
+    ),
+    (
+        "golden/regression_goldens/inflation_linked_bond/inflation_linked_bond_5y",
+        &["1D", "1M", "6M"],
+        "theta does not synthesize monthly CPI publications; the rolled linker requires observations beyond the fixture's published history",
+    ),
+    (
         "golden/bloomberg/cap_floor/usd_cap_5y_atm_black",
         &["1M", "6M"],
         CAP_FIXINGS,

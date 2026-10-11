@@ -241,7 +241,6 @@ def build_irs() -> dict[str, Any]:
                         "stub": "none",
                         "start": "2026-05-04",
                         "end": "2031-05-04",
-                        "par_method": None,
                         "payment_lag_days": 0,
                     },
                     "float_leg": {

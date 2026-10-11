@@ -1,10 +1,4 @@
-use super::annuity::{
-    asset_swap_forward_components, fixed_leg_annuity, par_rate_and_annuity_from_discount,
-};
 use super::compute::clear_price_driving_overrides;
-use crate::instruments::fixed_income::bond::metrics::price_yield_spread::asw::{
-    asw_leg_schedule, resolved_asw_forward_curve_id,
-};
 use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::BondZSpreadPricingKernel;
 use crate::instruments::fixed_income::bond::{Bond, CashflowSpec};
 use crate::pricer::ModelKey;
@@ -174,87 +168,10 @@ pub(super) fn price_from_asw_market(
     as_of: Date,
     asw_market: f64,
 ) -> Result<f64> {
-    // Only well-defined for fixed-rate, non-custom bonds in this helper.
-    if bond.custom_cashflows.is_some() {
+    if bond.custom_cashflows.is_some() || !matches!(bond.cashflow_spec, CashflowSpec::Fixed(_)) {
         return Err(finstack_quant_core::InputError::Invalid.into());
     }
-    let (coupon, frequency, stub) = match &bond.cashflow_spec {
-        CashflowSpec::Fixed(spec) => (
-            bond.cashflow_spec
-                .plain_fixed_rate()?
-                .ok_or(finstack_quant_core::InputError::Invalid)?,
-            spec.schedule.frequency,
-            spec.schedule.stub,
-        ),
-        _ => return Err(finstack_quant_core::InputError::Invalid.into()),
-    };
-
-    let disc = curves.get_discount(&bond.discount_curve_id)?;
-
-    // Mirror the schedule and annuity definition used by AssetSwapMarketCalculator
-    // (discount-ratio approximation on the fixed-leg schedule).
-    if as_of >= bond.maturity {
-        return Err(finstack_quant_core::Error::Validation(
-            "ASW market price inversion requires at least two fixed-leg schedule dates".to_string(),
-        ));
-    }
-    let sched = asw_leg_schedule(as_of, bond.maturity, frequency, stub, None)?;
-    if sched.len() < 2 {
-        return Err(finstack_quant_core::Error::Validation(
-            "ASW market price inversion requires at least two fixed-leg schedule dates".to_string(),
-        ));
-    }
-
-    let day_count = bond.cashflow_spec.day_count();
-    let forward_components = if let Some(fwd_id) = resolved_asw_forward_curve_id(bond) {
-        let fwd = curves.get_forward(fwd_id.as_str())?;
-        Some(asset_swap_forward_components(
-            disc.as_ref(),
-            fwd.as_ref(),
-            day_count,
-            Some(frequency),
-            &sched,
-            0.0,
-        )?)
-    } else {
-        None
-    };
-    let (par_rate, ann) = if let Some((float_pv, fixed_ann, float_ann)) = forward_components {
-        if fixed_ann.abs() < 1e-12 {
-            (0.0, 0.0)
-        } else {
-            (float_pv / fixed_ann, float_ann)
-        }
-    } else {
-        par_rate_and_annuity_from_discount(disc.as_ref(), day_count, Some(frequency), &sched)?
-    };
-    if bond.notional.amount().abs() < 1e-12 {
-        return Err(finstack_quant_core::Error::Validation(
-            "ASW market price inversion is undefined for near-zero notional".to_string(),
-        ));
-    }
-    // Use epsilon check to avoid unstable inversion when annuity is degenerate.
-    if ann.abs() < 1e-12 {
-        return Err(finstack_quant_core::Error::Validation(
-            "ASW market price inversion is undefined for near-zero fixed-leg annuity".to_string(),
-        ));
-    }
-
-    let price_pct = if let Some((float_pv, fixed_ann, float_ann)) = forward_components {
-        1.0 + coupon * fixed_ann - float_pv - asw_market * float_ann
-    } else {
-        // Mirror the AssetSwapMarketCalculator fallback (exact par-par form
-        // with the floating leg proxied on the same schedule using the
-        // discount curve's day count): invert
-        // asw = [(C - par)·Ann_fixed + (1 - p)] / Ann_float for p.
-        let float_ann = fixed_leg_annuity(disc.as_ref(), disc.day_count(), None, &sched)?;
-        if float_ann.abs() < 1e-12 {
-            return Err(finstack_quant_core::Error::Validation(
-                "ASW market price inversion is undefined for near-zero floating-leg annuity"
-                    .to_string(),
-            ));
-        }
-        1.0 + (coupon - par_rate) * ann - asw_market * float_ann
-    };
-    Ok(price_pct * bond.notional.amount())
+    let (coupon_pv, float_pv, float_annuity) =
+        crate::instruments::fixed_income::bond::metrics::price_yield_spread::asw::settlement_asw_components(bond, curves, as_of)?;
+    Ok((1.0 + coupon_pv - float_pv - asw_market * float_annuity) * bond.notional.amount())
 }

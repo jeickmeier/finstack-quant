@@ -137,16 +137,10 @@ fn p1_deal_call_proceeds_include_final_stub_collateral_interest() {
         .filter(|dt| **dt >= d(2026, 1, 1))
         .min()
         .expect("call date");
-    let prev_pay = *a
-        .cashflows
-        .iter()
-        .map(|(dt, _)| dt)
-        .filter(|dt| **dt < call_date)
-        .max()
-        .expect("previous payment date");
+    // The call is paid on January 2, but the contractual quarter ends January 1.
     let stub = DayCount::Act360
-        .year_fraction(prev_pay, call_date, DayCountContext::default())
-        .expect("stub");
+        .year_fraction(d(2025, 10, 1), d(2026, 1, 1), DayCountContext::default())
+        .expect("contractual accrual");
     let collateral_stub_interest = 100_000_000.0 * 0.08 * stub;
     let a_accrued = 90_000_000.0 * 0.05 * stub;
     let paid_a = flows_on(&a.cashflows, call_date);
@@ -388,6 +382,7 @@ fn p5_oc_cure_is_sized_for_an_interest_funded_paydown() {
             interest_collections: usd(25_000_000.0),
             principal_collections: usd(0.0),
             payment_date: d(2024, 4, 1),
+            accrual_end: d(2024, 4, 1),
             period_start: d(2024, 1, 1),
             valuation_date: d(2024, 1, 1),
             pool_balance: usd(118_000_000.0),

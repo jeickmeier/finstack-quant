@@ -3,11 +3,9 @@
 //! Lookback options depend on the maximum or minimum spot price
 //! observed over the life of the option.
 //!
-//! This payoff tracks extrema on **engine event dates only** (discrete /
-//! daily-close monitoring). It is not a continuous-monitoring lookback:
-//! intra-step Brownian-bridge extrema are not computed. By default every
-//! event step is observed; `with_monitoring` restricts the extremum to the
-//! contractual observation steps of a discretely monitored lookback.
+//! Event-date extrema implement discrete monitoring. Calling
+//! `with_continuous_monitoring` samples the conditional log-GBM Brownian-bridge
+//! extremum inside each interval, using the engine's per-step uniform draw.
 //!
 //! # Unified Implementation
 //!
@@ -20,6 +18,64 @@ use crate::monte_carlo::traits::Payoff;
 use crate::types::OptionType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
+
+/// Conditional log-GBM extremum state shared by fixed and floating payoffs.
+#[derive(Debug, Clone)]
+struct ContinuousExtremum {
+    volatility: f64,
+    previous: Option<(f64, f64)>,
+}
+
+impl ContinuousExtremum {
+    fn new(volatility: f64) -> finstack_quant_core::Result<Self> {
+        if !volatility.is_finite() || volatility < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "Continuous lookback volatility must be finite and nonnegative".into(),
+            ));
+        }
+        Ok(Self {
+            volatility,
+            previous: None,
+        })
+    }
+
+    fn sample(
+        &mut self,
+        state: &PathState,
+        spot: f64,
+        maximum: bool,
+    ) -> finstack_quant_core::Result<f64> {
+        if spot <= 0.0 || !state.time.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "Continuous lognormal lookback requires positive spot and finite time".into(),
+            ));
+        }
+        let current = spot.ln();
+        let previous = self.previous.replace((state.time, current));
+        let Some((time, log_spot)) = previous else {
+            return Ok(spot);
+        };
+        let dt = state.time - time;
+        if dt < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "Continuous lookback event times must be nondecreasing".into(),
+            ));
+        }
+        let variance = self.volatility * self.volatility * dt;
+        let root = if variance == 0.0 {
+            (current - log_spot).abs()
+        } else {
+            let u = state.uniform_random();
+            if !u.is_finite() || !(0.0..=1.0).contains(&u) {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Lookback bridge requires a uniform draw in [0,1]".into(),
+                ));
+            }
+            ((current - log_spot).powi(2) - 2.0 * variance * u.max(f64::MIN_POSITIVE).ln()).sqrt()
+        };
+        Ok((0.5 * (current + log_spot + if maximum { root } else { -root })).exp())
+    }
+}
 
 /// Unified fixed-strike lookback option.
 ///
@@ -65,6 +121,7 @@ pub struct Lookback {
 
     /// Steps at which the extremum is observed (every step by default).
     monitoring: BarrierMonitoring,
+    bridge: Option<ContinuousExtremum>,
     /// Extreme spot price observed (max for Call, min for Put)
     extreme_spot: f64,
     /// Initial extremum for reset (preserves seasoning across MC paths)
@@ -89,6 +146,7 @@ impl Lookback {
             notional,
             maturity_step,
             monitoring: BarrierMonitoring::Continuous { start_step: 0 },
+            bridge: None,
             extreme_spot,
             initial_extreme: extreme_spot,
         }
@@ -122,6 +180,7 @@ impl Lookback {
             notional,
             maturity_step,
             monitoring: BarrierMonitoring::Continuous { start_step: 0 },
+            bridge: None,
             extreme_spot: initial_extremum,
             initial_extreme: initial_extremum,
         }
@@ -137,13 +196,43 @@ impl Lookback {
     #[must_use]
     pub fn with_monitoring(mut self, monitoring: BarrierMonitoring) -> Self {
         self.monitoring = monitoring;
+        self.bridge = None;
         self
+    }
+
+    /// Monitor the continuous GBM extremum between engine event dates.
+    ///
+    /// The bridge is exact for constant volatility and piecewise-constant
+    /// log drift on the supplied grid. It samples one independent uniform
+    /// per step and changes the payoff's random-stream consumption.
+    ///
+    /// # Arguments
+    ///
+    /// * `volatility` - Finite nonnegative annualized lognormal spot volatility
+    ///   in decimal units, using the same year clock as the simulated process.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for negative or non-finite volatility.
+    pub fn with_continuous_monitoring(
+        mut self,
+        volatility: f64,
+    ) -> finstack_quant_core::Result<Self> {
+        self.bridge = Some(ContinuousExtremum::new(volatility)?);
+        self.monitoring = BarrierMonitoring::Continuous { start_step: 0 };
+        Ok(self)
     }
 }
 
 impl Payoff for Lookback {
     fn supports_lrm_greeks(&self) -> bool {
-        self.maturity_step > 0 && !self.monitoring.observes(0)
+        self.bridge.is_none() && self.maturity_step > 0 && !self.monitoring.observes(0)
+    }
+
+    fn needs_uniform_random(&self) -> bool {
+        self.bridge
+            .as_ref()
+            .is_some_and(|bridge| bridge.volatility > 0.0)
     }
 
     /// Update the tracked extremum when the event falls on or before maturity.
@@ -159,9 +248,13 @@ impl Payoff for Lookback {
     fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
         if state.step <= self.maturity_step && self.monitoring.observes(state.step) {
             let spot = super::require_finite_state(state.spot(), "SPOT", state.step)?;
+            let extreme = match &mut self.bridge {
+                Some(bridge) => bridge.sample(state, spot, self.option_type == OptionType::Call)?,
+                None => spot,
+            };
             self.extreme_spot = match self.option_type {
-                OptionType::Call => self.extreme_spot.max(spot),
-                OptionType::Put => self.extreme_spot.min(spot),
+                OptionType::Call => self.extreme_spot.max(extreme),
+                OptionType::Put => self.extreme_spot.min(extreme),
             };
         }
         Ok(())
@@ -177,6 +270,9 @@ impl Payoff for Lookback {
 
     fn reset(&mut self) {
         self.extreme_spot = self.initial_extreme;
+        if let Some(bridge) = &mut self.bridge {
+            bridge.previous = None;
+        }
     }
 
     fn max_event_step(&self) -> Option<usize> {
@@ -203,6 +299,7 @@ pub struct FloatingStrikeLookback {
 
     /// Steps at which the extremum is observed (every step by default).
     monitoring: BarrierMonitoring,
+    bridge: Option<ContinuousExtremum>,
     terminal_spot: f64,
     /// Extreme spot price observed (min for Call, max for Put)
     extreme_spot: f64,
@@ -248,6 +345,7 @@ impl FloatingStrikeLookback {
             notional,
             maturity_step,
             monitoring: BarrierMonitoring::Continuous { start_step: 0 },
+            bridge: None,
             terminal_spot: 0.0,
             extreme_spot: initial_extremum,
             initial_extreme: initial_extremum,
@@ -264,13 +362,43 @@ impl FloatingStrikeLookback {
     #[must_use]
     pub fn with_monitoring(mut self, monitoring: BarrierMonitoring) -> Self {
         self.monitoring = monitoring;
+        self.bridge = None;
         self
+    }
+
+    /// Monitor the continuous GBM extremum between engine event dates.
+    ///
+    /// The bridge is exact for constant volatility and piecewise-constant
+    /// log drift on the supplied grid. It samples one independent uniform
+    /// per step and changes the payoff's random-stream consumption.
+    ///
+    /// # Arguments
+    ///
+    /// * `volatility` - Finite nonnegative annualized lognormal spot volatility
+    ///   in decimal units, using the same year clock as the simulated process.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for negative or non-finite volatility.
+    pub fn with_continuous_monitoring(
+        mut self,
+        volatility: f64,
+    ) -> finstack_quant_core::Result<Self> {
+        self.bridge = Some(ContinuousExtremum::new(volatility)?);
+        self.monitoring = BarrierMonitoring::Continuous { start_step: 0 };
+        Ok(self)
     }
 }
 
 impl Payoff for FloatingStrikeLookback {
     fn supports_lrm_greeks(&self) -> bool {
-        self.maturity_step > 0 && !self.monitoring.observes(0)
+        self.bridge.is_none() && self.maturity_step > 0 && !self.monitoring.observes(0)
+    }
+
+    fn needs_uniform_random(&self) -> bool {
+        self.bridge
+            .as_ref()
+            .is_some_and(|bridge| bridge.volatility > 0.0)
     }
 
     /// Update the tracked extremum and capture terminal spot at maturity.
@@ -287,9 +415,15 @@ impl Payoff for FloatingStrikeLookback {
         if state.step <= self.maturity_step {
             let spot = super::require_finite_state(state.spot(), "SPOT", state.step)?;
             if self.monitoring.observes(state.step) {
+                let extreme = match &mut self.bridge {
+                    Some(bridge) => {
+                        bridge.sample(state, spot, self.option_type == OptionType::Put)?
+                    }
+                    None => spot,
+                };
                 self.extreme_spot = match self.option_type {
-                    OptionType::Call => self.extreme_spot.min(spot),
-                    OptionType::Put => self.extreme_spot.max(spot),
+                    OptionType::Call => self.extreme_spot.min(extreme),
+                    OptionType::Put => self.extreme_spot.max(extreme),
                 };
             }
             if state.step == self.maturity_step {
@@ -313,6 +447,9 @@ impl Payoff for FloatingStrikeLookback {
     fn reset(&mut self) {
         self.terminal_spot = 0.0;
         self.extreme_spot = self.initial_extreme;
+        if let Some(bridge) = &mut self.bridge {
+            bridge.previous = None;
+        }
     }
 
     fn max_event_step(&self) -> Option<usize> {
@@ -762,6 +899,124 @@ mod tests {
                 }
             }
             assert_eq!(finals, expected);
+        }
+    }
+    #[test]
+    fn continuous_bridge_resets_and_samples_both_sides() {
+        let mut call = Lookback::new(OptionType::Call, 100.0, 1.0, 1)
+            .with_continuous_monitoring(0.2)
+            .unwrap();
+        let mut put = Lookback::new(OptionType::Put, 100.0, 1.0, 1)
+            .with_continuous_monitoring(0.2)
+            .unwrap();
+        for _ in 0..2 {
+            let mut start = PathState::new(0, 0.0);
+            start.set(state_keys::SPOT, 100.0);
+            let mut end = PathState::new(1, 1.0);
+            end.set(state_keys::SPOT, 100.0);
+            end.set_uniform_random(0.5);
+            call.on_event(&mut start).unwrap();
+            call.on_event(&mut end).unwrap();
+            put.on_event(&mut start).unwrap();
+            put.on_event(&mut end).unwrap();
+            let log_extreme = (-0.5_f64 * 0.04 * 0.5_f64.ln()).sqrt();
+            assert!(
+                (call.value(Currency::USD).unwrap().amount() - 100.0 * log_extreme.exp_m1()).abs()
+                    < 1e-10
+            );
+            assert!(
+                (put.value(Currency::USD).unwrap().amount() - 100.0 * -(-log_extreme).exp_m1())
+                    .abs()
+                    < 1e-10
+            );
+            call.reset();
+            put.reset();
+        }
+    }
+
+    #[test]
+    fn continuous_lookback_grid_and_seed_convergence_meets_one_bp_budget() {
+        use crate::monte_carlo::pricer::path_dependent::{
+            PathDependentPricer, PathDependentPricerConfig,
+        };
+        use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess};
+        use crate::monte_carlo::TimeGrid;
+        // For zero log drift, the reflection principle gives
+        // max(log(S/S0)) ~ |N(0, sigma² T)|. Integrating its density yields
+        // E[max(S)] = 2 S0 exp(sigma² T/2) Phi(sigma sqrt(T)).
+        // This reference uses neither the lookback kernel nor bridge sampling.
+        let sigma = 0.03_f64;
+        let rate = 0.5 * sigma * sigma;
+        let df = (-rate).exp();
+        let expected_max = 200.0 * rate.exp() * finstack_quant_core::math::norm_cdf(sigma);
+        let fixed_reference = df * (expected_max - 100.0);
+        let floating_reference = df * expected_max - 100.0;
+        let process = GbmProcess::new(GbmParams::new(rate, 0.0, sigma).unwrap());
+        let budget = 100.0 * 1e-4;
+        let mut fixed_values = Vec::new();
+        let mut floating_values = Vec::new();
+        for steps in [1, 8, 32] {
+            for seed in [17, 29] {
+                let pricer = PathDependentPricer::new(PathDependentPricerConfig {
+                    num_paths: 1_000_000,
+                    seed,
+                    use_parallel: true,
+                    antithetic: true,
+                    ..Default::default()
+                });
+                let fixed = Lookback::new(OptionType::Call, 100.0, 1.0, steps)
+                    .with_continuous_monitoring(sigma)
+                    .unwrap();
+                let floating = FloatingStrikeLookback::new(OptionType::Put, 1.0, steps)
+                    .with_continuous_monitoring(sigma)
+                    .unwrap();
+                let fixed = pricer
+                    .price_with_grid(
+                        &process,
+                        100.0,
+                        TimeGrid::uniform(1.0, steps).unwrap(),
+                        &fixed,
+                        Currency::USD,
+                        df,
+                    )
+                    .unwrap();
+                let floating = pricer
+                    .price_with_grid(
+                        &process,
+                        100.0,
+                        TimeGrid::uniform(1.0, steps).unwrap(),
+                        &floating,
+                        Currency::USD,
+                        df,
+                    )
+                    .unwrap();
+                for (result, reference) in
+                    [(&fixed, fixed_reference), (&floating, floating_reference)]
+                {
+                    let half_width = 2.5758293035489004 * result.stderr;
+                    assert!(
+                        half_width < budget,
+                        "steps={steps}, seed={seed}, 99% half-width={half_width}"
+                    );
+                    assert!(
+                        (result.mean.amount() - reference).abs() < budget,
+                        "steps={steps}, seed={seed}, value={}, reference={reference}, stderr={}",
+                        result.mean.amount(),
+                        result.stderr
+                    );
+                }
+                fixed_values.push(fixed.mean.amount());
+                floating_values.push(floating.mean.amount());
+            }
+        }
+        for values in [fixed_values, floating_values] {
+            let min = values.iter().copied().fold(f64::INFINITY, f64::min);
+            let max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+            assert!(
+                max - min < budget,
+                "grid/seed refinement spread {} exceeds {budget}",
+                max - min
+            );
         }
     }
 }

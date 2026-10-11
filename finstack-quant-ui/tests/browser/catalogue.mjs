@@ -116,7 +116,7 @@ try {
       await page.goto(server.url, { waitUntil: "networkidle" });
       const input = page.getByRole("combobox", { name: "Instrument type" });
       const seen = [];
-      for (const type of ["bond", "equity", "commodity_option", "bond"]) {
+      for (const type of ["bond", "equity", "commodity_spot_option", "bond"]) {
         if (type !== "bond" || seen.length) {
           await input.fill(type);
           await page.getByRole("option", { name: type, exact: true }).click();
@@ -139,12 +139,16 @@ try {
           ])
           .filter(([, count]) => count),
       );
-      assert.deepEqual(selected, { commodity_option: 1, equity: 1, bond: 1 });
+      assert.deepEqual(selected, {
+        commodity_spot_option: 1,
+        equity: 1,
+        bond: 1,
+      });
       assert.deepEqual(
         await page.evaluate(() =>
           JSON.parse(localStorage.getItem("finstack.recent-instruments")),
         ),
-        ["bond", "commodity_option", "equity"],
+        ["bond", "commodity_spot_option", "equity"],
       );
       await page.addScriptTag({
         path: path.join(root, "node_modules/axe-core/axe.min.js"),

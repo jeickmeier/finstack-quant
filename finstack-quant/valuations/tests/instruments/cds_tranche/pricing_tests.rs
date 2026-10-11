@@ -149,14 +149,14 @@ fn test_at_maturity_pricing() {
     // Act
     let result = pricer.price_tranche(&tranche, &market, as_of);
 
-    // Assert: PV should be zero or minimal at maturity
+    // The final 12-day contractual stub remains payable on maturity.
     assert!(result.is_ok());
     let pv = result.unwrap();
     approx_eq(
         pv.amount(),
-        0.0,
-        1e-2,
-        "At maturity tranche should have minimal PV",
+        tranche.notional.amount() * tranche.coupon_bp / 10_000.0 * 12.0 / 360.0,
+        1e-6,
+        "At maturity retain the unsettled final premium",
     );
 }
 

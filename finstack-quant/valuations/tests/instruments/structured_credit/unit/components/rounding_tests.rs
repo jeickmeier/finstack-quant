@@ -52,6 +52,7 @@ fn run_rounding_test(amount: f64, rounding: RoundingConvention) -> f64 {
         interest_collections: Money::new(1_000_000.0, currency).expect("valid money fixture"),
         principal_collections: Money::new(0.0, currency).expect("valid money fixture"),
         payment_date: Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),
+        accrual_end: Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),
         period_start: Date::from_calendar_date(2023, time::Month::October, 1).unwrap(),
         valuation_date: Date::from_calendar_date(2023, time::Month::October, 1).unwrap(),
         pool_balance: Money::new(1_000_000.0, currency).expect("valid money fixture"),

@@ -25,9 +25,9 @@
     "schema": "schemas/commodity_future.json"
   },
   {
-    "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json",
-    "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_option.schema.json",
-    "schema": "schemas/commodity_option.json"
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_spot_option.schema.json",
+    "schema": "schemas/commodity_spot_option.json"
   },
   {
     "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spread_option.schema.json",

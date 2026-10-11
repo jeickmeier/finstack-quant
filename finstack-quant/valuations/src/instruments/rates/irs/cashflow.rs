@@ -439,7 +439,10 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
                 roll_rule: crate::cashflow::builder::specs::RollRule::None,
             },
         });
-    float_b.build(curves)
+    match (curves, as_of) {
+        (Some(market), Some(date)) => float_b.build_as_of(market, date),
+        _ => float_b.build(curves),
+    }
 }
 
 /// Build a full, signed cashflow schedule with `CFKind` metadata for an IRS with market curves.
@@ -519,6 +522,53 @@ mod tests {
     use finstack_quant_core::dates::{DayCount, DayCountContext, StubKind, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use time::macros::date;
+
+    #[test]
+    fn term_coupon_observation_cutoff_is_valuation_date_not_curve_base() {
+        use finstack_quant_core::market_data::{
+            scalars::ScalarTimeSeries, term_structures::ForwardCurve,
+        };
+        let mut irs = InterestRateSwap::example().expect("example");
+        irs.notional = Money::from((10_000_000_i64, irs.notional.currency()));
+        irs.float_leg.start = date!(2025 - 01 - 02);
+        irs.float_leg.end = date!(2025 - 04 - 02);
+        irs.float_leg.forward_curve_id = "TEST-TERM".into();
+        irs.float_leg.frequency = Tenor::quarterly();
+        irs.float_leg.compounding = FloatingLegCompounding::Simple;
+        irs.float_leg.reset_lag_days = 0;
+        irs.float_leg.spread_bp = Decimal::ZERO;
+        irs.float_leg.day_count = DayCount::Act360;
+        irs.float_leg.calendar_id = Some("weekends_only".into());
+        irs.float_leg.fixing_calendar_id = Some("weekends_only".into());
+        let curve = ForwardCurve::builder("TEST-TERM", 0.25)
+            .base_date(date!(2025 - 01 - 01))
+            .knots([(0.0, 0.04), (1.0, 0.04)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(curve);
+        let as_of = date!(2025 - 02 - 01);
+        assert!(float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of)).is_err());
+        let market = market.insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:TEST-TERM",
+                vec![(date!(2025 - 01 - 02), 0.06)],
+                None,
+            )
+            .expect("fixing"),
+        );
+        let schedule = float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of))
+            .expect("schedule");
+        let coupon = schedule
+            .get_flows()
+            .iter()
+            .find(|cf| cf.kind == CFKind::FloatReset)
+            .expect("coupon");
+        assert!(
+            (coupon.amount.amount() - 150_000.0).abs() < 1e-6,
+            "{}",
+            coupon.amount
+        );
+    }
 
     #[test]
     fn irs_leg_schedules_do_not_emit_notional_flows() {
@@ -778,7 +828,7 @@ mod tests {
                     stub: StubKind::ShortFront,
                     start,
                     end,
-                    par_method: None,
+
                     payment_lag_days: 0,
                     end_of_month: false,
                 })

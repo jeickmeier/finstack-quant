@@ -516,88 +516,29 @@ fn test_index_delta_with_very_small_spot() {
     assert!(delta.is_finite());
 }
 
-// Contract Size Edge Cases
-
+// Cash notional is the sole scale of both legs.
 #[test]
-fn test_equity_trs_with_zero_contract_size() {
-    // Arrange - Zero contract size should result in zero PV
+fn equity_trs_scales_both_legs_with_cash_notional() {
     let market = create_market_context();
-    let mut underlying =
-        EquityUnderlyingParams::new("SPX", "SPX-SPOT", USD).with_div_yield_id("SPX-DIV-YIELD");
-    underlying = underlying.with_contract_size(0.0);
-
-    let trs = EquityTotalReturnSwap::builder()
-        .id("TRS-ZERO-CONTRACT".into())
-        .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
-        .underlying(underlying)
-        .financing_leg(FinancingLegSpec::new(
-            "USD-OIS",
-            "USD-SOFR-3M",
-            Decimal::from(25),
-            DayCount::Act360,
-        ))
-        .schedule(TrsScheduleSpec::from_params(
-            as_of_date(),
-            d(2026, 1, 2),
-            ScheduleParams::quarterly_act360(),
-        ))
-        .side(PayReceive::Receive)
-        .dividend_settlement(
-            finstack_quant_valuations::instruments::equity::TrsDividendSettlement::OnDividendDate,
-        )
-        .build()
-        .unwrap();
-
-    // Act
-    let result = trs.value(&market, as_of_date());
-
-    // Assert
-    assert!(result.is_ok());
-    // TR leg should be zero, so NPV = -financing leg
-    let npv = result.unwrap();
-    let fin_pv = trs.pv_financing_leg(&market, as_of_date()).unwrap();
-    approx_eq(
-        npv.amount(),
-        -fin_pv.amount(),
-        TOLERANCE_CENTS,
-        "Zero contract size should zero out TR leg",
-    );
-}
-
-#[test]
-fn test_equity_trs_with_fractional_contract_size() {
-    // Arrange
-    let market = create_market_context();
-    let mut underlying =
-        EquityUnderlyingParams::new("SPX", "SPX-SPOT", USD).with_div_yield_id("SPX-DIV-YIELD");
-    underlying = underlying.with_contract_size(0.1); // Mini contract
-
-    let trs = EquityTotalReturnSwap::builder()
-        .id("TRS-MINI".into())
-        .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
-        .underlying(underlying)
-        .financing_leg(FinancingLegSpec::new(
-            "USD-OIS",
-            "USD-SOFR-3M",
-            Decimal::from(25),
-            DayCount::Act360,
-        ))
-        .schedule(TrsScheduleSpec::from_params(
-            as_of_date(),
-            d(2026, 1, 2),
-            ScheduleParams::quarterly_act360(),
-        ))
-        .side(PayReceive::Receive)
-        .dividend_settlement(
-            finstack_quant_valuations::instruments::equity::TrsDividendSettlement::OnDividendDate,
-        )
-        .build()
-        .unwrap();
-
-    // Act
-    let result = trs.value(&market, as_of_date());
-
-    // Assert
-    assert!(result.is_ok());
-    assert!(result.unwrap().amount().is_finite());
+    let trs = super::test_utils::TestEquityTrsBuilder::new().build();
+    let mut doubled = trs.clone();
+    doubled.notional = Money::new(trs.notional.amount() * 2.0, USD).expect("notional");
+    for (base, twice) in [
+        (
+            trs.pv_total_return_leg(&market, as_of_date()),
+            doubled.pv_total_return_leg(&market, as_of_date()),
+        ),
+        (
+            trs.pv_financing_leg(&market, as_of_date()),
+            doubled.pv_financing_leg(&market, as_of_date()),
+        ),
+    ] {
+        assert!(
+            (twice.expect("scaled leg").amount() - 2.0 * base.expect("base leg").amount()).abs()
+                < 1e-8
+        );
+    }
+    let mut obsolete = serde_json::to_value(&trs).expect("serialized");
+    obsolete["underlying"]["contract_size"] = serde_json::json!(100.0);
+    assert!(serde_json::from_value::<EquityTotalReturnSwap>(obsolete).is_err());
 }

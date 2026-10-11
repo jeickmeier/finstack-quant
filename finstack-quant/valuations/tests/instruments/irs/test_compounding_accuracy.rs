@@ -79,7 +79,6 @@ fn test_compounding_lookback_sensitivity() {
             payment_lag_days: 0,
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
-            par_method: None,
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
@@ -153,7 +152,6 @@ fn test_rate_cutoff_uses_business_day_lockout_over_weekend() {
             payment_lag_days: 0,
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
-            par_method: None,
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
@@ -209,40 +207,15 @@ fn test_payment_delay_sensitivity() {
     // but we're pricing on 2025-01-01, so past resets need fixings
     let fixings = finstack_quant_core::market_data::scalars::ScalarTimeSeries::new(
         "FIXING:FWD",
-        vec![
-            (
-                Date::from_calendar_date(2023, Month::December, 28).unwrap(),
-                0.05,
-            ),
-            (
-                Date::from_calendar_date(2024, Month::January, 1).unwrap(),
-                0.05,
-            ),
-            (
-                Date::from_calendar_date(2024, Month::March, 28).unwrap(),
-                0.05,
-            ),
-            (
-                Date::from_calendar_date(2024, Month::April, 1).unwrap(),
-                0.05,
-            ),
-            (
-                Date::from_calendar_date(2024, Month::June, 28).unwrap(),
-                0.05,
-            ),
-            (
-                Date::from_calendar_date(2024, Month::July, 1).unwrap(),
-                0.05,
-            ),
-            (
-                Date::from_calendar_date(2024, Month::September, 30).unwrap(),
-                0.05,
-            ),
-            (
-                Date::from_calendar_date(2024, Month::October, 1).unwrap(),
-                0.05,
-            ),
-        ],
+        (0..400)
+            .map(|day| {
+                (
+                    Date::from_calendar_date(2023, Month::December, 1).unwrap()
+                        + time::Duration::days(day),
+                    0.05,
+                )
+            })
+            .collect(),
         None,
     )
     .expect("fixings series");
@@ -313,7 +286,6 @@ fn test_seasoned_compounded_swap_requires_fixings() {
             payment_lag_days: 0,
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
-            par_method: None,
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
@@ -396,7 +368,6 @@ fn test_seasoned_compounded_swap_with_fixings_prices() {
             payment_lag_days: 0,
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
-            par_method: None,
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
@@ -474,7 +445,6 @@ fn test_compounded_swap_with_spread_near_zero_rates() {
             payment_lag_days: 0,
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
-            par_method: None,
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
@@ -566,7 +536,6 @@ fn test_compounded_swap_with_spread_negative_rates() {
             payment_lag_days: 0,
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
-            par_method: None,
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
@@ -666,7 +635,6 @@ fn test_observation_shift_before_curve_base_date() {
             payment_lag_days: 0,
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
-            par_method: None,
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),

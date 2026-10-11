@@ -578,7 +578,7 @@ fn build_swap(
         stub: leg_conv.stub,
         start,
         end: maturity,
-        par_method: None,
+
         payment_lag_days: leg_conv.payment_lag_days,
         end_of_month,
     };

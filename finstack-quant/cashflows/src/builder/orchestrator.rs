@@ -600,7 +600,25 @@ impl CashFlowBuilder {
         &self,
         curves: Option<&finstack_quant_core::market_data::context::MarketContext>,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        self.compile_plan()?.project(curves)
+        self.compile_plan()?.project(curves, None)
+    }
+
+    /// Build cashflows using the valuation date to distinguish historical fixings
+    /// from projections, independently of the forward curves' base dates.
+    ///
+    /// # Arguments
+    ///
+    /// * `curves` - Market context supplying projection curves and exact-date
+    ///   historical fixings under `FIXING:{forward_curve_id}`. Required floating
+    ///   inputs must be present unless the coupon explicitly configures a fallback.
+    /// * `as_of` - Observation cutoff: resets before this date require historical
+    ///   fixings; on this date an available fixing takes precedence over projection.
+    pub fn build_as_of(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<CashFlowSchedule> {
+        self.compile_plan()?.project(Some(curves), Some(as_of))
     }
 
     fn compile_plan(&self) -> finstack_quant_core::Result<CompiledCashFlowPlan> {
@@ -728,6 +746,7 @@ impl CompiledCashFlowPlan {
     fn project(
         &self,
         curves: Option<&finstack_quant_core::market_data::context::MarketContext>,
+        observation_date: Option<Date>,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         let accrual_start = self
             .fixed_schedules
@@ -770,6 +789,7 @@ impl CompiledCashFlowPlan {
         }
         let ctx = BuildContext {
             ccy,
+            observation_date,
             issue: self.issue,
             redemption_date: self.redemption_date,
             redemption_effective_date: self.redemption_effective_date,

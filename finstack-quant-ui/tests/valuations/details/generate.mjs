@@ -47,7 +47,7 @@ function bigintPaths(value, path = []) {
 }
 const cases = [];
 for (const type of [
-  "commodity_option",
+  "commodity_spot_option",
   "composite",
   "credit_default_swap",
   "fx_option",
@@ -62,7 +62,7 @@ for (const type of [
   let market = patch(await source(entry.marketSource), entry.marketPatches);
   let asOf = entry.request.asOf,
     model = entry.request.model;
-  if (type === "commodity_option") {
+  if (type === "commodity_spot_option") {
     const fixture = await read(commodityPath);
     instrument = fixture.commodity;
     market = fixture.market;
@@ -98,7 +98,7 @@ for (const type of [
     [],
   );
   const expected = {
-    commodity_option: "monte_carlo",
+    commodity_spot_option: "monte_carlo",
     composite: "composite",
     credit_default_swap: "credit_derivative",
     fx_option: "fx",

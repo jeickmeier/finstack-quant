@@ -4,7 +4,7 @@
 
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
@@ -110,9 +110,8 @@ fn collections(results: &HashMap<String, TrancheCashflows>) -> Vec<(Date, f64)> 
     by_date.into_iter().collect()
 }
 
-/// 30/360 accrual between two business-day-adjusted payment dates, which is
-/// what the pool earns: a payment date rolled off a weekend lengthens one
-/// period and shortens the next.
+/// 30/360 accrual between contractual monthly boundaries; payment rolls
+/// do not change the interest earned.
 fn accrual(from: Date, to: Date) -> f64 {
     DayCount::Thirty360
         .year_fraction(from, to, DayCountContext::default())
@@ -139,15 +138,16 @@ fn roll_rates_reproduce_the_hand_computed_schedule() {
     let collected = collections(&results);
     let mut performing = 1_000_000.0_f64;
     let mut prev = close();
-    for (month, (date, actual)) in collected.iter().take(12).enumerate() {
-        let expected = performing * 0.06 * accrual(prev, *date) * (1.0 - 0.5 * 0.01);
+    for (month, (_, actual)) in collected.iter().take(12).enumerate() {
+        let end = close().add_months(month as i32 + 1).expect("contract end");
+        let expected = performing * 0.06 * accrual(prev, end) * (1.0 - 0.5 * 0.01);
         assert!(
             (actual - expected).abs() < 0.02,
             "month {}: collected {actual} vs hand {expected}",
             month + 1
         );
         performing *= 0.99;
-        prev = *date;
+        prev = end;
     }
 
     let survivor = 1_000_000.0 * 0.99_f64.powi(60);
@@ -181,8 +181,9 @@ fn cures_return_balance_to_current_in_the_period_they_happen() {
     let mut buckets = [0.0_f64; 3];
     let mut arrears = 0.0_f64;
     let mut prev = close();
-    for (month, (date, actual)) in collected.iter().take(12).enumerate() {
-        let accrual = accrual(prev, *date);
+    for (month, (_, actual)) in collected.iter().take(12).enumerate() {
+        let end = close().add_months(month as i32 + 1).expect("contract end");
+        let accrual = accrual(prev, end);
         let entry = performing * 0.01;
         let delinquent_bop: f64 = buckets.iter().sum();
         let before = delinquent_bop + entry;
@@ -201,7 +202,7 @@ fn cures_return_balance_to_current_in_the_period_they_happen() {
         let repaid = arrears * cured_share;
         arrears -= repaid;
         let expected = (performing - 0.5 * entry) * 0.06 * accrual + repaid;
-        prev = *date;
+        prev = end;
         assert!(
             (actual - expected).abs() < 0.02,
             "month {}: collected {actual} vs hand {expected}",

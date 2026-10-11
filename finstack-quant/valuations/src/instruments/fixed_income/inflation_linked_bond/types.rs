@@ -187,6 +187,14 @@ pub struct InflationLinkedBond {
     pub lag: InflationLag,
     /// Deflation protection
     pub deflation_protection: DeflationProtection,
+    /// Black lognormal volatility of the contractual reference-CPI/base-CPI ratio.
+    /// The surface uses expiry in Act/365F years to the last required publication
+    /// and a Strike axis in ratio units (the par floor strikes at 1.0). The
+    /// supplied forward ratio and volatility are under the payment-date measure.
+    /// Required for a protected payment whose reference CPI is not yet known;
+    /// an explicitly supplied zero-volatility surface selects deterministic pricing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub floor_vol_surface_id: Option<CurveId>,
     /// Business day convention
     #[builder(default = BusinessDayConvention::ModifiedFollowing)]
     #[serde(default = "crate::serde_defaults::bdc_modified_following")]
@@ -343,6 +351,7 @@ impl InflationLinkedBond {
             indexation_method: IndexationMethod::Tips,
             lag: IndexationMethod::Tips.standard_lag(),
             deflation_protection: DeflationProtection::MaturityOnly,
+            floor_vol_surface_id: None,
             business_day_convention: BusinessDayConvention::Unadjusted,
             stub: StubKind::None,
             calendar_id: None,
@@ -742,6 +751,15 @@ impl crate::instruments::common_impl::traits::Instrument for InflationLinkedBond
         let mut deps = MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_inflation_curve(self.inflation_index_id.clone());
+        if let Some(id) = &self.floor_vol_surface_id {
+            deps.add_volatility_dependency(
+                crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                    id.clone(),
+                    None,
+                    Some(1.0),
+                ),
+            );
+        }
         Ok(deps)
     }
 
@@ -787,7 +805,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
     fn raw_cashflow_schedule(
         &self,
         curves: &MarketContext,
-        _as_of: Date,
+        as_of: Date,
     ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
         if self.issue_date >= self.maturity {
             return Ok(crate::cashflow::traits::schedule_from_classified_flows(
@@ -799,20 +817,20 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
                 },
             ));
         }
-        let inflation_source = self.inflation_source(curves)?;
         let periods = self.periods()?;
         let coupon_rate = self.real_coupon_rate()?;
 
         let mut detailed_flows = Vec::with_capacity(periods.len() + 1);
         let mut coupon_rows = Vec::with_capacity(periods.len());
-        for period in &periods {
+        for period in periods.iter().filter(|period| period.payment_date > as_of) {
             let accrual_factor = period.accrual_year_fraction.max(0.0);
             let base_amount = self.notional.amount() * coupon_rate * accrual_factor;
-            let raw_ratio = inflation_source.ratio(self, period.payment_date)?;
-            let ratio = match self.deflation_protection {
-                DeflationProtection::AllPayments => raw_ratio.max(1.0),
-                DeflationProtection::None | DeflationProtection::MaturityOnly => raw_ratio,
-            };
+            let ratio = self.payment_index_ratio(
+                period.payment_date,
+                curves,
+                as_of,
+                self.deflation_protection == DeflationProtection::AllPayments,
+            )?;
             coupon_rows.push((
                 period.payment_date,
                 base_amount * ratio,
@@ -827,21 +845,22 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
         )?;
 
         let principal_date = self.principal_payment_date()?;
-        let raw_principal_ratio = inflation_source.ratio(self, principal_date)?;
-        let principal_ratio = match self.deflation_protection {
-            DeflationProtection::None => raw_principal_ratio,
-            DeflationProtection::MaturityOnly | DeflationProtection::AllPayments => {
-                raw_principal_ratio.max(1.0)
-            }
-        };
-        detailed_flows.push(crate::cashflow::primitives::CashFlow::new(
-            principal_date,
-            None,
-            self.notional * principal_ratio,
-            crate::cashflow::primitives::CFKind::Notional,
-            0.0,
-            None,
-        ));
+        if principal_date > as_of {
+            let principal_ratio = self.payment_index_ratio(
+                principal_date,
+                curves,
+                as_of,
+                self.deflation_protection != DeflationProtection::None,
+            )?;
+            detailed_flows.push(crate::cashflow::primitives::CashFlow::new(
+                principal_date,
+                None,
+                self.notional * principal_ratio,
+                crate::cashflow::primitives::CFKind::Notional,
+                0.0,
+                None,
+            ));
+        }
 
         let schedule = crate::cashflow::traits::schedule_from_classified_flows(
             detailed_flows,
@@ -865,6 +884,91 @@ mod tests {
     use finstack_quant_core::market_data::scalars::{InflationIndex, InflationInterpolation};
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use time::Month;
+
+    #[test]
+    fn stored_cpi_is_not_known_before_publication() {
+        use time::macros::date;
+        let mut bond = InflationLinkedBond::example().expect("example");
+        bond.base_cpi = 100.0;
+        bond.lag = InflationLag::Months(3);
+        let index = InflationIndex::new(
+            "US-CPI",
+            vec![(date!(2025 - 03 - 01), 150.0)],
+            Currency::USD,
+        )
+        .expect("index")
+        .with_interpolation(InflationInterpolation::Linear)
+        .with_publication_dates(vec![(date!(2025 - 03 - 01), date!(2025 - 04 - 15))])
+        .expect("publication");
+        let curve = InflationCurve::builder("US-CPI")
+            .base_date(date!(2025 - 03 - 01))
+            .base_cpi(120.0)
+            .knots([(0.0, 120.0), (2.0, 120.0)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new()
+            .insert(curve)
+            .insert_inflation_index(index);
+        assert_eq!(
+            bond.index_ratio_from_market(date!(2025 - 06 - 01), &market, date!(2025 - 04 - 14))
+                .expect("projected"),
+            1.2
+        );
+        for as_of in [date!(2025 - 04 - 15), date!(2025 - 04 - 16)] {
+            assert_eq!(
+                bond.index_ratio_from_market(date!(2025 - 06 - 01), &market, as_of)
+                    .expect("published"),
+                1.5
+            );
+        }
+    }
+
+    #[test]
+    fn protected_unknown_cpi_includes_option_time_value() {
+        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use time::macros::date;
+        let mut bond = InflationLinkedBond::example().expect("example");
+        bond.base_cpi = 100.0;
+        bond.lag = InflationLag::None;
+        let as_of = date!(2025 - 01 - 01);
+        let payment = date!(2026 - 01 - 01);
+        let market = MarketContext::new().insert(
+            InflationCurve::builder("US-CPI")
+                .base_date(as_of)
+                .base_cpi(100.0)
+                .knots([(0.0, 100.0), (2.0, 100.0)])
+                .build()
+                .expect("curve"),
+        );
+        assert!(
+            (bond
+                .payment_index_ratio(payment, &market, as_of, false)
+                .expect("unprotected")
+                - 1.0)
+                .abs()
+                < 1e-12
+        );
+        assert!(bond
+            .payment_index_ratio(payment, &market, as_of, true)
+            .is_err());
+        bond.floor_vol_surface_id = Some("CPI-RATIO-VOL".into());
+        for sigma in [0.0, 0.2] {
+            let surface = VolSurface::builder("CPI-RATIO-VOL")
+                .expiries(&[0.1, 2.0])
+                .strikes(&[0.5, 1.5])
+                .row(&[sigma, sigma])
+                .row(&[sigma, sigma])
+                .build()
+                .expect("ratio vol");
+            let market = market.clone().insert_surface(surface);
+            let ratio = bond
+                .payment_index_ratio(payment, &market, as_of, true)
+                .expect("floor");
+            // ATM lognormal ratio: E[max(X,1)] = 2 Phi(sigma/2).
+            let expected = 2.0 * finstack_quant_core::math::norm_cdf(sigma / 2.0);
+            assert!((ratio - expected).abs() < 1e-12, "{ratio} vs {expected}");
+        }
+    }
 
     #[test]
     fn rejects_retired_top_level_quoted_clean_key() {
@@ -916,6 +1020,7 @@ mod tests {
             indexation_method: IndexationMethod::Tips,
             lag: InflationLag::None,
             deflation_protection: DeflationProtection::MaturityOnly,
+            floor_vol_surface_id: None,
             business_day_convention: BusinessDayConvention::Following,
             stub: StubKind::None,
             calendar_id: None,
@@ -1034,6 +1139,7 @@ mod tests {
             indexation_method: IndexationMethod::Tips,
             lag: InflationLag::None,
             deflation_protection: DeflationProtection::MaturityOnly,
+            floor_vol_surface_id: None,
             business_day_convention: BusinessDayConvention::Following,
             stub: StubKind::None,
             calendar_id: None,
@@ -1192,7 +1298,18 @@ mod tests {
             .knots([(0.0, 100.0), (1.0, 95.0), (2.0, 90.0)])
             .build()
             .expect("inflation curve should build");
-        MarketContext::new().insert(discount).insert(inflation)
+        MarketContext::new()
+            .insert(discount)
+            .insert(inflation)
+            .insert_surface(
+                finstack_quant_core::market_data::surfaces::VolSurface::builder("CPI-ZERO-VOL")
+                    .expiries(&[0.1, 40.0])
+                    .strikes(&[0.5, 1.5])
+                    .row(&[0.0, 0.0])
+                    .row(&[0.0, 0.0])
+                    .build()
+                    .expect("zero-vol floor fixture"),
+            )
     }
 
     fn sample_bond(deflation_protection: DeflationProtection) -> InflationLinkedBond {
@@ -1209,6 +1326,7 @@ mod tests {
             indexation_method: IndexationMethod::Tips,
             lag: InflationLag::None,
             deflation_protection,
+            floor_vol_surface_id: Some("CPI-ZERO-VOL".into()),
             business_day_convention: BusinessDayConvention::Following,
             stub: StubKind::None,
             calendar_id: None,
@@ -1288,7 +1406,7 @@ mod tests {
             .insert_inflation_index(index);
 
         let ratio = bond
-            .index_ratio_from_market(d(2025, Month::June, 15), &market)
+            .index_ratio_from_market(d(2025, Month::June, 15), &market, d(2025, Month::March, 1))
             .expect("hybrid RefCPI");
         let expected = (110.0 + (14.0 / 30.0) * (120.0 - 110.0)) / bond.base_cpi;
         assert!((ratio - expected).abs() < 1e-12);
@@ -1462,7 +1580,7 @@ mod tests {
             .insert(curve)
             .insert_inflation_index(index);
         let hybrid = bond
-            .index_ratio_from_market(date, &market)
+            .index_ratio_from_market(date, &market, d(2024, Month::September, 1))
             .expect("hybrid ratio");
         assert!((hybrid - 1.0).abs() < 1e-12, "hybrid ratio {hybrid}");
     }
@@ -1519,5 +1637,71 @@ mod tests {
         // just that the validation didn't reject the bond.
         bond.index_ratio(as_of, &index)
             .expect("3-month UK gilt lag is valid");
+    }
+    #[test]
+    fn protected_cpi_ratio_matches_independent_stochastic_density_grid() {
+        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use time::macros::date;
+        let as_of = date!(2025 - 01 - 01);
+        let payment = date!(2026 - 01 - 01);
+        let mut bond = InflationLinkedBond::example().unwrap();
+        bond.base_cpi = 100.0;
+        bond.lag = InflationLag::None;
+        bond.floor_vol_surface_id = Some("RATIO-VOL".into());
+        let budget = 1e-5; // 0.1 bp of principal for the expected ratio.
+        for forward in [0.8_f64, 1.0, 1.2] {
+            for sigma in [0.05_f64, 0.2, 0.5] {
+                let market = MarketContext::new()
+                    .insert(
+                        InflationCurve::builder("US-CPI")
+                            .base_date(as_of)
+                            .base_cpi(100.0 * forward)
+                            .knots([(0.0, 100.0 * forward), (2.0, 100.0 * forward)])
+                            .build()
+                            .unwrap(),
+                    )
+                    .insert_surface(
+                        VolSurface::builder("RATIO-VOL")
+                            .expiries(&[1.0])
+                            .strikes(&[1.0])
+                            .row(&[sigma])
+                            .build()
+                            .unwrap(),
+                    );
+                let actual = bond
+                    .payment_index_ratio(payment, &market, as_of, true)
+                    .unwrap();
+                let split = (-forward.ln() + 0.5 * sigma * sigma) / sigma;
+                let mut references = Vec::new();
+                for steps in [256, 512, 1024] {
+                    let mut expected = 0.0;
+                    for (left, right) in [
+                        (-10.0, split.clamp(-10.0, 10.0)),
+                        (split.clamp(-10.0, 10.0), 10.0),
+                    ] {
+                        let h = (right - left) / steps as f64;
+                        for i in 0..=steps {
+                            let z = left + i as f64 * h;
+                            let ratio = forward * (sigma * z - 0.5 * sigma * sigma).exp();
+                            let weight = if i == 0 || i == steps {
+                                1.0
+                            } else if i % 2 == 0 {
+                                2.0
+                            } else {
+                                4.0
+                            };
+                            expected += h / 3.0 * weight * ratio.max(1.0) * (-0.5 * z * z).exp()
+                                / std::f64::consts::TAU.sqrt();
+                        }
+                    }
+                    assert!((actual - expected).abs() < budget,
+                        "F={forward}, sigma={sigma}, grid={steps}, ratio={actual}, density={expected}");
+                    references.push(expected);
+                }
+                assert!(references
+                    .windows(2)
+                    .all(|pair| (pair[0] - pair[1]).abs() < budget));
+            }
+        }
     }
 }

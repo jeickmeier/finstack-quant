@@ -42,7 +42,7 @@ A forward pays its mark at contractual settlement and is discounted. A margined 
 
 ### Vanilla, averaging and spread payoffs
 
-The native commodity option envelope is `commodity_option`, priced under `black76` for this European forward-price example. The selector names the model rather than an exchange venue. Lognormal Black requires positive forward/strike inputs in its supported domain; negative commodity prices demand a different model, not a unit conversion.
+The native envelopes distinguish `commodity_spot_option` from `commodity_future_option`. This European spot-option example uses `commodity_spot_option` under `black76` with a delivery-forward price. Early exercise and spot simulation additionally require an explicit observed spot identifier and market value; the futures-option contract names its underlying futures expiry. The selector names the model rather than an exchange venue. Lognormal Black requires positive forward/strike inputs in its supported domain; negative commodity prices demand a different model, not a unit conversion.
 
 An arithmetic Asian call depends on the average fixing price. Turnbull–Wakeman approximates the distribution using moments; it is not an exact lognormal distribution for an arithmetic average. Averaging reduces exposure to individual fixing shocks, but comparing unrelated maturities or forward levels confounds that effect. The controlled comparison below uses the same expiry, strike, quantity, volatility and a flat forward curve. Its lower Asian premium isolates averaging within that model.
 

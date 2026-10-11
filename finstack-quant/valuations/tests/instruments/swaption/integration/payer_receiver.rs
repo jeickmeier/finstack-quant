@@ -40,7 +40,7 @@ fn test_forward_swap_rate_includes_first_multicurve_float_period() {
         stub: StubKind::None,
         start: swap_start,
         end: swap_end,
-        par_method: None,
+
         payment_lag_days: 0,
         end_of_month: false,
     };

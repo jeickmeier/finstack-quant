@@ -46,7 +46,7 @@ fn create_swaption(expiry_months: i64, swap_tenor_years: i32) -> Swaption {
         stub: StubKind::None,
         start: swap_start,
         end: swap_end,
-        par_method: None,
+
         payment_lag_days: 0,
         end_of_month: false,
     };

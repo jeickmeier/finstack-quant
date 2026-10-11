@@ -374,7 +374,7 @@
       "type": "registry:lib"
     },
     {
-      "name": "contract-commodity-option",
+      "name": "contract-commodity-spot-option",
       "type": "registry:lib"
     },
     {
@@ -725,23 +725,23 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/cases.json",
-      "sha256": "041d586f68a847fdbae7018acf7f4648c968c441bf3f910a0363ccdb9b396648"
+      "sha256": "5330a3111343a5b7fa55682bc7f343451eca105eaf84d064c206158f76c14bc3"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "2ffec35118d702ed95f7e987251d460e47ec61eab015e78d3dedaf8a72d0f23e"
+      "sha256": "8a70290b2fee322cb8749c4baadfc75574548ce2f4e25f969f5b7b90f23101da"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "3f270ce131a8ba12d768b270464a44b6d50bb1b5ed94bbe40b310ce2d5df7683"
+      "sha256": "ef79b7b214f1b92f9486e85f7251b2eff671d09de1d90600a21ce4ed7aa936c7"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
-      "sha256": "2220b6d108a6fb9a6944bedb7f0eb7d9db05b95169d9fb9154f42d34536018b0"
+      "sha256": "75ccf0330466b637a2869e34652dd502cf8505e76293d0178d7b9d4976550885"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-      "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4"
+      "sha256": "41bfc4354e0bfa035f03f2429616d2bb3e59af860a209bb05ff81cb2d4b2f0ac"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-model.json",

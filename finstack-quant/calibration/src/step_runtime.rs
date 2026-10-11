@@ -820,10 +820,11 @@ mod tests {
     /// Synthetic 5Y [3,7] CDX mezzanine upfront at ν = 6, ρ = 0.3 under the
     /// default Student-t pricer (product Gauss over the exact conditional
     /// binomial). Quoted cash settles on 2025-03-25: the no-upfront trade PV
-    /// -0.215368524909 per unit tranche notional is divided by its settlement
+    /// -0.215357829096 per unit tranche notional is divided by its settlement
     /// discount factor exp(-0.03 * 5/365). The step recovers ν near 6 without
     /// manufacturing the quote from a live price.
-    const STUDENT_T_FIXTURE_UPFRONT_PCT: f64 = -0.215_457_050_711;
+    // Refreshed after separating contractual premium accrual from payment dates.
+    const STUDENT_T_FIXTURE_UPFRONT_PCT: f64 = -0.215_446_350_502;
 
     fn build_student_t_quote(upfront_pct: f64) -> CdsTrancheQuote {
         let maturity = Date::from_calendar_date(2030, Month::March, 20).expect("valid maturity");

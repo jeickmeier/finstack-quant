@@ -235,8 +235,8 @@ pub use fx::{
 
 pub use commodity::{
     CommodityAsianOption, CommodityForward, CommodityFuture, CommodityFutureFixing,
-    CommodityFutureOption, CommodityOption, CommoditySpreadOption, CommoditySwap,
-    CommoditySwaption,
+    CommodityFutureOption, CommoditySpotOption, CommoditySpotOptionExercise, CommoditySpreadOption,
+    CommoditySwap, CommoditySwaption,
 };
 
 pub use rates::InterestRateFutureOption;
@@ -272,8 +272,8 @@ pub use common_impl::traits::{
 pub use common_impl::parameters::{
     BondConvention, CommodityUnderlyingParams, CreditParams, EquityUnderlyingParams, ExerciseStyle,
     FinancingLegSpec, FixedLegSpec, FloatLegSpec, FxUnderlyingParams, IndexUnderlyingParams,
-    Monitoring, OptionMarketParams, OptionType, ParRateMethod, PayReceive, PremiumLegSpec,
-    ProtectionLegSpec, QuantoSpec, SettlementType, TotalReturnLegSpec, VolatilityModel,
+    Monitoring, OptionMarketParams, OptionType, PayReceive, PremiumLegSpec, ProtectionLegSpec,
+    QuantoSpec, SettlementType, TotalReturnLegSpec, VolatilityModel,
 };
 
 pub use common_impl::parameters::trs_common::TrsScheduleSpec;

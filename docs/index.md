@@ -76,6 +76,8 @@ mise run python-examples
   recently implemented feature work.
 - [`superpowers/plans/`](superpowers/plans/): implementation plans. Do not edit
   active plan files unless the current task explicitly requires it.
+- [`REMOVING_THE_UI.md`](REMOVING_THE_UI.md): how to remove the component
+  registry without taking the quant engine or the analyst reader with it.
 
 ## Package Surfaces
 

@@ -51,7 +51,6 @@
 //!         start: date!(2025-01-15),
 //!         end: date!(2030-01-15),
 //!         end_of_month: false,
-//!         par_method: None,
 //!         payment_lag_days: 0,
 //!     })
 //!     .float_leg(FloatLegSpec {

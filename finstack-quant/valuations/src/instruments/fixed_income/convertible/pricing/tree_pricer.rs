@@ -7,7 +7,7 @@ use crate::instruments::common_impl::traits::Instrument;
 
 use super::engine::price_convertible_bond;
 
-/// Registry pricer for Convertible Bond using Tsiveriotis-Zhang tree-based pricing.
+/// Registry pricer for Convertible Bond using a defaultable-equity tree with recovery of principal.
 pub(crate) struct ConvertibleTreePricer;
 
 impl ConvertibleTreePricer {

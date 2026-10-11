@@ -144,7 +144,7 @@ fn test_irs_fixed_leg_quarterly_schedule() {
             stub: StubKind::None,
             start: date!(2024 - 01 - 01),
             end: date!(2025 - 01 - 01),
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -197,7 +197,7 @@ fn test_irs_fixed_leg_semiannual_schedule() {
             stub: StubKind::None,
             start: date!(2024 - 01 - 01),
             end: date!(2026 - 01 - 01),
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -321,7 +321,7 @@ fn test_irs_stub_front() {
             stub: StubKind::ShortFront,
             start: date!(2024 - 01 - 15),
             end: date!(2026 - 01 - 01),
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -370,7 +370,7 @@ fn test_irs_stub_back() {
             stub: StubKind::ShortBack,
             start: date!(2024 - 01 - 01),
             end: date!(2026 - 06 - 15),
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -503,7 +503,7 @@ fn test_regular_short_front_schedule_does_not_tag_first_coupon_as_stub() {
             stub: StubKind::ShortFront,
             start: date!(2024 - 01 - 01),
             end: date!(2026 - 01 - 01),
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -560,7 +560,7 @@ fn test_genuine_front_stub_fixed_coupon_is_tagged_as_stub() {
             stub: StubKind::ShortFront,
             start: date!(2024 - 01 - 15),
             end: date!(2026 - 01 - 01),
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -614,7 +614,7 @@ fn test_regular_holiday_end_coupon_under_stub_rule_is_not_tagged_stub() {
             stub: StubKind::ShortBack,
             start: date!(2024 - 01 - 04),
             end: date!(2025 - 01 - 04),
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -671,7 +671,7 @@ fn test_regular_eom_schedule_under_stub_rule_is_not_tagged_stub() {
             stub: StubKind::ShortFront,
             start: date!(2024 - 01 - 31),
             end: date!(2024 - 04 - 30),
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: true,
         })
@@ -729,7 +729,7 @@ fn test_irs_different_frequencies() {
             stub: StubKind::None,
             start: date!(2024 - 01 - 01),
             end: date!(2026 - 01 - 01),
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -779,7 +779,7 @@ fn test_irs_calendar_adjustments() {
             stub: StubKind::None,
             start: date!(2024 - 01 - 01),
             end: date!(2026 - 01 - 01),
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -831,7 +831,7 @@ fn test_irs_explicit_zero_payment_delay_preserved() {
             stub: StubKind::None,
             start,
             end,
-            par_method: None,
+
             payment_lag_days: 0, // Explicit 0 should stay 0
             end_of_month: false,
         })
@@ -911,7 +911,7 @@ fn test_irs_explicit_zero_reset_lag_preserved() {
             stub: StubKind::None,
             start,
             end,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })
@@ -1062,7 +1062,7 @@ fn test_irs_npv_parity_at_par_rate() {
             stub: StubKind::None,
             start: as_of,
             end: end_date,
-            par_method: None,
+
             payment_lag_days: 0,
             end_of_month: false,
         })

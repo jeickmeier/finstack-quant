@@ -14,6 +14,37 @@ use finstack_quant_valuations::metrics::MetricId;
 
 const TREE_STEPS: usize = 100;
 
+fn calibrated_credit_market() -> finstack_quant_core::market_data::context::MarketContext {
+    let market = create_market_context();
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
+        &market,
+        dates::base_date(),
+        "USD-CREDIT",
+        "ISSUER",
+        "USD-OIS",
+    )
+    .expect("replayable credit curve");
+    market.insert(hazard)
+}
+
+#[test]
+fn cs01_rejects_a_materialized_hazard_without_quote_replay() {
+    let bond = create_convertible_with_credit();
+    let market = create_market_context_with_credit(200.0);
+    let error = bond
+        .price_with_metrics(
+            &market,
+            dates::base_date(),
+            &[MetricId::Cs01],
+            crate::instruments::test_support::credit::pricing_options(),
+        )
+        .expect_err("quote-space CS01 requires replay inputs");
+    assert!(
+        error.to_string().contains("lossless calibration recipe"),
+        "{error}"
+    );
+}
+
 #[test]
 fn test_credit_spread_reduces_price() {
     let bond = create_convertible_with_credit();
@@ -168,14 +199,14 @@ fn test_credit_spread_effect_larger_for_otm() {
 #[test]
 fn test_cs01_nonzero_with_credit_curve() {
     let bond = create_convertible_with_credit();
-    let market = create_market_context_with_credit(200.0);
+    let market = calibrated_credit_market();
 
     let result = bond
         .price_with_metrics(
             &market,
             dates::base_date(),
             &[MetricId::Cs01],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("should compute CS01");
 
@@ -206,7 +237,7 @@ fn test_cs01_zspread_fallback_without_credit_curve() {
             &market,
             dates::base_date(),
             &[MetricId::Cs01],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("should compute CS01");
 
@@ -230,15 +261,16 @@ fn test_cs01_zspread_fallback_without_credit_curve() {
 
 #[test]
 fn test_dv01_and_cs01_are_distinct() {
-    let bond = create_convertible_with_credit();
-    let market = create_market_context_with_credit(200.0);
+    let mut bond = create_convertible_with_credit();
+    bond.recovery_rate = Some(0.4);
+    let market = calibrated_credit_market();
 
     let result = bond
         .price_with_metrics(
             &market,
             dates::base_date(),
             &[MetricId::Dv01, MetricId::Cs01],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("should compute DV01 and CS01");
 
@@ -267,14 +299,14 @@ fn test_dv01_and_cs01_are_distinct() {
 #[test]
 fn test_convertible_bucketed_cs01_reconciles_to_parallel() {
     let bond = create_convertible_with_credit();
-    let market = create_market_context_with_credit(200.0);
+    let market = calibrated_credit_market();
 
     let result = bond
         .price_with_metrics(
             &market,
             dates::base_date(),
             &[MetricId::Cs01, MetricId::BucketedCs01],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("should compute Cs01 and BucketedCs01");
 
@@ -349,37 +381,21 @@ fn test_recovery_rate_increases_price() {
 }
 
 #[test]
-fn test_recovery_rate_100_pct_equals_no_credit() {
-    // With 100% recovery, the credit curve has no effect (cash discounted at rf).
-    let mut bond_full_recovery = create_convertible_with_credit();
-    bond_full_recovery.recovery_rate = Some(1.0);
-
-    let bond_no_credit = create_standard_convertible();
-
-    let market_with_credit = create_market_context_with_credit(200.0);
-    let market_no_credit = create_market_context();
-
-    let price_full_recovery =
-        price_convertible_bond(&bond_full_recovery, &market_with_credit, dates::base_date())
-            .expect("should price full recovery");
-
-    let price_no_credit = price_convertible_bond(
-        &with_tree_steps(&bond_no_credit, TREE_STEPS),
-        &market_no_credit,
-        dates::base_date(),
-    )
-    .expect("should price no credit");
-
-    // Should be very close since 100% recovery = risk-free discounting on cash
-    let diff_pct =
-        (price_full_recovery.amount() - price_no_credit.amount()).abs() / price_no_credit.amount();
-    assert!(
-        diff_pct < 0.005,
-        "100% recovery should match no-credit price: full_recovery={}, no_credit={}, diff={:.4}%",
-        price_full_recovery.amount(),
-        price_no_credit.amount(),
-        diff_pct * 100.0,
-    );
+fn test_full_principal_recovery_does_not_restore_defaulted_coupons() {
+    let mut bond = create_convertible_with_credit();
+    bond.recovery_rate = Some(1.0);
+    bond.conversion.ratio = Some(1e-8);
+    let market = create_market_context_with_credit(200.0);
+    let credit = price_convertible_bond(&bond, &market, dates::base_date())
+        .expect("FRP price")
+        .amount();
+    bond.credit_curve_id = None;
+    let risk_free = price_convertible_bond(&bond, &market, dates::base_date())
+        .expect("no default")
+        .amount();
+    // A premium coupon bond loses its future coupons on default even at 100%
+    // principal recovery. Default is not equivalent to risk-free continuation.
+    assert!(credit < risk_free - 0.01, "{credit} vs {risk_free}");
 }
 
 #[test]
@@ -430,7 +446,7 @@ fn test_greeks_with_credit_curve() {
                 MetricId::Vega,
                 MetricId::Rho,
             ],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            crate::instruments::test_support::credit::pricing_options(),
         )
         .expect("should compute Greeks with credit curve");
 

@@ -3,8 +3,8 @@
 //! This module implements the waterfall logic for distributing collateral
 //! cashflows to CMO tranches according to their priority and type.
 
-use super::tranches::pac_support::{allocate_pac_support, PacSchedule};
 use super::types::{CmoTranche, CmoTrancheType, CmoWaterfall};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 
 /// Cashflow allocation for a single period.
@@ -58,29 +58,6 @@ pub struct CmoWaterfallPeriodResult {
     pub residual_interest: f64,
 }
 
-/// Execute waterfall for a single period.
-///
-/// Distributes principal and interest from collateral to tranches
-/// according to waterfall rules.
-///
-/// # Arguments
-///
-/// * `waterfall` - Waterfall configuration with tranches
-/// * `available_principal` - Total principal available for distribution
-/// * `available_interest` - Total interest available for distribution
-///
-/// # Returns
-///
-/// Waterfall execution result with allocations by tranche
-/// Optional PAC context for waterfall execution.
-#[derive(Debug, Clone, Default)]
-pub struct PacContext {
-    /// PAC schedule for scheduled payment lookup.
-    pub schedule: Option<PacSchedule>,
-    /// Current period index into the schedule.
-    pub period_index: usize,
-}
-
 /// Execute waterfall while preserving scheduled-principal vs prepayment buckets.
 ///
 /// `collateral_survival` is the fraction of the collateral balance that
@@ -102,8 +79,8 @@ pub struct PacContext {
 /// * `accrual_fraction` - Year fraction of this period's accrual month on the
 ///   collateral's day count (exactly 1/12 on 30/360). Tranche coupons and Z
 ///   accretion accrue over it, like the collateral interest that funds them.
-/// * `pac_context` - Optional PAC schedule, period index, and realized PSA;
-///   `None` applies no PAC collar constraint.
+/// * `payment_date` - Actual contractual payment date used to select each
+///   PAC tranche's original principal target. Targets are never regenerated.
 ///
 /// # Accrual (Z) tranches
 ///
@@ -133,9 +110,24 @@ pub fn execute_waterfall_with_principal_breakdown(
     available_interest: f64,
     collateral_survival: f64,
     accrual_fraction: f64,
-    pac_context: Option<&PacContext>,
+    payment_date: Date,
 ) -> finstack_quant_core::Result<CmoWaterfallPeriodResult> {
     let tranches = &waterfall.tranches;
+    for tranche in tranches
+        .iter()
+        .filter(|tranche| tranche.tranche_type == CmoTrancheType::Pac)
+    {
+        tranche
+            .pac_schedule
+            .as_ref()
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "PAC tranche '{}' requires its original dated principal schedule",
+                    tranche.id
+                ))
+            })?
+            .validate()?;
+    }
     let n = tranches.len();
     let mut remaining_principal = scheduled_principal + prepayment_principal;
     let mut remaining_interest = available_interest;
@@ -250,7 +242,7 @@ pub fn execute_waterfall_with_principal_breakdown(
             &group,
             remaining_principal,
             waterfall.pro_rata_same_priority,
-            pac_context,
+            payment_date,
         ) {
             remaining_principal -= amount;
             principal_allocations[i] = amount;
@@ -294,13 +286,14 @@ pub fn execute_waterfall_with_principal_breakdown(
         }
     }
 
-    // Attribute scheduled vs prepayment principal AT SOURCE rather than by
-    // draining a single shared counter in priority order. A PAC tranche's
+    // Classify contractual scheduled principal before allocating excess.
+    // PAC targets define scheduled payments at the tranche level. A PAC tranche's
     // collar allocation is scheduled principal by construction (capped by
     // the PAC schedule); any excess above the PAC schedule is prepayment.
     // The remaining pool scheduled/prepayment is then split pro-rata across
     // every other tranche's allocation, which is order-independent and
-    // conserves both pool buckets exactly.
+    // conserves total principal. PACs can transform collateral prepayments
+    // into scheduled tranche principal.
     // Accretion-directed principal joins the scheduled bucket: it is a
     // deterministic coupon-driven redirection of interest collections, not a
     // function of prepayment behavior (see function docs).
@@ -309,7 +302,7 @@ pub fn execute_waterfall_with_principal_breakdown(
         &principal_allocations,
         scheduled_principal + accretion_directed,
         prepayment_principal,
-        pac_context,
+        payment_date,
     );
 
     let mut total_principal = 0.0;
@@ -375,7 +368,7 @@ fn allocate_principal_to_group(
     group: &[usize],
     available: f64,
     pro_rata: bool,
-    pac_context: Option<&PacContext>,
+    payment_date: Date,
 ) -> Vec<(usize, f64)> {
     let mut allocations = Vec::with_capacity(group.len());
     let mut remaining = available;
@@ -386,51 +379,30 @@ fn allocate_principal_to_group(
         .partition(|&&i| tranches[i].tranche_type == CmoTrancheType::Pac);
     let balance = |i: usize| tranches[i].current_face.amount();
 
-    // When PAC schedule is available, use proper PAC/Support allocation
-    if let Some(ctx) = pac_context {
-        if let Some(ref schedule) = ctx.schedule {
-            let pac_balance: f64 = pac_tranches.iter().map(|&i| balance(i)).sum();
-            let support_balance: f64 = other_tranches.iter().map(|&i| balance(i)).sum();
-            let pac_scheduled = schedule.scheduled_at(ctx.period_index);
-
-            let (pac_alloc, support_alloc) =
-                allocate_pac_support(remaining, pac_balance, support_balance, pac_scheduled);
-
-            // Distribute PAC allocation pro-rata among PAC tranches
-            if pac_balance > 0.0 && pac_alloc > 0.0 {
-                for &i in &pac_tranches {
-                    allocations.push((i, pac_alloc * (balance(i) / pac_balance)));
-                }
-            }
-            // Distribute support allocation among other tranches
-            if support_alloc > 0.0 {
-                let mut support_remaining = support_alloc;
-                for &i in &other_tranches {
-                    if support_remaining <= 0.0 {
-                        break;
-                    }
-                    let alloc = balance(i).min(support_remaining);
-                    allocations.push((i, alloc));
-                    support_remaining -= alloc;
-                }
-            }
-
-            return allocations;
-        }
-    }
-
-    // Fallback: balance-limited allocation when no PAC schedule is available
-    for &i in &pac_tranches {
-        if remaining <= 0.0 {
-            break;
-        }
-        let bal = balance(i);
-        if bal <= 0.0 {
-            continue;
-        }
-        let allocated = bal.min(remaining);
-        allocations.push((i, allocated));
-        remaining -= allocated;
+    // Each PAC claims its own dated target, capped by its live balance.
+    // If the group is short, targets share the shortfall proportionally.
+    // With no PAC in this group, ordinary pro-rata/sequential rules below
+    // apply unchanged even if a junior group contains a PAC.
+    let targets: Vec<_> = pac_tranches
+        .iter()
+        .map(|&i| {
+            let target = tranches[i]
+                .pac_schedule
+                .as_ref()
+                .map_or(0.0, |schedule| schedule.get_payment(payment_date));
+            (i, balance(i).min(target).max(0.0))
+        })
+        .collect();
+    let requested: f64 = targets.iter().map(|(_, amount)| amount).sum();
+    let scale = if requested > 0.0 {
+        (remaining / requested).min(1.0)
+    } else {
+        0.0
+    };
+    for (i, target) in targets {
+        let paid = target * scale;
+        allocations.push((i, paid));
+        remaining -= paid;
     }
 
     // Support tranches absorb excess/shortfall
@@ -507,35 +479,32 @@ fn attribute_scheduled_principal(
     principal_allocations: &[f64],
     scheduled_principal: f64,
     prepayment_principal: f64,
-    pac_context: Option<&PacContext>,
+    payment_date: Date,
 ) -> Vec<(f64, f64)> {
     let mut result = vec![(0.0_f64, 0.0_f64); tranches.len()];
     let is_pac = |i: usize| tranches[i].tranche_type == CmoTrancheType::Pac;
 
-    // PAC schedule amount for this period (0.0 when no PAC context).
-    let pac_scheduled = pac_context
-        .and_then(|ctx| {
-            ctx.schedule
-                .as_ref()
-                .map(|s| s.scheduled_at(ctx.period_index))
+    let claims: Vec<_> = tranches
+        .iter()
+        .enumerate()
+        .map(|(i, tranche)| {
+            if is_pac(i) {
+                tranche.pac_schedule.as_ref().map_or(0.0, |schedule| {
+                    schedule
+                        .get_payment(payment_date)
+                        .min(principal_allocations[i])
+                })
+            } else {
+                0.0
+            }
         })
-        .unwrap_or(0.0);
-
-    // Total principal allocated to PAC tranches this period.
-    let total_pac_alloc: f64 = (0..tranches.len())
-        .filter(|&i| is_pac(i))
-        .map(|i| principal_allocations[i])
-        .sum();
-
-    // PACs collectively claim scheduled principal up to the schedule amount.
-    let pac_scheduled_claimed = total_pac_alloc.min(pac_scheduled).max(0.0);
-
-    // Per-PAC scheduled portion, pro-rata to PAC allocation. Any PAC
-    // allocation above the schedule is prepayment-eligible (handled below).
-    for i in (0..tranches.len()).filter(|&i| is_pac(i)) {
-        if total_pac_alloc > 0.0 {
-            result[i].0 = pac_scheduled_claimed * (principal_allocations[i] / total_pac_alloc);
-        }
+        .collect();
+    let requested: f64 = claims.iter().sum();
+    // PAC principal up to its contractual target is scheduled at the tranche
+    // level, even when collateral prepayments funded that target.
+    let pac_scheduled_claimed = requested;
+    for (i, claim) in claims.into_iter().enumerate() {
+        result[i].0 = claim;
     }
 
     // Remaining pool scheduled principal after PAC claims, plus the full
@@ -585,6 +554,20 @@ mod tests {
     use super::*;
     use crate::instruments::fixed_income::cmo::types::CmoTranche;
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::DateExt;
+    const PAYMENT: Date = time::macros::date!(2024 - 02 - 25);
+    fn pac_plan(amount: f64) -> super::super::tranches::pac_support::PacSchedule {
+        use super::super::tranches::pac_support::{PacPayment, PacSchedule};
+        PacSchedule {
+            payments: (0..12)
+                .map(|month| PacPayment {
+                    date: PAYMENT.add_months(month).expect("payment date"),
+                    principal: amount,
+                })
+                .collect(),
+            collar: super::super::types::PacCollar::standard(),
+        }
+    }
 
     fn create_test_waterfall() -> CmoWaterfall {
         let tranches = vec![
@@ -608,7 +591,7 @@ mod tests {
             500.0,
             1.0,
             1.0 / 12.0,
-            None,
+            PAYMENT,
         )
         .expect("valid waterfall fixture");
 
@@ -641,7 +624,7 @@ mod tests {
             500.0,
             1.0,
             1.0 / 12.0,
-            None,
+            PAYMENT,
         )
         .expect("valid waterfall fixture");
 
@@ -675,7 +658,7 @@ mod tests {
             500.0,
             1.0,
             1.0 / 12.0,
-            None,
+            PAYMENT,
         )
         .expect("valid waterfall fixture");
 
@@ -706,7 +689,7 @@ mod tests {
             200.0,
             1.0,
             1.0 / 12.0,
-            None,
+            PAYMENT,
         )
         .expect("valid waterfall fixture");
 
@@ -759,7 +742,7 @@ mod tests {
             1_000.0,
             0.5,
             1.0 / 12.0,
-            None,
+            PAYMENT,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
 
@@ -810,7 +793,7 @@ mod tests {
             5_000.0,
             1.0,
             1.0 / 12.0,
-            None,
+            PAYMENT,
         )
         .expect("valid waterfall fixture");
 
@@ -866,18 +849,6 @@ mod tests {
     /// values for both SR and PAC, and this test would have caught that.
     #[test]
     fn test_order_permutation_scheduled_prepayment_identical() {
-        use crate::instruments::fixed_income::cmo::tranches::pac_support::PacSchedule;
-        use crate::instruments::fixed_income::cmo::types::PacCollar;
-
-        let pac_schedule = PacSchedule {
-            scheduled_payments: vec![4_000.0; 12],
-            collar: PacCollar::standard(),
-        };
-        let pac_context = PacContext {
-            schedule: Some(pac_schedule),
-            period_index: 0,
-        };
-
         // Waterfall A: [SR, PAC]
         let tranches_a = vec![
             CmoTranche::sequential("SR", Money::from((50_000_i64, Currency::USD)), 0.04, 1),
@@ -886,7 +857,7 @@ mod tests {
                 Money::from((50_000_i64, Currency::USD)),
                 0.04,
                 1,
-                PacCollar::standard(),
+                pac_plan(4_000.0),
             ),
         ];
         let mut waterfall_a = CmoWaterfall::new(tranches_a);
@@ -897,7 +868,7 @@ mod tests {
             5_000.0,
             1.0,
             1.0 / 12.0,
-            Some(&pac_context),
+            PAYMENT,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
 
@@ -908,7 +879,7 @@ mod tests {
                 Money::from((50_000_i64, Currency::USD)),
                 0.04,
                 1,
-                PacCollar::standard(),
+                pac_plan(4_000.0),
             ),
             CmoTranche::sequential("SR", Money::from((50_000_i64, Currency::USD)), 0.04, 1),
         ];
@@ -920,7 +891,7 @@ mod tests {
             5_000.0,
             1.0,
             1.0 / 12.0,
-            Some(&pac_context),
+            PAYMENT,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
 
@@ -1007,7 +978,7 @@ mod tests {
             900.0,
             1.0,
             1.0 / 12.0,
-            None,
+            PAYMENT,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
         let a1 = r1
@@ -1053,7 +1024,7 @@ mod tests {
             900.0,
             1.0,
             1.0 / 12.0,
-            None,
+            PAYMENT,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
         let a2 = r2
@@ -1106,7 +1077,7 @@ mod tests {
             400.0,
             1.0,
             1.0 / 12.0,
-            None,
+            PAYMENT,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
         let a1 = r1
@@ -1142,7 +1113,7 @@ mod tests {
             310.0,
             1.0,
             1.0 / 12.0,
-            None,
+            PAYMENT,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
         let z2 = r2
@@ -1184,7 +1155,7 @@ mod tests {
             600.0,
             1.0,
             1.0 / 12.0,
-            None,
+            PAYMENT,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
         let a = r
@@ -1242,7 +1213,7 @@ mod tests {
                 interest,
                 1.0,
                 1.0 / 12.0,
-                None,
+                PAYMENT,
             )
             .expect("valid execute_waterfall_with_principal_breakdown fixture");
             let cash_out: f64 = r.allocations.iter().map(|a| a.interest + a.principal).sum();
@@ -1296,7 +1267,7 @@ mod tests {
             0.0, // interest irrelevant here
             1.0,
             1.0 / 12.0,
-            None,
+            PAYMENT,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
 
@@ -1351,44 +1322,25 @@ mod tests {
     /// when a PAC tranche's total principal allocation exceeds the PAC
     /// schedule amount (`total_pac_alloc > pac_scheduled`), the excess is
     /// prepayment-eligible rather than scheduled.  This branch is exercised
-    /// when the PAC receives principal via the balance-limited fallback path
-    /// (no amortization schedule in the PAC context), which means
-    /// `pac_scheduled = 0`.  In that case the entire PAC allocation is
-    /// "excess" and must be split pro-rata from the remaining-scheduled +
-    /// prepayment pool — none of it is automatically labeled scheduled.
-    ///
-    /// Structure: PAC (priority 1) alone — no support tranche.  A
-    /// `PacContext` with `schedule = None` is provided so the waterfall uses
-    /// the fallback allocation (gives the PAC its balance-limited amount) and
-    /// the attribution sees `pac_scheduled = 0.0`, triggering the excess
-    /// path for the full allocation.
-    ///
-    /// Expected labeling: because `pac_scheduled_claimed = 0`, ALL of the
-    /// PAC's allocation is prepayment-eligible and receives a pro-rata share
-    /// of both the pool scheduled and prepayment buckets.  The PAC's
-    /// `scheduled_principal` equals `scheduled_pool` (it is the only
-    /// eligible tranche) and `prepayment_principal` equals `prepayment_pool`,
-    /// with both pool buckets fully conserved.
+    /// when an explicit zero contractual target receives excess principal
+    /// after all support balances have retired. Source attribution still
+    /// conserves scheduled and prepaid collateral buckets.
     #[test]
     fn test_pac_excess_over_schedule_labeled_prepayment() {
-        // No schedule → pac_scheduled = 0 in attribution → full allocation is
-        // excess → entire allocation is prepayment-eligible.
-        let pac_context = PacContext {
-            schedule: None, // triggers balance-limited fallback allocation
-            period_index: 0,
-        };
+        // An explicit zero target makes the broken-PAC sweep's allocation
+        // excess, funded pro rata from scheduled and prepaid collections.
 
         let tranches = vec![CmoTranche::pac(
             "PAC",
             Money::from((50_000_i64, Currency::USD)),
             0.04,
             1,
-            crate::instruments::fixed_income::cmo::types::PacCollar::standard(),
+            pac_plan(0.0),
         )];
         let mut waterfall = CmoWaterfall::new(tranches);
 
         // Pool: 4,000 scheduled + 8,000 prepayment = 12,000 total.
-        // Fallback allocation: PAC receives 12,000 (balance >> available).
+        // Broken-PAC sweep: PAC receives 12,000 (balance >> available).
         // Attribution: pac_scheduled = 0 → PAC excess = 12,000 → entire
         // 12,000 splits pro-rata from (4,000 scheduled + 8,000 prepay).
         // Since the PAC is the only eligible tranche (fraction = 1.0):
@@ -1403,7 +1355,7 @@ mod tests {
             0.0,
             1.0,
             1.0 / 12.0,
-            Some(&pac_context),
+            PAYMENT,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
 
@@ -1455,9 +1407,6 @@ mod tests {
     /// still outstanding — principal must be conserved.
     #[test]
     fn broken_pac_excess_principal_accelerates_pac() {
-        use crate::instruments::fixed_income::cmo::tranches::pac_support::PacSchedule;
-        use crate::instruments::fixed_income::cmo::types::PacCollar;
-
         // PAC 50,000 + a nearly-depleted support of 2,000 at the same priority.
         let tranches = vec![
             CmoTranche::pac(
@@ -1465,20 +1414,11 @@ mod tests {
                 Money::from((50_000_i64, Currency::USD)),
                 0.04,
                 1,
-                PacCollar::standard(),
+                pac_plan(4_000.0),
             ),
             CmoTranche::sequential("SUP", Money::from((2_000_i64, Currency::USD)), 0.05, 1),
         ];
         let mut waterfall = CmoWaterfall::new(tranches);
-
-        let pac_schedule = PacSchedule {
-            scheduled_payments: vec![4_000.0; 12],
-            collar: PacCollar::standard(),
-        };
-        let pac_context = PacContext {
-            schedule: Some(pac_schedule),
-            period_index: 0,
-        };
 
         // Fast-prepay pool: 4,000 scheduled + 6,000 prepayment = 10,000 total.
         // PAC schedule claims 4,000; support absorbs its full 2,000 balance
@@ -1490,7 +1430,7 @@ mod tests {
             1_000.0,
             1.0,
             1.0 / 12.0,
-            Some(&pac_context),
+            PAYMENT,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
 
@@ -1543,9 +1483,6 @@ mod tests {
     /// scheduled principal as prepayment.
     #[test]
     fn test_pac_scheduled_principal_labeled_scheduled_regardless_of_order() {
-        use crate::instruments::fixed_income::cmo::tranches::pac_support::PacSchedule;
-        use crate::instruments::fixed_income::cmo::types::PacCollar;
-
         // SR and PAC share priority 1 so the PAC/Support split applies.
         let tranches = vec![
             CmoTranche::sequential("SR", Money::from((50_000_i64, Currency::USD)), 0.04, 1),
@@ -1554,20 +1491,12 @@ mod tests {
                 Money::from((50_000_i64, Currency::USD)),
                 0.04,
                 1,
-                PacCollar::standard(),
+                pac_plan(4_000.0),
             ),
         ];
         let mut waterfall = CmoWaterfall::new(tranches);
 
         // PAC schedule with a known scheduled amount for period 0.
-        let pac_schedule = PacSchedule {
-            scheduled_payments: vec![4_000.0; 12],
-            collar: PacCollar::standard(),
-        };
-        let pac_context = PacContext {
-            schedule: Some(pac_schedule),
-            period_index: 0,
-        };
 
         // Period principal: 6,000 scheduled + 3,000 prepayment = 9,000 total.
         // Within the collar, `allocate_pac_support` gives the PAC its
@@ -1580,7 +1509,7 @@ mod tests {
             5_000.0, // interest
             1.0,
             1.0 / 12.0,
-            Some(&pac_context),
+            PAYMENT,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
 
@@ -1637,5 +1566,85 @@ mod tests {
             "total prepayment principal should equal the pool's 3,000, got {}",
             result.total_prepayment_principal
         );
+    }
+}
+
+#[cfg(test)]
+mod dated_pac_regressions {
+    use super::super::tranches::pac_support::{PacPayment, PacSchedule};
+    use super::super::PacCollar;
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+    use time::macros::date;
+
+    fn pac(id: &str, principal: f64, priority: u32) -> CmoTranche {
+        CmoTranche::pac(
+            id,
+            Money::from((100_i64, Currency::USD)),
+            0.0,
+            priority,
+            PacSchedule {
+                payments: vec![PacPayment {
+                    date: date!(2025 - 02 - 25),
+                    principal,
+                }],
+                collar: PacCollar::standard(),
+            },
+        )
+    }
+
+    #[test]
+    fn junior_pac_does_not_change_senior_pro_rata() {
+        let mut waterfall = CmoWaterfall::new(vec![
+            CmoTranche::sequential("A", Money::from((50_i64, Currency::USD)), 0.0, 1),
+            CmoTranche::sequential("B", Money::from((50_i64, Currency::USD)), 0.0, 1),
+            pac("PAC", 20.0, 2),
+        ]);
+        waterfall.pro_rata_same_priority = true;
+        let result = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            10.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0 / 12.0,
+            date!(2025 - 02 - 25),
+        )
+        .expect("waterfall");
+        assert_eq!(result.allocations[0].principal, 5.0);
+        assert_eq!(result.allocations[1].principal, 5.0);
+        assert_eq!(result.allocations[2].principal, 0.0);
+    }
+
+    #[test]
+    fn pacs_with_distinct_targets_get_their_own_contractual_principal() {
+        let mut waterfall = CmoWaterfall::new(vec![
+            pac("P1", 10.0, 1),
+            pac("P2", 30.0, 1),
+            CmoTranche::support("SUP", Money::from((100_i64, Currency::USD)), 0.0, 2),
+        ]);
+        let result = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            20.0,
+            30.0,
+            0.0,
+            1.0,
+            1.0 / 12.0,
+            date!(2025 - 02 - 25),
+        )
+        .expect("waterfall");
+        assert_eq!(result.allocations[0].principal, 10.0);
+        assert_eq!(result.allocations[1].principal, 30.0);
+        assert_eq!(result.allocations[2].principal, 10.0);
+        assert!((result.total_scheduled_principal - 40.0).abs() < 1e-12);
+        assert!((result.total_prepayment_principal - 10.0).abs() < 1e-12);
+        for allocation in &result.allocations {
+            assert!(
+                (allocation.scheduled_principal + allocation.prepayment_principal
+                    - allocation.principal)
+                    .abs()
+                    < 1e-12
+            );
+        }
     }
 }

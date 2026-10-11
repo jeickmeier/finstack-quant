@@ -1,4 +1,4 @@
-//! Tsiveriotis-Zhang backward-induction engine.
+//! Defaultable-equity tree with fractional recovery of outstanding principal.
 
 use finstack_quant_core::{Error, Result};
 
@@ -44,37 +44,13 @@ pub(super) fn terminal_payoff(
     (total + coupon, cash + coupon)
 }
 
-/// Implementation of Tsiveriotis-Zhang tree pricing logic.
+/// Equity market state for a jump-to-zero default model.
 ///
-/// Uses per-step discount factors from the full term structure instead of
-/// flat-rate discounting. The equity component is discounted at the risk-free
-/// forward rate and the cash component at the recovery-adjusted risky forward
-/// rate, both extracted step-by-step from the risk-free discount curve and the
-/// issuer hazard curve.
-/// The tree's risk-neutral branch probabilities are recomputed per step from
-/// the same risk-free forwards, so drift and discounting stay consistent on
-/// non-flat curves.
-///
-/// ## Credit model
-///
-/// **Credit curve convention**: `credit_curve_id` names the issuer
-/// `HazardCurve`. The zero-recovery risky forward is
-/// `risky_fwd = rf_fwd × S(t_{i+1}) / S(t_i)`; the recovery blend below
-/// converts it to recovery-adjusted discounting.
-///
-/// The risky step discount factors are adjusted for recovery:
-///
-/// ```text
-/// risky_fwd_adj = risky_fwd * (1 - R) + rf_fwd * R
-/// ```
-///
-/// where `R` is the recovery rate (0.0 to 1.0). At R=0 this reduces to the
-/// zero-recovery TZ model. Setting R=0.40 (ISDA standard for senior unsecured)
-/// reflects that bondholders recover 40% of face value on default, reducing
-/// the effective credit spread impact on the cash component.
-/// Equity market state at the valuation date driving the lattice.
+/// Conditional on survival the stock grows at `r - q + lambda`; at default
+/// it becomes zero and the bond pays recovery times outstanding principal.
+/// See Milanov and Kounchev (2012), https://arxiv.org/abs/1206.1400.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct TzMarketInputs {
+pub(super) struct CreditTreeMarketInputs {
     /// Underlying share price in the bond's quote currency.
     pub(super) spot: f64,
     /// Annualized equity volatility (decimal).
@@ -86,15 +62,15 @@ pub(super) struct TzMarketInputs {
     pub(super) dividend_yield: f64,
 }
 
-pub(super) struct TsiveriotisZhangEngine<'a> {
+pub(super) struct CreditTreeEngine<'a> {
     pub(super) valuator: &'a ConvertibleBondValuator,
     pub(super) steps: usize,
     pub(super) time_to_maturity: f64,
 }
 
-impl<'a> TsiveriotisZhangEngine<'a> {
-    pub(super) fn price(&self, market: TzMarketInputs) -> Result<(f64, f64)> {
-        let TzMarketInputs {
+impl<'a> CreditTreeEngine<'a> {
+    pub(super) fn price(&self, market: CreditTreeMarketInputs) -> Result<(f64, f64)> {
+        let CreditTreeMarketInputs {
             spot,
             volatility,
             risk_free_rate,
@@ -107,7 +83,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
         // the full dividend yield (the DividendAdjustment variants carry no
         // threshold, so nothing is carved out) and the conversion ratio
         // accretes as `ratio(t) = ratio_0 * exp(q_prot * t)` from the
-        // valuation date. The stock keeps its unprotected drift `r - q`;
+        // valuation date. The stock keeps its conditional drift `r - q + lambda`;
         // protection enters only through the conversion payoff, so with full
         // protection the discounted conversion claim
         // `E[e^{-∫r} * ratio_0 * e^{qT} * S_T] = ratio_0 * S_0` is restored to
@@ -119,33 +95,27 @@ impl<'a> TsiveriotisZhangEngine<'a> {
         };
         let ratio_accretion_at = |step: usize| (protected_dividend_rate * step as f64 * dt).exp();
 
-        // Evolution parameters for the recombining binomial tree.
-        //
-        // Drift-discount consistency: the up/down factors depend only on
-        // volatility and dt, so they are constant across steps and the
-        // lattice recombines. The branch probabilities, however, are recomputed
-        // per step from the SAME per-step risk-free forward rate used for
-        // discounting in backward induction (`rf_step_dfs`):
-        //
-        //   r_i = -ln(df_rf[i]) / dt,   p_i = (e^{(r_i - q)dt} - d) / (u - d)
-        //
-        // so the stock's tree forward matches the discount curve step by step
-        // (martingale property) even on non-flat curves. The base parameters
-        // below (built from the t=0 short rate) only supply the constant
-        // factors; their probabilities are replaced by the per-step set.
+        // Constant CRR up/down factors retain recombination. Conditional
+        // branch probabilities use r + lambda - q so survival-weighted stock
+        // growth, including its jump to zero, has risk-neutral drift r - q.
         let params = EvolutionParams::equity_crr(volatility, risk_free_rate, dividend_yield, dt)?;
 
         // Per-step probabilities driven by the per-step forward rates implied
         // by the risk-free step discount factors (u/d unchanged).
         let mut step_params = Vec::with_capacity(self.steps);
-        for &df in &self.valuator.rf_step_dfs {
+        for (&df, &survival) in self
+            .valuator
+            .rf_step_dfs
+            .iter()
+            .zip(&self.valuator.survival_factors)
+        {
             if df <= 0.0 {
                 return Err(Error::Validation(format!(
                     "convertible tree requires positive per-step risk-free discount \
                      factors, got {df}"
                 )));
             }
-            let step_rate = -df.ln() / dt;
+            let step_rate = -(df * survival).ln() / dt;
             step_params.push(params.with_drift(step_rate - dividend_yield, dt)?);
         }
 
@@ -180,14 +150,17 @@ impl<'a> TsiveriotisZhangEngine<'a> {
 
         for i in 0..num_nodes {
             let node_spot = get_spot(self.steps, i);
-            let conversion_val = self
-                .valuator
-                .conversion_value(node_spot, terminal_accretion);
+            let conversion_val =
+                self.valuator
+                    .conversion_value(node_spot, terminal_accretion, self.steps);
 
-            let cash_level = self
+            let principal = self
                 .valuator
-                .face_value
-                .max(terminal_put.unwrap_or(self.valuator.face_value));
+                .principal_map
+                .get(&self.steps)
+                .copied()
+                .unwrap_or(0.0);
+            let cash_level = principal.max(terminal_put.unwrap_or(principal));
             values.push(terminal_payoff(
                 conversion_val,
                 cash_level,
@@ -206,13 +179,19 @@ impl<'a> TsiveriotisZhangEngine<'a> {
 
             // Per-step discount factors from full term structure, and the
             // per-step branch probabilities derived from the same forwards.
-            let df_rf = self.valuator.rf_step_dfs[step];
-            let df_risky = self.valuator.risky_step_dfs[step];
+            let discount = self.valuator.rf_step_dfs[step] * self.valuator.survival_factors[step];
+            let recovery = self.valuator.recovery_by_step[step];
             let sp = &step_params[step];
             let step_accretion = ratio_accretion_at(step);
             // Exercise decisions are ex-coupon; the coupon is added after
             // conversion/call/put resolution so no branch can overwrite it.
-            let coupon = self.valuator.coupon_map.get(&step).copied().unwrap_or(0.0);
+            let coupon = self.valuator.coupon_map.get(&step).copied().unwrap_or(0.0)
+                + self
+                    .valuator
+                    .principal_map
+                    .get(&step)
+                    .copied()
+                    .unwrap_or(0.0);
             let call_price_here = self.valuator.call_price_at_step(step);
             let put_price_here = self.valuator.put_price_at_step(step);
 
@@ -224,18 +203,17 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 let exp_total = sp.prob_up * v_up + sp.prob_down * v_down;
                 let exp_cash = sp.prob_up * c_up + sp.prob_down * c_down;
 
-                // TZ discounting: equity at risk-free, cash at risky
-                let equity_part = (exp_total - exp_cash) * df_rf;
-                let cash_part = exp_cash * df_risky;
-                let continuation_total = equity_part + cash_part;
-                let continuation_cash = cash_part;
+                let continuation_total = exp_total * discount + recovery;
+                let continuation_cash = exp_cash * discount + recovery;
 
                 // Node decision logic
                 let node_spot = get_spot(step, i);
 
                 // 1. Conversion (uses variable delivery for MandatoryVariable,
                 //    dividend-protection accretion at this step's time)
-                let conversion_val = self.valuator.conversion_value(node_spot, step_accretion);
+                let conversion_val =
+                    self.valuator
+                        .conversion_value(node_spot, step_accretion, step);
                 let can_convert = self.valuator.conversion_allowed(step, node_spot);
 
                 let mut final_total = continuation_total;
@@ -260,7 +238,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
 
                 // 2. Call (Issuer minimizes value).
                 //
-                // Tsiveriotis-Zhang call rule:
+                // Issuer exercise rule:
                 //   value = min(continuation, max(call_price, conversion_value))
                 // The issuer calls only when doing so *reduces* the bond value,
                 // i.e. when `continuation > value_if_called`, where

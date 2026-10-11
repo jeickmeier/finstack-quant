@@ -102,7 +102,7 @@ impl TrsScheduleSpec {
             dates.push(first.accrual_start);
             dates.extend(periods.iter().map(|period| period.accrual_end));
         }
-        let payment_dates = dates.iter().skip(1).copied().collect();
+        let payment_dates = periods.iter().map(|period| period.payment_date).collect();
         Ok(Schedule {
             dates,
             payment_dates,
@@ -113,15 +113,53 @@ impl TrsScheduleSpec {
 
     /// Computes the payment date for a given accrual end date.
     ///
-    /// When `payment_lag_days == 0` this returns the accrual end date unchanged.
-    /// Otherwise the date is shifted forward by the specified number of business
-    /// days using the schedule's calendar.
+    /// Apply the schedule business-day convention, then its business-day lag.
+    ///
+    /// # Arguments
+    ///
+    /// * `accrual_end` - Contractual end date of the return period, before payment adjustment.
     pub fn payment_date_for(&self, accrual_end: Date) -> finstack_quant_core::Result<Date> {
-        if self.params.payment_lag_days == 0 {
-            return Ok(accrual_end);
-        }
         let cal =
             crate::cashflow::builder::calendar::resolve_calendar_strict(&self.params.calendar_id)?;
-        accrual_end.add_business_days(self.params.payment_lag_days, cal)
+        let adjusted = finstack_quant_core::dates::adjust(
+            accrual_end,
+            self.params.business_day_convention,
+            cal,
+        )?;
+        adjusted.add_business_days(self.params.payment_lag_days, cal)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::dates::BusinessDayConvention;
+    use time::macros::date;
+
+    #[test]
+    fn payment_dates_keep_month_end_adjustment_and_lag() {
+        for lag in [0, 2] {
+            let mut params = ScheduleParams::quarterly_act360();
+            params.calendar_id = "weekends_only".into();
+            params.business_day_convention = BusinessDayConvention::ModifiedFollowing;
+            params.adjust_accrual_dates = false;
+            params.payment_lag_days = lag;
+            let spec =
+                TrsScheduleSpec::from_params(date!(2024 - 03 - 30), date!(2024 - 06 - 30), params);
+            let expected = if lag == 0 {
+                date!(2024 - 06 - 28)
+            } else {
+                date!(2024 - 07 - 02)
+            };
+            assert_eq!(
+                spec.period_schedule().expect("schedule").payment_dates,
+                vec![expected]
+            );
+            assert_eq!(
+                spec.payment_date_for(date!(2024 - 06 - 30))
+                    .expect("payment"),
+                expected
+            );
+        }
     }
 }

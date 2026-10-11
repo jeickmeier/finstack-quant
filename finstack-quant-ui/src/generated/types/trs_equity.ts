@@ -3467,10 +3467,6 @@ export interface Tenor {
  * Underlying equity parameters (spot ID, dividend yield, contract size).
  */
 export interface D_3907A55Cf33393B0F707 {
-  /**
-   * Contract size (shares per contract)
-   */
-  contract_size: number;
   currency: Currency1;
   /**
    * Optional dividend yield identifier

@@ -4,11 +4,10 @@ use super::config::{
     CdsTranchePricer, CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORRELATION, NUMERICAL_TOLERANCE,
     PAR_SPREAD_TOLERANCE,
 };
-use crate::cashflow::builder::specs::RollRule;
 use crate::cashflow::primitives::CFKind;
 use crate::constants::BASIS_POINTS_PER_UNIT;
 use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
-use finstack_quant_core::dates::{next_cds_date, Date};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::CreditIndexData};
 use finstack_quant_core::math::binomial_pmf_all_into;
 use finstack_quant_core::{Error, Result};
@@ -333,6 +332,7 @@ impl CdsTranchePricer {
     ///
     /// Uses the robust date scheduling utilities with proper business day
     /// conventions and calendar support.
+    #[cfg(test)]
     pub(super) fn generate_payment_schedule(
         &self,
         tranche: &CdsTranche,
@@ -343,68 +343,49 @@ impl CdsTranchePricer {
     }
 
     /// Generate the complete contractual schedule before valuation-date filtering.
+    #[cfg(test)]
     pub(super) fn generate_full_payment_schedule(
         &self,
         tranche: &CdsTranche,
         as_of: Date,
     ) -> Result<Vec<Date>> {
-        let start_date = tranche.contractual_start_date(as_of).unwrap_or(as_of);
+        let periods = self.generate_coupon_periods(tranche, as_of)?;
+        Ok(periods
+            .first()
+            .map(|period| period.accrual_start)
+            .into_iter()
+            .chain(periods.iter().map(|period| period.payment_date))
+            .collect())
+    }
 
-        let dates = if tranche.roll_rule == RollRule::CdsImm {
-            // Business-day-adjust IMM roll dates with the tranche's calendar
-            // and convention (Modified Following per ISDA standard), matching
-            // the single-name CDS schedule path. Unadjusted 20ths landing on
-            // weekends/holidays would misstate accrual periods and payment
-            // timing.
-            let calendar = tranche
-                .calendar_id
-                .as_deref()
-                .and_then(finstack_quant_core::dates::calendar::calendar_by_id);
-            let adjust_date = |d: Date| -> Result<Date> {
-                if let Some(cal) = calendar {
-                    finstack_quant_core::dates::adjust(d, tranche.business_day_convention, cal)
-                } else {
-                    Ok(d)
-                }
-            };
-            let mut out = vec![start_date];
-            let mut current = start_date;
-            while current < tranche.maturity {
-                current = next_cds_date(current)?;
-                // Ensure we don't go past maturity (next_cds_date can go past if close)
-                if current > tranche.maturity {
-                    out.push(adjust_date(tranche.maturity)?);
-                    break;
-                }
-                out.push(adjust_date(current)?);
-            }
-            out
-        } else {
-            let periods = crate::cashflow::builder::periods::build_periods(
-                crate::cashflow::builder::periods::BuildPeriodsParams {
-                    start: start_date,
-                    end: tranche.maturity,
-                    frequency: tranche.frequency,
-                    stub: tranche.stub,
-                    business_day_convention: tranche.business_day_convention,
-                    calendar_id: tranche
-                        .calendar_id
-                        .as_deref()
-                        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
-                    end_of_month: false,
-                    day_count: tranche.day_count,
-                    payment_lag_days: 0,
-                    reset_lag_days: None,
-                    adjust_accrual_dates: false,
-                    roll_rule: crate::cashflow::builder::specs::RollRule::None,
-                },
-            )?;
-            std::iter::once(start_date)
-                .chain(periods.into_iter().map(|period| period.payment_date))
-                .collect()
-        };
-
-        Ok(dates)
+    pub(super) fn generate_coupon_periods(
+        &self,
+        tranche: &CdsTranche,
+        as_of: Date,
+    ) -> Result<Vec<crate::cashflow::builder::SchedulePeriod>> {
+        let start = tranche.contractual_start_date(as_of).unwrap_or(as_of);
+        if start >= tranche.maturity {
+            return Ok(Vec::new());
+        }
+        crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start,
+                end: tranche.maturity,
+                frequency: tranche.frequency,
+                stub: tranche.stub,
+                business_day_convention: tranche.business_day_convention,
+                calendar_id: tranche
+                    .calendar_id
+                    .as_deref()
+                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                end_of_month: false,
+                day_count: tranche.day_count,
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+                roll_rule: tranche.roll_rule,
+            },
+        )
     }
 
     /// Calculate the model upfront for the tranche.

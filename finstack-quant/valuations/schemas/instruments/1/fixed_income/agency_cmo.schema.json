@@ -267,16 +267,16 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Original face amount"
         },
-        "pac_collar": {
+        "pac_schedule": {
           "anyOf": [
             {
-              "$ref": "#/$defs/PacCollar"
+              "$ref": "#/$defs/PacSchedule"
             },
             {
               "type": "null"
             }
           ],
-          "description": "PAC collar (if PAC tranche)"
+          "description": "Original dated PAC principal targets and collar; required only for PAC tranches."
         },
         "priority": {
           "description": "Payment priority (1 = highest for sequential)",
@@ -379,6 +379,48 @@
       "required": [
         "lower_speed_multiplier",
         "upper_speed_multiplier"
+      ],
+      "type": "object"
+    },
+    "PacPayment": {
+      "additionalProperties": false,
+      "description": "Dated contractual PAC principal target, in the tranche currency's major units.",
+      "properties": {
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Contractual payment date, including the collateral's payment delay."
+        },
+        "principal": {
+          "description": "Planned principal payment, finite and nonnegative.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "date",
+        "principal"
+      ],
+      "type": "object"
+    },
+    "PacSchedule": {
+      "additionalProperties": false,
+      "description": "Original contractual PAC schedule. Pricing never regenerates these targets.",
+      "properties": {
+        "collar": {
+          "$ref": "#/$defs/PacCollar",
+          "description": "PAC collar"
+        },
+        "payments": {
+          "description": "Strictly increasing dated principal targets fixed at construction.",
+          "items": {
+            "$ref": "#/$defs/PacPayment"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "payments",
+        "collar"
       ],
       "type": "object"
     },

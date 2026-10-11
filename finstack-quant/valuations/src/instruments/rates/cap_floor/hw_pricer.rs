@@ -603,6 +603,7 @@ mod tests {
         kappa: f64,
         sigma: f64,
         short_rate: f64,
+        config: RateExoticMcConfig,
     ) -> MoneyEstimate {
         let context = DayCountContext::default();
         let mut events = BTreeMap::<finstack_quant_core::dates::Date, CompoundedSofrMcEvent>::new();
@@ -665,13 +666,7 @@ mod tests {
                 .expect("valid Hull-White parameters"),
             r0: short_rate,
             event_times,
-            config: RateExoticMcConfig {
-                num_paths: if sigma == 0.0 { 2 } else { 16_384 },
-                seed: 0x5EED_50F5,
-                antithetic: true,
-                min_steps_between_events: 4,
-                ..Default::default()
-            },
+            config,
             currency: caplet.notional.currency(),
         };
         pricer
@@ -1435,16 +1430,47 @@ mod tests {
             .expect("moment-match price")
             .value
             .amount();
-        let mc =
-            compounded_sofr_hw_mc_benchmark(as_of, &caplet, &projection, kappa, sigma, short_rate);
-        let repeated_mc =
-            compounded_sofr_hw_mc_benchmark(as_of, &caplet, &projection, kappa, sigma, short_rate);
-
-        assert_eq!(
-            mc.mean.amount().to_bits(),
-            repeated_mc.mean.amount().to_bits()
+        let budget = caplet.notional.amount() * 1e-5; // 0.1 bp of notional.
+        let mut values = Vec::new();
+        for steps in [2, 4, 8] {
+            for seed in [0x5EED_50F5, 0xC0FF_EE17] {
+                let config = RateExoticMcConfig {
+                    num_paths: 65_536,
+                    seed,
+                    antithetic: true,
+                    min_steps_between_events: steps,
+                    ..Default::default()
+                };
+                let estimate = compounded_sofr_hw_mc_benchmark(
+                    as_of,
+                    &caplet,
+                    &projection,
+                    kappa,
+                    sigma,
+                    short_rate,
+                    config,
+                );
+                assert!(
+                    2.5758293035489004 * estimate.stderr < budget,
+                    "RFR MC 99% half-width exceeds {budget}: {}",
+                    estimate.stderr
+                );
+                assert!(
+                    (estimate.mean.amount() - analytical).abs() < budget,
+                    "steps={steps}, seed={seed}, analytical={analytical}, reference={}, stderr={}",
+                    estimate.mean.amount(),
+                    estimate.stderr
+                );
+                values.push(estimate.mean.amount());
+            }
+        }
+        let low = values.iter().copied().fold(f64::INFINITY, f64::min);
+        let high = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        assert!(
+            high - low < budget,
+            "RFR grid/seed spread {} exceeds {budget}",
+            high - low
         );
-        assert_eq!(mc.stderr.to_bits(), repeated_mc.stderr.to_bits());
 
         let mut zero_sigma_caplet = caplet;
         zero_sigma_caplet
@@ -1474,19 +1500,17 @@ mod tests {
             kappa,
             0.0,
             short_rate,
+            RateExoticMcConfig {
+                num_paths: 2,
+                seed: 17,
+                min_steps_between_events: 4,
+                ..Default::default()
+            },
         );
         assert!(
             (zero_sigma_mc.mean.amount() - zero_sigma_intrinsic).abs() < 1.0e-8,
             "zero-sigma MC must equal intrinsic value: MC={}, intrinsic={zero_sigma_intrinsic}",
             zero_sigma_mc.mean.amount()
-        );
-
-        let tolerance = 5.0 * mc.stderr + 0.50;
-        assert!(
-            (mc.mean.amount() - analytical).abs() <= tolerance,
-            "moment match={analytical:.6}, MC={:.6}, stderr={:.6}, tolerance={tolerance:.6}",
-            mc.mean.amount(),
-            mc.stderr
         );
     }
 
@@ -1581,5 +1605,37 @@ mod tests {
 
         assert_eq!(model.volatility.times()[0], 0.0);
         assert_eq!(model.volatility.values(), &[0.01, 0.02]);
+    }
+    #[test]
+    fn selected_hw_greeks_reprice_the_selected_model_without_black_surface() {
+        use crate::instruments::PricingOptions;
+        use crate::metrics::MetricId;
+        use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+        let (as_of, cap, market) = example_cap_market();
+        let registry = crate::pricer::standard_pricer_registry();
+        let price = |bp: f64| {
+            let shifted = market
+                .bump([MarketBump::Curve {
+                    id: cap.forward_curve_id.clone(),
+                    spec: BumpSpec::parallel_bp(bp),
+                }])
+                .unwrap();
+            registry
+                .price_raw(&cap, ModelKey::HullWhite1F, &shifted, as_of)
+                .unwrap()
+        };
+        let base = price(0.0);
+        let up = price(1.0);
+        let down = price(-1.0);
+        let result = cap
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Delta, MetricId::Gamma],
+                PricingOptions::default().with_model(ModelKey::HullWhite1F),
+            )
+            .unwrap();
+        assert!((result.measures["delta"] - (up - down) / 2e-4).abs() < 1e-6);
+        assert!((result.measures["gamma"] - (up - 2.0 * base + down) / 1e-8).abs() < 1e-3);
     }
 }

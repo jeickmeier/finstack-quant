@@ -307,7 +307,7 @@ test('AssetBackedFacility exposes undrawn, revolving end, projection and IRR', (
   assert.equal(facility.effectiveRevolvingEnd, '2026-01-15');
   const projection = facility.project(FLAT_USD_MARKET, '2024-01-15');
   assert.equal(projection.commitment_fees.length, 8);
-  close(facility.facilityIrr(FLAT_USD_MARKET, '2024-01-15'), 0.06268880790140878, 1e-12, 'IRR');
+  close(facility.facilityIrr(FLAT_USD_MARKET, '2024-01-15'), 0.06261943398520163, 1e-12, 'IRR');
   const deal = JSON.parse(facility.synthesizedDealJson());
   assert.equal(deal.schema, 'finstack_quant.instrument/1');
   assert.equal(deal.instrument.type, 'structured_credit');
@@ -706,7 +706,7 @@ test('pnlBridge and attributePnlMany run the Rust attribution entry points', () 
     CONVERTIBLE.as_of_t1,
     'USD'
   );
-  assert.equal(bridge.toString(), 'USD -61.80');
+  assert.equal(bridge.toString(), 'USD -60.42');
 
   const params = {
     instrument: CONVERTIBLE.instrument.instrument,

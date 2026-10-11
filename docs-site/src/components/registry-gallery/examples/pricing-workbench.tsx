@@ -52,8 +52,8 @@ export const exampleRequests: Record<string, PriceRequest> = {
     ...cashflowCase("equity_option"),
     metrics: ["delta", "gamma", "vega", "theta", "bucketed_vega"],
   },
-  commodity_option: {
-    ...detailCase("commodity_option"),
+  commodity_spot_option: {
+    ...detailCase("commodity_spot_option"),
     metrics: ["theta"],
   },
   composite: detailCase("composite"),
@@ -81,7 +81,7 @@ const exampleResultTabs = {
   xccy_swap: "cashflows",
   interest_rate_swap: "measures",
   equity_option: "buckets",
-  commodity_option: "measures",
+  commodity_spot_option: "measures",
   composite: "measures",
   credit_default_swap: "measures",
   fx_option: "measures",

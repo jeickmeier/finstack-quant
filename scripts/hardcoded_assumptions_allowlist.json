@@ -1736,13 +1736,13 @@
       "reason": "Contract-spec formula, unit multiplier, or API label; exchange/product specs live in contract-spec registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/commodity/commodity_option/types.rs",
+      "path": "finstack-quant/valuations/src/instruments/commodity/commodity_spot_option/types.rs",
       "category": "contract_spec",
       "contains": ".multiplier(1.0)",
       "reason": "Contract-spec formula, unit multiplier, or API label; exchange/product specs live in contract-spec registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/commodity/commodity_option/types.rs",
+      "path": "finstack-quant/valuations/src/instruments/commodity/commodity_spot_option/types.rs",
       "category": "contract_spec",
       "contains": "Ok(vega_abs * 0.01 * self.quantity * self.multiplier)",
       "reason": "Contract-spec formula, unit multiplier, or API label; exchange/product specs live in contract-spec registries."

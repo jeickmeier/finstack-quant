@@ -4,6 +4,7 @@
 //! redistribute the cashflows from underlying MBS pools into tranches with
 //! different risk/return profiles.
 
+use super::tranches::pac_support::PacSchedule;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::mbs_passthrough::{AgencyMbsPassthrough, AgencyProgram};
@@ -99,9 +100,9 @@ pub struct CmoTranche {
     pub coupon: f64,
     /// Payment priority (1 = highest for sequential)
     pub priority: u32,
-    /// PAC collar (if PAC tranche)
+    /// Original dated PAC principal targets and collar; required only for PAC tranches.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pac_collar: Option<PacCollar>,
+    pub pac_schedule: Option<PacSchedule>,
 }
 
 impl CmoTranche {
@@ -114,12 +115,21 @@ impl CmoTranche {
             current_face: face,
             coupon,
             priority,
-            pac_collar: None,
+            pac_schedule: None,
         }
     }
 
-    /// Create a PAC tranche.
-    pub fn pac(id: &str, face: Money, coupon: f64, priority: u32, collar: PacCollar) -> Self {
+    /// Create a PAC tranche with its persistent contractual principal plan.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Deal-unique tranche identifier.
+    /// * `face` - Original and opening current principal in the tranche currency.
+    /// * `coupon` - Annual cash coupon as a decimal rate, such as 0.04 for 4%.
+    /// * `priority` - Principal priority, with 1 paid before larger values.
+    /// * `schedule` - Dated original principal targets generated at construction
+    ///   or supplied from the deal terms; retained unchanged when seasoning.
+    pub fn pac(id: &str, face: Money, coupon: f64, priority: u32, schedule: PacSchedule) -> Self {
         Self {
             id: id.to_string(),
             tranche_type: CmoTrancheType::Pac,
@@ -127,7 +137,7 @@ impl CmoTranche {
             current_face: face,
             coupon,
             priority,
-            pac_collar: Some(collar),
+            pac_schedule: Some(schedule),
         }
     }
 
@@ -140,7 +150,7 @@ impl CmoTranche {
             current_face: face,
             coupon,
             priority,
-            pac_collar: None,
+            pac_schedule: None,
         }
     }
 
@@ -163,7 +173,7 @@ impl CmoTranche {
             current_face: face,
             coupon,
             priority,
-            pac_collar: None,
+            pac_schedule: None,
         }
     }
 
@@ -176,7 +186,7 @@ impl CmoTranche {
             current_face: notional,
             coupon,
             priority: 0, // IO gets interest before principal allocation
-            pac_collar: None,
+            pac_schedule: None,
         }
     }
 
@@ -189,7 +199,7 @@ impl CmoTranche {
             current_face: face,
             coupon: 0.0,
             priority: 0,
-            pac_collar: None,
+            pac_schedule: None,
         }
     }
 
@@ -375,10 +385,10 @@ impl AgencyCmo {
                 || original <= 0.0
                 || !current.is_finite()
                 || current < 0.0
-                || current > original
+                || (current > original && tranche.tranche_type != CmoTrancheType::Accrual)
             {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "{context} tranche '{}' requires 0 <= current_face <= positive original_face",
+                    "{context} tranche '{}' requires nonnegative current_face and positive original_face; only accrual tranches may exceed original_face",
                     tranche.id
                 )));
             }
@@ -401,23 +411,27 @@ impl AgencyCmo {
                     tranche.id
                 )));
             }
-            match (&tranche.tranche_type, &tranche.pac_collar) {
-                (CmoTrancheType::Pac, Some(collar))
-                    if collar.lower_speed_multiplier.is_finite()
-                        && collar.upper_speed_multiplier.is_finite()
-                        && collar.lower_speed_multiplier >= 0.0
-                        && collar.lower_speed_multiplier <= collar.upper_speed_multiplier => {}
-                (CmoTrancheType::Pac, _) => {
+            match (&tranche.tranche_type, &tranche.pac_schedule) {
+                (CmoTrancheType::Pac, Some(schedule)) => {
+                    schedule.validate()?;
+                    if schedule.get_total() > tranche.original_face.amount() + 1e-6 {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "{context} PAC tranche '{}' targets exceed original face",
+                            tranche.id
+                        )));
+                    }
+                }
+                (CmoTrancheType::Pac, None) => {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "{context} PAC tranche '{}' requires a finite ordered non-negative collar",
+                        "{context} PAC tranche '{}' requires its original dated principal schedule",
                         tranche.id
-                    )));
+                    )))
                 }
                 (_, Some(_)) => {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "{context} non-PAC tranche '{}' cannot define a PAC collar",
+                        "{context} non-PAC tranche '{}' cannot define a PAC schedule",
                         tranche.id
-                    )));
+                    )))
                 }
                 _ => {}
             }
@@ -528,29 +542,41 @@ impl AgencyCmo {
 
     /// Create an example PAC/Support structure.
     pub fn example_pac_support() -> finstack_quant_core::Result<Self> {
-        use time::macros::date;
-        let tranches = vec![
+        let mut deal = Self::example()?;
+        deal.id = InstrumentId::new("FNR-2024-2-PAC");
+        deal.deal_name = "FNR 2024-2".into();
+        deal.collateral_wac = Some(0.045);
+        let pool = super::pricer::resolve_collateral(&deal, deal.issue_date)?;
+        let dates: Vec<_> =
+            crate::instruments::fixed_income::mbs_passthrough::pricer::generate_cashflows(
+                &pool,
+                deal.issue_date,
+                None,
+            )?
+            .iter()
+            .map(|flow| flow.payment_date)
+            .collect();
+        let schedule = PacSchedule::generate(
+            pool.current_face.amount(),
+            50_000_000.0,
+            &dates,
+            pool.wac,
+            pool.seasoning_months(deal.issue_date),
+            PacCollar::standard(),
+        )?;
+        deal.waterfall = CmoWaterfall::new(vec![
             CmoTranche::pac(
                 "PAC",
                 Money::from((50_000_000_i64, Currency::USD)),
                 0.0375,
                 1,
-                PacCollar::standard(),
+                schedule,
             ),
             CmoTranche::support("SUP", Money::from((50_000_000_i64, Currency::USD)), 0.04, 2),
-        ];
-
-        Self::builder()
-            .id(InstrumentId::new("FNR-2024-2-PAC"))
-            .deal_name("FNR 2024-2".into())
-            .agency(AgencyProgram::Fnma)
-            .issue_date(date!(2024 - 01 - 01))
-            .waterfall(CmoWaterfall::new(tranches))
-            .reference_tranche_id("PAC".to_string())
-            .collateral_wac(0.045)
-            .collateral_wam_months(360)
-            .discount_curve_id(CurveId::new("USD-OIS"))
-            .build()
+        ]);
+        deal.reference_tranche_id = "PAC".into();
+        deal.validate()?;
+        Ok(deal)
     }
 
     /// Create an example IO/PO strip structure.
@@ -784,7 +810,7 @@ mod tests {
 
         let pac = cmo.waterfall.get_tranche("PAC").expect("PAC exists");
         assert_eq!(pac.tranche_type, CmoTrancheType::Pac);
-        assert!(pac.pac_collar.is_some());
+        assert!(pac.pac_schedule.is_some());
 
         let sup = cmo.waterfall.get_tranche("SUP").expect("SUP exists");
         assert_eq!(sup.tranche_type, CmoTrancheType::Support);
@@ -891,6 +917,27 @@ mod tests {
         assert!(
             msg.contains("tranche 'Z'") && msg.contains("pass-through"),
             "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn accreted_z_balance_survives_serialization() {
+        let mut cmo = AgencyCmo::example_accrual().expect("example");
+        let z = cmo
+            .waterfall
+            .tranches
+            .iter_mut()
+            .find(|t| t.id == "Z")
+            .expect("Z");
+        z.current_face = Money::new(z.original_face.amount() * 1.1, z.original_face.currency())
+            .expect("accreted face");
+        cmo.validate().expect("legitimate accretion");
+        let json = serde_json::to_string(&cmo).expect("serialize");
+        let restored: AgencyCmo = serde_json::from_str(&json).expect("deserialize");
+        restored.validate().expect("reconstructed accretion");
+        assert_eq!(
+            restored.waterfall.get_tranche("Z").expect("Z").current_face,
+            cmo.waterfall.get_tranche("Z").expect("Z").current_face
         );
     }
 
