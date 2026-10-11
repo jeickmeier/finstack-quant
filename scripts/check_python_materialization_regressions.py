@@ -10,6 +10,7 @@ from pathlib import Path
 import time
 from typing import Any
 
+from baseline_identity import require_baseline_name, require_sha256, require_tree_revision
 from prepare_materialization_criterion_run import combined_fixture_digest, tree_revision
 
 EXPECTED_CASES = ("cold_a_5000_unique", "cold_b_5000_50", "warm_b_5000_50")
@@ -97,7 +98,7 @@ def write_baseline(
         raise ValueError("stale Python measurement predates baseline establishment")
     payload = {
         "schema": SCHEMA,
-        "baseline_name": baseline_name,
+        "baseline_name": require_baseline_name(baseline_name),
         "tree_revision": revision,
         "fixture_sha256": combined,
         "fixtures": individual,
@@ -141,26 +142,20 @@ def compact_baseline_from_record(
     fixtures = record["fixtures"]
     return {
         "schema": SCHEMA,
-        "baseline_name": baseline_name,
-        "tree_revision": baseline["python_baseline_tree_revision"],
-        "fixture_sha256": baseline["python_baseline_fixture_sha256"],
+        "baseline_name": require_baseline_name(baseline_name),
+        "tree_revision": require_tree_revision(baseline["python_baseline_tree_revision"]),
+        "fixture_sha256": require_sha256(baseline["python_baseline_fixture_sha256"], "fixture_sha256"),
         "fixtures": {
-            "a": fixtures["a"]["sha256"],
-            "b": fixtures["b"]["sha256"],
+            "a": require_sha256(fixtures["a"]["sha256"], "fixtures.a"),
+            "b": require_sha256(fixtures["b"]["sha256"], "fixtures.b"),
         },
         "expected_cases": list(EXPECTED_CASES),
         "medians_ms": {name: _median(current_cases[name]) / (1.0 + float(changes[name])) for name in EXPECTED_CASES},
     }
 
 
-def verify_baseline(
-    baseline_path: Path,
-    fixture_a: Path,
-    fixture_b: Path,
-    manifest_path: Path | None = None,
-) -> dict[str, Any]:
-    """Verify the immutable Python baseline schema, cases, and fixture identity."""
-    baseline = _load(baseline_path)
+def _require_baseline_shape(baseline: dict[str, Any]) -> None:
+    """Reject a compact baseline whose schema, cases, medians, or identity are wrong."""
     if baseline.get("schema") != SCHEMA:
         raise ValueError("unsupported Python materialization baseline schema")
     if baseline.get("expected_cases") != list(EXPECTED_CASES):
@@ -173,6 +168,25 @@ def verify_baseline(
         for value in medians.values()
     ):
         raise ValueError("baseline medians must be positive finite numbers")
+    require_baseline_name(baseline.get("baseline_name"))
+    require_tree_revision(baseline.get("tree_revision"))
+    require_sha256(baseline.get("fixture_sha256"), "fixture_sha256")
+    fixtures = baseline.get("fixtures")
+    if not isinstance(fixtures, dict) or set(fixtures) != {"a", "b"}:
+        raise ValueError("baseline fixtures must name fixture a and fixture b")
+    require_sha256(fixtures["a"], "fixtures.a")
+    require_sha256(fixtures["b"], "fixtures.b")
+
+
+def verify_baseline(
+    baseline_path: Path,
+    fixture_a: Path,
+    fixture_b: Path,
+    manifest_path: Path | None = None,
+) -> dict[str, Any]:
+    """Verify the immutable Python baseline schema, cases, and fixture identity."""
+    baseline = _load(baseline_path)
+    _require_baseline_shape(baseline)
     individual, combined = _fixture_digests(fixture_a, fixture_b)
     if baseline.get("fixture_sha256") != combined or baseline.get("fixtures") != individual:
         raise ValueError("baseline fixture digest does not match supplied fixtures")
@@ -200,8 +214,7 @@ def verify_baseline(
 def seal_baseline_manifest(baseline_path: Path, manifest_path: Path) -> None:
     """Record the immutable Python baseline digest and provenance."""
     baseline = _load(baseline_path)
-    if baseline.get("schema") != SCHEMA:
-        raise ValueError("unsupported Python materialization baseline schema")
+    _require_baseline_shape(baseline)
     manifest = _load(manifest_path)
     manifest.update({
         "python_baseline_name": baseline["baseline_name"],

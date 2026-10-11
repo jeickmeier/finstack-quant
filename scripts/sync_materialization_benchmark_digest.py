@@ -6,6 +6,7 @@ import argparse
 import hashlib
 from pathlib import Path
 import re
+import sys
 
 _DIGEST_PATTERN = re.compile(
     r"(Its\s+SHA-256 is `)[0-9a-f]{64}(`\.)",
@@ -36,7 +37,11 @@ def main() -> int:
     expected = synchronized_text(original, digest)
     if args.check:
         if original != expected:
-            parser.error(f"{args.document} does not record artifact SHA-256 {digest}")
+            print(
+                f"{args.document} does not record artifact SHA-256 {digest}",
+                file=sys.stderr,
+            )
+            return 1
         print(f"Materialization benchmark artifact digest verified: {digest}")
         return 0
     args.document.write_text(expected, encoding="utf-8")

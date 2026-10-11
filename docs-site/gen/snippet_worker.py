@@ -18,6 +18,32 @@ SITE = Path(__file__).resolve().parents[1]
 _ASSERTION_HIT_FUNCTION = "__finstack_record_assertion_hit__"
 
 
+def path_segment(value: object, label: str) -> str:
+    """Return one path segment, rejecting separators and parent-directory names."""
+    if not isinstance(value, str) or value in {"", ".", ".."} or "/" in value or "\\" in value or "\x00" in value:
+        raise RuntimeError(f"{label} must be a single path segment")
+    return value
+
+
+def confined_directory(root: Path, lesson_id: str, block_id: str) -> Path:
+    """Return the block asset directory, which must resolve inside ``root``."""
+    lesson = path_segment(lesson_id, "lesson_id")
+    block = path_segment(block_id, "block id")
+    resolved_root = root.resolve()
+    asset_path = resolved_root / lesson / block
+    if not asset_path.resolve().is_relative_to(resolved_root):
+        raise RuntimeError(f"asset path escapes {resolved_root}: {asset_path}")
+    return asset_path
+
+
+def require_segments(request: dict) -> str:
+    """Reject lesson and block ids that are not single path segments."""
+    lesson_id = path_segment(request["lesson_id"], "lesson_id")
+    for block in request["blocks"]:
+        path_segment(block["id"], "block id")
+    return lesson_id
+
+
 def files() -> dict[Path, str]:
     """Snapshot exportable files without modifying the lesson's working state."""
     return {
@@ -61,11 +87,17 @@ def capture_figures(
 
 
 def capture_files(
-    before: dict[Path, str], asset_path: Path, asset_prefix: str, *, publish_assets: bool
+    before: dict[Path, str],
+    asset_path: Path,
+    asset_prefix: str,
+    asset_root: Path,
+    *,
+    publish_assets: bool,
 ) -> tuple[list[str], dict[str, str]]:
     """Capture exportable files created or changed by one block."""
     assets = []
     hashes = {}
+    resolved_root = asset_root.resolve()
     for file, fingerprint in sorted(files().items()):
         if before.get(file) == fingerprint:
             continue
@@ -73,6 +105,8 @@ def capture_files(
         asset = asset_prefix + name.as_posix()
         if publish_assets:
             target = asset_path / name
+            if not target.resolve().is_relative_to(resolved_root):
+                raise RuntimeError(f"captured file escapes {resolved_root}: {target}")
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(file, target)
         assets.append(asset)
@@ -143,6 +177,7 @@ def restrict_notebook_access(allowed_root: Path) -> set[str]:
 def main() -> None:
     """Execute the supplied sequence and capture designated block outputs."""
     request = json.loads(Path(sys.argv[1]).read_text())
+    lesson_id = require_segments(request)
     expected = request["expected_runtime"]
     if Path(sys.executable).resolve() != Path(expected["python_executable"]):
         raise RuntimeError("Snippet worker interpreter does not match the recorded runtime")
@@ -160,7 +195,7 @@ def main() -> None:
     namespace = {"__name__": "__main__"}
     if assertion_locations is not None:
         namespace[_ASSERTION_HIT_FUNCTION] = assertion_hits.add
-    asset_root = Path(request.get("asset_root", SITE / "public" / "snippet-assets"))
+    asset_root = Path(request.get("asset_root", SITE / "public" / "snippet-assets")).resolve()
     results = []
     figure_hashes = {}
     for block in request["blocks"]:
@@ -171,7 +206,7 @@ def main() -> None:
             exec(
                 compile_block(
                     block,
-                    request["lesson_id"],
+                    lesson_id,
                     None if assertion_locations is None else assertion_locations[block["id"]],
                 ),
                 namespace,
@@ -179,8 +214,8 @@ def main() -> None:
         if notebook_violations:
             raise RuntimeError(f"Notebook access escaped the declared projection: {sorted(notebook_violations)}")
         capture = block["id"] in request["capture"]
-        asset_path = asset_root / request["lesson_id"] / block["id"]
-        asset_prefix = f"/snippet-assets/{request['lesson_id']}/{block['id']}/"
+        asset_path = confined_directory(asset_root, lesson_id, block["id"])
+        asset_prefix = f"/snippet-assets/{lesson_id}/{block['id']}/"
         if capture and publish_assets:
             if asset_path.is_dir():
                 shutil.rmtree(asset_path)
@@ -194,7 +229,13 @@ def main() -> None:
         )
         if not capture:
             continue
-        file_assets, file_hashes = capture_files(before, asset_path, asset_prefix, publish_assets=publish_assets)
+        file_assets, file_hashes = capture_files(
+            before,
+            asset_path,
+            asset_prefix,
+            asset_root,
+            publish_assets=publish_assets,
+        )
         assets.extend(file_assets)
         asset_hashes.update(file_hashes)
         assets.sort()

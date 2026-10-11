@@ -6,10 +6,12 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import sys
 
 import pytest
 
 _SCRIPT_PATH = Path(__file__).parents[1] / "check_criterion_regressions.py"
+sys.path.insert(0, str(_SCRIPT_PATH.parent))
 _SPEC = importlib.util.spec_from_file_location("check_criterion_regressions", _SCRIPT_PATH)
 assert _SPEC is not None
 assert _SPEC.loader is not None
@@ -168,3 +170,46 @@ def test_run_metadata_requires_revisions_and_fixture_digest(tmp_path: Path) -> N
         encoding="utf-8",
     )
     assert load_run_metadata(path)["fixture_sha256"] == "a" * 64
+
+
+@pytest.mark.parametrize(
+    ("baseline_name", "digest"),
+    [
+        ("../escape", "a" * 64),
+        ("materialization-v1", "not-a-digest"),
+    ],
+)
+def test_malformed_baseline_identity_is_rejected_before_comparison_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    baseline_name: str,
+    digest: str,
+) -> None:
+    """A bad baseline name or digest never creates the comparison artifact."""
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(
+        json.dumps({
+            "baseline_name": baseline_name,
+            "tree_revision": "tree-current",
+            "fixture_sha256": digest,
+        }),
+        encoding="utf-8",
+    )
+    output = tmp_path / "comparison.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "check_criterion_regressions.py",
+            "--baseline",
+            str(baseline),
+            "--comparison-output",
+            str(output),
+        ],
+    )
+
+    with pytest.raises(SystemExit) as caught:
+        _MODULE.main()
+
+    assert caught.value.code == 2
+    assert not output.exists()

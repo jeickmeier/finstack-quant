@@ -239,6 +239,10 @@ jobs:
     steps:
       - name: Resolve release metadata
         id: release
+        env:
+          # workflow_dispatch input. Keep it out of the run script so a tag
+          # cannot break out of the shell (githubactions:S7630).
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           timestamp_tag="master-$(date -u +%Y%m%d-%H%M%S)"
 
@@ -247,8 +251,13 @@ jobs:
             echo "target=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
             echo "make_latest=false" >> "$GITHUB_OUTPUT"
-          elif [[ -n "${{ inputs.tag }}" ]]; then
-            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "$INPUT_TAG" ]]; then
+            # Newlines in the tag would inject extra GITHUB_OUTPUT keys.
+            if [[ ! "$INPUT_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+              echo "invalid release tag: ${INPUT_TAG}" >&2
+              exit 1
+            fi
+            echo "tag=${INPUT_TAG}" >> "$GITHUB_OUTPUT"
             echo "target=${{ github.sha }}" >> "$GITHUB_OUTPUT"
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
             echo "make_latest=true" >> "$GITHUB_OUTPUT"

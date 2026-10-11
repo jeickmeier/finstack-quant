@@ -8,6 +8,8 @@ import math
 from pathlib import Path
 from typing import Any
 
+from baseline_identity import require_baseline_name, require_sha256, require_tree_revision
+
 MATERIALIZATION_CASES = (
     "cold_a_5000_unique",
     "cold_b_5000_50",
@@ -131,20 +133,25 @@ def collect_regressions(
     return regressions
 
 
+def load_baseline(path: Path) -> dict[str, Any]:
+    """Load a compact baseline and reject malformed identity fields before any write."""
+    payload: object = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise TypeError("compact baseline must be a JSON object")
+    require_baseline_name(payload.get("baseline_name"))
+    require_tree_revision(payload.get("tree_revision"))
+    require_sha256(payload.get("fixture_sha256"), "fixture_sha256")
+    return payload
+
+
 def load_run_metadata(path: Path) -> dict[str, Any]:
     """Load and validate benchmark provenance used by the comparison gate."""
     payload: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
-    required_strings = ("baseline_name", "baseline_revision", "current_revision")
-    for key in required_strings:
+    require_baseline_name(payload.get("baseline_name"))
+    for key in ("baseline_revision", "current_revision"):
         if not isinstance(payload.get(key), str) or not payload[key]:
             raise TypeError(f"run metadata requires non-empty {key}")
-    fixture_digest = payload.get("fixture_sha256")
-    if (
-        not isinstance(fixture_digest, str)
-        or len(fixture_digest) != 64
-        or any(character not in "0123456789abcdef" for character in fixture_digest)
-    ):
-        raise TypeError("run metadata fixture_sha256 must be a lowercase SHA-256 digest")
+    require_sha256(payload.get("fixture_sha256"), "run metadata fixture_sha256")
     if not isinstance(payload.get("started_at_ns"), int):
         raise TypeError("run metadata requires integer started_at_ns")
     return payload
@@ -191,7 +198,7 @@ def main() -> int:
     try:
         metadata = load_run_metadata(args.run_metadata) if args.run_metadata else None
         if args.baseline:
-            baseline: dict[str, Any] = json.loads(args.baseline.read_text(encoding="utf-8"))
+            baseline = load_baseline(args.baseline)
             comparison = materialization_comparison(
                 args.criterion_dir,
                 baseline,

@@ -232,3 +232,63 @@ def test_strict_python_comparison_flags_median_regression(tmp_path: Path, monkey
         encoding="utf-8",
     )
     assert _check(paths) == [(name, pytest.approx(0.1001)) for name in _MODULE.EXPECTED_CASES]
+
+
+def _sealable_baseline(name: str = "python-materialization-v1", digest: str = "a" * 64) -> dict[str, object]:
+    return {
+        "schema": _MODULE.SCHEMA,
+        "baseline_name": name,
+        "tree_revision": "tree-current",
+        "fixture_sha256": digest,
+        "fixtures": {"a": "b" * 64, "b": "c" * 64},
+        "expected_cases": list(_MODULE.EXPECTED_CASES),
+        "medians_ms": dict.fromkeys(_MODULE.EXPECTED_CASES, 1.0),
+    }
+
+
+@pytest.mark.parametrize(
+    ("name", "digest"),
+    [
+        ("../escape", "a" * 64),
+        ("python-materialization-v1", "not-a-digest"),
+    ],
+)
+def test_seal_rejects_malformed_identity_without_rewriting_the_manifest(tmp_path: Path, name: str, digest: str) -> None:
+    """A bad baseline name or digest is rejected before the manifest is rewritten."""
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps(_sealable_baseline(name, digest)), encoding="utf-8")
+    manifest = tmp_path / "manifest.json"
+    original = {
+        "provenance": "Captured from base revision.",
+        "python_baseline_path": "benchmarks/materialization/materialization-python-baseline.json",
+    }
+    manifest.write_text(json.dumps(original), encoding="utf-8")
+    before = manifest.read_bytes()
+
+    with pytest.raises(ValueError, match=r"baseline_name|fixture_sha256"):
+        _MODULE.seal_baseline_manifest(baseline, manifest)
+
+    assert manifest.read_bytes() == before
+
+
+def test_seal_preserves_existing_manifest_keys(tmp_path: Path) -> None:
+    """Sealing updates baseline identity and leaves provenance and path fields in place."""
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps(_sealable_baseline()), encoding="utf-8")
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps({
+            "provenance": "Captured from base revision.",
+            "python_baseline_path": "benchmarks/materialization/materialization-python-baseline.json",
+        }),
+        encoding="utf-8",
+    )
+
+    _MODULE.seal_baseline_manifest(baseline, manifest)
+
+    sealed = json.loads(manifest.read_text(encoding="utf-8"))
+    assert sealed["provenance"] == "Captured from base revision."
+    assert sealed["python_baseline_path"] == "benchmarks/materialization/materialization-python-baseline.json"
+    assert sealed["python_baseline_name"] == "python-materialization-v1"
+    assert sealed["python_baseline_tree_revision"] == "tree-current"
+    assert sealed["python_baseline_fixture_sha256"] == "a" * 64

@@ -228,3 +228,65 @@ def test_benchmark_checker_rejects_tampered_manifest_baseline_paths(language: st
             rust_path,
             python_path,
         )
+
+
+def _sealable_rust_baseline(name: str = "materialization-v1", digest: str = "a" * 64) -> dict[str, object]:
+    return {
+        "schema": _MODULE.SCHEMA,
+        "baseline_name": name,
+        "tree_revision": "tree-current",
+        "fixture_sha256": digest,
+        "fixtures": {"a": "b" * 64, "b": "c" * 64},
+        "expected_cases": list(_MODULE.EXPECTED_CASES),
+        "medians_ms": {case: {"point": 10.0, "lower": 9.0, "upper": 11.0} for case in _MODULE.EXPECTED_CASES},
+    }
+
+
+@pytest.mark.parametrize(
+    ("name", "digest"),
+    [
+        ("../escape", "a" * 64),
+        ("materialization-v1", "not-a-digest"),
+    ],
+)
+def test_rust_seal_rejects_malformed_identity_without_rewriting_the_manifest(
+    tmp_path: Path, name: str, digest: str
+) -> None:
+    """A bad baseline name or digest is rejected before the manifest is rewritten."""
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps(_sealable_rust_baseline(name, digest)), encoding="utf-8")
+    manifest = tmp_path / "manifest.json"
+    original = {
+        "provenance": "Captured from base revision.",
+        "rust_baseline_path": "benchmarks/materialization/materialization-rust-baseline.json",
+    }
+    manifest.write_text(json.dumps(original), encoding="utf-8")
+    before = manifest.read_bytes()
+
+    with pytest.raises(ValueError, match=r"baseline_name|fixture_sha256"):
+        _MODULE.seal_baseline_manifest(baseline, manifest)
+
+    assert manifest.read_bytes() == before
+
+
+def test_rust_seal_preserves_existing_manifest_keys(tmp_path: Path) -> None:
+    """Sealing updates baseline identity and leaves provenance and path fields in place."""
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps(_sealable_rust_baseline()), encoding="utf-8")
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps({
+            "provenance": "Captured from base revision.",
+            "rust_baseline_path": "benchmarks/materialization/materialization-rust-baseline.json",
+        }),
+        encoding="utf-8",
+    )
+
+    _MODULE.seal_baseline_manifest(baseline, manifest)
+
+    sealed = json.loads(manifest.read_text(encoding="utf-8"))
+    assert sealed["provenance"] == "Captured from base revision."
+    assert sealed["rust_baseline_path"] == "benchmarks/materialization/materialization-rust-baseline.json"
+    assert sealed["rust_baseline_name"] == "materialization-v1"
+    assert sealed["rust_baseline_tree_revision"] == "tree-current"
+    assert sealed["rust_baseline_fixture_sha256"] == "a" * 64

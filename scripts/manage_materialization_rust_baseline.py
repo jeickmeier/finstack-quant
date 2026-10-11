@@ -11,6 +11,7 @@ import shutil
 import subprocess
 from typing import Any
 
+from baseline_identity import require_baseline_name, require_sha256, require_tree_revision
 from prepare_materialization_criterion_run import combined_fixture_digest, tree_revision
 
 EXPECTED_CASES = (
@@ -94,7 +95,7 @@ def write_baseline(
         raise TypeError("run metadata requires integer started_at_ns")
     payload = {
         "schema": SCHEMA,
-        "baseline_name": baseline_name,
+        "baseline_name": require_baseline_name(baseline_name),
         "base_revision": _git_head(),
         "tree_revision": revision,
         "fixture_sha256": fixture_sha256,
@@ -106,14 +107,8 @@ def write_baseline(
     output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def verify_baseline(
-    baseline_path: Path,
-    fixture_a: Path,
-    fixture_b: Path,
-    manifest_path: Path | None = None,
-) -> dict[str, Any]:
-    """Verify compact baseline shape, fixture identity, and optional manifest."""
-    baseline: dict[str, Any] = json.loads(baseline_path.read_text(encoding="utf-8"))
+def _require_baseline_shape(baseline: dict[str, Any]) -> None:
+    """Reject a compact baseline whose schema, cases, medians, or identity are wrong."""
     if baseline.get("schema") != SCHEMA:
         raise ValueError("unsupported Rust materialization baseline schema")
     if baseline.get("expected_cases") != list(EXPECTED_CASES):
@@ -131,6 +126,25 @@ def verify_baseline(
             )
         ):
             raise ValueError("Rust materialization baseline estimates must be positive finite ranges")
+    require_baseline_name(baseline.get("baseline_name"))
+    require_tree_revision(baseline.get("tree_revision"))
+    require_sha256(baseline.get("fixture_sha256"), "fixture_sha256")
+    fixtures = baseline.get("fixtures")
+    if not isinstance(fixtures, dict) or set(fixtures) != {"a", "b"}:
+        raise ValueError("Rust materialization baseline fixtures must name fixture a and fixture b")
+    require_sha256(fixtures["a"], "fixtures.a")
+    require_sha256(fixtures["b"], "fixtures.b")
+
+
+def verify_baseline(
+    baseline_path: Path,
+    fixture_a: Path,
+    fixture_b: Path,
+    manifest_path: Path | None = None,
+) -> dict[str, Any]:
+    """Verify compact baseline shape, fixture identity, and optional manifest."""
+    baseline: dict[str, Any] = json.loads(baseline_path.read_text(encoding="utf-8"))
+    _require_baseline_shape(baseline)
     fixtures = {"a": _sha256(fixture_a), "b": _sha256(fixture_b)}
     if baseline.get("fixture_sha256") != combined_fixture_digest(fixture_a, fixture_b):
         raise ValueError("Rust materialization baseline fixture digest mismatch")
@@ -160,8 +174,7 @@ def verify_baseline(
 def seal_baseline_manifest(baseline_path: Path, manifest_path: Path) -> None:
     """Record checked-in Rust baseline identity in the benchmark manifest."""
     baseline: dict[str, Any] = json.loads(baseline_path.read_text(encoding="utf-8"))
-    if baseline.get("schema") != SCHEMA:
-        raise ValueError("unsupported Rust materialization baseline schema")
+    _require_baseline_shape(baseline)
     manifest: dict[str, Any] = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest.update({
         "rust_baseline_name": baseline["baseline_name"],
