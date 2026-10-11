@@ -77,19 +77,30 @@ arrow = { version = "57", default-features = false }
 [profile.dev]
 # Standard development profile (cargo-llvm-cov will override these for coverage runs)
 incremental = true
-# opt-level 1 keeps the Python cdylib's __eh_frame under the 16 MB compact-unwind
-# limit (ld warns at opt-level 0).
-opt-level = 1
+# opt-level 0 keeps `cargo build` off LLVM. opt-level 1 made a cold
+# dev build codegen-bound (valuations 77s, of which 51s was codegen; 141s wall
+# on 18 cores). `profile.test` stays at opt-level 1 so warm test runs stay fast.
+# At opt-level 0 the Python cdylib's __eh_frame exceeds macOS ld's 16 MB
+# compact-unwind limit; finstack-quant-py's build script passes
+# `-Wl,-no_compact_unwind` for Apple dev links.
+opt-level = 0
 debug = 1
 
 [profile.test]
 # Standard test profile
 # Reduced debug level for faster compilation (line info only, no full debug symbols)
 # opt-level 1 keeps clean `rust-test` in the same band as opt-level 0 and cuts a
-# warm rerun from about 136s to 37s on this workspace.
+# warm rerun from about 136s to 37s on this workspace. The slow compile units
+# are workspace crates (valuations unit tests are ~77s).
 incremental = true
 opt-level = 1
 debug = 1
+
+# `*` matches non-workspace crates only, so workspace members stay at opt-level 1.
+# Dependencies compile at opt-level 0. A cold `cargo test --no-run` went from
+# 181s to 167s, and arrow-cast from 13s to 1.6s.
+[profile.test.package."*"]
+opt-level = 0
 
 [profile.release]
 # Performance-optimized release profile
