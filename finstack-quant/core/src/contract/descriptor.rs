@@ -1,6 +1,13 @@
 //! Identity and version policy for persisted contracts.
 
-use super::{ContractError, Diagnostic, LoadLimits, LoadPhase, Severity, ValidationReport};
+use std::fmt::Display;
+
+use serde::de::DeserializeOwned;
+
+use super::{
+    deserialize_json_value, parse_json_value, ContractError, Diagnostic, LoadLimits, LoadPhase,
+    Severity, ValidationReport,
+};
 
 /// Identity and version policy for one persisted contract.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -112,13 +119,8 @@ impl ContractDescriptor {
         pointer: &str,
         limits: &LoadLimits,
     ) -> Result<u32, ContractError> {
-        let result = match found {
-            Some(version) => self.validate_version(version),
-            None => Err(ContractError::MissingVersion {
-                contract: self.id.to_string(),
-            }),
-        };
-        result.map_err(|error| self.diagnostic_error(error, pointer, limits))
+        self.resolve(found)
+            .map_err(|error| self.diagnostic_error(error, pointer, limits))
     }
 
     /// Parse a required schema marker and return structured contract errors.
@@ -141,15 +143,70 @@ impl ContractDescriptor {
         pointer: &str,
         limits: &LoadLimits,
     ) -> Result<u32, ContractError> {
-        let result = found.map_or_else(
-            || {
-                Err(ContractError::MissingVersion {
-                    contract: self.id.to_string(),
-                })
-            },
-            |schema| self.parse_schema(schema),
+        found
+            .map_or_else(|| self.resolve(None), |schema| self.parse_schema(schema))
+            .map_err(|error| self.diagnostic_error(error, pointer, limits))
+    }
+
+    /// Decode a persisted document whose root `schema` key names this contract.
+    ///
+    /// The bytes are parsed under `limits`, the root `/schema` string is
+    /// checked with [`Self::parse_schema_strict`], and the whole document is
+    /// then deserialized into `T`. Domain validation of `T` is left to the
+    /// caller; report its failure with [`Self::semantic_error`].
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - Complete UTF-8 JSON document carrying a root `schema`
+    ///   marker in the exact `"<contract>/<version>"` format.
+    /// * `limits` - Resource policy bounding input size, JSON depth, and
+    ///   retained diagnostics.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContractError::LimitExceeded`] for byte or depth overflows,
+    /// and [`ContractError::Report`] for malformed JSON, a non-string marker
+    /// (`"contract/structure-invalid"`), a missing, malformed, or unsupported
+    /// marker, or a document that does not match `T`.
+    pub fn decode<T>(&self, bytes: &[u8], limits: &LoadLimits) -> Result<T, ContractError>
+    where
+        T: DeserializeOwned,
+    {
+        let value = parse_json_value(bytes, limits)?;
+        let schema = match value.get("schema") {
+            Some(schema) => Some(deserialize_json_value::<String>(schema.clone(), limits)?),
+            None => None,
+        };
+        self.parse_schema_strict(schema.as_deref(), "/schema", limits)?;
+        deserialize_json_value(value, limits)
+    }
+
+    /// Report a failed domain validation of a decoded artifact.
+    ///
+    /// # Arguments
+    ///
+    /// * `error` - Domain validation failure whose display text becomes the
+    ///   diagnostic message.
+    /// * `limits` - Resource policy bounding retained diagnostics.
+    ///
+    /// # Returns
+    ///
+    /// [`ContractError::Report`] holding one `"contract/semantic-invalid"`
+    /// error in the [`LoadPhase::Semantic`] phase, tagged with this contract.
+    #[must_use]
+    pub fn semantic_error(&self, error: impl Display, limits: &LoadLimits) -> ContractError {
+        let mut report = ValidationReport::default();
+        report.push_bounded(
+            limits,
+            Diagnostic::new(
+                "contract/semantic-invalid",
+                LoadPhase::Semantic,
+                Severity::Error,
+                error.to_string(),
+            )
+            .with_contract(self.id),
         );
-        result.map_err(|error| self.diagnostic_error(error, pointer, limits))
+        ContractError::Report(Box::new(report))
     }
 
     fn validate_version(&self, version: u32) -> Result<u32, ContractError> {

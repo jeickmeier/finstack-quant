@@ -162,7 +162,8 @@ pub fn excess_collateral_excess_percentage(excess_collateral: JsValue) -> Result
 ///
 /// # Errors
 ///
-/// Throws for an unknown currency or a non-finite margin amount.
+/// Throws for an unknown currency, a non-finite margin amount or funding
+/// spread, or an annual cost outside the Decimal range.
 #[wasm_bindgen(js_name = marginFundingCost)]
 pub fn margin_funding_cost(
     margin_posted: JsValue,
@@ -174,11 +175,10 @@ pub fn margin_funding_cost(
     let margin_posted = js_money(&margin_posted, "marginPosted", currency)?;
     let funding_rate = js_f64(&funding_rate, "fundingRate")?;
     let collateral_rate = js_f64(&collateral_rate, "collateralRate")?;
-    to_js_value(&metrics::MarginFundingCost::calculate(
-        margin_posted,
-        funding_rate,
-        collateral_rate,
-    ))
+    to_js_value(
+        &metrics::MarginFundingCost::calculate(margin_posted, funding_rate, collateral_rate)
+            .map_err(to_js_err)?,
+    )
 }
 
 /// Funding spread: funding rate minus collateral rate.
@@ -201,7 +201,8 @@ pub fn margin_funding_cost_spread(funding_cost: JsValue) -> Result<f64, JsValue>
 ///
 /// # Errors
 ///
-/// Throws if `funding_cost` is malformed.
+/// Throws if `funding_cost` is malformed, `year_fraction` is non-finite, or
+/// the period cost is outside the Decimal range.
 #[wasm_bindgen(js_name = marginFundingCostCostForPeriod)]
 pub fn margin_funding_cost_cost_for_period(
     funding_cost: JsValue,
@@ -209,7 +210,10 @@ pub fn margin_funding_cost_cost_for_period(
 ) -> Result<f64, JsValue> {
     let value: metrics::MarginFundingCost = from_js_json(&funding_cost, "fundingCost")?;
     let year_fraction = js_f64(&year_fraction, "yearFraction")?;
-    Ok(value.cost_for_period(year_fraction).amount())
+    Ok(value
+        .cost_for_period(year_fraction)
+        .map_err(to_js_err)?
+        .amount())
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +228,8 @@ pub fn margin_funding_cost_cost_for_period(
 ///
 /// # Errors
 ///
-/// Throws for an unknown currency or a non-finite collateral value.
+/// Throws for an unknown currency, a non-finite collateral value, or a
+/// one-basis-point PV change outside the monetary amount range.
 #[wasm_bindgen(js_name = haircut01)]
 pub fn haircut01(
     collateral_value: JsValue,
@@ -234,10 +239,9 @@ pub fn haircut01(
     let currency = js_currency(&currency, "currency")?;
     let collateral_value = js_money(&collateral_value, "collateralValue", currency)?;
     let current_haircut = js_f64(&current_haircut, "currentHaircut")?;
-    to_js_value(&metrics::Haircut01::calculate(
-        collateral_value,
-        current_haircut,
-    ))
+    to_js_value(
+        &metrics::Haircut01::calculate(collateral_value, current_haircut).map_err(to_js_err)?,
+    )
 }
 
 /// Current haircut expressed in basis points.

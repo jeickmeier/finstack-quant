@@ -545,7 +545,7 @@ impl ScheduleParams {
     /// assert!(bad.validate().is_err());
     /// ```
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        crate::builder::calendar::resolve_calendar_strict(&self.calendar_id).map_err(|err| {
+        finstack_quant_core::dates::calendar_by_id_strict(&self.calendar_id).map_err(|err| {
             finstack_quant_core::Error::Validation(format!(
                 "unknown calendar_id '{}': {err}",
                 self.calendar_id

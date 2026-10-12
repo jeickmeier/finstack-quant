@@ -474,7 +474,8 @@ pub fn execute_waterfall(
         if is_pik_enabled(state, &s.instrument_id) {
             let moved = s.breakdown.interest_expense_cash;
             s.toggled_pik_moved = moved;
-            s.breakdown.interest_expense_pik += moved;
+            s.breakdown.interest_expense_pik =
+                s.breakdown.interest_expense_pik.checked_add(moved)?;
             s.breakdown.interest_expense_cash = Money::from((0_i64, currency));
         }
     }

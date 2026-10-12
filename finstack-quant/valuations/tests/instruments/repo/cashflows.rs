@@ -214,7 +214,7 @@ fn test_value_matches_discounted_provider_flows() {
             Money::new(0.0, Currency::USD).expect("valid money fixture"),
             |acc, (date, amount)| {
                 let df = discount.df_between_dates(as_of, date)?;
-                acc.checked_add(amount * df)
+                acc.checked_add(amount.checked_mul_f64(df)?)
             },
         )
         .expect("discounting provider flows should succeed");

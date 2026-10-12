@@ -30,7 +30,7 @@
 //! # }
 //! ```
 
-use crate::dates::calendar::HolidayCalendar;
+use crate::dates::calendar::{HolidayCalendar, WeekendRule};
 use time::Date;
 
 /// A lightweight view combining several holiday calendars (union semantics).
@@ -62,18 +62,30 @@ impl HolidayCalendar for CompositeCalendar<'_> {
         self.calendars.iter().any(|c| c.is_holiday(date))
     }
 
-    /// Combine the sub-calendars' own `is_business_day` so that non-default
-    /// weekend rules (e.g. Friday/Saturday Middle East calendars) are
-    /// respected, instead of inheriting the trait's hardcoded Sat/Sun default:
-    /// a date is a business day only if it is one on **all** sub-calendars.
+    /// A date is a business day only if it is one on **all** sub-calendars,
+    /// so each member's weekend rule (e.g. Friday/Saturday Middle East
+    /// calendars) is respected.
     ///
-    /// An empty calendar list falls back to the default Sat/Sun weekend rule.
+    /// An empty calendar list falls back to the Saturday/Sunday weekend rule.
     fn is_business_day(&self, date: Date) -> bool {
         if self.calendars.is_empty() {
-            use crate::dates::date_extensions::DateExt;
-            return !date.is_weekend();
+            return !WeekendRule::SaturdaySunday.is_weekend(date.weekday());
         }
         self.calendars.iter().all(|c| c.is_business_day(date))
+    }
+
+    fn calendar_id(&self) -> Option<String> {
+        let mut member_ids = self
+            .calendars
+            .iter()
+            .map(|calendar| calendar.calendar_id())
+            .collect::<Option<Vec<_>>>()?;
+        if member_ids.is_empty() {
+            return None;
+        }
+        member_ids.sort_unstable();
+        member_ids.dedup();
+        crate::dates::calendar::canonical_calendar_id(&member_ids.join("+")).ok()
     }
 }
 

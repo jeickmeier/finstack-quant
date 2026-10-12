@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule.schema.json",
-      "bytes": 31847,
+      "bytes": 32142,
       "kind": "output",
       "path": "schemas/cashflow/1/cashflow_schedule.schema.json",
       "summary": "Ordered classified cashflows with their notional, day count and schedule metadata.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
-      "bytes": 77931,
+      "bytes": 78226,
       "kind": "input",
       "path": "schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
       "summary": "Notional, dates, coupon program, fees and principal events that build a schedule.",

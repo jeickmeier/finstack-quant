@@ -1066,7 +1066,7 @@ mod tests {
             .iter()
             .try_fold(Money::from((0_i64, Currency::USD)), |acc, flow| {
                 let df = discount.df_between_dates(as_of, flow.date)?;
-                acc.checked_add(flow.amount * df)
+                acc.checked_add(flow.amount.checked_mul_f64(df)?)
             })
             .expect("discounted projected rows should sum");
         let npv = pricer.npv(&index, &market, as_of).expect("index npv");

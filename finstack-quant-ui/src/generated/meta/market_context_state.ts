@@ -62,6 +62,34 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind"
   },
   {
+    "path": "#/$defs/d_13ceef63597b70bc1a71",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState",
+    "description": "Serialized source grid and time origin for a rolled interpolation."
+  },
+  {
+    "path": "#/$defs/d_13ceef63597b70bc1a71/properties/offset",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState/properties/offset",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_13ceef63597b70bc1a71/properties/source_points",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState/properties/source_points"
+  },
+  {
+    "path": "#/$defs/d_13ceef63597b70bc1a71/properties/source_points/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState/properties/source_points/items"
+  },
+  {
+    "path": "#/$defs/d_13ceef63597b70bc1a71/properties/source_points/items/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState/properties/source_points/items/prefixItems/0",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_13ceef63597b70bc1a71/properties/source_points/items/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState/properties/source_points/items/prefixItems/1",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_14c856f170a7fa5ec480",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpStyle",
     "description": "Enum of supported interpolation styles. The default is `Linear`."
@@ -317,11 +345,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/TenorUnit/oneOf/3",
     "const": "years",
     "description": "Years (Y)"
-  },
-  {
-    "path": "#/$defs/d_21e7c0751f339b65c465",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationFutureContractId",
-    "description": "Serialized identifier for an interest-rate futures convention."
   },
   {
     "path": "#/$defs/d_268127561c9d65277399",
@@ -802,8 +825,8 @@ export default [
     "path": "#/$defs/d_7648df53fa77f2541b06/oneOf/2/properties/futures/properties/contract",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationQuote/oneOf/2/properties/futures/properties/contract",
     "description": "Convention-registry identifier for the futures contract.",
-    "ref": "#/$defs/RateCalibrationFutureContractId",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationFutureContractId"
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_7648df53fa77f2541b06/oneOf/2/properties/futures/properties/convexity_adjustment",
@@ -1251,6 +1274,11 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/calendar_id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/calendar_id",
+    "description": "Registered holiday calendar id of the business-day time axis (for\nexample `\"brbd\"` for a Bus/252 curve). Omitted when the day count needs\nno calendar."
+  },
+  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/calibration_ois_cutoff_days",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/calibration_ois_cutoff_days",
     "description": "OIS cut-off (business days) the curve was calibrated under, if any.",
@@ -1683,6 +1711,21 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/roll_transform",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/roll_transform",
+    "description": "Source interpolation and accumulated time origin for a rolled curve."
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/roll_transform/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/roll_transform/anyOf/0",
+    "ref": "#/$defs/InterpRollState",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/roll_transform/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/roll_transform/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/type",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/type",
     "const": "inflation"
@@ -1779,6 +1822,21 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/roll_transform",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/roll_transform",
+    "description": "Source interpolation and accumulated time origin for a rolled curve."
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/roll_transform/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/roll_transform/anyOf/0",
+    "ref": "#/$defs/InterpRollState",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/roll_transform/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/roll_transform/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/spot_level",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/spot_level",
     "description": "Spot index level (volatility index curves)",
@@ -1798,45 +1856,45 @@ export default [
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6",
-    "description": "VolIndex curve state"
+    "description": "BasisSpread curve state"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/base",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/base",
-    "description": "Base date",
+    "description": "Base date.",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/day_count",
-    "description": "Day count convention",
+    "description": "Day count convention.",
     "ref": "#/$defs/DayCount",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCount"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/extrapolation",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/extrapolation",
-    "description": "Extrapolation policy",
+    "description": "Extrapolation policy.",
     "ref": "#/$defs/ExtrapolationPolicy",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ExtrapolationPolicy"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/id",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/id",
-    "description": "Curve identifier"
+    "description": "Curve identifier."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/interp_style",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/interp_style",
-    "description": "Interpolation style",
+    "description": "Interpolation style.",
     "ref": "#/$defs/InterpStyle",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpStyle"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/knot_points",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/knot_points",
-    "description": "Time/value pairs used to construct the curve"
+    "description": "Time/value pairs used to construct the curve."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/knot_points/items",
@@ -1853,30 +1911,33 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/spot_level",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/spot_level",
-    "description": "Spot index level (volatility index curves)",
-    "format": "double"
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/roll_transform",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/roll_transform",
+    "description": "Source interpolation and accumulated time origin for a rolled curve."
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/spot_price",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/spot_price",
-    "description": "Spot price (signed price curves)",
-    "format": "double"
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/roll_transform/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/roll_transform/anyOf/0",
+    "ref": "#/$defs/InterpRollState",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/roll_transform/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/roll_transform/anyOf/1"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/type",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/type",
-    "const": "vol_index"
+    "const": "basis_spread"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7",
-    "description": "BasisSpread curve state"
+    "description": "Parametric curve state"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/base",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/base",
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/base_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/base_date",
     "description": "Base date.",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
@@ -1889,82 +1950,27 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCount"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/extrapolation",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/extrapolation",
-    "description": "Extrapolation policy.",
-    "ref": "#/$defs/ExtrapolationPolicy",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ExtrapolationPolicy"
-  },
-  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/id",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/id",
     "description": "Curve identifier."
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/interp_style",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/interp_style",
-    "description": "Interpolation style.",
-    "ref": "#/$defs/InterpStyle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpStyle"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/knot_points",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/knot_points",
-    "description": "Time/value pairs used to construct the curve."
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/knot_points/items",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/knot_points/items"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/knot_points/items/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/knot_points/items/prefixItems/0",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/knot_points/items/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/knot_points/items/prefixItems/1",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/type",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/type",
-    "const": "basis_spread"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/8",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/8",
-    "description": "Parametric curve state"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/8/properties/base_date",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/8/properties/base_date",
-    "description": "Base date.",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/8/properties/day_count",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/8/properties/day_count",
-    "description": "Day count convention.",
-    "ref": "#/$defs/DayCount",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCount"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/8/properties/id",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/8/properties/id",
-    "description": "Curve identifier."
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/8/properties/model",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/8/properties/model",
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/model",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/model",
     "description": "Nelson-Siegel model parameters.",
     "ref": "#/$defs/NelsonSiegelModel",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/NelsonSiegelModel"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/8/properties/type",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/8/properties/type",
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/time_offset",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/time_offset",
+    "default": 0,
+    "description": "Current origin in the source model's year-fraction coordinates;\nomitted means `0.0` (a curve that has never been rolled).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/type",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/type",
     "const": "parametric"
   },
   {

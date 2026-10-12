@@ -3,6 +3,7 @@
 //! This module provides reusable FX provider types that can be shared across
 //! bindings (Python, WASM, etc.) without duplication.
 
+use super::provider::{directional_rate, recover};
 use super::{FxConversionPolicy, FxProvider};
 use crate::collections::HashMap;
 use crate::currency::Currency;
@@ -10,10 +11,6 @@ use crate::dates::Date;
 use crate::error::InputError;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
-
-fn recover<T>(res: Result<T, std::sync::PoisonError<T>>) -> T {
-    res.unwrap_or_else(std::sync::PoisonError::into_inner)
-}
 
 /// Simple FX provider backed by an in-memory quote store.
 ///
@@ -94,11 +91,7 @@ impl SimpleFxProvider {
     /// provider.set_quote(Currency::GBP, Currency::USD, 1.25);
     /// ```
     pub fn set_quote(&self, from: Currency, to: Currency, rate: f64) -> crate::Result<()> {
-        let rate = super::validate_fx_rate(from, to, rate)?;
-        let mut quotes = recover(self.quotes.write());
-        quotes.insert((from, to), rate);
-        self.advance_revision();
-        Ok(())
+        self.set_quotes(&[(from, to, rate)])
     }
 
     /// Bulk insert or update FX quotes.
@@ -256,25 +249,23 @@ impl FxProvider for SimpleFxProvider {
         if from == to {
             return Ok(1.0);
         }
-        {
+        let scoped = {
             let pinned = recover(self.pinned_quotes.read());
-            if let Some(&rate) = pinned.get(&(from, to, on, policy)) {
-                return Ok(rate);
+            directional_rate(|a, b| pinned.get(&(a, b, on, policy)).copied(), from, to)?
+        };
+        let rate = match scoped {
+            Some(rate) => Some(rate),
+            None => {
+                let quotes = recover(self.quotes.read());
+                directional_rate(|a, b| quotes.get(&(a, b)).copied(), from, to)?
             }
-            if let Some(&rate) = pinned.get(&(to, from, on, policy)) {
-                return super::reciprocal_rate_or_err(rate, to, from);
+        };
+        rate.ok_or_else(|| {
+            InputError::NotFound {
+                id: format!("FX:{from}->{to}"),
             }
-        }
-        if let Some(rate) = self.get_direct(from, to) {
-            return Ok(rate);
-        }
-        if let Some(rate) = self.get_direct(to, from) {
-            return super::reciprocal_rate_or_err(rate, to, from);
-        }
-        Err(InputError::NotFound {
-            id: format!("FX:{from}->{to}"),
-        }
-        .into())
+            .into()
+        })
     }
 
     fn snapshot_quotes(&self) -> Vec<(Currency, Currency, f64)> {
@@ -300,9 +291,7 @@ impl FxProvider for SimpleFxProvider {
 /// scenario analysis without losing the rest of the FX matrix state. The
 /// bump is **term-structure preserving**: for the bumped pair the provider
 /// returns `original.rate(query) * (1 + bump_pct)`, so a date-aware
-/// provider keeps its date/policy structure under the bump (2026-06-09 core
-/// the previous implementation returned one frozen absolute
-/// rate for every date/policy).
+/// provider keeps its date/policy structure under the bump.
 pub struct BumpedFxProvider {
     /// Original provider to delegate to
     original: Arc<dyn FxProvider>,
@@ -415,17 +404,14 @@ impl FxProvider for BumpedFxProvider {
         let mut quotes = self.original.snapshot_quotes();
         let from = self.override_from;
         let to = self.override_to;
-        let rate = quotes
-            .iter()
-            .find(|&&(base, quote, _)| base == from && quote == to)
-            .map(|&(_, _, rate)| rate)
-            .or_else(|| {
-                quotes
-                    .iter()
-                    .find(|&&(base, quote, _)| base == to && quote == from)
-                    .map(|&(_, _, rate)| 1.0 / rate)
-            });
-        if let Some(rate) = rate {
+        let stored = |a, b| {
+            quotes
+                .iter()
+                .find(|&&(base, quote, _)| base == a && quote == b)
+                .map(|&(_, _, rate)| rate)
+        };
+        // An invalid reciprocal leaves the snapshot unshocked rather than failing it.
+        if let Ok(Some(rate)) = directional_rate(stored, from, to) {
             quotes.retain(|&(base, quote, _)| {
                 !((base == from && quote == to) || (base == to && quote == from))
             });
@@ -446,7 +432,9 @@ impl FxProvider for BumpedFxProvider {
         }
         for &(base, quote, on, policy, rate) in &quotes {
             if base == to && quote == from {
-                rates.entry((on, policy)).or_insert(1.0 / rate);
+                if let Ok(reciprocal) = super::reciprocal_rate_or_err(rate, to, from) {
+                    rates.entry((on, policy)).or_insert(reciprocal);
+                }
             }
         }
         quotes.retain(|&(base, quote, _, _, _)| {

@@ -1398,7 +1398,7 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
         "fromDecimalStr(amount: string, currency: Currency): Money;"
     ));
 
-    // Rate / Bps / Percentage accessors are getters, as in Rust-shaped Python.
+    // Rate / Bps accessors are getters, as in Rust-shaped Python.
     for (name, getters) in [
         (
             "Rate ",
@@ -1407,7 +1407,6 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
                 "asPercent: number",
                 "asBp: number",
                 "asBasisPoints: Bps",
-                "asPercentage: Percentage",
             ][..],
         ),
         (
@@ -1417,17 +1416,6 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
                 "asBp: number",
                 "asPercent: number",
                 "asRate: Rate",
-                "asPercentage: Percentage",
-            ][..],
-        ),
-        (
-            "Percentage ",
-            &[
-                "asDecimal: number",
-                "asPercent: number",
-                "asBp: number",
-                "asRate: Rate",
-                "asBasisPoints: Bps",
             ][..],
         ),
     ] {

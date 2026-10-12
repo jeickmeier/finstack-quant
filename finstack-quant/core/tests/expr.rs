@@ -2,13 +2,10 @@
 //!
 //! Organized by concern:
 //! - `ast`: AST construction and structural equality
-//! - `context`: ExpressionContext implementations
+//! - `context`: `SimpleContext` column resolution
 //! - `eval`: Core evaluation infrastructure
 //! - `functions`: Function-specific behavior tests
 //! - `serde`: Serialization/deserialization tests
-
-#[path = "expr/common.rs"]
-mod common;
 
 #[path = "expr/ast.rs"]
 mod ast;

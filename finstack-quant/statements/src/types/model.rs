@@ -3,8 +3,8 @@
 use crate::error::{Error, Result};
 use crate::types::{NodeId, NodeSpec, NodeType};
 use finstack_quant_core::contract::{
-    deserialize_json_value, parse_json_value, ContractDescriptor, ContractError, Diagnostic,
-    LoadLimits, LoadPhase, Severity, ValidationReport,
+    deserialize_json_value, parse_json_value, ContractDescriptor, ContractError, LoadLimits,
+    ValidationReport,
 };
 use finstack_quant_core::dates::Period;
 use finstack_quant_core::wire::SchemaVersion;
@@ -324,7 +324,7 @@ impl FinancialModelSpec {
         let mut model: Self = deserialize_json_value(value, limits)?;
         model
             .validate_semantics()
-            .map_err(|error| validation_report_error(error, limits))?;
+            .map_err(|error| FINANCIAL_MODEL_CONTRACT.semantic_error(error, limits))?;
         Ok((model, ValidationReport::default()))
     }
 
@@ -692,21 +692,6 @@ pub(crate) fn validated_explicit_value_type(
         }
     }
     Ok(inferred)
-}
-
-fn validation_report_error(error: Error, limits: &LoadLimits) -> ContractError {
-    let mut report = ValidationReport::default();
-    report.push_bounded(
-        limits,
-        Diagnostic::new(
-            "contract/semantic-invalid",
-            LoadPhase::Semantic,
-            Severity::Error,
-            error.to_string(),
-        )
-        .with_contract(FINANCIAL_MODEL_CONTRACT.id),
-    );
-    ContractError::Report(Box::new(report))
 }
 
 /// Capital structure specification.

@@ -1292,6 +1292,7 @@ mod tests {
         let exposure_base = Money::from((10_000_000_i64, Currency::USD));
         let expected_im = ClearingHouseImCalculator::for_ccp("LCH")
             .calculate_conservative(exposure_base)
+            .expect("conservative im")
             .amount();
         let instrument = Arc::new(
             TestMarginableInstrument::new(

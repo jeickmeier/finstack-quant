@@ -200,6 +200,12 @@ export type CurveState =
        */
       base: DateWire;
       /**
+       * Registered holiday calendar id of the business-day time axis (for
+       * example `"brbd"` for a Bus/252 curve). Omitted when the day count needs
+       * no calendar.
+       */
+      calendar_id?: string | null;
+      /**
        * OIS cut-off (business days) the curve was calibrated under, if any.
        */
       calibration_ois_cutoff_days?: number | null;
@@ -382,6 +388,10 @@ export type CurveState =
        * Time/value pairs used to construct the curve
        */
       knot_points: [unknown, unknown][];
+      /**
+       * Source interpolation and accumulated time origin for a rolled curve.
+       */
+      roll_transform?: InterpRollState | null;
       type: "inflation";
     }
   | {
@@ -416,6 +426,10 @@ export type CurveState =
        */
       knot_points: [unknown, unknown][];
       /**
+       * Source interpolation and accumulated time origin for a rolled curve.
+       */
+      roll_transform?: InterpRollState | null;
+      /**
        * Spot index level (volatility index curves)
        */
       spot_level?: number | null;
@@ -424,41 +438,6 @@ export type CurveState =
        */
       spot_price?: number | null;
       type: "price";
-    }
-  | {
-      /**
-       * Base date
-       */
-      base: DateWire;
-      /**
-       * Day count convention
-       */
-      day_count: DayCount;
-      /**
-       * Extrapolation policy
-       */
-      extrapolation: ExtrapolationPolicy;
-      /**
-       * Curve identifier
-       */
-      id: string;
-      /**
-       * Interpolation style
-       */
-      interp_style: InterpStyle;
-      /**
-       * Time/value pairs used to construct the curve
-       */
-      knot_points: [unknown, unknown][];
-      /**
-       * Spot index level (volatility index curves)
-       */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
-      type: "vol_index";
     }
   | {
       /**
@@ -485,6 +464,10 @@ export type CurveState =
        * Time/value pairs used to construct the curve.
        */
       knot_points: [unknown, unknown][];
+      /**
+       * Source interpolation and accumulated time origin for a rolled curve.
+       */
+      roll_transform?: InterpRollState | null;
       type: "basis_spread";
     }
   | {
@@ -504,6 +487,11 @@ export type CurveState =
        * Nelson-Siegel model parameters.
        */
       model: NelsonSiegelModel;
+      /**
+       * Current origin in the source model's year-fraction coordinates;
+       * omitted means `0.0` (a curve that has never been rolled).
+       */
+      time_offset?: number;
       type: "parametric";
     };
 /**
@@ -753,7 +741,7 @@ export type RateCalibrationQuote =
         /**
          * Convention-registry identifier for the futures contract.
          */
-        contract: RateCalibrationFutureContractId;
+        contract: Id;
         /**
          * Optional pre-computed convexity adjustment.
          */
@@ -842,10 +830,6 @@ export type RateCalibrationPillar =
  * Unit of a tenor period.
  */
 export type TenorUnit = "days" | "weeks" | "months" | "years";
-/**
- * Serialized identifier for an interest-rate futures convention.
- */
-export type RateCalibrationFutureContractId = string;
 /**
  * Role of a curve and its linked rate-curve identifier during calibration.
  */
@@ -1418,6 +1402,13 @@ export interface HazardCalibrationInput {
   };
 }
 /**
+ * Serialized source grid and time origin for a rolled interpolation.
+ */
+export interface InterpRollState {
+  offset: number;
+  source_points: [unknown, unknown][];
+}
+/**
  * A dated dividend event.
  */
 export interface DividendEvent {
@@ -1943,7 +1934,6 @@ export interface PeriodPlan {
    * Ordered periods produced by the parser.
    */
   periods: Period[];
-  [k: string]: unknown;
 }
 /**
  * Rating level for credit rating scales.

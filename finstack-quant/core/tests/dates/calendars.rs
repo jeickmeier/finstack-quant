@@ -1181,3 +1181,18 @@ fn brbd_consciencia_negra_year_gated_from_2024() {
     );
     assert!(Brbd.is_holiday(make_date(2024, 11, 20)));
 }
+
+#[test]
+fn swiss_and_frankfurt_calendars_do_not_substitute_weekend_holidays() {
+    for calendar in [&Six as &dyn HolidayCalendar, &Chzh] {
+        assert!(calendar.is_holiday(make_date(2026, 8, 1)));
+        assert!(calendar.is_business_day(make_date(2026, 8, 3)));
+        assert!(calendar.is_holiday(make_date(2026, 12, 25)));
+        assert!(calendar.is_holiday(make_date(2026, 12, 26)));
+        assert!(calendar.is_business_day(make_date(2026, 12, 28)));
+    }
+
+    assert!(Defr.is_holiday(make_date(2026, 12, 25)));
+    assert!(Defr.is_holiday(make_date(2026, 12, 26)));
+    assert!(Defr.is_business_day(make_date(2026, 12, 28)));
+}

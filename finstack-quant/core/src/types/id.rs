@@ -19,9 +19,11 @@
 //! - [`InstrumentId`]: Financial instrument identifiers (bonds, swaps, options)
 //! - [`IndexId`]: Market index identifiers (equity or fixed income indices)
 //! - [`PriceId`]: Price/scalar identifiers for market observables
+//! - [`UnderlyingId`]: Underlying asset identifiers (equity, FX, commodity)
 //! - [`CalendarId`]: Holiday calendar identifiers for schedule generation
 //! - [`PoolId`]: Pool identifiers for securitized instruments
 //! - [`DealId`]: Deal identifiers for structured products
+//! - [`IssuerId`]: Credit issuer identifiers
 //!
 //! # Examples
 //!
@@ -82,7 +84,7 @@
 //!
 //! # See Also
 //!
-//! - [`CurveId`], [`InstrumentId`], [`IndexId`], [`PriceId`] - Common ID type aliases
+//! - [`CurveId`], [`InstrumentId`], [`IndexId`], [`PriceId`], [`UnderlyingId`], [`CalendarId`], [`PoolId`], [`DealId`], [`IssuerId`] - Common ID type aliases
 
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -186,27 +188,6 @@ impl<T> Id<T> {
         &self.value
     }
 
-    /// Convert this ID into an owned `String`.
-    ///
-    /// Consumes the ID and returns a new `String` containing the ID value.
-    /// This involves cloning the underlying string data.
-    ///
-    /// # Returns
-    ///
-    /// An owned `String` containing the ID value.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::types::CurveId;
-    ///
-    /// let id = CurveId::new("USD-OIS");
-    /// let s: String = id.into_string();
-    /// assert_eq!(s, "USD-OIS");
-    /// ```
-    pub fn into_string(self) -> String {
-        self.value.as_ref().to_owned()
-    }
     /// Check if this ID is empty.
     ///
     /// # Returns
@@ -348,14 +329,6 @@ impl<T> std::borrow::Borrow<str> for Id<T> {
     }
 }
 
-impl<T> std::str::FromStr for Id<T> {
-    type Err = std::convert::Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::new(s))
-    }
-}
-
 /// Marker type for curve identifiers
 #[derive(Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -404,7 +377,8 @@ pub struct DealTag;
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct IssuerTag;
 
-/// Type aliases for common ID types
+// Type aliases for common ID types.
+
 /// Type-safe identifier for market data curves
 pub type CurveId = Id<CurveTag>;
 /// Type-safe identifier for financial instruments

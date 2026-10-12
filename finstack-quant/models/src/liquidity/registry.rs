@@ -44,7 +44,7 @@ pub(crate) fn embedded_liquidity_defaults() -> Result<&'static LiquidityDefaults
 }
 
 fn liquidity_defaults_from_file(file: LiquidityDefaultsFile) -> Result<LiquidityDefaults> {
-    let schema_version = LIQUIDITY_DEFAULTS_CONTRACT
+    LIQUIDITY_DEFAULTS_CONTRACT
         .parse_schema(&file.schema)
         .map_err(|error| {
             Error::Validation(format!(
@@ -53,15 +53,9 @@ fn liquidity_defaults_from_file(file: LiquidityDefaultsFile) -> Result<Liquidity
                 LIQUIDITY_DEFAULTS_CONTRACT.schema_string(),
             ))
         })?;
-    let version = LIQUIDITY_DEFAULTS_CONTRACT
+    LIQUIDITY_DEFAULTS_CONTRACT
         .resolve(Some(file.version))
         .map_err(|error| Error::Validation(error.to_string()))?;
-    if schema_version != version {
-        return Err(Error::Validation(format!(
-            "liquidity defaults schema version {schema_version} does not match version field \
-             {version}"
-        )));
-    }
     file.default_config.validate()?;
     Ok(LiquidityDefaults {
         default_config: file.default_config,

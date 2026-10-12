@@ -12,11 +12,10 @@ use wasm_bindgen::prelude::*;
 
 /// Parse a cashflow kind label into its `CFKind` wire string.
 ///
-/// The label is the kind as Rust displays it (Rust `CFKind::from_str`), which
-/// is the wire string except for prepayments: the label is `"prepayment"`
-/// and the wire string `"pre_payment"`.
+/// Matching is exact (Rust `CFKind::from_str`): the label is the snake_case
+/// wire string itself, as used by the `kind` field of a `CashFlow`.
 ///
-/// @param name - Kind label such as `"fixed"`, `"float_reset"` or `"prepayment"`.
+/// @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
 /// @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
 /// @throws If `name` is not a string (kind `invalid_type`) or names no cashflow kind (kind `validation`).
 #[wasm_bindgen(js_name = cfKindParse)]

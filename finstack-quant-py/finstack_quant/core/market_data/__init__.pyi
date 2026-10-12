@@ -106,6 +106,7 @@ class DiscountCurve:
         interp: Optional[str] = None,
         extrapolation: Optional[str] = None,
         day_count: Optional[Union[DayCount, str]] = None,
+        calendar_id: Optional[str] = None,
         validation_mode: Optional[str] = None,
         forward_floor: Optional[float] = None,
     ) -> None:
@@ -132,6 +133,12 @@ class DiscountCurve:
         day_count : DayCount | str, optional
             Day-count label used to convert query dates to curve time. The
             default is fixed at ``"act_365f"`` (it is not inferred from ``id``).
+        calendar_id : str, optional
+            Registered holiday calendar of the curve's time axis (for example
+            ``"brbd"``), or a ``+``-joined union. Required with
+            ``day_count="bus_252"``: every date-based query, including
+            ``df_between_dates``, counts business days on this calendar.
+            ``None`` (default) suits every calendar-free day count.
         validation_mode : str, optional
             ``"market_standard"`` (monotonic DFs and a -50bp implied forward
             floor) or ``"negative_rate_friendly"``. ``None`` selects the Rust
@@ -145,7 +152,10 @@ class DiscountCurve:
         ------
         ValueError
             If a knot is non-finite or duplicated, discount factors violate
-            the validation mode, or a label is unknown.
+            the validation mode, a label is unknown, or a ``"bus_252"`` curve
+            has no ``calendar_id``.
+        KeyError
+            If ``calendar_id`` names no registered calendar.
         TypeError
             If ``base_date`` is neither a date nor a string.
 
@@ -156,6 +166,16 @@ class DiscountCurve:
         >>> curve = DiscountCurve("USD-OIS", datetime.date(2025, 1, 1), [(0.0, 1.0), (1.0, 0.95)], day_count="act_360")
         >>> curve.day_count
         'act_360'
+        >>> cdi = DiscountCurve(
+        ...     "BRL-CDI",
+        ...     "2025-01-06",
+        ...     [(0.0, 1.0), (1.0, 0.9)],
+        ...     day_count="bus_252",
+        ...     calendar_id="brbd",
+        ...     interp="log_linear",
+        ... )
+        >>> cdi.calendar_id
+        'brbd'
 
         """
         ...
@@ -628,6 +648,23 @@ class DiscountCurve:
         -------
         str
             Lower-case ISDA day-count label such as ``"act_365f"``, ``"act_360"`` or ``"30_360"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def calendar_id(self) -> Optional[str]:
+        """
+        Registered holiday calendar of the curve's time axis.
+
+        Returns
+        -------
+        str or None
+            Canonical calendar id (for example ``"brbd"`` on a ``"bus_252"``
+            curve), or ``None`` when the day count needs no calendar.
 
         Notes
         -----

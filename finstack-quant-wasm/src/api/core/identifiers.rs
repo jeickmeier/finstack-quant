@@ -53,21 +53,6 @@ impl JsCreditRating {
         Self::parse(&name, "name").map(Self::wrap)
     }
 
-    /// Parse a rating; the same as `new CreditRating(name)`.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Rating text in S&P/Fitch (`"BBB-"`) or Moody's (`"Baa3"`)
-    ///   spelling; case and spaces are ignored.
-    ///
-    /// @returns The parsed `CreditRating`.
-    /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
-    /// `FinstackError` (kind `validation`) if it is not a rating.
-    #[wasm_bindgen(js_name = fromName)]
-    pub fn from_name(name: JsValue) -> Result<JsCreditRating, JsValue> {
-        Self::parse(&name, "name").map(Self::wrap)
-    }
-
     /// S&P/Fitch `AAA`, Moody's `Aaa`.
     ///
     /// @returns The `AAA` rating.
@@ -558,7 +543,7 @@ impl JsAttributes {
     /// @throws `TypeError` if `tag` is not a string.
     #[wasm_bindgen(js_name = addTag)]
     pub fn add_tag(&mut self, tag: JsValue) -> Result<(), JsValue> {
-        self.inner.tags.insert(js_string(&tag, "tag")?);
+        self.inner.add_tag(js_string(&tag, "tag")?);
         Ok(())
     }
 
@@ -619,8 +604,8 @@ impl JsAttributes {
     /// @throws `TypeError` if `key` or `value` is not a string.
     #[wasm_bindgen(js_name = setMeta)]
     pub fn set_meta(&mut self, key: JsValue, value: JsValue) -> Result<(), JsValue> {
-        let key = js_string(&key, "key")?;
-        self.inner.set_meta(&key, js_string(&value, "value")?);
+        self.inner
+            .set_meta(js_string(&key, "key")?, js_string(&value, "value")?);
         Ok(())
     }
 

@@ -2,7 +2,7 @@
 
 use time::Date;
 
-use crate::dates::{calendar_by_id_strict, HolidayCalendar, Tenor};
+use crate::dates::{calendar_by_id_strict, canonical_calendar_id, HolidayCalendar, Tenor};
 
 /// Optional context for day-count year-fraction calculations.
 ///
@@ -183,32 +183,82 @@ impl DayCountContextState {
     }
 }
 
-impl<'a> From<DayCountContext<'a>> for DayCountContextState {
-    fn from(value: DayCountContext<'a>) -> Self {
+impl<'a> TryFrom<DayCountContext<'a>> for DayCountContextState {
+    type Error = crate::Error;
+
+    fn try_from(value: DayCountContext<'a>) -> crate::Result<Self> {
         let calendar_id = value
             .calendar
-            .and_then(|cal| cal.metadata().map(|meta| meta.id.to_string()));
-        Self {
+            .map(|calendar| {
+                let id = calendar.calendar_id().ok_or_else(|| {
+                    crate::Error::Validation(
+                        "day-count calendar has no registered identifier and cannot be restored"
+                            .into(),
+                    )
+                })?;
+                canonical_calendar_id(&id)
+            })
+            .transpose()?;
+        Ok(Self {
             calendar_id,
             frequency: value.frequency,
             bus_basis: value.bus_basis,
             coupon_period: value.coupon_period,
             end_is_termination_date: value.end_is_termination_date,
-        }
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dates::{calendar_by_id_strict, HolidayCalendar};
     use time::macros::date;
 
     #[test]
     fn default_state_is_the_default_context_snapshot() {
         assert_eq!(
             DayCountContextState::default(),
-            DayCountContextState::from(DayCountContext::default())
+            DayCountContextState::try_from(DayCountContext::default()).expect("default snapshot")
         );
+    }
+
+    #[test]
+    fn composite_calendar_id_round_trips_in_context_state() {
+        let calendar = calendar_by_id_strict("usny+target2").expect("registered union");
+        let context = DayCountContext {
+            calendar: Some(calendar),
+            ..DayCountContext::default()
+        };
+        let state = DayCountContextState::try_from(context).expect("snapshot composite id");
+        assert_eq!(state.calendar_id.as_deref(), Some("target2+usny"));
+        let restored = state.to_ctx().expect("restore composite");
+        let restored_state = DayCountContextState::try_from(restored).expect("resnapshot");
+        assert_eq!(restored_state.calendar_id.as_deref(), Some("target2+usny"));
+    }
+
+    #[test]
+    fn context_snapshot_rejects_unregistered_custom_calendar() {
+        struct CustomCalendar;
+        impl HolidayCalendar for CustomCalendar {
+            fn is_holiday(&self, date: Date) -> bool {
+                date.month() == time::Month::June && date.day() == 1
+            }
+
+            fn is_business_day(&self, date: Date) -> bool {
+                !crate::dates::WeekendRule::SaturdaySunday.is_weekend(date.weekday())
+                    && !self.is_holiday(date)
+            }
+        }
+
+        let calendar = CustomCalendar;
+        let context = DayCountContext {
+            calendar: Some(&calendar),
+            ..DayCountContext::default()
+        };
+        let error = DayCountContextState::try_from(context)
+            .expect_err("custom calendar cannot be reconstructed from registry");
+        assert!(error.to_string().contains("cannot be restored"));
     }
 
     #[test]

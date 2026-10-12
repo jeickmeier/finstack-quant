@@ -488,7 +488,7 @@ impl Repo {
         if factor <= 0.0 {
             return Err(Error::Input(finstack_quant_core::InputError::Invalid));
         }
-        Ok(self.cash_amount / factor)
+        self.cash_amount.checked_div_f64(factor)
     }
 
     /// Check if the repo is adequately collateralized.
@@ -541,7 +541,7 @@ impl Repo {
             Money::from((0_i64, self.cash_amount.currency())),
             |acc, (date, amount)| {
                 let df = disc_curve.df_between_dates(as_of, date)?;
-                acc.checked_add(amount * df)
+                acc.checked_add(amount.checked_mul_f64(df)?)
             },
         )
     }

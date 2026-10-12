@@ -1974,13 +1974,16 @@ class PeriodId:
         -------
         PeriodId
 
-            Following non-fiscal period of the same frequency, with year rollover.
+            Following period of the same frequency and calendar, with year
+            rollover. Fiscal weeks roll after week 53.
 
         Raises
         ------
         ValueError
-            If the identifier is fiscal. Use :meth:`next_fiscal` with an
-            explicit :class:`FiscalConfig`.
+            If the next period's year is out of range, or a fiscal daily
+            identifier is at day 365 (the fiscal year's length depends on its
+            calendar; use :meth:`next_fiscal` with an explicit
+            :class:`FiscalConfig`).
         """
         ...
 
@@ -1992,13 +1995,16 @@ class PeriodId:
         -------
         PeriodId
 
-            Preceding non-fiscal period of the same frequency, with year rollover.
+            Preceding period of the same frequency and calendar, with year
+            rollover.
 
         Raises
         ------
         ValueError
-            If the identifier is fiscal. Use :meth:`prev_fiscal` with an
-            explicit :class:`FiscalConfig`.
+            If the previous period's year is out of range, or a fiscal daily
+            identifier is at day 1 (the prior fiscal year's length depends on
+            its calendar; use :meth:`prev_fiscal` with an explicit
+            :class:`FiscalConfig`).
         """
         ...
 

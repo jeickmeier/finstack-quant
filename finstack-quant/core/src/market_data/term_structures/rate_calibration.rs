@@ -4,23 +4,19 @@ use crate::currency::Currency;
 use crate::dates::{Date, DayCount, Tenor};
 use crate::types::{CurveId, IndexId};
 
-/// Serialized identifier for an interest-rate futures convention.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(transparent)]
-pub struct RateCalibrationFutureContractId(String);
+mod future_contract_id {
+    /// Marker for [`RateCalibrationFutureContractId`].
+    #[derive(Debug, Clone, Copy, Default)]
+    #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+    pub struct RateCalibrationFutureContractTag;
 
-impl RateCalibrationFutureContractId {
-    /// Create an identifier from its canonical convention-registry key.
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
-    }
-
-    /// Borrow the canonical convention-registry key.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+    /// Serialized identifier for an interest-rate futures convention.
+    ///
+    /// Alias of [`crate::types::Id`].
+    pub type RateCalibrationFutureContractId = crate::types::Id<RateCalibrationFutureContractTag>;
 }
+
+pub use future_contract_id::RateCalibrationFutureContractId;
 
 /// Numerical method used to calibrate a rate curve.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

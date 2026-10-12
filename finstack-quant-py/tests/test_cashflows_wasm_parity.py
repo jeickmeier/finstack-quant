@@ -332,11 +332,7 @@ def _primitives() -> Any:
     flow = CashFlow(dt.date(2025, 7, 15), usd(30_000), "fixed", accrual_factor=0.5, rate=0.06)
     accrual = CashFlowAccrual(dt.date(2025, 1, 15), dt.date(2025, 7, 15), DayCount.THIRTY_360)
     return {
-        # WASM returns the serde wire string (``pre_payment``); read Python's from a serialized flow.
-        "parse": [
-            wire(CashFlow(dt.date(2025, 7, 15), usd(0), CFKind.parse(name), 0.0))["kind"]
-            for name in ("fixed", "prepayment", "collateral_substitution_out")
-        ],
+        "parse": [CFKind.parse(name).name for name in ("fixed", "pre_payment", "collateral_substitution_out")],
         "interest_like": [
             CFKind.parse(kind).is_interest_like() for kind in ("fixed", "float_reset", "fee", "notional")
         ],

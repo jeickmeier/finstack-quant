@@ -68,7 +68,7 @@ pub(crate) fn settlement_date(bond: &Bond, as_of: Date) -> Result<Date> {
         },
     };
 
-    let cal = crate::cashflow::builder::calendar::resolve_calendar_strict(calendar_id)?;
+    let cal = finstack_quant_core::dates::calendar_by_id_strict(calendar_id)?;
     let advanced = as_of.add_business_days(sd, cal)?;
     let adjusted = adjust(advanced, business_day_convention, cal)?;
     Ok(adjusted.max(bond.issue_date))

@@ -8,13 +8,13 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::InputError;
 
-use super::calendar::resolve_calendar_strict;
 use super::date_generation::{
     build_schedule_period, effective_frequency, effective_stub, generate_periods_with_adjustment,
     icma_coupon_period, validate_accrual_grid, validate_unique_payment_dates,
 };
 use super::emission::compute_reset_date;
 use super::specs::{RollRule, ScheduleParams};
+use finstack_quant_core::dates::calendar_by_id_strict;
 
 /// Accrual period with payment timing.
 ///
@@ -172,7 +172,7 @@ pub fn period_accrual(
             "accrual subinterval lies outside its contractual period".into(),
         ));
     }
-    let cal = resolve_calendar_strict(params.calendar_id)?;
+    let cal = calendar_by_id_strict(params.calendar_id)?;
     // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)); ICMA stubs use the adjacent regular coupon.
     let day_count_context = DayCountContext {
         calendar: Some(cal),
@@ -281,7 +281,7 @@ fn enrich_periods(
     periods: Vec<SchedulePeriod>,
     params: &BuildPeriodsParams<'_>,
 ) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
-    let cal = resolve_calendar_strict(params.calendar_id)?;
+    let cal = calendar_by_id_strict(params.calendar_id)?;
     let periods = periods
         .into_iter()
         .map(|period| enrich_period(period, params, cal))
@@ -347,7 +347,7 @@ pub fn build_single_period(
     params: BuildPeriodsParams<'_>,
 ) -> finstack_quant_core::Result<SchedulePeriod> {
     let params = params.validated_effective()?;
-    let cal = resolve_calendar_strict(params.calendar_id)?;
+    let cal = calendar_by_id_strict(params.calendar_id)?;
     let period = build_schedule_period(
         params.start,
         params.end,

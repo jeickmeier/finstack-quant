@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json",
-      "bytes": 89933,
+      "bytes": 89794,
       "kind": "input",
       "path": "schemas/factor_model/1/credit_factor_model.schema.json",
       "summary": "Calibrated credit factor hierarchy, loadable as pricing input.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/factor_model/1/factor_model_config.schema.json",
-      "bytes": 59250,
+      "bytes": 59117,
       "kind": "input",
       "path": "schemas/factor_model/1/factor_model_config.schema.json",
       "summary": "Factor definitions, matchers and covariance settings.",
@@ -713,7 +713,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/risk_decomposition.schema.json",
-      "bytes": 9269,
+      "bytes": 10520,
       "kind": "output",
       "path": "schemas/models/1/risk_decomposition.schema.json",
       "summary": "Portfolio-level decomposition of total risk across common factors and residuals.",

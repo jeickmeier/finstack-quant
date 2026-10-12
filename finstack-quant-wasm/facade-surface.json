@@ -787,7 +787,6 @@
       "InstrumentId",
       "MarketContext",
       "Money",
-      "Percentage",
       "PeriodId",
       "PeriodKind",
       "PriceCurve",
@@ -1079,19 +1078,13 @@
     "kind": "class",
     "statics": ["fromBp", "fromJson", "fromPercent", "parse", "zero"],
     "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
-    "getters": ["asBasisPoints", "asBp", "asBpF64", "asDecimal", "asPercent", "asPercentage"]
+    "getters": ["asBasisPoints", "asBp", "asBpF64", "asDecimal", "asPercent"]
   },
   "core.Bps": {
     "kind": "class",
     "statics": ["fromJson", "zero"],
     "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
-    "getters": ["asBp", "asDecimal", "asPercent", "asPercentage", "asRate"]
-  },
-  "core.Percentage": {
-    "kind": "class",
-    "statics": ["fromJson", "zero"],
-    "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
-    "getters": ["asBasisPoints", "asBp", "asBpF64", "asDecimal", "asPercent", "asRate"]
+    "getters": ["asBp", "asDecimal", "asPercent", "asRate"]
   },
   "core.CreditRating": {
     "kind": "class",
@@ -1119,7 +1112,6 @@
       "cccPlus",
       "d",
       "fromJson",
-      "fromName",
       "nr"
     ],
     "methods": [
@@ -1484,6 +1476,7 @@
     ],
     "getters": [
       "baseDate",
+      "calendarId",
       "dayCount",
       "dfs",
       "extrapolation",

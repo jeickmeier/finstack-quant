@@ -61,7 +61,7 @@ use crate::cashflow::traits::CashflowProvider;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt};
+use finstack_quant_core::dates::{BusinessDayConvention, Date};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -83,8 +83,11 @@ use finstack_quant_core::Result;
 /// # Settlement
 ///
 /// When `settlement_days` is `None`, the pair-aware default is T+1 for
-/// USD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit
-/// `settlement_days` overrides that default; `settlement_date` overrides both.
+/// USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB and T+2 otherwise (including
+/// EUR/USD). An explicit `settlement_days` is the contractual lag and overrides
+/// that default in either direction (for example tom-next T+1 on EUR/USD);
+/// `settlement_date` overrides both. Without calendars the USD leg uses the
+/// `usny` calendar and other currencies count weekdays only.
 ///
 /// See module-level documentation for comprehensive FX quoting conventions.
 #[derive(
@@ -112,11 +115,13 @@ pub struct FxSpot {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub settlement_date: Option<Date>,
-    /// Optional T+N settlement lag in business days when `settlement_date` is not provided.
+    /// Optional contractual T+N settlement lag in business days when
+    /// `settlement_date` is not provided.
     ///
     /// `None` uses the pair-aware default from
     /// [`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for
-    /// USD↔CAD and USD↔TRY, T+2 otherwise.
+    /// USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB, T+2 otherwise. An explicit value
+    /// overrides that default.
     pub settlement_days: Option<u32>,
     /// Optional quoted FX spot rate (quote per base); `None` reads the FxMatrix.
     pub quoted_spot: Option<f64>,
@@ -329,26 +334,14 @@ impl FxSpot {
                 )
             });
 
-            if use_joint_calendar {
-                // CLS-consistent spot roll: a US holiday on an intermediate day
-                // does not delay a USD pair's spot date (2026-06-09 core quant
-                // review, FX spot finding).
-                fx_spot_date_for_pair(
-                    as_of,
-                    settlement_days,
-                    self.base_currency,
-                    self.quote_currency,
-                    self.base_calendar_id.as_deref(),
-                    self.quote_calendar_id.as_deref(),
-                )
-            } else {
-                let lag_days = i32::try_from(settlement_days).map_err(|_| {
-                    finstack_quant_core::Error::Validation(format!(
-                        "FxSpot settlement_days {settlement_days} exceeds the supported range"
-                    ))
-                })?;
-                as_of.add_weekdays(lag_days)
-            }
+            fx_spot_date_for_pair(
+                as_of,
+                settlement_days,
+                self.base_currency,
+                self.quote_currency,
+                self.base_calendar_id.as_deref(),
+                self.quote_calendar_id.as_deref(),
+            )
         }
     }
 
@@ -464,8 +457,9 @@ impl FxSpot {
     ///
     /// # Arguments
     ///
-    /// * `settlement_days` - Business days from the trade/valuation date to
-    ///   settlement (T+N, non-negative); overrides the pair default.
+    /// * `settlement_days` - Contractual business-day lag from the
+    ///   trade/valuation date; it overrides the pair-aware market default in
+    ///   either direction (for example `1` for a tom-next EUR/USD trade).
     pub fn with_settlement_days(mut self, settlement_days: u32) -> Self {
         self.settlement_days = Some(settlement_days);
         self
@@ -745,7 +739,7 @@ mod tests {
         let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
             .with_settlement_days(1);
 
-        // Wednesday -> should settle Thursday (T+1 weekdays)
+        // A contractual T+1 (tom) lag is honored: Wednesday settles Thursday.
         let as_of = date(2025, Month::January, 15); // Wednesday
         let settle = spot
             .effective_settlement_date(as_of)

@@ -397,13 +397,13 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
             })
         })?;
         let r = decimal_to_f64(r, "Deposit fixed_rate")?;
-        let redemption = self.notional * (1.0 + r * yf);
+        let redemption = self.notional.checked_mul_f64(1.0 + r * yf)?;
         let interest = redemption.checked_sub(self.notional)?;
         let flows = vec![
             crate::cashflow::primitives::CashFlow::new(
                 effective_start,
                 None,
-                self.notional * -1.0,
+                self.notional.checked_neg(),
                 crate::cashflow::primitives::CFKind::Notional,
                 0.0,
                 None,
@@ -482,7 +482,13 @@ mod tests {
             .amount
             .checked_add(schedule.get_flows()[2].amount)
             .expect("maturity cash");
-        assert_eq!(redemption, deposit.notional * (1.0 + 0.045 * yf));
+        assert_eq!(
+            redemption,
+            deposit
+                .notional
+                .checked_mul_f64(1.0 + 0.045 * yf)
+                .expect("finite redemption multiplier")
+        );
     }
 
     #[test]

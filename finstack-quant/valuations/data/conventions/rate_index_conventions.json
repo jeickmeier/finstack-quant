@@ -310,6 +310,48 @@
     },
     {
       "ids": [
+        "AUD-BBSW-3M",
+        "BBSW-3M"
+      ],
+      "record": {
+        "currency": "AUD",
+        "kind": "term",
+        "tenor": "3M",
+        "day_count": "act_365f",
+        "default_payment_frequency": "3M",
+        "default_payment_lag_days": 0,
+        "default_reset_lag_days": 0,
+        "ois_compounding": null,
+        "market_calendar_id": "auce",
+        "market_settlement_days": 1,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "act_365f",
+        "default_fixed_leg_frequency": "3M"
+      }
+    },
+    {
+      "ids": [
+        "AUD-BBSW-6M",
+        "BBSW-6M"
+      ],
+      "record": {
+        "currency": "AUD",
+        "kind": "term",
+        "tenor": "6M",
+        "day_count": "act_365f",
+        "default_payment_frequency": "6M",
+        "default_payment_lag_days": 0,
+        "default_reset_lag_days": 0,
+        "ois_compounding": null,
+        "market_calendar_id": "auce",
+        "market_settlement_days": 1,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "act_365f",
+        "default_fixed_leg_frequency": "6M"
+      }
+    },
+    {
+      "ids": [
         "CAD-CORRA",
         "CAD-CORRA-OIS",
         "CORRA"

@@ -34,6 +34,7 @@ pub struct DiscountCurveBuilder {
     /// [`Self::build`] requires `Some(_)` and errors on `None`.
     pub(super) base: Option<Date>,
     pub(super) day_count: DayCount,
+    pub(super) calendar_id: Option<String>,
     pub(super) points: Vec<(f64, f64)>, // (t, df)
     pub(super) style: InterpStyle,
     pub(super) extrapolation: ExtrapolationPolicy,
@@ -61,6 +62,34 @@ impl DiscountCurveBuilder {
         self.day_count = day_count;
         self
     }
+
+    /// Set the registered holiday calendar of the curve's time axis.
+    ///
+    /// Required for business-day day counts such as Bus/252, where the year
+    /// fraction from the base date counts business days. The calendar belongs
+    /// to the curve (for example `"brbd"` for a BRL CDI curve), so every
+    /// date-based query uses it.
+    ///
+    /// # Arguments
+    ///
+    /// * `calendar_id` - Registered calendar id, or a `+`-joined union such as
+    ///   `"usny+target2"`; resolved and canonicalized at [`Self::build`].
+    pub fn calendar_id(mut self, calendar_id: impl Into<String>) -> Self {
+        self.calendar_id = Some(calendar_id.into());
+        self
+    }
+
+    /// Optionally set the time-axis holiday calendar; `None` clears it.
+    ///
+    /// # Arguments
+    ///
+    /// * `calendar_id` - Registered calendar id, or `None` for a day count that
+    ///   needs no calendar. Used by the serde round-trip path.
+    pub fn calendar_id_opt(mut self, calendar_id: Option<String>) -> Self {
+        self.calendar_id = calendar_id;
+        self
+    }
+
     /// Supply knot points `(t, df)` where *t* is the year fraction and *df*
     /// the discount factor.
     pub fn knots<I>(mut self, pts: I) -> Self
@@ -242,8 +271,9 @@ impl DiscountCurveBuilder {
     ///
     /// Returns an error when the base date is missing, fewer than two knots are
     /// supplied after zero-time anchoring, a discount factor is non-positive,
-    /// knots are invalid, or the configured monotonicity, forward-rate, or
-    /// interpolation constraints are violated.
+    /// knots are invalid, the configured monotonicity, forward-rate, or
+    /// interpolation constraints are violated, the calendar id is unknown, or a
+    /// Bus/252 curve has no calendar.
     pub fn build(mut self) -> crate::Result<DiscountCurve> {
         let base = self.base.ok_or(crate::error::InputError::Invalid)?;
         if !self.points.is_empty() {
@@ -278,6 +308,17 @@ impl DiscountCurveBuilder {
     }
 
     fn finish(self, base: Date, knots: Vec<f64>, dfs: Vec<f64>) -> crate::Result<DiscountCurve> {
+        let calendar = self
+            .calendar_id
+            .as_deref()
+            .map(super::CurveCalendar::resolve)
+            .transpose()?;
+        if self.day_count == DayCount::Bus252 && calendar.is_none() {
+            return Err(crate::Error::Validation(format!(
+                "Bus/252 discount curve '{}' requires a holiday calendar",
+                self.id
+            )));
+        }
         let knots = knots.into_boxed_slice();
         let dfs = dfs.into_boxed_slice();
 
@@ -293,6 +334,7 @@ impl DiscountCurveBuilder {
             id: self.id,
             base,
             day_count: self.day_count,
+            calendar,
             knots,
             dfs,
             interp,

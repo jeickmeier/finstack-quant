@@ -1,6 +1,6 @@
 """Behavioral tests for the core value-type ergonomics added to the Python bindings.
 
-Covers ``Rate``/``Bps``/``Percentage`` conversions and string parsing,
+Covers ``Rate``/``Bps`` conversions and string parsing,
 ``CreditRating`` ordering and typed equality, ``Attributes`` mapping dunders,
 ``Money`` formatting/division/rounding, ``FinstackConfig`` scale overrides,
 ``ScorecardScale`` validation and the ``core.math`` additions.
@@ -17,7 +17,7 @@ import pytest
 from finstack_quant.core.config import FinstackConfig, RoundingMode, ToleranceConfig
 from finstack_quant.core.money import Money
 from finstack_quant.core.rating_scales import RatingLevel, ScorecardScale, embedded_registry
-from finstack_quant.core.types import Attributes, Bps, CreditRating, CurveId, InstrumentId, Percentage, Rate
+from finstack_quant.core.types import Attributes, Bps, CreditRating, CurveId, InstrumentId, Rate
 
 
 class TestRateFamily:
@@ -28,31 +28,24 @@ class TestRateFamily:
 
     def test_cross_conversions(self) -> None:
         assert Rate(0.05).as_basis_points == Bps(500)
-        assert Rate(0.05).as_percentage == Percentage(5.0)
+        assert Rate(0.05).as_percent == 5.0
         assert Bps(250).as_rate == Rate(0.025)
-        assert Bps(250).as_percentage == Percentage(2.5)
         assert Bps(250).as_percent == 2.5
-        assert Percentage(2.5).as_basis_points == Bps(250)
-        assert Percentage(2.5).as_rate == Rate(0.025)
 
     def test_predicates_and_abs(self) -> None:
         assert Rate(-0.01).abs() == Rate(0.01)
         assert Rate(-0.01).is_negative()
         assert not Rate(-0.01).is_positive()
         assert Bps(0).is_zero()
-        assert Percentage(-1.0).abs().is_positive()
 
     def test_arithmetic(self) -> None:
         assert (Rate(0.05) + Bps(25)).as_bp == 525
         assert (Rate(0.05) - Bps(25)).as_bp == 475
         assert 2.0 * Rate(0.05) == Rate(0.10)
-        assert (Percentage(10.0) + Percentage(2.5)) == Percentage(12.5)
-        assert (Percentage(10.0) / 4.0) == Percentage(2.5)
-        assert -Percentage(1.0) == Percentage(-1.0)
         assert 3 * Bps(10) == Bps(30)
 
     def test_json_and_pickle(self) -> None:
-        for value in (Rate(0.05), Bps(250), Percentage(12.5)):
+        for value in (Rate(0.05), Bps(250)):
             assert type(value).from_json(value.to_json()) == value
             assert pickle.loads(pickle.dumps(value)) == value  # noqa: S301
 

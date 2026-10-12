@@ -56,15 +56,38 @@ where
 /// Variants are grouped by category:
 /// - **Interest**: `Fixed`, `FloatReset`, `Stub`
 /// - **Inflation**: `InflationCoupon`
-/// - **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`
+/// - **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`
 /// - **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`
 /// - **Revolving**: `RevolvingDraw`, `RevolvingRepayment`
 /// - **Credit Events**: `DefaultedNotional`, `Recovery`
 /// - **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.
+///
+/// # Labels
+///
+/// `Display`, `FromStr`, and serde share one snake_case label per kind
+/// (`"fixed"`, `"float_reset"`, `"pre_payment"`); `FromStr` matches it
+/// exactly, with no aliases or case folding. [`CFKind::parse_label`] adds the
+/// case-insensitive reporting aliases.
 #[non_exhaustive]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    strum_macros::Display,
+    strum_macros::EnumString,
+)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
+#[strum(
+    serialize_all = "snake_case",
+    parse_err_ty = String,
+    parse_err_fn = unknown_cf_kind
+)]
 pub enum CFKind {
     /// Fixed-rate coupon cash-flow.
     ///
@@ -232,76 +255,8 @@ pub enum CFKind {
     CollateralSubstitutionOut,
 }
 
-impl std::fmt::Display for CFKind {
-    #[allow(unreachable_patterns)] // non_exhaustive future-proofing
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let label = match self {
-            CFKind::Fixed => "fixed",
-            CFKind::FloatReset => "float_reset",
-            CFKind::InflationCoupon => "inflation_coupon",
-            CFKind::Fee => "fee",
-            CFKind::CommitmentFee => "commitment_fee",
-            CFKind::UsageFee => "usage_fee",
-            CFKind::FacilityFee => "facility_fee",
-            CFKind::LcFee => "lc_fee",
-            CFKind::FrontingFee => "fronting_fee",
-            CFKind::Notional => "notional",
-            CFKind::Pik => "pik",
-            CFKind::Amortization => "amortization",
-            CFKind::PrePayment => "prepayment",
-            CFKind::RevolvingDraw => "revolving_draw",
-            CFKind::RevolvingRepayment => "revolving_repayment",
-            CFKind::DefaultedNotional => "defaulted_notional",
-            CFKind::Recovery => "recovery",
-            CFKind::AccruedOnDefault => "accrued_on_default",
-            CFKind::Stub => "stub",
-            CFKind::InitialMarginPost => "initial_margin_post",
-            CFKind::InitialMarginReturn => "initial_margin_return",
-            CFKind::VariationMarginReceive => "variation_margin_receive",
-            CFKind::VariationMarginPay => "variation_margin_pay",
-            CFKind::MarginInterest => "margin_interest",
-            CFKind::CollateralSubstitutionIn => "collateral_substitution_in",
-            CFKind::CollateralSubstitutionOut => "collateral_substitution_out",
-            _ => "unknown",
-        };
-        f.write_str(label)
-    }
-}
-
-impl std::str::FromStr for CFKind {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "fixed" => Ok(Self::Fixed),
-            "float_reset" => Ok(Self::FloatReset),
-            "inflation_coupon" => Ok(Self::InflationCoupon),
-            "fee" => Ok(Self::Fee),
-            "commitment_fee" => Ok(Self::CommitmentFee),
-            "usage_fee" => Ok(Self::UsageFee),
-            "facility_fee" => Ok(Self::FacilityFee),
-            "lc_fee" => Ok(Self::LcFee),
-            "fronting_fee" => Ok(Self::FrontingFee),
-            "notional" => Ok(Self::Notional),
-            "pik" => Ok(Self::Pik),
-            "amortization" => Ok(Self::Amortization),
-            "prepayment" => Ok(Self::PrePayment),
-            "revolving_draw" => Ok(Self::RevolvingDraw),
-            "revolving_repayment" => Ok(Self::RevolvingRepayment),
-            "defaulted_notional" => Ok(Self::DefaultedNotional),
-            "recovery" => Ok(Self::Recovery),
-            "accrued_on_default" => Ok(Self::AccruedOnDefault),
-            "stub" => Ok(Self::Stub),
-            "initial_margin_post" => Ok(Self::InitialMarginPost),
-            "initial_margin_return" => Ok(Self::InitialMarginReturn),
-            "variation_margin_receive" => Ok(Self::VariationMarginReceive),
-            "variation_margin_pay" => Ok(Self::VariationMarginPay),
-            "margin_interest" => Ok(Self::MarginInterest),
-            "collateral_substitution_in" => Ok(Self::CollateralSubstitutionIn),
-            "collateral_substitution_out" => Ok(Self::CollateralSubstitutionOut),
-            _ => Err(format!("unknown cashflow kind {s:?}")),
-        }
-    }
+fn unknown_cf_kind(s: &str) -> String {
+    format!("unknown cashflow kind {s:?}")
 }
 
 impl CFKind {
@@ -549,13 +504,14 @@ impl CashFlow {
     ///
     /// Zero amounts are valid: floored coupons (e.g. a floating coupon with
     /// a 0% floor in a negative-rate environment) legitimately produce
-    /// zero-amount cashflows (
-    /// zero amounts were previously rejected).
+    /// zero-amount cashflows.
     ///
     /// # Errors
-    /// Returns [`crate::Error::Input`] if the `amount`, accrual factor, or
-    /// rate is non-finite, or [`crate::Error::Validation`] if the accrual
-    /// factor is negative or the reset date is after the payment date.
+    /// Returns [`crate::Error::Input`] if the `amount`, accrual factor, rate,
+    /// or projected index rate is non-finite, [`crate::Error::CurrencyMismatch`]
+    /// if the principal delta is in another currency, or
+    /// [`crate::Error::Validation`] if the accrual factor is negative, the
+    /// reset date is after the payment date, or an accrual period is empty.
     ///
     /// # Example
     /// ```rust
@@ -588,6 +544,9 @@ impl CashFlow {
     /// - Accrual factor must be finite (not NaN or Infinity)
     /// - Rate (if present) must be finite (not NaN or Infinity)
     /// - Reset date (if present) must not be after the payment date
+    /// - Principal delta (if present) must share the amount's currency
+    /// - Accrual metadata (if present) must have start before end, a coupon
+    ///   period with start before end, and a finite projected index rate
     pub fn validate(&self) -> crate::Result<()> {
         if !self.amount.amount().is_finite() {
             let kind = NonFiniteKind::classify(self.amount.amount());
@@ -1082,12 +1041,17 @@ mod tests {
 
         for kind in &all {
             assert_roundtrip(*kind);
+            assert_eq!(
+                serde_json::to_value(kind).expect("CFKind serializes"),
+                serde_json::Value::String(kind.to_string()),
+                "Display and serde labels must agree for {kind:?}"
+            );
         }
     }
 
     #[test]
     fn cfkind_from_str_rejects_noncanonical_spellings() {
-        for rejected in ["amort", "pre_payment", "FIXED", "Float-Reset", " fixed"] {
+        for rejected in ["amort", "prepayment", "FIXED", "Float-Reset", " fixed"] {
             assert!(rejected.parse::<CFKind>().is_err());
         }
     }

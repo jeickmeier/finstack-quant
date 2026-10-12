@@ -16,7 +16,7 @@ import {
 import { getCurveView } from "../../src/views";
 const curves = fixture.curves as CurveState[];
 afterEach(cleanup);
-it("validates all nine variants against the generated contract and native Market round trip", () => {
+it("validates all eight variants against the generated contract and native Market round trip", () => {
   expect(createWireCodec(schema).validator.safeParse(fixture).success).toBe(
     true,
   );
@@ -29,11 +29,11 @@ it("validates all nine variants against the generated contract and native Market
   } finally {
     market.free();
   }
-  expect(new Set(curves.map((curve) => curve.type)).size).toBe(9);
+  expect(new Set(curves.map((curve) => curve.type)).size).toBe(8);
 });
 it("plots every stored tuple unchanged, overlays only compatible variants and retains original references", () => {
   const panels = curvePanels(curves);
-  expect(panels).toHaveLength(9);
+  expect(panels).toHaveLength(8);
   expect(panels.find((p) => p.type === "discount")!.states).toHaveLength(2);
   const flat = (nodes: readonly SceneNode[]): SceneNode[] =>
     nodes.flatMap((n) => (n.kind === "group" ? flat(n.children) : [n]));

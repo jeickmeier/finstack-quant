@@ -20,30 +20,6 @@ pub enum TouchType {
     NoTouch,
 }
 
-impl std::fmt::Display for TouchType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::OneTouch => write!(f, "one_touch"),
-            Self::NoTouch => write!(f, "no_touch"),
-        }
-    }
-}
-
-impl std::str::FromStr for TouchType {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "one_touch" => Ok(Self::OneTouch),
-            "no_touch" => Ok(Self::NoTouch),
-            _ => Err(format!(
-                "Unknown touch type: '{}'. Valid: one_touch, no_touch",
-                s
-            )),
-        }
-    }
-}
-
 pub use finstack_quant_core::types::{BarrierDirection, PayoutTiming};
 
 /// FX touch option (American binary option).
@@ -582,43 +558,19 @@ crate::impl_empty_cashflow_provider!(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
 
     #[test]
-    fn touch_type_fromstr_display_roundtrip() {
-        let variants = [TouchType::OneTouch, TouchType::NoTouch];
-        for v in variants {
-            let s = v.to_string();
-            let parsed = TouchType::from_str(&s).expect("roundtrip parse should succeed");
-            assert_eq!(v, parsed, "roundtrip failed for {s}");
+    fn touch_type_serde_accepts_only_canonical_snake_case() {
+        for (variant, canonical, rejected) in [
+            (TouchType::OneTouch, "one_touch", "OneTouch"),
+            (TouchType::NoTouch, "no_touch", "NoTouch"),
+        ] {
+            assert_eq!(
+                serde_json::to_string(&variant).expect("serialize touch type"),
+                format!("\"{canonical}\"")
+            );
+            assert!(serde_json::from_str::<TouchType>(&format!("\"{rejected}\"")).is_err());
         }
-        assert!(TouchType::from_str("onetouch").is_err());
-        assert!(TouchType::from_str("notouch").is_err());
-        assert!(TouchType::from_str("invalid").is_err());
-    }
-
-    #[test]
-    fn barrier_direction_fromstr_display_roundtrip() {
-        let variants = [BarrierDirection::Up, BarrierDirection::Down];
-        for v in variants {
-            let s = v.to_string();
-            let parsed = BarrierDirection::from_str(&s).expect("roundtrip parse should succeed");
-            assert_eq!(v, parsed, "roundtrip failed for {s}");
-        }
-        assert!(BarrierDirection::from_str("invalid").is_err());
-    }
-
-    #[test]
-    fn payout_timing_fromstr_display_roundtrip() {
-        let variants = [PayoutTiming::AtHit, PayoutTiming::AtExpiry];
-        for v in variants {
-            let s = v.to_string();
-            let parsed = PayoutTiming::from_str(&s).expect("roundtrip parse should succeed");
-            assert_eq!(v, parsed, "roundtrip failed for {s}");
-        }
-        assert!(PayoutTiming::from_str("athit").is_err());
-        assert!(PayoutTiming::from_str("atexpiry").is_err());
-        assert!(PayoutTiming::from_str("invalid").is_err());
     }
 
     // Validation tests

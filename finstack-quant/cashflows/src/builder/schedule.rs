@@ -300,8 +300,6 @@ where
 }
 
 impl Discountable for CashFlowSchedule {
-    type PVOutput = finstack_quant_core::Result<Money>;
-
     fn npv(&self, disc: &dyn Discounting, base: Date) -> finstack_quant_core::Result<Money> {
         let flows = self
             .flows
@@ -311,6 +309,8 @@ impl Discountable for CashFlowSchedule {
             .collect::<Vec<_>>();
 
         if flows.is_empty() {
+            // The schedule's notional currency is the zero present value when
+            // no cash-settlement rows remain.
             return Money::new(0.0, self.notional.initial.currency());
         }
 

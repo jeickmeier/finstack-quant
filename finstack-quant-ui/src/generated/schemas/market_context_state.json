@@ -174,6 +174,39 @@
       ],
       "type": "object"
     },
+    "d_13ceef63597b70bc1a71": {
+      "additionalProperties": false,
+      "description": "Serialized source grid and time origin for a rolled interpolation.",
+      "properties": {
+        "offset": {
+          "format": "double",
+          "type": "number"
+        },
+        "source_points": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_points",
+        "offset"
+      ],
+      "type": "object"
+    },
     "d_14c856f170a7fa5ec480": {
       "description": "Enum of supported interpolation styles. The default is `Linear`.",
       "oneOf": [
@@ -422,10 +455,6 @@
           "type": "string"
         }
       ]
-    },
-    "d_21e7c0751f339b65c465": {
-      "description": "Serialized identifier for an interest-rate futures convention.",
-      "type": "string"
     },
     "d_268127561c9d65277399": {
       "additionalProperties": false,
@@ -933,7 +962,7 @@
               "additionalProperties": false,
               "properties": {
                 "contract": {
-                  "$ref": "#/$defs/d_21e7c0751f339b65c465",
+                  "$ref": "#/$defs/d_33ee2f2e4664717e30ef",
                   "description": "Convention-registry identifier for the futures contract."
                 },
                 "convexity_adjustment": {
@@ -1385,6 +1414,13 @@
               "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
               "description": "Base date"
             },
+            "calendar_id": {
+              "description": "Registered holiday calendar id of the business-day time axis (for\nexample `\"brbd\"` for a Bus/252 curve). Omitted when the day count needs\nno calendar.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "calibration_ois_cutoff_days": {
               "description": "OIS cut-off (business days) the curve was calibrated under, if any.",
               "format": "int32",
@@ -1784,6 +1820,17 @@
               },
               "type": "array"
             },
+            "roll_transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/d_13ceef63597b70bc1a71"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source interpolation and accumulated time origin for a rolled curve."
+            },
             "type": {
               "const": "inflation",
               "type": "string"
@@ -1877,6 +1924,17 @@
               },
               "type": "array"
             },
+            "roll_transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/d_13ceef63597b70bc1a71"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source interpolation and accumulated time origin for a rolled curve."
+            },
             "spot_level": {
               "description": "Spot index level (volatility index curves)",
               "format": "double",
@@ -1895,81 +1953,6 @@
             },
             "type": {
               "const": "price",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type",
-            "id",
-            "base",
-            "day_count",
-            "knot_points",
-            "interp_style",
-            "extrapolation"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "VolIndex curve state",
-          "properties": {
-            "base": {
-              "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
-              "description": "Base date"
-            },
-            "day_count": {
-              "$ref": "#/$defs/d_ac3149b00d5253379c16",
-              "description": "Day count convention"
-            },
-            "extrapolation": {
-              "$ref": "#/$defs/d_86124daa1d76a07e8682",
-              "description": "Extrapolation policy"
-            },
-            "id": {
-              "description": "Curve identifier",
-              "type": "string"
-            },
-            "interp_style": {
-              "$ref": "#/$defs/d_14c856f170a7fa5ec480",
-              "description": "Interpolation style"
-            },
-            "knot_points": {
-              "description": "Time/value pairs used to construct the curve",
-              "items": {
-                "maxItems": 2,
-                "minItems": 2,
-                "prefixItems": [
-                  {
-                    "format": "double",
-                    "type": "number"
-                  },
-                  {
-                    "format": "double",
-                    "type": "number"
-                  }
-                ],
-                "type": "array"
-              },
-              "type": "array"
-            },
-            "spot_level": {
-              "description": "Spot index level (volatility index curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "spot_price": {
-              "description": "Spot price (signed price curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "type": {
-              "const": "vol_index",
               "type": "string"
             }
           },
@@ -2027,6 +2010,17 @@
               },
               "type": "array"
             },
+            "roll_transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/d_13ceef63597b70bc1a71"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source interpolation and accumulated time origin for a rolled curve."
+            },
             "type": {
               "const": "basis_spread",
               "type": "string"
@@ -2062,6 +2056,12 @@
             "model": {
               "$ref": "#/$defs/d_fe18010fa6c9de5d3f03",
               "description": "Nelson-Siegel model parameters."
+            },
+            "time_offset": {
+              "default": 0,
+              "description": "Current origin in the source model's year-fraction coordinates;\nomitted means `0.0` (a curve that has never been rolled).",
+              "format": "double",
+              "type": "number"
             },
             "type": {
               "const": "parametric",

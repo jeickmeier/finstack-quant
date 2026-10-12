@@ -25,9 +25,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 
 /// Conservative fallback IM: `|exposure_base| × conservative_rate`.
-#[must_use]
-pub(crate) fn conservative_im(exposure_base: Money, conservative_rate: f64) -> Money {
-    exposure_base.abs() * conservative_rate
+pub(crate) fn conservative_im(
+    exposure_base: Money,
+    conservative_rate: f64,
+) -> finstack_quant_core::Result<Money> {
+    exposure_base.abs().checked_mul_f64(conservative_rate)
 }
 
 pub(crate) fn require_im_exposure_base(

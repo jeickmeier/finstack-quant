@@ -2,12 +2,13 @@
   "id": "defr",
   "name": "Germany (Frankfurt) Holiday Calendar",
   "ignore_weekends": false,
+  "comment": "Same holiday set as TARGET2 (New Year's Day, Good Friday, Easter Monday, Labour Day, Christmas, St Stephen's Day), as noted in eurex.json. German practice does not move a holiday that falls on a weekend.",
   "rules": [
-    { "type": "fixed", "name": "Neujahr (New Year's Day)", "month": "january", "day": 1, "observed": "next_monday" },
+    { "type": "fixed", "name": "Neujahr (New Year's Day)", "month": "january", "day": 1 },
     { "type": "easter_offset", "name": "Karfreitag (Good Friday)", "days": -3 },
     { "type": "easter_offset", "name": "Ostermontag (Easter Monday)", "days": 0 },
-    { "type": "fixed", "name": "Tag der Arbeit (Labour Day)", "month": "may", "day": 1, "observed": "next_monday" },
-    { "type": "fixed", "name": "Erster Weihnachtstag (Christmas Day)", "month": "december", "day": 25, "observed": "next_monday" },
-    { "type": "fixed", "name": "Zweiter Weihnachtstag (St. Stephen's Day)", "month": "december", "day": 26, "observed": "next_monday" }
+    { "type": "fixed", "name": "Tag der Arbeit (Labour Day)", "month": "may", "day": 1 },
+    { "type": "fixed", "name": "Erster Weihnachtstag (Christmas Day)", "month": "december", "day": 25 },
+    { "type": "fixed", "name": "Zweiter Weihnachtstag (St. Stephen's Day)", "month": "december", "day": 26 }
   ]
 }

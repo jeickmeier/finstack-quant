@@ -19,179 +19,6 @@ pub(crate) struct DagNode {
     /// Dependencies (other DAG nodes this depends on).
     pub dependencies: Vec<u64>,
 }
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::config::{ResultsMeta, RoundingContext, NUMERIC_MODE_F64};
-
-    fn meta() -> ResultsMeta {
-        crate::config::results_meta(&crate::config::FinstackConfig::default())
-    }
-
-    fn explicit_meta() -> ResultsMeta {
-        ResultsMeta {
-            numeric_mode: NUMERIC_MODE_F64.to_owned(),
-            rounding: RoundingContext::default(),
-            fx_policy_applied: None,
-            parallel: false,
-            timestamp: None,
-            version: None,
-        }
-    }
-
-    #[test]
-    fn dag_builder_deduplicates_structurally_identical_nodes() {
-        let mut builder = DagBuilder::new();
-        let a = Expr::call(
-            Function::RollingMean,
-            vec![Expr::column("x"), Expr::literal(3.0)],
-        );
-        let b = Expr::call(
-            Function::RollingMean,
-            vec![Expr::column("x"), Expr::literal(3.0)],
-        );
-
-        let plan = builder
-            .build_plan(vec![a, b], meta())
-            .expect("valid expressions should build a DAG plan");
-        assert_eq!(plan.nodes.len(), 3, "column, literal, rolling mean");
-        assert_eq!(plan.roots.len(), 2);
-        assert_eq!(plan.roots[0], plan.roots[1]);
-    }
-
-    #[test]
-    fn dag_builder_orders_dependencies_topologically() {
-        let mut builder = DagBuilder::new();
-        let col = Expr::column("x");
-        let lit = Expr::literal(2.0);
-        let sum = Expr::call(Function::RollingSum, vec![col.clone(), lit.clone()]);
-        let mean = Expr::call(Function::RollingMean, vec![col, lit]);
-
-        let plan = builder
-            .build_plan(vec![sum, mean], meta())
-            .expect("valid expressions should build a DAG plan");
-        assert_eq!(plan.nodes.len(), 4);
-
-        // Ensure dependencies come before dependents in node order.
-        for node in &plan.nodes {
-            for &dep in &node.dependencies {
-                let dep_index = plan
-                    .nodes
-                    .iter()
-                    .position(|n| n.id == dep)
-                    .expect("dependency must exist");
-                let node_index = plan
-                    .nodes
-                    .iter()
-                    .position(|n| n.id == node.id)
-                    .expect("node must exist in plan");
-                assert!(dep_index < node_index);
-            }
-        }
-    }
-
-    #[test]
-    fn dag_topological_sort_rejects_excessive_depth() {
-        let mut builder = DagBuilder::new();
-        let mut prev = 0_u64;
-        for id in 1..=MAX_DAG_RECURSION_DEPTH as u64 + 1 {
-            let dependencies = if prev == 0 { vec![] } else { vec![prev] };
-            builder.nodes.insert(
-                id,
-                DagNode {
-                    id,
-                    expr: Expr::literal(id as f64),
-                    dependencies,
-                },
-            );
-            prev = id;
-        }
-
-        let err = builder
-            .topological_sort(&[prev])
-            .expect_err("deep recursion should fail with a guard");
-        assert!(
-            err.to_string().contains("maximum DAG recursion depth"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn dag_build_plan_rejects_deeply_nested_ast() {
-        // A programmatic AST nested just past the limit must return the
-        // structured depth error from process_expression instead of
-        // overflowing the stack during plan construction.
-        let mut expr = Expr::column("x");
-        for _ in 0..MAX_DAG_RECURSION_DEPTH + 1 {
-            expr = Expr::unary_op(UnaryOp::Neg, expr);
-        }
-
-        let mut builder = DagBuilder::new();
-        let err = builder
-            .build_plan(vec![expr], meta())
-            .expect_err("deeply nested AST should fail with a depth guard");
-        assert!(
-            err.to_string().contains("maximum DAG recursion depth"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn dag_build_plan_accepts_ast_below_depth_limit() {
-        let mut expr = Expr::column("x");
-        for _ in 0..MAX_DAG_RECURSION_DEPTH - 2 {
-            expr = Expr::unary_op(UnaryOp::Neg, expr);
-        }
-
-        let mut builder = DagBuilder::new();
-        let plan = builder
-            .build_plan(vec![expr], meta())
-            .expect("AST below the depth limit should build a plan");
-        assert_eq!(plan.nodes.len(), MAX_DAG_RECURSION_DEPTH - 1);
-    }
-
-    #[test]
-    fn dag_builder_keeps_dependency_chain_in_topological_order() {
-        let mut builder = DagBuilder::new();
-        let col_x = Expr::column("x");
-        let lag_x = Expr::call(Function::Lag, vec![col_x, Expr::literal(1.0)]);
-        let diff_lag = Expr::call(Function::Diff, vec![lag_x, Expr::literal(1.0)]);
-
-        let plan = builder
-            .build_plan(vec![diff_lag], explicit_meta())
-            .expect("valid expressions should build a DAG plan");
-
-        let mut found_column = false;
-        let mut found_lag = false;
-        for node in &plan.nodes {
-            match &node.expr.node {
-                ExprNode::Column(_) => {
-                    assert!(!found_column && !found_lag);
-                    found_column = true;
-                }
-                ExprNode::Call(Function::Lag, _) => {
-                    assert!(found_column && !found_lag);
-                    found_lag = true;
-                }
-                ExprNode::Call(Function::Diff, _) => {
-                    assert!(found_column && found_lag);
-                }
-                _ => {}
-            }
-        }
-    }
-
-    #[test]
-    fn dag_builder_allows_empty_plans() {
-        let mut builder = DagBuilder::new();
-        let plan = builder
-            .build_plan(vec![], explicit_meta())
-            .expect("empty root list should still produce a valid plan");
-
-        assert!(plan.nodes.is_empty());
-        assert!(plan.roots.is_empty());
-    }
-}
 
 const MAX_DAG_RECURSION_DEPTH: usize = 512;
 
@@ -218,11 +45,6 @@ pub(crate) struct DagBuilder {
 }
 
 impl DagBuilder {
-    /// Create a new DAG builder.
-    pub(crate) fn new() -> Self {
-        Self::default()
-    }
-
     /// Build an execution plan from a list of root expressions.
     pub(crate) fn build_plan(
         &mut self,
@@ -369,5 +191,179 @@ impl DagBuilder {
         }
 
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{ResultsMeta, RoundingContext, NUMERIC_MODE_F64};
+
+    fn meta() -> ResultsMeta {
+        crate::config::results_meta(&crate::config::FinstackConfig::default())
+    }
+
+    fn explicit_meta() -> ResultsMeta {
+        ResultsMeta {
+            numeric_mode: NUMERIC_MODE_F64.to_owned(),
+            rounding: RoundingContext::default(),
+            fx_policy_applied: None,
+            parallel: false,
+            timestamp: None,
+            version: None,
+        }
+    }
+
+    #[test]
+    fn dag_builder_deduplicates_structurally_identical_nodes() {
+        let mut builder = DagBuilder::default();
+        let a = Expr::call(
+            Function::RollingMean,
+            vec![Expr::column("x"), Expr::literal(3.0)],
+        );
+        let b = Expr::call(
+            Function::RollingMean,
+            vec![Expr::column("x"), Expr::literal(3.0)],
+        );
+
+        let plan = builder
+            .build_plan(vec![a, b], meta())
+            .expect("valid expressions should build a DAG plan");
+        assert_eq!(plan.nodes.len(), 3, "column, literal, rolling mean");
+        assert_eq!(plan.roots.len(), 2);
+        assert_eq!(plan.roots[0], plan.roots[1]);
+    }
+
+    #[test]
+    fn dag_builder_orders_dependencies_topologically() {
+        let mut builder = DagBuilder::default();
+        let col = Expr::column("x");
+        let lit = Expr::literal(2.0);
+        let sum = Expr::call(Function::RollingSum, vec![col.clone(), lit.clone()]);
+        let mean = Expr::call(Function::RollingMean, vec![col, lit]);
+
+        let plan = builder
+            .build_plan(vec![sum, mean], meta())
+            .expect("valid expressions should build a DAG plan");
+        assert_eq!(plan.nodes.len(), 4);
+
+        // Ensure dependencies come before dependents in node order.
+        for node in &plan.nodes {
+            for &dep in &node.dependencies {
+                let dep_index = plan
+                    .nodes
+                    .iter()
+                    .position(|n| n.id == dep)
+                    .expect("dependency must exist");
+                let node_index = plan
+                    .nodes
+                    .iter()
+                    .position(|n| n.id == node.id)
+                    .expect("node must exist in plan");
+                assert!(dep_index < node_index);
+            }
+        }
+    }
+
+    #[test]
+    fn dag_topological_sort_rejects_excessive_depth() {
+        let mut builder = DagBuilder::default();
+        let mut prev = 0_u64;
+        for id in 1..=MAX_DAG_RECURSION_DEPTH as u64 + 1 {
+            let dependencies = if prev == 0 { vec![] } else { vec![prev] };
+            builder.nodes.insert(
+                id,
+                DagNode {
+                    id,
+                    expr: Expr::literal(id as f64),
+                    dependencies,
+                },
+            );
+            prev = id;
+        }
+
+        let err = builder
+            .topological_sort(&[prev])
+            .expect_err("deep recursion should fail with a guard");
+        assert!(
+            err.to_string().contains("maximum DAG recursion depth"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn dag_build_plan_rejects_deeply_nested_ast() {
+        // A programmatic AST nested just past the limit must return the
+        // structured depth error from process_expression instead of
+        // overflowing the stack during plan construction.
+        let mut expr = Expr::column("x");
+        for _ in 0..MAX_DAG_RECURSION_DEPTH + 1 {
+            expr = Expr::unary_op(UnaryOp::Neg, expr);
+        }
+
+        let mut builder = DagBuilder::default();
+        let err = builder
+            .build_plan(vec![expr], meta())
+            .expect_err("deeply nested AST should fail with a depth guard");
+        assert!(
+            err.to_string().contains("maximum DAG recursion depth"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn dag_build_plan_accepts_ast_below_depth_limit() {
+        let mut expr = Expr::column("x");
+        for _ in 0..MAX_DAG_RECURSION_DEPTH - 2 {
+            expr = Expr::unary_op(UnaryOp::Neg, expr);
+        }
+
+        let mut builder = DagBuilder::default();
+        let plan = builder
+            .build_plan(vec![expr], meta())
+            .expect("AST below the depth limit should build a plan");
+        assert_eq!(plan.nodes.len(), MAX_DAG_RECURSION_DEPTH - 1);
+    }
+
+    #[test]
+    fn dag_builder_keeps_dependency_chain_in_topological_order() {
+        let mut builder = DagBuilder::default();
+        let col_x = Expr::column("x");
+        let lag_x = Expr::call(Function::Lag, vec![col_x, Expr::literal(1.0)]);
+        let diff_lag = Expr::call(Function::Diff, vec![lag_x, Expr::literal(1.0)]);
+
+        let plan = builder
+            .build_plan(vec![diff_lag], explicit_meta())
+            .expect("valid expressions should build a DAG plan");
+
+        let mut found_column = false;
+        let mut found_lag = false;
+        for node in &plan.nodes {
+            match &node.expr.node {
+                ExprNode::Column(_) => {
+                    assert!(!found_column && !found_lag);
+                    found_column = true;
+                }
+                ExprNode::Call(Function::Lag, _) => {
+                    assert!(found_column && !found_lag);
+                    found_lag = true;
+                }
+                ExprNode::Call(Function::Diff, _) => {
+                    assert!(found_column && found_lag);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[test]
+    fn dag_builder_allows_empty_plans() {
+        let mut builder = DagBuilder::default();
+        let plan = builder
+            .build_plan(vec![], explicit_meta())
+            .expect("empty root list should still produce a valid plan");
+
+        assert!(plan.nodes.is_empty());
+        assert!(plan.roots.is_empty());
     }
 }

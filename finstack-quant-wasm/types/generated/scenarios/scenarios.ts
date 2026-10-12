@@ -1472,11 +1472,18 @@ export type OvernightIndexConstraintApplication = "daily" | "period";
  * Variants are grouped by category:
  * - **Interest**: `Fixed`, `FloatReset`, `Stub`
  * - **Inflation**: `InflationCoupon`
- * - **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`
+ * - **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`
  * - **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`
  * - **Revolving**: `RevolvingDraw`, `RevolvingRepayment`
  * - **Credit Events**: `DefaultedNotional`, `Recovery`
  * - **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.
+ *
+ * # Labels
+ *
+ * `Display`, `FromStr`, and serde share one snake_case label per kind
+ * (`"fixed"`, `"float_reset"`, `"pre_payment"`); `FromStr` matches it
+ * exactly, with no aliases or case folding. [`CFKind::parse_label`] adds the
+ * case-insensitive reporting aliases.
  */
 export type CFKind =
   | "fixed"
@@ -3049,7 +3056,9 @@ export type PrepaymentPenalty =
  *
  * # Investment Grade
  *
- * Ratings of `BBBMinus` and above are considered "investment grade":
+ * Ratings of `BBBMinus` and above are considered "investment grade".
+ * Ordering follows the `repr(u8)` discriminant, so `NR` (21) sorts before
+ * `D` (22) even though `D` is declared first:
  */
 export type CreditRating =
   | "AAA"
@@ -4655,13 +4664,6 @@ export type TagPredicate =
  */
 export type MoveUnit = "basis_point" | "vol_point" | "percent" | "price_unit";
 /**
- * Type-safe identifier for a node in a financial model.
- *
- * Serializes as a plain string and is interoperable with `&str` via
- * [`Borrow`] and [`AsRef`].
- */
-export type NodeId = string;
-/**
  * Individual operation within a scenario.
  *
  * Each variant represents a specific type of shock or adjustment that can be
@@ -4856,7 +4858,7 @@ export type OperationSpec =
       /**
        * Statement node identifier.
        */
-      node_id: NodeId;
+      node_id: Id;
       /**
        * Percentage change to apply.
        */
@@ -4867,7 +4869,7 @@ export type OperationSpec =
       /**
        * Statement node identifier.
        */
-      node_id: NodeId;
+      node_id: Id;
       /**
        * Finite absolute value in the node's units; monetary nodes retain
        * their currency and interpret this as major currency units.
@@ -5211,6 +5213,20 @@ export interface AgencyCmo {
 }
 /**
  * User-defined tags and key-value metadata for instrument classification.
+ *
+ * Tags are a sorted set of labels. Metadata is a sorted string-to-string map.
+ * Both fields are public so callers can insert, remove, and iterate entries
+ * directly. [`Attributes::add_tag`] and [`Attributes::set_meta`] are the
+ * in-place writers; [`Attributes::with_tag`] and [`Attributes::with_meta`]
+ * return the bag for construction chains.
+ *
+ * [`Attributes::matches_selector`] accepts three forms:
+ *
+ * - `"*"` matches every attribute set
+ * - `"tag:<name>"` matches when that tag is present
+ * - `"meta:<key>=<value>"` matches an exact metadata entry
+ *
+ * Any other selector text returns `false`.
  */
 export interface Attributes {
   /**
@@ -12518,8 +12534,11 @@ export interface VolatilityIndexFutureOption {
  * # Settlement
  *
  * When `settlement_days` is `None`, the pair-aware default is T+1 for
- * USD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit
- * `settlement_days` overrides that default; `settlement_date` overrides both.
+ * USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB and T+2 otherwise (including
+ * EUR/USD). An explicit `settlement_days` is the contractual lag and overrides
+ * that default in either direction (for example tom-next T+1 on EUR/USD);
+ * `settlement_date` overrides both. Without calendars the USD leg uses the
+ * `usny` calendar and other currencies count weekdays only.
  *
  * See module-level documentation for comprehensive FX quoting conventions.
  */
@@ -20070,7 +20089,7 @@ export interface RateBindingSpec {
   /**
    * Statement node ID to receive the rate.
    */
-  node_id: NodeId;
+  node_id: Id;
   /**
    * Tenor for rate extraction (e.g., "3M", "1Y").
    */

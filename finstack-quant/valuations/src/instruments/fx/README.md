@@ -15,7 +15,7 @@ leaf `mod.rs` rustdoc.
 
 | Directory | Prices | Market convention / model |
 |-----------|--------|---------------------------|
-| `fx_spot/` | Spot FX positions | Value in quote currency = base amount × spot; settlement rolled with the CLS-consistent joint-calendar spot rule (T+2 for majors, T+1 for USD/CAD) |
+| `fx_spot/` | Spot FX positions | Value in quote currency = base amount × spot; settlement uses the currencies' individual lags, pair minimum and applicable USD holiday rules |
 | `fx_forward/` | Outright forwards | Covered interest parity, `F = S · DF_foreign(T) / DF_domestic(T)`; stable PV `N · (S · DF_foreign − K · DF_domestic)`. Standard constructors take calendar `Tenor` |
 | `fx_future/` | Exchange-listed deliverable FX futures | Daily variation-margin P&L. `fair_price` uses the deterministic-rate CIP-forward approximation and does not include stochastic-rate/FX convexity |
 | `fx_future_option/` | Options on listed FX futures | Listed-future option lifecycle and settlement terms |
@@ -68,8 +68,10 @@ reached through the standard metric registry.
   ("numéraire") currency. Option payoffs are quoted in domestic; notionals are
   in base unless a type says otherwise.
 - **Spot dates and standard tenors.** Leaves that derive settlement dates roll
-  through `instruments::fx_spot_date_for_pair`. Signed lags support bounded T−N
-  stepping. Forward, swap and NDF standard-maturity constructors then add a
+  through `instruments::fx_spot_date_for_pair`, which derives each currency's
+  lag from its currency code and applies explicit pair minimums and holiday
+  calendars. Signed business-day arithmetic uses `DateExt::add_business_days`;
+  negative lags are not spot-settlement conventions. Forward, swap and NDF standard-maturity constructors then add a
   calendar `Tenor` with explicit business-day and EOM policy; broken-date
   constructors take explicit contractual dates.
 - **Two clocks.** Option pricers combine a vol-surface clock with a

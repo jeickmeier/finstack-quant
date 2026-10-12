@@ -48,26 +48,6 @@
 //! # Ok(())
 //! # }
 //! ```
-//!
-//! ## Attributes and Selection
-//!
-//! ```rust
-//! use finstack_quant_valuations::instruments::Attributes;
-//!
-//! let attrs = Attributes::new()
-//!     .with_tag("high-yield")
-//!     .with_tag("energy")
-//!     .with_meta("sector", "oil-gas")
-//!     .with_meta("rating", "BB+");
-//!
-//! assert!(attrs.has_tag("high-yield"));
-//! assert_eq!(attrs.get_meta("sector"), Some("oil-gas"));
-//!
-//! // Selector matching
-//! assert!(attrs.matches_selector("tag:energy"));
-//! assert!(attrs.matches_selector("meta:rating=BB+"));
-//! assert!(attrs.matches_selector("*")); // Matches all
-//! ```
 
 mod instrument;
 #[macro_use]
@@ -81,59 +61,6 @@ pub use option_greeks::{
 };
 pub use pricing_options::PricingOptions;
 
-/// Metadata for instrument categorization, tagging, and scenario selection.
-///
-/// Attributes provide a flexible tagging system for organizing instruments,
-/// applying scenarios, and filtering portfolios. Tags are simple strings for
-/// broad categorization, while metadata key-value pairs store structured information.
-///
-/// # Tag-Based Selection
-///
-/// Tags enable coarse-grained filtering:
-/// - Asset class: "equity", "fixed-income", "credit"
-/// - Risk profile: "high-yield", "investment-grade"
-/// - Sector: "technology", "financials", "energy"
-/// - Custom: Any domain-specific categories
-///
-/// # Metadata Pairs
-///
-/// Key-value metadata stores structured attributes:
-/// - Credit ratings: `("rating", "AA+")`
-/// - Geographic region: `("region", "north-america")`
-/// - Counterparty: `("counterparty", "JPMORGAN")`
-/// - Desk/book: `("desk", "rates-trading")`
-///
-/// # Selector Patterns
-///
-/// Attributes support pattern-based selection for scenarios:
-/// - `"*"`: Matches all instruments
-/// - `"tag:high-yield"`: Matches instruments with the "high-yield" tag
-/// - `"meta:sector=technology"`: Matches instruments with sector metadata
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_valuations::instruments::Attributes;
-///
-/// let mut attrs = Attributes::new()
-///     .with_tag("corporate")
-///     .with_tag("investment-grade")
-///     .with_meta("issuer", "AAPL")
-///     .with_meta("rating", "AA+");
-///
-/// // Check tags
-/// assert!(attrs.has_tag("corporate"));
-/// assert!(!attrs.has_tag("high-yield"));
-///
-/// // Access metadata
-/// assert_eq!(attrs.get_meta("issuer"), Some("AAPL"));
-/// assert_eq!(attrs.get_meta("rating"), Some("AA+"));
-///
-/// // Pattern matching
-/// assert!(attrs.matches_selector("tag:corporate"));
-/// assert!(attrs.matches_selector("meta:issuer=AAPL"));
-/// assert!(!attrs.matches_selector("tag:high-yield"));
-/// ```
 pub use finstack_quant_core::types::Attributes;
 
 pub(crate) use macros::{impl_focused_pricing_overrides, impl_instrument_base};

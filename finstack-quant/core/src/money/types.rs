@@ -26,11 +26,9 @@ use crate::currency::Currency;
 use crate::dates::Date;
 use crate::error::{Error, InputError, NonFiniteKind};
 use core::fmt;
-use core::ops::{AddAssign, Div, DivAssign, Mul, MulAssign, SubAssign};
 
 use super::rounding::{
-    amount_from_repr, repr_add, repr_div_f64, repr_mul_f64, repr_sub, try_repr_div_f64,
-    try_repr_mul_f64, try_round_f64, AmountRepr,
+    amount_from_repr, repr_add, repr_div_f64, repr_mul_f64, repr_sub, try_round_f64, AmountRepr,
 };
 
 /// Format an integer string (optionally prefixed by `-`) with thousands
@@ -361,25 +359,13 @@ impl Money {
     }
 
     #[inline]
-    fn ingest_rounding_params(
-        currency: Currency,
-        cfg: Option<&FinstackConfig>,
-    ) -> (u32, RoundingMode) {
-        match cfg {
-            Some(cfg) => (cfg.ingest_scale(currency), cfg.rounding.mode),
-            None => (u32::from(currency.decimals()), RoundingMode::Bankers),
-        }
-    }
-
-    #[inline]
     fn try_new_finite(
         amount: f64,
         currency: Currency,
         cfg: Option<&FinstackConfig>,
     ) -> Result<Self, Error> {
         let rounded = if let Some(cfg) = cfg {
-            let (dp, mode) = Self::ingest_rounding_params(currency, Some(cfg));
-            try_round_f64(amount, dp as i32, mode)?
+            try_round_f64(amount, cfg.ingest_scale(currency) as i32, cfg.rounding.mode)?
         } else {
             // Shortest round-trip conversion (`Decimal::from_f64`): `0.1_f64`
             // ingests as `0.1`, not the 28-digit IEEE expansion that
@@ -419,7 +405,7 @@ impl Money {
     /// range should avoid this lossy view and keep values on Decimal-backed APIs.
     #[inline]
     pub fn amount(&self) -> f64 {
-        (*self).into_amount()
+        amount_from_repr(self.amount)
     }
 
     /// Lossless amount accessor as the internal [`rust_decimal::Decimal`].
@@ -446,20 +432,6 @@ impl Money {
     #[inline]
     pub const fn currency(&self) -> Currency {
         self.currency
-    }
-
-    /// Consume `self` and return just the numeric amount.
-    #[inline]
-    #[must_use]
-    pub fn into_amount(self) -> f64 {
-        self.into_parts().0
-    }
-
-    /// Consume `self` into `(amount, currency)`.
-    #[inline]
-    #[must_use]
-    pub fn into_parts(self) -> (f64, Currency) {
-        (amount_from_repr(self.amount), self.currency)
     }
 
     // Checked arithmetic
@@ -572,7 +544,7 @@ impl Money {
     #[inline]
     pub fn checked_mul_f64(self, rhs: f64) -> Result<Self, Error> {
         Ok(Self {
-            amount: try_repr_mul_f64(self.amount, rhs)?,
+            amount: repr_mul_f64(self.amount, rhs)?,
             currency: self.currency,
         })
     }
@@ -637,7 +609,7 @@ impl Money {
     #[inline]
     pub fn checked_div_f64(self, rhs: f64) -> Result<Self, Error> {
         Ok(Self {
-            amount: try_repr_div_f64(self.amount, rhs)?,
+            amount: repr_div_f64(self.amount, rhs)?,
             currency: self.currency,
         })
     }
@@ -774,7 +746,7 @@ impl Money {
         // on *where* a `convert` was inserted and could break serial≡parallel
         // determinism. Apply minor-unit rounding only at the reporting boundary
         // (e.g. via `format`), not on every conversion.
-        let new_amount = try_repr_mul_f64(self.amount, rate)?;
+        let new_amount = repr_mul_f64(self.amount, rate)?;
         Ok(Self {
             amount: new_amount,
             currency: to,
@@ -828,40 +800,6 @@ impl Money {
     }
 }
 
-/// Scale a [`Money`] by an `f64`, preserving currency.
-///
-/// # Panics
-/// Panics if `rhs` is non-finite (NaN/±∞) or if the product overflows the
-/// underlying `Decimal` range (~7.9e28). For scalars from untrusted or computed
-/// input, prefer [`Money::checked_mul_f64`], which returns an error instead.
-impl Mul<f64> for Money {
-    type Output = Self;
-    #[inline]
-    fn mul(self, rhs: f64) -> Self::Output {
-        Self {
-            amount: repr_mul_f64(self.amount, rhs),
-            currency: self.currency,
-        }
-    }
-}
-
-/// Divide a [`Money`] by an `f64`, preserving currency.
-///
-/// # Panics
-/// Panics if `rhs` is non-finite, exactly zero, or if the quotient overflows the
-/// underlying `Decimal` range. For divisors from untrusted or computed input,
-/// prefer [`Money::checked_div_f64`], which returns an error instead.
-impl Div<f64> for Money {
-    type Output = Self;
-    #[inline]
-    fn div(self, rhs: f64) -> Self::Output {
-        Self {
-            amount: repr_div_f64(self.amount, rhs),
-            currency: self.currency,
-        }
-    }
-}
-
 // Generic tuple conversions for common numeric primitives.
 //
 // Integer conversions route through `Decimal::from`, which is exact for the
@@ -882,108 +820,6 @@ macro_rules! from_integer_tuple {
 }
 
 from_integer_tuple!(i64, u64);
-
-impl TryFrom<(f64, Currency)> for Money {
-    type Error = Error;
-    #[inline]
-    fn try_from(value: (f64, Currency)) -> Result<Self, Error> {
-        Self::new(value.0, value.1)
-    }
-}
-
-/// Shorthand for constructing [`Money`] literals.
-/// See unit tests and `examples/` for usage.
-#[macro_export]
-macro_rules! money {
-    ($amount:expr, $code:ident) => {
-        $crate::money::Money::new($amount, $crate::currency::Currency::$code)
-    };
-}
-
-// Unchecked arithmetic – currency must match or panic
-// NOTE: AddAssign and SubAssign require matching currencies. Currency
-// mismatch will always panic regardless of build type. For explicit error
-// handling, use `checked_add` and `checked_sub` which return `Result<Money, Error>`.
-
-impl AddAssign for Money {
-    /// Adds another [`Money`] value to this one in place.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `rhs` has a different currency or if the addition
-    /// overflows `Decimal`. For fallible arithmetic, use
-    /// [`Money::checked_add`] which returns `Result`.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use finstack_quant_core::money::Money;
-    /// use finstack_quant_core::currency::Currency;
-    ///
-    /// let mut total = Money::from((100_i64, Currency::USD));
-    /// total += Money::from((50_i64, Currency::USD));
-    /// assert_eq!(total.amount(), 150.0);
-    /// ```
-    #[track_caller]
-    #[allow(clippy::panic)]
-    fn add_assign(&mut self, rhs: Self) {
-        // Always fail loudly on currency mismatch; silent no-ops are correctness bugs.
-        assert!(
-            self.currency == rhs.currency,
-            "Currency mismatch in Money::add_assign: lhs={}, rhs={}",
-            self.currency,
-            rhs.currency
-        );
-        self.amount = repr_add(self.amount, rhs.amount)
-            .unwrap_or_else(|_| panic!("Decimal overflow in Money::add_assign"));
-    }
-}
-
-impl SubAssign for Money {
-    /// Subtracts another [`Money`] value from this one in place.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `rhs` has a different currency or if the subtraction
-    /// overflows `Decimal`. For fallible arithmetic, use
-    /// [`Money::checked_sub`] which returns `Result`.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use finstack_quant_core::money::Money;
-    /// use finstack_quant_core::currency::Currency;
-    ///
-    /// let mut total = Money::from((100_i64, Currency::USD));
-    /// total -= Money::from((30_i64, Currency::USD));
-    /// assert_eq!(total.amount(), 70.0);
-    /// ```
-    #[track_caller]
-    #[allow(clippy::panic)]
-    fn sub_assign(&mut self, rhs: Self) {
-        // Always fail loudly on currency mismatch; silent no-ops are correctness bugs.
-        assert!(
-            self.currency == rhs.currency,
-            "Currency mismatch in Money::sub_assign: lhs={}, rhs={}",
-            self.currency,
-            rhs.currency
-        );
-        self.amount = repr_sub(self.amount, rhs.amount)
-            .unwrap_or_else(|_| panic!("Decimal overflow in Money::sub_assign"));
-    }
-}
-
-impl MulAssign<f64> for Money {
-    fn mul_assign(&mut self, rhs: f64) {
-        self.amount = repr_mul_f64(self.amount, rhs);
-    }
-}
-
-impl DivAssign<f64> for Money {
-    fn div_assign(&mut self, rhs: f64) {
-        self.amount = repr_div_f64(self.amount, rhs);
-    }
-}
 
 /// Ensure two `Money` values share the same currency.
 #[inline]
@@ -1026,13 +862,6 @@ mod tests {
     }
 
     #[test]
-    fn macro_constructs_money() {
-        let m = crate::money!(250.0, GBP).expect("valid money literal");
-        assert_eq!(m.amount(), 250.0);
-        assert_eq!(m.currency(), Currency::GBP);
-    }
-
-    #[test]
     fn tuple_from_conversions() {
         use core::convert::Into;
         let m1: Money = (100_i64, Currency::USD).into();
@@ -1055,12 +884,6 @@ mod tests {
     #[test]
     fn new_rejects_non_finite_amounts() {
         assert!(Money::new(f64::NAN, Currency::USD).is_err());
-    }
-
-    #[test]
-    #[should_panic(expected = "Money division requires finite")]
-    fn division_by_zero_panics() {
-        let _ = Money::from((10_i64, Currency::USD)) / 0.0;
     }
 
     #[test]
@@ -1109,27 +932,6 @@ mod tests {
     }
 
     #[test]
-    fn money_operators_accept_finite_scalars() {
-        let money = Money::from((12_i64, Currency::USD));
-
-        assert_eq!((money * 2.0).amount(), 24.0);
-        assert_eq!((money / 3.0).amount(), 4.0);
-    }
-
-    #[test]
-    fn money_assign_operators_accept_finite_scalars() {
-        let mut money = Money::from((12_i64, Currency::USD));
-
-        money *= 2.5;
-        assert_eq!(money.amount(), 30.0);
-        assert_eq!(money.currency(), Currency::USD);
-
-        money /= 4.0;
-        assert_eq!(money.amount(), 7.5);
-        assert_eq!(money.currency(), Currency::USD);
-    }
-
-    #[test]
     fn money_deserialize_rejects_unknown_fields() {
         let json = r#"{"amount":10.0,"currency":"USD","unexpected":true}"#;
         let result: std::result::Result<Money, _> = serde_json::from_str(json);
@@ -1147,12 +949,6 @@ mod tests {
         assert_eq!(object.len(), 2);
         assert!(object.contains_key("amount"));
         assert_eq!(object.get("currency"), Some(&serde_json::json!("USD")));
-    }
-
-    #[test]
-    #[should_panic(expected = "Money multiplication requires finite")]
-    fn multiply_by_nan_panics() {
-        let _ = Money::from((10_i64, Currency::USD)) * f64::NAN;
     }
 
     struct NaNProvider;
@@ -1329,36 +1125,6 @@ mod tests {
             usd.amount_decimal(),
             rust_decimal::Decimal::from_str("20000000000000000.2").expect("valid decimal")
         );
-    }
-
-    #[test]
-    #[should_panic(expected = "Currency mismatch")]
-    fn add_assign_panics_on_currency_mismatch() {
-        let mut usd = Money::from((100_i64, Currency::USD));
-        let eur = Money::from((50_i64, Currency::EUR));
-        usd += eur;
-    }
-
-    #[test]
-    #[should_panic(expected = "Currency mismatch")]
-    fn sub_assign_panics_on_currency_mismatch() {
-        let mut usd = Money::from((100_i64, Currency::USD));
-        let eur = Money::from((50_i64, Currency::EUR));
-        usd -= eur;
-    }
-
-    #[test]
-    fn add_assign_succeeds_for_matching_currencies() {
-        let mut total = Money::from((100_i64, Currency::USD));
-        total += Money::from((50_i64, Currency::USD));
-        assert_eq!(total.amount(), 150.0);
-    }
-
-    #[test]
-    fn sub_assign_succeeds_for_matching_currencies() {
-        let mut total = Money::from((100_i64, Currency::USD));
-        total -= Money::from((30_i64, Currency::USD));
-        assert_eq!(total.amount(), 70.0);
     }
 
     fn hash_of(money: Money) -> u64 {

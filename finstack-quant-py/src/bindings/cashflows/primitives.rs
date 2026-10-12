@@ -61,6 +61,10 @@ cf_kind_classattrs! {
     USAGE_FEE => UsageFee,
     /// Facility fee on total commitment.
     FACILITY_FEE => FacilityFee,
+    /// Letter-of-credit fee on the face of issued letters of credit.
+    LC_FEE => LcFee,
+    /// Fronting fee paid to the issuing bank on outstanding letters of credit.
+    FRONTING_FEE => FrontingFee,
     /// Principal exchange or notional flow.
     NOTIONAL => Notional,
     /// Payment-in-kind interest capitalization.
@@ -99,7 +103,7 @@ cf_kind_classattrs! {
 
 #[pymethods]
 impl PyCFKind {
-    /// Parse a cashflow kind from its snake_case label (e.g. ``"fixed"``).
+    /// Parse a cashflow kind from its exact snake_case label (e.g. ``"fixed"``, ``"pre_payment"``).
     #[classmethod]
     #[pyo3(text_signature = "(cls, name)")]
     fn parse(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {

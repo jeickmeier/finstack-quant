@@ -296,7 +296,7 @@ mod examples {
     }
 
     pub(super) fn haircut01() -> Result<Vec<Value>> {
-        example(&crate::metrics::Haircut01::calculate(usd(5_000_000), 0.02))
+        example(&crate::metrics::Haircut01::calculate(usd(5_000_000), 0.02)?)
     }
 
     pub(super) fn im_collateral_result() -> Result<Vec<Value>> {
@@ -338,7 +338,7 @@ mod examples {
             usd(10_000_000),
             0.055,
             0.0525,
-        ))
+        )?)
     }
 
     pub(super) fn margin_utilization() -> Result<Vec<Value>> {

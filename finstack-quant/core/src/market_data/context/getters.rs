@@ -8,7 +8,7 @@ use crate::market_data::scalars::{InflationIndex, MarketScalar, ScalarTimeSeries
 use crate::market_data::surfaces::{FxDeltaVolSurface, VolCube, VolSurface};
 use crate::market_data::term_structures::{
     BaseCorrelationCurve, BasisSpreadCurve, CreditIndexData, DiscountCurve, ForwardCurve,
-    HazardCurve, InflationCurve, ParametricCurve, PriceCurve,
+    HazardCurve, InflationCurve, ParametricCurve, PriceCurve, PriceCurveKind,
 };
 use crate::market_data::traits::Discounting;
 use crate::types::CurveId;
@@ -144,13 +144,22 @@ impl MarketContext {
     ///
     /// These curves typically store forward levels for instruments such as VIX futures.
     ///
+    /// # Arguments
+    ///
+    /// * `id` - Curve identifier of a [`PriceCurve`] of kind
+    ///   [`PriceCurveKind::VolIndex`]; a signed price curve under the same id
+    ///   is a type mismatch.
+    ///
     /// # Errors
     ///
     /// Returns an error if the identifier is missing or refers to a different curve type.
     pub fn get_vol_index_curve(&self, id: impl AsRef<str>) -> Result<Arc<PriceCurve>> {
         let id_str = id.as_ref();
         self.get_curve_with_type_check(id_str, "VolIndex", |storage| {
-            storage.vol_index().map(Arc::clone)
+            storage
+                .price()
+                .filter(|curve| curve.kind() == PriceCurveKind::VolIndex)
+                .map(Arc::clone)
         })
     }
 
@@ -175,7 +184,12 @@ impl MarketContext {
     /// ```
     pub fn get_price_curve(&self, id: impl AsRef<str>) -> Result<Arc<PriceCurve>> {
         let id_str = id.as_ref();
-        self.get_curve_with_type_check(id_str, "Price", |storage| storage.price().map(Arc::clone))
+        self.get_curve_with_type_check(id_str, "Price", |storage| {
+            storage
+                .price()
+                .filter(|curve| curve.kind() == PriceCurveKind::Price)
+                .map(Arc::clone)
+        })
     }
 
     /// Get a basis spread curve by identifier.

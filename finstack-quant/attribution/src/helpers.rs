@@ -103,6 +103,25 @@ impl InstrumentFactorUse {
     }
 }
 
+/// Keep a curve-movement measurement, treating a curve absent from either
+/// market as unmeasured.
+///
+/// A missing curve cannot move, so it is skipped; any other measurement
+/// failure (a non-finite curve sample, an empty tenor grid) is returned so the
+/// attribution fails rather than silently averaging over fewer curves.
+pub(crate) fn measured_unless_missing(
+    measurement: finstack_quant_core::Result<f64>,
+) -> finstack_quant_core::Result<Option<f64>> {
+    use finstack_quant_core::error::InputError;
+    match measurement {
+        Ok(shift) => Ok(Some(shift)),
+        Err(finstack_quant_core::Error::Input(
+            InputError::MissingCurve { .. } | InputError::NotFound { .. },
+        )) => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
 /// Compute P&L between two valuations in target currency.
 ///
 /// Converts both valuations to target currency before computing difference.

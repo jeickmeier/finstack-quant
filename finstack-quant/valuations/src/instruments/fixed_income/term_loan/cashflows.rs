@@ -129,7 +129,7 @@ pub(crate) fn generate_cashflows(
             .ddtl
             .as_ref()
             .map_or(loan.notional_limit, |ddtl| ddtl.commitment);
-        let fee = upfront.amount(commitment);
+        let fee = upfront.amount(commitment)?;
         if fee.amount() > 0.0 {
             fees.push(FeeSpec::Fixed {
                 date: loan.issue_date,

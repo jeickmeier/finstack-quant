@@ -260,16 +260,31 @@ impl MarginFundingCost {
     /// ```text
     /// Annual_Cost = Margin × (Funding_Rate - Collateral_Rate)
     /// ```
-    pub fn calculate(margin_posted: Money, funding_rate: f64, collateral_rate: f64) -> Self {
+    ///
+    /// # Arguments
+    ///
+    /// * `margin_posted` - Posted margin; the cost is stated in its currency.
+    /// * `funding_rate` - Unsecured funding rate as an annualized decimal (0.05 is 5%).
+    /// * `collateral_rate` - Rate earned on posted collateral as an annualized decimal.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the funding spread is non-finite or the annual
+    /// cost overflows the Decimal amount range.
+    pub fn calculate(
+        margin_posted: Money,
+        funding_rate: f64,
+        collateral_rate: f64,
+    ) -> Result<Self> {
         let spread = funding_rate - collateral_rate;
-        let annual_cost = margin_posted * spread;
+        let annual_cost = margin_posted.checked_mul_f64(spread)?;
 
-        Self {
+        Ok(Self {
             margin_posted,
             funding_rate,
             collateral_rate,
             annual_cost,
-        }
+        })
     }
 
     /// Get the funding spread (funding rate - collateral rate).
@@ -279,8 +294,17 @@ impl MarginFundingCost {
     }
 
     /// Calculate cost for a specific period.
-    pub fn cost_for_period(&self, year_fraction: f64) -> Money {
-        self.annual_cost * year_fraction
+    ///
+    /// # Arguments
+    ///
+    /// * `year_fraction` - Length of the period in years; scales the annual cost linearly.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `year_fraction` is non-finite or the period cost
+    /// overflows the Decimal amount range.
+    pub fn cost_for_period(&self, year_fraction: f64) -> Result<Money> {
+        self.annual_cost.checked_mul_f64(year_fraction)
     }
 }
 
@@ -306,15 +330,25 @@ impl Haircut01 {
     /// ```text
     /// Haircut01 = Collateral_Value × 0.0001
     /// ```
-    pub fn calculate(collateral_value: Money, current_haircut: f64) -> Self {
+    ///
+    /// # Arguments
+    ///
+    /// * `collateral_value` - Collateral market value; the PV change is stated in its currency.
+    /// * `current_haircut` - Current haircut as a decimal fraction (0.02 is 2%), stored for reporting.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the one-basis-point PV change overflows the
+    /// Decimal amount range.
+    pub fn calculate(collateral_value: Money, current_haircut: f64) -> Result<Self> {
         const ONE_BP: f64 = 0.0001;
-        let pv_change = collateral_value * ONE_BP;
+        let pv_change = collateral_value.checked_mul_f64(ONE_BP)?;
 
-        Self {
+        Ok(Self {
             collateral_value,
             current_haircut,
             pv_change,
-        }
+        })
     }
 
     /// Get the haircut in basis points.
@@ -379,7 +413,7 @@ mod tests {
         let funding_rate = 0.055; // 5.5%
         let collateral_rate = 0.053; // 5.3%
 
-        let cost = MarginFundingCost::calculate(margin, funding_rate, collateral_rate);
+        let cost = MarginFundingCost::calculate(margin, funding_rate, collateral_rate).unwrap();
 
         assert!((cost.spread() - 0.002).abs() < 1e-10); // 20bp
         assert!((cost.annual_cost.amount() - 100_000.0).abs() < 0.01); // 50M × 0.2%
@@ -412,7 +446,7 @@ mod tests {
     #[test]
     fn haircut01() {
         let collateral = Money::from((100_000_000_i64, Currency::USD));
-        let h01 = Haircut01::calculate(collateral, 0.02);
+        let h01 = Haircut01::calculate(collateral, 0.02).unwrap();
 
         assert_eq!(h01.pv_change.amount(), 10_000.0); // 100M × 0.01%
         assert_eq!(h01.haircut_bp(), 200.0); // 2% = 200bp

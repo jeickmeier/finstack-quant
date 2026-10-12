@@ -9,9 +9,9 @@
 //! - Classify compiler periods using contractual stub metadata
 //! - Apply business day adjustments using calendars
 
-use super::calendar::resolve_calendar_strict;
 use super::periods::SchedulePeriod;
 use super::specs::RollRule;
+use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{
     adjust, is_cds_date, is_imm_date, next_cds_date, next_imm, prev_cds_date,
     BusinessDayConvention, Date, DateExt, DayCount, HolidayCalendar, ScheduleBuilder, StubKind,
@@ -374,7 +374,7 @@ pub(crate) fn generate_periods_with_adjustment(
         RollRule::Imm => builder.imm(),
         RollRule::CdsImm => builder.cds_imm(),
     };
-    let cal = resolve_calendar_strict(calendar_id)?;
+    let cal = calendar_by_id_strict(calendar_id)?;
 
     // Core's IMM generator lists futures roll dates only. A coupon schedule
     // must retain its contractual end, including when no roll falls inside it.
@@ -451,7 +451,7 @@ mod tests {
 
     #[test]
     fn adjust_is_idempotent_for_every_convention() {
-        let cal = resolve_calendar_strict("usny").expect("usny calendar");
+        let cal = calendar_by_id_strict("usny").expect("usny calendar");
         let conventions = [
             BusinessDayConvention::Unadjusted,
             BusinessDayConvention::Following,

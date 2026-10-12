@@ -2252,10 +2252,6 @@ export interface Rate extends WasmOwned {
    */
   readonly asBasisPoints: Bps;
   /**
-   * The rate as a `Percentage`.
-   */
-  readonly asPercentage: Percentage;
-  /**
    * Absolute value (Rust `Rate::abs`).
    *
    * @returns A new `Rate` with the sign removed.
@@ -2339,10 +2335,10 @@ export interface RateConstructor {
   /**
    * Create a rate from a whole number of basis points.
    *
-   * The canonical Rust `Bps::try_new` is integer-backed and **rejects
-   * fractional input** rather than silently rounding it: a sub-bp rate
-   * quietly rounded to whole bp is a pricing bug, not a convenience.
-   * Use `new Rate(decimal)` or `Rate.fromPercent` for sub-bp rates.
+   * Delegates to Rust `Rate::try_from_bp`, which rejects fractional input
+   * rather than silently rounding it: a sub-bp rate quietly rounded to
+   * whole bp is a pricing bug, not a convenience. Use `new Rate(decimal)`,
+   * `Rate.fromPercent`, or `Rate.parse("62.5bp")` for sub-bp rates.
    *
    * @example
    * ```javascript
@@ -2419,13 +2415,10 @@ export interface Bps extends WasmOwned {
    */
   readonly asRate: Rate;
   /**
-   * Value as a `Percentage`.
-   */
-  readonly asPercentage: Percentage;
-  /**
-   * Absolute value (Rust `Bps::abs`).
+   * Absolute value (Rust `Bps::checked_abs`).
    *
    * @returns A new `Bps` with the sign removed.
+   * @throws `FinstackError` (kind `validation`) when the quote is `-2147483648` bp, whose absolute value has no 32-bit representation.
    */
   abs(): Bps;
   /**
@@ -2493,130 +2486,6 @@ export interface BpsConstructor {
    * @returns A `Bps` equal to zero.
    */
   zero(): Bps;
-}
-
-/**
- * Percentage stored in percent points (`5.0` means 5%).
- *
- * Use this when you want the API to be explicit that the value is in
- * percent (rather than decimal). Equivalent to `Rate` for arithmetic.
- *
- * @example
- * ```javascript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * const p = new core.Percentage(5.0);
- * p.asDecimal;  // 0.05
- * p.asPercent;  // 5
- * p.asBp;       // 500
- * ```
- */
-export interface Percentage extends WasmOwned {
-  /**
-   * Value as a decimal (5% → 0.05).
-   *
-   * @returns Decimal equivalent.
-   */
-  readonly asDecimal: number;
-  /**
-   * Value in percent points.
-   *
-   * @returns Percent value.
-   */
-  readonly asPercent: number;
-  /**
-   * Value in basis points, rounded to the nearest integer (e.g. 17.5% → 1750).
-   */
-  readonly asBp: number;
-  /**
-   * Value in fractional basis points, without rounding (Rust `Percentage::as_bp_f64`).
-   *
-   * The decimal point of the percentage's shortest decimal form moves two
-   * places, so `1.1` reports `110` rather than `110.00000000000001`.
-   *
-   * @returns Value in fractional bp.
-   */
-  readonly asBpF64: number;
-  /**
-   * Value as a decimal `Rate`.
-   */
-  readonly asRate: Rate;
-  /**
-   * Value as `Bps`, rounded to the nearest whole basis point.
-   */
-  readonly asBasisPoints: Bps;
-  /**
-   * Absolute value (Rust `Percentage::abs`).
-   *
-   * @returns A new `Percentage` with the sign removed.
-   */
-  abs(): Percentage;
-  /**
-   * Whether the value is exactly zero.
-   *
-   * @returns `true` when the percentage is zero.
-   */
-  isZero(): boolean;
-  /**
-   * Whether the value is strictly positive.
-   *
-   * @returns `true` when the percentage is above zero.
-   */
-  isPositive(): boolean;
-  /**
-   * Whether the value is strictly negative.
-   *
-   * @returns `true` when the percentage is below zero.
-   */
-  isNegative(): boolean;
-  /**
-   * Serialize to the canonical JSON wire form shared with Python `Percentage.to_json`.
-   *
-   * @returns Compact JSON text.
-   * @throws If serialization fails (not expected for a valid value).
-   */
-  toJson(): string;
-}
-
-/**
- * Percentage stored in percent points (`5.0` means 5%).
- *
- * Use this when you want the API to be explicit that the value is in
- * percent (rather than decimal). Equivalent to `Rate` for arithmetic.
- *
- * @example
- * ```javascript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * const p = new core.Percentage(5.0);
- * p.asDecimal;  // 0.05
- * p.asPercent;  // 5
- * p.asBp;       // 500
- * ```
- */
-export interface PercentageConstructor {
-  /**
-   * Create a percentage.
-   *
-   * @param percent - Value in percent (e.g. `5.0` for 5%).
-   * @returns The constructed `Percentage`.
-   * @throws If `percent` is non-finite.
-   */
-  new (percent: number): Percentage;
-  /**
-   * Deserialize from the canonical JSON wire form produced by `toJson`.
-   *
-   * @param json - Canonical `Percentage` JSON text (or the equivalent plain value).
-   * @returns The parsed `Percentage`.
-   * @throws If `json` is malformed or holds an invalid value.
-   */
-  fromJson(json: JsonInput): Percentage;
-  /**
-   * The zero percentage (Rust `Percentage::ZERO`).
-   *
-   * @returns A `Percentage` equal to zero.
-   */
-  zero(): Percentage;
 }
 
 /**
@@ -3158,6 +3027,10 @@ export interface DiscountCurveOptions {
    */
   dayCount?: string;
   /**
+   * Registered holiday calendar of the time axis (e.g. `"brbd"`); required with `"bus_252"`.
+   */
+  calendarId?: string;
+  /**
    * Validation preset; omitted means the Rust default `"market_standard"`.
    */
   validationMode?: DiscountCurveValidationMode;
@@ -3234,6 +3107,10 @@ export interface DiscountCurve extends WasmOwned {
    * Day count that converts dates to curve time, such as `"act_365f"`.
    */
   readonly dayCount: string;
+  /**
+   * Registered holiday calendar of the curve's time axis (for example `"brbd"` on a `"bus_252"` curve), or `undefined` when none is set.
+   */
+  readonly calendarId: string | undefined;
   /**
    * Interpolation style between pillars, such as `"monotone_convex"`.
    */
@@ -3350,9 +3227,9 @@ export interface DiscountCurveConstructor {
   /**
    * Construct a discount curve from named options.
    *
-   * @param options - DiscountCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, df0, t1, df1, …]` array or typed array, `t` in years, `df` strictly positive, even length); and the optional `interp` (`"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"`, `"piecewise_quadratic_forward"`), `extrapolation` (`"flat_zero"`, `"flat_forward"`, or `"none"`, which returns NaN outside the pillar range), `dayCount` (used to convert dates to curve time; not inferred from the ID), `validationMode` (`"market_standard"` or `"negative_rate_friendly"`) and `forwardFloor` (decimal minimum implied forward, required with `"negative_rate_friendly"` and rejected otherwise). Omitted options use the Rust builder defaults: `monotone_convex`, `flat_forward`, `act_365f` and `market_standard`. Unknown keys are rejected.
+   * @param options - DiscountCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, df0, t1, df1, …]` array or typed array, `t` in years, `df` strictly positive, even length); and the optional `interp` (`"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"`, `"piecewise_quadratic_forward"`), `extrapolation` (`"flat_zero"`, `"flat_forward"`, or `"none"`, which returns NaN outside the pillar range), `dayCount` (used to convert dates to curve time; not inferred from the ID), `calendarId` (registered holiday calendar of the curve's time axis, e.g. `"brbd"`; required with `"bus_252"`), `validationMode` (`"market_standard"` or `"negative_rate_friendly"`) and `forwardFloor` (decimal minimum implied forward, required with `"negative_rate_friendly"` and rejected otherwise). Omitted options use the Rust builder defaults: `monotone_convex`, `flat_forward`, `act_365f` and `market_standard`. Unknown keys are rejected.
    * @returns The constructed `DiscountCurve`.
-   * @throws `TypeError` (kind `invalid_type`) if `options` is not a JSON string or plain object; `FinstackError` (kind `validation`) for an unknown or mistyped key, an odd `knots` length, a malformed date, an unknown interpolation/extrapolation/day-count/validation name, a misplaced or missing `forwardFloor`, or discount factors the curve validation rejects.
+   * @throws `TypeError` (kind `invalid_type`) if `options` is not a JSON string or plain object; `FinstackError` (kind `validation`) for an unknown or mistyped key, an odd `knots` length, a malformed date, an unknown interpolation/extrapolation/day-count/validation name, a misplaced or missing `forwardFloor`, a `"bus_252"` curve without `calendarId`, or discount factors the curve validation rejects; `FinstackError` (kind `not_found`) for an unknown `calendarId`.
    */
   new (options: DiscountCurveOptions | string): DiscountCurve;
   /**
@@ -5090,14 +4967,14 @@ export interface PeriodId extends WasmOwned {
    * Step forward to the next period (Rust `PeriodId::next`).
    *
    * @returns The following `PeriodId`, rolling the year where needed.
-   * @throws `FinstackError` (kind `validation`) for a fiscal identifier (use `nextFiscal`) or when the year would overflow.
+   * @throws `FinstackError` (kind `validation`) when the year would overflow, or for a fiscal daily identifier at day 365, whose next day depends on the fiscal calendar (use `nextFiscal`).
    */
   next(): PeriodId;
   /**
    * Step back to the previous period (Rust `PeriodId::prev`).
    *
    * @returns The preceding `PeriodId`, rolling the year where needed.
-   * @throws `FinstackError` (kind `validation`) for a fiscal identifier (use `prevFiscal`) or when the year would overflow.
+   * @throws `FinstackError` (kind `validation`) when the year would overflow, or for a fiscal daily identifier at day 1, whose previous day depends on the fiscal calendar (use `prevFiscal`).
    */
   prev(): PeriodId;
   /**
@@ -6409,14 +6286,6 @@ export interface CreditRatingConstructor {
    * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if it is not a rating.
    */
   new (name: string): CreditRating;
-  /**
-   * Parse a rating; the same as `new CreditRating(name)`.
-   *
-   * @param name - Rating text in S&P/Fitch (`"BBB-"`) or Moody's (`"Baa3"`) spelling; case and spaces are ignored.
-   * @returns The parsed `CreditRating`.
-   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if it is not a rating.
-   */
-  fromName(name: string): CreditRating;
   /**
    * Deserialize from the canonical JSON wire form produced by `toJson`.
    *
@@ -8371,10 +8240,6 @@ export interface CoreNamespace {
    * Basis-point quantity constructor (1 is 0.01%).
    */
   Bps: BpsConstructor;
-  /**
-   * Percentage quantity constructor (5 is 5%).
-   */
-  Percentage: PercentageConstructor;
   /**
    * Day-count convention constructor and named factories.
    */
@@ -14080,7 +13945,7 @@ export interface MarginNamespace {
    * @param collateralRate - Rate earned on posted collateral as an annualized decimal.
    * @param currency - ISO-4217 currency of the posted margin.
    * @returns The `MarginFundingCost` (`margin_posted`, `funding_rate`, `collateral_rate`, `annual_cost`) as a plain object.
-   * @throws Error - Throws for an unknown currency or a non-finite margin amount.
+   * @throws Error - Throws for an unknown currency, a non-finite margin amount or funding spread, or an annual cost outside the Decimal range.
    */
   marginFundingCost(
     marginPosted: number,
@@ -14100,7 +13965,7 @@ export interface MarginNamespace {
    * @param fundingCost - `MarginFundingCost` (object or JSON).
    * @param yearFraction - Length of the period in years.
    * @returns The cost in major units of the posted margin's currency.
-   * @throws Error - Throws if `funding_cost` is malformed.
+   * @throws Error - Throws if `funding_cost` is malformed, `year_fraction` is non-finite, or the period cost is outside the Decimal range.
    */
   marginFundingCostCostForPeriod(
     fundingCost: MarginFundingCost | string,
@@ -14112,7 +13977,7 @@ export interface MarginNamespace {
    * @param currentHaircut - Current haircut as a decimal fraction (0.02 is 2%).
    * @param currency - ISO-4217 currency of the collateral value.
    * @returns The `Haircut01` (`collateral_value`, `current_haircut`, `pv_change`) as a plain object.
-   * @throws Error - Throws for an unknown currency or a non-finite collateral value.
+   * @throws Error - Throws for an unknown currency, a non-finite collateral value, or a one-basis-point PV change outside the monetary amount range.
    */
   haircut01(collateralValue: number, currentHaircut: number, currency: string): Haircut01;
   /**
@@ -15055,7 +14920,7 @@ export interface CashflowsNamespace {
    * The four arrays are parallel: entry `i` of each describes flow `i`.
    *
    * @param dates - ISO-8601 flow dates; the calendar year of each date is its bucket.
-   * @param kinds - Cashflow kind labels as Rust displays them (`"fixed"`, `"notional"`, `"prepayment"`; also `"coupon"` and `"principal"`), ASCII case ignored; principal-like kinds go to `principal`, all others to `non_principal`.
+   * @param kinds - Cashflow kind labels as Rust displays them (`"fixed"`, `"notional"`, `"pre_payment"`; also `"coupon"` and `"principal"`), ASCII case ignored; principal-like kinds go to `principal`, all others to `non_principal`.
    * @param amounts - Flow amounts in one currency's units.
    * @param pvs - Present value of each flow, in the same units as `amounts`.
    * @returns `{ year, non_principal, principal, pv }` rows in ascending year order.
@@ -15110,11 +14975,10 @@ export interface CashflowsNamespace {
   /**
    * Parse a cashflow kind label into its `CFKind` wire string.
    *
-   * The label is the kind as Rust displays it (Rust `CFKind::from_str`), which
-   * is the wire string except for prepayments: the label is `"prepayment"`
-   * and the wire string `"pre_payment"`.
+   * Matching is exact (Rust `CFKind::from_str`): the label is the snake_case
+   * wire string itself, as used by the `kind` field of a `CashFlow`.
    *
-   * @param name - Kind label such as `"fixed"`, `"float_reset"` or `"prepayment"`.
+   * @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
    * @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
    * @throws If `name` is not a string (kind `invalid_type`) or names no cashflow kind (kind `validation`).
    */
@@ -25163,15 +25027,15 @@ export interface FxForwardInstrument extends FxInstrument {
  */
 export interface FxForwardFromTradeDateOptions {
   /**
-   * Base-currency holiday calendar; omitted uses weekends only.
+   * Base-currency holiday calendar; omitted counts weekdays only, except that a USD leg uses `"usny"`.
    */
   base_calendar_id?: string | null;
   /**
-   * Quote-currency holiday calendar; omitted uses weekends only.
+   * Quote-currency holiday calendar; omitted counts weekdays only, except that a USD leg uses `"usny"`.
    */
   quote_calendar_id?: string | null;
   /**
-   * T+N spot lag in business days; omitted uses the pair's market standard.
+   * Contractual T+N spot lag in business days, honored as given (e.g. `1` for tom-next); omitted uses the pair's market standard.
    */
   settlement_days?: number | null;
   /**

@@ -56,39 +56,46 @@ market.curves.push(
     detachment_points: [0.03, 0.07, 0.1],
     correlations: [0.2, 0.3, 0.4],
   },
-  ...["price", "vol_index", "basis_spread"].map((type) => ({
+  ...[
+    {
+      type: "price",
+      id: "PRICE",
+      spot_price: 100,
+      knot_points: [
+        [0, 100],
+        [1, 102],
+        [5, 110],
+      ],
+    },
+    {
+      type: "price",
+      id: "VOL_INDEX",
+      spot_level: 18,
+      knot_points: [
+        [0, 18],
+        [1, 19],
+        [5, 20],
+      ],
+    },
+    {
+      type: "basis_spread",
+      id: "BASIS_SPREAD",
+      knot_points: [
+        [0, -0.001],
+        [1, -0.0012],
+        [5, -0.0015],
+      ],
+    },
+  ].map((curve) => ({
     ...base,
-    type,
-    id: type.toUpperCase(),
-    ...(type === "price"
-      ? { spot_price: 100 }
-      : type === "vol_index"
-        ? { spot_level: 18 }
-        : {}),
-    knot_points:
-      type === "basis_spread"
-        ? [
-            [0, -0.001],
-            [1, -0.0012],
-            [5, -0.0015],
-          ]
-        : type === "vol_index"
-          ? [
-              [0, 18],
-              [1, 19],
-              [5, 20],
-            ]
-          : [
-              [0, 100],
-              [1, 102],
-              [5, 110],
-            ],
+    ...curve,
   })),
   {
     type: "parametric",
     id: "NS",
     base_date: base.base,
     day_count: base.day_count,
+    time_offset: 0.0,
     model: {
       variant: "ns",
       beta0: 0.04,
@@ -110,4 +117,6 @@ try {
 } finally {
   state.free();
 }
-console.log("Retained native-validated state for all nine curve variants.");
+console.log(
+  "Retained native-validated state for all eight curve storage types.",
+);

@@ -1291,7 +1291,7 @@ mod tests {
         };
 
         // Context → state → JSON → state → context preserves coupon_period.
-        let state: DayCountContextState = ctx.into();
+        let state = DayCountContextState::try_from(ctx).expect("snapshot context");
         assert_eq!(state.coupon_period, Some(coupon));
 
         let json = serde_json::to_string(&state).expect("serialize");

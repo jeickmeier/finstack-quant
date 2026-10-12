@@ -480,7 +480,7 @@ pub(crate) fn prepare_deal_simulation(
                 .to_string(),
         )
     })?;
-    let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict(calendar_id)?;
+    let calendar = finstack_quant_core::dates::calendar_by_id_strict(calendar_id)?;
 
     let convention = instrument
         .business_day_convention

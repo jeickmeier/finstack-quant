@@ -1,30 +1,17 @@
 //! FX date utilities for joint calendar adjustments and spot rolls.
 //!
-//! These helpers implement the common two-calendar rule used in FX settlement:
-//! a date is valid only if it is a business day in both the base-currency and
-//! quote-currency calendars. They intentionally model only that joint-calendar
-//! rule; additional settlement calendars such as USD must be supplied
-//! explicitly by the caller when market convention requires them.
+//! Symmetric joint-calendar helpers and pair-aware FX settlement-date rolls.
 //!
-//! # FX spot-date convention (CLS-consistent)
-//!
-//! The market convention for rolling trade date to spot is **asymmetric in
-//! USD** ([`fx_spot_date`]):
-//!
-//! - **Intermediate days** (days counted toward T+n before the value date) must
-//!   be business days in every *non-USD* currency calendar. A USD holiday on an
-//!   intermediate day does **not** delay spot — e.g. EUR/USD traded Thu
-//!   2025-07-03 (Fri Jul 4 is a US holiday) still settles Mon 2025-07-07, not
-//!   Tue 2025-07-08.
-//! - **The final value date** must be a business day in *all* calendars: both
-//!   currencies and, for non-USD crosses, USD as well (the cross settles via
-//!   two USD legs). If the T+n candidate fails, spot rolls forward to the next
-//!   date good in all calendars.
-//! - **T+0** requests return the trade date unchanged (no adjustment), matching
-//!   [`add_joint_business_days`].
-//!
-//! The symmetric helper [`add_joint_business_days`] gates every counted day on
-//! all supplied calendars; use [`fx_spot_date`] when the USD asymmetry matters.
+//! [`fx_spot_date`] counts each currency's settlement lag separately on that
+//! currency's own calendar (CAD and TRY settle one day sooner than other
+//! currencies), enforces the pair's lag as a weekday minimum, then moves the
+//! later date forward until every final-date calendar is open. USD holidays do
+//! not delay the USD leg's intermediate days for ordinary pairs, while USD/MXN
+//! and South American pairs count USD business days. The USD calendar must also
+//! be open on the final date of every USD pair and non-USD cross. T+0 returns
+//! the trade date unchanged; signed business-day arithmetic remains in
+//! [`DateExt::add_business_days`]. The symmetric helper
+//! [`add_joint_business_days`] gates every counted day on all supplied calendars.
 //!
 //! # Typical usage
 //!
@@ -36,9 +23,12 @@
 //! # References
 //!
 //! - Business-day conventions: `docs/REFERENCES.md#isda-2006-definitions`
-//!
-//! - FX settlement / spot-lag conventions: CLS settlement rules; see also
-//!   (FX spot lag finding)
+//! - FX spot-date conventions (T+1 pairs, per-currency counting, USD
+//!   intermediate-day and Latin American rules): "Foreign exchange date
+//!   conventions", Wikipedia,
+//!   <https://en.wikipedia.org/wiki/Foreign_exchange_date_conventions>, and
+//!   the EBS value-date calendar (CME Group),
+//!   <https://www.cmegroup.com/content/dam/cmegroup/documents/ebs_value-date-calendar.pdf>.
 
 use crate::currency::Currency;
 use crate::dates::{
@@ -49,9 +39,10 @@ use crate::{Error, Result};
 
 /// Standard FX spot lag in business days for a currency pair.
 ///
-/// Returns `1` for USD↔CAD (North American same-day zone) and USD↔TRY
-/// (Istanbul convention). Every other pair, including USD/MXN and EUR/USD,
-/// returns `2`.
+/// Returns `1` for USD/CAD, USD/TRY, USD/PHP and USD/RUB, the T+1 spot pairs
+/// of the interbank convention, and `2` for every other pair, including
+/// USD/MXN, EUR/USD and crosses such as EUR/CAD. Offshore-only T+1 markets
+/// (for example offshore USD/KZT) are not inferred; pass an explicit lag.
 ///
 /// # Arguments
 ///
@@ -62,14 +53,38 @@ use crate::{Error, Result};
 ///
 /// Spot settlement lag in business days (`1` or `2`).
 pub fn fx_standard_settlement_days(base: Currency, quote: Currency) -> u32 {
-    match (base, quote) {
-        (Currency::USD, Currency::CAD)
-        | (Currency::CAD, Currency::USD)
-        | (Currency::USD, Currency::TRY)
-        | (Currency::TRY, Currency::USD) => 1,
+    let ((Currency::USD, other) | (other, Currency::USD)) = (base, quote) else {
+        return 2;
+    };
+    match other {
+        Currency::CAD | Currency::TRY | Currency::PHP | Currency::RUB => 1,
         _ => 2,
     }
 }
+
+/// Earliest settlement lag of one currency leg under the market standard.
+///
+/// CAD and TRY settle one business day after trade; every other currency
+/// settles two business days after trade (EBS value-date convention). The
+/// pair's own lag still applies as a minimum, so CAD/TRY settles T+2.
+fn currency_settlement_days(currency: Currency) -> u32 {
+    match currency {
+        Currency::CAD | Currency::TRY => 1,
+        _ => 2,
+    }
+}
+
+/// Currencies whose USD leg counts USD business days (not weekdays) during
+/// the spot clock: two clear US working days are required.
+const USD_BUSINESS_DAY_COUNT_CURRENCIES: [Currency; 7] = [
+    Currency::MXN,
+    Currency::ARS,
+    Currency::BRL,
+    Currency::CLP,
+    Currency::COP,
+    Currency::PEN,
+    Currency::UYU,
+];
 
 /// Resolve a calendar ID to a calendar reference.
 ///
@@ -147,34 +162,10 @@ pub fn adjust_joint_calendar(
         .adjust_joint_calendar(date, business_day_convention)
 }
 
-fn advance_business_days(
-    start: Date,
-    n_days: u32,
-    is_business_day: impl Fn(Date) -> bool,
-) -> Result<Date> {
-    let max_iters = (n_days.saturating_mul(10).saturating_add(25)).max(1000);
-    let mut date = start;
-    let mut count = 0;
-    let mut iters = 0;
-
-    while count < n_days && iters < max_iters {
-        date = date.add_days(1)?;
-        if is_business_day(date) {
-            count += 1;
-        }
-        iters += 1;
-    }
-
-    if count < n_days {
-        return Err(Error::Input(
-            crate::error::InputError::JointCalendarIterationLimitExceeded {
-                start,
-                n_days,
-                max_iters,
-            },
-        ));
-    }
-    Ok(date)
+fn add_business_days_on(start: Date, n_days: u32, calendar: &dyn HolidayCalendar) -> Result<Date> {
+    let n_days = i32::try_from(n_days)
+        .map_err(|_| Error::Validation("business-day offset exceeds the supported range".into()))?;
+    start.add_business_days(n_days, calendar)
 }
 
 /// Add N business days on all supplied calendars.
@@ -206,7 +197,8 @@ fn advance_business_days(
 ///
 /// Returns an error if:
 /// - Either calendar ID is not recognized (see [`resolve_calendar`])
-/// - Too many iterations needed (>5x the requested days), suggesting a calendar configuration issue
+/// - A counted step finds no joint business day within 100 calendar days
+///   (`InputError::AdjustmentFailed`), suggesting a calendar configuration issue
 /// - Advancing would exceed the supported date range
 ///
 /// For FX cross pairs that do not involve USD (e.g. EUR/JPY), USD-good days
@@ -238,55 +230,48 @@ pub fn add_joint_business_days(
     settlement_cal_id: Option<&str>,
 ) -> Result<Date> {
     let pair = ResolvedCalendarPair::resolve(base_cal_id, quote_cal_id)?;
-    let settlement_cal = match settlement_cal_id {
-        Some(id) => Some(resolve_calendar(Some(id))?),
-        None => None,
-    };
-
-    advance_business_days(start, n_days, |date| {
-        pair.is_joint_business_day(date)
-            && settlement_cal.is_none_or(|calendar| calendar.is_business_day(date))
-    })
+    match settlement_cal_id {
+        Some(id) => {
+            let calendars = [pair.base, pair.quote, calendar_by_id_strict(id)?];
+            add_business_days_on(start, n_days, &CompositeCalendar::new(&calendars))
+        }
+        None => pair.add_joint_business_days(start, n_days),
+    }
 }
 
-/// Roll a trade date to spot using the market (CLS-consistent) FX convention,
-/// which is **asymmetric in USD**.
+/// Roll a trade date to spot under the pair's contractual spot lag.
 ///
-/// Counting toward T+n:
+/// Each currency leg counts business days on its own calendar: its market lag
+/// (CAD and TRY one day, other currencies two) capped at the pair lag, plus any
+/// days by which `settlement_days` exceeds the pair standard. The USD leg of an
+/// ordinary pair counts weekdays, because a US holiday is a good intermediate
+/// day; for USD/MXN and the South American currencies (ARS, BRL, CLP, COP, PEN,
+/// UYU) the USD leg counts US business days, also when that currency trades
+/// against a non-USD currency. `settlement_days` weekdays is the pair minimum.
+/// The later date then rolls forward until every final-date calendar (both
+/// currencies and USD) is open. `settlement_days == 0` returns the trade date
+/// unchanged.
 ///
-/// - **Intermediate days** must be business days in every **non-USD** currency
-///   calendar. The USD calendar does *not* gate intermediate days: a US holiday
-///   at T+1 does not delay spot for a USD pair (nor for a cross).
-/// - **The final value date** must be a business day in **all** calendars —
-///   both currency calendars and, when supplied, the USD calendar (crosses
-///   settle via two USD legs). If the T+n candidate is not good in all
-///   calendars, spot rolls forward to the next date that is.
-/// - `lag_days == 0` returns `trade_date` unchanged (T+0 behavior matches
-///   [`add_joint_business_days`]).
-/// - Negative lags move backward by joint business days. Intermediate and
-///   final-day calendar rules are applied in the same direction.
-///
-/// `usd_cal_id` names the USD settlement calendar (typically `"usny"`). When it
-/// matches `base_cal_id` or `quote_cal_id` (case-insensitive), that side is
-/// treated as the USD leg and excluded from intermediate-day gating. For
-/// non-USD crosses, pass the USD calendar so the final value date is also
-/// checked against USD. Passing `None` reproduces the symmetric two-calendar
-/// rule of [`add_joint_business_days`].
+/// `settlement_days` is the contractual lag: callers pass
+/// [`fx_standard_settlement_days`] for market spot, or a shorter or longer lag
+/// (tom-next T+1, forward-start T+3) that is honored as given.
 ///
 /// # Arguments
 ///
-/// * `trade_date` - The trade execution date
-/// * `lag_days` - Signed business days to spot; positive values move
-///   forward and negative values represent T−N settlement.
-/// * `base_cal_id` - Optional calendar ID for the base currency
-/// * `quote_cal_id` - Optional calendar ID for the quote currency
-/// * `usd_cal_id` - Optional USD settlement calendar ID (e.g. `Some("usny")`)
+/// * `trade_date` - The trade execution date from which settlement is calculated.
+/// * `base_currency` - Base currency; its calendar counts the first leg.
+/// * `quote_currency` - Quote currency; its calendar counts the second leg.
+/// * `settlement_days` - Contractual spot lag in business days, from 0 through 31.
+/// * `base_cal_id` - Optional base-currency calendar; `None` uses weekends only.
+/// * `quote_cal_id` - Optional quote-currency calendar; `None` uses weekends only.
+/// * `usd_cal_id` - USD settlement calendar. Required for non-USD crosses; for a
+///   USD pair `None` falls back to the USD leg's own calendar.
 ///
 /// # Errors
 ///
-/// Returns an error if any calendar ID is unrecognized, the date would leave
-/// the supported range, or the iteration limit is exceeded (suggesting a
-/// calendar configuration issue).
+/// Returns an error if a required calendar is absent or unknown, the lag is
+/// above 31 days, a date leaves the supported range, or no required business
+/// day is found within 100 calendar days.
 ///
 /// # Examples
 ///
@@ -294,87 +279,93 @@ pub fn add_joint_business_days(
 /// # use finstack_quant_core::dates::create_date;
 /// # use time::Month;
 /// # use finstack_quant_core::dates::fx::fx_spot_date;
+/// # use finstack_quant_core::currency::Currency;
 /// // EUR/USD traded Thu 2025-07-03. Fri 2025-07-04 is a US holiday but a good
-/// // EUR day, so it still counts as the first intermediate day; spot is
-/// // Mon 2025-07-07 (good in both), not Tue 2025-07-08.
+/// // intermediate day under the EUR/USD convention; spot is Mon 2025-07-07.
 /// let trade = create_date(2025, Month::July, 3).unwrap();
-/// let spot = fx_spot_date(trade, 2, Some("target2"), Some("usny"), Some("usny")).unwrap();
+/// let spot = fx_spot_date(trade, Currency::EUR, Currency::USD, 2,
+///     Some("target2"), Some("usny"), Some("usny")).unwrap();
 /// assert_eq!(spot, create_date(2025, Month::July, 7).unwrap());
+///
+/// // A contractual T+1 (tom) EUR/USD trade settles the next joint business day.
+/// let tom = fx_spot_date(create_date(2025, Month::January, 15).unwrap(), Currency::EUR,
+///     Currency::USD, 1, Some("target2"), Some("usny"), Some("usny")).unwrap();
+/// assert_eq!(tom, create_date(2025, Month::January, 16).unwrap());
 /// ```
 pub fn fx_spot_date(
     trade_date: Date,
-    lag_days: i32,
+    base_currency: Currency,
+    quote_currency: Currency,
+    settlement_days: u32,
     base_cal_id: Option<&str>,
     quote_cal_id: Option<&str>,
     usd_cal_id: Option<&str>,
 ) -> Result<Date> {
     let base_cal = resolve_calendar(base_cal_id)?;
     let quote_cal = resolve_calendar(quote_cal_id)?;
-    let usd_cal = match usd_cal_id {
-        Some(id) => Some(resolve_calendar(Some(id))?),
-        None => None,
-    };
-
-    if lag_days == 0 {
+    if settlement_days == 0 {
         return Ok(trade_date);
     }
-    const MAX_ABS_FX_SPOT_LAG_DAYS: u32 = 31;
-    let lag_magnitude = lag_days.unsigned_abs();
-    if lag_magnitude > MAX_ABS_FX_SPOT_LAG_DAYS {
+    let usd_cal = match usd_cal_id {
+        Some(id) => Some(calendar_by_id_strict(id)?),
+        None if base_currency == Currency::USD => Some(base_cal),
+        None if quote_currency == Currency::USD => Some(quote_cal),
+        None => None,
+    };
+    let Some(usd_cal) = usd_cal else {
+        return Err(Error::Validation(
+            "FX spot settlement for a non-USD cross requires a USD calendar".into(),
+        ));
+    };
+    const MAX_FX_SPOT_LAG_DAYS: u32 = 31;
+    if settlement_days > MAX_FX_SPOT_LAG_DAYS {
         return Err(Error::Validation(format!(
-            "FX spot lag {lag_days} exceeds the supported range \
-             [-{MAX_ABS_FX_SPOT_LAG_DAYS}, {MAX_ABS_FX_SPOT_LAG_DAYS}]"
+            "FX spot lag {settlement_days} exceeds the supported range 0..={MAX_FX_SPOT_LAG_DAYS}"
         )));
     }
-    let direction = if lag_days > 0 { 1 } else { -1 };
 
-    let is_usd = |id: Option<&str>| matches!((id, usd_cal_id), (Some(a), Some(u)) if a.eq_ignore_ascii_case(u));
-    let base_is_usd = is_usd(base_cal_id);
-    let quote_is_usd = is_usd(quote_cal_id);
-
-    // Intermediate days are gated by each currency's own calendar EXCEPT USD.
-    let intermediate_good = |d: Date| {
-        (base_is_usd || base_cal.is_business_day(d))
-            && (quote_is_usd || quote_cal.is_business_day(d))
-    };
-    // The final value date must be good on ALL calendars (incl. USD).
-    let final_good = |d: Date| {
-        base_cal.is_business_day(d)
-            && quote_cal.is_business_day(d)
-            && usd_cal.is_none_or(|c| c.is_business_day(d))
-    };
-
-    let max_iters: u32 = (lag_magnitude.saturating_mul(10).saturating_add(25)).max(1000);
-    let mut iters: u32 = 0;
-    let mut date = trade_date;
-    let mut count = 0u32;
-
-    while count < lag_magnitude && iters < max_iters {
-        date = date.add_days(direction)?;
-        if intermediate_good(date) {
-            count += 1;
+    // Days beyond the pair standard extend every leg; a shorter contractual
+    // lag caps every leg.
+    let standard = fx_standard_settlement_days(base_currency, quote_currency);
+    let capped = settlement_days.min(standard);
+    let extension = settlement_days.saturating_sub(standard);
+    let leg_lag = |currency: Currency| currency_settlement_days(currency).min(capped) + extension;
+    let usd_counts_business_days = USD_BUSINESS_DAY_COUNT_CURRENCIES
+        .iter()
+        .any(|currency| *currency == base_currency || *currency == quote_currency);
+    let leg = |currency: Currency, calendar: &dyn HolidayCalendar| -> Result<Date> {
+        let lag = leg_lag(currency);
+        if currency == Currency::USD {
+            // US holidays are good intermediate days unless the pair needs
+            // clear US business days.
+            if usd_counts_business_days {
+                add_business_days_on(trade_date, lag, usd_cal)
+            } else {
+                add_weekdays_on(trade_date, lag)
+            }
+        } else {
+            add_business_days_on(trade_date, lag, calendar)
         }
-        iters += 1;
+    };
+    let mut date = leg(base_currency, base_cal)?
+        .max(leg(quote_currency, quote_cal)?)
+        .max(add_weekdays_on(trade_date, settlement_days)?);
+    let is_cross = base_currency != Currency::USD && quote_currency != Currency::USD;
+    if is_cross && usd_counts_business_days {
+        date = date.max(add_business_days_on(trade_date, settlement_days, usd_cal)?);
     }
+    let final_calendars = [base_cal, quote_cal, usd_cal];
+    adjust(
+        date,
+        BusinessDayConvention::Following,
+        &CompositeCalendar::new(&final_calendars),
+    )
+}
 
-    // Roll the candidate value date in the requested direction until it is
-    // good in all calendars.
-    while !final_good(date) && iters < max_iters {
-        date = date.add_days(direction)?;
-        iters += 1;
-    }
-
-    if count < lag_magnitude || !final_good(date) {
-        return Err(Error::Input(
-            crate::error::InputError::JointCalendarIterationLimitExceeded {
-                start: trade_date,
-                n_days: lag_magnitude,
-                max_iters,
-            },
-        ));
-    }
-
-    Ok(date)
+fn add_weekdays_on(start: Date, n_days: u32) -> Result<Date> {
+    let n_days = i32::try_from(n_days)
+        .map_err(|_| Error::Validation("weekday offset exceeds the supported range".into()))?;
+    start.add_weekdays(n_days)
 }
 
 // Batch-optimized variants (pre-resolved calendars)
@@ -441,7 +432,9 @@ impl ResolvedCalendarPair {
     ///
     /// The date that is `n_days` joint business days after `start`.
     pub fn add_joint_business_days(&self, start: Date, n_days: u32) -> Result<Date> {
-        advance_business_days(start, n_days, |date| self.is_joint_business_day(date))
+        with_joint_calendar(self.base, self.quote, |joint_calendar| {
+            add_business_days_on(start, n_days, joint_calendar)
+        })
     }
 
     /// Adjust a date using pre-resolved calendars.
@@ -473,6 +466,26 @@ mod tests {
     use crate::dates::create_date;
     use time::Month;
 
+    fn spot(
+        trade_date: Date,
+        base_currency: Currency,
+        quote_currency: Currency,
+        settlement_days: u32,
+        base_cal_id: Option<&str>,
+        quote_cal_id: Option<&str>,
+        usd_cal_id: Option<&str>,
+    ) -> Result<Date> {
+        fx_spot_date(
+            trade_date,
+            base_currency,
+            quote_currency,
+            settlement_days,
+            base_cal_id,
+            quote_cal_id,
+            usd_cal_id,
+        )
+    }
+
     struct Jan29Holiday;
     struct Jan30And31Holidays;
 
@@ -480,11 +493,19 @@ mod tests {
         fn is_holiday(&self, date: Date) -> bool {
             date.year() == 2025 && date.month() == Month::January && date.day() == 29
         }
+
+        fn is_business_day(&self, date: Date) -> bool {
+            !date.is_weekend() && !self.is_holiday(date)
+        }
     }
 
     impl HolidayCalendar for Jan30And31Holidays {
         fn is_holiday(&self, date: Date) -> bool {
             date.year() == 2025 && date.month() == Month::January && matches!(date.day(), 30 | 31)
+        }
+
+        fn is_business_day(&self, date: Date) -> bool {
+            !date.is_weekend() && !self.is_holiday(date)
         }
     }
 
@@ -494,14 +515,13 @@ mod tests {
     #[test]
     fn fx_date_range_boundaries_return_errors() {
         assert!(add_joint_business_days(Date::MAX, 1, None, None, None).is_err());
-        assert!(fx_spot_date(Date::MAX, 1, None, None, None).is_err());
-        assert!(fx_spot_date(Date::MIN, -1, None, None, None).is_err());
+        assert!(spot(Date::MAX, Currency::EUR, Currency::USD, 1, None, None, None).is_err());
         assert_eq!(
             add_joint_business_days(Date::MAX, 0, None, None, None).unwrap(),
             Date::MAX
         );
         assert_eq!(
-            fx_spot_date(Date::MIN, 0, None, None, None).unwrap(),
+            spot(Date::MIN, Currency::EUR, Currency::USD, 0, None, None, None).unwrap(),
             Date::MIN
         );
     }
@@ -747,8 +767,16 @@ mod tests {
         // counts as an intermediate day. Market spot is Mon 2025-07-07.
         let trade = create_date(2025, Month::July, 3).unwrap();
 
-        let spot = fx_spot_date(trade, 2, Some("target2"), Some("usny"), Some("usny"))
-            .expect("fx spot roll");
+        let spot = spot(
+            trade,
+            Currency::EUR,
+            Currency::USD,
+            2,
+            Some("target2"),
+            Some("usny"),
+            Some("usny"),
+        )
+        .expect("fx spot roll");
         assert_eq!(
             spot,
             create_date(2025, Month::July, 7).unwrap(),
@@ -767,8 +795,16 @@ mod tests {
         // EUR day) but the value date itself is a US holiday, so spot must roll
         // to Mon 2025-07-07.
         let trade = create_date(2025, Month::July, 2).unwrap();
-        let spot = fx_spot_date(trade, 2, Some("target2"), Some("usny"), Some("usny"))
-            .expect("fx spot roll");
+        let spot = spot(
+            trade,
+            Currency::EUR,
+            Currency::USD,
+            2,
+            Some("target2"),
+            Some("usny"),
+            Some("usny"),
+        )
+        .expect("fx spot roll");
         assert_eq!(
             spot,
             create_date(2025, Month::July, 7).unwrap(),
@@ -782,8 +818,16 @@ mod tests {
         // EUR and JPY so it counts as an intermediate day; the final value date
         // Mon 2025-07-07 is good in all three calendars.
         let trade = create_date(2025, Month::July, 3).unwrap();
-        let spot = fx_spot_date(trade, 2, Some("target2"), Some("jpto"), Some("usny"))
-            .expect("fx spot roll");
+        let spot = spot(
+            trade,
+            Currency::EUR,
+            Currency::JPY,
+            2,
+            Some("target2"),
+            Some("jpto"),
+            Some("usny"),
+        )
+        .expect("fx spot roll");
         assert_eq!(
             spot,
             create_date(2025, Month::July, 7).unwrap(),
@@ -792,39 +836,162 @@ mod tests {
     }
 
     #[test]
-    fn fx_spot_date_non_usd_pair_without_usd_matches_symmetric_rule() {
-        // Without a USD calendar, fx_spot_date reproduces the two-calendar
-        // joint rule exactly (EUR/GBP over the 2024 UK Christmas break).
+    fn fx_spot_date_non_usd_cross_requires_usd_calendar() {
         let trade = create_date(2024, Month::December, 23).unwrap();
-        let spot =
-            fx_spot_date(trade, 2, Some("target2"), Some("gblo"), None).expect("fx spot roll");
-        let symmetric = add_joint_business_days(trade, 2, Some("target2"), Some("gblo"), None)
-            .expect("symmetric roll");
-        assert_eq!(spot, symmetric);
+        let error = spot(
+            trade,
+            Currency::EUR,
+            Currency::GBP,
+            2,
+            Some("target2"),
+            Some("gblo"),
+            None,
+        )
+        .expect_err("cross spot requires USD final-date calendar");
+        assert!(error.to_string().contains("requires a USD calendar"));
     }
 
     #[test]
     fn fx_spot_date_t_plus_zero_returns_trade_date() {
         // Documented T+0 behavior: return the trade date unchanged.
         let trade = create_date(2025, Month::July, 4).unwrap();
-        let spot =
-            fx_spot_date(trade, 0, Some("target2"), Some("usny"), Some("usny")).expect("T+0");
+        let spot = spot(
+            trade,
+            Currency::EUR,
+            Currency::USD,
+            0,
+            Some("target2"),
+            Some("usny"),
+            Some("usny"),
+        )
+        .expect("T+0");
         assert_eq!(spot, trade);
     }
     #[test]
-    fn fx_spot_date_supports_negative_joint_business_day_lags() {
+    fn signed_business_day_arithmetic_is_separate_from_spot_settlement() {
         let trade = create_date(2025, Month::January, 15).unwrap();
-        let spot =
-            fx_spot_date(trade, -1, Some("target2"), Some("usny"), Some("usny")).expect("T-1");
-        assert_eq!(spot, create_date(2025, Month::January, 14).unwrap());
+        let prior = trade
+            .add_business_days(-1, &WEEKENDS_ONLY)
+            .expect("signed business-day arithmetic");
+        assert_eq!(prior, create_date(2025, Month::January, 14).unwrap());
     }
 
     #[test]
     fn fx_spot_date_rejects_unbounded_lags_before_iteration() {
         let trade = create_date(2025, Month::January, 15).unwrap();
-        let error = fx_spot_date(trade, i32::MIN, Some("target2"), Some("usny"), Some("usny"))
-            .expect_err("extreme lag must be rejected");
+        let error = spot(
+            trade,
+            Currency::EUR,
+            Currency::USD,
+            u32::MAX,
+            Some("target2"),
+            Some("usny"),
+            Some("usny"),
+        )
+        .expect_err("extreme lag must be rejected");
         assert!(error.to_string().contains("supported range"));
+    }
+
+    #[test]
+    fn fx_spot_date_uses_individual_currency_lags_and_pair_holiday_rules() {
+        let cad_chf_trade = create_date(2018, Month::August, 3).unwrap();
+        let cad_chf = spot(
+            cad_chf_trade,
+            Currency::CAD,
+            Currency::CHF,
+            2,
+            Some("cato"),
+            Some("chzh"),
+            Some("usny"),
+        )
+        .expect("CAD/CHF spot date");
+        assert_eq!(cad_chf, create_date(2018, Month::August, 7).unwrap());
+
+        let south_america_trade = create_date(2025, Month::July, 3).unwrap();
+        let usd_brl = spot(
+            south_america_trade,
+            Currency::USD,
+            Currency::BRL,
+            2,
+            Some("usny"),
+            Some("brbd"),
+            Some("usny"),
+        )
+        .expect("USD/BRL spot date");
+        assert_eq!(usd_brl, create_date(2025, Month::July, 8).unwrap());
+
+        let usd_mxn = spot(
+            south_america_trade,
+            Currency::USD,
+            Currency::MXN,
+            2,
+            Some("usny"),
+            None,
+            Some("usny"),
+        )
+        .expect("USD/MXN spot date");
+        assert_eq!(usd_mxn, create_date(2025, Month::July, 8).unwrap());
+    }
+
+    #[test]
+    fn explicit_lag_below_standard_is_honored() {
+        // EUR/USD tom (T+1) traded Wed 2025-01-15 settles Thu 2025-01-16.
+        let tom = spot(
+            create_date(2025, Month::January, 15).unwrap(),
+            Currency::EUR,
+            Currency::USD,
+            1,
+            Some("target2"),
+            Some("usny"),
+            Some("usny"),
+        )
+        .expect("EUR/USD tom");
+        assert_eq!(tom, create_date(2025, Month::January, 16).unwrap());
+    }
+
+    #[test]
+    fn lag_above_standard_counts_business_days_on_each_leg() {
+        // EUR/USD T+3 traded Tue 2024-12-24: TARGET2 is closed on 25-26 Dec,
+        // so the EUR leg counts 27, 30 and 31 Dec.
+        let t3 = spot(
+            create_date(2024, Month::December, 24).unwrap(),
+            Currency::EUR,
+            Currency::USD,
+            3,
+            Some("target2"),
+            Some("usny"),
+            Some("usny"),
+        )
+        .expect("EUR/USD T+3");
+        assert_eq!(t3, create_date(2024, Month::December, 31).unwrap());
+    }
+
+    #[test]
+    fn latin_american_usd_leg_counts_on_the_usd_calendar() {
+        // USD/MXN with only the USD settlement calendar supplied: Fri
+        // 2025-07-04 is a US holiday, so two clear US business days end Tue
+        // 2025-07-08.
+        let usd_mxn = spot(
+            create_date(2025, Month::July, 3).unwrap(),
+            Currency::USD,
+            Currency::MXN,
+            2,
+            None,
+            None,
+            Some("usny"),
+        )
+        .expect("USD/MXN spot");
+        assert_eq!(usd_mxn, create_date(2025, Month::July, 8).unwrap());
+    }
+
+    #[test]
+    fn usd_php_and_usd_rub_are_t_plus_one_pairs() {
+        for other in [Currency::CAD, Currency::TRY, Currency::PHP, Currency::RUB] {
+            assert_eq!(fx_standard_settlement_days(Currency::USD, other), 1);
+            assert_eq!(fx_standard_settlement_days(other, Currency::USD), 1);
+        }
+        assert_eq!(fx_standard_settlement_days(Currency::USD, Currency::MXN), 2);
+        assert_eq!(fx_standard_settlement_days(Currency::EUR, Currency::CAD), 2);
     }
 
     #[test]

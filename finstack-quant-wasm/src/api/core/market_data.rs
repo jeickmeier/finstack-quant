@@ -85,6 +85,8 @@ struct DiscountCurveOptions {
     #[serde(default)]
     day_count: Option<String>,
     #[serde(default)]
+    calendar_id: Option<String>,
+    #[serde(default)]
     validation_mode: Option<String>,
     #[serde(default)]
     forward_floor: Option<f64>,
@@ -110,7 +112,8 @@ impl JsDiscountCurve {
 
         let mut builder = RustDiscountCurve::builder(options.id)
             .base_date(base)
-            .knots(pairs);
+            .knots(pairs)
+            .calendar_id_opt(options.calendar_id);
         if let Some(interp) = options.interp.as_deref() {
             builder = builder.interp(parse_interp_style(interp)?);
         }
@@ -149,7 +152,9 @@ impl JsDiscountCurve {
     ///   `"cubic_hermite"`, `"piecewise_quadratic_forward"`), `extrapolation`
     ///   (`"flat_zero"`, `"flat_forward"`, or `"none"`, which returns NaN
     ///   outside the pillar range), `dayCount` (used to convert dates to curve
-    ///   time; not inferred from the ID),
+    ///   time; not inferred from the ID), `calendarId` (registered holiday
+    ///   calendar of the curve's time axis, e.g. `"brbd"`; required with
+    ///   `"bus_252"`),
     ///   `validationMode` (`"market_standard"` or `"negative_rate_friendly"`)
     ///   and `forwardFloor` (decimal minimum implied forward, required with
     ///   `"negative_rate_friendly"` and rejected otherwise). Omitted options use
@@ -161,8 +166,9 @@ impl JsDiscountCurve {
     /// string or plain object; `FinstackError` (kind `validation`) for an
     /// unknown or mistyped key, an odd `knots` length, a malformed date, an
     /// unknown interpolation/extrapolation/day-count/validation name, a
-    /// misplaced or missing `forwardFloor`, or discount factors the curve
-    /// validation rejects.
+    /// misplaced or missing `forwardFloor`, a `"bus_252"` curve without
+    /// `calendarId`, or discount factors the curve validation rejects;
+    /// `FinstackError` (kind `not_found`) for an unknown `calendarId`.
     #[wasm_bindgen(constructor)]
     pub fn new(options: JsValue) -> Result<JsDiscountCurve, JsValue> {
         Self::build(from_js_json(&options, "options")?)
@@ -481,6 +487,13 @@ impl JsDiscountCurve {
     #[wasm_bindgen(getter, js_name = dayCount)]
     pub fn day_count(&self) -> String {
         self.inner.day_count().to_string()
+    }
+
+    /// Registered holiday calendar of the curve's time axis (for example
+    /// `"brbd"` on a `"bus_252"` curve), or `undefined` when none is set.
+    #[wasm_bindgen(getter, js_name = calendarId)]
+    pub fn calendar_id(&self) -> Option<String> {
+        self.inner.calendar_id().map(str::to_owned)
     }
 
     /// Interpolation style between pillars, such as `"monotone_convex"`.

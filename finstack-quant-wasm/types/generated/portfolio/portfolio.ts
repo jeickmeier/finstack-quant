@@ -862,11 +862,18 @@ export type PositionId = string;
  * Variants are grouped by category:
  * - **Interest**: `Fixed`, `FloatReset`, `Stub`
  * - **Inflation**: `InflationCoupon`
- * - **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`
+ * - **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`
  * - **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`
  * - **Revolving**: `RevolvingDraw`, `RevolvingRepayment`
  * - **Credit Events**: `DefaultedNotional`, `Recovery`
  * - **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.
+ *
+ * # Labels
+ *
+ * `Display`, `FromStr`, and serde share one snake_case label per kind
+ * (`"fixed"`, `"float_reset"`, `"pre_payment"`); `FromStr` matches it
+ * exactly, with no aliases or case folding. [`CFKind::parse_label`] adds the
+ * case-insensitive reporting aliases.
  */
 export type CFKind =
   | "fixed"
@@ -1212,10 +1219,6 @@ export type MarketDependency =
         id: string;
       };
     };
-/**
- * Unique identifier for a risk factor.
- */
-export type FactorId = string;
 /**
  * Initial margin calculation methodology.
  *
@@ -3083,7 +3086,7 @@ export interface FactorContribution {
   /**
    * Identifier of the factor being reported.
    */
-  factor_id: FactorId;
+  factor_id: Id;
   /**
    * Marginal sensitivity of portfolio risk to the factor. Same sign
    * convention as `absolute_risk`.
@@ -3108,7 +3111,7 @@ export interface FactorContributionDelta {
   /**
    * Factor identifier whose contribution changed.
    */
-  factor_id: FactorId;
+  factor_id: Id;
   /**
    * Relative change in the reported risk contribution.
    */
@@ -3126,7 +3129,7 @@ export interface FactorPnlProfile {
   /**
    * Identifier of the shocked factor.
    */
-  factor_id: FactorId;
+  factor_id: Id;
   /**
    * Ordered position identifiers indexing the inner `position_pnls` axis.
    */
@@ -5651,7 +5654,7 @@ export interface PositionFactorContribution {
   /**
    * Identifier of the contributing factor.
    */
-  factor_id: FactorId;
+  factor_id: Id;
   /**
    * Portfolio position identifier.
    */
@@ -6025,7 +6028,7 @@ export interface SensitivityMatrixJson {
   /**
    * Ordered factor identifiers, one per column of `data`.
    */
-  factor_ids: FactorId[];
+  factor_ids: Id[];
   /**
    * Ordered position identifiers, one per row of `data`.
    */

@@ -23,7 +23,7 @@ tests/
 ├── math.rs                 + math/        interp, solver, integration, stats, summation
 ├── money.rs                + money/       FX conversion, rounding contexts
 ├── serde.rs                + serde/       wire-format goldens, roundtrips
-├── types.rs                + types/       Rate / Bps / Percentage
+├── types.rs                + types/       Rate / Bps
 ├── golden_tests.rs         + golden/      reference-value fixtures (see golden/README.md)
 ├── canonical_api.rs                       npv/irr/quadrature result and error consistency
 ├── phase2_strictness.rs                   nested serde strictness + finite-value regressions
@@ -44,7 +44,6 @@ domain's numbers.
 | `dates/common.rs` | `make_date(y, m, d)`, `TestCal` (in-memory holiday calendar), `DAYCOUNT_TOLERANCE = 1e-12` |
 | `math/common.rs` | `approx_eq(a, b, tol)`, `standard_knots`/`standard_dfs`, `two_point_knots`/`two_point_dfs` |
 | `market_data/test_helpers.rs` | `sample_base_date()` (2024-01-01) and `sample_*_curve(id)` / `sample_vol_surface()` builders |
-| `expr/common.rs` | Placeholder; expression tests use `SimpleContext` directly |
 
 Tolerances that are not shared live next to their assertions, for example
 `XIRR_TOLERANCE = 1e-6` in `cashflow/irr.rs` (Excel-compatible XIRR precision)

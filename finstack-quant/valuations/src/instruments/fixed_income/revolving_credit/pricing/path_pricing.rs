@@ -277,7 +277,7 @@ impl RevolvingCreditPricer {
 
         // Add upfront fee if applicable
         total_pv += compute_upfront_fee_pv(
-            facility.upfront_fee_amount(),
+            facility.upfront_fee_amount()?,
             facility.issue_date,
             as_of,
             disc_curve.as_ref(),

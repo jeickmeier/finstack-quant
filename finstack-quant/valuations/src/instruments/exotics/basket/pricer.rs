@@ -243,9 +243,9 @@ impl BasketCalculator {
                             finstack_quant_core::InputError::Invalid,
                         ));
                     }
-                    (base_value * units) / s
+                    base_value.checked_mul_f64(units)?.checked_div_f64(s)?
                 } else {
-                    base_value * constituent.weight
+                    base_value.checked_mul_f64(constituent.weight)?
                 }
             }
             ValueMode::Total { shares, aum } => {
@@ -265,7 +265,7 @@ impl BasketCalculator {
                         context,
                         as_of,
                     )?;
-                    base_value * units
+                    base_value.checked_mul_f64(units)?
                 } else if let Some(a) = aum {
                     Money::new(a * constituent.weight, basket.reporting_currency)?
                 } else if let Some(s) = shares {
@@ -284,7 +284,7 @@ impl BasketCalculator {
                         context,
                         as_of,
                     )?;
-                    base_value * constituent.weight * s
+                    base_value.checked_mul_f64(constituent.weight * s)?
                 } else {
                     return Err(finstack_quant_core::Error::Input(
                         finstack_quant_core::InputError::Invalid,

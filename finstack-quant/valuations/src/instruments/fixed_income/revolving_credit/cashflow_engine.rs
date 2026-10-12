@@ -285,7 +285,7 @@ impl<'a> CashflowEngine<'a> {
             flows.push(CashFlow::new(
                 self.facility.issue_date,
                 None,
-                self.facility.drawn * -1.0,
+                self.facility.drawn.checked_neg(),
                 CFKind::Notional,
                 0.0,
                 None,
@@ -463,7 +463,7 @@ impl<'a> CashflowEngine<'a> {
                 let interest_rate = match &self.facility.rate {
                     RateSpec::Fixed { rate } => {
                         let rate = super::utils::fixed_rate_at(self.facility, *rate, sub_start);
-                        let interest = current_balance * (rate * dt);
+                        let interest = current_balance.checked_mul_f64(rate * dt)?;
                         total_interest = total_interest.checked_add(interest)?;
                         rate
                     }
@@ -542,7 +542,7 @@ impl<'a> CashflowEngine<'a> {
                             )
                         };
 
-                        let interest = current_balance * (coupon_rate * dt);
+                        let interest = current_balance.checked_mul_f64(coupon_rate * dt)?;
                         total_interest = total_interest.checked_add(interest)?;
                         coupon_rate
                     }
@@ -554,21 +554,22 @@ impl<'a> CashflowEngine<'a> {
                     .fees
                     .commitment_fee_bp_at(utilization, sub_start)?;
                 if commitment_fee_bp > 0.0 {
-                    let commitment_fee = current_undrawn * (commitment_fee_bp * 1e-4 * dt);
+                    let commitment_fee =
+                        current_undrawn.checked_mul_f64(commitment_fee_bp * 1e-4 * dt)?;
                     total_commitment_fee = total_commitment_fee.checked_add(commitment_fee)?;
                     weighted_commitment_fee_rate += (commitment_fee_bp * 1e-4) * dt;
                 }
 
                 let usage_fee_bp = self.facility.fees.usage_fee_bp_at(utilization, sub_start)?;
                 if usage_fee_bp > 0.0 {
-                    let usage_fee = current_balance * (usage_fee_bp * 1e-4 * dt);
+                    let usage_fee = current_balance.checked_mul_f64(usage_fee_bp * 1e-4 * dt)?;
                     total_usage_fee = total_usage_fee.checked_add(usage_fee)?;
                     weighted_usage_fee_rate += (usage_fee_bp * 1e-4) * dt;
                 }
 
                 let facility_fee_bp = self.facility.fees.facility_fee_bp_at(sub_start);
                 if facility_fee_bp > 0.0 {
-                    let facility_fee = commitment * (facility_fee_bp * 1e-4 * dt);
+                    let facility_fee = commitment.checked_mul_f64(facility_fee_bp * 1e-4 * dt)?;
                     total_facility_fee = total_facility_fee.checked_add(facility_fee)?;
                     weighted_facility_fee_rate += (facility_fee_bp * 1e-4) * dt;
                 }
@@ -576,14 +577,15 @@ impl<'a> CashflowEngine<'a> {
                 if lc_outstanding.amount() > 0.0 {
                     let lc_fee_bp = self.facility.lc_fee_bp_at(sub_start);
                     if lc_fee_bp > 0.0 {
-                        total_lc_fee =
-                            total_lc_fee.checked_add(lc_outstanding * (lc_fee_bp * 1e-4 * dt))?;
+                        total_lc_fee = total_lc_fee
+                            .checked_add(lc_outstanding.checked_mul_f64(lc_fee_bp * 1e-4 * dt)?)?;
                         weighted_lc_fee_rate += lc_fee_bp * 1e-4 * dt;
                     }
                     let fronting_bp = self.facility.fronting_fee_bp();
                     if fronting_bp > 0.0 {
-                        total_fronting_fee = total_fronting_fee
-                            .checked_add(lc_outstanding * (fronting_bp * 1e-4 * dt))?;
+                        total_fronting_fee = total_fronting_fee.checked_add(
+                            lc_outstanding.checked_mul_f64(fronting_bp * 1e-4 * dt)?,
+                        )?;
                         weighted_fronting_fee_rate += fronting_bp * 1e-4 * dt;
                     }
                 }
@@ -704,7 +706,7 @@ impl<'a> CashflowEngine<'a> {
                     event.date,
                     None,
                     if event.is_draw {
-                        event.amount * -1.0
+                        event.amount.checked_neg()
                     } else {
                         event.amount
                     },
@@ -876,7 +878,7 @@ impl<'a> CashflowEngine<'a> {
             flows.push(CashFlow::new(
                 self.facility.issue_date,
                 None,
-                self.facility.drawn * -1.0,
+                self.facility.drawn.checked_neg(),
                 CFKind::Notional,
                 0.0,
                 None,
@@ -971,7 +973,7 @@ impl<'a> CashflowEngine<'a> {
                 let avg_utilization = (utilization_start + utilization_end) / 2.0;
                 let commitment = self.facility.commitment_at(sub_start);
                 let lc_outstanding = self.facility.lc_outstanding_at(sub_start);
-                let drawn_balance = commitment * avg_utilization;
+                let drawn_balance = commitment.checked_mul_f64(avg_utilization)?;
                 // Letters of credit consume availability; the utilization
                 // process is capped so this stays non-negative.
                 let undrawn_balance = Money::new(
@@ -1087,7 +1089,8 @@ impl<'a> CashflowEngine<'a> {
                     }
                 };
 
-                interest = interest.checked_add(drawn_balance * (coupon_rate * sub_dt))?;
+                interest =
+                    interest.checked_add(drawn_balance.checked_mul_f64(coupon_rate * sub_dt)?)?;
                 weighted_rate += coupon_rate * sub_dt;
                 accrual += sub_dt;
 
@@ -1099,8 +1102,9 @@ impl<'a> CashflowEngine<'a> {
                     .fees
                     .commitment_fee_bp_at(tier_utilization, sub_start)?;
                 if commitment_bp > 0.0 {
-                    commitment_fee = commitment_fee
-                        .checked_add(undrawn_balance * (commitment_bp * 1e-4 * sub_dt))?;
+                    commitment_fee = commitment_fee.checked_add(
+                        undrawn_balance.checked_mul_f64(commitment_bp * 1e-4 * sub_dt)?,
+                    )?;
                     weighted_commitment_bp += commitment_bp * 1e-4 * sub_dt;
                 }
                 let usage_bp = self
@@ -1108,26 +1112,28 @@ impl<'a> CashflowEngine<'a> {
                     .fees
                     .usage_fee_bp_at(tier_utilization, sub_start)?;
                 if usage_bp > 0.0 {
-                    usage_fee =
-                        usage_fee.checked_add(drawn_balance * (usage_bp * 1e-4 * sub_dt))?;
+                    usage_fee = usage_fee
+                        .checked_add(drawn_balance.checked_mul_f64(usage_bp * 1e-4 * sub_dt)?)?;
                     weighted_usage_bp += usage_bp * 1e-4 * sub_dt;
                 }
                 let facility_bp = self.facility.fees.facility_fee_bp_at(sub_start);
                 if facility_bp > 0.0 {
-                    facility_fee =
-                        facility_fee.checked_add(commitment * (facility_bp * 1e-4 * sub_dt))?;
+                    facility_fee = facility_fee
+                        .checked_add(commitment.checked_mul_f64(facility_bp * 1e-4 * sub_dt)?)?;
                     weighted_facility_bp += facility_bp * 1e-4 * sub_dt;
                 }
                 if lc_outstanding.amount() > 0.0 {
                     let lc_bp = self.facility.lc_fee_bp_at(sub_start);
                     if lc_bp > 0.0 {
-                        lc_fee = lc_fee.checked_add(lc_outstanding * (lc_bp * 1e-4 * sub_dt))?;
+                        lc_fee = lc_fee
+                            .checked_add(lc_outstanding.checked_mul_f64(lc_bp * 1e-4 * sub_dt)?)?;
                         weighted_lc_bp += lc_bp * 1e-4 * sub_dt;
                     }
                     let fronting_bp = self.facility.fronting_fee_bp();
                     if fronting_bp > 0.0 {
-                        fronting_fee = fronting_fee
-                            .checked_add(lc_outstanding * (fronting_bp * 1e-4 * sub_dt))?;
+                        fronting_fee = fronting_fee.checked_add(
+                            lc_outstanding.checked_mul_f64(fronting_bp * 1e-4 * sub_dt)?,
+                        )?;
                         weighted_fronting_bp += fronting_bp * 1e-4 * sub_dt;
                     }
                 }

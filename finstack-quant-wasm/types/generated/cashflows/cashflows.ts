@@ -99,11 +99,18 @@ export type AmortizationSpec =
  * Variants are grouped by category:
  * - **Interest**: `Fixed`, `FloatReset`, `Stub`
  * - **Inflation**: `InflationCoupon`
- * - **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`
+ * - **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`
  * - **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`
  * - **Revolving**: `RevolvingDraw`, `RevolvingRepayment`
  * - **Credit Events**: `DefaultedNotional`, `Recovery`
  * - **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.
+ *
+ * # Labels
+ *
+ * `Display`, `FromStr`, and serde share one snake_case label per kind
+ * (`"fixed"`, `"float_reset"`, `"pre_payment"`); `FromStr` matches it
+ * exactly, with no aliases or case folding. [`CFKind::parse_label`] adds the
+ * case-insensitive reporting aliases.
  */
 export type CFKind =
   | "fixed"

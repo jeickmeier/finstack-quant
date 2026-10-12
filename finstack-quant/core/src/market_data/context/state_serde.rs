@@ -713,7 +713,8 @@ impl TryFrom<MarketContextState> for MarketContext {
             Ok((context, _report)) => Ok(context),
             Err(ContractError::Core(error)) => Err(error),
             Err(ContractError::Report(report)) => Err(crate::Error::Validation(format!(
-                "MarketContextState restore failed with {report} error(s)"
+                "MarketContextState restore failed: {}",
+                report.summary()
             ))),
             Err(error) => Err(crate::Error::Validation(error.to_string())),
         }

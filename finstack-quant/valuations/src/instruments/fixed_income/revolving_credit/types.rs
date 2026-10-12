@@ -1132,13 +1132,16 @@ impl RevolvingCredit {
 
     /// Upfront fee amount in the facility currency (zero when none), resolved
     /// against the opening commitment.
-    pub fn upfront_fee_amount(&self) -> Money {
-        self.fees
-            .upfront_fee
-            .as_ref()
-            .map_or(Money::from((0_i64, self.commitment.currency())), |fee| {
-                fee.amount(self.commitment)
-            })
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a fractional fee is non-finite or the fee is
+    /// outside the Decimal range.
+    pub fn upfront_fee_amount(&self) -> finstack_quant_core::Result<Money> {
+        self.fees.upfront_fee.as_ref().map_or_else(
+            || Ok(Money::from((0_i64, self.commitment.currency()))),
+            |fee| fee.amount(self.commitment),
+        )
     }
 
     /// Scheduled fixed fees dated after `as_of`, as `(date, amount)`.

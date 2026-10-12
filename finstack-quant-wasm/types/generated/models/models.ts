@@ -342,10 +342,6 @@ export type Id = string;
  */
 export type DateWire = string;
 /**
- * Unique identifier for a risk factor.
- */
-export type FactorId = string;
-/**
  * Broad classification of a risk factor.
  */
 export type FactorType =
@@ -2897,7 +2893,7 @@ export interface FactorCovarianceMatrix {
   /**
    * Factor identifiers, in the row and column order of `data`.
    */
-  factor_ids: FactorId[];
+  factor_ids: Id[];
   /**
    * Matrix dimension. Equals `factor_ids.len()`.
    */
@@ -2918,7 +2914,7 @@ export interface FactorDefinition {
   /**
    * Unique factor identifier.
    */
-  id: FactorId;
+  id: Id;
   /**
    * Mapping from factor move to market-data perturbation.
    */
@@ -2939,7 +2935,7 @@ export interface MappingRule {
   /**
    * Factor assigned when both filters match.
    */
-  factor_id: FactorId;
+  factor_id: Id;
 }
 /**
  * Filters on an individual market dependency.
@@ -2986,7 +2982,7 @@ export interface FactorNode {
   /**
    * Factor assigned at this node when it is a valid classification level.
    */
-  factor_id?: FactorId | null;
+  factor_id?: Id | null;
   /**
    * Filter that must match for this node to participate in traversal.
    */
@@ -3185,7 +3181,7 @@ export interface FactorCorrelationMatrix {
   /**
    * Factor IDs in row/column order.
    */
-  factor_ids: FactorId[];
+  factor_ids: Id[];
 }
 /**
  * Complete vol state for all factors and all issuers at the calibration date.
@@ -3543,7 +3539,7 @@ export interface FactorContribution {
   /**
    * Identifier of the factor being reported.
    */
-  factor_id: FactorId;
+  factor_id: Id;
   /**
    * Marginal sensitivity of portfolio risk to the factor. Same sign
    * convention as `absolute_risk`.
@@ -4967,7 +4963,7 @@ export interface PositionFactorContribution {
   /**
    * Identifier of the contributing factor.
    */
-  factor_id: FactorId;
+  factor_id: Id;
   /**
    * Portfolio position identifier.
    */

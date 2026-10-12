@@ -81,6 +81,10 @@ impl PyDiscountCurve {
     /// day_count : DayCount | str, optional
     ///     Day-count convention used to convert query dates to curve time.
     ///     Default is fixed at ``"act_365f"`` (not inferred from the ID).
+    /// calendar_id : str, optional
+    ///     Registered holiday calendar of the curve's time axis (for example
+    ///     ``"brbd"``), or a ``+``-joined union. Required when ``day_count`` is
+    ///     ``"bus_252"``; every date-based query counts business days on it.
     /// validation_mode : str, optional
     ///     ``"market_standard"`` (default: monotonic DFs, -50bp forward floor)
     ///     or ``"negative_rate_friendly"``.
@@ -91,7 +95,10 @@ impl PyDiscountCurve {
     /// ------
     /// ValueError
     ///     If a knot is non-finite or duplicated, discount factors violate the
-    ///     validation mode, or an enum label is unknown.
+    ///     validation mode, an enum label is unknown, or a ``"bus_252"`` curve
+    ///     has no ``calendar_id``.
+    /// KeyError
+    ///     If ``calendar_id`` names no registered calendar.
     ///
     /// Example
     /// -------
@@ -105,7 +112,7 @@ impl PyDiscountCurve {
         clippy::too_many_arguments,
         reason = "keyword-only curve options mirror the Rust builder setters"
     )]
-    #[pyo3(signature = (id, base_date, knots, *, interp=None, extrapolation=None, day_count=None, validation_mode=None, forward_floor=None))]
+    #[pyo3(signature = (id, base_date, knots, *, interp=None, extrapolation=None, day_count=None, calendar_id=None, validation_mode=None, forward_floor=None))]
     fn new(
         id: &str,
         base_date: &Bound<'_, PyAny>,
@@ -113,12 +120,16 @@ impl PyDiscountCurve {
         interp: Option<&str>,
         extrapolation: Option<&str>,
         day_count: Option<&Bound<'_, PyAny>>,
+        calendar_id: Option<String>,
         validation_mode: Option<&str>,
         forward_floor: Option<f64>,
     ) -> PyResult<Self> {
         let base = py_to_date(base_date)?;
 
-        let mut builder = DiscountCurve::builder(id).base_date(base).knots(knots);
+        let mut builder = DiscountCurve::builder(id)
+            .base_date(base)
+            .knots(knots)
+            .calendar_id_opt(calendar_id);
         if let Some(interp) = interp {
             builder = builder.interp(parse_interp_style(interp)?);
         }
@@ -406,6 +417,9 @@ impl PyDiscountCurve {
 
     /// Forward discount factor between two dates: ``DF(0, to) / DF(0, from)``.
     ///
+    /// Both dates map to curve time with the curve's own day count and
+    /// time-axis calendar (``calendar_id``).
+    ///
     /// Parameters
     /// ----------
     /// from_date : datetime.date | str
@@ -532,6 +546,14 @@ impl PyDiscountCurve {
     #[getter]
     fn day_count(&self) -> String {
         self.inner.day_count().to_string()
+    }
+
+    /// Registered holiday calendar of the curve's time axis, or ``None``.
+    ///
+    /// Set for business-day day counts such as ``"bus_252"`` (e.g. ``"brbd"``).
+    #[getter]
+    fn calendar_id(&self) -> Option<String> {
+        self.inner.calendar_id().map(str::to_owned)
     }
 
     /// Interpolation style label (e.g. ``"monotone_convex"``).

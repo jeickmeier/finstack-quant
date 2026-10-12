@@ -181,12 +181,29 @@ export type Currency =
   | "ZMW"
   | "ZWL";
 /**
- * Type-safe identifier for a node in a financial model.
+ * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
- * Serializes as a plain string and is interoperable with `&str` via
- * [`Borrow`] and [`AsRef`].
+ * This type wraps a string identifier with a phantom type parameter to ensure
+ * type safety at compile time. Different `Id<T>` types with different `T`
+ * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+ *
+ * # Type Parameters
+ *
+ * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+ *
+ * # Invariants
+ *
+ * - Storage uses `Arc<str>` for efficient cloning
+ * - The phantom marker has zero size and runtime cost
+ * - Two `Id<T>` values are equal if their string values are equal
+ * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+ *
+ * # Thread Safety
+ *
+ * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+ * safely share and clone IDs with minimal synchronization overhead.
  */
-export type NodeId = string;
+export type Id = string;
 /**
  * Identifier for a Gregorian period like `2025Q1` or a fiscal period like
  * `FY2025W53`.
@@ -351,30 +368,6 @@ export type TerminalValueSpec =
       type: "h_model";
       [k: string]: unknown;
     };
-/**
- * A phantom-typed identifier that prevents mixing different kinds of IDs.
- *
- * This type wraps a string identifier with a phantom type parameter to ensure
- * type safety at compile time. Different `Id<T>` types with different `T`
- * cannot be compared or mixed accidentally, preventing entire classes of bugs.
- *
- * # Type Parameters
- *
- * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
- *
- * # Invariants
- *
- * - Storage uses `Arc<str>` for efficient cloning
- * - The phantom marker has zero size and runtime cost
- * - Two `Id<T>` values are equal if their string values are equal
- * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
- *
- * # Thread Safety
- *
- * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
- * safely share and clone IDs with minimal synchronization overhead.
- */
-export type Id = string;
 /**
  * Exit-multiple sensitivity shock shape.
  *
@@ -723,6 +716,20 @@ export interface Money {
 }
 /**
  * User-defined tags and key-value metadata for instrument classification.
+ *
+ * Tags are a sorted set of labels. Metadata is a sorted string-to-string map.
+ * Both fields are public so callers can insert, remove, and iterate entries
+ * directly. [`Attributes::add_tag`] and [`Attributes::set_meta`] are the
+ * in-place writers; [`Attributes::with_tag`] and [`Attributes::with_meta`]
+ * return the bag for construction chains.
+ *
+ * [`Attributes::matches_selector`] accepts three forms:
+ *
+ * - `"*"` matches every attribute set
+ * - `"tag:<name>"` matches when that tag is present
+ * - `"meta:<key>=<value>"` matches an exact metadata entry
+ *
+ * Any other selector text returns `false`.
  */
 export interface Attributes {
   /**
@@ -747,15 +754,15 @@ export interface BalanceSheetArticulation {
   /**
    * Node IDs whose values represent total assets.
    */
-  assets_nodes: NodeId[];
+  assets_nodes: Id[];
   /**
    * Node IDs whose values represent total equity.
    */
-  equity_nodes: NodeId[];
+  equity_nodes: Id[];
   /**
    * Node IDs whose values represent total liabilities.
    */
-  liabilities_nodes: NodeId[];
+  liabilities_nodes: Id[];
   /**
    * Tolerance override; falls back to
    * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
@@ -846,7 +853,7 @@ export interface RetainedEarningsReconciliation {
   /**
    * Optional node for dividends paid.
    */
-  dividends_node?: NodeId | null;
+  dividends_node?: Id | null;
   /**
    * Sign convention applied to the `dividends_node` input. Defaults
    * to [`SignConventionPolicy::MagnitudePositive`].
@@ -857,15 +864,15 @@ export interface RetainedEarningsReconciliation {
   /**
    * Node for net income.
    */
-  net_income_node: NodeId;
+  net_income_node: Id;
   /**
    * Additional adjustment nodes (buybacks, AOCI, etc.).
    */
-  other_adjustments?: NodeId[];
+  other_adjustments?: Id[];
   /**
    * Node for retained earnings balance.
    */
-  retained_earnings_node: NodeId;
+  retained_earnings_node: Id;
   /**
    * Tolerance override; falls back to
    * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
@@ -885,19 +892,19 @@ export interface CashReconciliation {
   /**
    * Node for cash balance.
    */
-  cash_balance_node: NodeId;
+  cash_balance_node: Id;
   /**
    * Optional node for cash from financing.
    */
-  cff_node?: NodeId | null;
+  cff_node?: Id | null;
   /**
    * Optional node for cash from investing.
    */
-  cfi_node?: NodeId | null;
+  cfi_node?: Id | null;
   /**
    * Optional node for cash from operations.
    */
-  cfo_node?: NodeId | null;
+  cfo_node?: Id | null;
   /**
    * Tolerance override; falls back to
    * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
@@ -906,7 +913,7 @@ export interface CashReconciliation {
   /**
    * Node for total cash flow.
    */
-  total_cash_flow_node: NodeId;
+  total_cash_flow_node: Id;
   [k: string]: unknown;
 }
 /**
@@ -919,7 +926,7 @@ export interface MissingValueCheck {
   /**
    * Nodes that must have values in every in-scope period.
    */
-  required_nodes: NodeId[];
+  required_nodes: Id[];
   /**
    * Which periods to inspect.
    */
@@ -937,11 +944,11 @@ export interface SignConventionCheck {
   /**
    * Nodes expected to carry negative values.
    */
-  negative_nodes?: NodeId[];
+  negative_nodes?: Id[];
   /**
    * Nodes expected to carry positive values.
    */
-  positive_nodes?: NodeId[];
+  positive_nodes?: Id[];
   [k: string]: unknown;
 }
 /**
@@ -955,7 +962,7 @@ export interface NonFiniteCheck {
   /**
    * Specific nodes to check; if empty, all nodes in results are inspected.
    */
-  nodes?: NodeId[];
+  nodes?: Id[];
   [k: string]: unknown;
 }
 /**
@@ -965,15 +972,15 @@ export interface CapexReconciliation {
   /**
    * Capex from the cash flow statement (investing section).
    */
-  capex_cf_node: NodeId;
+  capex_cf_node: Id;
   /**
    * Optional intangible-asset additions node.
    */
-  intangible_additions_node?: NodeId | null;
+  intangible_additions_node?: Id | null;
   /**
    * Optional PP&E additions node.
    */
-  ppe_additions_node?: NodeId | null;
+  ppe_additions_node?: Id | null;
   /**
    * Sign convention applied to `capex_cf_node`, `ppe_additions_node`,
    * and `intangible_additions_node`. Defaults to
@@ -1175,7 +1182,7 @@ export interface CheckFinding {
   /**
    * Node identifiers involved in the finding.
    */
-  nodes?: NodeId[];
+  nodes?: Id[];
   /**
    * Period the finding relates to, if applicable.
    */
@@ -1874,7 +1881,7 @@ export interface CoverageFloorCheck {
   /**
    * Denominator node (e.g. interest expense, total debt service).
    */
-  denominator_node: NodeId;
+  denominator_node: Id;
   /**
    * Minimum ratio before an error is issued.
    */
@@ -1886,7 +1893,7 @@ export interface CoverageFloorCheck {
   /**
    * Numerator node (e.g. EBITDA, cash flow available for debt service).
    */
-  numerator_node: NodeId;
+  numerator_node: Id;
   [k: string]: unknown;
 }
 /**
@@ -1950,11 +1957,11 @@ export interface CreditMapping {
   /**
    * Monthly cash burn node (for liquidity runway).
    */
-  cash_burn_node?: NodeId | null;
+  cash_burn_node?: Id | null;
   /**
    * Cash / liquidity node.
    */
-  cash_node?: NodeId | null;
+  cash_node?: Id | null;
   /**
    * Minimum coverage ratio that triggers a warning; defaults to `1.5`.
    */
@@ -1962,19 +1969,19 @@ export interface CreditMapping {
   /**
    * Total debt node.
    */
-  debt_node: NodeId;
+  debt_node: Id;
   /**
    * EBITDA node.
    */
-  ebitda_node: NodeId;
+  ebitda_node: Id;
   /**
    * Free cash flow node.
    */
-  fcf_node?: NodeId | null;
+  fcf_node?: Id | null;
   /**
    * Interest expense node.
    */
-  interest_expense_node: NodeId;
+  interest_expense_node: Id;
   /**
    * `(min, max)` leverage warning range; defaults to `(0.0, 6.0)`.
    *
@@ -2176,19 +2183,19 @@ export interface DepreciationReconciliation {
   /**
    * Capital expenditures node (cash flow statement / investing).
    */
-  capex_node: NodeId;
+  capex_node: Id;
   /**
    * D&A expense node (income statement).
    */
-  depreciation_expense_node: NodeId;
+  depreciation_expense_node: Id;
   /**
    * Optional asset disposals node.
    */
-  disposals_node?: NodeId | null;
+  disposals_node?: Id | null;
   /**
    * PP&E balance node (balance sheet).
    */
-  ppe_node: NodeId;
+  ppe_node: Id;
   /**
    * Sign convention applied to `capex_node`,
    * `depreciation_expense_node`, and `disposals_node`. Defaults to
@@ -2244,11 +2251,11 @@ export interface DividendReconciliation {
   /**
    * Dividends paid node (cash flow statement, financing).
    */
-  dividends_cf_node: NodeId;
+  dividends_cf_node: Id;
   /**
    * Dividends node (equity / retained earnings schedule).
    */
-  dividends_equity_node: NodeId;
+  dividends_equity_node: Id;
   /**
    * Sign convention applied to both dividend inputs. Defaults to
    * [`SignConventionPolicy::MagnitudePositive`].
@@ -2664,11 +2671,11 @@ export interface EffectiveTaxRateCheck {
   /**
    * Pretax income node.
    */
-  pretax_income_node: NodeId;
+  pretax_income_node: Id;
   /**
    * Tax expense node.
    */
-  tax_expense_node: NodeId;
+  tax_expense_node: Id;
   [k: string]: unknown;
 }
 /**
@@ -2993,7 +3000,7 @@ export interface FcfSignCheck {
   /**
    * Free cash flow node.
    */
-  fcf_node: NodeId;
+  fcf_node: Id;
   [k: string]: unknown;
 }
 /**
@@ -3126,7 +3133,7 @@ export interface GrowthRateConsistency {
   /**
    * Nodes to monitor for growth-rate plausibility.
    */
-  nodes: NodeId[];
+  nodes: Id[];
   /**
    * Which periods to check.
    */
@@ -3140,7 +3147,7 @@ export interface InterestExpenseReconciliation {
   /**
    * Optional capital-structure interest node for direct comparison.
    */
-  cs_interest_node?: NodeId | null;
+  cs_interest_node?: Id | null;
   /**
    * Debt-balance / rate pairs: `(balance_node, optional_rate_node)`.
    */
@@ -3148,7 +3155,7 @@ export interface InterestExpenseReconciliation {
   /**
    * Interest expense node (income statement).
    */
-  interest_expense_node: NodeId;
+  interest_expense_node: Id;
   /**
    * Tolerance expressed as a fraction (default 0.05 = 5 %).
    */
@@ -3186,41 +3193,41 @@ export interface ThreeStatementMapping {
   /**
    * Total-assets nodes (balance sheet).
    */
-  assets_nodes: NodeId[];
+  assets_nodes: Id[];
   /**
    * Capital expenditures node (cash flow statement).
    */
-  capex_node?: NodeId | null;
+  capex_node?: Id | null;
   /**
    * Cash / cash-equivalents node (balance sheet).
    */
-  cash_node: NodeId;
+  cash_node: Id;
   /**
    * Cash from financing node (cash flow statement).
    */
-  cff_node?: NodeId | null;
+  cff_node?: Id | null;
   /**
    * Cash from investing node (cash flow statement).
    */
-  cfi_node?: NodeId | null;
+  cfi_node?: Id | null;
   /**
    * Cash from operations node (cash flow statement).
    */
-  cfo_node?: NodeId | null;
+  cfo_node?: Id | null;
   /**
    * Capital-structure interest node; when present the interest
    * reconciliation compares against it directly instead of testing an
    * implied rate.
    */
-  cs_interest_node?: NodeId | null;
+  cs_interest_node?: Id | null;
   /**
    * Current-asset nodes summed into net working capital.
    */
-  current_assets_nodes?: NodeId[];
+  current_assets_nodes?: Id[];
   /**
    * Current-liability nodes summed into net working capital.
    */
-  current_liabilities_nodes?: NodeId[];
+  current_liabilities_nodes?: Id[];
   /**
    * Debt-balance / optional-rate pairs used to test the implied interest
    * rate against `interest_expense_node`.
@@ -3229,66 +3236,66 @@ export interface ThreeStatementMapping {
   /**
    * Depreciation / amortization expense node (income statement).
    */
-  depreciation_node?: NodeId | null;
+  depreciation_node?: Id | null;
   /**
    * Dividends charged against equity (balance sheet / equity roll-forward);
    * enables the dividend reconciliation together with `dividends_node`.
    */
-  dividends_equity_node?: NodeId | null;
+  dividends_equity_node?: Id | null;
   /**
    * Dividends paid node (cash flow statement / financing).
    */
-  dividends_node?: NodeId | null;
+  dividends_node?: Id | null;
   /**
    * Total-equity nodes (balance sheet).
    */
-  equity_nodes: NodeId[];
+  equity_nodes: Id[];
   /**
    * Intangible-asset additions node; enables the capex reconciliation
    * together with `capex_node`.
    */
-  intangible_additions_node?: NodeId | null;
+  intangible_additions_node?: Id | null;
   /**
    * Interest expense node (income statement).
    */
-  interest_expense_node?: NodeId | null;
+  interest_expense_node?: Id | null;
   /**
    * Total-liabilities nodes (balance sheet).
    */
-  liabilities_nodes: NodeId[];
+  liabilities_nodes: Id[];
   /**
    * Net income node (income statement).
    */
-  net_income_node: NodeId;
+  net_income_node: Id;
   /**
    * PP&E additions node; enables the capex reconciliation together with
    * `capex_node`.
    */
-  ppe_additions_node?: NodeId | null;
+  ppe_additions_node?: Id | null;
   /**
    * PP&E balance node (balance sheet).
    */
-  ppe_node?: NodeId | null;
+  ppe_node?: Id | null;
   /**
    * Pre-tax income node (income statement).
    */
-  pretax_income_node?: NodeId | null;
+  pretax_income_node?: Id | null;
   /**
    * Retained earnings node (balance sheet).
    */
-  retained_earnings_node: NodeId;
+  retained_earnings_node: Id;
   /**
    * Income tax expense node (income statement).
    */
-  tax_expense_node?: NodeId | null;
+  tax_expense_node?: Id | null;
   /**
    * Total cash flow node (cash flow statement).
    */
-  total_cf_node?: NodeId | null;
+  total_cf_node?: Id | null;
   /**
    * Change-in-working-capital node (cash flow statement, operating).
    */
-  wc_change_cf_node?: NodeId | null;
+  wc_change_cf_node?: Id | null;
 }
 /**
  * Transaction assumptions for an LBO evaluation.
@@ -3522,11 +3529,11 @@ export interface LeverageRangeCheck {
   /**
    * Total debt node.
    */
-  debt_node: NodeId;
+  debt_node: Id;
   /**
    * EBITDA node.
    */
-  ebitda_node: NodeId;
+  ebitda_node: Id;
   /**
    * `(min, max)` range that triggers an error when exceeded.
    *
@@ -3550,11 +3557,11 @@ export interface LiquidityRunwayCheck {
   /**
    * Cash burn rate node (positive = burning cash).
    */
-  cash_burn_node: NodeId;
+  cash_burn_node: Id;
   /**
    * Cash balance node.
    */
-  cash_node: NodeId;
+  cash_node: Id;
   /**
    * Minimum runway (in months) before an error.
    */
@@ -4296,7 +4303,7 @@ export interface TrendCheck {
   /**
    * Node to monitor.
    */
-  node: NodeId;
+  node: Id;
   /**
    * Severity to assign to the finding.
    */
@@ -4331,11 +4338,11 @@ export interface WorkingCapitalConsistency {
   /**
    * Current-asset nodes from the balance sheet.
    */
-  current_assets_nodes: NodeId[];
+  current_assets_nodes: Id[];
   /**
    * Current-liability nodes from the balance sheet.
    */
-  current_liabilities_nodes: NodeId[];
+  current_liabilities_nodes: Id[];
   /**
    * Tolerance override; falls back to
    * [`finstack_quant_statements::checks::CheckConfig::default_tolerance`].
@@ -4344,6 +4351,6 @@ export interface WorkingCapitalConsistency {
   /**
    * Working-capital change node from the cash flow statement.
    */
-  wc_change_cf_node: NodeId;
+  wc_change_cf_node: Id;
   [k: string]: unknown;
 }

@@ -213,17 +213,12 @@ fn defaults_from_file(file: DefaultsFile) -> Result<MonteCarloDefaults> {
 }
 
 fn validate_file(file: &DefaultsFile) -> Result<()> {
-    let schema_version = MONTE_CARLO_DEFAULTS_CONTRACT
+    MONTE_CARLO_DEFAULTS_CONTRACT
         .parse_schema(&file.schema)
         .map_err(|error| Error::Validation(error.to_string()))?;
-    let version = MONTE_CARLO_DEFAULTS_CONTRACT
+    MONTE_CARLO_DEFAULTS_CONTRACT
         .resolve(Some(file.version))
         .map_err(|error| Error::Validation(error.to_string()))?;
-    if schema_version != version {
-        return Err(Error::Validation(format!(
-            "Monte Carlo defaults schema version {schema_version} does not match version {version}"
-        )));
-    }
     validate_runtime("rust.european_pricer", &file.rust.european_pricer)?;
     validate_runtime(
         "rust.path_dependent_pricer",

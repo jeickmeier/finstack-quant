@@ -4,30 +4,19 @@ use finstack_quant_core::market_data::bumps::BumpUnits;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// Unique identifier for a risk factor.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct FactorId(String);
+mod factor_id {
+    /// Marker for [`FactorId`].
+    #[derive(Debug, Clone, Copy, Default)]
+    #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+    pub struct FactorTag;
 
-impl FactorId {
-    /// Create a factor identifier from any string-like value.
-    #[must_use]
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
-    }
-
-    /// Borrow the underlying factor identifier string.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+    /// Unique identifier for a risk factor.
+    ///
+    /// Alias of [`finstack_quant_core::types::Id`].
+    pub type FactorId = finstack_quant_core::types::Id<FactorTag>;
 }
 
-impl fmt::Display for FactorId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+pub use factor_id::FactorId;
 
 /// Broad classification of a risk factor.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

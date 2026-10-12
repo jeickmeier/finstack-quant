@@ -29,8 +29,7 @@ fn loan_debt_service(
             let curve = market.get_forward(index)?;
             // Project the next reset: the accrual starting one reset lag after
             // `as_of` fixes on the curve rather than on a historical fixing.
-            let calendar =
-                crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")?;
+            let calendar = finstack_quant_core::dates::calendar_by_id_strict("weekends_only")?;
             let next_reset = as_of.add_business_days(curve.reset_lag(), calendar)?;
             let projected =
                 term_rate_for_period(curve.as_ref(), market, next_reset, asset.day_count)?;

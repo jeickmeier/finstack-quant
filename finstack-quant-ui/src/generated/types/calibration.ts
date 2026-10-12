@@ -4412,6 +4412,12 @@ export type DE988Ea453181Acf6E6F1 =
       allow_non_monotonic: boolean;
       base: Date24;
       /**
+       * Registered holiday calendar id of the business-day time axis (for
+       * example `"brbd"` for a Bus/252 curve). Omitted when the day count needs
+       * no calendar.
+       */
+      calendar_id?: string | null;
+      /**
        * OIS cut-off (business days) the curve was calibrated under, if any.
        */
       calibration_ois_cutoff_days?: number | null;
@@ -4574,6 +4580,10 @@ export type DE988Ea453181Acf6E6F1 =
        * Time/value pairs used to construct the curve
        */
       knot_points: [number, number][];
+      /**
+       * Source interpolation and accumulated time origin for a rolled curve.
+       */
+      roll_transform?: DB539D636Bb6F89D140E2 | null;
     }
   | {
       correlations: number[];
@@ -4601,6 +4611,10 @@ export type DE988Ea453181Acf6E6F1 =
        * Time/value pairs used to construct the curve.
        */
       knot_points: [number, number][];
+      /**
+       * Source interpolation and accumulated time origin for a rolled curve.
+       */
+      roll_transform?: DB539D636Bb6F89D140E2 | null;
     }
   | {
       base_date: Date31;
@@ -4664,6 +4678,11 @@ export type DE988Ea453181Acf6E6F1 =
             variant: "nss";
             [k: string]: unknown;
           };
+      /**
+       * Current origin in the source model's year-fraction coordinates;
+       * omitted means `0.0` (a curve that has never been rolled).
+       */
+      time_offset?: number;
     }
   | {
       base: Date32;
@@ -4685,6 +4704,10 @@ export type DE988Ea453181Acf6E6F1 =
        * Time/value pairs used to construct the curve
        */
       knot_points: [number, number][];
+      /**
+       * Source interpolation and accumulated time origin for a rolled curve.
+       */
+      roll_transform?: DB539D636Bb6F89D140E2 | null;
       /**
        * Spot index level (volatility index curves)
        */
@@ -4714,6 +4737,10 @@ export type DE988Ea453181Acf6E6F1 =
        * Time/value pairs used to construct the curve
        */
       knot_points: [number, number][];
+      /**
+       * Source interpolation and accumulated time origin for a rolled curve.
+       */
+      roll_transform?: DB539D636Bb6F89D140E2 | null;
       /**
        * Spot index level (volatility index curves)
        */
@@ -5045,10 +5072,7 @@ export type D_35C617761984E0696394 =
     }
   | {
       futures: {
-        /**
-         * Convention-registry identifier for the futures contract.
-         */
-        contract: string;
+        contract: Id25;
         /**
          * Optional pre-computed convexity adjustment.
          */
@@ -5062,7 +5086,7 @@ export type D_35C617761984E0696394 =
     }
   | {
       swap: {
-        index_id: Id25;
+        index_id: Id26;
         /**
          * Relative-tenor or absolute-date maturity pillar.
          */
@@ -5085,7 +5109,7 @@ export type D_35C617761984E0696394 =
     }
   | {
       basis: {
-        index_id: Id26;
+        index_id: Id27;
         /**
          * Relative-tenor or absolute-date maturity pillar.
          */
@@ -5111,13 +5135,13 @@ export type Id23 = string;
  */
 export type Id24 = string;
 /**
- * ISO 8601 calendar date string.
- */
-export type Date25 = string;
-/**
  * Opaque string identifier.
  */
 export type Id25 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date25 = string;
 /**
  * Opaque string identifier.
  */
@@ -5130,6 +5154,10 @@ export type Id27 = string;
  * Opaque string identifier.
  */
 export type Id28 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id29 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -6182,13 +6210,13 @@ export interface D_1Da7F2B6C0211Ad55Af2 {
   role:
     | {
         discount: {
-          projection_curve_id: Id27;
+          projection_curve_id: Id28;
           [k: string]: unknown;
         };
       }
     | {
         projection: {
-          discount_curve_id: Id28;
+          discount_curve_id: Id29;
           [k: string]: unknown;
         };
       };
@@ -6312,4 +6340,11 @@ export interface D_6B0044A7Dc5Fa1F3E1De {
   quote: {
     [k: string]: unknown;
   };
+}
+/**
+ * Serialized source grid and time origin for a rolled interpolation.
+ */
+export interface DB539D636Bb6F89D140E2 {
+  offset: number;
+  source_points: [number, number][];
 }

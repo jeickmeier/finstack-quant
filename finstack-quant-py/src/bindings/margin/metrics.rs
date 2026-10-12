@@ -287,7 +287,8 @@ impl PyMarginFundingCost {
     ///
     /// ``margin_posted`` is a float in ``currency``; ``funding_rate`` and
     /// ``collateral_rate`` are annualised decimal rates (``0.03`` = 3%).
-    /// Raises ``ValueError`` for an unknown currency or a non-finite amount.
+    /// Raises ``ValueError`` for an unknown currency, a non-finite amount or
+    /// funding spread, or an annual cost outside the Decimal range.
     #[new]
     fn new(
         margin_posted: f64,
@@ -300,7 +301,8 @@ impl PyMarginFundingCost {
                 money(margin_posted, currency)?,
                 funding_rate,
                 collateral_rate,
-            ),
+            )
+            .map_err(core_to_py)?,
         })
     }
 
@@ -352,9 +354,13 @@ impl PyMarginFundingCost {
         self.inner.spread()
     }
 
-    /// Cost for a period of ``year_fraction`` years.
-    fn cost_for_period(&self, year_fraction: f64) -> f64 {
-        self.inner.cost_for_period(year_fraction).amount()
+    /// Cost for a period of ``year_fraction`` years; raises ``ValueError``
+    /// for a non-finite fraction or a cost outside the Decimal range.
+    fn cost_for_period(&self, year_fraction: f64) -> PyResult<f64> {
+        self.inner
+            .cost_for_period(year_fraction)
+            .map(|cost| cost.amount())
+            .map_err(core_to_py)
     }
 
     /// Export the result as a single-row pandas ``DataFrame``.
@@ -426,7 +432,8 @@ impl PyHaircut01 {
             inner: finstack_quant_margin::metrics::Haircut01::calculate(
                 money(collateral_value, currency)?,
                 current_haircut,
-            ),
+            )
+            .map_err(core_to_py)?,
         })
     }
 

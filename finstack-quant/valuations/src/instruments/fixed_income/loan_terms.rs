@@ -337,10 +337,15 @@ impl UpfrontFee {
     ///
     /// * `commitment` - Opening commitment the fractional form is applied to;
     ///   the absolute form ignores it.
-    pub fn amount(&self, commitment: Money) -> Money {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the fraction is non-finite or the fee is outside
+    /// the Decimal range.
+    pub fn amount(&self, commitment: Money) -> finstack_quant_core::Result<Money> {
         match self {
-            Self::Amount(money) => *money,
-            Self::FractionOfCommitment(fraction) => commitment * *fraction,
+            Self::Amount(money) => Ok(*money),
+            Self::FractionOfCommitment(fraction) => commitment.checked_mul_f64(*fraction),
         }
     }
 }
@@ -407,10 +412,13 @@ mod tests {
     #[test]
     fn upfront_fee_fraction_scales_with_the_commitment() {
         let commitment = Money::new(50_000_000.0, Currency::USD).expect("money");
-        let pct = UpfrontFee::FractionOfCommitment(0.02).amount(commitment);
+        let pct = UpfrontFee::FractionOfCommitment(0.02)
+            .amount(commitment)
+            .expect("fee");
         assert!((pct.amount() - 1_000_000.0).abs() < 1e-9);
         let abs = UpfrontFee::Amount(Money::new(250_000.0, Currency::USD).expect("money"))
-            .amount(commitment);
+            .amount(commitment)
+            .expect("fee");
         assert!((abs.amount() - 250_000.0).abs() < 1e-9);
     }
 

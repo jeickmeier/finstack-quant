@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::dates::HolidayCalendar;
+use finstack_quant_core::dates::{HolidayCalendar, WeekendRule};
 use time::Month;
 
 /// Standard tolerance for day count year fraction comparisons.
@@ -37,5 +37,9 @@ impl TestCal {
 impl HolidayCalendar for TestCal {
     fn is_holiday(&self, date: Date) -> bool {
         self.holidays.contains(&date)
+    }
+
+    fn is_business_day(&self, date: Date) -> bool {
+        !WeekendRule::SaturdaySunday.is_weekend(date.weekday()) && !self.is_holiday(date)
     }
 }

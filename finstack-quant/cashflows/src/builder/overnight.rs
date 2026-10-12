@@ -622,7 +622,7 @@ impl OvernightBusinessDays {
         let mut days = Vec::with_capacity(capacity);
         let mut cursor = earliest;
         while cursor < window_end {
-            if cursor.is_business_day(calendar) {
+            if calendar.is_business_day(cursor) {
                 days.push(cursor);
             }
             cursor += time::Duration::days(1);
@@ -653,7 +653,7 @@ fn compile_window(
     let mut observations = Vec::new();
     let mut current = window_start;
 
-    if window_start < window_end && !window_start.is_business_day(calendar) {
+    if window_start < window_end && !calendar.is_business_day(window_start) {
         let preceding = business_days
             .step_back(ordinal, lookback.saturating_add(1))
             .ok_or_else(|| {

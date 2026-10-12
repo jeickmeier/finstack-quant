@@ -194,13 +194,6 @@ fn bp_roundtrip() {
 }
 
 #[wasm_bindgen_test]
-fn percentage_roundtrip() {
-    let p = JsPercentage::new(JsValue::from(5.0)).expect("valid");
-    assert!((p.as_decimal() - 0.05).abs() < 1e-12);
-    assert!((p.as_percent() - 5.0).abs() < 1e-12);
-}
-
-#[wasm_bindgen_test]
 fn rate_zero() {
     let r = JsRate::new(JsValue::from(0.0)).expect("valid");
     assert_eq!(r.as_decimal(), 0.0);
@@ -212,12 +205,6 @@ fn rate_zero() {
 fn bp_large_value() {
     let b = JsBps::new(JsValue::from(10_000.0)).expect("valid");
     assert!((b.as_decimal() - 1.0).abs() < 1e-10);
-}
-
-#[wasm_bindgen_test]
-fn percentage_zero() {
-    let p = JsPercentage::new(JsValue::from(0.0)).expect("valid");
-    assert_eq!(p.as_decimal(), 0.0);
 }
 
 #[wasm_bindgen_test]

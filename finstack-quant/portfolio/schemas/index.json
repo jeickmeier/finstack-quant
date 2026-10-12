@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_assignment_report.schema.json",
-      "bytes": 29678,
+      "bytes": 29563,
       "kind": "output",
       "path": "schemas/portfolio/1/factor_assignment_report.schema.json",
       "summary": "Assignment results for a portfolio-level factor mapping pass.",
@@ -101,7 +101,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_pnl_profile.schema.json",
-      "bytes": 21209,
+      "bytes": 22466,
       "kind": "output",
       "path": "schemas/portfolio/1/factor_pnl_profile.schema.json",
       "summary": "P&L profile for one factor across a scenario grid.",
@@ -191,7 +191,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_cashflows.schema.json",
-      "bytes": 53093,
+      "bytes": 53388,
       "kind": "component",
       "path": "schemas/portfolio/1/portfolio_cashflows.schema.json",
       "summary": "Rich portfolio cashflow ladder preserving event classifications.",
@@ -335,7 +335,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/sensitivity_matrix_json.schema.json",
-      "bytes": 20975,
+      "bytes": 22232,
       "kind": "output",
       "path": "schemas/portfolio/1/sensitivity_matrix_json.schema.json",
       "summary": "Canonical wire form of a factor-sensitivity matrix, shared by both hosts.",
@@ -353,7 +353,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/stress_result.schema.json",
-      "bytes": 11951,
+      "bytes": 13202,
       "kind": "output",
       "path": "schemas/portfolio/1/stress_result.schema.json",
       "summary": "Result of a factor-stress scenario.",
@@ -389,7 +389,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/what_if_result.schema.json",
-      "bytes": 13075,
+      "bytes": 14320,
       "kind": "output",
       "path": "schemas/portfolio/1/what_if_result.schema.json",
       "summary": "Result of a position what-if scenario.",

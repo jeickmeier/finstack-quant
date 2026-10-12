@@ -890,8 +890,8 @@ pub(crate) fn emit_float_coupons_on(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::calendar::resolve_calendar_strict;
     use crate::builder::FloatingLegCompounding;
+    use finstack_quant_core::dates::calendar_by_id_strict;
     use time::Month;
 
     #[test]
@@ -972,7 +972,7 @@ mod tests {
             .knots([(0.0, 0.05), (1.0, 0.05)])
             .build()
             .expect("valid forward curve");
-        let calendar = resolve_calendar_strict("weekends_only").expect("calendar registered");
+        let calendar = calendar_by_id_strict("weekends_only").expect("calendar registered");
 
         let observations = OvernightObservationSchedule::compile(
             base,
@@ -1012,7 +1012,7 @@ mod tests {
             .knots([(0.0, 0.05), (1.0, 0.05)])
             .build()
             .expect("valid forward curve");
-        let calendar = resolve_calendar_strict("weekends_only").expect("calendar registered");
+        let calendar = calendar_by_id_strict("weekends_only").expect("calendar registered");
 
         let observations = OvernightObservationSchedule::compile(
             start,

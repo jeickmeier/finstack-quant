@@ -5,6 +5,7 @@
     "fields": [
       "allow_non_monotonic",
       "base",
+      "calendar_id",
       "calibration_ois_cutoff_days",
       "day_count",
       "extrapolation",
@@ -22,7 +23,7 @@
       "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
       "pointer": "#/$defs/CurveState/oneOf/0",
       "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-      "sha256": "9d94c1f60b29790dfd5f61081a5866361b934b1c64df46b902e84ec2104f0ec4",
+      "sha256": "54c0c17b1f975969c253f3fa7fcda5bbd60aad80f2b50790e76451d96d36303c",
       "description": "Discount curve state"
     }
   },
@@ -90,13 +91,14 @@
       "indexation_lag_months",
       "interp_style",
       "knot_points",
+      "roll_transform",
       "type"
     ],
     "source": {
       "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
       "pointer": "#/$defs/CurveState/oneOf/3",
       "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-      "sha256": "494fb684a32d529e7a39c16fd2b759a7721856500eb5d62eae02bd1c70499958",
+      "sha256": "8e775a6ab7fd3e50474f3ae44efd84dc0228cdcad86537eca99b3af6cfbd2040",
       "description": "Inflation curve state"
     }
   },
@@ -127,6 +129,7 @@
       "id",
       "interp_style",
       "knot_points",
+      "roll_transform",
       "spot_level",
       "spot_price",
       "type"
@@ -135,30 +138,8 @@
       "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
       "pointer": "#/$defs/CurveState/oneOf/5",
       "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-      "sha256": "7f6184ff3a168211375a06e4ab5246ea2415af131b246b4386f78f79b8425479",
+      "sha256": "1d7f1c5317ba7d5480380ce107e6335a791bfc3e689c76034bb878f4c60c821d",
       "description": "Price curve state"
-    }
-  },
-  {
-    "type": "vol_index",
-    "route": "stored-knots",
-    "fields": [
-      "base",
-      "day_count",
-      "extrapolation",
-      "id",
-      "interp_style",
-      "knot_points",
-      "spot_level",
-      "spot_price",
-      "type"
-    ],
-    "source": {
-      "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-      "pointer": "#/$defs/CurveState/oneOf/6",
-      "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-      "sha256": "9e4bba8a20a0453412f3773b20310d33ad91618c609f3d4552e28893f453e7b6",
-      "description": "VolIndex curve state"
     }
   },
   {
@@ -171,13 +152,14 @@
       "id",
       "interp_style",
       "knot_points",
+      "roll_transform",
       "type"
     ],
     "source": {
       "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-      "pointer": "#/$defs/CurveState/oneOf/7",
+      "pointer": "#/$defs/CurveState/oneOf/6",
       "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-      "sha256": "146ee4d69c1073ca229ef8f4e8bd277a5edb98d531d22a5f8bbc6d0eb180469b",
+      "sha256": "3a8f5d54d6f814924270d42641e451d0ea145bdee2a0a1d78320bd243a386973",
       "description": "BasisSpread curve state"
     }
   },
@@ -189,13 +171,14 @@
       "day_count",
       "id",
       "model",
+      "time_offset",
       "type"
     ],
     "source": {
       "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-      "pointer": "#/$defs/CurveState/oneOf/8",
+      "pointer": "#/$defs/CurveState/oneOf/7",
       "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-      "sha256": "54a0408f1781150f53f06323998a3b6d4a242b77e397b898125f3959e73a646e",
+      "sha256": "3c213e1b83b45690bbf71b40101b460794ed4af70ff92dd1e2323a864ca8db87",
       "description": "Parametric curve state"
     }
   }

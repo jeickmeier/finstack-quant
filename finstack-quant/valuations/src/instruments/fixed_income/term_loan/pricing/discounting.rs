@@ -52,33 +52,12 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::term_loan::types::RateSpec;
 use crate::pricer::{expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError};
 use crate::results::ValuationResult;
+use finstack_quant_core::cashflow::npv;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 
 use crate::instruments::fixed_income::term_loan::cashflows::generate_cashflows;
 use crate::instruments::fixed_income::term_loan::TermLoan;
-
-/// Discount holder-view flows using the curve's date-based discount factors.
-/// Cashflows on or before `as_of` are already settled and therefore excluded.
-fn npv_by_date(
-    disc: &DiscountCurve,
-    as_of: finstack_quant_core::dates::Date,
-    flows: &[(finstack_quant_core::dates::Date, Money)],
-) -> finstack_quant_core::Result<Money> {
-    if flows.is_empty() {
-        return Err(finstack_quant_core::InputError::TooFewPoints.into());
-    }
-
-    let mut total = Money::from((0_i64, flows[0].1.currency()));
-    for (date, amount) in flows {
-        if *date <= as_of {
-            continue;
-        }
-        total = total.checked_add(*amount * disc.df_between_dates(as_of, *date)?)?;
-    }
-    Ok(total)
-}
 
 /// Term loan pricer using deterministic cashflow discounting.
 ///
@@ -216,7 +195,7 @@ impl TermLoanDiscountingPricer {
             )?;
             Money::new(pv, loan.currency)
         } else {
-            npv_by_date(disc.as_ref(), settlement_date, &flows)
+            npv(disc.as_ref(), settlement_date, &flows)
         }
     }
 
@@ -237,8 +216,10 @@ impl TermLoanDiscountingPricer {
         let mut pre_settlement = Money::from((0_i64, loan.currency));
         for cf in schedule.get_flows() {
             if cf.kind != CFKind::Pik && cf.date > as_of && cf.date <= settlement {
-                pre_settlement = pre_settlement
-                    .checked_add(cf.amount * disc.df_between_dates(as_of, cf.date)?)?;
+                pre_settlement = pre_settlement.checked_add(
+                    cf.amount
+                        .checked_mul_f64(disc.df_between_dates(as_of, cf.date)?)?,
+                )?;
             }
         }
         Ok((df_settlement, pre_settlement))
@@ -274,7 +255,9 @@ impl TermLoanDiscountingPricer {
         }
         let (df_settlement, pre_settlement) =
             Self::settlement_carry(loan, market, as_of, schedule)?;
-        (settlement_value * df_settlement).checked_add(pre_settlement)
+        settlement_value
+            .checked_mul_f64(df_settlement)?
+            .checked_add(pre_settlement)
     }
 
     /// Settlement-date value from an instrument PV on `as_of`: the inverse of
@@ -307,7 +290,9 @@ impl TermLoanDiscountingPricer {
                 loan.id
             )));
         }
-        Ok(value.checked_sub(pre_settlement)? * (1.0 / df_settlement))
+        value
+            .checked_sub(pre_settlement)?
+            .checked_div_f64(df_settlement)
     }
 
     /// The flows a buyer settling today receives, for quote-space measures
@@ -572,7 +557,7 @@ mod tests {
             .iter()
             .map(|cf| (cf.date, cf.amount))
             .collect();
-        let pv_including = npv_by_date(&disc, as_of, &flows_including).expect("pv including PIK");
+        let pv_including = npv(&disc, as_of, &flows_including).expect("pv including PIK");
 
         assert!(
             pv_including.amount() > pv_excluding.amount(),

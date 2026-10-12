@@ -242,10 +242,6 @@
         }
       ]
     },
-    "CovenantMetricId": {
-      "description": "String-backed identifier for a covenant operating metric.\n\nThese identifiers are conventionally aligned with `finstack-quant-statements`\nnode IDs such as `debt_to_ebitda`, `ebitda`, `interest_coverage`, and\n`dscr`, but this crate intentionally has no compile-time dependency on\n`finstack-quant-statements`.",
-      "type": "string"
-    },
     "CovenantScope": {
       "description": "Whether a covenant is tested periodically or only upon an action.",
       "oneOf": [
@@ -272,7 +268,7 @@
         "denominator_metric_id": {
           "anyOf": [
             {
-              "$ref": "#/$defs/CovenantMetricId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -283,13 +279,13 @@
         "metric_id": {
           "anyOf": [
             {
-              "$ref": "#/$defs/CovenantMetricId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
             }
           ],
-          "description": "Metric ID to use for evaluation (for financial covenants)"
+          "description": "Metric ID to use for evaluation (for financial covenants), conventionally\na statements node ID such as `debt_to_ebitda`, `ebitda`,\n`interest_coverage`, or `dscr`."
         },
         "threshold_schedule": {
           "anyOf": [
@@ -731,13 +727,17 @@
       "format": "date",
       "type": "string"
     },
+    "Id": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
+    },
     "SpringingCondition": {
       "additionalProperties": false,
       "description": "Optional activation condition for springing covenants.",
       "properties": {
         "metric_id": {
-          "$ref": "#/$defs/CovenantMetricId",
-          "description": "Metric that controls activation (e.g., revolver utilization)."
+          "$ref": "#/$defs/Id",
+          "description": "Metric that controls activation (e.g., revolver utilization), named by\nits statements node ID."
         },
         "test": {
           "$ref": "#/$defs/ThresholdTest",

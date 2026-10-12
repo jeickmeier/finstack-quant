@@ -13,6 +13,7 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
+use indexmap::map::Entry;
 use indexmap::IndexMap;
 
 /// Resolve the canonical forward-roll target before projecting fixings.
@@ -276,13 +277,27 @@ fn one_instrument_pnl(
             return InstrumentPnlRow::Failed(inst_id, format!("cashflow collection failed: {err}"))
         }
     };
-    for (ccy, flow) in flows {
-        carry_by_currency
-            .entry(ccy)
-            .and_modify(|m| *m += flow)
-            .or_insert(flow);
+    for flow in flows.into_values() {
+        if let Err(err) = add_by_currency(&mut carry_by_currency, flow) {
+            return InstrumentPnlRow::Failed(inst_id, format!("carry aggregation failed: {err}"));
+        }
     }
     InstrumentPnlRow::Carry(inst_id, carry_by_currency)
+}
+
+/// Add `money` into the per-currency `totals`, inserting a new entry for an
+/// unseen currency.
+fn add_by_currency(totals: &mut IndexMap<Currency, Money>, money: Money) -> Result<()> {
+    match totals.entry(money.currency()) {
+        Entry::Occupied(mut entry) => {
+            let sum = entry.get().checked_add(money)?;
+            entry.insert(sum);
+        }
+        Entry::Vacant(entry) => {
+            entry.insert(money);
+        }
+    }
+    Ok(())
 }
 
 fn fold_instrument_pnl_rows(rows: Vec<InstrumentPnlRow>) -> InstrumentPnlResult {
@@ -293,13 +308,19 @@ fn fold_instrument_pnl_rows(rows: Vec<InstrumentPnlRow>) -> InstrumentPnlResult 
         match row {
             InstrumentPnlRow::Failed(id, reason) => failed_instruments.push((id, reason)),
             InstrumentPnlRow::Carry(id, carry_by_currency) => {
-                for (ccy, amount) in &carry_by_currency {
-                    total_carry
-                        .entry(*ccy)
-                        .and_modify(|m| *m += *amount)
-                        .or_insert(*amount);
+                let mut next_total = total_carry.clone();
+                match carry_by_currency
+                    .values()
+                    .try_for_each(|amount| add_by_currency(&mut next_total, *amount))
+                {
+                    Ok(()) => {
+                        total_carry = next_total;
+                        instrument_carry.push((id, carry_by_currency));
+                    }
+                    Err(err) => {
+                        failed_instruments.push((id, format!("carry aggregation failed: {err}")))
+                    }
                 }
-                instrument_carry.push((id, carry_by_currency));
             }
         }
     }
@@ -383,11 +404,7 @@ fn collect_instrument_cashflows(
         let flows = instrument.dated_cashflows(market, start_date)?;
         for (date, money) in flows.into_iter() {
             if date > start_date && date <= end_date {
-                let ccy = money.currency();
-                result
-                    .entry(ccy)
-                    .and_modify(|m| *m += money)
-                    .or_insert(money);
+                add_by_currency(&mut result, money)?;
             }
         }
     }
@@ -698,7 +715,7 @@ mod tests {
         if let Ok(flows) = instrument.dated_cashflows(&market, base_date) {
             for (date, money) in flows {
                 if date > base_date && date <= new_date {
-                    cf_sum += money;
+                    cf_sum = cf_sum.checked_add(money).expect("cf sum");
                 }
             }
         }
@@ -709,8 +726,10 @@ mod tests {
         let pv_new = instrument
             .value(&rolled, new_date)
             .expect("pv at t1 on rolled market");
-        let mut expected = pv_new.checked_sub(pv_old).expect("pv diff");
-        expected += cf_sum;
+        let expected = pv_new
+            .checked_sub(pv_old)
+            .and_then(|diff| diff.checked_add(cf_sum))
+            .expect("pv diff");
         let expected_carry = expected.amount();
 
         let mut ctx = ExecutionContext {

@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/capex_reconciliation.schema.json",
-      "bytes": 3503,
+      "bytes": 4643,
       "kind": "component",
       "path": "schemas/statements_analytics/1/capex_reconciliation.schema.json",
       "summary": "Verifies that cash-flow-statement capex equals the sum of PP&E additions and intangible additions.",
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_analysis_options.schema.json",
-      "bytes": 26061,
+      "bytes": 27149,
       "kind": "input",
       "path": "schemas/statements_analytics/1/corporate_analysis_options.schema.json",
       "summary": "Optional DCF, coverage, check-suite, valuation-date and LTV settings of the corporate analysis pipeline.",
@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/coverage_floor_check.schema.json",
-      "bytes": 1231,
+      "bytes": 2375,
       "kind": "component",
       "path": "schemas/statements_analytics/1/coverage_floor_check.schema.json",
       "summary": "Flags periods where a coverage ratio (e.g.",
@@ -119,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/depreciation_reconciliation.schema.json",
-      "bytes": 3542,
+      "bytes": 4678,
       "kind": "component",
       "path": "schemas/statements_analytics/1/depreciation_reconciliation.schema.json",
       "summary": "Verifies PP&E(t) = PP&E(t−1) + Capex(t) − D&A(t) − Disposals(t).",
@@ -128,7 +128,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dividend_reconciliation.schema.json",
-      "bytes": 3187,
+      "bytes": 4331,
       "kind": "component",
       "path": "schemas/statements_analytics/1/dividend_reconciliation.schema.json",
       "summary": "Verifies that dividends on the cash flow statement equal the dividends charged against equity.",
@@ -164,7 +164,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/effective_tax_rate_check.schema.json",
-      "bytes": 1295,
+      "bytes": 2439,
       "kind": "component",
       "path": "schemas/statements_analytics/1/effective_tax_rate_check.schema.json",
       "summary": "Verifies that the effective tax rate (tax expense / pretax income) falls within an expected range.",
@@ -191,7 +191,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/fcf_sign_check.schema.json",
-      "bytes": 1171,
+      "bytes": 2319,
       "kind": "component",
       "path": "schemas/statements_analytics/1/fcf_sign_check.schema.json",
       "summary": "Tracks consecutive periods of negative free cash flow and flags at configurable thresholds.",
@@ -218,7 +218,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/growth_rate_consistency.schema.json",
-      "bytes": 1888,
+      "bytes": 3036,
       "kind": "component",
       "path": "schemas/statements_analytics/1/growth_rate_consistency.schema.json",
       "summary": "Flags line items whose period-over-period growth exceeds configurable upper / lower bounds.",
@@ -227,7 +227,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/interest_expense_reconciliation.schema.json",
-      "bytes": 1803,
+      "bytes": 2939,
       "kind": "component",
       "path": "schemas/statements_analytics/1/interest_expense_reconciliation.schema.json",
       "summary": "Reconciles interest expense against debt balances or the capital-structure interest schedule.",
@@ -236,7 +236,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
-      "bytes": 14450,
+      "bytes": 15474,
       "kind": "input",
       "path": "schemas/statements_analytics/1/lbo_config.schema.json",
       "summary": "Transaction assumptions for an LBO evaluation.",
@@ -245,7 +245,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
-      "bytes": 33811,
+      "bytes": 34959,
       "kind": "output",
       "path": "schemas/statements_analytics/1/lbo_result.schema.json",
       "summary": "Outputs of an LBO evaluation.",
@@ -263,7 +263,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/leverage_range_check.schema.json",
-      "bytes": 1597,
+      "bytes": 2741,
       "kind": "component",
       "path": "schemas/statements_analytics/1/leverage_range_check.schema.json",
       "summary": "Flags periods where Debt / TTM EBITDA falls outside configurable warning and error ranges.",
@@ -272,7 +272,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/liquidity_runway_check.schema.json",
-      "bytes": 1266,
+      "bytes": 2410,
       "kind": "component",
       "path": "schemas/statements_analytics/1/liquidity_runway_check.schema.json",
       "summary": "Estimates the liquidity runway in months and flags periods that fall below configurable warning and error thresholds.",
@@ -299,7 +299,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/peer_set.schema.json",
-      "bytes": 6881,
+      "bytes": 7845,
       "kind": "component",
       "path": "schemas/statements_analytics/1/peer_set.schema.json",
       "summary": "A set of comparable companies with their metrics.",
@@ -434,7 +434,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/trend_check.schema.json",
-      "bytes": 2246,
+      "bytes": 3394,
       "kind": "component",
       "path": "schemas/statements_analytics/1/trend_check.schema.json",
       "summary": "Flags a metric that has been deteriorating for `lookback_periods` consecutive periods.",
@@ -452,7 +452,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/working_capital_consistency.schema.json",
-      "bytes": 1528,
+      "bytes": 2668,
       "kind": "component",
       "path": "schemas/statements_analytics/1/working_capital_consistency.schema.json",
       "summary": "Verifies that the change in working capital on the cash flow statement equals the negative delta of net working capital on the balance sheet.",

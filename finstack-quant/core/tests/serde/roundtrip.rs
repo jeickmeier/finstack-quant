@@ -67,7 +67,7 @@ fn daycount_ctx_state_roundtrip() {
     let yf = DayCount::Bus252.year_fraction(start, end, ctx).unwrap();
     assert!(yf > 0.0);
 
-    let roundtrip_state: DayCountContextState = ctx.into();
+    let roundtrip_state = DayCountContextState::try_from(ctx).expect("snapshot context");
     assert_eq!(roundtrip_state.calendar_id.as_deref(), Some("target2"));
     assert_eq!(roundtrip_state.frequency, Some(Tenor::quarterly()));
     assert_eq!(roundtrip_state.bus_basis, Some(260));

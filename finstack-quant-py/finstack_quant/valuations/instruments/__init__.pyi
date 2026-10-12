@@ -15033,11 +15033,14 @@ class FxForward:
         foreign_discount_curve_id : str
             Base-currency discount curve identifier.
         base_calendar_id : str | None
-            Base-currency holiday calendar; ``None`` uses weekends only.
+            Base-currency holiday calendar; ``None`` counts weekdays only, except
+            that a USD leg uses ``"usny"``.
         quote_calendar_id : str | None
-            Quote-currency holiday calendar; ``None`` uses weekends only.
+            Quote-currency holiday calendar; ``None`` counts weekdays only, except
+            that a USD leg uses ``"usny"``.
         settlement_days : int | None
-            T+N spot lag in business days (non-negative); ``None`` uses
+            Contractual T+N spot lag in business days (non-negative), honored as
+            given (for example ``1`` for tom-next); ``None`` uses
             :meth:`FxForward.standard_settlement_days` for the pair.
         business_day_convention : BusinessDayConvention | str | None
             Roll rule applied to the maturity: a ``BusinessDayConvention`` or a

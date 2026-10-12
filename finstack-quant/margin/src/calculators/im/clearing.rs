@@ -270,7 +270,12 @@ impl ClearingHouseImCalculator {
     /// # Returns
     ///
     /// `|exposure_base| × conservative_rate`, where the rate is a decimal fraction.
-    pub fn calculate_conservative(&self, exposure_base: Money) -> Money {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the conservative rate is non-finite or the
+    /// scaled amount overflows the Decimal amount range.
+    pub fn calculate_conservative(&self, exposure_base: Money) -> Result<Money> {
         super::conservative_im(exposure_base, self.params().conservative_rate)
     }
 }
@@ -337,7 +342,7 @@ impl ClearingHouseImCalculator {
             as_of,
             "an external IM source amount",
         )?;
-        Ok(self.calculate_conservative(exposure_base))
+        self.calculate_conservative(exposure_base)
     }
 
     fn params(&self) -> CcpParams {
@@ -433,7 +438,9 @@ mod tests {
     fn conservative_calculation() {
         let calc = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear);
         let notional = Money::from((100_000_000_i64, Currency::USD));
-        let im = calc.calculate_conservative(notional);
+        let im = calc
+            .calculate_conservative(notional)
+            .expect("conservative im");
 
         // LCH SwapClear ~2%
         assert_eq!(im.amount(), 2_000_000.0);
@@ -444,7 +451,9 @@ mod tests {
         let calc =
             ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::IceClearCredit);
         let notional = Money::from((50_000_000_i64, Currency::USD));
-        let im = calc.calculate_conservative(notional);
+        let im = calc
+            .calculate_conservative(notional)
+            .expect("conservative im");
 
         // ICE Clear Credit ~10%
         assert_eq!(im.amount(), 5_000_000.0);
@@ -495,7 +504,9 @@ mod tests {
                 mpor_days: 7,
             }));
         let notional = Money::from((100_000_000_i64, Currency::USD));
-        let fallback = calc.calculate_conservative(notional);
+        let fallback = calc
+            .calculate_conservative(notional)
+            .expect("conservative im");
 
         let fake_inst = TestInstrument::new(notional);
         let market = MarketContext::new();

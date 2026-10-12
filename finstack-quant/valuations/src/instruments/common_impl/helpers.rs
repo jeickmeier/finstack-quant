@@ -210,7 +210,7 @@ where
         return Ok(Money::from((0_i64, notional.currency())));
     }
     let disc = market.get_discount(discount_curve_id.as_str())?;
-    // Use None to use the curve's day count for consistent pricing with metrics
+    // Discount on the curve's own time axis, consistent with curve metrics.
     npv(disc.as_ref(), as_of, &flows)
 }
 

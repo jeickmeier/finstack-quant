@@ -104,7 +104,6 @@ export const core = {
   Money: wasm.Money,
   Rate: wasm.Rate,
   Bps: wasm.Bps,
-  Percentage: wasm.Percentage,
   CreditRating: wasm.CreditRating,
   CurveId: wasm.CurveId,
   InstrumentId: wasm.InstrumentId,

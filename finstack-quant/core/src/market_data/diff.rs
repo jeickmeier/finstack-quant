@@ -94,13 +94,25 @@ impl TenorSamplingMethod {
     }
 }
 
+/// Reject an empty tenor grid or a non-finite tenor.
+fn validate_measurement_grid(sample_points: &[f64]) -> Result<()> {
+    if sample_points.is_empty() || sample_points.iter().any(|t| !t.is_finite()) {
+        return Err(crate::InputError::Invalid.into());
+    }
+    Ok(())
+}
+
 /// Generic internal measurement helper for curve-like objects.
 fn measure_average_shift(
     sample_points: &[f64],
     scaling_factor: f64,
     mut value_t0: impl FnMut(f64) -> f64,
     mut value_t1: impl FnMut(f64) -> f64,
-) -> f64 {
+) -> Result<f64> {
+    validate_measurement_grid(sample_points)?;
+    if !scaling_factor.is_finite() {
+        return Err(crate::InputError::Invalid.into());
+    }
     let mut total_shift = 0.0;
     let mut count = 0;
 
@@ -110,6 +122,9 @@ fn measure_average_shift(
         }
         let v0 = value_t0(t);
         let v1 = value_t1(t);
+        if !v0.is_finite() || !v1.is_finite() {
+            return Err(crate::InputError::Invalid.into());
+        }
 
         let shift = if values_are_effectively_equal(v0, v1) {
             0.0
@@ -117,13 +132,20 @@ fn measure_average_shift(
             (v1 - v0) * scaling_factor
         };
         total_shift += shift;
+        if !total_shift.is_finite() {
+            return Err(crate::InputError::Invalid.into());
+        }
         count += 1;
     }
 
     if count == 0 {
-        return 0.0;
+        return Err(crate::InputError::TooFewPoints.into());
     }
-    total_shift / count as f64
+    let average = total_shift / count as f64;
+    if !average.is_finite() {
+        return Err(crate::InputError::Invalid.into());
+    }
+    Ok(average)
 }
 
 fn values_are_effectively_equal(a: f64, b: f64) -> bool {
@@ -149,7 +171,9 @@ fn values_are_effectively_equal(a: f64, b: f64) -> bool {
 ///
 /// # Errors
 ///
-/// Returns an error if `curve_id` is absent from either market context.
+/// Returns an error if `curve_id` is absent from either market context, the
+/// selected grid is empty or non-finite, or a curve cannot provide a finite
+/// sample value on that grid.
 pub fn measure_discount_curve_shift(
     curve_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -160,12 +184,7 @@ pub fn measure_discount_curve_shift(
     let curve_t1 = market_t1.get_discount(&curve_id)?;
 
     let tenors = method.tenors(Some(curve_t0.knots()));
-    Ok(measure_average_shift(
-        tenors,
-        10_000.0,
-        |t| curve_t0.zero(t),
-        |t| curve_t1.zero(t),
-    ))
+    measure_average_shift(tenors, 10_000.0, |t| curve_t0.zero(t), |t| curve_t1.zero(t))
 }
 
 /// Measure average parallel spread shift in hazard curve (basis points).
@@ -181,7 +200,9 @@ pub fn measure_discount_curve_shift(
 ///
 /// # Errors
 ///
-/// Returns an error if `curve_id` is absent from either market context.
+/// Returns an error if `curve_id` is absent from either market context, the
+/// selected grid is empty or non-finite, or a curve cannot provide a finite
+/// sample value on that grid.
 pub fn measure_hazard_curve_shift(
     curve_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -197,12 +218,12 @@ pub fn measure_hazard_curve_shift(
         _ => method.tenors(None),
     };
 
-    Ok(measure_average_shift(
+    measure_average_shift(
         tenors,
         10_000.0,
         |t| curve_t0.hazard_rate(t),
         |t| curve_t1.hazard_rate(t),
-    ))
+    )
 }
 
 /// Measure the average **par CDS spread** shift on a hazard curve (basis points).
@@ -225,7 +246,9 @@ pub fn measure_hazard_curve_shift(
 ///
 /// # Errors
 ///
-/// Returns an error if `curve_id` is absent from either market context.
+/// Returns an error if `curve_id` is absent from either market context, the
+/// selected grid is empty or non-finite, or a curve cannot provide a finite
+/// sample value on that grid.
 pub fn measure_par_spread_shift(
     curve_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -244,12 +267,12 @@ pub fn measure_par_spread_shift(
     let interp_t0 = curve_t0.par_interp();
     let interp_t1 = curve_t1.par_interp();
     // `cds_quote_bp` already returns basis points → scaling factor 1.0.
-    Ok(measure_average_shift(
+    measure_average_shift(
         tenors,
         1.0,
         |t| curve_t0.cds_quote_bp(t, interp_t0),
         |t| curve_t1.cds_quote_bp(t, interp_t1),
-    ))
+    )
 }
 
 /// Measure the **per-tenor** par CDS spread shift (basis points) at the given
@@ -271,7 +294,9 @@ pub fn measure_par_spread_shift(
 ///
 /// # Errors
 ///
-/// Returns an error if `curve_id` is absent from either market context.
+/// Returns an error if `curve_id` is absent from either market context, the
+/// selected grid is empty or non-finite, or a curve cannot provide a finite
+/// sample value on that grid.
 pub fn measure_per_tenor_par_spread_shift(
     curve_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -282,10 +307,18 @@ pub fn measure_per_tenor_par_spread_shift(
     let curve_t1 = market_t1.get_hazard(&curve_id)?;
     let interp_t0 = curve_t0.par_interp();
     let interp_t1 = curve_t1.par_interp();
-    Ok(tenors
+    validate_measurement_grid(tenors)?;
+    tenors
         .iter()
-        .map(|&t| curve_t1.cds_quote_bp(t, interp_t1) - curve_t0.cds_quote_bp(t, interp_t0))
-        .collect())
+        .map(|&t| {
+            let shift = curve_t1.cds_quote_bp(t, interp_t1) - curve_t0.cds_quote_bp(t, interp_t0);
+            if shift.is_finite() {
+                Ok(shift)
+            } else {
+                Err(crate::InputError::Invalid.into())
+            }
+        })
+        .collect()
 }
 
 /// Measure the average **credit-curve** shift (basis points), accepting either
@@ -369,10 +402,18 @@ pub fn measure_per_tenor_credit_curve_shift(
     }
     let curve_t0 = market_t0.get_discount(curve_id)?;
     let curve_t1 = market_t1.get_discount(curve_id)?;
-    Ok(tenors
+    validate_measurement_grid(tenors)?;
+    tenors
         .iter()
-        .map(|&t| (curve_t1.zero(t) - curve_t0.zero(t)) * 10_000.0)
-        .collect())
+        .map(|&t| {
+            let shift = (curve_t1.zero(t) - curve_t0.zero(t)) * 10_000.0;
+            if shift.is_finite() {
+                Ok(shift)
+            } else {
+                Err(crate::InputError::Invalid.into())
+            }
+        })
+        .collect()
 }
 
 /// Measure average inflation rate shift (basis points).
@@ -394,7 +435,7 @@ pub fn measure_inflation_curve_shift(
 ) -> Result<f64> {
     let curve_t0 = market_t0.get_inflation_curve(&curve_id)?;
     let curve_t1 = market_t1.get_inflation_curve(&curve_id)?;
-    Ok(measure_average_shift(
+    measure_average_shift(
         STANDARD_TENORS,
         10_000.0,
         |t| {
@@ -413,7 +454,7 @@ pub fn measure_inflation_curve_shift(
                 ratio.powf(1.0 / t) - 1.0
             }
         },
-    ))
+    )
 }
 
 /// Measure the change between the latest published index levels, in basis points.
@@ -991,8 +1032,18 @@ mod tests {
 
     #[test]
     fn average_shift_uses_relative_equality_for_large_magnitudes() {
-        let shift = measure_average_shift(&[1.0], 10_000.0, |_| 1.0e9, |_| 1.0e9 + 1.0e-6);
+        let shift = measure_average_shift(&[1.0], 10_000.0, |_| 1.0e9, |_| 1.0e9 + 1.0e-6)
+            .expect("finite sample should measure");
 
         assert_eq!(shift, 0.0);
+    }
+
+    #[test]
+    fn shift_measurement_rejects_empty_or_non_finite_grids_and_samples() {
+        assert!(measure_average_shift(&[], 1.0, |_| 0.0, |_| 1.0).is_err());
+        assert!(measure_average_shift(&[f64::NAN], 1.0, |_| 0.0, |_| 1.0).is_err());
+        assert!(measure_average_shift(&[1.0], 1.0, |_| f64::INFINITY, |_| 1.0).is_err());
+        assert!(validate_measurement_grid(&[]).is_err());
+        assert!(validate_measurement_grid(&[f64::INFINITY]).is_err());
     }
 }

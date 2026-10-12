@@ -67,10 +67,22 @@ pub(crate) fn build_interp_input_error(
 /// helper shared by all term-structure `*_on_date()` methods.
 #[inline]
 pub(crate) fn year_fraction_to(base: Date, date: Date, day_count: DayCount) -> Result<f64> {
+    year_fraction_to_with_ctx(base, date, day_count, DayCountContext::default())
+}
+
+/// [`year_fraction_to`] for a curve whose time axis carries a holiday
+/// calendar (Bus/252 discount curves).
+#[inline]
+pub(crate) fn year_fraction_to_with_ctx(
+    base: Date,
+    date: Date,
+    day_count: DayCount,
+    ctx: DayCountContext<'_>,
+) -> Result<f64> {
     if date == base {
         Ok(0.0)
     } else {
-        Ok(day_count.signed_year_fraction(base, date, DayCountContext::default())?)
+        Ok(day_count.signed_year_fraction(base, date, ctx)?)
     }
 }
 

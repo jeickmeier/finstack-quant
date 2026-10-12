@@ -23,7 +23,7 @@ impl ResolvedVarianceCalendar {
     fn resolve(spec: VarianceCalendar<'_>) -> finstack_quant_core::Result<Self> {
         match spec {
             VarianceCalendar::Single(id) => Ok(Self::Single(
-                crate::cashflow::builder::calendar::resolve_calendar_strict(id)?,
+                finstack_quant_core::dates::calendar_by_id_strict(id)?,
             )),
             VarianceCalendar::Joint { base, quote } => Ok(Self::Joint(
                 ResolvedCalendarPair::resolve(Some(base), Some(quote))?,

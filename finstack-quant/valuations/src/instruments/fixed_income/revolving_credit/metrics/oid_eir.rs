@@ -26,7 +26,7 @@ impl MetricCalculator for OidEirAmortizationCalculator {
         let schedule = facility.raw_cashflow_schedule(&context.curves, origination)?;
         let spec = facility.oid_eir.clone().unwrap_or_default();
         let mut extra = Vec::new();
-        let upfront = facility.upfront_fee_amount();
+        let upfront = facility.upfront_fee_amount()?;
         if upfront.amount() > 0.0 {
             extra.push((origination, upfront.amount()));
         }

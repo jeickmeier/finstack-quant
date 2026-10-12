@@ -336,7 +336,7 @@ fn initialize_build_state(
         flows.push(CashFlow::new(
             issue,
             None,
-            notional.initial * -1.0,
+            notional.initial.checked_neg(),
             CFKind::Notional,
             0.0,
             None,

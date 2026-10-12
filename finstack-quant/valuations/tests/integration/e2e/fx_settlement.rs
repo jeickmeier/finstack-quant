@@ -74,6 +74,8 @@ fn test_usd_eur_spot_new_year_2024() {
     // Jan 1 is a joint closure.
     let spot = fx_spot_date(
         trade_date,
+        Currency::USD,
+        Currency::EUR,
         2,               // T+2
         Some("nyse"),    // USD calendar
         Some("target2"), // EUR calendar
@@ -119,8 +121,16 @@ fn test_usd_eur_spot_christmas_2024() {
 
     // CLS-consistent rule : same result here
     // since the skipped days are TARGET2 (non-USD) closures.
-    let spot = fx_spot_date(trade_date, 2, Some("nyse"), Some("target2"), Some("nyse"))
-        .expect("Valid calendars");
+    let spot = fx_spot_date(
+        trade_date,
+        Currency::USD,
+        Currency::EUR,
+        2,
+        Some("nyse"),
+        Some("target2"),
+        Some("nyse"),
+    )
+    .expect("Valid calendars");
 
     // Expected: Friday, December 27, 2024
     let expected = create_date(2024, Month::December, 27).expect("Valid expected date");
@@ -238,8 +248,16 @@ fn test_usd_gbp_spot_july_4th_2025() {
     let trade_date = create_date(2025, Month::July, 2).expect("Valid date");
 
     // CLS-consistent rule .
-    let spot = fx_spot_date(trade_date, 2, Some("nyse"), Some("gblo"), Some("nyse"))
-        .expect("Valid calendars");
+    let spot = fx_spot_date(
+        trade_date,
+        Currency::USD,
+        Currency::GBP,
+        2,
+        Some("nyse"),
+        Some("gblo"),
+        Some("nyse"),
+    )
+    .expect("Valid calendars");
 
     // Expected: Monday, July 7, 2025
     let expected = create_date(2025, Month::July, 7).expect("Valid expected date");
@@ -314,8 +332,16 @@ fn test_add_joint_business_days_christmas_week_2024() {
 fn test_usd_gbp_spot_mlk_day_2025() {
     let trade_date = create_date(2025, Month::January, 17).expect("Valid date");
 
-    let spot = fx_spot_date(trade_date, 2, Some("nyse"), Some("gblo"), Some("nyse"))
-        .expect("Valid calendars");
+    let spot = fx_spot_date(
+        trade_date,
+        Currency::USD,
+        Currency::GBP,
+        2,
+        Some("nyse"),
+        Some("gblo"),
+        Some("nyse"),
+    )
+    .expect("Valid calendars");
 
     // Expected: Tuesday, January 21, 2025
     let expected = create_date(2025, Month::January, 21).expect("Valid expected date");

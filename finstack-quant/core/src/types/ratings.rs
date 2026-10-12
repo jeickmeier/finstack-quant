@@ -51,7 +51,9 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Investment Grade
 ///
-/// Ratings of `BBBMinus` and above are considered "investment grade":
+/// Ratings of `BBBMinus` and above are considered "investment grade".
+/// Ordering follows the `repr(u8)` discriminant, so `NR` (21) sorts before
+/// `D` (22) even though `D` is declared first:
 ///
 /// ```rust
 /// use finstack_quant_core::types::CreditRating;
@@ -59,79 +61,81 @@ use serde::{Deserialize, Serialize};
 /// assert!(CreditRating::A.is_investment_grade());
 /// assert!(CreditRating::BBBMinus.is_investment_grade());
 /// assert!(!CreditRating::BBPlus.is_investment_grade());
+/// assert!(CreditRating::C < CreditRating::NR && CreditRating::NR < CreditRating::D);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[repr(u8)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum CreditRating {
     /// AAA / Aaa — Highest quality, minimal credit risk
     #[serde(rename = "AAA")]
-    AAA,
+    AAA = 0,
     /// AA+ / Aa1
     #[serde(rename = "AA+")]
-    AAPlus,
+    AAPlus = 1,
     /// AA / Aa2 — Very high quality, very low credit risk
     #[serde(rename = "AA")]
-    AA,
+    AA = 2,
     /// AA- / Aa3
     #[serde(rename = "AA-")]
-    AAMinus,
+    AAMinus = 3,
     /// A+ / A1
     #[serde(rename = "A+")]
-    APlus,
+    APlus = 4,
     /// A / A2 — High quality, low credit risk
     #[serde(rename = "A")]
-    A,
+    A = 5,
     /// A- / A3
     #[serde(rename = "A-")]
-    AMinus,
+    AMinus = 6,
     /// BBB+ / Baa1
     #[serde(rename = "BBB+")]
-    BBBPlus,
+    BBBPlus = 7,
     /// BBB / Baa2 — Medium grade, moderate credit risk (lowest investment grade)
     #[serde(rename = "BBB")]
-    BBB,
+    BBB = 8,
     /// BBB- / Baa3
     #[serde(rename = "BBB-")]
-    BBBMinus,
+    BBBMinus = 9,
     /// BB+ / Ba1
     #[serde(rename = "BB+")]
-    BBPlus,
+    BBPlus = 10,
     /// BB / Ba2 — Speculative, substantial credit risk
     #[serde(rename = "BB")]
-    BB,
+    BB = 11,
     /// BB- / Ba3
     #[serde(rename = "BB-")]
-    BBMinus,
+    BBMinus = 12,
     /// B+ / B1
     #[serde(rename = "B+")]
-    BPlus,
+    BPlus = 13,
     /// B / B2 — Highly speculative, high credit risk
     #[serde(rename = "B")]
-    B,
+    B = 14,
     /// B- / B3
     #[serde(rename = "B-")]
-    BMinus,
+    BMinus = 15,
     /// CCC+ / Caa1
     #[serde(rename = "CCC+")]
-    CCCPlus,
+    CCCPlus = 16,
     /// CCC / Caa2 — Poor standing, very high credit risk
     #[serde(rename = "CCC")]
-    CCC,
+    CCC = 17,
     /// CCC- / Caa3
     #[serde(rename = "CCC-")]
-    CCCMinus,
+    CCCMinus = 18,
     /// CC / Ca — Highly vulnerable, near default
     #[serde(rename = "CC")]
-    CC,
+    CC = 19,
     /// C — Lowest rated, typically in default
     #[serde(rename = "C")]
-    C,
-    /// D — In default
+    C = 20,
+    /// D — In default. Discriminant 22, so this sorts after `NR`.
     #[serde(rename = "D")]
-    D,
-    /// NR — Not rated
+    D = 22,
+    /// NR — Not rated. Discriminant 21, between `C` and `D`.
     #[serde(rename = "NR")]
-    NR,
+    NR = 21,
 }
 
 impl CreditRating {
@@ -160,45 +164,9 @@ impl CreditRating {
     }
 
     /// Numeric ordinal for ordering. Lower values indicate higher credit quality.
-    /// NR is placed between C and D in the ordering.
+    /// The value is the `repr(u8)` discriminant, which places `NR` between `C` and `D`.
     fn ordinal(self) -> u8 {
-        match self {
-            Self::AAA => 0,
-            Self::AAPlus => 1,
-            Self::AA => 2,
-            Self::AAMinus => 3,
-            Self::APlus => 4,
-            Self::A => 5,
-            Self::AMinus => 6,
-            Self::BBBPlus => 7,
-            Self::BBB => 8,
-            Self::BBBMinus => 9,
-            Self::BBPlus => 10,
-            Self::BB => 11,
-            Self::BBMinus => 12,
-            Self::BPlus => 13,
-            Self::B => 14,
-            Self::BMinus => 15,
-            Self::CCCPlus => 16,
-            Self::CCC => 17,
-            Self::CCCMinus => 18,
-            Self::CC => 19,
-            Self::C => 20,
-            Self::NR => 21,
-            Self::D => 22,
-        }
-    }
-}
-
-impl PartialOrd for CreditRating {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for CreditRating {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.ordinal().cmp(&other.ordinal())
+        self as u8
     }
 }
 
@@ -217,19 +185,7 @@ impl CreditRating {
     /// assert!(!CreditRating::BBPlus.is_investment_grade());
     /// ```
     pub fn is_investment_grade(&self) -> bool {
-        matches!(
-            self,
-            Self::AAA
-                | Self::AAPlus
-                | Self::AA
-                | Self::AAMinus
-                | Self::APlus
-                | Self::A
-                | Self::AMinus
-                | Self::BBBPlus
-                | Self::BBB
-                | Self::BBBMinus
-        )
+        self.ordinal() <= Self::BBBMinus.ordinal()
     }
 
     /// Check if rating is speculative grade (below BBB-).
@@ -363,15 +319,7 @@ fn parse_credit_rating(value: &str) -> Result<CreditRating, crate::Error> {
         .into());
     }
 
-    let normalized = trimmed.replace(' ', "");
-    if normalized.is_empty() {
-        return Err(crate::error::InputError::InvalidRating {
-            value: value.to_string(),
-        }
-        .into());
-    }
-
-    let upper = normalized.to_uppercase();
+    let upper = trimmed.replace(' ', "").to_uppercase();
 
     if matches!(upper.as_str(), "NR" | "NOTRATED" | "UNRATED") {
         return Ok(CreditRating::NR);
@@ -420,48 +368,44 @@ fn parse_credit_rating(value: &str) -> Result<CreditRating, crate::Error> {
         .into());
     }
 
-    // Ratings that don't support notches always resolve to the flat variant
-    let supports_notches = matches!(
-        base_slice,
-        "AA" | "A" | "BBB" | "BAA" | "BB" | "BA" | "B" | "CCC" | "CAA"
-    );
-
-    let rating = match (base_slice, supports_notches) {
-        ("AAA", _) => CreditRating::AAA,
-        ("AA", true) => match notch {
+    // AAA, CC, C, D, and NR have no notches. A `+`, `-`, or Moody's digit on
+    // those bases is ignored and the flat variant is returned.
+    let rating = match base_slice {
+        "AAA" => CreditRating::AAA,
+        "AA" => match notch {
             Notch::Plus => CreditRating::AAPlus,
             Notch::Flat => CreditRating::AA,
             Notch::Minus => CreditRating::AAMinus,
         },
-        ("A", true) => match notch {
+        "A" => match notch {
             Notch::Plus => CreditRating::APlus,
             Notch::Flat => CreditRating::A,
             Notch::Minus => CreditRating::AMinus,
         },
-        ("BBB" | "BAA", true) => match notch {
+        "BBB" | "BAA" => match notch {
             Notch::Plus => CreditRating::BBBPlus,
             Notch::Flat => CreditRating::BBB,
             Notch::Minus => CreditRating::BBBMinus,
         },
-        ("BB" | "BA", true) => match notch {
+        "BB" | "BA" => match notch {
             Notch::Plus => CreditRating::BBPlus,
             Notch::Flat => CreditRating::BB,
             Notch::Minus => CreditRating::BBMinus,
         },
-        ("B", true) => match notch {
+        "B" => match notch {
             Notch::Plus => CreditRating::BPlus,
             Notch::Flat => CreditRating::B,
             Notch::Minus => CreditRating::BMinus,
         },
-        ("CCC" | "CAA", true) => match notch {
+        "CCC" | "CAA" => match notch {
             Notch::Plus => CreditRating::CCCPlus,
             Notch::Flat => CreditRating::CCC,
             Notch::Minus => CreditRating::CCCMinus,
         },
-        ("CC" | "CA", _) => CreditRating::CC,
-        ("C", _) => CreditRating::C,
-        ("D", _) => CreditRating::D,
-        ("NR", _) => CreditRating::NR,
+        "CC" | "CA" => CreditRating::CC,
+        "C" => CreditRating::C,
+        "D" => CreditRating::D,
+        "NR" => CreditRating::NR,
         _ => {
             return Err(crate::error::InputError::InvalidRating {
                 value: value.to_string(),
@@ -541,6 +485,8 @@ mod tests {
         assert!(CreditRating::AA < CreditRating::AAMinus);
         assert!(CreditRating::AAMinus < CreditRating::APlus);
         assert!(CreditRating::BBBMinus < CreditRating::BBPlus);
+        assert!(CreditRating::C < CreditRating::NR);
+        assert!(CreditRating::NR < CreditRating::D);
         assert!(CreditRating::B < CreditRating::D);
     }
 
@@ -585,6 +531,12 @@ mod tests {
             "Not Rated".parse::<CreditRating>().expect("Not Rated"),
             CreditRating::NR
         );
+        assert_eq!(
+            "AAA+".parse::<CreditRating>().expect("AAA+"),
+            CreditRating::AAA
+        );
+        assert_eq!("Ca".parse::<CreditRating>().expect("Ca"), CreditRating::CC);
+        assert_eq!("D1".parse::<CreditRating>().expect("D1"), CreditRating::D);
         assert!("XYZ".parse::<CreditRating>().is_err());
     }
 
@@ -610,5 +562,31 @@ mod tests {
                 "noncanonical persisted rating {noncanonical} must be rejected"
             );
         }
+    }
+
+    #[test]
+    fn every_rating_display_matches_serde_wire_name() {
+        let check = |rating: CreditRating| {
+            let json = serde_json::to_string(&rating).expect("rating serializes");
+            assert_eq!(json, format!("\"{rating}\""));
+            let restored: CreditRating = serde_json::from_str(&json).expect("rating deserializes");
+            assert_eq!(restored, rating);
+        };
+
+        // One list: a missing variant fails this match, and every listed variant
+        // is checked against its serde rename.
+        macro_rules! check_ratings {
+            ($($variant:ident),+ $(,)?) => {{
+                $(check(CreditRating::$variant);)+
+                let _exhaustive = |rating: CreditRating| match rating {
+                    $(CreditRating::$variant)|+ => {}
+                };
+            }};
+        }
+
+        check_ratings!(
+            AAA, AAPlus, AA, AAMinus, APlus, A, AMinus, BBBPlus, BBB, BBBMinus, BBPlus, BB,
+            BBMinus, BPlus, B, BMinus, CCCPlus, CCC, CCCMinus, CC, C, D, NR,
+        );
     }
 }

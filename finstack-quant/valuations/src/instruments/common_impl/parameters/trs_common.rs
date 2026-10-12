@@ -77,7 +77,7 @@ impl TrsScheduleSpec {
                 "{context} schedule start must precede end"
             )));
         }
-        crate::cashflow::builder::calendar::resolve_calendar_strict(&self.params.calendar_id)?;
+        finstack_quant_core::dates::calendar_by_id_strict(&self.params.calendar_id)?;
         let schedule = self.period_schedule()?;
         if schedule.dates.len() < 2 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -119,8 +119,7 @@ impl TrsScheduleSpec {
     ///
     /// * `accrual_end` - Contractual end date of the return period, before payment adjustment.
     pub fn payment_date_for(&self, accrual_end: Date) -> finstack_quant_core::Result<Date> {
-        let cal =
-            crate::cashflow::builder::calendar::resolve_calendar_strict(&self.params.calendar_id)?;
+        let cal = finstack_quant_core::dates::calendar_by_id_strict(&self.params.calendar_id)?;
         let adjusted = finstack_quant_core::dates::adjust(
             accrual_end,
             self.params.business_day_convention,

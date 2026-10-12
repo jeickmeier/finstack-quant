@@ -653,9 +653,7 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
         expiry: finstack_quant_core::dates::Date,
         conventions: &SwaptionLegConventions<'_>,
     ) -> Result<finstack_quant_core::dates::Date> {
-        let calendar = finstack_quant_cashflows::builder::calendar::resolve_calendar_strict(
-            conventions.calendar_id,
-        )?;
+        let calendar = finstack_quant_core::dates::calendar_by_id_strict(conventions.calendar_id)?;
         let unadjusted_start = expiry.add_business_days(conventions.settlement_days, calendar)?;
         adjust(
             unadjusted_start,

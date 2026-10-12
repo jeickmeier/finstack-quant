@@ -120,7 +120,7 @@ impl<'a> MetricsContext<'a> {
             &finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new(),
         )?;
         let (avg_credit_shift_bp, credit_curves_measured) =
-            average_credit(&market_deps, market_t0, market_t1);
+            average_credit(&market_deps, market_t0, market_t1)?;
         let (avg_vol_shift_abs, vol_shift_error) = match volatility_shift(
             instrument.as_ref(),
             &market_deps,
@@ -184,10 +184,19 @@ fn average_credit(
     deps: &MarketDependencies,
     t0: &MarketContext,
     t1: &MarketContext,
-) -> (Option<f64>, usize) {
-    average_over(&deps.curves.credit_curves, |id| {
-        measure_credit_curve_shift(id.as_str(), t0, t1, TenorSamplingMethod::Standard).ok()
-    })
+) -> finstack_quant_core::Result<(Option<f64>, usize)> {
+    let mut shifts = Vec::with_capacity(deps.curves.credit_curves.len());
+    for id in &deps.curves.credit_curves {
+        if let Some(shift) = crate::helpers::measured_unless_missing(measure_credit_curve_shift(
+            id.as_str(),
+            t0,
+            t1,
+            TenorSamplingMethod::Standard,
+        ))? {
+            shifts.push(shift);
+        }
+    }
+    Ok(average_over(shifts, Some))
 }
 
 fn average_spot(deps: &MarketDependencies, t0: &MarketContext, t1: &MarketContext) -> Option<f64> {

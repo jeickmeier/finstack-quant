@@ -1113,7 +1113,7 @@
         "factor_ids": {
           "description": "Factor identifiers, in the row and column order of `data`.",
           "items": {
-            "$ref": "#/$defs/FactorId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
@@ -1147,7 +1147,7 @@
           "description": "Broad factor classification."
         },
         "id": {
-          "$ref": "#/$defs/FactorId",
+          "$ref": "#/$defs/Id",
           "description": "Unique factor identifier."
         },
         "market_mapping": {
@@ -1161,10 +1161,6 @@
         "market_mapping"
       ],
       "type": "object"
-    },
-    "FactorId": {
-      "description": "Unique identifier for a risk factor.",
-      "type": "string"
     },
     "FactorModelConfig": {
       "additionalProperties": false,
@@ -1239,7 +1235,7 @@
         "factor_id": {
           "anyOf": [
             {
-              "$ref": "#/$defs/FactorId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -1531,7 +1527,7 @@
           "description": "Dependency-side filter."
         },
         "factor_id": {
-          "$ref": "#/$defs/FactorId",
+          "$ref": "#/$defs/Id",
           "description": "Factor assigned when both filters match."
         }
       },

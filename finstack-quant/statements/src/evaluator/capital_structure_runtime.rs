@@ -402,14 +402,24 @@ fn accumulate(
     source: &crate::capital_structure::CashflowBreakdown,
     convert: impl Fn(Money) -> crate::error::Result<Money>,
 ) -> crate::error::Result<()> {
-    total.interest_expense_cash += convert(source.interest_expense_cash)?;
-    total.interest_expense_pik += convert(source.interest_expense_pik)?;
-    total.principal_payment += convert(source.principal_payment)?;
-    total.fees += convert(source.fees)?;
-    total.debt_balance += convert(source.debt_balance)?;
-    total.accrued_interest += convert(source.accrued_interest)?;
+    total.interest_expense_cash = total
+        .interest_expense_cash
+        .checked_add(convert(source.interest_expense_cash)?)?;
+    total.interest_expense_pik = total
+        .interest_expense_pik
+        .checked_add(convert(source.interest_expense_pik)?)?;
+    total.principal_payment = total
+        .principal_payment
+        .checked_add(convert(source.principal_payment)?)?;
+    total.fees = total.fees.checked_add(convert(source.fees)?)?;
+    total.debt_balance = total
+        .debt_balance
+        .checked_add(convert(source.debt_balance)?)?;
+    total.accrued_interest = total
+        .accrued_interest
+        .checked_add(convert(source.accrued_interest)?)?;
     let mut income = total.interest_income_cash_or_zero();
-    income += convert(source.interest_income_cash_or_zero())?;
+    income = income.checked_add(convert(source.interest_income_cash_or_zero())?)?;
     total.interest_income_cash = Some(income);
     // Opening balance and principal components; one the source does not
     // record leaves the total untouched.

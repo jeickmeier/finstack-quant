@@ -1,6 +1,6 @@
 //! Discount-curve bumping and roll-forward transformations.
 
-use super::super::common::{roll_knots, year_fraction_to};
+use super::super::common::{roll_knots, year_fraction_to_with_ctx};
 use super::DiscountCurve;
 use crate::dates::DateExt;
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
@@ -266,7 +266,12 @@ impl DiscountCurve {
             return Ok(self.clone());
         }
         let new_base = self.base.add_days(days)?;
-        let dt_years = year_fraction_to(self.base, new_base, self.day_count)?;
+        let dt_years = year_fraction_to_with_ctx(
+            self.base,
+            new_base,
+            self.day_count,
+            self.day_count_context(),
+        )?;
 
         // Realized-forward renormalization: divide every rolled DF by the
         // old curve's DF at the roll horizon, interpolated in the curve's own

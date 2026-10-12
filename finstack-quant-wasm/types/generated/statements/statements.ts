@@ -339,21 +339,6 @@ export type AssetDynamics =
       };
     };
 /**
- * Type-safe identifier for a node in a financial model.
- *
- * Serializes as a plain string and is interoperable with `&str` via
- * [`Borrow`] and [`AsRef`].
- */
-export type NodeId = string;
-/**
- * Barrier-crossing detection policy for first-passage default simulation.
- *
- * `Discrete` only checks the barrier at grid points (fast but biased for
- * coarse time steps). `BrownianBridge` uses a Brownian-bridge crossing
- * probability between grid points to approximate continuous monitoring.
- */
-export type BarrierCrossing = "discrete" | "brownian_bridge";
-/**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
  * This type wraps a string identifier with a phantom type parameter to ensure
@@ -377,6 +362,14 @@ export type BarrierCrossing = "discrete" | "brownian_bridge";
  * safely share and clone IDs with minimal synchronization overhead.
  */
 export type Id = string;
+/**
+ * Barrier-crossing detection policy for first-passage default simulation.
+ *
+ * `Discrete` only checks the barrier at grid points (fast but biased for
+ * coarse time steps). `BrownianBridge` uses a Brownian-bridge crossing
+ * probability between grid points to approximate continuous monitoring.
+ */
+export type BarrierCrossing = "discrete" | "brownian_bridge";
 /**
  * Thin facade over canonical builder coupon specs for bond cashflows.
  *
@@ -759,11 +752,18 @@ export type OvernightIndexConstraintApplication = "daily" | "period";
  * Variants are grouped by category:
  * - **Interest**: `Fixed`, `FloatReset`, `Stub`
  * - **Inflation**: `InflationCoupon`
- * - **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`
+ * - **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`
  * - **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`
  * - **Revolving**: `RevolvingDraw`, `RevolvingRepayment`
  * - **Credit Events**: `DefaultedNotional`, `Recovery`
  * - **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.
+ *
+ * # Labels
+ *
+ * `Display`, `FromStr`, and serde share one snake_case label per kind
+ * (`"fixed"`, `"float_reset"`, `"pre_payment"`); `FromStr` matches it
+ * exactly, with no aliases or case folding. [`CFKind::parse_label`] adds the
+ * case-insensitive reporting aliases.
  */
 export type CFKind =
   | "fixed"
@@ -2115,6 +2115,20 @@ export interface AppliedAdjustment {
 }
 /**
  * User-defined tags and key-value metadata for instrument classification.
+ *
+ * Tags are a sorted set of labels. Metadata is a sorted string-to-string map.
+ * Both fields are public so callers can insert, remove, and iterate entries
+ * directly. [`Attributes::add_tag`] and [`Attributes::set_meta`] are the
+ * in-place writers; [`Attributes::with_tag`] and [`Attributes::with_meta`]
+ * return the bag for construction chains.
+ *
+ * [`Attributes::matches_selector`] accepts three forms:
+ *
+ * - `"*"` matches every attribute set
+ * - `"tag:<name>"` matches when that tag is present
+ * - `"meta:<key>=<value>"` matches an exact metadata entry
+ *
+ * Any other selector text returns `false`.
  */
 export interface Attributes {
   /**
@@ -2139,15 +2153,15 @@ export interface BalanceSheetArticulation {
   /**
    * Node IDs whose values represent total assets.
    */
-  assets_nodes: NodeId[];
+  assets_nodes: Id[];
   /**
    * Node IDs whose values represent total equity.
    */
-  equity_nodes: NodeId[];
+  equity_nodes: Id[];
   /**
    * Node IDs whose values represent total liabilities.
    */
-  liabilities_nodes: NodeId[];
+  liabilities_nodes: Id[];
   /**
    * Tolerance override; falls back to
    * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
@@ -3959,7 +3973,7 @@ export interface RetainedEarningsReconciliation {
   /**
    * Optional node for dividends paid.
    */
-  dividends_node?: NodeId | null;
+  dividends_node?: Id | null;
   /**
    * Sign convention applied to the `dividends_node` input. Defaults
    * to [`SignConventionPolicy::MagnitudePositive`].
@@ -3970,15 +3984,15 @@ export interface RetainedEarningsReconciliation {
   /**
    * Node for net income.
    */
-  net_income_node: NodeId;
+  net_income_node: Id;
   /**
    * Additional adjustment nodes (buybacks, AOCI, etc.).
    */
-  other_adjustments?: NodeId[];
+  other_adjustments?: Id[];
   /**
    * Node for retained earnings balance.
    */
-  retained_earnings_node: NodeId;
+  retained_earnings_node: Id;
   /**
    * Tolerance override; falls back to
    * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
@@ -3998,19 +4012,19 @@ export interface CashReconciliation {
   /**
    * Node for cash balance.
    */
-  cash_balance_node: NodeId;
+  cash_balance_node: Id;
   /**
    * Optional node for cash from financing.
    */
-  cff_node?: NodeId | null;
+  cff_node?: Id | null;
   /**
    * Optional node for cash from investing.
    */
-  cfi_node?: NodeId | null;
+  cfi_node?: Id | null;
   /**
    * Optional node for cash from operations.
    */
-  cfo_node?: NodeId | null;
+  cfo_node?: Id | null;
   /**
    * Tolerance override; falls back to
    * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
@@ -4019,7 +4033,7 @@ export interface CashReconciliation {
   /**
    * Node for total cash flow.
    */
-  total_cash_flow_node: NodeId;
+  total_cash_flow_node: Id;
   [k: string]: unknown;
 }
 /**
@@ -4032,7 +4046,7 @@ export interface MissingValueCheck {
   /**
    * Nodes that must have values in every in-scope period.
    */
-  required_nodes: NodeId[];
+  required_nodes: Id[];
   /**
    * Which periods to inspect.
    */
@@ -4050,11 +4064,11 @@ export interface SignConventionCheck {
   /**
    * Nodes expected to carry negative values.
    */
-  negative_nodes?: NodeId[];
+  negative_nodes?: Id[];
   /**
    * Nodes expected to carry positive values.
    */
-  positive_nodes?: NodeId[];
+  positive_nodes?: Id[];
   [k: string]: unknown;
 }
 /**
@@ -4068,7 +4082,7 @@ export interface NonFiniteCheck {
   /**
    * Specific nodes to check; if empty, all nodes in results are inspected.
    */
-  nodes?: NodeId[];
+  nodes?: Id[];
   [k: string]: unknown;
 }
 /**
@@ -6580,7 +6594,7 @@ export interface CheckFinding {
   /**
    * Node identifiers involved in the finding.
    */
-  nodes?: NodeId[];
+  nodes?: Id[];
   /**
    * Period the finding relates to, if applicable.
    */
@@ -6839,7 +6853,7 @@ export interface NodeSpec {
   /**
    * Unique identifier for this node
    */
-  node_id: NodeId;
+  node_id: Id;
   /**
    * Node computation type
    */

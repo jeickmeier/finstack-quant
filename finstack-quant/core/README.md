@@ -101,7 +101,7 @@ want it; domain-specific numerics (stochastic processes, payoffs) belong in
 
 | Path | What it is |
 |------|------------|
-| `types::{Rate, Bps, Percentage}` | Rate wrappers. See "Rate units" below. |
+| `types::{Rate, Bps}` | Rate wrappers. See "Rate units" below. |
 | `types::{Id, CurveId, InstrumentId, IssuerId, IndexId, DealId, PoolId, PriceId, CalendarId, UnderlyingId}` | Phantom-typed identifiers; `#[serde(transparent)]`, so they stay plain strings on the wire. |
 | `types::CreditRating` | Neutral rating enum, parsing, ordering, and stable labels. Rating-factor calculations live in `finstack-quant-models`. |
 | `types::{Attributes, BarrierType}` | Attribute bags for matching/metadata; barrier taxonomy. |
@@ -203,10 +203,10 @@ Construction returns `Result`; non-finite and unrepresentable amounts are reject
 currencies. Cross-currency work goes through an `FxProvider`, and the applied
 `FxConversionPolicy` is recorded in the result rather than left implicit.
 
-**Rate units.** `Rate` holds decimals (5% is `0.05`), `Percentage` holds whole
-percent (25% is `25.0`), and `Bps` holds basis points (25 bp is `25.0`). Curve
-knot values are decimals. Fields and parameters named `*_bp`/`*_bps` are the
-exception and carry basis points.
+**Rate units.** `Rate` holds decimals (5% is `0.05`; `Rate::from_percent(5.0)` and
+`Rate::as_percent` are the percent-point view). `Bps` holds basis points (25 bp
+is `25`). Curve knot values are decimals. Fields and parameters named
+`*_bp`/`*_bps` are the exception and carry basis points.
 
 **Day-count context.** Some conventions cannot be evaluated from two dates
 alone. `DayCount::ActActIsma` needs frequency and an unadjusted regular reference

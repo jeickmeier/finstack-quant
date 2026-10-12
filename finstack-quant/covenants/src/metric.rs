@@ -2,70 +2,25 @@
 
 use finstack_quant_core::HashMap;
 use serde::{Deserialize, Serialize};
-use std::borrow::Borrow;
-use std::fmt;
-use std::sync::Arc;
 
-/// String-backed identifier for a covenant operating metric.
-///
-/// These identifiers are conventionally aligned with `finstack-quant-statements`
-/// node IDs such as `debt_to_ebitda`, `ebitda`, `interest_coverage`, and
-/// `dscr`, but this crate intentionally has no compile-time dependency on
-/// `finstack-quant-statements`.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[repr(transparent)]
-#[serde(transparent)]
-pub struct CovenantMetricId(Arc<str>);
+mod metric_id {
+    /// Marker for [`CovenantMetricId`].
+    #[derive(Debug, Clone, Copy, Default)]
+    #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+    pub struct CovenantMetricTag;
 
-impl CovenantMetricId {
-    /// Create a covenant metric identifier from a string-like value.
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(Arc::from(id.into()))
-    }
-
-    /// Return the string form of this metric identifier.
-    #[inline]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+    /// String-backed identifier for a covenant operating metric.
+    ///
+    /// These identifiers are conventionally aligned with `finstack-quant-statements`
+    /// node IDs such as `debt_to_ebitda`, `ebitda`, `interest_coverage`, and
+    /// `dscr`, but this crate intentionally has no compile-time dependency on
+    /// `finstack-quant-statements`.
+    ///
+    /// Alias of [`finstack_quant_core::types::Id`].
+    pub type CovenantMetricId = finstack_quant_core::types::Id<CovenantMetricTag>;
 }
 
-impl fmt::Display for CovenantMetricId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl From<&str> for CovenantMetricId {
-    fn from(value: &str) -> Self {
-        Self(Arc::from(value))
-    }
-}
-
-impl From<String> for CovenantMetricId {
-    fn from(value: String) -> Self {
-        Self(Arc::from(value))
-    }
-}
-
-impl From<&String> for CovenantMetricId {
-    fn from(value: &String) -> Self {
-        Self(Arc::from(value.as_str()))
-    }
-}
-
-impl Borrow<str> for CovenantMetricId {
-    fn borrow(&self) -> &str {
-        &self.0
-    }
-}
-
-impl AsRef<str> for CovenantMetricId {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
+pub use metric_id::CovenantMetricId;
 
 /// Source of covenant operating metric values.
 pub trait CovenantMetricSource: Send + Sync {

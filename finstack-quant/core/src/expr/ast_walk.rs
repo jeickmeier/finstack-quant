@@ -1,13 +1,10 @@
 //! AST walks used to enforce layering invariants on the expression engine.
 //!
 //! The core scalar evaluator (`core::expr::eval`) rejects a small set of
-//! period-aware functions (`Ttm`, `Ytd`, `Qtd`, `FiscalYtd`, `GrowthRate`,
-//! plus the multi-arg reducers `Sum`/`Mean`/`Coalesce` and the annualization
-//! helpers) that the `statements` crate evaluates with knowledge of the
-//! period grid. Historically that rejection only fired at `eval()` time.
-//!
-//! This module exposes a parser/compile-time check that callers can use to
-//! reject those functions earlier with a typed validation error.
+//! period-aware functions (see [`super::ast::Function::is_scalar_evaluable`])
+//! that the `statements` crate evaluates with knowledge of the period grid.
+//! This module lets `CompiledExpr::try_new_scalar` reject them at compile
+//! time instead of at `eval()` time.
 
 use super::ast::{Expr, ExprNode};
 

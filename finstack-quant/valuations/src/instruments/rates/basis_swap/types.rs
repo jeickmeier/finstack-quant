@@ -348,7 +348,7 @@ impl BasisSwap {
 
     fn resolve_leg_calendar<'a>(&self, leg_name: &str, leg: &'a FloatLegSpec) -> Result<&'a str> {
         if let Some(id) = leg.calendar_id.as_deref() {
-            if crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok() {
+            if finstack_quant_core::dates::calendar_by_id_strict(id).is_ok() {
                 return Ok(id);
             }
         }
@@ -433,7 +433,7 @@ impl BasisSwap {
         let fwd = market.get_forward(&leg.forward_curve_id)?;
 
         let calendar_id = self.resolve_leg_calendar("priced", leg)?;
-        let fixing_calendar = crate::cashflow::builder::calendar::resolve_calendar_strict(
+        let fixing_calendar = finstack_quant_core::dates::calendar_by_id_strict(
             leg.fixing_calendar_id.as_deref().unwrap_or(calendar_id),
         )?;
         let periods = crate::cashflow::builder::periods::build_periods(

@@ -113,7 +113,7 @@ impl ModelTimeSeries for DatedMetricSeries {
     }
 
     fn period_end_date(&self, period: &PeriodId) -> Result<Date> {
-        Date::from_ordinal_date(period.year, period.index)
+        Date::from_ordinal_date(period.year(), period.index())
             .map_err(|error| Error::Validation(error.to_string()))
     }
 

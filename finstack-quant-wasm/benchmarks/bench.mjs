@@ -688,12 +688,11 @@ async function main() {
 
   // --- Extended benchmarks (additional coverage) --------------------------------
 
-  bench('core', 'Rate / Bps / Percentage conversions', 12000, () => {
+  bench('core', 'Rate / Bps conversions', 12000, () => {
     const r = new w.Rate(0.05);
     const _sum = r.asDecimal + r.asPercent + r.asBp;
     void _sum;
     void new w.Bps(50).asDecimal;
-    void new w.Percentage(5).asDecimal;
   });
 
   bench('core', 'Tenor construction + toYears', 8000, () => {

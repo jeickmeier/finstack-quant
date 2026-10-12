@@ -830,7 +830,7 @@ pub fn settlement_date(bond: &ConvertibleBond, as_of: Date) -> Result<Date> {
     })?;
     let schedule = bond.cashflow_spec.schedule();
     let calendar =
-        crate::cashflow::builder::calendar::resolve_calendar_strict(schedule.calendar_id.as_str())?;
+        finstack_quant_core::dates::calendar_by_id_strict(schedule.calendar_id.as_str())?;
     let advanced = as_of.add_business_days(days, calendar)?;
     adjust(advanced, schedule.business_day_convention, calendar)
 }

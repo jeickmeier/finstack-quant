@@ -19,7 +19,7 @@
 //!
 //! # Valuation-Date Cutoff (IMPORTANT)
 //!
-//! [`npv`], [`npv_with_ctx`], and the [`Discountable`] trait follow
+//! [`npv`] and the [`Discountable`] trait follow
 //! **market-standard pricing semantics**: cashflows dated **on or before** the
 //! valuation date are excluded (only strictly-future flows are discounted).
 //! A flow that has already paid is not part of the instrument's present value.
@@ -68,9 +68,9 @@
 //! - Andersen, L., & Piterbarg, V. (2010). *Interest Rate Modeling* (3 vols).
 //!   Atlantic Financial Press. Volume 1, Chapter 3. `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
 
+use crate::dates::Date;
 #[cfg(test)]
 use crate::dates::DayCount;
-use crate::dates::{Date, DayCountContext};
 use crate::market_data::traits::Discounting;
 use crate::math::NeumaierAccumulator;
 use crate::money::Money;
@@ -121,9 +121,6 @@ use crate::money::Money;
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub trait Discountable: Send + Sync {
-    /// Output type for the NPV calculation.
-    type PVOutput;
-
     /// Compute present value using the given discount curve.
     ///
     /// Follows market-standard pricing semantics: flows dated on or before
@@ -132,7 +129,7 @@ pub trait Discountable: Send + Sync {
     /// # Arguments
     ///
     /// * `disc` - Discount curve that supplies discount factors using its own
-    ///   base date and day-count convention.
+    ///   base date, day-count convention, and time-axis calendar.
     /// * `base` - Valuation date to which strictly future cashflows are
     ///   discounted; flows dated on or before it are excluded.
     ///
@@ -142,10 +139,16 @@ pub trait Discountable: Send + Sync {
     ///
     /// # Errors
     ///
-    /// The default implementation returns `Err` when:
-    /// - [`InputError::TooFewPoints`](crate::error::InputError::TooFewPoints): Empty cashflow list
-    /// - Day count calculation fails (e.g., missing calendar for Bus/252)
-    fn npv(&self, disc: &dyn Discounting, base: Date) -> Self::PVOutput;
+    /// The blanket implementation for `AsRef<[(Date, Money)]>` returns `Err` when:
+    /// - [`InputError::TooFewPoints`](crate::error::InputError::TooFewPoints): the
+    ///   slice is empty, so there is no currency for a zero result
+    /// - Day count calculation fails on the curve's time axis
+    /// - [`Error::CurrencyMismatch`](crate::Error::CurrencyMismatch): the flows
+    ///   do not share one currency
+    ///
+    /// An implementor that already carries a currency returns zero in that
+    /// currency when every flow is excluded from the present value.
+    fn npv(&self, disc: &dyn Discounting, base: Date) -> crate::Result<Money>;
 }
 
 /// Discount factor for a flat, continuously compounded rate over `years`.
@@ -225,8 +228,9 @@ pub fn flat_discount_factor(rate: f64, years: f64) -> crate::Result<f64> {
 
 /// Compute NPV of dated `Money` flows using a discount curve with static dispatch.
 ///
-/// By default, uses the curve's own day count convention for year fraction calculations.
-/// This ensures consistency between NPV and metric calculations (e.g., par rate).
+/// Maps dates to curve time with the curve's own day count and time-axis
+/// calendar ([`Discounting::day_count_context`]), so NPV and curve metrics
+/// (e.g. par rate) share one time basis.
 ///
 /// # Valuation-Date Cutoff
 ///
@@ -293,39 +297,10 @@ pub fn npv<D: Discounting + ?Sized>(
     base: Date,
     flows: &[(Date, Money)],
 ) -> crate::Result<Money> {
-    npv_with_ctx(disc, base, DayCountContext::default(), flows)
-}
-
-/// Compute NPV of dated `Money` cashflows using an explicit day-count context.
-///
-/// Flows dated on or before `base` are excluded (see the module docs,
-/// "Valuation-Date Cutoff").
-///
-/// # Arguments
-///
-/// * `disc` - Discounting source that supplies discount factors, base date, and
-///   day-count convention for the monetary cashflows.
-/// * `base` - Valuation date to which eligible cashflows are discounted. Flows
-///   on or before this date are excluded.
-/// * `ctx` - Supplemental day-count information, such as calendars or
-///   reference periods, required by the discount source's convention.
-/// * `flows` - Dated cashflows in one currency. Empty input or mixed currencies
-///   return an error.
-///
-/// # Errors
-///
-/// Same error conditions as [`npv`].
-pub(crate) fn npv_with_ctx<D: Discounting + ?Sized>(
-    disc: &D,
-    base: Date,
-    ctx: DayCountContext<'_>,
-    flows: &[(Date, Money)],
-) -> crate::Result<Money> {
     if flows.is_empty() {
         return Err(crate::error::InputError::TooFewPoints.into());
     }
     let ccy = flows[0].1.currency();
-
     for (_, amt) in flows.iter().skip(1) {
         if amt.currency() != ccy {
             return Err(crate::Error::CurrencyMismatch {
@@ -334,14 +309,8 @@ pub(crate) fn npv_with_ctx<D: Discounting + ?Sized>(
             });
         }
     }
-
-    // Per-flow discounting: Money × f64 discount factor produces a Money
-    // value rounded to Money's Decimal scale. Accumulation of rounded
-    // per-flow values is exact at that scale. For bit-exact precision,
-    // callers should pre-discount amounts in Decimal and sum via
-    // sum_prediscounted_money().
     let mut total = Money::from((0_i64, ccy));
-    for_each_discounted(disc, base, ctx, flows, |amt, df| {
+    for_each_discounted(disc, base, flows, |amt, df| {
         let disc_amt = amt.checked_mul_f64(df)?;
         total = total.checked_add(disc_amt)?;
         Ok(())
@@ -385,22 +354,16 @@ pub fn npv_amounts_with_curve<D: Discounting + ?Sized>(
     }
 
     let mut total = NeumaierAccumulator::new();
-    for_each_discounted(
-        disc,
-        base,
-        DayCountContext::default(),
-        flows,
-        |amount, df| {
-            let discounted = amount * df;
-            if !discounted.is_finite() {
-                return Err(crate::Error::Validation(
-                    "discounted cashflow amount must be finite".to_string(),
-                ));
-            }
-            total.add(discounted);
-            Ok(())
-        },
-    )?;
+    for_each_discounted(disc, base, flows, |amount, df| {
+        let discounted = amount * df;
+        if !discounted.is_finite() {
+            return Err(crate::Error::Validation(
+                "discounted cashflow amount must be finite".to_string(),
+            ));
+        }
+        total.add(discounted);
+        Ok(())
+    })?;
     let result = total.total();
     if !result.is_finite() {
         return Err(crate::Error::Validation(
@@ -413,7 +376,6 @@ pub fn npv_amounts_with_curve<D: Discounting + ?Sized>(
 fn for_each_discounted<T, D, F>(
     disc: &D,
     base: Date,
-    ctx: DayCountContext<'_>,
     flows: &[(Date, T)],
     mut apply: F,
 ) -> crate::Result<()>
@@ -425,6 +387,7 @@ where
     // base date. Relative discounting keeps Money and scalar valuation on the
     // same cutoff, time-origin, and discount-factor validation policy.
     let day_count = disc.day_count();
+    let ctx = disc.day_count_context();
     let curve_base = disc.base_date();
     let t_base = day_count.signed_year_fraction(curve_base, base, ctx)?;
     let df_base = disc.df(t_base);
@@ -436,8 +399,7 @@ where
 
     for (date, amount) in flows {
         // Market-standard valuation semantics: cash on the valuation date has
-        // already settled. `include_past_flows` exists only for callers that
-        // explicitly require the investment-NPV convention.
+        // already settled and is excluded from present value.
         if *date <= base {
             continue;
         }
@@ -481,32 +443,8 @@ fn flat_curve(
 mod hardening_tests {
     use super::*;
     use crate::currency::Currency;
-    use crate::dates::calendar::TARGET2;
     use crate::dates::create_date;
     use time::Month;
-    #[test]
-    fn npv_with_bus252_context_counts_business_days() {
-        let base = create_date(2025, Month::January, 6).expect("Valid test date"); // Monday
-        let pay = create_date(2025, Month::January, 13).expect("Valid test date"); // Next Monday
-        let curve = flat_curve("BRL-FLAT", base, 0.10, DayCount::Bus252);
-        let flows = vec![(pay, Money::from((100_i64, Currency::USD)))];
-        let ctx = DayCountContext {
-            calendar: Some(&TARGET2),
-            frequency: None,
-            bus_basis: None,
-            coupon_period: None,
-            end_is_termination_date: false,
-        };
-
-        let pv = npv_with_ctx(&curve, base, ctx, &flows).expect("Bus/252 NPV should succeed");
-        let expected = 100.0 * (-0.10_f64 * (5.0 / 252.0)).exp();
-        assert!(
-            (pv.amount() - expected).abs() < 1e-10,
-            "{} vs {}",
-            pv.amount(),
-            expected
-        );
-    }
 
     /// `npv` must discount to the supplied valuation date even when it differs
     /// from the curve's own base date — using the relative discount factor
@@ -561,8 +499,6 @@ impl<T> Discountable for T
 where
     T: AsRef<[(Date, Money)]> + Send + Sync,
 {
-    type PVOutput = crate::Result<Money>;
-
     fn npv(&self, disc: &dyn Discounting, base: Date) -> crate::Result<Money> {
         npv(disc, base, self.as_ref())
     }
@@ -708,23 +644,6 @@ mod tests {
     }
 
     #[test]
-    fn tuples_discountable_uses_curve_day_count() {
-        let curve = ZeroRateCurve {
-            id: CurveId::new("USD-OIS"),
-        };
-        let base = curve.base_date();
-        let pay = base + time::Duration::days(1);
-        let flows = vec![
-            (pay, Money::from((10_i64, crate::currency::Currency::USD))),
-            (pay, Money::from((5_i64, crate::currency::Currency::USD))),
-        ];
-        let pv = flows
-            .npv(&curve, base)
-            .expect("NPV calculation should succeed in test");
-        assert!((pv.amount() - 15.0).abs() < 1e-12);
-    }
-
-    #[test]
     fn npv_rejects_invalid_valuation_date_discount_factor() {
         let curve = InvalidBaseDfCurve {
             id: CurveId::new("BAD-DF"),
@@ -735,8 +654,7 @@ mod tests {
             Money::from((10_i64, Currency::USD)),
         )];
 
-        let err = npv_with_ctx(&curve, base, DayCountContext::default(), &flows)
-            .expect_err("df_base <= 0 should be rejected");
+        let err = npv(&curve, base, &flows).expect_err("df_base <= 0 should be rejected");
 
         assert!(
             err.to_string()
@@ -756,7 +674,7 @@ mod tests {
             Money::from((10_i64, Currency::USD)),
         )];
 
-        let err = npv_with_ctx(&curve, base, DayCountContext::default(), &flows)
+        let err = npv(&curve, base, &flows)
             .expect_err("non-finite cashflow discount factor should be rejected");
 
         assert!(
@@ -767,13 +685,43 @@ mod tests {
     }
 
     #[test]
-    fn npv_with_ctx_propagates_bus252_missing_calendar_error() {
+    fn bus252_discount_curve_requires_its_own_calendar() {
+        let base = create_date(2025, Month::January, 6).expect("Valid test date");
+        let err = crate::market_data::term_structures::DiscountCurve::builder("BRL-FLAT")
+            .base_date(base)
+            .day_count(DayCount::Bus252)
+            .knots([(0.0, 1.0), (1.0, 0.9)])
+            .build()
+            .expect_err("Bus/252 time axis needs a calendar");
+        assert!(err.to_string().contains("requires a holiday calendar"));
+    }
+
+    #[test]
+    fn npv_counts_business_days_on_the_curve_calendar() {
+        use crate::market_data::term_structures::{DiscountCurve, ValidationMode};
+        use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
+
         let base = create_date(2025, Month::January, 6).expect("Valid test date");
         let pay = create_date(2025, Month::January, 13).expect("Valid test date");
-        let curve = flat_curve("BRL-FLAT", base, 0.10, DayCount::Bus252);
+        let curve = DiscountCurve::builder("BRL-BUS252")
+            .base_date(base)
+            .day_count(DayCount::Bus252)
+            .calendar_id("target2")
+            .knots([(0.0, 1.0), (1.0, (-0.10_f64).exp())])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::FlatForward)
+            .validation(ValidationMode::Raw {
+                allow_non_monotonic: false,
+                forward_floor: None,
+            })
+            .build()
+            .expect("calendar-backed Bus/252 curve");
         let flows = vec![(pay, Money::from((100_i64, Currency::USD)))];
 
-        assert!(npv_with_ctx(&curve, base, DayCountContext::default(), &flows).is_err());
+        let pv = npv(&curve, base, &flows).expect("calendar-backed NPV");
+        let independently_counted = 100.0 * (-0.10_f64 * 5.0 / 252.0).exp();
+        assert!((pv.amount() - independently_counted).abs() < 1e-12);
+        assert_eq!(curve.calendar_id(), Some("target2"));
     }
 
     #[test]
@@ -820,9 +768,7 @@ mod tests {
         assert_eq!(pv.amount(), 100.0);
     }
 
-    /// Default pricing semantics exclude flows on or before the valuation
-    /// date; `include_past_flows` restores the legacy include-everything
-    /// behavior ().
+    /// Pricing excludes flows on or before the valuation date.
     #[test]
     fn test_npv_excludes_past_flows_by_default() {
         let base = create_date(2025, Month::January, 1).expect("Valid test date");
@@ -845,9 +791,6 @@ mod tests {
             npv(&curve, base, &flows[2..]).expect("future-only NPV should succeed in test");
         assert_eq!(pv.amount(), only_future.amount());
         assert!(pv.amount() > 0.0 && pv.amount() < 55.0);
-
-        // Opt-in: past and on-date flows are included (future-valued at the
-        // curve's signed year fraction), reproducing the legacy behavior.
     }
 
     /// If every flow is on or before the valuation date, the default
@@ -885,10 +828,8 @@ mod tests {
 
     #[test]
     fn npv_precision_many_cashflows() {
-        // Regression test for Neumaier compensated summation precision.
-        // A 30Y quarterly swap has 120 cashflows where naive summation can
-        // accumulate floating-point errors of ~1e-10 to 1e-9 of total PV.
-        // With Neumaier summation, we should maintain much higher precision.
+        // 120 identical `Money` amounts at a unit discount factor. `npv` adds
+        // them in Decimal, so the total is exact.
         let curve = ZeroRateCurve {
             id: CurveId::new("PRECISION-TEST"),
         };
@@ -906,7 +847,7 @@ mod tests {
 
         let pv = npv(&curve, base, &flows).expect("NPV should succeed");
 
-        // With Neumaier summation, we expect precision better than 1e-10
+        // Decimal addition of these unit amounts is exact.
         assert!(
             (pv.amount() - 12000.0).abs() < 1e-10,
             "NPV precision lost with {} cashflows: expected 12000.0, got {} (error: {:.2e})",

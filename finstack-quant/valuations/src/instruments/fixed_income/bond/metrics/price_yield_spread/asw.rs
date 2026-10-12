@@ -70,8 +70,7 @@ pub(crate) fn settlement_asw_components(
     } else {
         params.frequency
     };
-    let calendar =
-        crate::cashflow::builder::calendar::resolve_calendar_strict(&params.calendar_id)?;
+    let calendar = finstack_quant_core::dates::calendar_by_id_strict(&params.calendar_id)?;
     let float_schedule = asw_leg_schedule(
         settlement,
         bond.maturity,

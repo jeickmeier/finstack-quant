@@ -7,12 +7,13 @@
 //! - rolling_mean / rolling_sum (row windows)
 //! - rolling_std / rolling_var / rolling_median
 //! - ewm_mean(expr, alpha, adjust)
-//! - std / var / median
-//! - shift / rank / quantile (reducer over entire series; broadcasts scalar)
-//!   - For rolling/windowed quantiles, use `rolling_median` or implement a
-//!   domain-specific rolling estimator; `quantile` here is a global reducer.
+//! - std / var / median / quantile (reducers over the entire series; broadcast
+//!   a scalar)
+//! - shift / rank
 //! - rolling_min / rolling_max / rolling_count
 //! - ewm_std / ewm_var
+//! - abs / sign / pow / round / floor / ceil / ln / exp / log10 / sqrt /
+//!   clamp / is_missing (element-wise)
 //!
 //! Evaluation supports:
 //! - DAG planning with shared sub-expression detection (each deduplicated

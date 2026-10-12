@@ -52,7 +52,6 @@
       "finstack_quant.core.market_data.invert_fx_rate",
       "finstack_quant.core.money.Money",
       "finstack_quant.core.types.Bps",
-      "finstack_quant.core.types.Percentage",
       "finstack_quant.core.types.Rate",
       "finstack_quant.portfolio.Portfolio",
       "finstack_quant.portfolio.value_portfolio",

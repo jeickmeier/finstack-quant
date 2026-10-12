@@ -1985,7 +1985,7 @@
     },
     "Attributes": {
       "additionalProperties": false,
-      "description": "User-defined tags and key-value metadata for instrument classification.",
+      "description": "User-defined tags and key-value metadata for instrument classification.\n\nTags are a sorted set of labels. Metadata is a sorted string-to-string map.\nBoth fields are public so callers can insert, remove, and iterate entries\ndirectly. [`Attributes::add_tag`] and [`Attributes::set_meta`] are the\nin-place writers; [`Attributes::with_tag`] and [`Attributes::with_meta`]\nreturn the bag for construction chains.\n\n[`Attributes::matches_selector`] accepts three forms:\n\n- `\"*\"` matches every attribute set\n- `\"tag:<name>\"` matches when that tag is present\n- `\"meta:<key>=<value>\"` matches an exact metadata entry\n\nAny other selector text returns `false`.\n\n# Examples\n\n```\nuse finstack_quant_core::types::Attributes;\n\nlet attrs = Attributes::new()\n    .with_tag(\"energy\")\n    .with_meta(\"region\", \"NA\");\nassert!(attrs.has_tag(\"energy\"));\nassert_eq!(attrs.get_meta(\"region\"), Some(\"NA\"));\nassert!(attrs.matches_selector(\"meta:region=NA\"));\nassert!(!attrs.matches_selector(\"sector:energy\"));\n```",
       "properties": {
         "meta": {
           "additionalProperties": {
@@ -3856,7 +3856,7 @@
       ]
     },
     "CFKind": {
-      "description": "Enumeration of cash-flow kinds for classification and ordering.\n\nUsed to distinguish between different types of cashflows for\nproper sequencing, risk calculation, and accounting treatment.\n\n# Sign Convention\n\nThe enum itself is **view agnostic**: individual instruments are\nresponsible for mapping these kinds into a holder or issuer view.\nBy convention in this crate:\n\n| Kind | Holder View (Long) | Issuer View (Short) |\n|------|-------------------|---------------------|\n| Interest (Fixed/Float) | Positive (receive) | Negative (pay) |\n| Notional (initial) | Negative (pay) | Positive (receive) |\n| Notional (final) | Positive (receive) | Negative (pay) |\n| Amortization | Positive (receive) | Negative (pay) |\n| PIK | Increases notional | Increases liability |\n| Fee | Negative (pay) | Positive (receive) |\n\nWhen constructing cashflow schedules, instruments should apply the appropriate\nsign based on the economic perspective being represented.\n\n# Cashflow Categories\n\nVariants are grouped by category:\n- **Interest**: `Fixed`, `FloatReset`, `Stub`\n- **Inflation**: `InflationCoupon`\n- **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`\n- **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`\n- **Revolving**: `RevolvingDraw`, `RevolvingRepayment`\n- **Credit Events**: `DefaultedNotional`, `Recovery`\n- **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.",
+      "description": "Enumeration of cash-flow kinds for classification and ordering.\n\nUsed to distinguish between different types of cashflows for\nproper sequencing, risk calculation, and accounting treatment.\n\n# Sign Convention\n\nThe enum itself is **view agnostic**: individual instruments are\nresponsible for mapping these kinds into a holder or issuer view.\nBy convention in this crate:\n\n| Kind | Holder View (Long) | Issuer View (Short) |\n|------|-------------------|---------------------|\n| Interest (Fixed/Float) | Positive (receive) | Negative (pay) |\n| Notional (initial) | Negative (pay) | Positive (receive) |\n| Notional (final) | Positive (receive) | Negative (pay) |\n| Amortization | Positive (receive) | Negative (pay) |\n| PIK | Increases notional | Increases liability |\n| Fee | Negative (pay) | Positive (receive) |\n\nWhen constructing cashflow schedules, instruments should apply the appropriate\nsign based on the economic perspective being represented.\n\n# Cashflow Categories\n\nVariants are grouped by category:\n- **Interest**: `Fixed`, `FloatReset`, `Stub`\n- **Inflation**: `InflationCoupon`\n- **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`\n- **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`\n- **Revolving**: `RevolvingDraw`, `RevolvingRepayment`\n- **Credit Events**: `DefaultedNotional`, `Recovery`\n- **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.\n\n# Labels\n\n`Display`, `FromStr`, and serde share one snake_case label per kind\n(`\"fixed\"`, `\"float_reset\"`, `\"pre_payment\"`); `FromStr` matches it\nexactly, with no aliases or case folding. [`CFKind::parse_label`] adds the\ncase-insensitive reporting aliases.",
       "oneOf": [
         {
           "const": "fixed",
@@ -9073,7 +9073,7 @@
       "type": "object"
     },
     "CreditRating": {
-      "description": "Unified credit rating scale with notch-level precision (agency-agnostic).\n\nEach variant represents a specific notch in the rating scale. Ratings\nwithout a `Plus`/`Minus` suffix represent the \"flat\" (middle) notch.\n\n| Variant     | S&P/Fitch | Moody's |\n|-------------|-----------|---------|\n| `AAA`       | AAA       | Aaa     |\n| `AAPlus`    | AA+       | Aa1     |\n| `AA`        | AA        | Aa2     |\n| `AAMinus`   | AA-       | Aa3     |\n| `APlus`     | A+        | A1      |\n| `A`         | A         | A2      |\n| `AMinus`    | A-        | A3      |\n| `BBBPlus`   | BBB+      | Baa1    |\n| `BBB`       | BBB       | Baa2    |\n| `BBBMinus`  | BBB-      | Baa3    |\n| `BBPlus`    | BB+       | Ba1     |\n| `BB`        | BB        | Ba2     |\n| `BBMinus`   | BB-       | Ba3     |\n| `BPlus`     | B+        | B1      |\n| `B`         | B         | B2      |\n| `BMinus`    | B-        | B3      |\n| `CCCPlus`   | CCC+      | Caa1    |\n| `CCC`       | CCC       | Caa2    |\n| `CCCMinus`  | CCC-      | Caa3    |\n| `CC`        | CC        | Ca      |\n| `C`         | C         | C       |\n| `D`         | D         | D       |\n| `NR`        | NR        | NR      |\n\n# Investment Grade\n\nRatings of `BBBMinus` and above are considered \"investment grade\":\n\n```rust\nuse finstack_quant_core::types::CreditRating;\n\nassert!(CreditRating::A.is_investment_grade());\nassert!(CreditRating::BBBMinus.is_investment_grade());\nassert!(!CreditRating::BBPlus.is_investment_grade());\n```",
+      "description": "Unified credit rating scale with notch-level precision (agency-agnostic).\n\nEach variant represents a specific notch in the rating scale. Ratings\nwithout a `Plus`/`Minus` suffix represent the \"flat\" (middle) notch.\n\n| Variant     | S&P/Fitch | Moody's |\n|-------------|-----------|---------|\n| `AAA`       | AAA       | Aaa     |\n| `AAPlus`    | AA+       | Aa1     |\n| `AA`        | AA        | Aa2     |\n| `AAMinus`   | AA-       | Aa3     |\n| `APlus`     | A+        | A1      |\n| `A`         | A         | A2      |\n| `AMinus`    | A-        | A3      |\n| `BBBPlus`   | BBB+      | Baa1    |\n| `BBB`       | BBB       | Baa2    |\n| `BBBMinus`  | BBB-      | Baa3    |\n| `BBPlus`    | BB+       | Ba1     |\n| `BB`        | BB        | Ba2     |\n| `BBMinus`   | BB-       | Ba3     |\n| `BPlus`     | B+        | B1      |\n| `B`         | B         | B2      |\n| `BMinus`    | B-        | B3      |\n| `CCCPlus`   | CCC+      | Caa1    |\n| `CCC`       | CCC       | Caa2    |\n| `CCCMinus`  | CCC-      | Caa3    |\n| `CC`        | CC        | Ca      |\n| `C`         | C         | C       |\n| `D`         | D         | D       |\n| `NR`        | NR        | NR      |\n\n# Investment Grade\n\nRatings of `BBBMinus` and above are considered \"investment grade\".\nOrdering follows the `repr(u8)` discriminant, so `NR` (21) sorts before\n`D` (22) even though `D` is declared first:\n\n```rust\nuse finstack_quant_core::types::CreditRating;\n\nassert!(CreditRating::A.is_investment_grade());\nassert!(CreditRating::BBBMinus.is_investment_grade());\nassert!(!CreditRating::BBPlus.is_investment_grade());\nassert!(CreditRating::C < CreditRating::NR && CreditRating::NR < CreditRating::D);\n```",
       "oneOf": [
         {
           "const": "AAA",
@@ -9182,12 +9182,12 @@
         },
         {
           "const": "D",
-          "description": "D — In default",
+          "description": "D — In default. Discriminant 22, so this sorts after `NR`.",
           "type": "string"
         },
         {
           "const": "NR",
-          "description": "NR — Not rated",
+          "description": "NR — Not rated. Discriminant 21, between `C` and `D`.",
           "type": "string"
         }
       ]
@@ -10211,6 +10211,13 @@
               "$ref": "#/$defs/DateWire",
               "description": "Base date"
             },
+            "calendar_id": {
+              "description": "Registered holiday calendar id of the business-day time axis (for\nexample `\"brbd\"` for a Bus/252 curve). Omitted when the day count needs\nno calendar.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "calibration_ois_cutoff_days": {
               "description": "OIS cut-off (business days) the curve was calibrated under, if any.",
               "format": "int32",
@@ -10610,6 +10617,17 @@
               },
               "type": "array"
             },
+            "roll_transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/InterpRollState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source interpolation and accumulated time origin for a rolled curve."
+            },
             "type": {
               "const": "inflation",
               "type": "string"
@@ -10703,6 +10721,17 @@
               },
               "type": "array"
             },
+            "roll_transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/InterpRollState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source interpolation and accumulated time origin for a rolled curve."
+            },
             "spot_level": {
               "description": "Spot index level (volatility index curves)",
               "format": "double",
@@ -10721,81 +10750,6 @@
             },
             "type": {
               "const": "price",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type",
-            "id",
-            "base",
-            "day_count",
-            "knot_points",
-            "interp_style",
-            "extrapolation"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "VolIndex curve state",
-          "properties": {
-            "base": {
-              "$ref": "#/$defs/DateWire",
-              "description": "Base date"
-            },
-            "day_count": {
-              "$ref": "#/$defs/DayCount",
-              "description": "Day count convention"
-            },
-            "extrapolation": {
-              "$ref": "#/$defs/ExtrapolationPolicy",
-              "description": "Extrapolation policy"
-            },
-            "id": {
-              "description": "Curve identifier",
-              "type": "string"
-            },
-            "interp_style": {
-              "$ref": "#/$defs/InterpStyle",
-              "description": "Interpolation style"
-            },
-            "knot_points": {
-              "description": "Time/value pairs used to construct the curve",
-              "items": {
-                "maxItems": 2,
-                "minItems": 2,
-                "prefixItems": [
-                  {
-                    "format": "double",
-                    "type": "number"
-                  },
-                  {
-                    "format": "double",
-                    "type": "number"
-                  }
-                ],
-                "type": "array"
-              },
-              "type": "array"
-            },
-            "spot_level": {
-              "description": "Spot index level (volatility index curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "spot_price": {
-              "description": "Spot price (signed price curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "type": {
-              "const": "vol_index",
               "type": "string"
             }
           },
@@ -10853,6 +10807,17 @@
               },
               "type": "array"
             },
+            "roll_transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/InterpRollState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source interpolation and accumulated time origin for a rolled curve."
+            },
             "type": {
               "const": "basis_spread",
               "type": "string"
@@ -10888,6 +10853,12 @@
             "model": {
               "$ref": "#/$defs/NelsonSiegelModel",
               "description": "Nelson-Siegel model parameters."
+            },
+            "time_offset": {
+              "default": 0.0,
+              "description": "Current origin in the source model's year-fraction coordinates;\nomitted means `0.0` (a curve that has never been rolled).",
+              "format": "double",
+              "type": "number"
             },
             "type": {
               "const": "parametric",
@@ -13403,7 +13374,7 @@
         "factor_ids": {
           "description": "Factor IDs in row/column order.",
           "items": {
-            "$ref": "#/$defs/FactorId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         }
@@ -13429,7 +13400,7 @@
         "factor_ids": {
           "description": "Factor identifiers, in the row and column order of `data`.",
           "items": {
-            "$ref": "#/$defs/FactorId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
@@ -13463,7 +13434,7 @@
           "description": "Broad factor classification."
         },
         "id": {
-          "$ref": "#/$defs/FactorId",
+          "$ref": "#/$defs/Id",
           "description": "Unique factor identifier."
         },
         "market_mapping": {
@@ -13505,10 +13476,6 @@
         "values"
       ],
       "type": "object"
-    },
-    "FactorId": {
-      "description": "Unique identifier for a risk factor.",
-      "type": "string"
     },
     "FactorModelConfig": {
       "additionalProperties": false,
@@ -13578,7 +13545,7 @@
         "factor_id": {
           "anyOf": [
             {
-              "$ref": "#/$defs/FactorId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -16231,7 +16198,7 @@
     },
     "FxSpot": {
       "additionalProperties": false,
-      "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `quoted_spot = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit\n`settlement_days` overrides that default; `settlement_date` overrides both.\n\nSee module-level documentation for comprehensive FX quoting conventions.",
+      "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `quoted_spot = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB and T+2 otherwise (including\nEUR/USD). An explicit `settlement_days` is the contractual lag and overrides\nthat default in either direction (for example tom-next T+1 on EUR/USD);\n`settlement_date` overrides both. Without calendars the USD leg uses the\n`usny` calendar and other currencies count weekdays only.\n\nSee module-level documentation for comprehensive FX quoting conventions.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -19470,6 +19437,39 @@
       ],
       "type": "object"
     },
+    "InterpRollState": {
+      "additionalProperties": false,
+      "description": "Serialized source grid and time origin for a rolled interpolation.",
+      "properties": {
+        "offset": {
+          "format": "double",
+          "type": "number"
+        },
+        "source_points": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_points",
+        "offset"
+      ],
+      "type": "object"
+    },
     "InterpStyle": {
       "description": "Enum of supported interpolation styles. The default is `Linear`.",
       "oneOf": [
@@ -20438,7 +20438,7 @@
           "description": "Dependency-side filter."
         },
         "factor_id": {
-          "$ref": "#/$defs/FactorId",
+          "$ref": "#/$defs/Id",
           "description": "Factor assigned when both filters match."
         }
       },
@@ -24821,10 +24821,6 @@
         }
       ]
     },
-    "RateCalibrationFutureContractId": {
-      "description": "Serialized identifier for an interest-rate futures convention.",
-      "type": "string"
-    },
     "RateCalibrationMethod": {
       "description": "Numerical method used to calibrate a rate curve.",
       "oneOf": [
@@ -25054,7 +25050,7 @@
               "additionalProperties": false,
               "properties": {
                 "contract": {
-                  "$ref": "#/$defs/RateCalibrationFutureContractId",
+                  "$ref": "#/$defs/Id",
                   "description": "Convention-registry identifier for the futures contract."
                 },
                 "convexity_adjustment": {

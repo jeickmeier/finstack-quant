@@ -7,7 +7,7 @@
         "cash_burn_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -18,7 +18,7 @@
         "cash_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -35,17 +35,17 @@
           ]
         },
         "debt_node": {
-          "$ref": "#/$defs/NodeId",
+          "$ref": "#/$defs/Id",
           "description": "Total debt node."
         },
         "ebitda_node": {
-          "$ref": "#/$defs/NodeId",
+          "$ref": "#/$defs/Id",
           "description": "EBITDA node."
         },
         "fcf_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -54,7 +54,7 @@
           "description": "Free cash flow node."
         },
         "interest_expense_node": {
-          "$ref": "#/$defs/NodeId",
+          "$ref": "#/$defs/Id",
           "description": "Interest expense node."
         },
         "leverage_warn": {
@@ -83,6 +83,10 @@
         "interest_expense_node"
       ],
       "type": "object"
+    },
+    "Id": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
     },
     "LboCheckMappings": {
       "additionalProperties": false,
@@ -123,10 +127,6 @@
       ],
       "type": "object"
     },
-    "NodeId": {
-      "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`].",
-      "type": "string"
-    },
     "PeriodId": {
       "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
       "type": "string"
@@ -138,14 +138,14 @@
         "assets_nodes": {
           "description": "Total-assets nodes (balance sheet).",
           "items": {
-            "$ref": "#/$defs/NodeId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
         "capex_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -154,13 +154,13 @@
           "description": "Capital expenditures node (cash flow statement)."
         },
         "cash_node": {
-          "$ref": "#/$defs/NodeId",
+          "$ref": "#/$defs/Id",
           "description": "Cash / cash-equivalents node (balance sheet)."
         },
         "cff_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -171,7 +171,7 @@
         "cfi_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -182,7 +182,7 @@
         "cfo_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -193,7 +193,7 @@
         "cs_interest_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -206,7 +206,7 @@
           "default": [],
           "description": "Current-asset nodes summed into net working capital.",
           "items": {
-            "$ref": "#/$defs/NodeId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
@@ -214,7 +214,7 @@
           "default": [],
           "description": "Current-liability nodes summed into net working capital.",
           "items": {
-            "$ref": "#/$defs/NodeId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
@@ -226,12 +226,12 @@
             "minItems": 2,
             "prefixItems": [
               {
-                "$ref": "#/$defs/NodeId"
+                "$ref": "#/$defs/Id"
               },
               {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/NodeId"
+                    "$ref": "#/$defs/Id"
                   },
                   {
                     "type": "null"
@@ -246,7 +246,7 @@
         "depreciation_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -257,7 +257,7 @@
         "dividends_equity_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -269,7 +269,7 @@
         "dividends_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -280,14 +280,14 @@
         "equity_nodes": {
           "description": "Total-equity nodes (balance sheet).",
           "items": {
-            "$ref": "#/$defs/NodeId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
         "intangible_additions_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -299,7 +299,7 @@
         "interest_expense_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -310,18 +310,18 @@
         "liabilities_nodes": {
           "description": "Total-liabilities nodes (balance sheet).",
           "items": {
-            "$ref": "#/$defs/NodeId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
         "net_income_node": {
-          "$ref": "#/$defs/NodeId",
+          "$ref": "#/$defs/Id",
           "description": "Net income node (income statement)."
         },
         "ppe_additions_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -333,7 +333,7 @@
         "ppe_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -344,7 +344,7 @@
         "pretax_income_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -353,13 +353,13 @@
           "description": "Pre-tax income node (income statement)."
         },
         "retained_earnings_node": {
-          "$ref": "#/$defs/NodeId",
+          "$ref": "#/$defs/Id",
           "description": "Retained earnings node (balance sheet)."
         },
         "tax_expense_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -370,7 +370,7 @@
         "total_cf_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -381,7 +381,7 @@
         "wc_change_cf_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"

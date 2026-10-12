@@ -1376,10 +1376,6 @@
         }
       ]
     },
-    "NodeId": {
-      "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`].",
-      "type": "string"
-    },
     "OperationSpec": {
       "description": "Individual operation within a scenario.\n\nEach variant represents a specific type of shock or adjustment that can be\napplied to market data, instruments, statements, or the valuation horizon.\nUnits are encoded in the variant name and field docs:\n- `Pct` fields use percentage points (`5.0 = +5%`)\n- `Bp` fields use additive basis points (1 bp = 1e-4), except\n  [`CurveKind::Commodity`] where `bp` is percent of the price-curve\n  forward\n- Vol-index `Pts` are **index points** (`1.0` on 18.5 → 19.5)\n- Correlation / base-corr `Pts` are **decimal correlation** (`0.02` = +0.02)\n\nHierarchy-targeted variants are resolved into direct identifiers during\n[`crate::engine::ScenarioEngine::apply`] using the market hierarchy attached\nto the execution context.",
       "oneOf": [
@@ -1778,7 +1774,7 @@
               "type": "string"
             },
             "node_id": {
-              "$ref": "#/$defs/NodeId",
+              "$ref": "#/$defs/Id",
               "description": "Statement node identifier."
             },
             "pct": {
@@ -1803,7 +1799,7 @@
               "type": "string"
             },
             "node_id": {
-              "$ref": "#/$defs/NodeId",
+              "$ref": "#/$defs/Id",
               "description": "Statement node identifier."
             },
             "value": {
@@ -2135,7 +2131,7 @@
           "description": "Output quote day-count convention. If `None`, uses the curve's convention.\nChanges the annualized rate while preserving maturity dates and the\ncurve-implied accumulation factor; native curve query times are unchanged."
         },
         "node_id": {
-          "$ref": "#/$defs/NodeId",
+          "$ref": "#/$defs/Id",
           "description": "Statement node ID to receive the rate."
         },
         "tenor": {

@@ -5,78 +5,21 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::borrow::Borrow;
-use std::fmt;
 
-/// Type-safe identifier for a node in a financial model.
-///
-/// Serializes as a plain string and is interoperable with `&str` via
-/// [`Borrow`] and [`AsRef`].
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[repr(transparent)]
-pub struct NodeId(String);
+mod node_id {
+    /// Marker for [`NodeId`].
+    #[derive(Debug, Clone, Copy, Default)]
+    #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+    pub struct NodeTag;
 
-impl NodeId {
-    /// Create a new `NodeId` from any string-like value.
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
-    }
-
-    /// Return the inner string slice.
-    #[inline]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+    /// Type-safe identifier for a node in a financial model.
+    ///
+    /// Alias of [`finstack_quant_core::types::Id`]. Serializes as a plain string
+    /// and borrows as `str`.
+    pub type NodeId = finstack_quant_core::types::Id<NodeTag>;
 }
 
-impl fmt::Display for NodeId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl From<&str> for NodeId {
-    fn from(s: &str) -> Self {
-        Self(s.to_owned())
-    }
-}
-
-impl From<String> for NodeId {
-    fn from(s: String) -> Self {
-        Self(s)
-    }
-}
-
-impl From<&String> for NodeId {
-    fn from(s: &String) -> Self {
-        Self(s.clone())
-    }
-}
-
-impl Borrow<str> for NodeId {
-    fn borrow(&self) -> &str {
-        &self.0
-    }
-}
-
-impl AsRef<str> for NodeId {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl PartialEq<&str> for NodeId {
-    fn eq(&self, other: &&str) -> bool {
-        &*self.0 == *other
-    }
-}
-
-impl PartialEq<str> for NodeId {
-    fn eq(&self, other: &str) -> bool {
-        &*self.0 == other
-    }
-}
+pub use node_id::NodeId;
 
 mod period_availability_dates {
     use super::{IndexMap, PeriodId};

@@ -19,7 +19,6 @@ api:
 - finstack_quant.core.market_data.invert_fx_rate
 - finstack_quant.core.money.Money
 - finstack_quant.core.types.Bps
-- finstack_quant.core.types.Percentage
 - finstack_quant.core.types.Rate
 - finstack_quant.portfolio.Portfolio
 - finstack_quant.portfolio.value_portfolio
@@ -51,7 +50,6 @@ Accounting values and pricing calculations have different requirements. Here `Mo
 | --- | --- | --- |
 | Rate | `Rate.from_percent(5)` | 0.05 |
 | Basis points | `Bps(250)` | 0.025 |
-| Percentage | `Percentage(5)` | 0.05 |
 
 One basis point is $10^{-4}$ of a rate. A percentage point is 100 basis points. An API expecting a decimal rate will interpret `5` as 500%, not 5%; using a named representation makes that error visible.
 
@@ -138,7 +136,7 @@ Read the accessors as properties. The displayed checks compare exact decimal mid
 {/* notebook-block notebook="01_foundations/core_types_and_money.ipynb" cell="money-units-rounding" role="build" */}
 ```python exec id=money-units-rounding role=build
 from decimal import Decimal, ROUND_HALF_EVEN
-from finstack_quant.core.types import Rate, Bps, Percentage
+from finstack_quant.core.types import Rate, Bps
 from finstack_quant.core.config import FinstackConfig
 rounded = [Decimal(x).quantize(Decimal('0.01'), rounding=ROUND_HALF_EVEN) for x in ('1.005','1.015')]
 print({'decimal_rate': Rate.from_percent(5).as_decimal, '250bp': Bps(250).as_decimal,

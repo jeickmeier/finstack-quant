@@ -17,10 +17,9 @@
 //!
 //! # Components
 //!
-//! - **Primitives** (`primitives`): Core types (`CashFlow`, `Notional`, `CFKind`)
+//! - **Primitives** (`primitives`): Core types (`CashFlow`, `CashFlowAccrual`, `CFKind`)
 //! - **Discounting** (`discounting`): Present value calculation with discount curves
 //! - **XIRR** (`xirr`): IRR/XIRR metrics for investment analysis
-
 //!
 //! # Financial Concepts
 //!

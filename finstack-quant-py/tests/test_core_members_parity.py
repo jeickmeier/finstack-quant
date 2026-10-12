@@ -14,7 +14,7 @@ import pytest
 from finstack_quant.core.dates import DayCount, DayCountContext, Tenor
 from finstack_quant.core.market_data import HazardCurve, VolCube
 from finstack_quant.core.math.stats import realized_variance, realized_variance_ohlc
-from finstack_quant.core.types import Bps, Percentage, Rate
+from finstack_quant.core.types import Bps, Rate
 
 PRICES = [100.0, 101.0, 99.5, 100.2, 102.0]
 OPEN = [100.0, 101.0, 99.5, 100.2]
@@ -34,11 +34,10 @@ def test_realized_variance_defaults_are_rust_owned() -> None:
 
 def test_rate_family_values_match_wasm() -> None:
     assert Rate("12.5bp").as_decimal == 0.00125
-    assert Percentage(0.175).as_bp == 18
+    assert Rate("17.5bp").as_bp == 18
     assert Bps(-1995).as_percent == -19.95
     assert Rate(0.0525).to_json() == "0.0525"
     assert Bps(25).to_json() == "25"
-    assert Percentage(5.0).to_json() == "5.0"
 
 
 def test_day_count_and_tenor_values_match_wasm() -> None:

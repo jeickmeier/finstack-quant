@@ -249,9 +249,8 @@ fn prepare_hw_cap_schedule(
             "cap/floor HW calibration requires a term index; compounded overnight quote calibration is not supported".into(),
         ));
     }
-    let calendar = finstack_quant_cashflows::builder::calendar::resolve_calendar_strict(
-        &convention.market_calendar_id,
-    )?;
+    let calendar =
+        finstack_quant_core::dates::calendar_by_id_strict(&convention.market_calendar_id)?;
     let start = adjust(
         params
             .base_date

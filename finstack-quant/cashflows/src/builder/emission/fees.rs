@@ -198,7 +198,7 @@ mod tests {
             day_count: DayCount::Act360,
             frequency: Tenor::quarterly(),
             stub: finstack_quant_core::dates::StubKind::ShortBack,
-            calendar: crate::builder::calendar::resolve_calendar_strict("weekends_only")
+            calendar: finstack_quant_core::dates::calendar_by_id_strict("weekends_only")
                 .expect("weekends_only calendar should resolve"),
             periods: vec![crate::builder::date_generation::CompiledPeriod {
                 period,

@@ -293,7 +293,7 @@ fn test_tranche_loss_allocation_no_loss() {
     .unwrap();
 
     // Act: Loss below attachment
-    let loss = tranche.loss_allocation(5.0);
+    let loss = tranche.loss_allocation(5.0).expect("loss");
 
     // Assert
     assert_eq!(loss.amount(), 0.0);
@@ -314,7 +314,7 @@ fn test_tranche_loss_allocation_partial_loss() {
     .unwrap();
 
     // Act: 12% loss (2% into the tranche)
-    let loss = tranche.loss_allocation(12.0);
+    let loss = tranche.loss_allocation(12.0).expect("loss");
 
     // Assert: 2% / 5% = 40% of tranche = $20M
     assert_eq!(loss.amount(), 20_000_000.0);
@@ -335,7 +335,7 @@ fn test_tranche_loss_allocation_full_loss() {
     .unwrap();
 
     // Act: 20% loss (beyond detachment)
-    let loss = tranche.loss_allocation(20.0);
+    let loss = tranche.loss_allocation(20.0).expect("loss");
 
     // Assert: Full tranche wiped out
     assert_eq!(loss.amount(), 50_000_000.0);

@@ -358,7 +358,7 @@ const cases = {
       end_is_termination_date: false,
     };
     return {
-      parse: ['fixed', 'prepayment', 'collateral_substitution_out'].map((name) =>
+      parse: ['fixed', 'pre_payment', 'collateral_substitution_out'].map((name) =>
         cashflows.cfKindParse(name)
       ),
       interest_like: ['fixed', 'float_reset', 'fee', 'notional'].map((kind) =>

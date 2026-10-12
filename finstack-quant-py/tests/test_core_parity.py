@@ -44,7 +44,7 @@ from finstack_quant.core.market_data import (
     invert_fx_rate,
 )
 from finstack_quant.core.money import Money
-from finstack_quant.core.types import Bps, CreditRating, Percentage, Rate
+from finstack_quant.core.types import Bps, CreditRating, Rate
 from finstack_quant.models.credit import moodys_warf_factor
 
 
@@ -248,16 +248,9 @@ class TestCoreTypesParity:
         with pytest.raises(ValueError, match="df"):
             special_functions.student_t_inv_cdf(0.5, math.nan)
 
-    def test_percentage_hash_matches_equality_for_signed_zero(self) -> None:
-        pos_zero = Percentage(0.0)
-        neg_zero = Percentage(-0.0)
-
-        assert pos_zero == neg_zero
-        assert hash(pos_zero) == hash(neg_zero)
-
     def test_credit_rating_notches_are_preserved_and_models_owns_warf(self) -> None:
-        assert CreditRating.from_name("BBB+") == CreditRating.BBB_PLUS
-        assert CreditRating.from_name("Baa1") == CreditRating.BBB_PLUS
+        assert CreditRating("BBB+") == CreditRating.BBB_PLUS
+        assert CreditRating("Baa1") == CreditRating.BBB_PLUS
         assert CreditRating.BBB_PLUS.name == "BBB+"
         assert moodys_warf_factor(CreditRating.BBB_PLUS) > 0.0
 

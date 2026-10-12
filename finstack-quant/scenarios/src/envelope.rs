@@ -1,8 +1,7 @@
 //! Versioned persistence envelope for scenario specifications.
 
 use finstack_quant_core::contract::{
-    deserialize_json_value, parse_json_value, ContractDescriptor, ContractError, Diagnostic,
-    LoadLimits, LoadPhase, Severity, ValidationReport,
+    ContractDescriptor, ContractError, LoadLimits, ValidationReport,
 };
 use serde::{Deserialize, Serialize};
 
@@ -78,27 +77,11 @@ impl ScenarioEnvelope {
         bytes: &[u8],
         limits: &LoadLimits,
     ) -> Result<(ScenarioSpec, ValidationReport), ContractError> {
-        let value = parse_json_value(bytes, limits)?;
-        let schema = match value.get("schema") {
-            Some(schema) => Some(deserialize_json_value::<String>(schema.clone(), limits)?),
-            None => None,
-        };
-        SCENARIO_CONTRACT.parse_schema_strict(schema.as_deref(), "/schema", limits)?;
-        let envelope: Self = deserialize_json_value(value, limits)?;
-        envelope.scenario.validate().map_err(|error| {
-            let mut report = ValidationReport::default();
-            report.push_bounded(
-                limits,
-                Diagnostic::new(
-                    "contract/semantic-invalid",
-                    LoadPhase::Semantic,
-                    Severity::Error,
-                    error.to_string(),
-                )
-                .with_contract(SCENARIO_CONTRACT.id),
-            );
-            ContractError::Report(Box::new(report))
-        })?;
+        let envelope: Self = SCENARIO_CONTRACT.decode(bytes, limits)?;
+        envelope
+            .scenario
+            .validate()
+            .map_err(|error| SCENARIO_CONTRACT.semantic_error(error, limits))?;
         Ok((envelope.scenario, ValidationReport::default()))
     }
 }

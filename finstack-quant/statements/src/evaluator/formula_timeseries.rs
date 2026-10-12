@@ -21,7 +21,7 @@ use time::{Date, Duration, Weekday};
 /// Offset exactly in calendar periods, independent of the number of stored observations.
 /// Out-of-range dates have no observation and return `None` without a linear walk.
 pub(crate) fn offset_period(context: &EvaluationContext, offset: i32) -> Option<PeriodId> {
-    let mut period = context.period_id;
+    let period = context.period_id;
     if offset == 0 {
         return Some(period);
     }
@@ -32,54 +32,13 @@ pub(crate) fn offset_period(context: &EvaluationContext, offset: i32) -> Option<
                 .history
                 .period_starting_on(target, PeriodKind::Daily, true);
         }
-        // A standalone context can resolve a same-year backward offset from
-        // the identifiers alone. Crossing a fiscal daily year requires the
-        // actual model dates retained by `PeriodHistory::with_periods`.
-        let index = i64::from(period.index) + i64::from(offset);
-        if offset < 0 && index >= 1 {
-            period.index = index as u16;
-            return Some(period);
-        }
-        return None;
-    }
-    if period.is_fiscal() && period.kind() == PeriodKind::Weekly {
-        // Core's fiscal weeks are seven-day blocks from the fiscal-year
-        // start, followed by a shortened final block: ceil(365/7) and
-        // ceil(366/7) both equal 53. Count the final block as one period;
-        // subtracting seven Gregorian days across it would skip W53.
-        let ordinal = i64::from(period.year) * 53 + i64::from(period.index) - 1 + i64::from(offset);
-        period.year = i32::try_from(ordinal.div_euclid(53)).ok()?;
-        period.index = (ordinal.rem_euclid(53) + 1) as u16;
-        return Some(period);
-    }
-    match period.kind() {
-        PeriodKind::Daily | PeriodKind::Weekly => {
-            let (date, days) = if period.kind() == PeriodKind::Daily {
-                (
-                    Date::from_ordinal_date(period.year, period.index).ok()?,
-                    i64::from(offset),
-                )
-            } else {
-                (
-                    Date::from_iso_week_date(period.year, period.index as u8, Weekday::Monday)
-                        .ok()?,
-                    i64::from(offset) * 7,
-                )
-            };
-            Some(PeriodId::from_date(
-                date.checked_add(Duration::days(days))?,
-                period.kind(),
-            ))
-        }
-        _ => {
-            let n = i64::from(period.periods_per_year());
-            let ordinal =
-                i64::from(period.year) * n + i64::from(period.index) - 1 + i64::from(offset);
-            period.year = i32::try_from(ordinal.div_euclid(n)).ok()?;
-            period.index = (ordinal.rem_euclid(n) + 1) as u16;
-            Some(period)
+        // Without model dates only same-year backward offsets are resolvable;
+        // a fiscal year's length depends on its calendar.
+        if offset > 0 {
+            return None;
         }
     }
+    period.shift(offset).ok()
 }
 
 /// Read an expression at an earlier calendar slot without compressing gaps.
@@ -355,9 +314,9 @@ fn period_observation_date(period: PeriodId, context: &EvaluationContext) -> Opt
         return None;
     }
     match period.kind() {
-        PeriodKind::Daily => Date::from_ordinal_date(period.year, period.index).ok(),
+        PeriodKind::Daily => Date::from_ordinal_date(period.year(), period.index()).ok(),
         PeriodKind::Weekly => {
-            Date::from_iso_week_date(period.year, period.index as u8, Weekday::Sunday).ok()
+            Date::from_iso_week_date(period.year(), period.index() as u8, Weekday::Sunday).ok()
         }
         _ => None,
     }

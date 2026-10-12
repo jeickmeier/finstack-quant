@@ -652,7 +652,7 @@ impl ReplayTemplate {
                 entry.payment = Some(flow.date);
                 entry.day_count = Some(accrual.day_count);
                 entry.day_count_context = Some(DayCountContext {
-                    calendar: Some(resolve_calendar_strict(
+                    calendar: Some(calendar_by_id_strict(
                         accrual
                             .calendar_id
                             .as_deref()
@@ -1125,7 +1125,7 @@ impl ReplayTemplate {
                     payment: flow.date,
                     day_count: accrual.day_count,
                     day_count_context: DayCountContext {
-                        calendar: Some(resolve_calendar_strict(
+                        calendar: Some(calendar_by_id_strict(
                             accrual
                                 .calendar_id
                                 .as_deref()

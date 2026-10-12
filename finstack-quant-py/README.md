@@ -332,7 +332,7 @@ primary IntelliSense surface; `py.typed` marks the package as typed. Runtime
 | Area | Module | Entry points |
 |------|--------|--------------|
 | Money / currency | `core.money`, `core.currency` | `Money`, `Currency` |
-| Rates and ratings | `core.types` | `Rate`, `Bps`, `Percentage`, `CreditRating` |
+| Rates and ratings | `core.types` | `Rate`, `Bps`, `CreditRating` |
 | Dates | `core.dates` | `Tenor`, `DayCount`, `PeriodId`, `Schedule`, `ScheduleBuilder`, `HolidayCalendar`, `BusinessDayConvention`, `StubKind`, `adjust` |
 | Config | `core.config` | `FinstackConfig`, `RoundingMode`, `ToleranceConfig` |
 | Curves / context | `core.market_data` | `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `FxMatrix`, `ScalarTimeSeries`, `MarketContext` |

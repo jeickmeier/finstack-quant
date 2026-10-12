@@ -733,9 +733,6 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
             finstack_quant_core::market_data::context::CurveState::BaseCorrelation(bc) => {
                 bc.id().to_string()
             }
-            finstack_quant_core::market_data::context::CurveState::VolIndex(vc) => {
-                vc.id().to_string()
-            }
             finstack_quant_core::market_data::context::CurveState::Price(pc) => pc.id().to_string(),
             finstack_quant_core::market_data::context::CurveState::BasisSpread(bs) => {
                 bs.id().to_string()
@@ -1083,6 +1080,43 @@ fn volatility_index_curve_rejects_unknown_fields() {
         .build()
         .unwrap();
     assert_strict_inbound(&curve);
+}
+
+#[test]
+fn volatility_index_kind_is_carried_by_price_curve_snapshot() {
+    use finstack_quant_core::market_data::context::{
+        CurveState, MarketContext, MarketContextState,
+    };
+    use finstack_quant_core::market_data::term_structures::{PriceCurve, PriceCurveKind};
+
+    let curve = PriceCurve::builder("VIX")
+        .kind(PriceCurveKind::VolIndex)
+        .base_date(test_date())
+        .spot_price(15.0)
+        .knots([(0.0, 15.0), (1.0, 18.0)])
+        .build()
+        .unwrap();
+    let context = MarketContext::new().insert(curve);
+    assert_eq!(
+        context.get_vol_index_curve("VIX").unwrap().kind(),
+        PriceCurveKind::VolIndex
+    );
+    let error = context.get_price_curve("VIX").unwrap_err().to_string();
+    assert!(
+        error.contains("Price") && error.contains("VolIndex"),
+        "wrong-kind lookup names both curve types: {error}"
+    );
+    assert_eq!(context.stats().curve_counts.get("VolIndex"), Some(&1));
+    assert_eq!(context.stats().curve_counts.get("Price"), None);
+
+    let state = MarketContextState::try_from(&context).unwrap();
+    assert!(matches!(
+        &state.curves[0],
+        CurveState::Price(curve) if curve.kind() == PriceCurveKind::VolIndex
+    ));
+    let wire = serde_json::to_value(state).unwrap();
+    assert_eq!(wire["curves"][0]["type"], "price");
+    assert_eq!(wire["curves"][0]["spot_level"], 15.0);
 }
 
 #[test]

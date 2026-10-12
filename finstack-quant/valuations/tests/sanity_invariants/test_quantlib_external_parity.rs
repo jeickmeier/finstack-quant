@@ -47,8 +47,7 @@ fn load_fixture<T: for<'de> Deserialize<'de>>(name: &str) -> T {
 }
 
 fn parse_iso_date(s: &str) -> Date {
-    let fmt = time::format_description::well_known::Iso8601::DEFAULT;
-    Date::parse(s, &fmt).expect("ISO date")
+    finstack_quant_core::dates::parse_iso_date(s).expect("ISO date")
 }
 
 /// Build a flat continuously-compounded discount curve at `rate`. Knot grid

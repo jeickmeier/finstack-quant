@@ -466,10 +466,10 @@ def test_valid_definition_parses_once_and_preserves_exact_rendering() -> None:
 
     assert sum(call.args[0] == definition_json for call in parse_json.call_args_list) == 1
     assert json_html == dict_html
-    assert len(dict_html.encode()) == 11284
+    assert len(dict_html.encode()) == 11498
     assert (
         hashlib.sha256(dict_html.encode()).hexdigest()
-        == "11a3aba264dce45e91749bc0deae1d60586fdb5f0e7467db55bf0adf0380f187"
+        == "32f5de9dee1276e50900a388be98bf1581905da2b5ddeb5a31f96428bfbe4f0e"
     )
 
 

@@ -323,18 +323,22 @@ impl Tranche {
     /// # Arguments
     /// * `cumulative_loss_pct` - Cumulative net loss in percentage points of
     ///   performing pool balance, in `[0, 100]` (for example, `12.0` means 12%).
-    pub fn loss_allocation(&self, cumulative_loss_pct: f64) -> Money {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `cumulative_loss_pct` is non-finite.
+    pub fn loss_allocation(&self, cumulative_loss_pct: f64) -> finstack_quant_core::Result<Money> {
         if cumulative_loss_pct <= self.effective_attach_pct() {
             // Losses have not reached this tranche's subordination
-            Money::from((0_i64, self.original_balance.currency()))
+            Ok(Money::from((0_i64, self.original_balance.currency())))
         } else if cumulative_loss_pct >= self.effective_detach_pct() {
             // Tranche fully impaired — written down to zero
-            self.original_balance
+            Ok(self.original_balance)
         } else {
             // Partial loss: only the portion between attachment and detachment
             let loss_within_tranche_pct = cumulative_loss_pct - self.effective_attach_pct();
             let loss_rate = loss_within_tranche_pct / self.thickness();
-            self.original_balance * loss_rate
+            self.original_balance.checked_mul_f64(loss_rate)
         }
     }
 
@@ -350,7 +354,7 @@ impl Tranche {
         &self,
         cumulative_loss_pct: f64,
     ) -> finstack_quant_core::Result<Money> {
-        let loss_amount = self.loss_allocation(cumulative_loss_pct);
+        let loss_amount = self.loss_allocation(cumulative_loss_pct)?;
         Money::new(
             (self.current_balance.amount() - loss_amount.amount()).max(0.0),
             self.current_balance.currency(),
@@ -1079,16 +1083,16 @@ mod tests {
         .expect("should succeed");
 
         // No loss case
-        let loss = tranche.loss_allocation(5.0);
+        let loss = tranche.loss_allocation(5.0).expect("loss");
         assert_eq!(loss.amount(), 0.0);
 
         // Partial loss case (12% cumulative loss)
-        let loss = tranche.loss_allocation(12.0);
+        let loss = tranche.loss_allocation(12.0).expect("loss");
         assert!(loss.amount() > 0.0);
         assert!(loss.amount() < tranche.original_balance.amount());
 
         // Full loss case (20% cumulative loss)
-        let loss = tranche.loss_allocation(20.0);
+        let loss = tranche.loss_allocation(20.0).expect("loss");
         assert_eq!(loss.amount(), tranche.original_balance.amount());
     }
 

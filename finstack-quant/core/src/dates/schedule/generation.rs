@@ -263,9 +263,8 @@ impl BuilderInternal {
                     break;
                 }
             };
-            let snapped = maybe_eom(self.eom, dt);
-            if snapped > self.start && snapped < self.end {
-                push_if_new(&mut buf, snapped);
+            if dt < self.end {
+                push_if_new(&mut buf, dt);
                 check_anchor_count(buf.len())?;
             }
             i = next_roll_index(i)?;

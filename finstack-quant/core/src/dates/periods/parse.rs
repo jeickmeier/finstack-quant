@@ -2,15 +2,12 @@
 
 use super::*;
 
-pub(super) fn parse_range_with_calendar<C: PeriodCalendar>(
-    s: &str,
-    calendar: &C,
-) -> crate::Result<(PeriodId, PeriodId)> {
+pub(super) fn parse_range(s: &str, calendar: Calendar) -> crate::Result<(PeriodId, PeriodId)> {
     let s = s.trim();
     let (lhs, rhs_raw) = s
         .split_once("..")
         .ok_or_else(|| invalid_period(s, "range is missing the '..' separator"))?;
-    let start = parse_id_with_calendar(lhs, calendar)?;
+    let start = parse_id(lhs, calendar)?;
     let rhs_raw = rhs_raw.trim();
     let rhs_upper = rhs_raw.to_ascii_uppercase();
     let rhs = rhs_upper.as_str();
@@ -23,7 +20,7 @@ pub(super) fn parse_range_with_calendar<C: PeriodCalendar>(
             .map(|c| c.is_ascii_digit())
             .unwrap_or(false)
     {
-        parse_id_with_calendar(rhs, calendar)?
+        parse_id(rhs, calendar)?
     } else {
         // relative form like "..D100" / "..Q4" / "..M12" / "..W52" / "..H2" / "..A"
         let designator = start.kind.designator().ok_or_else(|| {
@@ -36,11 +33,7 @@ pub(super) fn parse_range_with_calendar<C: PeriodCalendar>(
             rhs.trim_start_matches(designator),
             calendar.max_index(start.year, start.kind)?,
         )?;
-        if start.fiscal {
-            start.kind.build_fiscal_id(start.year, index)
-        } else {
-            start.kind.build_id(start.year, index)
-        }
+        PeriodId { index, ..start }
     };
     if start.kind != end.kind {
         return Err(invalid_period(
@@ -66,14 +59,13 @@ pub(super) fn parse_range_with_calendar<C: PeriodCalendar>(
     Ok((start, end))
 }
 
-fn parse_designated_id<C: PeriodCalendar>(
+fn parse_designated_id(
     s: &str,
     split_index: usize,
     kind: PeriodKind,
-    calendar: &C,
+    calendar: Calendar,
 ) -> crate::Result<PeriodId> {
     let explicit_fiscal = s.starts_with("FY");
-    let fiscal = explicit_fiscal || calendar.is_fiscal();
     let year_raw = s[..split_index]
         .strip_prefix("FY")
         .unwrap_or(&s[..split_index]);
@@ -81,63 +73,50 @@ fn parse_designated_id<C: PeriodCalendar>(
         .parse()
         .map_err(|_| invalid_period(s, "year is not a valid integer"))?;
     let max_index = if explicit_fiscal {
-        kind.relative_max_index()
+        kind.capacity()
     } else {
         calendar.max_index(year, kind)?
     };
     let index = kind.parse_index_with_limit(&s[split_index + 1..], max_index)?;
-    Ok(if fiscal {
-        kind.build_fiscal_id(year, index)
-    } else {
-        kind.build_id(year, index)
+    Ok(PeriodId {
+        year,
+        index,
+        kind,
+        fiscal: explicit_fiscal || calendar.is_fiscal(),
     })
 }
 
-pub(super) fn parse_id(s: &str) -> crate::Result<PeriodId> {
-    parse_id_with_calendar(s, &Gregorian)
-}
-
-pub(super) fn parse_id_with_calendar<C: PeriodCalendar>(
-    s: &str,
-    calendar: &C,
-) -> crate::Result<PeriodId> {
+/// Parse one period id; unprefixed ids take the fiscal flag of `calendar`.
+pub(super) fn parse_id(s: &str, calendar: Calendar) -> crate::Result<PeriodId> {
     let s = s.trim();
     // Normalize to uppercase to accept lowercase inputs.
     let s = s.to_ascii_uppercase();
     let s = s.as_str();
-    if let Some(i) = s.find('D') {
-        return parse_designated_id(s, i, PeriodKind::Daily, calendar);
+    for (designator, kind) in [
+        ('D', PeriodKind::Daily),
+        ('Q', PeriodKind::Quarterly),
+        ('M', PeriodKind::Monthly),
+        ('W', PeriodKind::Weekly),
+        ('H', PeriodKind::SemiAnnual),
+    ] {
+        if let Some(i) = s.find(designator) {
+            return parse_designated_id(s, i, kind, calendar);
+        }
     }
-    if let Some(i) = s.find('Q') {
-        return parse_designated_id(s, i, PeriodKind::Quarterly, calendar);
-    }
-    if let Some(i) = s.find('M') {
-        return parse_designated_id(s, i, PeriodKind::Monthly, calendar);
-    }
-    if let Some(i) = s.find('W') {
-        return parse_designated_id(s, i, PeriodKind::Weekly, calendar);
-    }
-    if let Some(i) = s.find('H') {
-        return parse_designated_id(s, i, PeriodKind::SemiAnnual, calendar);
-    }
-    if s.chars().all(|c| c.is_ascii_digit()) {
-        // annual
-        let year: i32 = s
-            .parse()
-            .map_err(|_| invalid_period(s, "year is not a valid integer"))?;
-        return Ok(if calendar.is_fiscal() {
-            PeriodKind::Annual.build_fiscal_id(year, 1)
-        } else {
-            PeriodId::annual(year)
-        });
-    }
-    if let Some(year) = s.strip_prefix("FY") {
-        let year: i32 = year
-            .parse()
-            .map_err(|_| invalid_period(s, "fiscal year is not a valid integer"))?;
-        return Ok(PeriodKind::Annual.build_fiscal_id(year, 1));
-    }
-    Err(invalid_period(s, "unrecognized period id"))
+    let (fiscal, year) = match s.strip_prefix("FY") {
+        Some(year) => (true, year),
+        None if s.chars().all(|c| c.is_ascii_digit()) => (calendar.is_fiscal(), s),
+        None => return Err(invalid_period(s, "unrecognized period id")),
+    };
+    let year: i32 = year
+        .parse()
+        .map_err(|_| invalid_period(s, "year is not a valid integer"))?;
+    Ok(PeriodId {
+        year,
+        index: 1,
+        kind: PeriodKind::Annual,
+        fiscal,
+    })
 }
 
 /// Accepted period-id and range grammar, appended to every parse error.
@@ -166,28 +145,8 @@ pub(super) fn checked_year_offset(year: i32, offset: i32) -> crate::Result<i32> 
     })
 }
 
-pub(super) fn days_in_year(year: i32) -> u16 {
-    if time::util::is_leap_year(year) {
-        366
-    } else {
-        365
-    }
-}
-
-pub(super) fn step(id: PeriodId) -> crate::Result<PeriodId> {
-    step_with_calendar(id, &Gregorian, true)
-}
-
-/// Step backward by one period (inverse of step).
-pub(super) fn step_backward(id: PeriodId) -> crate::Result<PeriodId> {
-    step_with_calendar(id, &Gregorian, false)
-}
-
-pub(super) fn step_with_calendar<C: PeriodCalendar>(
-    mut id: PeriodId,
-    calendar: &C,
-    forward: bool,
-) -> crate::Result<PeriodId> {
+/// Step one period forward or backward using the year capacity of `calendar`.
+pub(super) fn step(mut id: PeriodId, calendar: Calendar, forward: bool) -> crate::Result<PeriodId> {
     let max = calendar.max_index(id.year, id.kind)?;
     if id.index == 0 || id.index > max {
         return Err(invalid_period(

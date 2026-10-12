@@ -8,7 +8,7 @@ use crate::Result;
 
 use super::super::term_structures::{
     BaseCorrelationCurve, BasisSpreadCurve, DiscountCurve, ForwardCurve, HazardCurve,
-    InflationCurve, ParametricCurve, PriceCurve, PriceCurveKind,
+    InflationCurve, ParametricCurve, PriceCurve,
 };
 use super::BumpSpec;
 
@@ -25,7 +25,6 @@ macro_rules! for_each_context_curve {
                 type_name: "BaseCorrelation"
             },
             Price => { accessor: price, ty: PriceCurve, type_name: "Price" },
-            VolIndex => { accessor: vol_index, ty: PriceCurve, type_name: "VolIndex" },
             BasisSpread => { accessor: basis_spread, ty: BasisSpreadCurve, type_name: "BasisSpread" },
             Parametric => { accessor: parametric, ty: ParametricCurve, type_name: "Parametric" }
         }
@@ -115,8 +114,19 @@ macro_rules! define_curve_storage {
             )*
 
             /// Return a human-readable curve type (useful for diagnostics/logging).
+            ///
+            /// A volatility-index [`PriceCurve`] reports `"VolIndex"`, matching
+            /// the type name [`MarketContext::get_vol_index_curve`] checks for.
+            ///
+            /// [`MarketContext::get_vol_index_curve`]: crate::market_data::context::MarketContext::get_vol_index_curve
             pub fn curve_type(&self) -> &'static str {
                 match self {
+                    Self::Price(curve)
+                        if curve.kind()
+                            == crate::market_data::term_structures::PriceCurveKind::VolIndex =>
+                    {
+                        "VolIndex"
+                    }
                     $( Self::$variant(_) => $type_name, )*
                 }
             }
@@ -155,15 +165,11 @@ impl_curve_storage_from!(
     Parametric => ParametricCurve,
 );
 
-/// A [`PriceCurve`] lands in the `Price` or `VolIndex` slot according to its
-/// [`PriceCurveKind`], so `get_price_curve` / `get_vol_index_curve` stay
-/// type-checked lookups.
+/// Every [`PriceCurve`] uses the single `Price` storage variant. Its kind is
+/// carried by the curve itself and drives typed context lookups and snapshots.
 impl From<Arc<PriceCurve>> for CurveStorage {
     fn from(curve: Arc<PriceCurve>) -> Self {
-        match curve.kind() {
-            PriceCurveKind::Price => Self::Price(curve),
-            PriceCurveKind::VolIndex => Self::VolIndex(curve),
-        }
+        Self::Price(curve)
     }
 }
 
@@ -183,9 +189,8 @@ impl CurveStorage {
             Self::Inflation(curve) => Ok(Self::Inflation(Arc::new(curve.roll_forward(days)?))),
             Self::BaseCorrelation(curve) => Ok(Self::BaseCorrelation(Arc::clone(curve))),
             Self::Price(curve) => Ok(Self::Price(Arc::new(curve.roll_forward(days)?))),
-            Self::VolIndex(curve) => Ok(Self::VolIndex(Arc::new(curve.roll_forward(days)?))),
             Self::BasisSpread(curve) => Ok(Self::BasisSpread(Arc::new(curve.roll_forward(days)?))),
-            Self::Parametric(curve) => Ok(Self::Parametric(Arc::clone(curve))),
+            Self::Parametric(curve) => Ok(Self::Parametric(Arc::new(curve.roll_forward(days)?))),
         }
     }
 
@@ -254,12 +259,6 @@ impl CurveStorage {
                     BaseCorrelationCurve::id,
                 )?;
                 *self = Self::BaseCorrelation(Arc::new(curve));
-                Ok(())
-            }
-            Self::VolIndex(original) => {
-                let curve =
-                    bump_curve_preserving_id(original.as_ref(), original_id, spec, PriceCurve::id)?;
-                *self = Self::VolIndex(Arc::new(curve));
                 Ok(())
             }
             Self::Price(original) => {

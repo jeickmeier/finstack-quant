@@ -2,12 +2,46 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
- * Type-safe identifier for a node in a financial model.
+ * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
- * Serializes as a plain string and is interoperable with `&str` via
- * [`Borrow`] and [`AsRef`].
+ * This type wraps a string identifier with a phantom type parameter to ensure
+ * type safety at compile time. Different `Id<T>` types with different `T`
+ * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+ *
+ * # Type Parameters
+ *
+ * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+ *
+ * # Invariants
+ *
+ * - Storage uses `Arc<str>` for efficient cloning
+ * - The phantom marker has zero size and runtime cost
+ * - Two `Id<T>` values are equal if their string values are equal
+ * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+ *
+ * # Examples
+ *
+ * ```rust
+ * use finstack_quant_core::types::{CurveId, InstrumentId};
+ *
+ * // Create IDs with different type tags
+ * let curve = CurveId::from("USD-SOFR");
+ * let bond = InstrumentId::from("ISIN:US912828XG60");
+ *
+ * // Can compare IDs of the same type
+ * assert_eq!(curve, CurveId::from("USD-SOFR"));
+ * assert_ne!(curve, CurveId::from("EUR-ESTR"));
+ *
+ * // Cannot compare IDs of different types (compile error):
+ * // let _ = curve == bond;  // Error: mismatched types
+ * ```
+ *
+ * # Thread Safety
+ *
+ * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+ * safely share and clone IDs with minimal synchronization overhead.
  */
-export type D_033Ef06200A8Ef7Aaa49 = string;
+export type D_1Da830A1770Acb5Adc51 = string;
 /**
  * ISO 4217 currency enumeration
  */
@@ -730,7 +764,7 @@ export interface D_82A7F3795866Afe7C96C {
   /**
    * Node identifiers involved in the finding.
    */
-  nodes?: D_033Ef06200A8Ef7Aaa49[];
+  nodes?: D_1Da830A1770Acb5Adc51[];
   /**
    * Period the finding relates to, if applicable.
    */

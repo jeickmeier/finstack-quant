@@ -260,20 +260,7 @@ fn evaluate_period_aggregate_function(
         Function::Ytd => {
             require_args("ytd", args, 1, node_id)?;
             let current = context.period_id;
-            let start_of_year = match context.period_kind {
-                PeriodKind::Daily => finstack_quant_core::dates::PeriodId::day(current.year, 1)?,
-                PeriodKind::Quarterly => {
-                    finstack_quant_core::dates::PeriodId::quarter(current.year, 1)?
-                }
-                PeriodKind::Monthly => {
-                    finstack_quant_core::dates::PeriodId::month(current.year, 1)?
-                }
-                PeriodKind::Weekly => finstack_quant_core::dates::PeriodId::week(current.year, 1)?,
-                PeriodKind::SemiAnnual => {
-                    finstack_quant_core::dates::PeriodId::half(current.year, 1)?
-                }
-                PeriodKind::Annual => finstack_quant_core::dates::PeriodId::annual(current.year),
-            };
+            let start_of_year = current.shift(1 - i32::from(current.index()))?;
 
             sum_expression_range(&args[0], context, start_of_year, current, node_id)
         }
@@ -287,10 +274,10 @@ fn evaluate_period_aggregate_function(
             }
 
             let current = context.period_id;
-            let month = current.index as u32;
+            let month = u32::from(current.index());
             let quarter_start_month = ((month - 1) / 3) * 3 + 1;
             let start = finstack_quant_core::dates::PeriodId::month(
-                current.year,
+                current.year(),
                 quarter_start_month as u8,
             )?;
 
@@ -317,11 +304,11 @@ fn evaluate_period_aggregate_function(
             }
             let start_month = start_month_raw as u8;
             let current = context.period_id;
-            let current_month = current.index;
+            let current_month = current.index();
             let fiscal_start_year = if current_month >= start_month as u16 {
-                current.year
+                current.year()
             } else {
-                current.year - 1
+                current.year() - 1
             };
             let start =
                 finstack_quant_core::dates::PeriodId::month(fiscal_start_year, start_month)?;

@@ -277,7 +277,7 @@ pub(super) fn floating_fixing_date(
         .as_deref()
         .or(facility_calendar_id)
         .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
-    let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict(calendar_id)?;
+    let calendar = finstack_quant_core::dates::calendar_by_id_strict(calendar_id)?;
     reset_effective_date.add_business_days(-spec.reset_lag_days, calendar)
 }
 

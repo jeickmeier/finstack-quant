@@ -110,16 +110,16 @@ impl RevolvingCreditPricer {
             .map(|key| {
                 let flow = &buckets[&key];
                 let rate = (flow.rate_count > 0).then(|| flow.rate_sum / flow.rate_count as f64);
-                CashFlow::new(
+                Ok(CashFlow::new(
                     key.0,
                     key.1,
-                    flow.amount * (1.0 / num_paths),
+                    flow.amount.checked_div_f64(num_paths)?,
                     key.2,
                     flow.accrual_factor,
                     rate,
-                )
+                ))
             })
-            .collect();
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
         Ok(schedule_from_classified_flows(
             flows,

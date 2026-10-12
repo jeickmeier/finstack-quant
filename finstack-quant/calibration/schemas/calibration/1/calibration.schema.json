@@ -2133,6 +2133,39 @@
       "description": "Identifier for Inflation Swap market conventions (e.g., \"USD-CPI\", \"UK-RPI\").\n\nUsed to look up [`InflationSwapConventions`](crate::market::conventions::defs::InflationSwapConventions)\nfrom the convention registry.",
       "type": "string"
     },
+    "InterpRollState": {
+      "additionalProperties": false,
+      "description": "Serialized source grid and time origin for a rolled interpolation.",
+      "properties": {
+        "offset": {
+          "format": "double",
+          "type": "number"
+        },
+        "source_points": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_points",
+        "offset"
+      ],
+      "type": "object"
+    },
     "InterpStyle": {
       "description": "Enum of supported interpolation styles. The default is `Linear`.",
       "oneOf": [
@@ -3577,6 +3610,13 @@
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
               "description": "Base date"
             },
+            "calendar_id": {
+              "description": "Registered holiday calendar id of the business-day time axis (for\nexample `\"brbd\"` for a Bus/252 curve). Omitted when the day count needs\nno calendar.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "calibration_ois_cutoff_days": {
               "description": "OIS cut-off (business days) the curve was calibrated under, if any.",
               "format": "int32",
@@ -3979,6 +4019,17 @@
                 "type": "array"
               },
               "type": "array"
+            },
+            "roll_transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/InterpRollState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source interpolation and accumulated time origin for a rolled curve."
             }
           },
           "required": [
@@ -4072,6 +4123,17 @@
                 "type": "array"
               },
               "type": "array"
+            },
+            "roll_transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/InterpRollState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source interpolation and accumulated time origin for a rolled curve."
             }
           },
           "required": [
@@ -4108,6 +4170,12 @@
             "model": {
               "$ref": "#/$defs/NelsonSiegelModel",
               "description": "Nelson-Siegel model parameters."
+            },
+            "time_offset": {
+              "default": 0.0,
+              "description": "Current origin in the source model's year-fraction coordinates;\nomitted means `0.0` (a curve that has never been rolled).",
+              "format": "double",
+              "type": "number"
             }
           },
           "required": [
@@ -4165,6 +4233,17 @@
                 "type": "array"
               },
               "type": "array"
+            },
+            "roll_transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/InterpRollState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source interpolation and accumulated time origin for a rolled curve."
             },
             "spot_level": {
               "description": "Spot index level (volatility index curves)",
@@ -4240,6 +4319,17 @@
                 "type": "array"
               },
               "type": "array"
+            },
+            "roll_transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/InterpRollState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source interpolation and accumulated time origin for a rolled curve."
             },
             "spot_level": {
               "description": "Spot index level (volatility index curves)",
@@ -4433,10 +4523,6 @@
           "type": "object"
         }
       ]
-    },
-    "RateCalibrationFutureContractId": {
-      "description": "Serialized identifier for an interest-rate futures convention.",
-      "type": "string"
     },
     "RateCalibrationMethod": {
       "description": "Numerical method used to calibrate a rate curve.",
@@ -4667,7 +4753,7 @@
               "additionalProperties": false,
               "properties": {
                 "contract": {
-                  "$ref": "#/$defs/RateCalibrationFutureContractId",
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
                   "description": "Convention-registry identifier for the futures contract."
                 },
                 "convexity_adjustment": {

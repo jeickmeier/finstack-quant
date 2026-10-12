@@ -1,8 +1,7 @@
 //! Versioned persistence envelope for factor-model configuration.
 
 use finstack_quant_core::contract::{
-    deserialize_json_value, parse_json_value, ContractDescriptor, ContractError, Diagnostic,
-    LoadLimits, LoadPhase, Severity, ValidationReport,
+    ContractDescriptor, ContractError, LoadLimits, ValidationReport,
 };
 use serde::{Deserialize, Serialize};
 
@@ -78,32 +77,11 @@ impl FactorModelConfigEnvelope {
         bytes: &[u8],
         limits: &LoadLimits,
     ) -> Result<(FactorModelConfig, ValidationReport), ContractError> {
-        let value = parse_json_value(bytes, limits)?;
-        let schema = match value.get("schema") {
-            Some(schema) => Some(deserialize_json_value::<String>(schema.clone(), limits)?),
-            None => None,
-        };
-        FACTOR_MODEL_CONFIG_CONTRACT.parse_schema_strict(schema.as_deref(), "/schema", limits)?;
-        let envelope: Self = deserialize_json_value(value, limits)?;
+        let envelope: Self = FACTOR_MODEL_CONFIG_CONTRACT.decode(bytes, limits)?;
         envelope
             .config
             .validate()
-            .map_err(|error| semantic_error(error, limits))?;
+            .map_err(|error| FACTOR_MODEL_CONFIG_CONTRACT.semantic_error(error, limits))?;
         Ok((envelope.config, ValidationReport::default()))
     }
-}
-
-fn semantic_error(error: finstack_quant_core::Error, limits: &LoadLimits) -> ContractError {
-    let mut report = ValidationReport::default();
-    report.push_bounded(
-        limits,
-        Diagnostic::new(
-            "contract/semantic-invalid",
-            LoadPhase::Semantic,
-            Severity::Error,
-            error.to_string(),
-        )
-        .with_contract(FACTOR_MODEL_CONFIG_CONTRACT.id),
-    );
-    ContractError::Report(Box::new(report))
 }

@@ -161,7 +161,7 @@ impl CashFlowBuilder {
             _ => {}
         }
         let cash_leg = cash.unwrap_or(match kind {
-            CFKind::Amortization => delta * -1.0,
+            CFKind::Amortization => delta.checked_neg(),
             _ => delta,
         });
         if cash_leg.currency() != delta.currency() {

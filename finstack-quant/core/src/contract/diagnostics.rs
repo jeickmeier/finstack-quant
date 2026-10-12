@@ -309,12 +309,6 @@ impl ValidationReport {
     }
 }
 
-impl std::fmt::Display for ValidationReport {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.error_count().fmt(formatter)
-    }
-}
-
 /// Failure produced while parsing, validating, or materializing a persisted contract.
 #[non_exhaustive]
 #[derive(thiserror::Error, Debug)]

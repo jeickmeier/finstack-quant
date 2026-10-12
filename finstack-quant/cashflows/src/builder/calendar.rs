@@ -1,55 +1,12 @@
-//! Calendar resolution utilities for cashflow scheduling.
+//! Calendar helpers for cashflow scheduling.
 //!
-//! Provides a strict resolver that accepts explicit calendar IDs and supports
-//! a dedicated weekends-only calendar for cases without holiday rules.
+//! Calendar ids resolve through `finstack_quant_core::dates::calendar_by_id_strict`,
+//! which also serves the holiday-free `"weekends_only"` calendar.
 
-use finstack_quant_core::dates::{adjust, BusinessDayConvention, Date};
-use finstack_quant_core::dates::{calendar_by_id_strict, HolidayCalendar, WEEKENDS_ONLY};
+use finstack_quant_core::dates::{adjust, calendar_by_id_strict, BusinessDayConvention, Date};
 
 /// Canonical ID for the weekends-only calendar.
 pub const WEEKENDS_ONLY_ID: &str = "weekends_only";
-
-/// Resolve a calendar ID to a holiday calendar reference.
-/// Accepted IDs include the built-in `"weekends_only"` calendar and any
-/// calendar resolved by `finstack_quant_core::dates::calendar_by_id`.
-///
-/// # Arguments
-///
-/// * `calendar_id` - Calendar identifier to resolve.
-///
-/// # Returns
-///
-/// A holiday-calendar reference that can be reused for date adjustment and
-/// business-day counting.
-///
-/// # Errors
-///
-/// Returns an error if the calendar ID is not recognized.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_cashflows::builder::calendar::resolve_calendar_strict;
-///
-/// let cal = resolve_calendar_strict("weekends_only")?;
-/// assert!(cal.is_business_day(
-///     finstack_quant_core::dates::Date::from_calendar_date(
-///         2025,
-///         time::Month::January,
-///         2,
-///     )
-///     .expect("valid date"),
-/// ));
-/// # Ok::<(), finstack_quant_core::Error>(())
-/// ```
-pub fn resolve_calendar_strict(
-    calendar_id: &str,
-) -> finstack_quant_core::Result<&'static dyn HolidayCalendar> {
-    if calendar_id == WEEKENDS_ONLY_ID {
-        return Ok(&WEEKENDS_ONLY);
-    }
-    calendar_by_id_strict(calendar_id)
-}
 
 /// Adjust a single date using the strict calendar policy.
 ///
@@ -59,7 +16,8 @@ pub fn resolve_calendar_strict(
 ///   business-day convention.
 /// * `business_day_convention` - Business-day convention to apply when `date` is not a business
 ///   day in the resolved calendar.
-/// * `calendar_id` - Calendar identifier used for holiday lookup.
+/// * `calendar_id` - Calendar identifier used for holiday lookup; any id accepted by
+///   `calendar_by_id_strict`, including `+`-joined unions and `"weekends_only"`.
 ///
 /// # Returns
 ///
@@ -92,6 +50,6 @@ pub fn adjust_date(
     business_day_convention: BusinessDayConvention,
     calendar_id: &str,
 ) -> finstack_quant_core::Result<Date> {
-    let cal = resolve_calendar_strict(calendar_id)?;
+    let cal = calendar_by_id_strict(calendar_id)?;
     adjust(date, business_day_convention, cal)
 }

@@ -483,14 +483,14 @@ impl CapFloor {
 
     pub(crate) fn resolved_schedule_calendar_id(&self) -> finstack_quant_core::Result<&str> {
         if let Some(id) = self.calendar_id.as_deref() {
-            crate::cashflow::builder::calendar::resolve_calendar_strict(id)?;
+            finstack_quant_core::dates::calendar_by_id_strict(id)?;
             return Ok(id);
         }
         if let Ok(registry) = ConventionRegistry::try_global() {
             let index_id = IndexId::new(self.forward_curve_id.as_str());
             if let Ok(convention) = registry.require_rate_index(&index_id) {
                 let id = convention.market_calendar_id.as_str();
-                crate::cashflow::builder::calendar::resolve_calendar_strict(id)?;
+                finstack_quant_core::dates::calendar_by_id_strict(id)?;
                 return Ok(id);
             }
         }
@@ -1298,8 +1298,8 @@ mod tests {
             .into_iter()
             .last()
             .expect("last period");
-        let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("usny")
-            .expect("USNY calendar");
+        let calendar =
+            finstack_quant_core::dates::calendar_by_id_strict("usny").expect("USNY calendar");
         let expected = last_period
             .accrual_end
             .add_business_days(-3, calendar)
@@ -1402,9 +1402,8 @@ mod tests {
             let accrual =
                 (period.accrual_end - period.accrual_start).whole_days() as f64 / denominator;
             assert!((period.accrual_year_fraction - accrual).abs() < 1e-14);
-            let calendar =
-                crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")
-                    .expect("weekend calendar");
+            let calendar = finstack_quant_core::dates::calendar_by_id_strict("weekends_only")
+                .expect("weekend calendar");
             assert_eq!(
                 period.payment_date,
                 period

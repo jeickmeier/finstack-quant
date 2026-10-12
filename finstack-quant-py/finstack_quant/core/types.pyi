@@ -6,7 +6,7 @@ Provides typed wrappers for financial primitives used throughout the
 
 Example::
 
-    >>> from finstack_quant.core.types import Rate, Bps, Percentage
+    >>> from finstack_quant.core.types import Rate, Bps
     >>> r = Rate(0.05)
     >>> r.as_percent
     5.0
@@ -14,8 +14,6 @@ Example::
     500
     >>> Bps(250).as_decimal
     0.025
-    >>> Percentage(12.5).as_decimal
-    0.125
 
 Examples
 --------
@@ -32,7 +30,6 @@ from typing import Optional, Union
 __all__ = [
     "Rate",
     "Bps",
-    "Percentage",
     "CreditRating",
     "CurveId",
     "InstrumentId",
@@ -281,22 +278,6 @@ class Rate:
         Notes
         -----
         This accessor does not raise; sub-bp precision is rounded away.
-        """
-        ...
-
-    @property
-    def as_percentage(self) -> Percentage:
-        """
-        Rate as a ``Percentage`` value.
-
-        Returns
-        -------
-        Percentage
-            ``Percentage(rate * 100)``.
-
-        Notes
-        -----
-        This accessor does not raise.
         """
         ...
 
@@ -551,22 +532,6 @@ class Bps:
         """
         ...
 
-    @property
-    def as_percentage(self) -> Percentage:
-        """
-        Value as a ``Percentage``.
-
-        Returns
-        -------
-        Percentage
-            ``Percentage(bp / 100)``.
-
-        Notes
-        -----
-        This accessor does not raise.
-        """
-        ...
-
     def abs(self) -> Bps:
         """
         Magnitude of the spread, discarding its sign (basis points preserved).
@@ -576,9 +541,17 @@ class Bps:
         Bps
             Non-negative basis points of the same magnitude.
 
-        Notes
-        -----
-        This method does not raise.
+        Raises
+        ------
+        ValueError
+            If the quote is ``-2147483648`` bp, whose magnitude has no 32-bit
+            representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.types import Bps
+        >>> Bps(-25).abs().as_bp
+        25
         """
         ...
 
@@ -642,298 +615,6 @@ class Bps:
     def __rmul__(self, lhs: int) -> Bps: ...
     def __truediv__(self, rhs: int) -> Bps: ...
     def __neg__(self) -> Bps: ...
-    def __reduce__(self) -> tuple[object, tuple[str]]: ...
-
-class Percentage:
-    """
-    A percentage value (``12.5`` means 12.5%).
-
-    Immutable, hashable, ordered value type with checked arithmetic
-    (``+``/``-`` with ``Percentage``, ``*``/``/`` by ``float``) and
-    conversions to ``Rate`` and ``Bps``. Serializes as a bare JSON number and
-    is picklable.
-
-    Parameters
-    ----------
-    percent : float
-        Percentage value (e.g. ``12.5`` for 12.5%).
-
-    Raises
-    ------
-    ValueError
-        If *percent* is not finite.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.types import Percentage
-    >>> Percentage(12.5).as_decimal
-    0.125
-    >>> (Percentage(10.0) + Percentage(2.5)).as_percent
-    12.5
-    """
-
-    ZERO: Percentage
-    """Zero percent."""
-
-    def __init__(self, percent: float) -> None:
-        """
-        Construct from a percent value.
-
-        Parameters
-        ----------
-        percent : float
-            Percentage value (e.g. ``12.5`` for 12.5%).
-
-        Raises
-        ------
-        ValueError
-            If *percent* is not finite.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.types import Percentage
-        >>> Percentage(12.5).as_decimal
-        0.125
-        """
-        ...
-
-    @classmethod
-    def from_json(cls, json: str) -> Percentage:
-        """
-        Deserialize from JSON (a bare percent number such as ``12.5``).
-
-        Parameters
-        ----------
-        json : str
-            JSON number text in percent units.
-
-        Returns
-        -------
-        Percentage
-            Parsed percentage.
-
-        Raises
-        ------
-        ValueError
-            If *json* is not a finite number.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.types import Percentage
-        >>> Percentage.from_json("12.5").as_decimal
-        0.125
-        """
-        ...
-
-    def to_json(self) -> str:
-        """
-        Serialize to JSON (the bare percent number).
-
-        Returns
-        -------
-        str
-            JSON number text such as ``"12.5"``.
-
-        Raises
-        ------
-        ValueError
-            If serialization fails (cannot happen for a finite value).
-        """
-        ...
-
-    @property
-    def as_decimal(self) -> float:
-        """
-        Value as a decimal fraction.
-
-        Returns
-        -------
-        float
-            Value as a decimal fraction.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.types import Percentage
-        >>> Percentage(12.5).as_decimal
-        0.125
-        """
-        ...
-
-    @property
-    def as_percent(self) -> float:
-        """
-        Value expressed in percent units (``5.0`` means five percent).
-
-        Returns
-        -------
-        float
-            Value expressed in percent units.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.types import Percentage
-        >>> Percentage(12.5).as_percent
-        12.5
-        """
-        ...
-
-    @property
-    def as_bp(self) -> int:
-        """
-        Value rounded to the nearest whole basis point.
-
-        Returns
-        -------
-        int
-            ``round(percent * 100)``.
-
-        Notes
-        -----
-        This accessor does not raise.
-        """
-        ...
-
-    @property
-    def as_bp_f64(self) -> float:
-        """
-        Value in fractional basis points, without rounding.
-
-        The decimal point of the percentage's shortest decimal form is moved
-        two places in Rust (``Percentage::as_bp_f64``), so ``1.1`` reports
-        ``110.0`` rather than the binary product ``110.00000000000001``.
-
-        Returns
-        -------
-        float
-            Basis points (``1.0`` = 0.01%).
-
-        Notes
-        -----
-        This accessor does not raise.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.types import Percentage
-        >>> Percentage(1.1).as_bp_f64
-        110.0
-        """
-        ...
-
-    @property
-    def as_rate(self) -> Rate:
-        """
-        Value as a decimal ``Rate``.
-
-        Returns
-        -------
-        Rate
-            ``Rate(percent / 100)``.
-
-        Notes
-        -----
-        This accessor does not raise.
-        """
-        ...
-
-    @property
-    def as_basis_points(self) -> Bps:
-        """
-        Value as a ``Bps`` value, rounded to the nearest whole basis point.
-
-        Returns
-        -------
-        Bps
-            Whole-basis-point quote.
-
-        Notes
-        -----
-        This accessor does not raise; sub-bp precision is rounded away.
-        """
-        ...
-
-    def abs(self) -> Percentage:
-        """
-        Magnitude of the percentage, discarding its sign (percent units kept).
-
-        Returns
-        -------
-        Percentage
-            Non-negative percentage of the same magnitude.
-
-        Notes
-        -----
-        This method does not raise.
-        """
-        ...
-
-    def is_zero(self) -> bool:
-        """
-        Return whether exactly zero percent.
-
-        Returns
-        -------
-        bool
-            ``True`` for ``Percentage(0.0)``.
-
-        Notes
-        -----
-        This method does not raise.
-        """
-        ...
-
-    def is_positive(self) -> bool:
-        """
-        Return whether strictly positive.
-
-        Returns
-        -------
-        bool
-            ``True`` when ``as_percent > 0``.
-
-        Notes
-        -----
-        This method does not raise.
-        """
-        ...
-
-    def is_negative(self) -> bool:
-        """
-        Return whether strictly negative.
-
-        Returns
-        -------
-        bool
-            ``True`` when ``as_percent < 0``.
-
-        Notes
-        -----
-        This method does not raise.
-        """
-        ...
-
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
-    def __hash__(self) -> int: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __ne__(self, other: object) -> bool: ...
-    def __lt__(self, other: Percentage) -> bool: ...
-    def __le__(self, other: Percentage) -> bool: ...
-    def __gt__(self, other: Percentage) -> bool: ...
-    def __ge__(self, other: Percentage) -> bool: ...
-    def __add__(self, other: Percentage) -> Percentage: ...
-    def __sub__(self, other: Percentage) -> Percentage: ...
-    def __mul__(self, rhs: float) -> Percentage: ...
-    def __rmul__(self, lhs: float) -> Percentage: ...
-    def __truediv__(self, rhs: float) -> Percentage: ...
-    def __neg__(self) -> Percentage: ...
     def __reduce__(self) -> tuple[object, tuple[str]]: ...
 
 class CreditRating:
@@ -1020,35 +701,12 @@ class CreditRating:
 
     def __init__(self, name: str) -> None:
         """
-        Parse a rating string; equivalent to :meth:`from_name`.
+        Parse a rating string (case-insensitive, S&P/Fitch or Moody's notation).
 
         Parameters
         ----------
         name : str
             Rating string (e.g. ``"BBB"``, ``"bbb+"``, ``"Baa1"``).
-
-        Raises
-        ------
-        ValueError
-            If *name* cannot be parsed.
-        """
-        ...
-
-    @classmethod
-    def from_name(cls, name: str) -> CreditRating:
-        """
-        Parse a rating string case-insensitively while preserving notches.
-
-        Parameters
-        ----------
-        name : str
-            Rating string (e.g. ``"BBB"``, ``"bbb+"``, ``"Baa1"``).
-
-        Returns
-        -------
-        CreditRating
-            Canonical S&P/Fitch grade after case normalization, agency-alias
-            mapping, and notch preservation.
 
         Raises
         ------
@@ -1058,7 +716,7 @@ class CreditRating:
         Examples
         --------
         >>> from finstack_quant.core.types import CreditRating
-        >>> CreditRating.from_name("bbb+").name
+        >>> CreditRating("bbb+").name
         'BBB+'
         """
         ...

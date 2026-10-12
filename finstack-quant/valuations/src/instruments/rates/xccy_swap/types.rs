@@ -503,9 +503,11 @@ impl XccySwap {
                 "XccySwap reset lag must be non-negative".to_string(),
             ));
         }
-        let calendar_resolves = leg.leg.calendar_id.as_deref().is_some_and(|id| {
-            crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok()
-        });
+        let calendar_resolves = leg
+            .leg
+            .calendar_id
+            .as_deref()
+            .is_some_and(|id| finstack_quant_core::dates::calendar_by_id_strict(id).is_ok());
         if !calendar_resolves && !self.allow_calendar_fallback {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "XccySwap '{}' leg {} requires a resolvable calendar_id; set allow_calendar_fallback=true to opt into weekends_only",
@@ -526,7 +528,7 @@ impl XccySwap {
     pub(crate) fn resolve_leg_calendar_id<'a>(&self, leg: &'a XccySwapLeg) -> Result<&'a str> {
         match leg.leg.calendar_id.as_deref() {
             Some(id)
-                if crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok() =>
+                if finstack_quant_core::dates::calendar_by_id_strict(id).is_ok() =>
             {
                 Ok(id)
             }
@@ -549,9 +551,7 @@ impl XccySwap {
         &self,
         leg: &XccySwapLeg,
     ) -> Result<&'static dyn finstack_quant_core::dates::HolidayCalendar> {
-        crate::cashflow::builder::calendar::resolve_calendar_strict(
-            self.resolve_leg_calendar_id(leg)?,
-        )
+        finstack_quant_core::dates::calendar_by_id_strict(self.resolve_leg_calendar_id(leg)?)
     }
 
     /// Build one leg's accrual periods. Single source for both the pricing

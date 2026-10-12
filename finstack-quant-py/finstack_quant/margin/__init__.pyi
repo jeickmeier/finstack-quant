@@ -6947,8 +6947,9 @@ class MarginFundingCost:
         Raises
         ------
         ValueError
-            If ``currency`` is unrecognized, or ``margin_posted`` is non-finite
-            or outside the representable monetary range.
+            If ``currency`` is unrecognized, ``margin_posted`` or the funding
+            spread is non-finite, or the annual cost is outside the
+            representable monetary range.
         """
         ...
 
@@ -7123,9 +7124,11 @@ class MarginFundingCost:
         float
             Cost over the period.
 
-        Notes
-        -----
-        This method does not raise; out-of-domain or non-finite inputs yield ``NaN`` or ``inf`` rather than an exception.
+        Raises
+        ------
+        ValueError
+            If ``year_fraction`` is non-finite or the period cost is outside
+            the representable monetary range.
 
         Examples
         --------

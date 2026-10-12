@@ -478,7 +478,7 @@ fn issue_amortization_updates_fee_history() {
 }
 #[test]
 fn overnight_replay_is_independent_of_weekend_checkpoints() {
-    let cal = cf::builder::calendar::resolve_calendar_strict("weekends_only").expect("calendar");
+    let cal = finstack_quant_core::dates::calendar_by_id_strict("weekends_only").expect("calendar");
     let on = OvernightObservationSchedule::compile(
         date("2025-01-03"),
         date("2025-01-07"),
@@ -509,7 +509,7 @@ fn overnight_replay_is_independent_of_weekend_checkpoints() {
 
 #[test]
 fn lockout_requires_a_preceding_fixing() {
-    let cal = cf::builder::calendar::resolve_calendar_strict("weekends_only").expect("calendar");
+    let cal = finstack_quant_core::dates::calendar_by_id_strict("weekends_only").expect("calendar");
     for lockout_days in [5, 6, u32::MAX] {
         assert!(OvernightObservationSchedule::compile(
             date("2025-01-06"),

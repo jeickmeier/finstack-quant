@@ -301,7 +301,7 @@ CASES: dict[str, Callable[[], Any]] = {
         "matches": [_attributes().matches_selector("tag:energy"), _attributes().matches_selector("meta:sector=tech")],
         "items": [list(item) for item in _attributes().items()],
     },
-    "rate_zero": lambda: [types.Rate.ZERO.as_decimal, types.Bps.ZERO.as_bp, types.Percentage.ZERO.as_percent],
+    "rate_zero": lambda: [types.Rate.ZERO.as_decimal, types.Bps.ZERO.as_bp],
     "money": lambda: [
         json.loads(Money.zero("USD").to_json()),
         list(Money.from_tuple((12.5, "EUR")).to_tuple()),

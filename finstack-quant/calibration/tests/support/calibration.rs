@@ -61,8 +61,10 @@ pub(crate) fn split_market_context_state(
             CurveState::BaseCorrelation(c) => PriorMarketObject::BaseCorrelationCurve(c),
             CurveState::BasisSpread(c) => PriorMarketObject::BasisSpreadCurve(c),
             CurveState::Parametric(c) => PriorMarketObject::ParametricCurve(c),
+            CurveState::Price(c) if c.kind() == finstack_quant_core::market_data::term_structures::PriceCurveKind::VolIndex => {
+                PriorMarketObject::VolatilityIndexCurve(c)
+            }
             CurveState::Price(c) => PriorMarketObject::PriceCurve(c),
-            CurveState::VolIndex(c) => PriorMarketObject::VolatilityIndexCurve(c),
         })
         .collect::<Vec<_>>();
     prior.extend(

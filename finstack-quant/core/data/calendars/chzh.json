@@ -2,16 +2,17 @@
   "id": "chzh",
   "name": "Switzerland (Zurich) Holiday Calendar",
   "ignore_weekends": false,
+  "comment": "Zurich bank holidays: New Year's Day, Berchtoldstag (2 Jan), Good Friday, Easter Monday, Labour Day, Ascension, Whit Monday, Swiss National Day (1 Aug), Christmas and St Stephen's Day. Swiss practice does not move a holiday that falls on a weekend. Same rule set as the QuantLib Switzerland calendar.",
   "rules": [
-    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "next_monday" },
-    { "type": "fixed", "name": "New Year's Holiday", "month": "january", "day": 2, "observed": "next_monday" },
+    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1 },
+    { "type": "fixed", "name": "New Year's Holiday", "month": "january", "day": 2 },
     { "type": "easter_offset", "name": "Good Friday", "days": -3 },
     { "type": "easter_offset", "name": "Easter Monday", "days": 0 },
-    { "type": "fixed", "name": "Labour Day", "month": "may", "day": 1, "observed": "next_monday" },
+    { "type": "fixed", "name": "Labour Day", "month": "may", "day": 1 },
     { "type": "easter_offset", "name": "Ascension Day", "days": 38 },
     { "type": "easter_offset", "name": "Whit Monday", "days": 49 },
-    { "type": "fixed", "name": "Swiss National Day", "month": "august", "day": 1, "observed": "next_monday" },
-    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "next_monday" },
-    { "type": "fixed", "name": "St. Stephen's Day", "month": "december", "day": 26, "observed": "next_monday" }
+    { "type": "fixed", "name": "Swiss National Day", "month": "august", "day": 1 },
+    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25 },
+    { "type": "fixed", "name": "St. Stephen's Day", "month": "december", "day": 26 }
   ]
 }

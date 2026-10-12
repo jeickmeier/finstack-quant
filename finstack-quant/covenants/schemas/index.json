@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json",
-      "bytes": 26958,
+      "bytes": 28037,
       "kind": "input",
       "path": "schemas/covenants/1/covenant_engine.schema.json",
       "summary": "Covenant engine for evaluation and consequence application.",

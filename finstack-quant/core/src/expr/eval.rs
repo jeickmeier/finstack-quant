@@ -7,8 +7,9 @@
 //!
 //! # Evaluation Strategy
 //!
-//! - **Planning**: Eager compilation or a lazily cached DAG plan
-//! - **DAG mode**: Topological order execution with sub-expression dedup
+//! - **Planning**: Every evaluation runs a DAG plan, built eagerly by
+//!   `with_planning` or lazily (and cached) on the first `eval()`
+//! - **Execution**: Topological order with sub-expression dedup
 //! - **Scratch buffers**: Reused to minimize allocations
 //! - **Deterministic**: Identical results across runs
 
@@ -62,20 +63,15 @@ impl Default for EvalOpts {
 
 /// Compiled expression with optimized evaluation.
 ///
-/// Wraps an expression AST with optional DAG planning for efficient evaluation
-/// of complex formulas. Used extensively in financial statement models where
-/// hundreds of interdependent formulas must be evaluated.
+/// Wraps an expression AST with a DAG execution plan that evaluates each
+/// structurally distinct sub-expression once per `eval()` call.
 ///
 /// # Components
 ///
 /// - **AST**: Expression tree to evaluate
-/// - **Plan**: Optional execution plan (topological order)
+/// - **Plan**: Execution plan in topological order, supplied by
+///   [`Self::with_planning`] or built and cached on the first [`Self::eval`]
 /// - **Scratch buffers**: Reused temporary storage to minimize allocations
-///
-/// # Evaluation Modes
-///
-/// - **Simple**: Direct recursive evaluation (fast for simple expressions)
-/// - **DAG-optimized**: Shared sub-expression elimination (best for complex graphs)
 ///
 /// # Thread Safety
 ///
@@ -239,8 +235,7 @@ impl CompiledExpr {
     /// valid execution plan, for example because planning detects an invalid
     /// dependency structure or more than 512 nested expression levels.
     pub fn with_planning(ast: Expr, meta: crate::config::ResultsMeta) -> crate::Result<Self> {
-        let mut builder = DagBuilder::new();
-        let plan = builder.build_plan(vec![ast.clone()], meta)?;
+        let plan = DagBuilder::default().build_plan(vec![ast.clone()], meta)?;
 
         Ok(Self {
             ast,
@@ -300,9 +295,8 @@ impl CompiledExpr {
         } else if let Some(plan) = self.lazy_plan.get() {
             plan
         } else {
-            let mut builder = DagBuilder::new();
             let meta = crate::config::results_meta(&crate::config::FinstackConfig::default());
-            let plan = builder.build_plan(vec![self.ast.clone()], meta)?;
+            let plan = DagBuilder::default().build_plan(vec![self.ast.clone()], meta)?;
             // Try to cache for future calls; if a racing thread beat us, use theirs.
             match self.lazy_plan.set(plan) {
                 Ok(()) => self.lazy_plan.get().ok_or_else(|| {
@@ -686,80 +680,66 @@ impl CompiledExpr {
         }
     }
 
-    /// Evaluate a function with given argument results (slices from arena).
+    /// Evaluate a function directly into `out`.
+    ///
+    /// Every arm writes the output slice. Scalar reducers broadcast one value
+    /// across `out`. Elementwise functions NaN-fill a short result.
     fn eval_function_into(
         &self,
         fun: Function,
         arg_slices: &[&[f64]],
         out: &mut [f64],
     ) -> crate::Result<()> {
-        let result = match fun {
-            Function::Lag => return self.eval_lag_into(arg_slices, out),
-            Function::Lead => return self.eval_lead_into(arg_slices, out),
-            Function::Diff => return self.eval_diff_into(arg_slices, out),
-            Function::PctChange => return self.eval_pct_change_into(arg_slices, out),
-            Function::RollingMean => return self.eval_rolling_mean_into(arg_slices, out),
-            Function::RollingSum => return self.eval_rolling_sum_into(arg_slices, out),
-            Function::RollingStd => return self.eval_rolling_std_into(arg_slices, out),
-            Function::RollingVar => return self.eval_rolling_var_into(arg_slices, out),
-            Function::RollingMedian => return self.eval_rolling_median_into(arg_slices, out),
-            Function::Shift => return self.eval_shift_into(arg_slices, out),
-            Function::RollingMin => return self.eval_rolling_min_into(arg_slices, out),
-            Function::RollingMax => return self.eval_rolling_max_into(arg_slices, out),
-            Function::RollingCount => return self.eval_rolling_count_into(arg_slices, out),
-            Function::EwmMean => {
-                if arg_slices.len() < 2 || arg_slices[1].is_empty() {
-                    out.fill(f64::NAN);
-                } else {
-                    self.eval_ewm_mean_into(arg_slices, out);
-                }
-                return Ok(());
+        match fun {
+            Function::Lag => Self::eval_lag_into(arg_slices, out)?,
+            Function::Lead => Self::eval_lead_into(arg_slices, out)?,
+            Function::Diff => Self::eval_diff_into(arg_slices, out)?,
+            Function::PctChange => Self::eval_pct_change_into(arg_slices, out)?,
+            Function::RollingMean => Self::eval_rolling_mean_into(arg_slices, out)?,
+            Function::RollingSum => Self::eval_rolling_sum_into(arg_slices, out)?,
+            Function::RollingStd => Self::eval_rolling_std_into(arg_slices, out)?,
+            Function::RollingVar => Self::eval_rolling_var_into(arg_slices, out)?,
+            Function::RollingMedian => self.eval_rolling_median_into(arg_slices, out)?,
+            Function::Shift => Self::eval_shift_into(arg_slices, out)?,
+            Function::RollingMin => Self::eval_rolling_min_into(arg_slices, out)?,
+            Function::RollingMax => Self::eval_rolling_max_into(arg_slices, out)?,
+            Function::RollingCount => Self::eval_rolling_count_into(arg_slices, out)?,
+            Function::EwmMean => Self::eval_ewm_mean_into(arg_slices, out),
+            Function::Std => Self::eval_population_var_into(arg_slices, out, true),
+            Function::Var => Self::eval_population_var_into(arg_slices, out, false),
+            Function::Median => self.eval_median_into(arg_slices, out),
+            Function::CumSum => Self::eval_cum_sum_into(arg_slices, out),
+            Function::CumProd => Self::eval_cum_prod_into(arg_slices, out),
+            Function::CumMin => Self::eval_cum_min_into(arg_slices, out),
+            Function::CumMax => Self::eval_cum_max_into(arg_slices, out),
+            Function::Rank => Self::eval_rank_into(arg_slices, out),
+            Function::Quantile => Self::eval_quantile_into(arg_slices, out),
+            Function::EwmStd => Self::eval_ewm_variance_into(arg_slices, out, true),
+            Function::EwmVar => Self::eval_ewm_variance_into(arg_slices, out, false),
+            Function::Abs => Self::eval_unary_into(arg_slices, out, f64::abs),
+            Function::Sign => Self::eval_sign_into(arg_slices, out),
+            Function::Pow => Self::eval_pow_into(arg_slices, out),
+            Function::Round => Self::eval_round_into(arg_slices, out)?,
+            Function::Floor => Self::eval_unary_into(arg_slices, out, f64::floor),
+            Function::Ceil => Self::eval_unary_into(arg_slices, out, f64::ceil),
+            Function::Ln => Self::eval_unary_into(arg_slices, out, f64::ln),
+            Function::Exp => Self::eval_unary_into(arg_slices, out, f64::exp),
+            Function::Log10 => Self::eval_unary_into(arg_slices, out, f64::log10),
+            Function::Sqrt => Self::eval_unary_into(arg_slices, out, f64::sqrt),
+            Function::Clamp => Self::eval_clamp_into(arg_slices, out),
+            Function::IsMissing => {
+                Self::eval_unary_into(
+                    arg_slices,
+                    out,
+                    |value| {
+                        if value.is_finite() {
+                            0.0
+                        } else {
+                            1.0
+                        }
+                    },
+                );
             }
-            Function::Std => {
-                if arg_slices.is_empty() {
-                    out.fill(f64::NAN);
-                } else {
-                    self.eval_std_into(arg_slices, out);
-                }
-                return Ok(());
-            }
-            Function::Var => {
-                if arg_slices.is_empty() {
-                    out.fill(f64::NAN);
-                } else {
-                    self.eval_var_into(arg_slices, out);
-                }
-                return Ok(());
-            }
-            Function::Median => {
-                if arg_slices.is_empty() {
-                    out.fill(f64::NAN);
-                } else {
-                    self.eval_median_into(arg_slices, out);
-                }
-                return Ok(());
-            }
-
-            Function::CumSum => self.eval_cum_sum(arg_slices),
-            Function::CumProd => self.eval_cum_prod(arg_slices),
-            Function::CumMin => self.eval_cum_min(arg_slices),
-            Function::CumMax => self.eval_cum_max(arg_slices),
-            Function::Rank => self.eval_rank(arg_slices),
-            Function::Quantile => self.eval_quantile(arg_slices),
-            Function::EwmStd => self.eval_ewm_std(arg_slices),
-            Function::EwmVar => self.eval_ewm_var(arg_slices),
-            Function::Abs => self.eval_abs(arg_slices),
-            Function::Sign => self.eval_sign(arg_slices),
-            Function::Pow => self.eval_pow(arg_slices),
-            Function::Round => self.eval_round(arg_slices)?,
-            Function::Floor => self.eval_floor(arg_slices),
-            Function::Ceil => self.eval_ceil(arg_slices),
-            Function::Ln => self.eval_ln(arg_slices),
-            Function::Exp => self.eval_exp(arg_slices),
-            Function::Log10 => self.eval_log10(arg_slices),
-            Function::Sqrt => self.eval_sqrt(arg_slices),
-            Function::Clamp => self.eval_clamp(arg_slices),
-            Function::IsMissing => self.eval_is_missing(arg_slices),
             Function::Sum
             | Function::Mean
             | Function::Ttm
@@ -780,10 +760,7 @@ impl CompiledExpr {
                     "Expression function '{fun}' is a statements-layer function; evaluate it via the statements crate instead of core::expr::eval"
                 )));
             }
-        };
-        let copy_len = out.len().min(result.len());
-        out[..copy_len].copy_from_slice(&result[..copy_len]);
-        out[copy_len..].fill(f64::NAN);
+        }
         Ok(())
     }
 }

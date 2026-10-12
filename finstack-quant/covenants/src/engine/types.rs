@@ -19,7 +19,8 @@ pub enum CovenantScope {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct SpringingCondition {
-    /// Metric that controls activation (e.g., revolver utilization).
+    /// Metric that controls activation (e.g., revolver utilization), named by
+    /// its statements node ID.
     pub metric_id: CovenantMetricId,
     /// Threshold test applied to the metric.
     pub test: ThresholdTest,
@@ -559,7 +560,9 @@ pub struct CovenantWaiver {
 pub struct CovenantSpec {
     /// The covenant to evaluate
     pub covenant: Covenant,
-    /// Metric ID to use for evaluation (for financial covenants)
+    /// Metric ID to use for evaluation (for financial covenants), conventionally
+    /// a statements node ID such as `debt_to_ebitda`, `ebitda`,
+    /// `interest_coverage`, or `dscr`.
     pub metric_id: Option<CovenantMetricId>,
     /// Earnings denominator used to validate a leverage ratio. Required for net
     /// debt/EBITDA, where a negative ratio can mean net cash or negative earnings.

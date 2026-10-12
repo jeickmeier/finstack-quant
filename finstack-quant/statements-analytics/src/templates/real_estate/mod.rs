@@ -775,14 +775,14 @@ pub fn add_rent_roll(
     let renewal_loss_expr = sum_expr(&renewal_loss_refs)?;
 
     builder = builder
-        .compute(&nodes.rent_pgi_node, &pgi_expr)?
-        .compute(&nodes.free_rent_node, &free_expr)?
-        .compute(&nodes.vacancy_loss_node, &vac_expr)?
+        .compute(nodes.rent_pgi_node.as_str(), &pgi_expr)?
+        .compute(nodes.free_rent_node.as_str(), &free_expr)?
+        .compute(nodes.vacancy_loss_node.as_str(), &vac_expr)?
         // Extra totals (fixed ids) for more underwriting transparency.
         .compute("vacancy_loss_physical", &vac_physical_expr)?
         .compute("renewal_prob_loss", &renewal_loss_expr)?
         .compute(
-            &nodes.rent_effective_node,
+            nodes.rent_effective_node.as_str(),
             format!(
                 "{} - {} - {}",
                 nodes.rent_pgi_node, nodes.free_rent_node, nodes.vacancy_loss_node
@@ -998,11 +998,11 @@ pub fn add_property_operating_statement(
 
     // Other income total (optional).
     let other_income_expr = sum_expr_or_zero(other_income_nodes);
-    builder = builder.compute(&nodes.other_income_total_node, other_income_expr)?;
+    builder = builder.compute(nodes.other_income_total_node.as_str(), other_income_expr)?;
 
     // EGI.
     builder = builder.compute(
-        &nodes.egi_node,
+        nodes.egi_node.as_str(),
         format!(
             "{} + {}",
             nodes.rent_roll.rent_effective_node, nodes.other_income_total_node
@@ -1023,7 +1023,7 @@ pub fn add_property_operating_statement(
             ManagementFeeBase::EffectiveRent => nodes.rent_roll.rent_effective_node.as_str(),
         };
         builder = builder.compute(
-            &nodes.management_fee_node,
+            nodes.management_fee_node.as_str(),
             format!("{base_expr} * {}", spec.rate),
         )?;
         opex_all.push(nodes.management_fee_node.as_str());
@@ -1031,19 +1031,19 @@ pub fn add_property_operating_statement(
 
     // OpEx total.
     let opex_expr = sum_expr_or_zero(&opex_all);
-    builder = builder.compute(&nodes.opex_total_node, opex_expr)?;
+    builder = builder.compute(nodes.opex_total_node.as_str(), opex_expr)?;
 
     // NOI.
     builder = builder.compute(
-        &nodes.noi_node,
+        nodes.noi_node.as_str(),
         format!("{} - {}", nodes.egi_node, nodes.opex_total_node),
     )?;
 
     // CapEx total and NCF.
     let capex_expr = sum_expr_or_zero(capex_nodes);
-    builder = builder.compute(&nodes.capex_total_node, capex_expr)?;
+    builder = builder.compute(nodes.capex_total_node.as_str(), capex_expr)?;
     builder = builder.compute(
-        &nodes.ncf_node,
+        nodes.ncf_node.as_str(),
         format!("{} - {}", nodes.noi_node, nodes.capex_total_node),
     )?;
 

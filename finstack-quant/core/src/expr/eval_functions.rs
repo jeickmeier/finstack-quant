@@ -45,7 +45,7 @@ use crate::math::{
 
 impl CompiledExpr {
     #[inline]
-    pub(super) fn validate_window(raw: f64) -> Option<usize> {
+    fn validate_window(raw: f64) -> Option<usize> {
         if !raw.is_finite() {
             return None;
         }
@@ -55,10 +55,27 @@ impl CompiledExpr {
         if raw.fract() != 0.0 {
             return None;
         }
-        if raw > usize::MAX as f64 {
+        // `usize::MAX as f64` rounds up to 2^64 on 64-bit hosts, so accepting
+        // equality would cast an unrepresentable offset to `usize::MAX`.
+        if raw >= usize::MAX as f64 {
             return None;
         }
         Some(raw as usize)
+    }
+
+    /// Read a scalar from a series that must be constant across every element.
+    ///
+    /// `series` is non-empty. A series whose elements are not bit-identical is
+    /// a validation error. `what` is the argument name embedded in that error.
+    #[inline]
+    fn constant_scalar(series: &[f64], what: &str) -> crate::Result<f64> {
+        let first = series[0];
+        if series.iter().any(|v| v.to_bits() != first.to_bits()) {
+            return Err(crate::Error::Validation(format!(
+                "{what} must be a constant scalar (literal); got a non-constant series"
+            )));
+        }
+        Ok(first)
     }
 
     /// Resolve a window/step parameter from the second argument series.
@@ -73,19 +90,10 @@ impl CompiledExpr {
     /// no `default` exists; callers emit all-NaN output in that case (the
     /// engine's invalid-parameter convention).
     #[inline]
-    pub(super) fn window_arg(
-        arg_results: &[&[f64]],
-        default: Option<usize>,
-    ) -> crate::Result<Option<usize>> {
+    fn window_arg(arg_results: &[&[f64]], default: Option<usize>) -> crate::Result<Option<usize>> {
         match arg_results.get(1) {
             Some(series) if !series.is_empty() => {
-                let first = series[0];
-                // Bit-level comparison is NaN-safe and deterministic.
-                if series.iter().any(|v| v.to_bits() != first.to_bits()) {
-                    return Err(crate::Error::Validation(
-                        "expression window/step argument must be a constant scalar (literal); got a non-constant series".to_string(),
-                    ));
-                }
+                let first = Self::constant_scalar(series, "expression window/step argument")?;
                 Ok(Self::validate_window(first))
             }
             _ => Ok(default),
@@ -93,7 +101,7 @@ impl CompiledExpr {
     }
 
     #[inline]
-    pub(super) fn rolling_apply_into(
+    fn rolling_apply_into(
         base: &[f64],
         win: usize,
         out: &mut [f64],
@@ -113,11 +121,35 @@ impl CompiledExpr {
             }
         }
     }
-    pub(super) fn eval_lag_into(
-        &self,
+
+    /// Resolve a rolling window, or fill `out` and return `Ok(())` when the
+    /// window is absent or invalid.
+    ///
+    /// An empty output returns before the window is validated, matching the
+    /// historical rolling entry points: a zero-length series does not reject a
+    /// non-constant window argument.
+    #[inline]
+    fn rolling_with(
         arg_results: &[&[f64]],
         out: &mut [f64],
+        op: impl FnOnce(&[f64], usize, &mut [f64]),
     ) -> crate::Result<()> {
+        if out.is_empty() {
+            return Ok(());
+        }
+        if arg_results.is_empty() {
+            out.fill(f64::NAN);
+            return Ok(());
+        }
+        let Some(win) = Self::window_arg(arg_results, None)? else {
+            out.fill(f64::NAN);
+            return Ok(());
+        };
+        op(arg_results[0], win, out);
+        Ok(())
+    }
+
+    pub(super) fn eval_lag_into(arg_results: &[&[f64]], out: &mut [f64]) -> crate::Result<()> {
         if arg_results.is_empty() {
             out.fill(f64::NAN);
             return Ok(());
@@ -136,11 +168,8 @@ impl CompiledExpr {
         }
         Ok(())
     }
-    pub(super) fn eval_lead_into(
-        &self,
-        arg_results: &[&[f64]],
-        out: &mut [f64],
-    ) -> crate::Result<()> {
+
+    pub(super) fn eval_lead_into(arg_results: &[&[f64]], out: &mut [f64]) -> crate::Result<()> {
         if arg_results.is_empty() {
             out.fill(f64::NAN);
             return Ok(());
@@ -151,15 +180,16 @@ impl CompiledExpr {
         };
         let base = arg_results[0];
         for (i, slot) in out.iter_mut().enumerate() {
-            *slot = base.get(i + n).copied().unwrap_or(f64::NAN);
+            *slot = i
+                .checked_add(n)
+                .and_then(|index| base.get(index))
+                .copied()
+                .unwrap_or(f64::NAN);
         }
         Ok(())
     }
-    pub(super) fn eval_diff_into(
-        &self,
-        arg_results: &[&[f64]],
-        out: &mut [f64],
-    ) -> crate::Result<()> {
+
+    pub(super) fn eval_diff_into(arg_results: &[&[f64]], out: &mut [f64]) -> crate::Result<()> {
         if arg_results.is_empty() {
             out.fill(f64::NAN);
             return Ok(());
@@ -177,6 +207,7 @@ impl CompiledExpr {
         }
         Ok(())
     }
+
     /// Percentage change over step `n`.
     ///
     /// Division-by-zero convention (intentionally different from the binary
@@ -184,7 +215,6 @@ impl CompiledExpr {
     /// a non-zero current value returns `±inf` (sign of the current value),
     /// and `0/0` returns `0.0` (interpreted as "no change").
     pub(super) fn eval_pct_change_into(
-        &self,
         arg_results: &[&[f64]],
         out: &mut [f64],
     ) -> crate::Result<()> {
@@ -208,114 +238,81 @@ impl CompiledExpr {
         Ok(())
     }
 
-    pub(super) fn eval_cum_sum(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        let len = arg_results.first().map(|a| a.len()).unwrap_or(0);
-        let mut out = Vec::with_capacity(len);
-        if !arg_results.is_empty() {
-            let base = arg_results[0];
-            let mut acc = 0.0;
-            for &v in base {
-                if !v.is_nan() {
-                    acc += v;
-                }
-                out.push(acc);
+    /// Left-to-right cumulative scan. NaNs are skipped and the previous
+    /// accumulator is written through.
+    ///
+    /// `cumsum` seeds `0.0` and adds. `cumprod` seeds `1.0` and multiplies.
+    /// `cummin` seeds `+∞`. `cummax` seeds `-∞`. A missing input fills `out`
+    /// with NaN. A result shorter than `out` NaN-fills the tail.
+    fn eval_cum_into(
+        arg_results: &[&[f64]],
+        out: &mut [f64],
+        mut acc: f64,
+        mut step: impl FnMut(f64, f64) -> f64,
+    ) {
+        let Some(base) = arg_results.first() else {
+            out.fill(f64::NAN);
+            return;
+        };
+        let n = out.len().min(base.len());
+        for i in 0..n {
+            let value = base[i];
+            if !value.is_nan() {
+                acc = step(acc, value);
             }
+            out[i] = acc;
         }
-        out
+        out[n..].fill(f64::NAN);
     }
 
-    pub(super) fn eval_cum_prod(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        let len = arg_results.first().map(|a| a.len()).unwrap_or(0);
-        let mut out = Vec::with_capacity(len);
-        if !arg_results.is_empty() {
-            let base = arg_results[0];
-            let mut acc = 1.0;
-            for &v in base {
-                if !v.is_nan() {
-                    acc *= v;
-                }
-                out.push(acc);
-            }
-        }
-        out
+    pub(super) fn eval_cum_sum_into(arg_results: &[&[f64]], out: &mut [f64]) {
+        Self::eval_cum_into(arg_results, out, 0.0, |acc, value| acc + value);
     }
 
-    pub(super) fn eval_cum_min(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        let len = arg_results.first().map(|a| a.len()).unwrap_or(0);
-        let mut out = Vec::with_capacity(len);
-        if !arg_results.is_empty() {
-            let base = arg_results[0];
-            let mut cur = f64::INFINITY;
-            for &v in base {
-                if !v.is_nan() {
-                    cur = if cur < v { cur } else { v };
-                }
-                out.push(cur);
-            }
-        }
-        out
+    pub(super) fn eval_cum_prod_into(arg_results: &[&[f64]], out: &mut [f64]) {
+        Self::eval_cum_into(arg_results, out, 1.0, |acc, value| acc * value);
     }
 
-    pub(super) fn eval_cum_max(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        let len = arg_results.first().map(|a| a.len()).unwrap_or(0);
-        let mut out = Vec::with_capacity(len);
-        if !arg_results.is_empty() {
-            let base = arg_results[0];
-            let mut cur = f64::NEG_INFINITY;
-            for &v in base {
-                if !v.is_nan() {
-                    cur = if cur > v { cur } else { v };
-                }
-                out.push(cur);
+    pub(super) fn eval_cum_min_into(arg_results: &[&[f64]], out: &mut [f64]) {
+        Self::eval_cum_into(arg_results, out, f64::INFINITY, |acc, value| {
+            if acc < value {
+                acc
+            } else {
+                value
             }
-        }
-        out
+        });
     }
+
+    pub(super) fn eval_cum_max_into(arg_results: &[&[f64]], out: &mut [f64]) {
+        Self::eval_cum_into(arg_results, out, f64::NEG_INFINITY, |acc, value| {
+            if acc > value {
+                acc
+            } else {
+                value
+            }
+        });
+    }
+
     pub(super) fn eval_rolling_mean_into(
-        &self,
         arg_results: &[&[f64]],
         out: &mut [f64],
     ) -> crate::Result<()> {
-        let len = out.len();
-        if len == 0 {
-            return Ok(());
-        }
-        if arg_results.is_empty() {
-            out.fill(f64::NAN);
-            return Ok(());
-        }
-        let base = arg_results[0];
-        let Some(win) = Self::window_arg(arg_results, None)? else {
-            out.fill(f64::NAN);
-            return Ok(());
-        };
-        Self::rolling_sum_incremental(base, win, out);
-        let w = win as f64;
-        for v in out.iter_mut() {
-            *v /= w;
-        }
-        Ok(())
+        Self::rolling_with(arg_results, out, |base, win, out| {
+            Self::rolling_sum_incremental(base, win, out);
+            let width = win as f64;
+            for value in out.iter_mut() {
+                *value /= width;
+            }
+        })
     }
+
     pub(super) fn eval_rolling_sum_into(
-        &self,
         arg_results: &[&[f64]],
         out: &mut [f64],
     ) -> crate::Result<()> {
-        let len = out.len();
-        if len == 0 {
-            return Ok(());
-        }
-        if arg_results.is_empty() {
-            out.fill(f64::NAN);
-            return Ok(());
-        }
-        let base = arg_results[0];
-        let Some(win) = Self::window_arg(arg_results, None)? else {
-            out.fill(f64::NAN);
-            return Ok(());
-        };
-        Self::rolling_sum_incremental(base, win, out);
-        Ok(())
+        Self::rolling_with(arg_results, out, |base, win, out| {
+            Self::rolling_sum_incremental(base, win, out);
+        })
     }
 
     /// Compensated rolling sum shared by all rolling_sum/rolling_mean inputs.
@@ -384,12 +381,9 @@ impl CompiledExpr {
 
     /// Resolve the EWM smoothing factor `alpha` to the valid pandas domain `(0, 1]`.
     ///
-    /// `ewm_mean` and `ewm_std`/`ewm_var` previously disagreed on how `alpha` was
-    /// interpreted (the mean used the raw value while the variance clamped to
-    /// `[0.001, 0.999]`, which silently rescaled slow EWMs and wrongly excluded
-    /// the valid `alpha = 1.0`). Both now funnel through this helper so a given
-    /// `alpha` always means the same thing. Non-finite or non-positive inputs are
-    /// floored to a tiny positive smoothing factor; values above 1 are capped.
+    /// Shared by `ewm_mean` and `ewm_std`/`ewm_var` so a given `alpha` means
+    /// the same thing in each. Non-finite or non-positive inputs are floored to
+    /// a tiny positive smoothing factor; values above 1 are capped.
     #[inline]
     fn resolve_ewm_alpha(raw: f64) -> f64 {
         const EWM_ALPHA_FLOOR: f64 = 1e-12;
@@ -399,12 +393,15 @@ impl CompiledExpr {
         raw.clamp(EWM_ALPHA_FLOOR, 1.0)
     }
 
-    pub(super) fn eval_ewm_mean_into(&self, arg_results: &[&[f64]], out: &mut [f64]) {
-        let len = out.len();
-        if len == 0 {
+    pub(super) fn eval_ewm_mean_into(arg_results: &[&[f64]], out: &mut [f64]) {
+        if out.is_empty() {
             return;
         }
-        let base = &arg_results[0];
+        if arg_results.len() < 2 || arg_results[1].is_empty() {
+            out.fill(f64::NAN);
+            return;
+        }
+        let base = arg_results[0];
         let alpha = Self::resolve_ewm_alpha(arg_results[1][0]);
         let adjust = if arg_results.len() >= 3 && !arg_results[2].is_empty() {
             arg_results[2][0] != 0.0
@@ -412,18 +409,17 @@ impl CompiledExpr {
             true
         };
         // Seed the recursion from the first non-NaN observation; leading NaNs
-        // emit NaN and must not poison the state (previously a leading NaN
-        // seeded `prev`/`weighted_sum` and every subsequent output was NaN —
-        // see ). Interior NaNs
-        // after the seed match `eval_ewm_variance_core`: the state is
-        // unchanged and NaN is emitted for that position.
+        // emit NaN and must not poison the state. Interior NaNs after the seed
+        // match `eval_ewm_variance_into`: the state is unchanged and NaN is
+        // emitted for that position.
         let mut prev: f64 = 0.0;
         let mut weighted_sum: f64 = 0.0;
         let mut wsum: f64 = 0.0;
         let mut seeded = false;
-        for (i, &x) in base.iter().enumerate() {
+        let filled = base.len().min(out.len());
+        for (slot, &x) in out.iter_mut().zip(base) {
             if x.is_nan() {
-                out[i] = f64::NAN;
+                *slot = f64::NAN;
                 continue;
             }
             if !seeded {
@@ -431,41 +427,41 @@ impl CompiledExpr {
                 weighted_sum = x;
                 wsum = 1.0;
                 seeded = true;
-                out[i] = x;
+                *slot = x;
                 continue;
             }
             if adjust {
                 weighted_sum = x + (1.0 - alpha) * weighted_sum;
                 wsum = 1.0 + (1.0 - alpha) * wsum;
-                out[i] = weighted_sum / wsum;
+                *slot = weighted_sum / wsum;
             } else {
                 prev = alpha * x + (1.0 - alpha) * prev;
-                out[i] = prev;
+                *slot = prev;
             }
         }
+        // A short input leaves no observation for the tail.
+        out[filled..].fill(f64::NAN);
     }
 
-    /// Population standard deviation over all non-NaN observations.
+    /// Population variance, or standard deviation when `take_sqrt` is set.
     ///
-    /// NaN policy: NaNs are excluded from both the sample and the count `n`
-    /// (matching `median`/`quantile` and the statements-layer reducers).
-    /// Fewer than two valid observations broadcasts NaN.
-    pub(super) fn eval_std_into(&self, arg_results: &[&[f64]], out: &mut [f64]) {
-        Self::eval_population_var_into(arg_results, out, true);
-    }
-
-    /// Population variance over all non-NaN observations (see [`Self::eval_std_into`]).
-    pub(super) fn eval_var_into(&self, arg_results: &[&[f64]], out: &mut [f64]) {
-        Self::eval_population_var_into(arg_results, out, false);
-    }
-
-    /// Shared two-pass population variance/std over non-NaN observations.
+    /// NaNs are excluded from both the sample and the count `n` (matching
+    /// `median`/`quantile`). Fewer than two valid observations broadcasts NaN
+    /// across `out`. The result is a scalar broadcast, including when `out`
+    /// is longer than the input.
     ///
     /// Two-pass (mean, then squared deviations) is numerically stable; the
     /// naive `E[x^2] - E[x]^2` form suffers catastrophic cancellation when
     /// the mean is large relative to the spread.
-    fn eval_population_var_into(arg_results: &[&[f64]], out: &mut [f64], take_sqrt: bool) {
-        let data = &arg_results[0];
+    pub(super) fn eval_population_var_into(
+        arg_results: &[&[f64]],
+        out: &mut [f64],
+        take_sqrt: bool,
+    ) {
+        let Some(data) = arg_results.first() else {
+            out.fill(f64::NAN);
+            return;
+        };
         let mut n = 0_usize;
         let mut sum = 0.0_f64;
         for &x in data.iter() {
@@ -500,10 +496,12 @@ impl CompiledExpr {
     ///
     /// NaN policy: NaNs are excluded from both the sample and the count `n`
     /// (the same skip-NaN policy as `quantile`); an all-NaN or empty input
-    /// broadcasts NaN. Previously NaNs sorted as the largest values and
-    /// shifted the midpoint (e.g. `median([1,2,3,NaN])` returned `2.5`).
+    /// broadcasts NaN, and `median([1, 2, 3, NaN])` is `2`.
     pub(super) fn eval_median_into(&self, arg_results: &[&[f64]], out: &mut [f64]) {
-        let data = &arg_results[0];
+        let Some(data) = arg_results.first() else {
+            out.fill(f64::NAN);
+            return;
+        };
         let mut guard = self
             .scratch
             .lock()
@@ -529,60 +527,36 @@ impl CompiledExpr {
             (buf[n / 2 - 1] + buf[n / 2]) * 0.5
         }
     }
+
     pub(super) fn eval_rolling_std_into(
-        &self,
         arg_results: &[&[f64]],
         out: &mut [f64],
     ) -> crate::Result<()> {
-        let len = out.len();
-        if len == 0 {
-            return Ok(());
-        }
-        if arg_results.is_empty() {
-            out.fill(f64::NAN);
-            return Ok(());
-        }
-        let base = arg_results[0];
-        let Some(win) = Self::window_arg(arg_results, None)? else {
-            out.fill(f64::NAN);
-            return Ok(());
-        };
-        Self::rolling_apply_into(base, win, out, &mut |w| {
-            Self::window_population_var(w).sqrt()
-        });
-        Ok(())
+        Self::rolling_with(arg_results, out, |base, win, out| {
+            Self::rolling_apply_into(base, win, out, &mut |window| {
+                Self::window_population_var(window).sqrt()
+            });
+        })
     }
+
     pub(super) fn eval_rolling_var_into(
-        &self,
         arg_results: &[&[f64]],
         out: &mut [f64],
     ) -> crate::Result<()> {
-        let len = out.len();
-        if len == 0 {
-            return Ok(());
-        }
-        if arg_results.is_empty() {
-            out.fill(f64::NAN);
-            return Ok(());
-        }
-        let base = arg_results[0];
-        let Some(win) = Self::window_arg(arg_results, None)? else {
-            out.fill(f64::NAN);
-            return Ok(());
-        };
-        Self::rolling_apply_into(base, win, out, &mut |w| Self::window_population_var(w));
-        Ok(())
+        Self::rolling_with(arg_results, out, |base, win, out| {
+            Self::rolling_apply_into(base, win, out, &mut |window| {
+                Self::window_population_var(window)
+            });
+        })
     }
 
     /// Two-pass population variance of one window, shared by `rolling_std`
-    /// and `rolling_var` for both NaN-containing and NaN-free inputs.
+    /// and `rolling_var`.
     ///
-    /// The previous NaN-free fast path used the running `E[x^2] - E[x]^2`
-    /// form, which suffers catastrophic cancellation when the mean is large
-    /// relative to the spread (e.g. prices near 1e8 with tiny variance) and
-    /// could disagree with the NaN path. A two-pass computation per window is
-    /// numerically stable and keeps a single algorithm for both paths.
-    /// A NaN inside the window propagates (window result is NaN).
+    /// Two passes avoid the catastrophic cancellation of the running
+    /// `E[x^2] - E[x]^2` form when the mean is large relative to the spread
+    /// (e.g. prices near 1e8 with tiny variance). A NaN inside the window
+    /// propagates (window result is NaN).
     #[inline]
     fn window_population_var(w: &[f64]) -> f64 {
         let n = w.len() as f64;
@@ -595,6 +569,7 @@ impl CompiledExpr {
             .sum::<f64>()
             / n
     }
+
     /// Rolling median over a fixed row window.
     ///
     /// NaN policy: NaNs inside a window are excluded from both the sample and
@@ -605,36 +580,21 @@ impl CompiledExpr {
         arg_results: &[&[f64]],
         out: &mut [f64],
     ) -> crate::Result<()> {
-        let len = out.len();
-        if len == 0 {
-            return Ok(());
-        }
-        if arg_results.is_empty() {
-            out.fill(f64::NAN);
-            return Ok(());
-        }
-        let base = arg_results[0];
-        let Some(win) = Self::window_arg(arg_results, None)? else {
-            out.fill(f64::NAN);
-            return Ok(());
-        };
-        let mut guard = self
-            .scratch
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let wbuf = &mut guard.window;
-        Self::rolling_apply_into(base, win, out, &mut |w| {
-            wbuf.clear();
-            wbuf.extend(w.iter().copied().filter(|v| !v.is_nan()));
-            Self::median_of_unsorted(wbuf)
-        });
-        Ok(())
+        Self::rolling_with(arg_results, out, |base, win, out| {
+            let mut guard = self
+                .scratch
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let wbuf = &mut guard.window;
+            Self::rolling_apply_into(base, win, out, &mut |window| {
+                wbuf.clear();
+                wbuf.extend(window.iter().copied().filter(|v| !v.is_nan()));
+                Self::median_of_unsorted(wbuf)
+            });
+        })
     }
-    pub(super) fn eval_shift_into(
-        &self,
-        arg_results: &[&[f64]],
-        out: &mut [f64],
-    ) -> crate::Result<()> {
+
+    pub(super) fn eval_shift_into(arg_results: &[&[f64]], out: &mut [f64]) -> crate::Result<()> {
         if arg_results.len() >= 2 && !arg_results[1].is_empty() {
             let base = arg_results[0];
             let raw = arg_results[1][0];
@@ -662,55 +622,54 @@ impl CompiledExpr {
         Ok(())
     }
 
-    pub(super) fn eval_abs(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        if let Some(base) = arg_results.first() {
-            base.iter().map(|v| v.abs()).collect()
-        } else {
-            Vec::new()
-        }
-    }
-
-    pub(super) fn eval_sign(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        if let Some(base) = arg_results.first() {
-            base.iter()
-                .map(|v| {
-                    if v.is_nan() {
-                        f64::NAN
-                    } else if *v > 0.0 {
-                        1.0
-                    } else if *v < 0.0 {
-                        -1.0
-                    } else {
-                        0.0
-                    }
-                })
-                .collect()
-        } else {
-            Vec::new()
-        }
-    }
-
-    /// Apply a unary scalar map over the first argument series.
-    fn eval_unary_map(arg_results: &[&[f64]], f: impl Fn(f64) -> f64) -> Vec<f64> {
-        arg_results
-            .first()
-            .map(|base| base.iter().map(|&v| f(v)).collect())
-            .unwrap_or_default()
-    }
-
-    pub(super) fn eval_pow(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        let (Some(base), Some(exponent)) = (arg_results.first(), arg_results.get(1)) else {
-            return arg_results
-                .first()
-                .map(|b| vec![f64::NAN; b.len()])
-                .unwrap_or_default();
+    /// Map `f` across the first argument.
+    ///
+    /// A missing input fills `out` with NaN. A result shorter than `out`
+    /// NaN-fills the tail.
+    pub(super) fn eval_unary_into(arg_results: &[&[f64]], out: &mut [f64], f: impl Fn(f64) -> f64) {
+        let Some(base) = arg_results.first() else {
+            out.fill(f64::NAN);
+            return;
         };
-        (0..base.len())
-            .map(|i| match exponent.get(i) {
-                Some(&e) => base[i].powf(e),
+        let n = out.len().min(base.len());
+        for i in 0..n {
+            out[i] = f(base[i]);
+        }
+        out[n..].fill(f64::NAN);
+    }
+
+    /// Expression `sign`: positive → `1`, negative → `-1`, both zeros → `0`.
+    ///
+    /// `f64::signum` preserves the sign of zero, so it is not this function.
+    fn sign_or_zero(value: f64) -> f64 {
+        if value.is_nan() {
+            f64::NAN
+        } else if value > 0.0 {
+            1.0
+        } else if value < 0.0 {
+            -1.0
+        } else {
+            0.0
+        }
+    }
+
+    pub(super) fn eval_sign_into(arg_results: &[&[f64]], out: &mut [f64]) {
+        Self::eval_unary_into(arg_results, out, Self::sign_or_zero);
+    }
+
+    pub(super) fn eval_pow_into(arg_results: &[&[f64]], out: &mut [f64]) {
+        let (Some(base), Some(exponent)) = (arg_results.first(), arg_results.get(1)) else {
+            out.fill(f64::NAN);
+            return;
+        };
+        let n = out.len().min(base.len());
+        for i in 0..n {
+            out[i] = match exponent.get(i) {
+                Some(&power) => base[i].powf(power),
                 None => f64::NAN,
-            })
-            .collect()
+            };
+        }
+        out[n..].fill(f64::NAN);
     }
 
     /// Evaluate `round(x[, digits])` with ties rounding half away from zero.
@@ -719,15 +678,10 @@ impl CompiledExpr {
     /// a non-constant series is a validation error (matching the
     /// window/step-argument convention) and a non-integral or out-of-range
     /// constant yields all-NaN output.
-    pub(super) fn eval_round(&self, arg_results: &[&[f64]]) -> crate::Result<Vec<f64>> {
+    pub(super) fn eval_round_into(arg_results: &[&[f64]], out: &mut [f64]) -> crate::Result<()> {
         let digits = match arg_results.get(1) {
             Some(series) if !series.is_empty() => {
-                let first = series[0];
-                if series.iter().any(|v| v.to_bits() != first.to_bits()) {
-                    return Err(crate::Error::Validation(
-                        "round() digits argument must be a constant scalar (literal); got a non-constant series".to_string(),
-                    ));
-                }
+                let first = Self::constant_scalar(series, "round() digits argument")?;
                 if !first.is_finite()
                     || first.fract() != 0.0
                     || first < i32::MIN as f64
@@ -741,239 +695,176 @@ impl CompiledExpr {
             _ => Some(0),
         };
         let Some(digits) = digits else {
-            return Ok(Self::eval_unary_map(arg_results, |_| f64::NAN));
+            Self::eval_unary_into(arg_results, out, |_| f64::NAN);
+            return Ok(());
         };
-        Ok(Self::eval_unary_map(arg_results, |v| {
-            crate::math::round_half_away(v, digits)
-        }))
+        Self::eval_unary_into(arg_results, out, |value| {
+            crate::math::round_half_away(value, digits)
+        });
+        Ok(())
     }
 
-    pub(super) fn eval_floor(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        Self::eval_unary_map(arg_results, f64::floor)
-    }
-
-    pub(super) fn eval_ceil(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        Self::eval_unary_map(arg_results, f64::ceil)
-    }
-
-    pub(super) fn eval_ln(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        Self::eval_unary_map(arg_results, f64::ln)
-    }
-
-    pub(super) fn eval_exp(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        Self::eval_unary_map(arg_results, f64::exp)
-    }
-
-    pub(super) fn eval_log10(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        Self::eval_unary_map(arg_results, f64::log10)
-    }
-
-    pub(super) fn eval_sqrt(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        Self::eval_unary_map(arg_results, f64::sqrt)
-    }
-
-    pub(super) fn eval_clamp(&self, arg_results: &[&[f64]]) -> Vec<f64> {
+    pub(super) fn eval_clamp_into(arg_results: &[&[f64]], out: &mut [f64]) {
         let (Some(base), Some(lo), Some(hi)) =
             (arg_results.first(), arg_results.get(1), arg_results.get(2))
         else {
-            return arg_results
-                .first()
-                .map(|b| vec![f64::NAN; b.len()])
-                .unwrap_or_default();
+            out.fill(f64::NAN);
+            return;
         };
-        (0..base.len())
-            .map(|i| match (lo.get(i), hi.get(i)) {
-                (Some(&l), Some(&h)) => crate::math::clamp_or_nan(base[i], l, h),
+        let n = out.len().min(base.len());
+        for i in 0..n {
+            out[i] = match (lo.get(i), hi.get(i)) {
+                (Some(&lower), Some(&upper)) => crate::math::clamp_or_nan(base[i], lower, upper),
                 _ => f64::NAN,
-            })
-            .collect()
-    }
-
-    pub(super) fn eval_is_missing(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        Self::eval_unary_map(arg_results, |v| if v.is_finite() { 0.0 } else { 1.0 })
-    }
-
-    pub(super) fn eval_rank(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        let len = arg_results.first().map(|a| a.len()).unwrap_or(0);
-        if !arg_results.is_empty() {
-            let base = &arg_results[0];
-            let mut indexed: Vec<(f64, usize)> =
-                base.iter().enumerate().map(|(i, &v)| (v, i)).collect();
-            indexed.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
-            let mut out: Vec<f64> = vec![0.0; len];
-            let mut current_rank: f64 = 1.0;
-            let mut last_value: f64 = f64::NAN;
-            for (value, orig_idx) in indexed {
-                if !value.is_nan() {
-                    // Exact comparison is intentional: values come from
-                    // sort_unstable_by(total_cmp) so bit-identical values are adjacent.
-                    #[allow(clippy::float_cmp)]
-                    if value != last_value && !last_value.is_nan() {
-                        current_rank += 1.0;
-                    }
-                    out[orig_idx] = current_rank;
-                    last_value = value;
-                } else {
-                    out[orig_idx] = f64::NAN;
-                }
-            }
-            return out;
+            };
         }
-        Vec::with_capacity(len)
+        out[n..].fill(f64::NAN);
     }
 
-    pub(super) fn eval_quantile(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        let len = arg_results.first().map(|a| a.len()).unwrap_or(0);
-        if arg_results.len() >= 2 && !arg_results[1].is_empty() {
-            let base = &arg_results[0];
-            let q = arg_results[1][0].clamp(0.0, 1.0);
-            let valid_values: Vec<f64> = base
-                .iter()
-                .filter_map(|&x| if x.is_nan() { None } else { Some(x) })
-                .collect();
-            let mut out = vec![0.0; len];
-            if !valid_values.is_empty() {
-                let quantile_value = quantile_linear_or_nan(&valid_values, q);
-                for v in out.iter_mut().take(len) {
-                    *v = quantile_value;
-                }
+    pub(super) fn eval_rank_into(arg_results: &[&[f64]], out: &mut [f64]) {
+        let Some(base) = arg_results.first() else {
+            out.fill(f64::NAN);
+            return;
+        };
+        let mut indexed: Vec<(f64, usize)> =
+            base.iter().enumerate().map(|(i, &v)| (v, i)).collect();
+        indexed.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+        let mut current_rank: f64 = 1.0;
+        let mut next_rank: f64 = 1.0;
+        let mut last_value: Option<f64> = None;
+        for (value, orig_idx) in indexed {
+            let ranked = if value.is_nan() {
+                f64::NAN
             } else {
-                for v in out.iter_mut().take(len) {
-                    *v = f64::NAN;
+                // Exact comparison is intentional: values come from
+                // sort_unstable_by(total_cmp) so bit-identical values are adjacent.
+                #[allow(clippy::float_cmp)]
+                if last_value.is_none_or(|last| value != last) {
+                    current_rank = next_rank;
                 }
+                last_value = Some(value);
+                next_rank += 1.0;
+                current_rank
+            };
+            if orig_idx < out.len() {
+                out[orig_idx] = ranked;
             }
-            return out;
         }
-        Vec::with_capacity(len)
+        let n = out.len().min(base.len());
+        out[n..].fill(f64::NAN);
     }
+
+    pub(super) fn eval_quantile_into(arg_results: &[&[f64]], out: &mut [f64]) {
+        let Some(base) = arg_results.first() else {
+            out.fill(f64::NAN);
+            return;
+        };
+        if arg_results.len() < 2 || arg_results[1].is_empty() {
+            out.fill(f64::NAN);
+            return;
+        }
+        let q = arg_results[1][0].clamp(0.0, 1.0);
+        let valid_values: Vec<f64> = base.iter().copied().filter(|x| !x.is_nan()).collect();
+        let quantile_value = if valid_values.is_empty() {
+            f64::NAN
+        } else {
+            quantile_linear_or_nan(&valid_values, q)
+        };
+        let n = out.len().min(base.len());
+        out[..n].fill(quantile_value);
+        out[n..].fill(f64::NAN);
+    }
+
     pub(super) fn eval_rolling_min_into(
-        &self,
         arg_results: &[&[f64]],
         out: &mut [f64],
     ) -> crate::Result<()> {
-        let len = out.len();
-        if len == 0 {
-            return Ok(());
-        }
-        if arg_results.is_empty() {
-            out.fill(f64::NAN);
-            return Ok(());
-        }
-        let base = arg_results[0];
-        let Some(win) = Self::window_arg(arg_results, None)? else {
-            out.fill(f64::NAN);
-            return Ok(());
-        };
-        Self::rolling_apply_into(base, win, out, &mut finite_min_or_nan);
-        Ok(())
+        Self::rolling_with(arg_results, out, |base, win, out| {
+            Self::rolling_apply_into(base, win, out, &mut finite_min_or_nan);
+        })
     }
+
     pub(super) fn eval_rolling_max_into(
-        &self,
         arg_results: &[&[f64]],
         out: &mut [f64],
     ) -> crate::Result<()> {
-        let len = out.len();
-        if len == 0 {
-            return Ok(());
-        }
-        if arg_results.is_empty() {
-            out.fill(f64::NAN);
-            return Ok(());
-        }
-        let base = arg_results[0];
-        let Some(win) = Self::window_arg(arg_results, None)? else {
-            out.fill(f64::NAN);
-            return Ok(());
-        };
-        Self::rolling_apply_into(base, win, out, &mut finite_max_or_nan);
-        Ok(())
+        Self::rolling_with(arg_results, out, |base, win, out| {
+            Self::rolling_apply_into(base, win, out, &mut finite_max_or_nan);
+        })
     }
+
     pub(super) fn eval_rolling_count_into(
-        &self,
         arg_results: &[&[f64]],
         out: &mut [f64],
     ) -> crate::Result<()> {
-        let len = out.len();
-        if len == 0 {
-            return Ok(());
-        }
-        if arg_results.is_empty() {
+        Self::rolling_with(arg_results, out, |base, win, out| {
+            Self::rolling_apply_into(base, win, out, &mut |window| finite_count(window) as f64);
+        })
+    }
+
+    /// Exponentially weighted population variance, or standard deviation when
+    /// `take_sqrt` is set.
+    ///
+    /// A missing smoothing factor fills `out` with NaN. Variance of a single
+    /// observation is `0.0`. `adjust` is true only for a strictly positive flag.
+    pub(super) fn eval_ewm_variance_into(arg_results: &[&[f64]], out: &mut [f64], take_sqrt: bool) {
+        if arg_results.len() < 2 || arg_results[1].is_empty() {
             out.fill(f64::NAN);
-            return Ok(());
+            return;
         }
         let base = arg_results[0];
-        let Some(win) = Self::window_arg(arg_results, None)? else {
+        if base.is_empty() {
             out.fill(f64::NAN);
-            return Ok(());
-        };
-        Self::rolling_apply_into(base, win, out, &mut |w| finite_count(w) as f64);
-        Ok(())
-    }
-
-    pub(super) fn eval_ewm_std(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        Self::eval_ewm_variance_core(arg_results, true)
-    }
-
-    pub(super) fn eval_ewm_var(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        Self::eval_ewm_variance_core(arg_results, false)
-    }
-
-    fn eval_ewm_variance_core(arg_results: &[&[f64]], take_sqrt: bool) -> Vec<f64> {
-        let len = arg_results.first().map(|a| a.len()).unwrap_or(0);
-        let mut out: Vec<f64> = Vec::with_capacity(len);
-        if arg_results.len() >= 2 && !arg_results[1].is_empty() {
-            let base = &arg_results[0];
-            if base.is_empty() {
-                return out;
-            }
-            let alpha = Self::resolve_ewm_alpha(arg_results[1][0]);
-            let adjust = arg_results
-                .get(2)
-                .and_then(|v| v.first())
-                .map(|&x| x > 0.0)
-                .unwrap_or(true);
-
-            // Keep the mean as an offset from the latest observation. Both
-            // the weighted variance recurrence and its mean differences then
-            // avoid subtracting large raw moments or repeatedly rounding a
-            // large absolute mean. NaNs emit NaN without advancing the state.
-            let mut origin = 0.0_f64;
-            let mut mean_offset = 0.0_f64;
-            let mut variance = 0.0_f64;
-            let mut weight_sum = 0.0_f64;
-            let mut seeded = false;
-
-            for &value in base.iter() {
-                if value.is_nan() {
-                    out.push(f64::NAN);
-                    continue;
-                }
-                if !seeded {
-                    origin = value;
-                    weight_sum = 1.0;
-                    seeded = true;
-                    // Existing convention: variance of a single observation is 0.0.
-                    out.push(0.0);
-                    continue;
-                }
-                let weight = if adjust {
-                    weight_sum = 1.0 + (1.0 - alpha) * weight_sum;
-                    1.0 / weight_sum
-                } else {
-                    alpha
-                };
-                if weight >= 1.0 {
-                    variance = 0.0;
-                    mean_offset = 0.0;
-                } else {
-                    let delta = (value - origin) - mean_offset;
-                    variance = (1.0 - weight) * (variance + weight * delta * delta);
-                    mean_offset = -(1.0 - weight) * delta;
-                }
-                origin = value;
-                out.push(if take_sqrt { variance.sqrt() } else { variance });
-            }
+            return;
         }
-        out
+        let alpha = Self::resolve_ewm_alpha(arg_results[1][0]);
+        let adjust = arg_results
+            .get(2)
+            .and_then(|v| v.first())
+            .map(|&x| x > 0.0)
+            .unwrap_or(true);
+
+        // Keep the mean as an offset from the latest observation. Both
+        // the weighted variance recurrence and its mean differences then
+        // avoid subtracting large raw moments or repeatedly rounding a
+        // large absolute mean. NaNs emit NaN without advancing the state.
+        let mut origin = 0.0_f64;
+        let mut mean_offset = 0.0_f64;
+        let mut variance = 0.0_f64;
+        let mut weight_sum = 0.0_f64;
+        let mut seeded = false;
+
+        let n = out.len().min(base.len());
+        for (i, &value) in base.iter().enumerate().take(n) {
+            if value.is_nan() {
+                out[i] = f64::NAN;
+                continue;
+            }
+            if !seeded {
+                origin = value;
+                weight_sum = 1.0;
+                seeded = true;
+                // Existing convention: variance of a single observation is 0.0.
+                out[i] = 0.0;
+                continue;
+            }
+            let weight = if adjust {
+                weight_sum = 1.0 + (1.0 - alpha) * weight_sum;
+                1.0 / weight_sum
+            } else {
+                alpha
+            };
+            if weight >= 1.0 {
+                variance = 0.0;
+                mean_offset = 0.0;
+            } else {
+                let delta = (value - origin) - mean_offset;
+                variance = (1.0 - weight) * (variance + weight * delta * delta);
+                mean_offset = -(1.0 - weight) * delta;
+            }
+            origin = value;
+            out[i] = if take_sqrt { variance.sqrt() } else { variance };
+        }
+        out[n..].fill(f64::NAN);
     }
 }

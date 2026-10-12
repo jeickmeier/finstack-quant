@@ -5,6 +5,11 @@ use crate::dates::Date;
 
 use super::types::FxConversionPolicy;
 
+/// Keep serving quote state after a writer panicked while holding a lock.
+pub(super) fn recover<T>(res: Result<T, std::sync::PoisonError<T>>) -> T {
+    res.unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 /// Helper to compute reciprocal rate safely, validating the output.
 ///
 /// Returns `1.0 / rate` if the reciprocal is a valid FX rate (finite and
@@ -32,6 +37,25 @@ pub(crate) fn reciprocal_rate_or_err(
     // Validate the OUTPUT: tiny (subnormal) or negative inputs produce a
     // reciprocal that is infinite, zero, or negative — never a valid FX rate.
     validate_fx_rate(to, from, reciprocal)
+}
+
+/// Resolve `from → to` from one quote store: the direct quote, otherwise the
+/// reciprocal of the opposite orientation.
+///
+/// A present opposite quote is authoritative for the store, so an invalid
+/// reciprocal is an error rather than a fallthrough to a lower-priority store.
+/// Direct quotes are returned as stored.
+pub(super) fn directional_rate(
+    quote: impl Fn(Currency, Currency) -> Option<f64>,
+    from: Currency,
+    to: Currency,
+) -> crate::Result<Option<f64>> {
+    if let Some(rate) = quote(from, to) {
+        return Ok(Some(rate));
+    }
+    quote(to, from)
+        .map(|rate| reciprocal_rate_or_err(rate, to, from))
+        .transpose()
 }
 
 #[inline]

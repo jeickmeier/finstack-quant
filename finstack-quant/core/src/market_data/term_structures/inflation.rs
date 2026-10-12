@@ -76,8 +76,12 @@ use super::common::{build_interp, roll_knots, split_points};
 use crate::dates::DateExt;
 use crate::dates::{Date, DayCount};
 use crate::market_data::bumps::{BumpSpec, BumpType, Bumpable};
-use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
-use crate::{error::InputError, math::interp::types::Interp, types::CurveId};
+use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
+use crate::{
+    error::InputError,
+    math::interp::types::{Interp, InterpRollState},
+    types::CurveId,
+};
 
 /// Default indexation lag in months for inflation-linked securities.
 ///
@@ -166,6 +170,9 @@ struct RawInflationCurve {
     pub interp_style: InterpStyle,
     /// Extrapolation policy
     pub extrapolation: ExtrapolationPolicy,
+    /// Source interpolation and accumulated time origin for a rolled curve.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub roll_transform: Option<InterpRollState>,
 }
 
 fn default_day_count() -> DayCount {
@@ -194,6 +201,7 @@ impl From<InflationCurve> for RawInflationCurve {
             knot_points,
             interp_style: curve.interp.style(),
             extrapolation: curve.interp.extrapolation(),
+            roll_transform: curve.interp.roll_state(),
         }
     }
 }
@@ -210,6 +218,7 @@ impl TryFrom<RawInflationCurve> for InflationCurve {
             .knots(state.knot_points)
             .interp(state.interp_style)
             .extrapolation(state.extrapolation)
+            .roll_transform(state.roll_transform)
             .build()
     }
 }
@@ -245,6 +254,7 @@ impl InflationCurve {
             points: Vec::new(),
             style: InterpStyle::LogLinear,
             extrapolation: ExtrapolationPolicy::default(),
+            roll_transform: None,
         }
     }
 
@@ -498,6 +508,15 @@ impl InflationCurve {
     }
 
     /// Create a builder pre-populated with this curve's data but a new ID.
+    ///
+    /// The builder keeps the curve's CPI pillars, base CPI, indexation lag and
+    /// any roll state, so `build()` reproduces the curve under `new_id`;
+    /// supplying more pillars through [`InflationCurveBuilder::knots`] drops
+    /// the roll state.
+    ///
+    /// # Arguments
+    ///
+    /// * `new_id` - Identifier of the rebuilt curve, the `MarketContext` lookup key.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> InflationCurveBuilder {
         InflationCurve::builder(new_id)
             .base_cpi(self.base_cpi)
@@ -512,6 +531,7 @@ impl InflationCurve {
             )
             .interp(self.interp.style())
             .extrapolation(self.interp.extrapolation())
+            .roll_transform(self.interp.roll_state())
     }
 
     /// Roll the curve forward by a specified number of days.
@@ -533,6 +553,9 @@ impl InflationCurve {
     /// Returns an error if no knot points remain after filtering expired points.
     /// Returns a validation error if the rolled base date exceeds the supported calendar range.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
+        if days == 0 {
+            return Ok(self.clone());
+        }
         let new_base = self.base_date.add_days(days)?;
         let dt_years = super::common::year_fraction_to(self.base_date, new_base, self.day_count)?;
 
@@ -553,6 +576,15 @@ impl InflationCurve {
             .knots(rolled_points)
             .interp(self.interp.style())
             .extrapolation(self.interp.extrapolation())
+            .roll_transform(
+                self.interp.next_roll_state(
+                    dt_years,
+                    self.knots
+                        .iter()
+                        .copied()
+                        .zip(self.cpi_levels.iter().copied()),
+                )?,
+            )
             .build()
     }
 }
@@ -586,6 +618,7 @@ pub struct InflationCurveBuilder {
     points: Vec<(f64, f64)>, // (t, cpi)
     style: InterpStyle,
     extrapolation: ExtrapolationPolicy,
+    roll_transform: Option<InterpRollState>,
 }
 
 impl InflationCurveBuilder {
@@ -623,11 +656,21 @@ impl InflationCurveBuilder {
     }
 
     /// Supply knot points `(t, cpi_level)`.
+    ///
+    /// Supplied pillars define the curve's interpolation; any roll state
+    /// carried over from [`InflationCurve::to_builder_with_id`] is dropped.
+    ///
+    /// # Arguments
+    ///
+    /// * `pts` - `(time, cpi_level)` pillars appended to any already supplied:
+    ///   times in years from the base date under the curve day count, CPI
+    ///   levels in index points.
     pub fn knots<I>(mut self, pts: I) -> Self
     where
         I: IntoIterator<Item = (f64, f64)>,
     {
         self.points.extend(pts);
+        self.roll_transform = None;
         self
     }
     /// Select interpolation style for this curve.
@@ -639,6 +682,11 @@ impl InflationCurveBuilder {
     /// Select extrapolation policy for CPI lookups outside the knot range.
     pub fn extrapolation(mut self, extrapolation: ExtrapolationPolicy) -> Self {
         self.extrapolation = extrapolation;
+        self
+    }
+
+    fn roll_transform(mut self, state: Option<InterpRollState>) -> Self {
+        self.roll_transform = state;
         self
     }
 
@@ -692,12 +740,21 @@ impl InflationCurveBuilder {
         crate::math::interp::utils::validate_knots(&kvec)?;
         let knots = kvec.into_boxed_slice();
         let cpi_levels = cvec.into_boxed_slice();
-        let interp = build_interp(
+        let mut interp = build_interp(
             self.style,
             knots.clone(),
             cpi_levels.clone(),
             self.extrapolation,
         )?;
+        if let Some(state) = self.roll_transform {
+            interp = Interp::restore_rolled(
+                self.style,
+                self.extrapolation,
+                ValidationPolicy::Strict,
+                state,
+            )?;
+            interp.validate_roll_samples(knots.iter().copied().zip(cpi_levels.iter().copied()))?;
+        }
         Ok(InflationCurve {
             id: self.id,
             base_cpi: self.base_cpi,
@@ -721,53 +778,78 @@ impl Bumpable for InflationCurve {
         )?;
 
         let bumped_id = spec.standard_bump_id(self.id());
-
-        let mut bumped_points = Vec::with_capacity(self.knots().len());
-        for &t in self.knots() {
-            if t <= 0.0 {
-                bumped_points.push((t, self.base_cpi()));
-                continue;
-            }
-
-            let zero_rate = self.inflation_rate(0.0, t)?;
-            let weight = match spec.bump_type {
-                BumpType::Parallel => 1.0,
-                BumpType::TriangularKeyRate {
-                    prev_bucket,
-                    target_bucket,
-                    next_bucket,
-                } => {
-                    crate::market_data::term_structures::common::validate_triangular_bucket_grid(
-                        prev_bucket,
-                        target_bucket,
-                        next_bucket,
-                    )?;
-                    crate::market_data::term_structures::common::triangular_weight(
-                        t,
-                        prev_bucket,
-                        target_bucket,
-                        next_bucket,
-                    )
-                }
-            };
+        if let BumpType::TriangularKeyRate {
+            prev_bucket,
+            target_bucket,
+            next_bucket,
+        } = spec.bump_type
+        {
+            crate::market_data::term_structures::common::validate_triangular_bucket_grid(
+                prev_bucket,
+                target_bucket,
+                next_bucket,
+            )?;
+        }
+        let weight = |t: f64| match spec.bump_type {
+            BumpType::Parallel => 1.0,
+            BumpType::TriangularKeyRate {
+                prev_bucket,
+                target_bucket,
+                next_bucket,
+            } => crate::market_data::term_structures::common::triangular_weight(
+                t,
+                prev_bucket,
+                target_bucket,
+                next_bucket,
+            ),
+        };
+        let base_cpi = self.base_cpi();
+        // Shock the annualized zero inflation rate to time `t` and return the
+        // implied CPI level; the base CPI is a published fixing and never moves.
+        let shocked_cpi_from_rate = |t: f64, zero_rate: f64| -> f64 {
+            let weight = weight(t);
             let bumped_zero_rate = if is_multiplicative {
                 (1.0 + zero_rate) * (1.0 + (shift - 1.0) * weight) - 1.0
             } else {
                 zero_rate + shift * weight
             };
-            let bumped_cpi = self.base_cpi() * (1.0 + bumped_zero_rate).powf(t);
-            bumped_points.push((t, bumped_cpi));
-        }
+            base_cpi * (1.0 + bumped_zero_rate).powf(t)
+        };
+        let shocked_cpi = |t: f64, cpi: f64| -> f64 {
+            if t <= 0.0 {
+                return cpi;
+            }
+            shocked_cpi_from_rate(t, ((cpi.ln() - base_cpi.ln()) / t).exp_m1())
+        };
 
-        InflationCurve::builder(bumped_id)
-            .base_cpi(self.base_cpi())
+        let builder = InflationCurve::builder(bumped_id)
+            .base_cpi(base_cpi)
             .base_date(self.base_date())
             .day_count(self.day_count())
             .indexation_lag_months(self.indexation_lag_months())
-            .knots(bumped_points)
             .interp(self.interp_style())
-            .extrapolation(self.extrapolation())
-            .build()
+            .extrapolation(self.extrapolation());
+        // A rolled curve shocks its source pillars and reads its current
+        // pillars back, so base and shocked curves share one interpolation.
+        if let Some((state, levels)) =
+            self.interp
+                .bump_rolled(ValidationPolicy::Strict, self.knots(), shocked_cpi)?
+        {
+            return builder
+                .knots(self.knots().iter().copied().zip(levels))
+                .roll_transform(Some(state))
+                .build();
+        }
+        let mut bumped_points = Vec::with_capacity(self.knots().len());
+        for &t in self.knots() {
+            if t <= 0.0 {
+                bumped_points.push((t, base_cpi));
+                continue;
+            }
+            let zero_rate = self.inflation_rate(0.0, t)?;
+            bumped_points.push((t, shocked_cpi_from_rate(t, zero_rate)));
+        }
+        builder.knots(bumped_points).build()
     }
 }
 
@@ -927,5 +1009,73 @@ mod tests {
         let rolled = ic.roll_forward(30).expect("roll_forward should succeed");
         assert_eq!(rolled.interp_style(), InterpStyle::Linear);
         assert_eq!(rolled.extrapolation(), ExtrapolationPolicy::FlatZero);
+    }
+
+    #[test]
+    fn rolls_preserve_source_interpolation_through_rebuilds_bumps_and_serde() {
+        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+        let source = InflationCurve::builder("CPI-SHAPE-ROLL")
+            .base_date(base)
+            .base_cpi(300.0)
+            .knots([(0.0, 300.0), (1.0, 306.0), (2.0, 318.0), (3.0, 336.0)])
+            .interp(InterpStyle::CubicHermite)
+            .build()
+            .unwrap();
+        let unchanged = source.roll_forward(0).unwrap();
+        assert_eq!(
+            serde_json::to_value(&source).unwrap(),
+            serde_json::to_value(&unchanged).unwrap()
+        );
+
+        let rolled = source.roll_forward(365).unwrap();
+        for time in [0.25, 0.5, 1.5] {
+            assert!((rolled.cpi(time) - source.cpi(time + 1.0)).abs() < 1e-12);
+        }
+        let rebuilt = rolled
+            .to_builder_with_id("CPI-SHAPE-REBUILT")
+            .build()
+            .unwrap();
+        assert!((rebuilt.cpi(0.5) - source.cpi(1.5)).abs() < 1e-12);
+
+        let restored: InflationCurve =
+            serde_json::from_str(&serde_json::to_string(&rolled).unwrap()).unwrap();
+        assert!((restored.cpi(0.5) - source.cpi(1.5)).abs() < 1e-12);
+        let twice = restored.roll_forward(180).unwrap();
+        assert!((twice.cpi(0.5) - source.cpi(1.5 + 180.0 / 365.0)).abs() < 1e-12);
+
+        let bumped = restored.apply_bump(BumpSpec::parallel_bp(10.0)).unwrap();
+        let bumped_round_trip: InflationCurve =
+            serde_json::from_str(&serde_json::to_string(&bumped).unwrap()).unwrap();
+        assert!((bumped_round_trip.cpi(0.5) - bumped.cpi(0.5)).abs() < 1e-12);
+        // The base CPI is a fixing: a rate shock never moves it.
+        assert_eq!(bumped.base_cpi(), restored.base_cpi());
+        assert_eq!(bumped.cpi(0.0), restored.cpi(0.0));
+
+        // A zero shock keeps the rolled Hermite shape off-pillar.
+        let flat = restored.apply_bump(BumpSpec::parallel_bp(0.0)).unwrap();
+        for time in [0.1, 0.25, 0.75] {
+            assert!((flat.cpi(time) - restored.cpi(time)).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn rolled_log_linear_curve_shock_pins_base_cpi_and_backward_roll_rebuilds() {
+        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+        let curve = InflationCurve::builder("CPI-LOGLIN")
+            .base_date(base)
+            .base_cpi(300.0)
+            .knots([(0.0, 300.0), (1.0, 306.0), (2.0, 318.0)])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::FlatForward)
+            .build()
+            .unwrap();
+        let rolled = curve.roll_forward(182).unwrap();
+        let bumped = rolled.apply_bump(BumpSpec::parallel_bp(25.0)).unwrap();
+        assert_eq!(bumped.base_cpi(), rolled.base_cpi());
+        assert!((bumped.cpi(0.0) - rolled.base_cpi()).abs() < 1e-12);
+        assert!(bumped.cpi(1.0) > rolled.cpi(1.0));
+
+        let back = curve.roll_forward(-30).expect("backward roll");
+        assert_eq!(back.base_cpi(), 300.0);
     }
 }

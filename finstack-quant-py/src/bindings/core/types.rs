@@ -1,9 +1,7 @@
 //! Python bindings for `finstack_quant_core::types`.
 
 use crate::errors::{core_to_py, serde_json_to_py};
-use finstack_quant_core::types::{
-    Attributes, Bps, CreditRating, CurveId, InstrumentId, Percentage, Rate,
-};
+use finstack_quant_core::types::{Attributes, Bps, CreditRating, CurveId, InstrumentId, Rate};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyKeyError, PyTypeError};
 use pyo3::prelude::*;
@@ -148,12 +146,6 @@ impl PyRate {
     #[getter]
     fn as_basis_points(&self) -> PyBps {
         PyBps::from_inner(Bps::from(self.inner))
-    }
-
-    /// Rate as a ``Percentage`` value.
-    #[getter]
-    fn as_percentage(&self) -> PyPercentage {
-        PyPercentage::from_inner(Percentage::from(self.inner))
     }
 
     /// Absolute value.
@@ -355,16 +347,19 @@ impl PyBps {
         PyRate::from_inner(self.inner.as_rate())
     }
 
-    /// Value as a ``Percentage``.
-    #[getter]
-    fn as_percentage(&self) -> PyPercentage {
-        PyPercentage::from_inner(Percentage::from(self.inner))
-    }
-
     /// Absolute value.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the quote is ``-2147483648`` bp, whose absolute value has no
+    ///     32-bit representation.
     #[pyo3(text_signature = "(self)")]
-    fn abs(&self) -> Self {
-        Self::from_inner(self.inner.abs())
+    fn abs(&self) -> PyResult<Self> {
+        self.inner
+            .checked_abs()
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// ``True`` when exactly zero basis points.
@@ -451,206 +446,6 @@ impl PyBps {
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
         from_json_impl(json, "invalid Bps JSON").map(Self::from_inner)
-    }
-
-    /// Support ``pickle`` via the JSON wire format.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-}
-
-/// A percentage value (``12.5`` means 12.5%).
-///
-/// Immutable, hashable value type with checked arithmetic and conversions to
-/// ``Rate`` and ``Bps``.
-///
-/// Parameters
-/// ----------
-/// percent : float
-///     Percentage value (``12.5`` for 12.5%).
-///
-/// Raises
-/// ------
-/// ValueError
-///     If *percent* is not finite.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.core.types import Percentage
-/// >>> Percentage(12.5).as_decimal
-/// 0.125
-#[pyclass(
-    module = "finstack_quant.core.types",
-    name = "Percentage",
-    frozen,
-    eq,
-    ord,
-    hash,
-    skip_from_py_object
-)]
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub struct PyPercentage {
-    /// Underlying Rust percentage.
-    pub(crate) inner: Percentage,
-}
-
-impl PyPercentage {
-    /// Build a Python wrapper from a Rust [`Percentage`].
-    pub(crate) fn from_inner(inner: Percentage) -> Self {
-        Self { inner }
-    }
-}
-
-impl Hash for PyPercentage {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        canonical_f64_bits(self.inner.as_percent()).hash(state);
-    }
-}
-
-#[pymethods]
-impl PyPercentage {
-    /// Zero percent.
-    #[classattr]
-    const ZERO: PyPercentage = PyPercentage {
-        inner: Percentage::ZERO,
-    };
-
-    /// Construct from a percent value (e.g. ``12.5`` for 12.5%).
-    ///
-    /// Raises ``ValueError`` if *percent* is not finite.
-    #[new]
-    #[pyo3(text_signature = "(percent)")]
-    fn new(percent: f64) -> PyResult<Self> {
-        Percentage::new(percent)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-
-    /// Value as a decimal fraction.
-    #[getter]
-    fn as_decimal(&self) -> f64 {
-        self.inner.as_decimal()
-    }
-
-    /// Value in percent terms.
-    #[getter]
-    fn as_percent(&self) -> f64 {
-        self.inner.as_percent()
-    }
-
-    /// Value rounded to the nearest whole basis point.
-    #[getter]
-    fn as_bp(&self) -> i32 {
-        self.inner.as_bp()
-    }
-
-    /// Value in fractional basis points, without rounding (Rust
-    /// ``Percentage::as_bp_f64``): ``Percentage(1.1).as_bp_f64 == 110.0``.
-    #[getter]
-    fn as_bp_f64(&self) -> f64 {
-        self.inner.as_bp_f64()
-    }
-
-    /// Value as a decimal ``Rate``.
-    #[getter]
-    fn as_rate(&self) -> PyRate {
-        PyRate::from_inner(self.inner.as_rate())
-    }
-
-    /// Value as a ``Bps`` value (rounded to the nearest whole basis point).
-    #[getter]
-    fn as_basis_points(&self) -> PyBps {
-        PyBps::from_inner(Bps::from(self.inner))
-    }
-
-    /// Absolute value.
-    #[pyo3(text_signature = "(self)")]
-    fn abs(&self) -> Self {
-        Self::from_inner(self.inner.abs())
-    }
-
-    /// ``True`` when exactly zero percent.
-    #[pyo3(text_signature = "(self)")]
-    fn is_zero(&self) -> bool {
-        self.inner.is_zero()
-    }
-
-    /// ``True`` when strictly positive.
-    #[pyo3(text_signature = "(self)")]
-    fn is_positive(&self) -> bool {
-        self.inner.is_positive()
-    }
-
-    /// ``True`` when strictly negative.
-    #[pyo3(text_signature = "(self)")]
-    fn is_negative(&self) -> bool {
-        self.inner.is_negative()
-    }
-
-    /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        format!("Percentage(percent={:?})", self.inner.as_percent())
-    }
-
-    /// Return ``str(self)``.
-    fn __str__(&self) -> String {
-        self.inner.to_string()
-    }
-
-    /// Add two percentages.
-    fn __add__(&self, other: PyRef<Self>) -> PyResult<Self> {
-        self.inner
-            .checked_add(other.inner)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-
-    /// Subtract two percentages.
-    fn __sub__(&self, other: PyRef<Self>) -> PyResult<Self> {
-        self.inner
-            .checked_sub(other.inner)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-
-    /// Multiply by a scalar ``float``.
-    fn __mul__(&self, rhs: f64) -> PyResult<Self> {
-        self.inner
-            .checked_mul(rhs)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-
-    /// Right-multiply by a scalar ``float``.
-    fn __rmul__(&self, lhs: f64) -> PyResult<Self> {
-        self.__mul__(lhs)
-    }
-
-    /// Divide by a scalar ``float``; raises ``ValueError`` on zero divisor.
-    fn __truediv__(&self, rhs: f64) -> PyResult<Self> {
-        self.inner
-            .checked_div(rhs)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-
-    /// Unary negation.
-    fn __neg__(&self) -> Self {
-        Self::from_inner(-self.inner)
-    }
-
-    /// Serialize to JSON (the bare percent number, e.g. ``12.5``).
-    #[allow(clippy::wrong_self_convention)]
-    fn to_json(&self) -> PyResult<String> {
-        to_json_impl(&self.inner, "invalid Percentage")
-    }
-
-    /// Deserialize from JSON (a bare percent number).
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        from_json_impl(json, "invalid Percentage JSON").map(Self::from_inner)
     }
 
     /// Support ``pickle`` via the JSON wire format.
@@ -823,8 +618,7 @@ impl PyCreditRating {
         inner: CreditRating::NR,
     };
 
-    /// Parse a rating string (case-insensitive, S&P/Fitch or Moody's
-    /// notation); equivalent to ``CreditRating.from_name(name)``.
+    /// Parse a rating string (case-insensitive, S&P/Fitch or Moody's notation).
     ///
     /// Raises ``ValueError`` if *name* is not a recognised rating.
     #[new]
@@ -833,15 +627,6 @@ impl PyCreditRating {
         name.parse::<CreditRating>()
             .map(Self::from_inner)
             .map_err(core_to_py)
-    }
-
-    /// Parse a rating string (case-insensitive, accepts S&P/Fitch and Moody's notation).
-    ///
-    /// Examples: ``"BBB"``, ``"BBB-"``, ``"Baa3"``, ``"B+"``, ``"B1"``
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, name)")]
-    fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
-        Self::new(name)
     }
 
     /// Canonical rating name in S&P/Fitch notation (e.g. ``"BBB-"``).
@@ -1187,7 +972,7 @@ impl PyAttributes {
     /// Add a tag (no-op if already present).
     #[pyo3(text_signature = "(self, tag)")]
     fn add_tag(&mut self, tag: &str) {
-        self.inner.tags.insert(tag.to_string());
+        self.inner.add_tag(tag);
     }
 
     /// Return whether *tag* is present.
@@ -1299,7 +1084,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add_class::<PyRate>()?;
     m.add_class::<PyBps>()?;
-    m.add_class::<PyPercentage>()?;
     m.add_class::<PyCreditRating>()?;
     m.add_class::<PyCurveId>()?;
     m.add_class::<PyInstrumentId>()?;
@@ -1312,7 +1096,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "CreditRating",
             "CurveId",
             "InstrumentId",
-            "Percentage",
             "Rate",
         ],
     )?;

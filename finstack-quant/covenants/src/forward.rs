@@ -854,9 +854,9 @@ mod tests {
                 .copied()
         }
         fn period_end_date(&self, period: &PeriodId) -> Result<Date> {
-            let m = [3u8, 6, 9, 12][(period.index as usize - 1).min(3)];
+            let m = [3u8, 6, 9, 12][(period.index() as usize - 1).min(3)];
             Ok(Date::from_calendar_date(
-                period.year,
+                period.year(),
                 Month::try_from(m).expect("Valid month (1-12)"),
                 30,
             )
@@ -864,8 +864,8 @@ mod tests {
         }
         fn period_start_date(&self, period: &PeriodId) -> Result<Date> {
             Ok(Date::from_calendar_date(
-                period.year,
-                Month::try_from(1 + 3 * (period.index as u8 - 1)).unwrap(),
+                period.year(),
+                Month::try_from(1 + 3 * (period.index() as u8 - 1)).unwrap(),
                 1,
             )
             .unwrap())

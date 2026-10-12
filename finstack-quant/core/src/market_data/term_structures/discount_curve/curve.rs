@@ -368,6 +368,14 @@ impl DiscountCurve {
     /// Works for both forward and backward date order. Returns `1.0` when
     /// `from == to`.
     ///
+    /// Both dates map to curve time with the curve's own day count and
+    /// time-axis calendar (see [`Self::day_count_context`]).
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - Start date of the interval.
+    /// * `to` - End date of the interval; an earlier date inverts the ratio.
+    ///
     /// [`Discounting::df_between_dates`]: crate::market_data::traits::Discounting::df_between_dates
     ///
     /// # Errors
@@ -502,7 +510,28 @@ impl DiscountCurve {
     /// Helper: compute year fraction from base date to target date using curve's day-count.
     #[inline]
     fn year_fraction_to(&self, date: Date) -> crate::Result<f64> {
-        super::super::common::year_fraction_to(self.base, date, self.day_count)
+        super::super::common::year_fraction_to_with_ctx(
+            self.base,
+            date,
+            self.day_count,
+            self.day_count_context(),
+        )
+    }
+
+    /// Day-count context of the curve's time axis: its holiday calendar, if
+    /// any, and no coupon metadata.
+    #[must_use]
+    pub fn day_count_context(&self) -> crate::dates::DayCountContext<'static> {
+        crate::dates::DayCountContext {
+            calendar: self.calendar.as_ref().map(|calendar| calendar.calendar),
+            ..crate::dates::DayCountContext::default()
+        }
+    }
+
+    /// Canonical id of the curve's time-axis holiday calendar, if any.
+    #[must_use]
+    pub fn calendar_id(&self) -> Option<&str> {
+        self.calendar.as_ref().map(|calendar| calendar.id.as_str())
     }
 
     /// Discount factor at time `t` (helper calling the underlying interpolator).
@@ -569,6 +598,7 @@ impl DiscountCurve {
             id: id.into(),
             base: None,
             day_count: DayCount::Act365F,
+            calendar_id: None,
             points: Vec::new(),
             style: InterpStyle::MonotoneConvex,
             extrapolation: ExtrapolationPolicy::FlatForward,
@@ -617,6 +647,7 @@ impl DiscountCurve {
         DiscountCurve::builder(new_id)
             .base_date(self.base)
             .day_count(self.day_count)
+            .calendar_id_opt(self.calendar.as_ref().map(|calendar| calendar.id.clone()))
             .interp(self.style)
             .extrapolation(self.extrapolation)
             .min_forward_tenor(self.min_forward_tenor)

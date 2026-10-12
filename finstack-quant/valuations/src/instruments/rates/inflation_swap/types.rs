@@ -285,7 +285,9 @@ impl InflationSwap {
         let tau_accrual = self.fixed_accrual()?;
 
         let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
-        let fixed_payment = self.notional * ((1.0 + fixed_rate).powf(tau_accrual) - 1.0);
+        let fixed_payment = self
+            .notional
+            .checked_mul_f64((1.0 + fixed_rate).powf(tau_accrual) - 1.0)?;
 
         // Date-based DF from as_of to payment: correct when the curve base
         // date differs from as_of.
@@ -296,7 +298,7 @@ impl InflationSwap {
             payment_date,
         )?;
 
-        Ok(fixed_payment * df)
+        fixed_payment.checked_mul_f64(df)
     }
 
     /// Compounding term τ of the fixed leg in years.
@@ -346,7 +348,8 @@ impl InflationSwap {
     fn fixed_leg_amount(&self) -> finstack_quant_core::Result<Money> {
         let tau_accrual = self.fixed_accrual()?;
         let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
-        Ok(self.notional * ((1.0 + fixed_rate).powf(tau_accrual) - 1.0))
+        self.notional
+            .checked_mul_f64((1.0 + fixed_rate).powf(tau_accrual) - 1.0)
     }
 
     /// Calculate PV of the inflation leg.
@@ -368,7 +371,7 @@ impl InflationSwap {
     ) -> finstack_quant_core::Result<Money> {
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let index_ratio = self.projected_index_ratio(market, as_of)?;
-        let inflation_payment = self.notional * (index_ratio - 1.0);
+        let inflation_payment = self.notional.checked_mul_f64(index_ratio - 1.0)?;
 
         // Date-based DF from as_of to payment: correct when the curve base
         // date differs from as_of.
@@ -379,7 +382,7 @@ impl InflationSwap {
             payment_date,
         )?;
 
-        Ok(inflation_payment * df)
+        inflation_payment.checked_mul_f64(df)
     }
 
     fn inflation_leg_amount(
@@ -388,7 +391,7 @@ impl InflationSwap {
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
         let index_ratio = self.projected_index_ratio(curves, as_of)?;
-        Ok(self.notional * (index_ratio - 1.0))
+        self.notional.checked_mul_f64(index_ratio - 1.0)
     }
 
     /// Fixed rate that sets the swap's present value to zero (par real rate / breakeven).

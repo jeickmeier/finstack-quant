@@ -17,6 +17,12 @@ export type DA33B682660A7Dfa1Ea09 =
        */
       base: string;
       /**
+       * Registered holiday calendar id of the business-day time axis (for
+       * example `"brbd"` for a Bus/252 curve). Omitted when the day count needs
+       * no calendar.
+       */
+      calendar_id?: string | null;
+      /**
        * OIS cut-off (business days) the curve was calibrated under, if any.
        */
       calibration_ois_cutoff_days?: number | null;
@@ -251,6 +257,10 @@ export type DA33B682660A7Dfa1Ea09 =
        * Time/value pairs used to construct the curve
        */
       knot_points: [number, number][];
+      /**
+       * Source interpolation and accumulated time origin for a rolled curve.
+       */
+      roll_transform?: D_13Ceef63597B70Bc1A71 | null;
       type: "inflation";
     }
   | {
@@ -298,6 +308,10 @@ export type DA33B682660A7Dfa1Ea09 =
        */
       knot_points: [number, number][];
       /**
+       * Source interpolation and accumulated time origin for a rolled curve.
+       */
+      roll_transform?: D_13Ceef63597B70Bc1A71 | null;
+      /**
        * Spot index level (volatility index curves)
        */
       spot_level?: number | null;
@@ -306,54 +320,6 @@ export type DA33B682660A7Dfa1Ea09 =
        */
       spot_price?: number | null;
       type: "price";
-    }
-  | {
-      /**
-       * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
-       */
-      base: string;
-      /**
-       * Day count convention
-       */
-      day_count:
-        | "one_one"
-        | "act_360"
-        | "act_365f"
-        | "act_365l"
-        | "30_360"
-        | "30e_360"
-        | "30e_360_isda"
-        | "30_360_it"
-        | "nl_365"
-        | "act_act"
-        | "act_act_isma"
-        | "act_act_afb"
-        | "bus_252";
-      /**
-       * Extrapolation policy
-       */
-      extrapolation: "flat_zero" | "flat_forward" | "none";
-      /**
-       * Curve identifier
-       */
-      id: string;
-      /**
-       * Interpolation style
-       */
-      interp_style: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
-      /**
-       * Time/value pairs used to construct the curve
-       */
-      knot_points: [number, number][];
-      /**
-       * Spot index level (volatility index curves)
-       */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
-      type: "vol_index";
     }
   | {
       /**
@@ -393,6 +359,10 @@ export type DA33B682660A7Dfa1Ea09 =
        * Time/value pairs used to construct the curve.
        */
       knot_points: [number, number][];
+      /**
+       * Source interpolation and accumulated time origin for a rolled curve.
+       */
+      roll_transform?: D_13Ceef63597B70Bc1A71 | null;
       type: "basis_spread";
     }
   | {
@@ -473,6 +443,11 @@ export type DA33B682660A7Dfa1Ea09 =
             variant: "nss";
             [k: string]: unknown;
           };
+      /**
+       * Current origin in the source model's year-fraction coordinates;
+       * omitted means `0.0` (a curve that has never been rolled).
+       */
+      time_offset?: number;
       type: "parametric";
     };
 /**
@@ -1401,6 +1376,13 @@ export interface D_268127561C9D65277399 {
   quote: {
     [k: string]: unknown;
   };
+}
+/**
+ * Serialized source grid and time origin for a rolled interpolation.
+ */
+export interface D_13Ceef63597B70Bc1A71 {
+  offset: number;
+  source_points: [number, number][];
 }
 /**
  * Dividend schedule for an equity or ETF underlying.

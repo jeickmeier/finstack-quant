@@ -67,8 +67,7 @@
 use crate::factor::credit::calibration::{BucketWeighting, PanelFrequency, PanelSpace};
 use crate::factor::{FactorId, FactorModelConfig};
 use finstack_quant_core::contract::{
-    deserialize_json_value, parse_json_value, ContractDescriptor, ContractError, Diagnostic,
-    LoadLimits, LoadPhase, Severity, ValidationReport,
+    ContractDescriptor, ContractError, LoadLimits, ValidationReport,
 };
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::IssuerId;
@@ -948,27 +947,10 @@ impl CreditFactorModel {
         bytes: &[u8],
         limits: &LoadLimits,
     ) -> Result<(Self, ValidationReport), ContractError> {
-        let value = parse_json_value(bytes, limits)?;
-        let schema = match value.get("schema") {
-            Some(schema) => Some(deserialize_json_value::<String>(schema.clone(), limits)?),
-            None => None,
-        };
-        CREDIT_FACTOR_MODEL_CONTRACT.parse_schema_strict(schema.as_deref(), "/schema", limits)?;
-        let model: Self = deserialize_json_value(value, limits)?;
-        model.validate().map_err(|error| {
-            let mut report = ValidationReport::default();
-            report.push_bounded(
-                limits,
-                Diagnostic::new(
-                    "contract/semantic-invalid",
-                    LoadPhase::Semantic,
-                    Severity::Error,
-                    error.to_string(),
-                )
-                .with_contract(CREDIT_FACTOR_MODEL_CONTRACT.id),
-            );
-            ContractError::Report(Box::new(report))
-        })?;
+        let model: Self = CREDIT_FACTOR_MODEL_CONTRACT.decode(bytes, limits)?;
+        model
+            .validate()
+            .map_err(|error| CREDIT_FACTOR_MODEL_CONTRACT.semantic_error(error, limits))?;
         Ok((model, ValidationReport::default()))
     }
 

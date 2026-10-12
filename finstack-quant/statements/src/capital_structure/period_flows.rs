@@ -375,7 +375,8 @@ pub fn calculate_period_flows(
                     net_interest_cash += cf.amount.amount() * scale;
                 }
                 _ if is_principal_repayment(cf) => {
-                    breakdown.principal_payment += scaled_abs_value;
+                    breakdown.principal_payment =
+                        breakdown.principal_payment.checked_add(scaled_abs_value)?;
                 }
                 CFKind::CommitmentFee
                 | CFKind::FacilityFee
@@ -385,15 +386,19 @@ pub fn calculate_period_flows(
                     // undrawn commitment, the facility size or the LC face, NOT on the drawn
                     // balance — they must not be scaled by the drawn-balance
                     // ratio. Pass them through at the scheduled amount.
-                    breakdown.fees += Money::new(cf.amount.amount().abs(), cf.amount.currency())?;
+                    breakdown.fees = breakdown
+                        .fees
+                        .checked_add(Money::new(cf.amount.amount().abs(), cf.amount.currency())?)?;
                 }
                 CFKind::Fee | CFKind::UsageFee => {
                     // Generic and usage (drawn-balance based) fees scale with
                     // the stateful/scheduled balance ratio like interest.
-                    breakdown.fees += scaled_abs_value;
+                    breakdown.fees = breakdown.fees.checked_add(scaled_abs_value)?;
                 }
                 CFKind::Pik => {
-                    breakdown.interest_expense_pik += scaled_abs_value;
+                    breakdown.interest_expense_pik = breakdown
+                        .interest_expense_pik
+                        .checked_add(scaled_abs_value)?;
                 }
                 CFKind::Notional | CFKind::RevolvingDraw => {
                     // Funding / draw events are not treated as scheduled principal payments in statements.

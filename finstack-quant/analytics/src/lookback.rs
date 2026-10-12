@@ -108,22 +108,9 @@ pub(crate) fn fytd_select(
 }
 
 fn fiscal_year_start_date(ref_date: Date, fiscal_config: FiscalConfig) -> Date {
-    let fy = ref_date.fiscal_year(fiscal_config);
-    let fy_start_month = Month::try_from(fiscal_config.start_month).unwrap_or(Month::January);
-    let calendar_year = if fiscal_config.start_month == 1 && fiscal_config.start_day <= 1 {
-        fy
-    } else {
-        fy - 1
-    };
-    // `FiscalConfig` accepts start_day 1..=31 regardless of month length;
-    // clamp to the last valid day of the start month (matching the overflow
-    // semantics of `DateExt::fiscal_year`, where "Feb 30" means the last day
-    // of February) so the construction below cannot fail and silently fall
-    // back to `ref_date`.
-    let start_day = fiscal_config
-        .start_day
-        .min(fy_start_month.length(calendar_year));
-    crate::dates::create_date(calendar_year, fy_start_month, start_day).unwrap_or(ref_date)
+    fiscal_config
+        .year_start(ref_date.fiscal_year(fiscal_config))
+        .unwrap_or(ref_date)
 }
 
 #[cfg(test)]

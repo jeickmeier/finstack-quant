@@ -383,20 +383,6 @@ pub enum InputError {
         reason: String,
     },
 
-    // Joint calendar FX date logic
-    /// Joint calendar business-day counting exceeded a safety iteration limit.
-    #[error(
-        "Joint calendar business-day roll exceeded iteration limit: requested {n_days} days, hit {max_iters} iterations"
-    )]
-    JointCalendarIterationLimitExceeded {
-        /// Start date for the roll.
-        start: Date,
-        /// Requested joint business days to add.
-        n_days: u32,
-        /// Maximum iterations allowed.
-        max_iters: u32,
-    },
-
     // Solver Failures
     /// Root-finding solver failed to converge within tolerance.
     ///

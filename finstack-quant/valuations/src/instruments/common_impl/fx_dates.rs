@@ -9,32 +9,23 @@ pub use finstack_quant_core::dates::fx::{
     add_joint_business_days, adjust_joint_calendar, ResolvedCalendarPair,
 };
 
-/// Roll a trade date to spot using the market (CLS-consistent) FX convention,
-/// deriving the USD calendar from the currency pair.
+/// Roll a trade date to spot under the pair's contractual spot lag.
 ///
-/// When either leg of the pair is USD, that leg's calendar ID is passed to
-/// [`fx_spot_date`] as the USD settlement calendar, so a US holiday on an
-/// intermediate day does not delay spot while the final value date must still
-/// be a good USD business day (e.g. EUR/USD traded Thu 2025-07-03 settles
-/// Mon 2025-07-07, not Tue 2025-07-08; see
-/// FX spot convention).
-///
-/// For non-USD crosses the instruments do not carry a USD calendar ID, so we
-/// pass `usd_cal_id = None` and behavior remains the symmetric two-calendar
-/// rule (a known limitation: the CLS rule would additionally require the final
-/// value date to be a good USD day).
+/// USD final-date checks use the supplied USD leg calendar or the registered
+/// `usny` calendar. Non-USD crosses always use `usny` for their final date.
 ///
 /// # Errors
 ///
-/// Returns an error if calendar resolution fails or the iteration limit is
-/// exceeded (see [`fx_spot_date`]).
+/// Returns an error if calendar resolution fails or no business day is found
+/// within the search window (see [`fx_spot_date`]).
 ///
 /// # Arguments
 ///
 /// * `trade_date` - FX trade date from which spot settlement is rolled.
-/// * `settlement_days` - Contractual T+N spot lag in joint business days.
-/// * `base_currency` - Base leg currency used to detect the pair's USD leg.
-/// * `quote_currency` - Quote leg currency used to detect the pair's USD leg.
+/// * `settlement_days` - Contractual spot lag in business days, from 0 through 31; pass
+///   [`finstack_quant_core::dates::fx::fx_standard_settlement_days`] for market spot.
+/// * `base_currency` - Base leg currency used to select its market settlement lag.
+/// * `quote_currency` - Quote leg currency used to select its market settlement lag.
 /// * `base_cal_id` - Optional base-currency business-calendar identifier.
 /// * `quote_cal_id` - Optional quote-currency business-calendar identifier.
 pub fn fx_spot_date_for_pair(
@@ -46,18 +37,21 @@ pub fn fx_spot_date_for_pair(
     quote_cal_id: Option<&str>,
 ) -> Result<Date> {
     let usd_cal_id = if base_currency == Currency::USD {
-        base_cal_id
+        Some(base_cal_id.unwrap_or("usny"))
     } else if quote_currency == Currency::USD {
-        quote_cal_id
+        Some(quote_cal_id.unwrap_or("usny"))
     } else {
-        None
+        Some("usny")
     };
-    let lag_days = i32::try_from(settlement_days).map_err(|_| {
-        finstack_quant_core::Error::Validation(format!(
-            "FX settlement_days {settlement_days} exceeds the supported range"
-        ))
-    })?;
-    fx_spot_date(trade_date, lag_days, base_cal_id, quote_cal_id, usd_cal_id)
+    fx_spot_date(
+        trade_date,
+        base_currency,
+        quote_currency,
+        settlement_days,
+        base_cal_id,
+        quote_cal_id,
+        usd_cal_id,
+    )
 }
 
 /// Add a standard calendar tenor to an FX spot date and apply the joint roll.

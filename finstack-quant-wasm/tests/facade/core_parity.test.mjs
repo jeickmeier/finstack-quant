@@ -297,11 +297,7 @@ const CASES = {
     ],
     items: attributes().items(),
   }),
-  rate_zero: () => [
-    core.Rate.zero().asDecimal,
-    core.Bps.zero().asBp,
-    core.Percentage.zero().asPercent,
-  ],
+  rate_zero: () => [core.Rate.zero().asDecimal, core.Bps.zero().asBp],
   money: () => [
     JSON.parse(core.Money.zero(core.Currency.usd()).toJson()),
     core.Money.fromTuple([12.5, 'EUR']).toTuple(),
@@ -479,21 +475,20 @@ test('unitless insertPrice rejects non-finite values in Rust (MarketScalar::unit
   }
 });
 
-test('Rate and Percentage report fractional basis points without binary noise', () => {
+test('Rate reports fractional basis points without binary noise', () => {
   assert.equal(new core.Rate(0.0029).asBpF64, 29);
   assert.equal(new core.Rate(0.00625).asBpF64, 62.5);
   assert.equal(new core.Rate(0.00625).asBp, 63);
-  assert.equal(new core.Percentage(1.1).asBpF64, 110);
-  assert.equal(new core.Percentage(0.07).asBpF64, 7);
+  // Percent quotes shift their decimal digits, not a binary quotient.
+  assert.equal(core.Rate.fromPercent(1.1).asBpF64, 110);
+  assert.equal(core.Rate.fromPercent(0.07).asBpF64, 7);
+  assert.equal(core.Rate.fromPercent(1.1).asPercent, 1.1);
   for (const value of [1e-30, -1e-30, 1e-300, Number.MIN_VALUE]) {
     const rate = new core.Rate(value);
-    const percentage = new core.Percentage(value);
     try {
       assert.equal(rate.asBpF64, value * 10_000);
-      assert.equal(percentage.asBpF64, value * 100);
     } finally {
       rate.free();
-      percentage.free();
     }
   }
 });

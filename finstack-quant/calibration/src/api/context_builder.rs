@@ -23,7 +23,7 @@ use crate::config::CalibrationConfig;
 use finstack_quant_core::market_data::context::{
     build_snapshot_fx_matrix, CurveState, CurveStorage, MarketContext,
 };
-use finstack_quant_core::market_data::term_structures::CreditIndexData;
+use finstack_quant_core::market_data::term_structures::{CreditIndexData, PriceCurveKind};
 use finstack_quant_core::types::CurveId;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -83,11 +83,22 @@ pub(crate) fn build_initial_context(
             PriorMarketObject::ParametricCurve(c) => {
                 ctx.insert_mut(CurveStorage::from_state(CurveState::Parametric(c.clone())));
             }
-            PriorMarketObject::PriceCurve(c) => {
+            PriorMarketObject::PriceCurve(c) | PriorMarketObject::VolatilityIndexCurve(c) => {
+                // The tag states the curve family; a vol-index curve is the one
+                // carrying `spot_level`, a price curve the one carrying `spot_price`.
+                let expected = match obj {
+                    PriorMarketObject::VolatilityIndexCurve(_) => PriceCurveKind::VolIndex,
+                    _ => PriceCurveKind::Price,
+                };
+                if c.kind() != expected {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "prior market object '{}' is tagged '{}' but holds a {:?} curve",
+                        c.id(),
+                        obj.kind_name(),
+                        c.kind()
+                    )));
+                }
                 ctx.insert_mut(CurveStorage::from_state(CurveState::Price(c.clone())));
-            }
-            PriorMarketObject::VolatilityIndexCurve(c) => {
-                ctx.insert_mut(CurveStorage::from_state(CurveState::VolIndex(c.clone())));
             }
             PriorMarketObject::VolSurface(s) => {
                 ctx.insert_surface_mut(s.clone());
@@ -242,6 +253,35 @@ mod tests {
         let cfg = CalibrationConfig::default();
         let ctx = build_initial_context(&prior, &[], &cfg).expect("build succeeds");
         assert!(ctx.get_discount("USD-OIS").is_ok());
+    }
+
+    #[test]
+    fn price_curve_prior_tag_must_match_the_curve_kind() {
+        use finstack_quant_core::dates::Date;
+        use finstack_quant_core::market_data::term_structures::PriceCurve;
+        use time::Month;
+
+        let curve = |kind| {
+            PriceCurve::builder("VIX")
+                .kind(kind)
+                .base_date(Date::from_calendar_date(2025, Month::January, 1).expect("date"))
+                .knots([(0.0, 15.0), (1.0, 18.0)])
+                .build()
+                .expect("curve")
+        };
+        let cfg = CalibrationConfig::default();
+        let vol_index = vec![PriorMarketObject::VolatilityIndexCurve(curve(
+            PriceCurveKind::VolIndex,
+        ))];
+        let ctx = build_initial_context(&vol_index, &[], &cfg).expect("matching tag");
+        assert!(ctx.get_vol_index_curve("VIX").is_ok());
+
+        let mismatched = vec![PriorMarketObject::VolatilityIndexCurve(curve(
+            PriceCurveKind::Price,
+        ))];
+        let error = build_initial_context(&mismatched, &[], &cfg)
+            .expect_err("a price curve under the vol-index tag is rejected");
+        assert!(error.to_string().contains("volatility_index_curve"));
     }
 
     #[test]

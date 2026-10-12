@@ -49,22 +49,9 @@ pub(crate) fn repr_sub(a: AmountRepr, b: AmountRepr) -> Result<AmountRepr, Error
         .ok_or_else(|| InputError::ConversionOverflow.into())
 }
 
-#[inline]
-#[allow(clippy::expect_used)] // Caller contract: `rhs` must be finite/representable.
-pub(crate) fn repr_mul_f64(a: AmountRepr, rhs: f64) -> AmountRepr {
-    try_repr_mul_f64(a, rhs).expect("Money multiplication requires finite, representable scalar")
-}
-
-#[inline]
-#[allow(clippy::expect_used)] // Caller contract: `rhs` must be finite, non-zero, representable.
-pub(crate) fn repr_div_f64(a: AmountRepr, rhs: f64) -> AmountRepr {
-    try_repr_div_f64(a, rhs)
-        .expect("Money division requires finite, non-zero, representable scalar")
-}
-
 /// Fallible multiplication by an `f64` scalar (no silent substitution).
 #[inline]
-pub(crate) fn try_repr_mul_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Error> {
+pub(crate) fn repr_mul_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Error> {
     if !rhs.is_finite() {
         return Err(InputError::NonFiniteValue {
             kind: crate::error::NonFiniteKind::classify(rhs),
@@ -86,7 +73,7 @@ pub(crate) fn try_repr_mul_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Er
 
 /// Fallible division by an `f64` scalar (no silent substitution).
 #[inline]
-pub(crate) fn try_repr_div_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Error> {
+pub(crate) fn repr_div_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Error> {
     if !rhs.is_finite() {
         return Err(InputError::NonFiniteValue {
             kind: crate::error::NonFiniteKind::classify(rhs),
@@ -233,88 +220,6 @@ mod tests {
         let b = Decimal::from_str("100.00").expect("valid decimal");
         let result = repr_sub(a, b).expect("subtraction should succeed");
         assert_eq!(result, Decimal::from_str("-75.00").expect("valid decimal"));
-    }
-
-    // repr_mul_f64 tests
-
-    #[test]
-    fn repr_mul_f64_positive() {
-        let a = Decimal::from_str("100.00").expect("valid decimal");
-        let result = repr_mul_f64(a, 2.5);
-        assert_eq!(result, Decimal::from_str("250.00").expect("valid decimal"));
-    }
-
-    #[test]
-    fn repr_mul_f64_negative_scalar() {
-        let a = Decimal::from_str("50.00").expect("valid decimal");
-        let result = repr_mul_f64(a, -2.0);
-        assert_eq!(result, Decimal::from_str("-100.00").expect("valid decimal"));
-    }
-
-    #[test]
-    fn repr_mul_f64_fractional() {
-        let a = Decimal::from_str("100.00").expect("valid decimal");
-        let result = repr_mul_f64(a, 0.1);
-        let expected = Decimal::from_str("10.00").expect("valid decimal");
-        assert!((result - expected).abs() < Decimal::from_str("0.01").expect("valid decimal"));
-    }
-
-    #[test]
-    #[should_panic(expected = "Money multiplication requires finite")]
-    fn repr_mul_f64_panics_on_nan() {
-        let a = Decimal::from_str("100.00").expect("valid decimal");
-        repr_mul_f64(a, f64::NAN);
-    }
-
-    #[test]
-    #[should_panic(expected = "Money multiplication requires finite")]
-    fn repr_mul_f64_panics_on_infinity() {
-        let a = Decimal::from_str("100.00").expect("valid decimal");
-        repr_mul_f64(a, f64::INFINITY);
-    }
-
-    // repr_div_f64 tests
-
-    #[test]
-    fn repr_div_f64_positive() {
-        let a = Decimal::from_str("100.00").expect("valid decimal");
-        let result = repr_div_f64(a, 2.0);
-        assert_eq!(result, Decimal::from_str("50.00").expect("valid decimal"));
-    }
-
-    #[test]
-    fn repr_div_f64_negative_scalar() {
-        let a = Decimal::from_str("100.00").expect("valid decimal");
-        let result = repr_div_f64(a, -4.0);
-        assert_eq!(result, Decimal::from_str("-25.00").expect("valid decimal"));
-    }
-
-    #[test]
-    fn repr_div_f64_fractional_divisor() {
-        let a = Decimal::from_str("100.00").expect("valid decimal");
-        let result = repr_div_f64(a, 0.5);
-        assert_eq!(result, Decimal::from_str("200.00").expect("valid decimal"));
-    }
-
-    #[test]
-    #[should_panic(expected = "Money division requires finite")]
-    fn repr_div_f64_panics_on_nan() {
-        let a = Decimal::from_str("100.00").expect("valid decimal");
-        repr_div_f64(a, f64::NAN);
-    }
-
-    #[test]
-    #[should_panic(expected = "Money division requires finite")]
-    fn repr_div_f64_panics_on_infinity() {
-        let a = Decimal::from_str("100.00").expect("valid decimal");
-        repr_div_f64(a, f64::INFINITY);
-    }
-
-    #[test]
-    #[should_panic(expected = "Money division requires finite")]
-    fn repr_div_f64_panics_on_zero() {
-        let a = Decimal::from_str("100.00").expect("valid decimal");
-        repr_div_f64(a, 0.0);
     }
 
     // round_f64 tests

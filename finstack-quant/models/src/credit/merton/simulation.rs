@@ -193,25 +193,29 @@ impl MertonModel {
         for _ in 0..n_base {
             normals.iter_mut().for_each(|z| *z = rng.normal(0.0, 1.0));
 
-            let jump_data: Option<Vec<StepJumpData>> = jump_params.map(|(lambda, _, _)| {
+            let jump_data: Option<Vec<StepJumpData>> = if let Some((lambda, _, _)) = jump_params {
                 let lambda_dt = lambda * dt;
-                (0..num_steps)
-                    .map(|_| {
-                        let u = rng.uniform();
-                        let base_count = poisson_inverse_cdf(lambda_dt, u);
-                        let anti_count =
-                            poisson_inverse_cdf(lambda_dt, (1.0 - u).min(1.0 - f64::EPSILON));
-                        let max_count = base_count.max(anti_count);
-                        let jump_normals: Vec<f64> =
-                            (0..max_count).map(|_| rng.normal(0.0, 1.0)).collect();
-                        StepJumpData {
-                            base_count,
-                            anti_count,
-                            jump_normals,
-                        }
-                    })
-                    .collect()
-            });
+                Some(
+                    (0..num_steps)
+                        .map(|_| {
+                            let u = rng.uniform();
+                            let base_count = poisson_inverse_cdf(lambda_dt, u)?;
+                            let anti_count =
+                                poisson_inverse_cdf(lambda_dt, (1.0 - u).min(1.0 - f64::EPSILON))?;
+                            let max_count = base_count.max(anti_count);
+                            let jump_normals: Vec<f64> =
+                                (0..max_count).map(|_| rng.normal(0.0, 1.0)).collect();
+                            Ok(StepJumpData {
+                                base_count,
+                                anti_count,
+                                jump_normals,
+                            })
+                        })
+                        .collect::<Result<Vec<_>>>()?,
+                )
+            } else {
+                None
+            };
 
             all_paths.push(v0);
             let mut v = v0;

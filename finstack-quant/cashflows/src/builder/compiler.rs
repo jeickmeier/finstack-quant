@@ -28,7 +28,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
 
-use super::calendar::resolve_calendar_strict;
 use super::date_generation::{
     build_schedule_period, compile_periods, effective_frequency, effective_stub,
     generate_periods_with_adjustment, validate_accrual_grid, CompiledPeriod,
@@ -38,6 +37,7 @@ use super::specs::{
     CouponType, FeeAccrualBasis, FeeBase, FeeSpec, FixedCouponSpec, FloatingCouponSpec,
     FloatingRateSpec, ScheduleParams,
 };
+use finstack_quant_core::dates::calendar_by_id_strict;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum WindowBound {
@@ -154,7 +154,7 @@ fn build_compiled_periods(
                 first.unadjusted_end,
                 params.business_day_convention,
                 params.payment_lag_days,
-                resolve_calendar_strict(&params.calendar_id)?,
+                calendar_by_id_strict(&params.calendar_id)?,
                 params.adjust_accrual_dates,
             )?;
         }
@@ -265,7 +265,7 @@ pub(super) fn build_fee_schedules(
                          schedule over [{issue}, {maturity}]"
                     )));
                 }
-                let calendar = resolve_calendar_strict(calendar_id)?;
+                let calendar = calendar_by_id_strict(calendar_id)?;
                 let terminal = terminal_accrual_end(&periods, maturity);
                 periodic_fees.push(PeriodicFee {
                     calendar_id: calendar_id.clone(),
@@ -534,7 +534,7 @@ pub(super) fn compute_coupon_schedules(
         if periods.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
-        let calendar = resolve_calendar_strict(&schedule.calendar_id)?;
+        let calendar = calendar_by_id_strict(&schedule.calendar_id)?;
 
         match &chosen_coupon.coupon {
             CouponSpec::Fixed { rate } => {
@@ -577,13 +577,13 @@ pub(super) fn compute_coupon_schedules(
                     schedule: schedule.clone(),
                 };
                 let runtime_spec = ResolvedFloatingRateSpec::try_from(&spec.rate_spec)?;
-                let calendar = resolve_calendar_strict(&spec.schedule.calendar_id)?;
+                let calendar = calendar_by_id_strict(&spec.schedule.calendar_id)?;
                 let fixing_calendar_id = spec
                     .rate_spec
                     .fixing_calendar_id
                     .as_deref()
                     .unwrap_or(&spec.schedule.calendar_id);
-                let fixing_calendar = resolve_calendar_strict(fixing_calendar_id)?;
+                let fixing_calendar = calendar_by_id_strict(fixing_calendar_id)?;
                 let terminal = terminal_accrual_end(&periods, maturity);
                 float_schedules.push(FloatSchedule {
                     spec,

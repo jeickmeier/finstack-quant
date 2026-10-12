@@ -1188,7 +1188,9 @@ export type PrepaymentPenalty =
  *
  * # Investment Grade
  *
- * Ratings of `BBBMinus` and above are considered "investment grade":
+ * Ratings of `BBBMinus` and above are considered "investment grade".
+ * Ordering follows the `repr(u8)` discriminant, so `NR` (21) sorts before
+ * `D` (22) even though `D` is declared first:
  */
 export type CreditRating =
   | "AAA"
@@ -1468,11 +1470,18 @@ export type OvernightIndexConstraintApplication = "daily" | "period";
  * Variants are grouped by category:
  * - **Interest**: `Fixed`, `FloatReset`, `Stub`
  * - **Inflation**: `InflationCoupon`
- * - **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`
+ * - **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`
  * - **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`
  * - **Revolving**: `RevolvingDraw`, `RevolvingRepayment`
  * - **Credit Events**: `DefaultedNotional`, `Recovery`
  * - **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.
+ *
+ * # Labels
+ *
+ * `Display`, `FromStr`, and serde share one snake_case label per kind
+ * (`"fixed"`, `"float_reset"`, `"pre_payment"`); `FromStr` matches it
+ * exactly, with no aliases or case folding. [`CFKind::parse_label`] adds the
+ * case-insensitive reporting aliases.
  */
 export type CFKind =
   | "fixed"
@@ -2210,10 +2219,6 @@ export type HierarchyDimension =
  * simplification.
  */
 export type BucketWeighting = "equal" | "dts";
-/**
- * Unique identifier for a risk factor.
- */
-export type FactorId = string;
 /**
  * Broad classification of a risk factor.
  */
@@ -4281,6 +4286,12 @@ export type CurveState =
        */
       base: DateWire;
       /**
+       * Registered holiday calendar id of the business-day time axis (for
+       * example `"brbd"` for a Bus/252 curve). Omitted when the day count needs
+       * no calendar.
+       */
+      calendar_id?: string | null;
+      /**
        * OIS cut-off (business days) the curve was calibrated under, if any.
        */
       calibration_ois_cutoff_days?: number | null;
@@ -4463,6 +4474,10 @@ export type CurveState =
        * Time/value pairs used to construct the curve
        */
       knot_points: [unknown, unknown][];
+      /**
+       * Source interpolation and accumulated time origin for a rolled curve.
+       */
+      roll_transform?: InterpRollState | null;
       type: "inflation";
     }
   | {
@@ -4497,6 +4512,10 @@ export type CurveState =
        */
       knot_points: [unknown, unknown][];
       /**
+       * Source interpolation and accumulated time origin for a rolled curve.
+       */
+      roll_transform?: InterpRollState | null;
+      /**
        * Spot index level (volatility index curves)
        */
       spot_level?: number | null;
@@ -4505,41 +4524,6 @@ export type CurveState =
        */
       spot_price?: number | null;
       type: "price";
-    }
-  | {
-      /**
-       * Base date
-       */
-      base: DateWire;
-      /**
-       * Day count convention
-       */
-      day_count: DayCount;
-      /**
-       * Extrapolation policy
-       */
-      extrapolation: ExtrapolationPolicy;
-      /**
-       * Curve identifier
-       */
-      id: string;
-      /**
-       * Interpolation style
-       */
-      interp_style: InterpStyle;
-      /**
-       * Time/value pairs used to construct the curve
-       */
-      knot_points: [unknown, unknown][];
-      /**
-       * Spot index level (volatility index curves)
-       */
-      spot_level?: number | null;
-      /**
-       * Spot price (signed price curves)
-       */
-      spot_price?: number | null;
-      type: "vol_index";
     }
   | {
       /**
@@ -4566,6 +4550,10 @@ export type CurveState =
        * Time/value pairs used to construct the curve.
        */
       knot_points: [unknown, unknown][];
+      /**
+       * Source interpolation and accumulated time origin for a rolled curve.
+       */
+      roll_transform?: InterpRollState | null;
       type: "basis_spread";
     }
   | {
@@ -4585,6 +4573,11 @@ export type CurveState =
        * Nelson-Siegel model parameters.
        */
       model: NelsonSiegelModel;
+      /**
+       * Current origin in the source model's year-fraction coordinates;
+       * omitted means `0.0` (a curve that has never been rolled).
+       */
+      time_offset?: number;
       type: "parametric";
     };
 /**
@@ -4702,7 +4695,7 @@ export type RateCalibrationQuote =
         /**
          * Convention-registry identifier for the futures contract.
          */
-        contract: RateCalibrationFutureContractId;
+        contract: Id;
         /**
          * Optional pre-computed convexity adjustment.
          */
@@ -4763,10 +4756,6 @@ export type RateCalibrationPillar =
   | {
       date: DateWire;
     };
-/**
- * Serialized identifier for an interest-rate futures convention.
- */
-export type RateCalibrationFutureContractId = string;
 /**
  * Role of a curve and its linked rate-curve identifier during calibration.
  */
@@ -5233,6 +5222,20 @@ export interface AgencyCmo {
 }
 /**
  * User-defined tags and key-value metadata for instrument classification.
+ *
+ * Tags are a sorted set of labels. Metadata is a sorted string-to-string map.
+ * Both fields are public so callers can insert, remove, and iterate entries
+ * directly. [`Attributes::add_tag`] and [`Attributes::set_meta`] are the
+ * in-place writers; [`Attributes::with_tag`] and [`Attributes::with_meta`]
+ * return the bag for construction chains.
+ *
+ * [`Attributes::matches_selector`] accepts three forms:
+ *
+ * - `"*"` matches every attribute set
+ * - `"tag:<name>"` matches when that tag is present
+ * - `"meta:<key>=<value>"` matches an exact metadata entry
+ *
+ * Any other selector text returns `false`.
  */
 export interface Attributes {
   /**
@@ -9796,7 +9799,7 @@ export interface FactorCovarianceMatrix {
   /**
    * Factor identifiers, in the row and column order of `data`.
    */
-  factor_ids: FactorId[];
+  factor_ids: Id[];
   /**
    * Matrix dimension. Equals `factor_ids.len()`.
    */
@@ -9817,7 +9820,7 @@ export interface FactorDefinition {
   /**
    * Unique factor identifier.
    */
-  id: FactorId;
+  id: Id;
   /**
    * Mapping from factor move to market-data perturbation.
    */
@@ -9838,7 +9841,7 @@ export interface MappingRule {
   /**
    * Factor assigned when both filters match.
    */
-  factor_id: FactorId;
+  factor_id: Id;
 }
 /**
  * Filters on an individual market dependency.
@@ -9885,7 +9888,7 @@ export interface FactorNode {
   /**
    * Factor assigned at this node when it is a valid classification level.
    */
-  factor_id?: FactorId | null;
+  factor_id?: Id | null;
   /**
    * Filter that must match for this node to participate in traversal.
    */
@@ -10218,7 +10221,7 @@ export interface FactorCorrelationMatrix {
   /**
    * Factor IDs in row/column order.
    */
-  factor_ids: FactorId[];
+  factor_ids: Id[];
 }
 /**
  * Complete vol state for all factors and all issuers at the calibration date.
@@ -14350,8 +14353,11 @@ export interface VolatilityIndexFutureOption {
  * # Settlement
  *
  * When `settlement_days` is `None`, the pair-aware default is T+1 for
- * USD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit
- * `settlement_days` overrides that default; `settlement_date` overrides both.
+ * USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB and T+2 otherwise (including
+ * EUR/USD). An explicit `settlement_days` is the contractual lag and overrides
+ * that default in either direction (for example tom-next T+1 on EUR/USD);
+ * `settlement_date` overrides both. Without calendars the USD leg uses the
+ * `usny` calendar and other currencies count weekdays only.
  *
  * See module-level documentation for comprehensive FX quoting conventions.
  */
@@ -19808,6 +19814,13 @@ export interface HazardCalibrationInput {
   quote: {
     [k: string]: unknown;
   };
+}
+/**
+ * Serialized source grid and time origin for a rolled interpolation.
+ */
+export interface InterpRollState {
+  offset: number;
+  source_points: [unknown, unknown][];
 }
 /**
  * Dividend schedule for an equity or ETF underlying.

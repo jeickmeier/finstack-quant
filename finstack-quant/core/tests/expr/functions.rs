@@ -121,6 +121,22 @@ mod shift_operations {
     }
 
     #[test]
+    fn lead_extreme_offset_returns_missing_values() {
+        let ctx = SimpleContext::new(["v"]).expect("unique columns");
+        let values = [1.0, 2.0, 3.0];
+        let cols: Vec<&[f64]> = vec![&values];
+        let lead = CompiledExpr::new(Expr::call(
+            Function::Lead,
+            vec![Expr::column("v"), Expr::literal(usize::MAX as f64)],
+        ));
+
+        let result = lead
+            .eval(&ctx, &cols, EvalOpts::default())
+            .expect("lead evaluates");
+        assert!(result.values.iter().all(|value| value.is_nan()));
+    }
+
+    #[test]
     fn shift_positive_equals_lag() {
         let ctx = SimpleContext::new(["x"]).expect("unique columns");
         let x = vec![10.0, 20.0, 30.0, 40.0];
@@ -1106,7 +1122,7 @@ mod ewm_operations {
     fn ewm_mean_leading_nan_does_not_poison_state() {
         // Regression: prev/weighted_sum previously seeded from base[0]
         // unconditionally, so a leading NaN made every subsequent output NaN.
-        // Seeding now matches eval_ewm_variance_core: leading NaNs emit NaN, the
+        // Seeding now matches eval_ewm_variance_into: leading NaNs emit NaN, the
         // first non-NaN observation seeds the state and emits the input value,
         // and interior NaNs emit NaN without updating the state.
         let ctx = SimpleContext::new(["x"]).expect("unique columns");
@@ -1397,7 +1413,7 @@ mod statistical_operations {
         let rank = CompiledExpr::new(Expr::call(Function::Rank, vec![Expr::column("v")]));
         let result = rank.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
 
-        assert_eq!(result, vec![3.0, 1.0, 2.0, 2.0]);
+        assert_eq!(result, vec![4.0, 1.0, 2.0, 2.0]);
     }
 
     #[test]

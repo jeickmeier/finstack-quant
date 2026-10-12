@@ -12,7 +12,6 @@
 //! violate remaining-balance targets on sampled paths.
 
 use super::bond_valuator::BondValuator;
-use crate::cashflow::builder::calendar::resolve_calendar_strict;
 use crate::cashflow::builder::specs::{CouponType, FloatingCouponSpec, FloatingRateFallback};
 use crate::cashflow::builder::{
     CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
@@ -27,6 +26,7 @@ use crate::instruments::fixed_income::bond::pricing::return_floor::realized_dist
 use crate::instruments::fixed_income::bond::{
     Bond, CallPut, CashflowSpec, ProtectionWindow, ReturnFloorKind,
 };
+use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{adjust, Date, DateExt, DayCount, DayCountContext, Duration};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::{fixing_series_id, require_fixing_value_exact};

@@ -301,13 +301,13 @@ impl JsPeriodId {
     /// Calendar (or fiscal) year of the period.
     #[wasm_bindgen(getter, js_name = year)]
     pub fn year(&self) -> i32 {
-        self.inner.year
+        self.inner.year()
     }
 
     /// One-based index of the period within its year (quarter, month, week or day number).
     #[wasm_bindgen(getter, js_name = index)]
     pub fn index(&self) -> u16 {
-        self.inner.index
+        self.inner.index()
     }
 
     /// Frequency of the period as a `PeriodKind`.
@@ -331,8 +331,9 @@ impl JsPeriodId {
     /// Step forward to the next period (Rust `PeriodId::next`).
     ///
     /// @returns The following `PeriodId`, rolling the year where needed.
-    /// @throws `FinstackError` (kind `validation`) for a fiscal identifier
-    /// (use `nextFiscal`) or when the year would overflow.
+    /// @throws `FinstackError` (kind `validation`) when the year would
+    /// overflow, or for a fiscal daily identifier at day 365, whose next day
+    /// depends on the fiscal calendar (use `nextFiscal`).
     #[wasm_bindgen(js_name = next)]
     pub fn next(&self) -> Result<JsPeriodId, JsValue> {
         self.inner.next().map(Self::wrap).map_err(to_js_err)
@@ -341,8 +342,9 @@ impl JsPeriodId {
     /// Step back to the previous period (Rust `PeriodId::prev`).
     ///
     /// @returns The preceding `PeriodId`, rolling the year where needed.
-    /// @throws `FinstackError` (kind `validation`) for a fiscal identifier
-    /// (use `prevFiscal`) or when the year would overflow.
+    /// @throws `FinstackError` (kind `validation`) when the year would
+    /// overflow, or for a fiscal daily identifier at day 1, whose previous day
+    /// depends on the fiscal calendar (use `prevFiscal`).
     #[wasm_bindgen(js_name = prev)]
     pub fn prev(&self) -> Result<JsPeriodId, JsValue> {
         self.inner.prev().map(Self::wrap).map_err(to_js_err)
@@ -485,13 +487,13 @@ impl JsFiscalConfig {
     /// Month the fiscal year starts in (1 = January).
     #[wasm_bindgen(getter, js_name = startMonth)]
     pub fn start_month(&self) -> u8 {
-        self.inner.start_month
+        self.inner.start_month()
     }
 
     /// Day of the start month the fiscal year starts on.
     #[wasm_bindgen(getter, js_name = startDay)]
     pub fn start_day(&self) -> u8 {
-        self.inner.start_day
+        self.inner.start_day()
     }
 }
 

@@ -40,7 +40,7 @@
 //!   Bond Yields." *Journal of Econometrics*, 130(2), 337-364. `docs/REFERENCES.md#diebold-li-2006`
 
 use crate::{
-    dates::{Date, DayCount},
+    dates::{Date, DateExt, DayCount},
     market_data::traits::Discounting,
     types::CurveId,
 };
@@ -313,6 +313,8 @@ pub struct ParametricCurve {
     base_date: Date,
     day_count: DayCount,
     model: NelsonSiegelModel,
+    /// Current origin in the source model's year-fraction coordinates.
+    time_offset: f64,
 }
 
 /// Raw serializable state of ParametricCurve.
@@ -330,6 +332,10 @@ struct RawParametricCurve {
     day_count: DayCount,
     /// Nelson-Siegel model parameters.
     model: NelsonSiegelModel,
+    /// Current origin in the source model's year-fraction coordinates;
+    /// omitted means `0.0` (a curve that has never been rolled).
+    #[serde(default)]
+    time_offset: f64,
 }
 
 impl From<ParametricCurve> for RawParametricCurve {
@@ -339,6 +345,7 @@ impl From<ParametricCurve> for RawParametricCurve {
             base_date: curve.base_date,
             day_count: curve.day_count,
             model: curve.model,
+            time_offset: curve.time_offset,
         }
     }
 }
@@ -351,6 +358,7 @@ impl TryFrom<RawParametricCurve> for ParametricCurve {
             .base_date(raw.base_date)
             .day_count(raw.day_count)
             .model(raw.model)
+            .time_offset(raw.time_offset)
             .build()
     }
 }
@@ -364,6 +372,7 @@ impl ParametricCurve {
             base_date: None,
             day_count: DayCount::Act365F,
             model: None,
+            time_offset: 0.0,
         }
     }
 
@@ -377,14 +386,28 @@ impl ParametricCurve {
     #[must_use]
     #[inline]
     pub fn zero_rate(&self, t: f64) -> f64 {
-        self.model.zero_rate(t)
+        if t <= 0.0 {
+            return self.forward_rate(0.0);
+        }
+        let df = self.df(t);
+        -df.ln() / t
     }
 
     /// Instantaneous forward rate at time `t`.
+    ///
+    /// At the model origin (`t = 0` on an unrolled curve) this is the model's
+    /// short rate, `beta0 + beta1`. Times before the model origin, reached
+    /// only after a backward roll, carry a zero forward because the discount
+    /// factor is held at one there.
     #[must_use]
     #[inline]
     pub fn forward_rate(&self, t: f64) -> f64 {
-        self.model.forward_rate(t)
+        let source_time = self.time_offset + t;
+        if source_time < 0.0 {
+            0.0
+        } else {
+            self.model.forward_rate(source_time)
+        }
     }
 
     /// Curve identifier.
@@ -415,7 +438,49 @@ impl ParametricCurve {
             base_date: Some(self.base_date),
             day_count: self.day_count,
             model: Some(self.model.clone()),
+            time_offset: self.time_offset,
         }
+    }
+
+    /// Roll the curve forward, retaining its source parameters and realizing
+    /// the forward discount-factor ratio `D(t + h) / D(h)`.
+    ///
+    /// # Arguments
+    ///
+    /// * `days` - Signed calendar-day shift for the base date. Negative values
+    ///   move the base date backward; the curve day count maps the shift into
+    ///   source-model year fractions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the rolled date is outside the supported calendar
+    /// range, the source-time offset is non-finite, or its discount factor is
+    /// non-finite or non-positive.
+    pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
+        if days == 0 {
+            return Ok(self.clone());
+        }
+        let base_date = self.base_date.add_days(days)?;
+        let years = crate::market_data::term_structures::common::year_fraction_to(
+            self.base_date,
+            base_date,
+            self.day_count,
+        )?;
+        let time_offset = self.time_offset + years;
+        if !time_offset.is_finite() {
+            return Err(crate::error::InputError::Invalid.into());
+        }
+        let normalization = source_discount_factor(&self.model, time_offset);
+        if !normalization.is_finite() || normalization <= 0.0 {
+            return Err(crate::error::InputError::NonPositiveValue.into());
+        }
+        Ok(Self {
+            id: self.id.clone(),
+            base_date,
+            day_count: self.day_count,
+            model: self.model.clone(),
+            time_offset,
+        })
     }
 }
 
@@ -436,8 +501,8 @@ impl Discounting for ParametricCurve {
         if t <= 0.0 {
             return 1.0;
         }
-        let z = self.model.zero_rate(t);
-        (-z * t).exp()
+        source_discount_factor(&self.model, self.time_offset + t)
+            / source_discount_factor(&self.model, self.time_offset)
     }
 }
 
@@ -447,6 +512,7 @@ pub struct ParametricCurveBuilder {
     base_date: Option<Date>,
     day_count: DayCount,
     model: Option<NelsonSiegelModel>,
+    time_offset: f64,
 }
 
 impl ParametricCurveBuilder {
@@ -465,6 +531,11 @@ impl ParametricCurveBuilder {
     /// Set the Nelson-Siegel model parameters.
     pub fn model(mut self, model: NelsonSiegelModel) -> Self {
         self.model = Some(model);
+        self
+    }
+
+    fn time_offset(mut self, offset: f64) -> Self {
+        self.time_offset = offset;
         self
     }
 
@@ -488,13 +559,29 @@ impl ParametricCurveBuilder {
             .model
             .ok_or(crate::Error::Validation("model is required".into()))?;
         model.validate()?;
+        if !self.time_offset.is_finite() {
+            return Err(crate::error::InputError::Invalid.into());
+        }
+        let normalization = source_discount_factor(&model, self.time_offset);
+        if !normalization.is_finite() || normalization <= 0.0 {
+            return Err(crate::error::InputError::NonPositiveValue.into());
+        }
 
         Ok(ParametricCurve {
             id: self.id,
             base_date,
             day_count: self.day_count,
             model,
+            time_offset: self.time_offset,
         })
+    }
+}
+
+fn source_discount_factor(model: &NelsonSiegelModel, time: f64) -> f64 {
+    if time <= 0.0 {
+        1.0
+    } else {
+        (-model.zero_rate(time) * time).exp()
     }
 }
 
@@ -547,6 +634,9 @@ mod tests {
         assert!((curve.df(0.0) - 1.0).abs() < 1e-12);
         assert!(curve.df(1.0) < 1.0);
         assert!(curve.df(5.0) < curve.df(1.0));
+        // The short rate of an unrolled curve is the model's beta0 + beta1.
+        assert!((curve.zero_rate(0.0) - 0.02).abs() < 1e-15);
+        assert!((curve.forward_rate(0.0) - 0.02).abs() < 1e-15);
     }
 
     #[test]
@@ -619,6 +709,58 @@ mod tests {
         let restored: ParametricCurve = serde_json::from_str(&json).unwrap();
         assert_eq!(curve.id(), restored.id());
         assert!((curve.df(5.0) - restored.df(5.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn ns_and_nss_rolls_realize_discount_factors_and_survive_serde() {
+        for model in [
+            NelsonSiegelModel::Ns {
+                beta0: 0.05,
+                beta1: -0.03,
+                beta2: 0.01,
+                tau: 1.2,
+            },
+            NelsonSiegelModel::Nss {
+                beta0: 0.05,
+                beta1: -0.03,
+                beta2: 0.01,
+                beta3: 0.004,
+                tau1: 1.2,
+                tau2: 5.0,
+            },
+        ] {
+            let source = ParametricCurve::builder("NS-ROLL")
+                .base_date(base_date())
+                .model(model)
+                .build()
+                .unwrap();
+            let unchanged = source.roll_forward(0).unwrap();
+            assert_eq!(
+                serde_json::to_value(&source).unwrap(),
+                serde_json::to_value(&unchanged).unwrap()
+            );
+
+            let rolled = source.roll_forward(365).unwrap();
+            assert!((rolled.df(0.5) - source.df(1.5) / source.df(1.0)).abs() < 1e-14);
+            assert!((rolled.forward_rate(0.5) - source.model.forward_rate(1.5)).abs() < 1e-14);
+            assert!((rolled.zero_rate(0.5) + rolled.df(0.5).ln() / 0.5).abs() < 1e-14);
+
+            let restored: ParametricCurve =
+                serde_json::from_str(&serde_json::to_string(&rolled).unwrap()).unwrap();
+            assert!((restored.df(0.5) - rolled.df(0.5)).abs() < 1e-14);
+            let rebuilt = rolled
+                .to_builder_with_id("NS-ROLL-REBUILT".into())
+                .build()
+                .unwrap();
+            assert!((rebuilt.df(0.5) - rolled.df(0.5)).abs() < 1e-14);
+
+            let twice = restored.roll_forward(180).unwrap();
+            let source_time = 1.0 + 180.0 / 365.0;
+            assert!(
+                (twice.df(0.5) - source.df(source_time + 0.5) / source.df(source_time)).abs()
+                    < 1e-14
+            );
+        }
     }
 
     #[test]

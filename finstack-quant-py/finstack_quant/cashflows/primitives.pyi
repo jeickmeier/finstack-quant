@@ -63,6 +63,8 @@ class CFKind:
     COMMITMENT_FEE: CFKind
     USAGE_FEE: CFKind
     FACILITY_FEE: CFKind
+    LC_FEE: CFKind
+    FRONTING_FEE: CFKind
     NOTIONAL: CFKind
     PIK: CFKind
     AMORTIZATION: CFKind
@@ -84,24 +86,25 @@ class CFKind:
     @classmethod
     def parse(cls, name: str) -> CFKind:
         """
-        Parse a cashflow kind from its snake_case label or a documented alias.
+        Parse a cashflow kind from its exact snake_case label.
 
         Parameters
         ----------
         name : str
-            Snake_case label such as ``"fixed"`` or ``"float_reset"``, or a
-            documented alias such as ``"amort"`` for ``AMORTIZATION``.
-            Matching is case-insensitive and separator-normalized.
+            Snake_case label such as ``"fixed"``, ``"float_reset"``, or
+            ``"pre_payment"``; the same string as :attr:`name` and the
+            ``kind`` field of serialized cashflows. Matching is exact: no
+            aliases, case folding, or whitespace trimming.
 
         Returns
         -------
         CFKind
-            The kind whose canonical label or alias matches *name*.
+            The kind whose label equals *name*.
 
         Raises
         ------
         ValueError
-            If *name* does not match any known label or alias.
+            If *name* is not a known cashflow kind label.
 
         Examples
         --------

@@ -10,8 +10,8 @@
 //!    interpolation contract.
 //! 4. `VolSurface::value_checked` and `value_in_bounds` agree on interior
 //!    evaluation points (the shared bilinear kernel regression test).
-//! 5. `Rate::try_from(f64)` / `Percentage::try_from(f64)` / `Bps::try_from(f64)`
-//!    are fallible analogs of the panicking `From<f64>` conversions.
+//! 5. `Rate::try_from(f64)` / `Bps::try_from(f64)` match the validating
+//!    constructors `from_decimal` and `try_new`.
 //! 6. `[(Date, f64)]::irr(None)` equals
 //!    `xirr_with_daycount_ctx(.., Act365F, DayCountContext::default(), None)`.
 //!
@@ -26,7 +26,7 @@ use finstack_quant_core::market_data::surfaces::{
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ValidationMode};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::{FormatOpts, Money};
-use finstack_quant_core::types::{Bps, Percentage, Rate};
+use finstack_quant_core::types::{Bps, Rate};
 use time::Month;
 
 fn d(year: i32, month: u8, day: u8) -> Date {
@@ -282,7 +282,7 @@ fn value_checked_matches_value_clamped_on_interior() {
     }
 }
 
-// Rate / Percentage / Bps: fallible-construction parity and NaN rejection
+// Rate / Bps: fallible-construction parity and NaN rejection
 
 #[test]
 fn rate_try_from_f64_matches_try_from_decimal_for_valid_inputs() {
@@ -301,21 +301,6 @@ fn rate_try_from_decimal_rejects_non_finite() {
     assert!(Rate::from_decimal(f64::NAN).is_err());
     assert!(Rate::from_decimal(f64::INFINITY).is_err());
     assert!(Rate::from_decimal(f64::NEG_INFINITY).is_err());
-}
-
-#[test]
-fn percentage_try_from_matches_new_for_valid_inputs() {
-    for &x in &[0.0, 5.0, -1.25, 150.0] {
-        let via_try = Percentage::try_from(x).unwrap();
-        let via_new = Percentage::new(x).unwrap();
-        assert!((via_try.as_percent() - via_new.as_percent()).abs() < 1e-15);
-    }
-}
-
-#[test]
-fn percentage_new_rejects_non_finite() {
-    assert!(Percentage::new(f64::NAN).is_err());
-    assert!(Percentage::new(f64::INFINITY).is_err());
 }
 
 #[test]

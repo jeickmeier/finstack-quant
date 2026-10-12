@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+### Core API simplification
+
+#### Added
+
+- `DiscountCurve` owns the holiday calendar of its time axis: `DiscountCurveBuilder::calendar_id` / `calendar_id_opt`, `DiscountCurve::calendar_id` and `day_count_context`, and the `Discounting::day_count_context` trait method. A Bus/252 curve counts business days on its own calendar in `df_between_dates`, `npv`, the `*_on_date` lookups and `roll_forward`, and is rejected at build without one. The wire form gains an optional `calendar_id`. Python `DiscountCurve(..., calendar_id=...)` and `.calendar_id`; WASM option `calendarId` and getter `calendarId`.
+- `HolidayCalendar::calendar_id` (canonical registry id, including `+`-joined unions) and a blanket `impl HolidayCalendar for &T`.
+- `Rate::try_from_bp`, `Div<f64> for Rate`, `TryFrom<f64> for Bps`, `Bps::checked_abs`, `PeriodId::shift`, `PeriodId::year`/`index`, `FiscalConfig::start_month`/`start_day`/`year_start`, `CFKind::LcFee` and `CFKind::FrontingFee` in the hosts.
+- Rate-index registry entries `AUD-BBSW-3M` and `AUD-BBSW-6M` (T-0 fixing, ACT/365F, Sydney `auce` calendar, T+1 settlement).
+- FX spot: USD/PHP and USD/RUB are T+1 pairs alongside USD/CAD and USD/TRY.
+
+#### Changed (breaking)
+
+- `HolidayCalendar::is_business_day` has no default; every calendar states its weekend rule. `DateExt::is_business_day` is removed. `DayCountContextState` converts from a `DayCountContext` with `TryFrom` and rejects a calendar with no registered id.
+- `Discountable::npv` returns `Result<Money>` (the `PVOutput` associated type is removed).
+- `Percentage` is removed on every host; use `Rate::from_percent` / `Rate::as_percent`. Python `Rate.as_percentage`, `Bps.as_percentage` and `CreditRating.from_name` (use `CreditRating(name)`), and WASM `asPercentage` / `CreditRating.fromName`, are removed.
+- `Rate::from_percent`, `Rate::as_percent` and a `"%"` rate string move the decimal point of the shortest decimal form instead of dividing or multiplying in binary (`from_percent(1.1)` is exactly 110 bp). Results can differ from the previous values in the last bit.
+- `Bps` and `Rate` operators panic on overflow, a zero divisor or a non-finite result in every build profile (the `checked_*` methods return the error). Python and WASM `Bps.abs` raise instead of panicking on `-2147483648` bp.
+- `Money` loses `into_amount`, `into_parts`, the `f64` multiply/divide operators and their assign forms, `TryFrom<(f64, Currency)>` and the `money!` macro. `Id::into_string` and `FromStr for Id` are removed. `FactorId`, `NodeId`, `CovenantMetricId` and `RateCalibrationFutureContractId` are `Id<Tag>` aliases; their JSON is unchanged and their schemas reference the shared `Id` definition.
+- `poisson_inverse_cdf` returns `Result<usize>` and is exact at every intensity (the normal approximation above an intensity of 30 is removed).
+- Margin `ClearingHouseImCalculator::calculate_conservative`, `MarginFundingCost::calculate` / `cost_for_period` and `Haircut01::calculate` return `Result`; Python raises `ValueError` and WASM throws where they previously returned NaN or infinity.
+- `fx_spot_date` takes a `u32` contractual lag (0 through 31) and requires a USD calendar for a non-USD cross. An explicit lag is honored in both directions: a T+1 tom-next EUR/USD trade settles the next joint business day, and a lag above the pair standard counts business days on each currency's calendar. Calendar-less FX instruments use `usny` for their USD leg.
+- `FxMatrix::clear_cache` → `clear_quotes`, `cache_stats` → `stored_quote_count` (same behavior).
+- `CFKind` `Display`/`FromStr` use the serde label (`"pre_payment"`, previously `"prepayment"`) and parse exactly.
+- `MarketContextState` drops the `vol_index` curve variant: a vol-index curve is a `price` curve carrying `spot_level`. A calibration prior tagged `volatility_index_curve` must hold a vol-index curve, and `curve_counts` report such curves as `VolIndex`.
+- Rolled basis-spread, inflation and price curves keep their source interpolation (`roll_transform` on the wire); a shock on a rolled curve shocks the source pillars and reads the current pillars back. `ParametricCurve` state carries `time_offset` (default `0`).
+- `PeriodPlan` and `FiscalConfig` deny unknown fields; fiscal `next()`/`prev()` step across years instead of erroring.
+- The expression engine's `rank` assigns tied values their minimum rank (pandas `method="min"`), matching its documentation and statements; it assigned dense ranks.
+- Curve-shift measurements in `market_data::diff` return an error for an empty or non-finite tenor grid or sample; attribution propagates that error instead of averaging over fewer curves (a curve missing from either market is still skipped).
+- Zurich (`chzh`), SIX (`six`) and `defr` calendars no longer move a weekend holiday to Monday.
+
 ### Export auditability
 
 #### Added

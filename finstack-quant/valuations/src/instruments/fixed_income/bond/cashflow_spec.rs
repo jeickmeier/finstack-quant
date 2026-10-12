@@ -261,7 +261,8 @@ impl CashflowSpec {
     ///
     /// - `coupon_type`: Cash (100% cash payment)
     /// - `gearing`: 1.0
-    /// - `reset_lag_days`: Market default from index registry (fallback: T-2)
+    /// - `reset_lag_days`: Market default from the rate-index registry (for
+    ///   example T-0 for `AUD-BBSW-3M`); unregistered indices default to T-2.
     /// - `index_floor_bp`: None
     /// - `all_in_cap_bp`: None
     /// - `reset_frequency`: Same as payment frequency
@@ -276,6 +277,7 @@ impl CashflowSpec {
     /// - **EURIBOR**: T-2
     /// - **LIBOR (historical)**: T-0 to T-2 depending on currency
     /// - **SONIA**: T-0 (same day)
+    /// - **BBSW**: T-0 (same day)
     ///
     /// Use `floating_with_reset_lag()` to specify a non-default reset lag.
     ///
@@ -360,6 +362,7 @@ impl CashflowSpec {
     /// | EURIBOR | T-2 (2 days) |
     /// | SONIA | T-0 (same day) |
     /// | TONA | T-2 (2 days) |
+    /// | BBSW | T-0 (same day) |
     /// | LIBOR (historical) | T-0 to T-2 |
     ///
     /// # Returns
@@ -754,6 +757,35 @@ mod tests {
             }
             other => panic!("Expected StepUp variant, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn registered_bbsw_resets_same_day_on_the_sydney_calendar() {
+        let inferred = CashflowSpec::floating(
+            CurveId::new("AUD-BBSW-3M"),
+            0.0,
+            Tenor::quarterly(),
+            DayCount::Act365F,
+        )
+        .expect("valid BBSW spec");
+        let CashflowSpec::Floating(inferred) = inferred else {
+            panic!("floating constructor returns a floating spec");
+        };
+        assert_eq!(inferred.rate_spec.reset_lag_days, 0);
+        assert_eq!(inferred.schedule.calendar_id.as_str(), "auce");
+
+        let explicit = CashflowSpec::floating_with_reset_lag(
+            CurveId::new("AUD-BBSW-3M"),
+            0.0,
+            Tenor::quarterly(),
+            DayCount::Act365F,
+            1,
+        )
+        .expect("explicit reset lag is valid");
+        let CashflowSpec::Floating(explicit) = explicit else {
+            panic!("floating constructor returns a floating spec");
+        };
+        assert_eq!(explicit.rate_spec.reset_lag_days, 1);
     }
 
     #[test]

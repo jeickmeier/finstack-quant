@@ -167,6 +167,10 @@ impl Default for FxPolicyMeta {
     }
 }
 
+/// Observed-quote capacity of [`FxConfig::default`].
+pub(crate) const DEFAULT_CACHE_CAPACITY: std::num::NonZeroUsize =
+    std::num::NonZeroUsize::MIN.saturating_add(255);
+
 /// Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour.
 ///
 /// Controls triangulation and caching.
@@ -200,7 +204,7 @@ impl Default for FxConfig {
             // rates through a pivot (typically USD). Disable explicitly for
             // strict-direct-quote setups.
             enable_triangulation: true,
-            cache_capacity: 256,
+            cache_capacity: DEFAULT_CACHE_CAPACITY.get(),
         }
     }
 }

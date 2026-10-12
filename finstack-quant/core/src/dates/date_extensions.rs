@@ -10,7 +10,7 @@ use crate::dates::calendar::business_days::{
     seek_business_day, BusinessDayConvention, MAX_BUSINESS_DAY_SEARCH_DAYS,
 };
 use crate::dates::periods::FiscalConfig;
-use time::{Date, Duration, Month, Weekday};
+use time::{Date, Duration, Month};
 
 const MONTHS_BY_INDEX: [Month; 12] = [
     Month::January,
@@ -137,8 +137,9 @@ pub trait DateExt: Sized {
 
     /// Calculate the number of whole months between two dates.
     ///
-    /// Returns the difference as `(other.year - self.year) * 12 + (other.month - self.month)`.
-    /// If `other` is before `self`, returns `0`.
+    /// Counts completed months: `(other.year - self.year) * 12 + (other.month - self.month)`,
+    /// minus one when `self.day() > other.day()` (the final month is not yet complete)
+    /// unless both dates are month-ends. If `other` is before `self`, returns `0`.
     ///
     /// This is commonly used to calculate loan seasoning (age) in months for
     /// structured credit instruments.
@@ -156,15 +157,11 @@ pub trait DateExt: Sized {
     /// assert_eq!(end.months_until(start), 0);
     /// ```
     fn months_until(self, other: Self) -> u32;
-
-    /// Returns `true` if the date is a business day according to the provided
-    /// `cal` (see `HolidayCalendar`).
-    fn is_business_day<C: crate::dates::HolidayCalendar + ?Sized>(self, cal: &C) -> bool;
 }
 
 impl DateExt for Date {
     fn is_weekend(self) -> bool {
-        matches!(self.weekday(), Weekday::Saturday | Weekday::Sunday)
+        crate::dates::WeekendRule::SaturdaySunday.is_weekend(self.weekday())
     }
 
     fn quarter(self) -> u8 {
@@ -175,28 +172,28 @@ impl DateExt for Date {
         let year = self.year();
 
         // Fast path: Calendar year
-        if config.start_month == 1 && config.start_day == 1 {
+        if config.start_month() == 1 && config.start_day() == 1 {
             return year;
         }
 
         let current_month = self.month() as u8;
 
-        if current_month > config.start_month {
+        if current_month > config.start_month() {
             // Strictly after the start month -> belongs to next fiscal year
             return year + 1;
-        } else if current_month < config.start_month {
+        } else if current_month < config.start_month() {
             // Strictly before the start month -> belongs to current calendar year
             return year;
         }
 
         // We are in the start month. Check the day.
-        // We must handle the edge case where config.start_day exceeds the month length
+        // We must handle the edge case where config.start_day() exceeds the month length
         // (e.g. config="Feb 30" implies "last day of Feb").
-        let threshold_day = if config.start_day <= 28 {
-            config.start_day
+        let threshold_day = if config.start_day() <= 28 {
+            config.start_day()
         } else {
             let month_len = self.month().length(year);
-            config.start_day.min(month_len)
+            config.start_day().min(month_len)
         };
 
         if self.day() >= threshold_day {
@@ -304,10 +301,6 @@ impl DateExt for Date {
             })?;
         }
         Ok(current)
-    }
-
-    fn is_business_day<C: crate::dates::HolidayCalendar + ?Sized>(self, cal: &C) -> bool {
-        cal.is_business_day(self)
     }
 
     fn months_until(self, other: Self) -> u32 {
@@ -463,6 +456,10 @@ mod tests {
         impl crate::dates::HolidayCalendar for AllHolidaysCal {
             fn is_holiday(&self, _date: Date) -> bool {
                 true
+            }
+
+            fn is_business_day(&self, _date: Date) -> bool {
+                false
             }
         }
 

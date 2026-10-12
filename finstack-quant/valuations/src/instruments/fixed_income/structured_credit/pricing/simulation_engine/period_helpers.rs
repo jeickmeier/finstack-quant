@@ -17,7 +17,7 @@ pub(crate) fn term_rate_for_period(
     accrual_start: Date,
     day_count: DayCount,
 ) -> Result<f64> {
-    let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")?;
+    let calendar = finstack_quant_core::dates::calendar_by_id_strict("weekends_only")?;
     let fixing_date = accrual_start.add_business_days(-fwd.reset_lag(), calendar)?;
     if fixing_date < fwd.base_date() {
         let series = fixings::get_fixing_series(context, fwd.id().as_str())?;
@@ -77,7 +77,7 @@ pub(crate) fn collateral_asset_rate_for_period(
     coupon: CollateralCoupon,
     rate_shift: f64,
 ) -> Result<f64> {
-    let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")?;
+    let calendar = finstack_quant_core::dates::calendar_by_id_strict("weekends_only")?;
     let fixing_date = accrual_start.add_business_days(-fwd.reset_lag(), calendar)?;
     let spread = coupon.spread_bp.unwrap_or(0.0) / 10_000.0;
     // The floor applies to the index before the spread (`FloatingRateSpec`

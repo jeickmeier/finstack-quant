@@ -301,7 +301,7 @@ pub(crate) fn trailing_sum_at(
         PeriodKind::Weekly => return None,
         PeriodKind::Daily if at.is_fiscal() => return None,
         PeriodKind::Daily => {
-            let end = time::Date::from_ordinal_date(at.year, at.index)
+            let end = time::Date::from_ordinal_date(at.year(), at.index())
                 .ok()?
                 .checked_add(time::Duration::days(1))?;
             let year = end.year().checked_sub(1)?;
@@ -325,19 +325,7 @@ pub(crate) fn trailing_sum_at(
         }
         total += value;
         if index + 1 < count {
-            if period.is_fiscal() {
-                // These fixed-frequency fiscal identifiers have the same
-                // capacity in every year, so no fiscal date convention is
-                // required to step them. Daily and weekly were excluded above.
-                if period.index > 1 {
-                    period.index -= 1;
-                } else {
-                    period.year = period.year.checked_sub(1)?;
-                    period.index = at.periods_per_year();
-                }
-            } else {
-                period = period.prev().ok()?;
-            }
+            period = period.prev().ok()?;
         }
     }
     total.is_finite().then_some(total)

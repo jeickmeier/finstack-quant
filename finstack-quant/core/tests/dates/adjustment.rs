@@ -206,6 +206,10 @@ impl HolidayCalendar for AllHolidaysCal {
     fn is_holiday(&self, _date: Date) -> bool {
         true // Every day is a holiday
     }
+
+    fn is_business_day(&self, _date: Date) -> bool {
+        false
+    }
 }
 
 /// Test that all business day conventions properly guard against infinite loops
@@ -334,6 +338,11 @@ impl HolidayCalendar for MetadataCal {
     fn is_holiday(&self, date: finstack_quant_core::dates::Date) -> bool {
         // Treat only January 1st as a holiday to keep behaviour simple.
         date.month() == time::Month::January && date.day() == 1
+    }
+
+    fn is_business_day(&self, date: finstack_quant_core::dates::Date) -> bool {
+        !finstack_quant_core::dates::WeekendRule::SaturdaySunday.is_weekend(date.weekday())
+            && !self.is_holiday(date)
     }
 
     fn metadata(&self) -> Option<CalendarMetadata> {

@@ -1,5 +1,5 @@
 /**
- * Core handle members and JSON round-trips bound in S20: Rate/Bps/Percentage,
+ * Core handle members and JSON round-trips bound in S20: Rate/Bps,
  * DayCount (`fromName`, `parse`, `nl365`), Tenor, ForwardCurve, VolCube,
  * FxDeltaVolSurface, FxRateResult and the realized-variance estimators.
  *
@@ -46,30 +46,26 @@ test('realizedVariance and realizedVarianceOhlc take the Rust defaults', () => {
   );
 });
 
-test('Rate, Bps and Percentage: parse, getters, conversions and JSON', () => {
+test('Rate and Bps: parse, getters, conversions and JSON', () => {
   const rate = core.Rate.parse('12.5bp');
   assert.equal(rate.asDecimal, 0.00125);
-  assert.equal(new core.Percentage(0.175).asBp, 18);
+  assert.equal(core.Rate.parse('17.5bp').asBp, 18);
   assert.equal(new core.Bps(-1995).asPercent, -19.95);
   const bps = new core.Bps(125);
   assert.equal(typeof bps.asDecimal, 'number');
   assert.equal(bps.asBp, 125);
   assert.equal(bps.asRate.asDecimal, 0.0125);
-  assert.equal(bps.asPercentage.asPercent, 1.25);
-  assert.equal(new core.Percentage(5).asRate.asDecimal, 0.05);
-  assert.equal(new core.Percentage(5).asBasisPoints.asBp, 500);
+  assert.equal(bps.asPercent, 1.25);
   assert.equal(new core.Rate(0.05).asBasisPoints.asBp, 500);
-  assert.equal(new core.Rate(0.05).asPercentage.asPercent, 5);
+  assert.equal(new core.Rate(0.05).asPercent, 5);
   assert.equal(new core.Rate(-0.01).abs().asDecimal, 0.01);
   assert.equal(new core.Rate(0).isZero(), true);
   assert.equal(new core.Bps(-5).isNegative(), true);
-  assert.equal(new core.Percentage(1).isPositive(), true);
+  assert.equal(new core.Bps(1).isPositive(), true);
   assert.equal(new core.Rate(0.0525).toJson(), '0.0525');
   assert.equal(new core.Bps(25).toJson(), '25');
-  assert.equal(new core.Percentage(5).toJson(), '5.0');
   assert.equal(core.Rate.fromJson('0.0525').asDecimal, 0.0525);
   assert.equal(core.Bps.fromJson('25').asBp, 25);
-  assert.equal(core.Percentage.fromJson('5.0').asPercent, 5);
   assert.throws(
     () => core.Rate.parse('abc'),
     (error) => error.kind === 'validation'

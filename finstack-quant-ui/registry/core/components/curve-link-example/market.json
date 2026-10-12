@@ -87,7 +87,8 @@
         "beta1": 0.003,
         "beta2": -0.006,
         "tau": 1.5
-      }
+      },
+      "time_offset": 0
     },
     {
       "type": "discount",
@@ -151,7 +152,7 @@
       "fx_policy": null
     },
     {
-      "type": "vol_index",
+      "type": "price",
       "id": "VOL_INDEX",
       "base": "2025-01-01",
       "day_count": "act_365f",

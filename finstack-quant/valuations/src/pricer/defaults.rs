@@ -86,17 +86,12 @@ struct DefaultsFile {
 }
 pub(crate) fn embedded_defaults() -> Result<&'static ProductMcDefaults> {
     DEFAULTS.load(|file| {
-        let schema_version = CONTRACT
+        CONTRACT
             .parse_schema(&file.schema)
             .map_err(|e| Error::Validation(e.to_string()))?;
-        let version = CONTRACT
+        CONTRACT
             .resolve(Some(file.version))
             .map_err(|e| Error::Validation(e.to_string()))?;
-        if schema_version != version {
-            return Err(Error::Validation(
-                "product Monte Carlo defaults schema and version disagree".into(),
-            ));
-        }
         validate_rate_exotics("rate_exotics", &file.defaults.rate_exotics)?;
         validate_lmm_bermudan("lmm_bermudan", &file.defaults.lmm_bermudan)?;
         validate_merton_pik_bond("merton_pik_bond", &file.defaults.merton_pik_bond)?;

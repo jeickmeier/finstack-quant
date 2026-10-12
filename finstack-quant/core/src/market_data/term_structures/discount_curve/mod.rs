@@ -117,10 +117,38 @@ pub use validation::ValidationMode;
 
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::{
-    dates::{Date, DayCount},
+    dates::{calendar_by_id_strict, canonical_calendar_id, Date, DayCount, HolidayCalendar},
     math::interp::types::Interp,
     types::CurveId,
 };
+
+/// Registered holiday calendar that completes a business-day time axis.
+///
+/// A Bus/252 curve counts business days between its base date and a query
+/// date; the calendar is part of the curve, not of the caller's instrument.
+#[derive(Clone)]
+pub(crate) struct CurveCalendar {
+    /// Canonical registry identifier, persisted on the wire.
+    pub(crate) id: String,
+    /// Resolved registry calendar.
+    pub(crate) calendar: &'static dyn HolidayCalendar,
+}
+
+impl CurveCalendar {
+    /// Resolve a registered calendar id (including `+`-joined unions).
+    pub(crate) fn resolve(id: &str) -> crate::Result<Self> {
+        Ok(Self {
+            calendar: calendar_by_id_strict(id)?,
+            id: canonical_calendar_id(id)?,
+        })
+    }
+}
+
+impl std::fmt::Debug for CurveCalendar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("CurveCalendar").field(&self.id).finish()
+    }
+}
 
 /// Default minimum forward rate tenor in years (~30 seconds).
 ///
@@ -139,6 +167,8 @@ pub struct DiscountCurve {
     pub(crate) base: Date,
     /// Day-count basis used to convert dates → time for discounting.
     pub(crate) day_count: DayCount,
+    /// Business-day calendar of the time axis; required by Bus/252.
+    pub(crate) calendar: Option<CurveCalendar>,
     /// Knot times in **years**.
     pub(crate) knots: Box<[f64]>,
     /// Discount factors (unitless).
@@ -191,6 +221,11 @@ struct RawDiscountCurve {
     pub base: Date,
     /// Day count convention for discount time basis
     pub day_count: DayCount,
+    /// Registered holiday calendar id of the business-day time axis (for
+    /// example `"brbd"` for a Bus/252 curve). Omitted when the day count needs
+    /// no calendar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar_id: Option<String>,
     /// Time/value pairs used to construct the curve
     pub knot_points: Vec<(f64, f64)>,
     /// Interpolation style
@@ -227,6 +262,7 @@ impl From<DiscountCurve> for RawDiscountCurve {
             id: curve.id.to_string(),
             base: curve.base,
             day_count: curve.day_count,
+            calendar_id: curve.calendar.map(|calendar| calendar.id),
             knot_points,
             interp_style: curve.style,
             extrapolation: curve.extrapolation,
@@ -248,6 +284,7 @@ impl TryFrom<RawDiscountCurve> for DiscountCurve {
         let mut curve = DiscountCurve::builder(state.id)
             .base_date(state.base)
             .day_count(state.day_count)
+            .calendar_id_opt(state.calendar_id)
             .knots(state.knot_points)
             .interp(state.interp_style)
             .extrapolation(state.extrapolation)
@@ -354,6 +391,60 @@ mod tests {
             "an absent rate calibration remains null"
         );
         assert!(restored.rate_calibration().is_none());
+        assert!(
+            serialized.get("calendar_id").is_none(),
+            "a calendar-free curve omits calendar_id on the wire"
+        );
+    }
+
+    #[test]
+    fn bus252_curve_calendar_round_trips_and_survives_roll_and_bump() {
+        use crate::dates::DayCountContext;
+        use crate::market_data::bumps::{BumpSpec, Bumpable};
+        use crate::market_data::traits::Discounting;
+
+        let base = Date::from_calendar_date(2025, time::Month::January, 6).expect("base");
+        let pay = Date::from_calendar_date(2025, time::Month::February, 3).expect("pay");
+        let curve = DiscountCurve::builder("BRL-CDI")
+            .base_date(base)
+            .day_count(DayCount::Bus252)
+            .calendar_id("brbd")
+            .knots([(0.0, 1.0), (1.0, 0.9)])
+            .interp(InterpStyle::LogLinear)
+            .build()
+            .expect("Bus/252 curve with calendar");
+
+        let brbd = calendar_by_id_strict("brbd").expect("brbd");
+        let business_days = brbd.count_business_days(base, pay);
+        let t = DayCount::Bus252
+            .year_fraction(
+                base,
+                pay,
+                DayCountContext {
+                    calendar: Some(brbd),
+                    ..DayCountContext::default()
+                },
+            )
+            .expect("bus/252 time");
+        assert_eq!(t, f64::from(business_days) / 252.0);
+        let df = curve
+            .df_between_dates(base, pay)
+            .expect("curve-owned calendar");
+        assert!((df - curve.df(t)).abs() < 1e-15);
+
+        let json = serde_json::to_value(&curve).expect("serialize");
+        assert_eq!(json["calendar_id"], "brbd");
+        let restored: DiscountCurve = serde_json::from_value(json).expect("deserialize");
+        assert_eq!(restored.calendar_id(), Some("brbd"));
+        assert_eq!(restored.df_between_dates(base, pay).expect("restored"), df);
+
+        let rolled = curve.roll_forward(7).expect("roll");
+        assert_eq!(rolled.calendar_id(), Some("brbd"));
+        let bumped = curve
+            .apply_bump(BumpSpec::parallel_bp(1.0))
+            .expect("bump keeps calendar");
+        assert_eq!(bumped.calendar_id(), Some("brbd"));
+        assert!(Discounting::day_count_context(&bumped).calendar.is_some());
     }
 
     #[test]

@@ -37,7 +37,8 @@
 
 use super::common::{build_interp_allow_any_values, roll_knots, split_points, year_fraction_to};
 use crate::dates::DateExt;
-use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
+use crate::math::interp::types::InterpRollState;
+use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::{
     dates::{Date, DayCount},
     error::InputError,
@@ -87,6 +88,9 @@ struct RawBasisSpreadCurve {
     pub interp_style: InterpStyle,
     /// Extrapolation policy.
     pub extrapolation: ExtrapolationPolicy,
+    /// Source interpolation and accumulated time origin for a rolled curve.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub roll_transform: Option<InterpRollState>,
 }
 
 impl From<BasisSpreadCurve> for RawBasisSpreadCurve {
@@ -105,6 +109,7 @@ impl From<BasisSpreadCurve> for RawBasisSpreadCurve {
             knot_points,
             interp_style: curve.interp.style(),
             extrapolation: curve.interp.extrapolation(),
+            roll_transform: curve.interp.roll_state(),
         }
     }
 }
@@ -119,6 +124,7 @@ impl TryFrom<RawBasisSpreadCurve> for BasisSpreadCurve {
             .knots(state.knot_points)
             .interp(state.interp_style)
             .extrapolation(state.extrapolation)
+            .roll_transform(state.roll_transform)
             .build()
     }
 }
@@ -134,6 +140,7 @@ impl BasisSpreadCurve {
             points: Vec::new(),
             style: InterpStyle::Linear,
             extrapolation: ExtrapolationPolicy::FlatZero,
+            roll_transform: None,
         }
     }
 
@@ -229,6 +236,9 @@ impl BasisSpreadCurve {
     /// backward.
     /// Returns a validation error if the rolled base date exceeds the supported calendar range.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
+        if days == 0 {
+            return Ok(self.clone());
+        }
         let new_base = self.base.add_days(days)?;
         let dt = year_fraction_to(self.base, new_base, self.day_count)?;
         let rolled = roll_knots(&self.knots, &self.spreads, dt);
@@ -243,10 +253,22 @@ impl BasisSpreadCurve {
             .knots(rolled)
             .interp(self.interp.style())
             .extrapolation(self.interp.extrapolation())
+            .roll_transform(self.interp.next_roll_state(
+                dt,
+                self.knots.iter().copied().zip(self.spreads.iter().copied()),
+            )?)
             .build()
     }
 
     /// Create a builder from this curve with a new ID (for rebuildable-with-id pattern).
+    ///
+    /// The builder keeps the curve's spread pillars and any roll state, so
+    /// `build()` reproduces the curve under `id`; replacing the pillars through
+    /// [`BasisSpreadCurveBuilder::knots`] drops the roll state.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Identifier of the rebuilt curve, the `MarketContext` lookup key.
     pub fn to_builder_with_id(&self, id: CurveId) -> BasisSpreadCurveBuilder {
         let points: Vec<(f64, f64)> = self
             .knots
@@ -261,6 +283,7 @@ impl BasisSpreadCurve {
             points,
             style: self.interp.style(),
             extrapolation: self.interp.extrapolation(),
+            roll_transform: self.interp.roll_state(),
         }
     }
 }
@@ -273,6 +296,7 @@ pub struct BasisSpreadCurveBuilder {
     points: Vec<(f64, f64)>,
     style: InterpStyle,
     extrapolation: ExtrapolationPolicy,
+    roll_transform: Option<InterpRollState>,
 }
 
 impl BasisSpreadCurveBuilder {
@@ -289,8 +313,18 @@ impl BasisSpreadCurveBuilder {
     }
 
     /// Set the knot points as `(time, spread)` pairs.
+    ///
+    /// Supplied pillars define the curve's interpolation; any roll state
+    /// carried over from [`BasisSpreadCurve::to_builder_with_id`] is dropped.
+    ///
+    /// # Arguments
+    ///
+    /// * `pts` - `(time, spread)` pillars replacing any already supplied:
+    ///   times in years from the base date under the curve day count, spreads
+    ///   as decimals.
     pub fn knots(mut self, pts: impl IntoIterator<Item = (f64, f64)>) -> Self {
         self.points = pts.into_iter().collect();
+        self.roll_transform = None;
         self
     }
 
@@ -303,6 +337,11 @@ impl BasisSpreadCurveBuilder {
     /// Set the extrapolation policy.
     pub fn extrapolation(mut self, policy: ExtrapolationPolicy) -> Self {
         self.extrapolation = policy;
+        self
+    }
+
+    fn roll_transform(mut self, state: Option<InterpRollState>) -> Self {
+        self.roll_transform = state;
         self
     }
 
@@ -328,12 +367,22 @@ impl BasisSpreadCurveBuilder {
         let knots: Box<[f64]> = knots_vec.into();
         let spreads: Box<[f64]> = spreads_vec.into();
 
-        let interp = build_interp_allow_any_values(
+        let mut interp = build_interp_allow_any_values(
             self.style,
             knots.clone(),
             spreads.clone(),
             self.extrapolation,
         )?;
+
+        if let Some(state) = self.roll_transform {
+            interp = Interp::restore_rolled(
+                self.style,
+                self.extrapolation,
+                ValidationPolicy::AllowNegative,
+                state,
+            )?;
+            interp.validate_roll_samples(knots.iter().copied().zip(spreads.iter().copied()))?;
+        }
 
         Ok(BasisSpreadCurve {
             id: self.id,
@@ -380,6 +429,53 @@ mod tests {
         assert!((curve.spread(0.0)).abs() < 1e-12);
         assert!((curve.spread(5.0) - 0.005).abs() < 1e-12);
         assert!((curve.spread(10.0) - 0.01).abs() < 1e-12);
+    }
+
+    #[test]
+    fn rolls_preserve_source_interpolation_state_and_zero_day_identity() {
+        let source = BasisSpreadCurve::builder("BASIS-ROLL")
+            .base_date(base_date())
+            .knots([(0.0, -0.002), (1.0, 0.001), (2.0, 0.003), (3.0, 0.008)])
+            .interp(InterpStyle::CubicHermite)
+            .build()
+            .unwrap();
+        let unchanged = source.roll_forward(0).unwrap();
+        assert_eq!(
+            serde_json::to_value(&source).unwrap(),
+            serde_json::to_value(&unchanged).unwrap()
+        );
+
+        let rolled = source.roll_forward(365).unwrap();
+        for time in [0.25, 0.5, 1.5] {
+            assert!((rolled.spread(time) - source.spread(time + 1.0)).abs() < 1e-12);
+        }
+        let rebuilt = rolled
+            .to_builder_with_id("BASIS-ROLL-REBUILT".into())
+            .build()
+            .unwrap();
+        assert!((rebuilt.spread(0.5) - source.spread(1.5)).abs() < 1e-12);
+
+        let restored: BasisSpreadCurve =
+            serde_json::from_str(&serde_json::to_string(&rolled).unwrap()).unwrap();
+        assert!((restored.spread(0.5) - source.spread(1.5)).abs() < 1e-12);
+        let twice = restored.roll_forward(180).unwrap();
+        assert!((twice.spread(0.5) - source.spread(1.5 + 180.0 / 365.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn forward_roll_without_an_origin_pillar_keeps_the_source_shape() {
+        let source = BasisSpreadCurve::builder("BASIS-NO-ORIGIN")
+            .base_date(base_date())
+            .knots([(1.0, 0.001), (2.0, 0.003), (3.0, 0.008)])
+            .interp(InterpStyle::CubicHermite)
+            .build()
+            .unwrap();
+        let rolled = source.roll_forward(30).unwrap();
+        assert!(rolled.interp.roll_state().is_some());
+        let dt = 30.0 / 365.0;
+        for time in [1.2, 1.5, 2.5] {
+            assert!((rolled.spread(time - dt) - source.spread(time)).abs() < 1e-12);
+        }
     }
 
     #[test]

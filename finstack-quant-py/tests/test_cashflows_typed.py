@@ -25,8 +25,14 @@ class TestPrimitives:
         assert not CFKind.FEE.is_interest_like()
         assert CFKind.NOTIONAL.is_principal_like()
         assert not CFKind.FIXED.is_principal_like()
+        assert CFKind.parse("lc_fee") == CFKind.LC_FEE
+        assert CFKind.parse("fronting_fee") == CFKind.FRONTING_FEE
+        assert CFKind.parse("pre_payment") == CFKind.PRE_PAYMENT
+        assert CFKind.PRE_PAYMENT.name == "pre_payment"
         with pytest.raises(ValueError, match="unknown cashflow kind"):
             CFKind.parse("amort")
+        with pytest.raises(ValueError, match="unknown cashflow kind"):
+            CFKind.parse("prepayment")
         with pytest.raises(ValueError, match="unknown cashflow kind"):
             CFKind.parse("not_a_kind")
 

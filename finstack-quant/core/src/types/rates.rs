@@ -1,25 +1,23 @@
 //! Strongly typed financial rate units with explicit conversion semantics.
 //!
 //! - [`Rate`] stores an `f64` decimal: `0.05` is 5% or 500 bp.
-//! - [`Percentage`] stores an `f64` percentage: `5.0` is 5% or 0.05 decimal.
 //! - [`Bps`] stores an integer basis-point quote: 1 bp is 0.01% or 0.0001
 //!   decimal, and 10,000 bp is 100%.
 //!
-//! `Rate` and `Percentage` serialize in their stored floating-point units and
-//! reject non-finite values when deserialized. `Bps` serializes as its integer
-//! basis-point quote. [`Percentage::new`] and the floating-point `Bps`
-//! conversion reject invalid values with validation errors.
+//! `Rate` serializes as its decimal and rejects non-finite values when
+//! deserialized. `Bps` serializes as its integer basis-point quote. The
+//! floating-point `Bps` conversion rejects invalid values with validation
+//! errors. Percent quotes use [`Rate::from_percent`] and [`Rate::as_percent`].
 //!
 //! # Example
 //!
 //! ```rust
-//! use finstack_quant_core::types::{Bps, Percentage, Rate};
+//! use finstack_quant_core::types::{Bps, Rate};
 //!
 //! let rate = Rate::from_decimal(0.05).expect("valid rate fixture");
 //! assert_eq!(rate, Rate::from_percent(5.0).expect("valid rate fixture"));
 //! assert_eq!(rate, Rate::from_bp(500));
-//! let percentage = Percentage::new(5.0).expect("finite percentage");
-//! assert_eq!(rate.as_percent(), percentage.as_percent());
+//! assert_eq!(rate.as_percent(), 5.0);
 //! assert_eq!(rate.as_bp(), Bps::new(500).as_bp());
 //! ```
 
@@ -31,19 +29,82 @@ use serde::{Deserialize, Serialize};
 use crate::error::{Error, InputError, NonFiniteKind};
 use crate::Result;
 
-/// Multiply `value` by a power of ten in decimal arithmetic.
+/// Scale `value` by a power of ten in decimal arithmetic.
 ///
-/// Parse the shortest round-trip decimal form without rounding, scale it
-/// exactly, and convert back to `f64`. Values outside Decimal's range or
-/// precision use the `f64` product, preserving tiny nonzero inputs.
-fn shift_decimal_point(value: f64, factor: u32) -> f64 {
+/// Parse the shortest round-trip decimal form, move its decimal point by the
+/// digits of `factor` (a power of ten), and convert back to `f64`. Division
+/// shifts the decimal scale exactly; a result that would need more than
+/// Decimal's 28 fractional digits, or a value outside Decimal's range, uses the
+/// correctly rounded `f64` product or quotient instead, so tiny nonzero inputs
+/// keep their magnitude. Zero keeps its sign.
+fn scale_decimal(value: f64, factor: u32, divide: bool) -> f64 {
     use rust_decimal::prelude::ToPrimitive;
+    let float_result = if divide {
+        value / f64::from(factor)
+    } else {
+        value * f64::from(factor)
+    };
+    if value == 0.0 {
+        return float_result;
+    }
+    let digits = factor.ilog10();
     rust_decimal::Decimal::from_str_exact(&value.to_string())
         .ok()
-        .and_then(|decimal| decimal.checked_mul(rust_decimal::Decimal::from(factor)))
+        .and_then(|mut decimal| {
+            if divide {
+                decimal.set_scale(decimal.scale() + digits).ok()?;
+                Some(decimal)
+            } else if decimal.scale() >= digits {
+                decimal.set_scale(decimal.scale() - digits).ok()?;
+                Some(decimal)
+            } else {
+                decimal.checked_mul(rust_decimal::Decimal::from(factor))
+            }
+        })
         .and_then(|scaled| scaled.to_f64())
-        .unwrap_or(value * f64::from(factor))
+        .unwrap_or(float_result)
 }
+
+/// Multiply `value` by a power of ten. See [`scale_decimal`].
+fn shift_decimal_point(value: f64, factor: u32) -> f64 {
+    scale_decimal(value, factor, false)
+}
+
+fn ensure_finite(value: f64) -> Result<f64> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(InputError::NonFiniteValue {
+            kind: NonFiniteKind::classify(value),
+        }
+        .into())
+    }
+}
+
+/// Unwrap a checked `Rate` operation inside an infallible `std::ops` operator.
+#[expect(
+    clippy::panic,
+    reason = "std::ops operators cannot return Result; the checked_* methods are the fallible API"
+)]
+fn rate_from_checked(result: Result<Rate>) -> Rate {
+    match result {
+        Ok(rate) => rate,
+        Err(error) => panic!("rate arithmetic failed: {error}"),
+    }
+}
+
+/// Unwrap a checked `Bps` operation inside an infallible `std::ops` operator.
+#[expect(
+    clippy::panic,
+    reason = "std::ops operators cannot return Result; the checked_* methods are the fallible API"
+)]
+fn bps_from_checked(result: Result<Bps>) -> Bps {
+    match result {
+        Ok(bps) => bps,
+        Err(error) => panic!("basis-point arithmetic failed: {error}"),
+    }
+}
+
 /// A financial rate stored as an `f64` decimal.
 ///
 /// For example, `0.05` represents 5% or 500 bp.
@@ -82,34 +143,77 @@ impl Rate {
     ///
     /// * `decimal` - Rate represented as a decimal, where one percent is `0.01`.
     pub fn from_decimal(decimal: f64) -> Result<Self> {
-        if !decimal.is_finite() {
-            return Err(InputError::NonFiniteValue {
-                kind: NonFiniteKind::classify(decimal),
-            }
-            .into());
-        }
-        Ok(Self(decimal))
+        ensure_finite(decimal).map(Self)
     }
 
     /// Create a rate from a percentage value, rejecting non-finite inputs.
     ///
+    /// The percent's shortest round-trip decimal form is moved two places, so
+    /// `1.1` percent is the decimal whose fractional basis-point value is
+    /// `110.0`, rather than the binary quotient `1.1 / 100.0`.
+    ///
     /// # Errors
     ///
     /// Returns `Error::Input(InputError::NonFiniteValue { .. })` when
-    /// `percent` is NaN or infinite.
+    /// `percent` is NaN or infinite, or when the scaled decimal is non-finite.
     ///
     /// # Arguments
     ///
     /// * `percent` - Rate represented in percentage points, where one percent is `1.0`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::types::Rate;
+    ///
+    /// assert_eq!(Rate::from_percent(1.1)?.as_bp_f64(), 110.0);
+    /// assert_eq!(Rate::from_percent(0.07)?.as_bp_f64(), 7.0);
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
     pub fn from_percent(percent: f64) -> Result<Self> {
-        Self::from_decimal(percent / 100.0)
+        ensure_finite(percent)?;
+        Self::from_decimal(scale_decimal(percent, 100, true))
     }
 
     /// Create a rate from an integer basis-point quote (500 bp = 5%).
     ///
     /// Negative values are accepted because spreads and rates may be negative.
+    ///
+    /// # Arguments
+    ///
+    /// * `bp` - Integer basis-point quote, where `500` is 5% (`0.05` decimal).
+    ///   Negative quotes are valid because spreads and rates may be negative.
     pub fn from_bp(bp: i32) -> Self {
         Self(bp as f64 / 10_000.0)
+    }
+
+    /// Create a rate from a floating-point basis-point quote.
+    ///
+    /// Whole quotes such as `250.0` match [`Self::from_bp`]. Fractional quotes
+    /// such as `62.5` are rejected: this is the integer basis-point constructor.
+    /// Parse `"62.5bp"` when the quote needs sub-bp precision.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Bps::try_new`]: a non-finite quote, a
+    /// fractional basis-point count, or a value outside the `i32` range.
+    ///
+    /// # Arguments
+    ///
+    /// * `bp` - Finite whole number of basis points, where `500.0` is 5%
+    ///   (`0.05` decimal). Fractional values are rejected.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::types::Rate;
+    ///
+    /// assert_eq!(Rate::try_from_bp(250.0)?, Rate::from_bp(250));
+    /// assert!(Rate::try_from_bp(62.5).is_err());
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn try_from_bp(bp: f64) -> Result<Self> {
+        Bps::try_new(bp).map(Self::from)
     }
 
     /// Return the internal decimal representation (0.05 for 5%).
@@ -119,9 +223,13 @@ impl Rate {
     }
 
     /// Return the percentage representation (5.0 for 5%).
+    ///
+    /// The stored decimal's shortest round-trip form is moved two places, so
+    /// a rate built with [`Self::from_percent`] reports that percent back
+    /// instead of a binary product such as `1.1000000000000001`.
     #[must_use]
     pub fn as_percent(self) -> f64 {
-        self.0 * 100.0
+        shift_decimal_point(self.0, 100)
     }
 
     /// Get the rate as basis points (rounded to nearest integer).
@@ -260,7 +368,8 @@ impl std::str::FromStr for Rate {
         } else if let Some(num) = lower.strip_suffix("bp") {
             (num, 10_000.0)
         } else if let Some(num) = lower.strip_suffix('%') {
-            (num, 100.0)
+            let percent: f64 = num.trim().parse().map_err(|_| invalid())?;
+            return Self::from_percent(percent);
         } else {
             (lower.as_str(), 1.0)
         };
@@ -284,25 +393,15 @@ impl From<Rate> for f64 {
     }
 }
 
-// Arithmetic operations.
-//
-// These operators panic if the result is non-finite (e.g. overflow of two large
-// finite rates to ±∞, or multiplication by a non-finite scalar), because they
-// check finiteness before storing the result. For inputs that may be untrusted or
-// computed, use the `checked_*` variants ([`Rate::checked_add`], etc.), which
-// return an error instead of panicking.
+// Arithmetic operators panic when the matching `checked_*` method returns an
+// error: a non-finite `Rate` result, or a `Bps` overflow or
+// zero divisor. The panic is the same in debug and release. Untrusted inputs
+// should call `checked_*`, which returns that error instead.
 impl Add for Rate {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        {
-            let value = self.0 + rhs.0;
-            assert!(
-                value.is_finite(),
-                "rate arithmetic produced a non-finite value"
-            );
-            Self(value)
-        }
+        rate_from_checked(self.checked_add(rhs))
     }
 }
 
@@ -310,14 +409,7 @@ impl Sub for Rate {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        {
-            let value = self.0 - rhs.0;
-            assert!(
-                value.is_finite(),
-                "rate arithmetic produced a non-finite value"
-            );
-            Self(value)
-        }
+        rate_from_checked(self.checked_sub(rhs))
     }
 }
 
@@ -325,14 +417,15 @@ impl Mul<f64> for Rate {
     type Output = Self;
 
     fn mul(self, rhs: f64) -> Self::Output {
-        {
-            let value = self.0 * rhs;
-            assert!(
-                value.is_finite(),
-                "rate arithmetic produced a non-finite value"
-            );
-            Self(value)
-        }
+        rate_from_checked(self.checked_mul(rhs))
+    }
+}
+
+impl Div<f64> for Rate {
+    type Output = Self;
+
+    fn div(self, rhs: f64) -> Self::Output {
+        rate_from_checked(self.checked_div(rhs))
     }
 }
 
@@ -381,12 +474,7 @@ impl Bps {
     /// * `bp` - Finite whole number of basis points (for example `25.0` for
     ///   25 bp). Fractional values are rejected because `Bps` is integer-backed.
     pub fn try_new(bp: f64) -> Result<Self> {
-        if !bp.is_finite() {
-            return Err(InputError::NonFiniteValue {
-                kind: NonFiniteKind::classify(bp),
-            }
-            .into());
-        }
+        ensure_finite(bp)?;
         if bp.fract() != 0.0 {
             return Err(InputError::FractionalBasisPoints { value: bp }.into());
         }
@@ -435,8 +523,24 @@ impl Bps {
     }
 
     /// Return the absolute basis-point quote.
+    ///
+    /// Panics when the quote is `i32::MIN`, which has no positive `i32`
+    /// representation; [`Self::checked_abs`] reports that overflow instead.
     pub fn abs(self) -> Self {
-        Self(self.0.abs())
+        bps_from_checked(self.checked_abs())
+    }
+
+    /// Return the absolute basis-point quote, rejecting `i32::MIN`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::ConversionOverflow` when the quote is `i32::MIN`,
+    /// whose absolute value has no `i32` representation.
+    pub fn checked_abs(self) -> Result<Self> {
+        self.0
+            .checked_abs()
+            .map(Self)
+            .ok_or_else(|| InputError::ConversionOverflow.into())
     }
 
     /// Add two basis-point values, rejecting integer overflow.
@@ -526,215 +630,6 @@ impl From<Bps> for i32 {
     }
 }
 
-// NOTE: There is intentionally no `impl From<Bps> for f64`.
-//
-// `TryFrom<f64> for Bps` reads a basis-point *count* (25.0 → 25bp), so a
-// `From<Bps> for f64` returning the *decimal* (25bp → 0.0025) made the f64
-// conversions asymmetric: round-tripping 25bp through f64 yielded 0bp
-// . Use the explicit
-// accessors instead: [`Bps::as_decimal`], [`Bps::as_percent`], or
-// `f64::from(bp.as_bp())` for the raw bp count.
-
-impl Add for Bps {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self(self.0 + rhs.0)
-    }
-}
-
-impl Sub for Bps {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self(self.0 - rhs.0)
-    }
-}
-
-impl Mul<i32> for Bps {
-    type Output = Self;
-
-    fn mul(self, rhs: i32) -> Self::Output {
-        Self(self.0 * rhs)
-    }
-}
-
-impl Div<i32> for Bps {
-    type Output = Self;
-
-    fn div(self, rhs: i32) -> Self::Output {
-        Self(self.0 / rhs)
-    }
-}
-
-impl Neg for Bps {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        Self(-self.0)
-    }
-}
-
-/// A percentage stored as an `f64` in percentage units.
-///
-/// For example, `5.0` represents 5% or 0.05 decimal.
-///
-/// # Serde
-///
-/// Serialized transparently as the inner `f64` percentage value.
-/// Deserialization routes through [`Percentage::new`], so non-finite
-/// values (NaN, ±Infinity) are rejected even for binary formats that can
-/// encode them.
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize)]
-pub struct Percentage(f64);
-
-impl<'de> Deserialize<'de> for Percentage {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let percent = f64::deserialize(deserializer)?;
-        Percentage::new(percent).map_err(serde::de::Error::custom)
-    }
-}
-
-impl Percentage {
-    /// Create a percentage value, rejecting non-finite inputs.
-    ///
-    /// Returns an error if `percent` is NaN or infinite, preventing silent
-    /// corruption of downstream financial calculations.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Error::Input(InputError::NonFiniteValue { .. })` when `percent`
-    /// is NaN or infinite.
-    ///
-    /// # Arguments
-    ///
-    /// * `percent` - Percentage points, where `5.0` represents 5%.
-    pub fn new(percent: f64) -> Result<Self> {
-        if !percent.is_finite() {
-            return Err(InputError::NonFiniteValue {
-                kind: NonFiniteKind::classify(percent),
-            }
-            .into());
-        }
-        Ok(Self(percent))
-    }
-
-    /// Return the stored percentage value (5.0 represents 5%).
-    pub fn as_percent(self) -> f64 {
-        self.0
-    }
-
-    /// Return the decimal-rate representation (5.0% becomes 0.05).
-    pub fn as_decimal(self) -> f64 {
-        self.0 / 100.0
-    }
-
-    /// Convert the percentage to a Rate decimal wrapper.
-    pub fn as_rate(self) -> Rate {
-        Rate(self.0 / 100.0)
-    }
-
-    /// Convert to integer basis points, rounding to the nearest basis point.
-    pub fn as_bp(self) -> i32 {
-        (self.0 * 100.0).round() as i32
-    }
-
-    /// Convert to fractional basis points, without rounding.
-    ///
-    /// The decimal point of the percentage's shortest round-trip decimal form
-    /// is moved two places, so `1.1%` reports `110.0` bp rather than the
-    /// binary-noise product `1.1 * 100.0 = 110.00000000000001`. Use
-    /// [`Self::as_bp`] for the rounded integer quote.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::types::Percentage;
-    ///
-    /// assert_eq!(Percentage::new(1.1)?.as_bp_f64(), 110.0);
-    /// assert_eq!(Percentage::new(0.625)?.as_bp_f64(), 62.5);
-    /// # Ok::<(), finstack_quant_core::Error>(())
-    /// ```
-    #[must_use]
-    pub fn as_bp_f64(self) -> f64 {
-        shift_decimal_point(self.0, 100)
-    }
-
-    /// The zero percentage value.
-    pub const ZERO: Self = Self(0.0);
-
-    /// Return true when the percentage is exactly zero.
-    pub fn is_zero(self) -> bool {
-        self.0 == 0.0
-    }
-
-    /// Return true when the percentage is strictly positive.
-    pub fn is_positive(self) -> bool {
-        self.0 > 0.0
-    }
-
-    /// Return true when the percentage is strictly negative.
-    pub fn is_negative(self) -> bool {
-        self.0 < 0.0
-    }
-
-    /// Return the absolute percentage value.
-    pub fn abs(self) -> Self {
-        Self(self.0.abs())
-    }
-
-    /// Add two percentages, rejecting non-finite results.
-    ///
-    /// # Errors
-    ///
-    /// Returns `InputError::NonFiniteValue` when the sum is NaN or infinite.
-    pub fn checked_add(self, rhs: Self) -> Result<Self> {
-        Self::new(self.0 + rhs.0)
-    }
-
-    /// Subtract two percentages, rejecting non-finite results.
-    ///
-    /// # Errors
-    ///
-    /// Returns `InputError::NonFiniteValue` when the difference is NaN or
-    /// infinite.
-    pub fn checked_sub(self, rhs: Self) -> Result<Self> {
-        Self::new(self.0 - rhs.0)
-    }
-
-    /// Multiply by a scalar, rejecting non-finite results.
-    ///
-    /// # Errors
-    ///
-    /// Returns `InputError::NonFiniteValue` when `rhs` or the product is NaN
-    /// or infinite.
-    pub fn checked_mul(self, rhs: f64) -> Result<Self> {
-        Self::new(self.0 * rhs)
-    }
-
-    /// Divide by a scalar, rejecting zero divisors and non-finite results.
-    ///
-    /// # Errors
-    ///
-    /// Returns `InputError::Invalid` for a zero divisor or
-    /// `InputError::NonFiniteValue` for a non-finite quotient.
-    pub fn checked_div(self, rhs: f64) -> Result<Self> {
-        if rhs == 0.0 {
-            return Err(InputError::Invalid.into());
-        }
-        Self::new(self.0 / rhs)
-    }
-}
-
-impl fmt::Display for Percentage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.2}%", self.0)
-    }
-}
-
 impl TryFrom<f64> for Bps {
     type Error = Error;
 
@@ -745,26 +640,50 @@ impl TryFrom<f64> for Bps {
     }
 }
 
-impl From<Percentage> for f64 {
-    fn from(pct: Percentage) -> Self {
-        pct.as_percent()
+// NOTE: There is intentionally no `impl From<Bps> for f64`.
+//
+// `TryFrom<f64> for Bps` reads a basis-point count (25.0 → 25bp), so a
+// `From<Bps> for f64` returning the decimal (25bp → 0.0025) made the f64
+// conversions asymmetric: round-tripping 25bp through f64 yielded 0bp.
+// Use [`Bps::as_decimal`], [`Bps::as_percent`], or `f64::from(bp.as_bp())`.
+
+impl Add for Bps {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        bps_from_checked(self.checked_add(rhs))
     }
 }
 
-impl TryFrom<f64> for Percentage {
-    type Error = Error;
+impl Sub for Bps {
+    type Output = Self;
 
-    /// Fallible conversion from percentage points, where `5.0` represents 5%.
-    fn try_from(percent: f64) -> Result<Self> {
-        Self::new(percent)
+    fn sub(self, rhs: Self) -> Self::Output {
+        bps_from_checked(self.checked_sub(rhs))
     }
 }
 
-impl Neg for Percentage {
+impl Mul<i32> for Bps {
+    type Output = Self;
+
+    fn mul(self, rhs: i32) -> Self::Output {
+        bps_from_checked(self.checked_mul(rhs))
+    }
+}
+
+impl Div<i32> for Bps {
+    type Output = Self;
+
+    fn div(self, rhs: i32) -> Self::Output {
+        bps_from_checked(self.checked_div(rhs))
+    }
+}
+
+impl Neg for Bps {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        Self(-self.0)
+        bps_from_checked(self.checked_neg())
     }
 }
 
@@ -777,35 +696,9 @@ impl From<Rate> for Bps {
     }
 }
 
-impl From<Rate> for Percentage {
-    fn from(rate: Rate) -> Self {
-        Percentage(rate.as_percent())
-    }
-}
-
 impl From<Bps> for Rate {
     fn from(bp: Bps) -> Self {
-        Rate::from_bp(bp.as_bp())
-    }
-}
-
-impl From<Bps> for Percentage {
-    fn from(bp: Bps) -> Self {
-        Percentage(bp.as_percent())
-    }
-}
-
-impl From<Percentage> for Rate {
-    fn from(pct: Percentage) -> Self {
-        Rate(pct.as_percent() / 100.0)
-    }
-}
-
-/// Converts to whole basis points, **rounding** to the nearest bp — `Bps` is an
-/// integer type, so sub-bp precision is lost.
-impl From<Percentage> for Bps {
-    fn from(pct: Percentage) -> Self {
-        Bps::new(pct.as_bp())
+        bp.as_rate()
     }
 }
 
@@ -816,16 +709,43 @@ mod tests {
     #[test]
     fn fractional_bp_accessors_scale_without_binary_noise() {
         let rate = |x: f64| Rate::from_decimal(x).expect("finite rate");
-        let pct = |x: f64| Percentage::new(x).expect("finite percentage");
         assert_eq!(rate(0.0029).as_bp_f64(), 29.0);
         assert_eq!(rate(0.00625).as_bp_f64(), 62.5);
         assert_eq!(rate(-0.0001).as_bp_f64(), -1.0);
-        assert_eq!(pct(1.1).as_bp_f64(), 110.0);
-        assert_eq!(pct(0.07).as_bp_f64(), 7.0);
-        assert_eq!(pct(0.29).as_bp_f64(), 29.0);
-        assert_eq!(pct(0.0).as_bp_f64(), 0.0);
         // Rounded integer accessors are unchanged.
         assert_eq!(rate(0.00625).as_bp(), 63);
+        let percent = |x: f64| Rate::from_percent(x).expect("finite percent");
+        assert_eq!(percent(1.1).as_bp_f64(), 110.0);
+        assert_eq!(percent(0.07).as_bp_f64(), 7.0);
+        assert_eq!(percent(0.29).as_bp_f64(), 29.0);
+        assert_eq!(percent(1.1).as_percent(), 1.1);
+        assert_eq!(percent(5.0), rate(0.05));
+    }
+
+    #[test]
+    fn from_percent_keeps_tiny_magnitudes_ordering_and_signed_zero() {
+        let percent = |x: f64| Rate::from_percent(x).expect("finite percent").as_decimal();
+        // Beyond Decimal's 28 fractional digits the f64 quotient is used.
+        assert_eq!(percent(1e-27), 1e-27 / 100.0);
+        assert!(percent(9.4e-27) < percent(9.49e-27));
+        assert!(percent(9.49e-27) < percent(9.5e-27));
+        assert!(percent(-0.0).is_sign_negative());
+        assert!(Rate::from_decimal(-0.0)
+            .unwrap()
+            .as_percent()
+            .is_sign_negative());
+    }
+
+    #[test]
+    fn bps_checked_abs_rejects_the_unrepresentable_minimum() {
+        assert_eq!(Bps::new(-25).checked_abs().unwrap(), Bps::new(25));
+        assert!(Bps::new(i32::MIN).checked_abs().is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "basis-point arithmetic failed")]
+    fn bps_abs_operator_panics_with_the_checked_error() {
+        let _ = Bps::new(i32::MIN).abs();
     }
 
     #[test]
@@ -834,10 +754,6 @@ mod tests {
             assert_eq!(
                 Rate::from_decimal(value).expect("finite rate").as_bp_f64(),
                 value * 10_000.0
-            );
-            assert_eq!(
-                Percentage::new(value).expect("finite percent").as_bp_f64(),
-                value * 100.0
             );
         }
     }
@@ -877,68 +793,6 @@ mod tests {
     }
 
     #[test]
-    fn rate_creation_and_conversion() {
-        let rate = Rate::from_percent(2.5).expect("valid rate fixture");
-        assert_eq!(rate.as_decimal(), 0.025);
-        assert_eq!(rate.as_percent(), 2.5);
-        assert_eq!(rate.as_bp(), 250);
-
-        let rate2 = Rate::from_bp(250);
-        assert_eq!(rate, rate2);
-
-        let rate3 = Rate::from_decimal(0.025).expect("valid rate fixture");
-        assert_eq!(rate, rate3);
-    }
-
-    #[test]
-    fn try_from_percent_rejects_non_finite_values() {
-        assert_eq!(
-            Rate::from_percent(2.5).expect("finite percent"),
-            Rate::from_percent(2.5).expect("valid rate fixture")
-        );
-        assert!(Rate::from_percent(f64::NAN).is_err());
-        assert!(Rate::from_percent(f64::INFINITY).is_err());
-        assert!(Rate::from_percent(f64::NEG_INFINITY).is_err());
-    }
-
-    #[test]
-    fn rate_arithmetic() {
-        let rate1 = Rate::from_percent(2.0).expect("valid rate fixture");
-        let rate2 = Rate::from_percent(1.5).expect("valid rate fixture");
-
-        // Use approximate equality for floating point comparisons
-        let eps = 1e-15;
-
-        let result_add = rate1 + rate2;
-        let expected_add = Rate::from_percent(3.5).expect("valid rate fixture");
-        assert!((result_add.as_decimal() - expected_add.as_decimal()).abs() < eps);
-
-        let result_sub = rate1 - rate2;
-        let expected_sub = Rate::from_percent(0.5).expect("valid rate fixture");
-        assert!((result_sub.as_decimal() - expected_sub.as_decimal()).abs() < eps);
-
-        let result_mul = rate1 * 2.0;
-        let expected_mul = Rate::from_percent(4.0).expect("valid rate fixture");
-        assert!((result_mul.as_decimal() - expected_mul.as_decimal()).abs() < eps);
-
-        let result_div = rate1.checked_div(2.0).unwrap();
-        let expected_div = Rate::from_percent(1.0).expect("valid rate fixture");
-        assert!((result_div.as_decimal() - expected_div.as_decimal()).abs() < eps);
-
-        let result_neg = -rate1;
-        let expected_neg = Rate::from_percent(-2.0).expect("valid rate fixture");
-        assert!((result_neg.as_decimal() - expected_neg.as_decimal()).abs() < eps);
-    }
-
-    #[test]
-    fn bp_creation_and_conversion() {
-        let bp = Bps::new(250);
-        assert_eq!(bp.as_bp(), 250);
-        assert_eq!(bp.as_decimal(), 0.025);
-        assert_eq!(bp.as_percent(), 2.5);
-    }
-
-    #[test]
     fn bp_try_new_and_try_from_reject_non_finite_values() {
         assert_eq!(Bps::try_new(12.0).expect("whole bp").as_bp(), 12);
         assert_eq!(Bps::try_from(13.0).expect("whole bp").as_bp(), 13);
@@ -973,47 +827,6 @@ mod tests {
     }
 
     #[test]
-    fn percentage_creation_and_conversion() {
-        let pct = Percentage::new(12.5).expect("finite percentage");
-        assert_eq!(pct.as_percent(), 12.5);
-        assert_eq!(pct.as_decimal(), 0.125);
-        assert_eq!(pct.as_bp(), 1250);
-    }
-
-    #[test]
-    fn cross_conversions() {
-        let rate = Rate::from_percent(2.5).expect("valid rate fixture");
-        let bp: Bps = rate.into();
-        let pct: Percentage = rate.into();
-
-        assert_eq!(bp.as_bp(), 250);
-        assert_eq!(pct.as_percent(), 2.5);
-
-        let rate_from_bp: Rate = bp.into();
-        let rate_from_pct: Rate = pct.into();
-
-        assert_eq!(rate, rate_from_bp);
-        assert_eq!(rate, rate_from_pct);
-    }
-
-    #[test]
-    fn constants_and_predicates() {
-        assert!(Rate::ZERO.is_zero());
-        assert!(!Rate::ZERO.is_positive());
-        assert!(!Rate::ZERO.is_negative());
-
-        let positive = Rate::from_percent(1.0).expect("valid rate fixture");
-        assert!(positive.is_positive());
-        assert!(!positive.is_negative());
-
-        let negative = Rate::from_percent(-1.0).expect("valid rate fixture");
-        assert!(negative.is_negative());
-        assert!(!negative.is_positive());
-
-        assert_eq!(negative.abs(), positive);
-    }
-
-    #[test]
     fn serde_round_trip() {
         let rate = Rate::from_percent(2.5).expect("valid rate fixture");
         let json = serde_json::to_string(&rate).expect("JSON serialization should succeed in test");
@@ -1026,18 +839,11 @@ mod tests {
         let deserialized: Bps =
             serde_json::from_str(&json).expect("JSON deserialization should succeed in test");
         assert_eq!(bp, deserialized);
-
-        let pct = Percentage::new(12.5).expect("finite percentage");
-        let json = serde_json::to_string(&pct).expect("JSON serialization should succeed in test");
-        let deserialized: Percentage =
-            serde_json::from_str(&json).expect("JSON deserialization should succeed in test");
-        assert_eq!(pct, deserialized);
     }
 
     /// Deserialization must route through the validating constructors so
     /// non-finite values cannot enter via formats that can encode them
     /// (JSON rejects NaN at the parser level, but binary formats do not).
-    /// .
     #[test]
     fn deserialize_rejects_non_finite() {
         use serde::de::value::Error as ValueError;
@@ -1047,10 +853,6 @@ mod tests {
             let rate: std::result::Result<Rate, ValueError> =
                 Rate::deserialize(bad.into_deserializer());
             assert!(rate.is_err(), "Rate must reject {bad}");
-
-            let pct: std::result::Result<Percentage, ValueError> =
-                Percentage::deserialize(bad.into_deserializer());
-            assert!(pct.is_err(), "Percentage must reject {bad}");
         }
 
         // Finite values still deserialize.

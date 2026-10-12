@@ -184,5 +184,17 @@ mod tests {
         let mut raw = serde_json::to_value(slice).unwrap();
         raw["displacements"] = serde_json::Value::Null;
         assert!(serde_json::from_value::<VolCubeExpirySlice>(raw).is_err());
+        for expiry in [0.0, -1.0] {
+            assert!(VolCubeExpirySlice::from_grid(
+                "BAD",
+                expiry,
+                &[5.0],
+                &[0.03],
+                &[0.2],
+                VolQuoteType::BlackLognormal,
+                None,
+            )
+            .is_err());
+        }
     }
 }

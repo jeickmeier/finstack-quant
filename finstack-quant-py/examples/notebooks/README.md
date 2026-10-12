@@ -127,7 +127,7 @@ teaching cell tagged `intentional-negative`, recorded in the test's
 
 | Path | Topics |
 |------|--------|
-| `core_types_and_money.ipynb` | `Currency`, `Money`, `Rate`, `Bps`, `Percentage`, `CreditRating` |
+| `core_types_and_money.ipynb` | `Currency`, `Money`, `Rate`, `Bps`, `CreditRating` |
 | `dates_calendars_schedules.ipynb` | `DayCount`, `Tenor`, `PeriodId`, `HolidayCalendar`, `ScheduleBuilder` |
 | `market_data_and_curves.ipynb` | `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `FxMatrix`, `MarketContext` |
 | `math_toolkit.ipynb` | Linear algebra, statistics, special functions, compensated summation |

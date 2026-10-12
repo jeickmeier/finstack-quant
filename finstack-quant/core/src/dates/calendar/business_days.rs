@@ -46,7 +46,6 @@
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 
-use crate::dates::DateExt;
 use crate::error::{Error, InputError};
 use time::{Date, Duration};
 
@@ -77,21 +76,21 @@ pub(crate) fn seek_business_day<C: HolidayCalendar + ?Sized>(
 
 /// Trait for market-specific holiday calendars.
 ///
-/// Implementors define market-specific holidays by implementing [`is_holiday`](Self::is_holiday).
-/// The trait provides a default [`is_business_day`](Self::is_business_day) that automatically
-/// treats Saturday/Sunday as non-business days in addition to market holidays.
+/// Implementors define market-specific holidays in [`is_holiday`](Self::is_holiday)
+/// and state their weekend rule in [`is_business_day`](Self::is_business_day).
 ///
 /// # Implementation Guide
 ///
 /// When implementing a custom calendar:
-/// 1. Implement only [`is_holiday`](Self::is_holiday) - weekend handling is automatic
-/// 2. Return `true` for market-specific non-working days (exchanges closed, bank holidays)
-/// 3. Optionally include weekends in `is_holiday` for consistency, but not required
+/// 1. Return `true` from [`is_holiday`](Self::is_holiday) for market-specific
+///    non-working days (exchanges closed, bank holidays)
+/// 2. Implement [`is_business_day`](Self::is_business_day) as "not a weekend
+///    under the market's [`WeekendRule`](super::WeekendRule) and not a holiday"
 ///
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::HolidayCalendar;
+/// use finstack_quant_core::dates::{HolidayCalendar, WeekendRule};
 /// use time::Date;
 ///
 /// struct CustomCalendar;
@@ -100,6 +99,10 @@ pub(crate) fn seek_business_day<C: HolidayCalendar + ?Sized>(
 ///     fn is_holiday(&self, date: Date) -> bool {
 ///         // Example: Only New Year's Day
 ///         date.month() == time::Month::January && date.day() == 1
+///     }
+///
+///     fn is_business_day(&self, date: Date) -> bool {
+///         !WeekendRule::SaturdaySunday.is_weekend(date.weekday()) && !self.is_holiday(date)
 ///     }
 /// }
 ///
@@ -121,12 +124,14 @@ pub trait HolidayCalendar: Send + Sync {
     /// Returns `true` if the `date` is a business day according to the
     /// calendar (i.e. not weekend and not holiday).
     ///
-    /// Weekend is defined as Saturday/Sunday and is independent of how a
-    /// particular calendar chooses to label weekends in [`Self::is_holiday`].
-    #[inline]
-    fn is_business_day(&self, date: Date) -> bool {
-        !date.is_weekend() && !self.is_holiday(date)
-    }
+    /// Each calendar applies its own weekend rule here (see
+    /// [`WeekendRule`](super::WeekendRule)); it is independent of how the
+    /// calendar labels weekends in [`Self::is_holiday`].
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Calendar date to classify.
+    fn is_business_day(&self, date: Date) -> bool;
 
     /// Counts business days in the half-open interval `[start, end)`.
     ///
@@ -153,6 +158,37 @@ pub trait HolidayCalendar: Send + Sync {
     #[inline]
     fn metadata(&self) -> Option<CalendarMetadata> {
         None
+    }
+
+    /// Canonical identifier that reconstructs this calendar through the
+    /// registered calendar resolver.
+    ///
+    /// Custom calendars should return `None` unless their identifier is
+    /// registered and resolves to identical behavior.
+    fn calendar_id(&self) -> Option<String> {
+        self.metadata().map(|metadata| metadata.id.to_string())
+    }
+}
+
+impl<T: HolidayCalendar + ?Sized> HolidayCalendar for &T {
+    fn is_holiday(&self, date: Date) -> bool {
+        (**self).is_holiday(date)
+    }
+
+    fn is_business_day(&self, date: Date) -> bool {
+        (**self).is_business_day(date)
+    }
+
+    fn count_business_days(&self, start: Date, end: Date) -> i32 {
+        (**self).count_business_days(start, end)
+    }
+
+    fn metadata(&self) -> Option<CalendarMetadata> {
+        (**self).metadata()
+    }
+
+    fn calendar_id(&self) -> Option<String> {
+        (**self).calendar_id()
     }
 }
 

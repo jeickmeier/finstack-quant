@@ -44,7 +44,7 @@ fn fiscal_weekly_offsets_include_the_short_final_week() {
     let periods = build_fiscal_periods("FY2024W52..FY2025W2", FiscalConfig::us_federal(), None)
         .unwrap()
         .periods;
-    assert_eq!(periods[1].id.index, 53);
+    assert_eq!(periods[1].id.index(), 53);
     assert_eq!((periods[1].end - periods[1].start).whole_days(), 2);
     let model = offset_model(periods.clone(), &[100.0, 110.0, 121.0, 133.1]);
     let result = Evaluator::new().evaluate(&model).unwrap();
@@ -73,8 +73,8 @@ fn fiscal_daily_offsets_cross_leap_and_nonleap_fiscal_years() {
         let periods = build_fiscal_periods(range, FiscalConfig::us_federal(), None)
             .unwrap()
             .periods;
-        assert_eq!(periods[1].id.index, expected_final_ordinal);
-        assert_eq!(periods[2].id.index, 1);
+        assert_eq!(periods[1].id.index(), expected_final_ordinal);
+        assert_eq!(periods[2].id.index(), 1);
         let model = offset_model(periods.clone(), &[100.0, 110.0, 121.0, 133.1]);
         let result = Evaluator::new().evaluate(&model).unwrap();
         close(result.get("prior", &periods[1].id).unwrap(), 100.0);
@@ -279,4 +279,28 @@ fn cashflow_period_aggregates_resolve_only_the_requested_window() {
     close(evaluate_formula(&qtd, &mut context, None).unwrap(), 150.0);
     let ytd = parse_and_compile("ytd(cs.interest_expense.LOAN)").unwrap();
     assert!(evaluate_formula(&ytd, &mut context, None).is_err());
+}
+
+#[test]
+fn ytd_starts_at_the_first_fiscal_period_of_the_fiscal_year() {
+    let periods = build_fiscal_periods("FY2024Q3..FY2025Q2", FiscalConfig::us_federal(), None)
+        .unwrap()
+        .periods;
+    let values: Vec<_> = periods
+        .iter()
+        .zip([1.0, 2.0, 4.0, 8.0])
+        .map(|(period, value)| (period.id, AmountOrScalar::scalar(value)))
+        .collect();
+    let model = ModelBuilder::new("fiscal-ytd")
+        .periods_explicit(periods.clone())
+        .unwrap()
+        .value("x", &values)
+        .compute("to_date", "ytd(x)")
+        .unwrap()
+        .build()
+        .unwrap();
+    let result = Evaluator::new().evaluate(&model).unwrap();
+    for (index, expected) in [(0, 1.0), (1, 3.0), (2, 4.0), (3, 12.0)] {
+        close(result.get("to_date", &periods[index].id).unwrap(), expected);
+    }
 }

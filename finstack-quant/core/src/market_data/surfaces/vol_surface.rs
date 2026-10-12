@@ -1048,6 +1048,11 @@ pub(super) fn validate_grid(
     }
     validate_axis(expiries)?;
     validate_axis(strikes)?;
+    if expiries.iter().any(|expiry| *expiry < 0.0) {
+        return Err(Error::Validation(
+            "volatility expiries must be non-negative".into(),
+        ));
+    }
     let n = expiries
         .len()
         .checked_mul(strikes.len())
@@ -1103,6 +1108,20 @@ mod displacement_tests {
         assert_eq!(surface.get_displacements(), Some(&[0.02, 0.03][..]));
         let mut raw = serde_json::to_value(surface).unwrap();
         raw["displacements"] = serde_json::Value::Null;
+        assert!(serde_json::from_value::<VolSurface>(raw).is_err());
+    }
+
+    #[test]
+    fn surface_expiries_must_be_nonnegative_in_construction_and_serde() {
+        let zero_expiry = VolSurface::from_grid("ZERO", &[0.0], &[0.03], &[0.2]).unwrap();
+        let restored: VolSurface =
+            serde_json::from_value(serde_json::to_value(zero_expiry).unwrap()).unwrap();
+        assert_eq!(restored.expiries(), &[0.0]);
+        assert!(VolSurface::from_grid("BAD", &[-0.25], &[0.03], &[0.2]).is_err());
+
+        let surface = VolSurface::from_grid("OK", &[1.0], &[0.03], &[0.2]).unwrap();
+        let mut raw = serde_json::to_value(surface).unwrap();
+        raw["expiries"][0] = serde_json::json!(-0.25);
         assert!(serde_json::from_value::<VolSurface>(raw).is_err());
     }
 }

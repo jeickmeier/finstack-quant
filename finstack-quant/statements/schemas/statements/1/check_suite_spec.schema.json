@@ -6,21 +6,21 @@
         "assets_nodes": {
           "description": "Node IDs whose values represent total assets.",
           "items": {
-            "$ref": "#/$defs/NodeId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
         "equity_nodes": {
           "description": "Node IDs whose values represent total equity.",
           "items": {
-            "$ref": "#/$defs/NodeId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
         "liabilities_nodes": {
           "description": "Node IDs whose values represent total liabilities.",
           "items": {
-            "$ref": "#/$defs/NodeId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
@@ -133,13 +133,13 @@
       "description": "Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally\nTotalCF = CFO + CFI + CFF.\n\nEvery configured operand must have the same scalar/monetary units and\ncurrency. Execution rejects incompatible units or non-finite/negative\ntolerances; it performs no FX conversion.",
       "properties": {
         "cash_balance_node": {
-          "$ref": "#/$defs/NodeId",
+          "$ref": "#/$defs/Id",
           "description": "Node for cash balance."
         },
         "cff_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -150,7 +150,7 @@
         "cfi_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -161,7 +161,7 @@
         "cfo_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -178,7 +178,7 @@
           ]
         },
         "total_cash_flow_node": {
-          "$ref": "#/$defs/NodeId",
+          "$ref": "#/$defs/Id",
           "description": "Node for total cash flow."
         }
       },
@@ -315,13 +315,17 @@
       ],
       "type": "object"
     },
+    "Id": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
+    },
     "MissingValueCheck": {
       "description": "Flags required nodes that lack values in applicable periods.\n\nMissing actual observations produce `Severity::Error` and fail the check.\nMissing forecast observations produce advisory `Severity::Warning` findings.",
       "properties": {
         "required_nodes": {
           "description": "Nodes that must have values in every in-scope period.",
           "items": {
-            "$ref": "#/$defs/NodeId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
@@ -336,10 +340,6 @@
       ],
       "type": "object"
     },
-    "NodeId": {
-      "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`].",
-      "type": "string"
-    },
     "NonFiniteCheck": {
       "description": "Detects NaN or infinite values in node results.\n\n**Gating**: findings are `Severity::Error`, so any non-finite cell sets\n`CheckResult::passed` to `false` and fails a pipeline gate. Non-finite\nvalues poison every downstream calculation, so they are never advisory.",
       "properties": {
@@ -347,7 +347,7 @@
           "default": [],
           "description": "Specific nodes to check; if empty, all nodes in results are inspected.",
           "items": {
-            "$ref": "#/$defs/NodeId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         }
@@ -380,7 +380,7 @@
         "dividends_node": {
           "anyOf": [
             {
-              "$ref": "#/$defs/NodeId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -394,19 +394,19 @@
           "description": "Sign convention applied to the `dividends_node` input. Defaults\nto [`SignConventionPolicy::MagnitudePositive`].\n`net_income_node` and `other_adjustments` always use\n`InflowPositive` by construction."
         },
         "net_income_node": {
-          "$ref": "#/$defs/NodeId",
+          "$ref": "#/$defs/Id",
           "description": "Node for net income."
         },
         "other_adjustments": {
           "default": [],
           "description": "Additional adjustment nodes (buybacks, AOCI, etc.).",
           "items": {
-            "$ref": "#/$defs/NodeId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
         "retained_earnings_node": {
-          "$ref": "#/$defs/NodeId",
+          "$ref": "#/$defs/Id",
           "description": "Node for retained earnings balance."
         },
         "tolerance": {
@@ -431,7 +431,7 @@
           "default": [],
           "description": "Nodes expected to carry negative values.",
           "items": {
-            "$ref": "#/$defs/NodeId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
@@ -439,7 +439,7 @@
           "default": [],
           "description": "Nodes expected to carry positive values.",
           "items": {
-            "$ref": "#/$defs/NodeId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         }

@@ -5,7 +5,7 @@
     "concepts": [
       "Three-cent NAV reconciliation; monetary amounts versus analytical values.",
       "IEEE-754 versus decimal arithmetic; ISO currency digits and banker rounding.",
-      "Same-currency enforcement; Rate, Bps and Percentage representations.",
+      "Same-currency enforcement; decimal Rate, percent quotes and Bps representations.",
       "FX market pair, pips, inverse, triangulation and conversion policy.",
       "Rounding and tolerance stamps, deterministic financial replay, independent staged snapshots."
     ],
@@ -20,7 +20,7 @@
         "notebook": "01_foundations/core_types_and_money.ipynb",
         "cell_id": "money-units-rounding",
         "status": "proven",
-        "coverage": "Rate/Bps/Percentage conversions, currency decimals, accumulation and rounding examples."
+        "coverage": "Rate (decimal and percent) and Bps conversions, currency decimals, accumulation and rounding examples."
       }
     ],
     "exercises": [

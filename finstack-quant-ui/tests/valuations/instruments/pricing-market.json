@@ -347,7 +347,7 @@
       "extrapolation": "flat_forward"
     },
     {
-      "type": "vol_index",
+      "type": "price",
       "id": "VIX",
       "base": "2023-12-28",
       "day_count": "act_365f",

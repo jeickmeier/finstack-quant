@@ -1652,8 +1652,8 @@ export default [
     "path": "#/$defs/d_35c617761984e0696394/oneOf/2/properties/futures/properties/contract",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationQuote/oneOf/2/properties/futures/properties/contract",
     "description": "Convention-registry identifier for the futures contract.",
-    "ref": "#/$defs/RateCalibrationFutureContractId",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationFutureContractId"
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_35c617761984e0696394/oneOf/2/properties/futures/properties/convexity_adjustment",
@@ -5160,6 +5160,34 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ResidualWeightingScheme"
   },
   {
+    "path": "#/$defs/d_b539d636bb6f89d140e2",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpRollState",
+    "description": "Serialized source grid and time origin for a rolled interpolation."
+  },
+  {
+    "path": "#/$defs/d_b539d636bb6f89d140e2/properties/offset",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpRollState/properties/offset",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_b539d636bb6f89d140e2/properties/source_points",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpRollState/properties/source_points"
+  },
+  {
+    "path": "#/$defs/d_b539d636bb6f89d140e2/properties/source_points/items",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpRollState/properties/source_points/items"
+  },
+  {
+    "path": "#/$defs/d_b539d636bb6f89d140e2/properties/source_points/items/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpRollState/properties/source_points/items/prefixItems/0",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_b539d636bb6f89d140e2/properties/source_points/items/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpRollState/properties/source_points/items/prefixItems/1",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_b7ebd05daecf38c26828",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwaptionConventionId",
     "description": "Identifier for Swaption market conventions (e.g., \"USD\", \"EUR\").\n\nUsed to look up [`SwaptionConventions`](crate::market::conventions::defs::SwaptionConventions)\nfrom the convention registry."
@@ -6242,11 +6270,6 @@ export default [
     "description": "Actual/Actual (ISDA) day count convention.\n\nActual days over the actual days in the containing calendar year,\nsplit and summed across year boundaries.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(b) - \"Actual/Actual (ISDA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ISDA\" (A006)\n- **Also known as**: Act/Act (ISDA), Actual/Actual, Act/Act"
   },
   {
-    "path": "#/$defs/d_c39105c8a7a2e9a5aa44",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationFutureContractId",
-    "description": "Serialized identifier for an interest-rate futures convention."
-  },
-  {
     "path": "#/$defs/d_c3c50fd88be2ae84feeb",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SabrInterpolationMethod",
     "const": "bilinear",
@@ -6743,6 +6766,11 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/0/properties/calendar_id",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/0/properties/calendar_id",
+    "description": "Registered holiday calendar id of the business-day time axis (for\nexample `\"brbd\"` for a Bus/252 curve). Omitted when the day count needs\nno calendar."
+  },
+  {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/0/properties/calibration_ois_cutoff_days",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/0/properties/calibration_ois_cutoff_days",
     "description": "OIS cut-off (business days) the curve was calibrated under, if any.",
@@ -7180,6 +7208,21 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/3/properties/roll_transform",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/3/properties/roll_transform",
+    "description": "Source interpolation and accumulated time origin for a rolled curve."
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/3/properties/roll_transform/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/3/properties/roll_transform/anyOf/0",
+    "ref": "#/$defs/InterpRollState",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpRollState"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/3/properties/roll_transform/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/3/properties/roll_transform/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/4",
     "description": "Pre-built CDS-index base-correlation curve."
@@ -7276,6 +7319,21 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/5/properties/roll_transform",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/5/properties/roll_transform",
+    "description": "Source interpolation and accumulated time origin for a rolled curve."
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/5/properties/roll_transform/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/5/properties/roll_transform/anyOf/0",
+    "ref": "#/$defs/InterpRollState",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpRollState"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/5/properties/roll_transform/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/5/properties/roll_transform/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/6",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/6",
     "description": "Pre-built parametric (e.g. Nelson-Siegel) curve."
@@ -7310,6 +7368,13 @@ export default [
     "description": "Nelson-Siegel model parameters.",
     "ref": "#/$defs/NelsonSiegelModel",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/NelsonSiegelModel"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/6/properties/time_offset",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/6/properties/time_offset",
+    "default": 0,
+    "description": "Current origin in the source model's year-fraction coordinates;\nomitted means `0.0` (a curve that has never been rolled).",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/7",
@@ -7372,6 +7437,21 @@ export default [
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/7/properties/knot_points/items/prefixItems/1",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/7/properties/knot_points/items/prefixItems/1",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/7/properties/roll_transform",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/7/properties/roll_transform",
+    "description": "Source interpolation and accumulated time origin for a rolled curve."
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/7/properties/roll_transform/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/7/properties/roll_transform/anyOf/0",
+    "ref": "#/$defs/InterpRollState",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpRollState"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/7/properties/roll_transform/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/7/properties/roll_transform/anyOf/1"
   },
   {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/7/properties/spot_level",
@@ -7446,6 +7526,21 @@ export default [
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/8/properties/knot_points/items/prefixItems/1",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/8/properties/knot_points/items/prefixItems/1",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/8/properties/roll_transform",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/8/properties/roll_transform",
+    "description": "Source interpolation and accumulated time origin for a rolled curve."
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/8/properties/roll_transform/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/8/properties/roll_transform/anyOf/0",
+    "ref": "#/$defs/InterpRollState",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpRollState"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/8/properties/roll_transform/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/8/properties/roll_transform/anyOf/1"
   },
   {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/8/properties/spot_level",

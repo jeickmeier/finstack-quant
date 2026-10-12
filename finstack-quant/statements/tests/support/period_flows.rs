@@ -117,12 +117,30 @@ pub fn aggregate_period_flows(
             let total = by_ccy
                 .entry(period.id)
                 .or_insert_with(|| CashflowBreakdown::with_currency(currency));
-            total.interest_expense_cash += breakdown.interest_expense_cash;
-            total.interest_expense_pik += breakdown.interest_expense_pik;
-            total.principal_payment += breakdown.principal_payment;
-            total.debt_balance += breakdown.debt_balance;
-            total.fees += breakdown.fees;
-            total.accrued_interest += breakdown.accrued_interest;
+            total.interest_expense_cash = total
+                .interest_expense_cash
+                .checked_add(breakdown.interest_expense_cash)
+                .expect("same-currency sum");
+            total.interest_expense_pik = total
+                .interest_expense_pik
+                .checked_add(breakdown.interest_expense_pik)
+                .expect("same-currency sum");
+            total.principal_payment = total
+                .principal_payment
+                .checked_add(breakdown.principal_payment)
+                .expect("same-currency sum");
+            total.debt_balance = total
+                .debt_balance
+                .checked_add(breakdown.debt_balance)
+                .expect("same-currency sum");
+            total.fees = total
+                .fees
+                .checked_add(breakdown.fees)
+                .expect("same-currency sum");
+            total.accrued_interest = total
+                .accrued_interest
+                .checked_add(breakdown.accrued_interest)
+                .expect("same-currency sum");
             result
                 .by_instrument
                 .entry(instrument_id.clone())

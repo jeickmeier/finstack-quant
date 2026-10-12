@@ -1,12 +1,8 @@
 //! Additional tests for rate types and conversions
 
-use finstack_quant_core::types::{Bps, Percentage, Rate};
+use finstack_quant_core::types::{Bps, Rate};
 use proptest::prelude::*;
 use std::panic::catch_unwind;
-
-fn percentage(percent: f64) -> Percentage {
-    Percentage::new(percent).expect("finite percentage fixture")
-}
 
 #[test]
 fn rate_conversions_roundtrip() {
@@ -39,8 +35,7 @@ fn rate_arithmetic_operations() {
     let doubled = r1 * 2.0;
     assert!((doubled.as_percent() - 6.0).abs() < 1e-10);
 
-    // Fallible division rejects zero and non-finite results.
-    let halved = r1.checked_div(2.0).unwrap();
+    let halved = r1 / 2.0;
     assert!((halved.as_percent() - 1.5).abs() < 1e-10);
 
     // Negation
@@ -156,78 +151,11 @@ fn bp_from_conversions() {
     let i: i32 = b.into();
     assert_eq!(i, 250);
 
-    // `From<Bps> for f64` was removed : the
-    // implicit decimal-out direction was asymmetric with `TryFrom<f64>`
-    // (which reads a bp count), so a 25bp round-trip through f64 became 0bp.
-    // Use the explicit accessors instead.
+    // `From<Bps> for f64` was removed. `TryFrom<f64>` reads a basis-point
+    // count, so a decimal-valued `From<Bps> for f64` turned a 25bp round-trip
+    // through f64 into 0bp. Use the explicit accessors instead.
     assert!((b.as_decimal() - 0.025).abs() < 1e-10);
     assert!((b.as_percent() - 2.5).abs() < 1e-10);
-}
-
-#[test]
-fn percentage_conversions() {
-    let pct = percentage(12.5);
-
-    assert_eq!(pct.as_percent(), 12.5);
-    assert!((pct.as_decimal() - 0.125).abs() < 1e-10);
-    assert_eq!(pct.as_bp(), 1250);
-
-    let rate = pct.as_rate();
-    assert!((rate.as_percent() - 12.5).abs() < 1e-10);
-}
-
-#[test]
-fn percentage_checked_arithmetic_operations() {
-    let p1 = percentage(10.0);
-    let p2 = percentage(5.0);
-
-    assert_eq!(p1.checked_add(p2).unwrap(), percentage(15.0));
-    assert_eq!(p1.checked_sub(p2).unwrap(), percentage(5.0));
-    assert_eq!(p1.checked_mul(2.0).unwrap(), percentage(20.0));
-    assert_eq!(p1.checked_div(2.0).unwrap(), percentage(5.0));
-    assert_eq!(-p1, percentage(-10.0));
-}
-
-#[test]
-fn percentage_predicates() {
-    assert!(Percentage::ZERO.is_zero());
-    assert!(!Percentage::ZERO.is_positive());
-    assert!(!Percentage::ZERO.is_negative());
-
-    let positive = percentage(15.5);
-    assert!(positive.is_positive());
-    assert!(!positive.is_negative());
-
-    let negative = percentage(-5.0);
-    assert!(negative.is_negative());
-    assert!(!negative.is_positive());
-}
-
-#[test]
-fn percentage_abs() {
-    let negative = percentage(-7.5);
-    assert_eq!(negative.abs(), percentage(7.5));
-
-    let positive = percentage(3.5);
-    assert_eq!(positive.abs(), percentage(3.5));
-}
-
-#[test]
-fn percentage_display_formatting() {
-    let pct = percentage(12.75);
-    assert_eq!(format!("{}", pct), "12.75%");
-
-    let pct = percentage(-5.5);
-    assert_eq!(format!("{}", pct), "-5.50%");
-}
-
-#[test]
-fn percentage_from_conversions() {
-    let p = Percentage::try_from(15.0).expect("finite percentage");
-    assert_eq!(p.as_percent(), 15.0);
-
-    let f: f64 = p.into();
-    assert_eq!(f, 15.0);
 }
 
 #[test]
@@ -238,28 +166,21 @@ fn cross_type_conversions() {
     assert_eq!(bp.as_bp(), 250);
     let rate_back: Rate = bp.into();
     assert_eq!(rate.as_bp(), rate_back.as_bp());
-
-    // Rate <-> Percentage
-    let rate = Rate::from_percent(3.5).expect("valid rate fixture");
-    let pct: Percentage = rate.into();
-    assert!((pct.as_percent() - 3.5).abs() < 1e-10);
-    let rate_back: Rate = pct.into();
-    assert!((rate.as_decimal() - rate_back.as_decimal()).abs() < 1e-10);
-
-    // Bps <-> Percentage
-    let bp = Bps::new(350);
-    let pct: Percentage = bp.into();
-    assert_eq!(pct.as_percent(), 3.5);
-    let bp_back: Bps = pct.into();
-    assert_eq!(bp.as_bp(), bp_back.as_bp());
 }
 
 #[test]
 fn non_finite_constructors_reject_input() {
     assert!(Rate::from_decimal(f64::NAN).is_err());
+    assert!(Rate::from_percent(f64::NAN).is_err());
     assert!(Rate::from_percent(f64::INFINITY).is_err());
-    assert!(Percentage::new(f64::NEG_INFINITY).is_err());
+    assert!(Rate::from_percent(f64::NEG_INFINITY).is_err());
     assert!(Rate::try_from(f64::NAN).is_err());
+    assert!(Rate::try_from_bp(f64::NAN).is_err());
+    assert!(Rate::try_from_bp(62.5).is_err());
+    assert_eq!(
+        Rate::try_from_bp(250.0).expect("whole bp"),
+        Rate::from_bp(250)
+    );
 }
 
 #[test]
@@ -273,6 +194,10 @@ fn non_finite_rate_arithmetic_panics() {
     assert!(catch_unwind(|| {
         let large = Rate::from_decimal(f64::MAX).expect("finite rate");
         let _ = large + large;
+    })
+    .is_err());
+    assert!(catch_unwind(|| {
+        let _ = rate / 0.0;
     })
     .is_err());
 }
@@ -307,16 +232,22 @@ fn checked_bps_arithmetic_rejects_integer_overflow_and_zero_division() {
     assert!(Bps::new(i32::MIN).checked_neg().is_err());
     assert!(Bps::new(10).checked_div(0).is_err());
     assert_eq!(Bps::new(10).checked_mul(3).unwrap(), Bps::new(30));
-}
-
-#[test]
-fn checked_percentage_arithmetic_rejects_non_finite_results() {
-    let pct = percentage(10.0);
-
-    assert!(pct.checked_mul(f64::INFINITY).is_err());
-    assert!(pct.checked_div(0.0).is_err());
-    assert_eq!(pct.checked_add(percentage(2.5)).unwrap(), percentage(12.5));
-    assert_eq!(-pct, percentage(-10.0));
+    assert!(catch_unwind(|| {
+        let _ = Bps::new(i32::MAX) + Bps::new(1);
+    })
+    .is_err());
+    assert!(catch_unwind(|| {
+        let _ = -Bps::new(i32::MIN);
+    })
+    .is_err());
+    assert!(catch_unwind(|| {
+        let _ = Bps::new(i32::MIN).abs();
+    })
+    .is_err());
+    assert!(catch_unwind(|| {
+        let _ = Bps::new(10) / 0;
+    })
+    .is_err());
 }
 
 #[test]
@@ -351,19 +282,6 @@ fn bp_ordering() {
 }
 
 #[test]
-fn percentage_ordering() {
-    let p1 = percentage(5.0);
-    let p2 = percentage(10.0);
-    let p3 = percentage(5.0);
-
-    assert!(p1 < p2);
-    assert!(p2 > p1);
-    assert_eq!(p1, p3);
-    assert!(p1 <= p3);
-    assert!(p1 >= p3);
-}
-
-#[test]
 fn rate_ordering() {
     let r1 = Rate::from_percent(2.0).expect("valid rate fixture");
     let r2 = Rate::from_percent(3.0).expect("valid rate fixture");
@@ -387,18 +305,6 @@ proptest! {
 
         prop_assert!(divided.as_decimal().is_finite());
         prop_assert!((divided.as_decimal() - decimal / divisor).abs() < 1e-10);
-    }
-
-    #[test]
-    fn checked_percentage_division_matches_finite_scalar_division(
-        percent in -100_000.0_f64..100_000.0,
-        divisor in prop_oneof![-1_000.0_f64..-1.0e-9, 1.0e-9_f64..1_000.0],
-    ) {
-        let percentage = Percentage::new(percent).unwrap();
-        let divided = percentage.checked_div(divisor).unwrap();
-
-        prop_assert!(divided.as_percent().is_finite());
-        prop_assert!((divided.as_percent() - percent / divisor).abs() < 1e-10);
     }
 
     #[test]

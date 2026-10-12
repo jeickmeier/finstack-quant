@@ -255,13 +255,13 @@ impl PyPeriodId {
     /// Gregorian or fiscal year label.
     #[getter]
     fn year(&self) -> i32 {
-        self.inner.year
+        self.inner.year()
     }
 
     /// Ordinal index within the year.
     #[getter]
     fn index(&self) -> u16 {
-        self.inner.index
+        self.inner.index()
     }
 
     /// Kind (frequency) of this period.
@@ -282,12 +282,12 @@ impl PyPeriodId {
         self.inner.periods_per_year()
     }
 
-    /// Next Gregorian/ISO period in sequence (fiscal ids need ``next_fiscal``).
+    /// Next period of the same kind and calendar (fiscal daily ids at day 365 need ``next_fiscal``).
     fn next(&self) -> PyResult<Self> {
         self.inner.next().map(Self::from_inner).map_err(core_to_py)
     }
 
-    /// Previous Gregorian/ISO period in sequence (fiscal ids need ``prev_fiscal``).
+    /// Previous period of the same kind and calendar (fiscal daily ids at day 1 need ``prev_fiscal``).
     fn prev(&self) -> PyResult<Self> {
         self.inner.prev().map(Self::from_inner).map_err(core_to_py)
     }
@@ -618,27 +618,28 @@ impl PyFiscalConfig {
     /// Month when the fiscal year starts (1-12).
     #[getter]
     fn start_month(&self) -> u8 {
-        self.inner.start_month
+        self.inner.start_month()
     }
 
     /// Day when the fiscal year starts (1-31).
     #[getter]
     fn start_day(&self) -> u8 {
-        self.inner.start_day
+        self.inner.start_day()
     }
 
     /// Support ``pickle`` by reconstructing through ``FiscalConfig(start_month, start_day)``.
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (u8, u8))> {
         Ok((
             py.get_type::<Self>().into_any(),
-            (self.inner.start_month, self.inner.start_day),
+            (self.inner.start_month(), self.inner.start_day()),
         ))
     }
 
     fn __repr__(&self) -> String {
         format!(
             "FiscalConfig(start_month={}, start_day={})",
-            self.inner.start_month, self.inner.start_day,
+            self.inner.start_month(),
+            self.inner.start_day(),
         )
     }
 }

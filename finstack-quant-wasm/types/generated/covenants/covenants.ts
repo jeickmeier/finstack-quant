@@ -185,14 +185,29 @@ export type ThresholdTest =
  */
 export type CovenantScope = "maintenance" | "incurrence";
 /**
- * String-backed identifier for a covenant operating metric.
+ * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
- * These identifiers are conventionally aligned with `finstack-quant-statements`
- * node IDs such as `debt_to_ebitda`, `ebitda`, `interest_coverage`, and
- * `dscr`, but this crate intentionally has no compile-time dependency on
- * `finstack-quant-statements`.
+ * This type wraps a string identifier with a phantom type parameter to ensure
+ * type safety at compile time. Different `Id<T>` types with different `T`
+ * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+ *
+ * # Type Parameters
+ *
+ * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+ *
+ * # Invariants
+ *
+ * - Storage uses `Arc<str>` for efficient cloning
+ * - The phantom marker has zero size and runtime cost
+ * - Two `Id<T>` values are equal if their string values are equal
+ * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+ *
+ * # Thread Safety
+ *
+ * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+ * safely share and clone IDs with minimal synchronization overhead.
  */
-export type CovenantMetricId = string;
+export type Id = string;
 /**
  * Unit of a tenor period.
  */
@@ -288,9 +303,10 @@ export interface Covenant {
  */
 export interface SpringingCondition {
   /**
-   * Metric that controls activation (e.g., revolver utilization).
+   * Metric that controls activation (e.g., revolver utilization), named by
+   * its statements node ID.
    */
-  metric_id: CovenantMetricId;
+  metric_id: Id;
   /**
    * Threshold test applied to the metric.
    */
@@ -391,11 +407,13 @@ export interface CovenantSpec {
    * Values must be finite and in the same reporting-period convention as the
    * ratio. A non-positive denominator makes the test a breach with no headroom.
    */
-  denominator_metric_id?: CovenantMetricId | null;
+  denominator_metric_id?: Id | null;
   /**
-   * Metric ID to use for evaluation (for financial covenants)
+   * Metric ID to use for evaluation (for financial covenants), conventionally
+   * a statements node ID such as `debt_to_ebitda`, `ebitda`,
+   * `interest_coverage`, or `dscr`.
    */
-  metric_id?: CovenantMetricId | null;
+  metric_id?: Id | null;
   /**
    * Time-varying threshold schedule that overrides the static threshold in
    * [`CovenantType`] when present. Enables leverage step-down schedules.

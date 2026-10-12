@@ -331,12 +331,12 @@ pub(crate) fn plan_credit_cascade(
     let mut total_shift_bp = 0.0;
     let mut count = 0usize;
     for curve_id in &credit_curves {
-        if let Ok(shift) = measure_par_spread_shift(
+        if let Some(shift) = crate::helpers::measured_unless_missing(measure_par_spread_shift(
             curve_id.as_str(),
             market_t0,
             market_t1,
             TenorSamplingMethod::Standard,
-        ) {
+        ))? {
             total_shift_bp += shift;
             count += 1;
         }

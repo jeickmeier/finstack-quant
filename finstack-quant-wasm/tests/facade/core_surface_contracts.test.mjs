@@ -38,3 +38,32 @@ test('zero vol-of-vol SABR nodes retain the exact Black cube limit', () => {
     cube.free();
   }
 });
+
+test('a Bus/252 discount curve counts business days on its own calendar', () => {
+  const curve = new facade.core.DiscountCurve({
+    id: 'BRL-CDI',
+    baseDate: '2025-01-06',
+    knots: [0, 1, 1, 0.9],
+    interp: 'log_linear',
+    dayCount: 'bus_252',
+    calendarId: 'brbd',
+  });
+  try {
+    assert.equal(curve.calendarId, 'brbd');
+    // 5 Brazilian business days from Mon 2025-01-06 to Mon 2025-01-13.
+    const df = curve.dfBetweenDates('2025-01-06', '2025-01-13');
+    assert.ok(Math.abs(df - curve.df(5 / 252)) < 1e-14);
+  } finally {
+    curve.free();
+  }
+  assert.throws(
+    () =>
+      new facade.core.DiscountCurve({
+        id: 'BRL-CDI',
+        baseDate: '2025-01-06',
+        knots: [0, 1, 1, 0.9],
+        dayCount: 'bus_252',
+      }),
+    /requires a holiday calendar/
+  );
+});

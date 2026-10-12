@@ -171,24 +171,6 @@ impl HolidayCalendar for Calendar {
     }
 }
 
-impl HolidayCalendar for &Calendar {
-    fn is_holiday(&self, date: Date) -> bool {
-        (*self).is_holiday(date)
-    }
-
-    fn is_business_day(&self, date: Date) -> bool {
-        <Calendar as HolidayCalendar>::is_business_day(*self, date)
-    }
-
-    fn count_business_days(&self, start: Date, end: Date) -> i32 {
-        <Calendar as HolidayCalendar>::count_business_days(*self, start, end)
-    }
-
-    fn metadata(&self) -> Option<CalendarMetadata> {
-        (*self).metadata()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

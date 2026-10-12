@@ -23,7 +23,7 @@ pub(super) fn contractual_reset_date(start: Date, spec: &FloatingCouponSpec) -> 
         .fixing_calendar_id
         .as_deref()
         .unwrap_or(&spec.schedule.calendar_id);
-    let calendar = resolve_calendar_strict(calendar_id)?;
+    let calendar = calendar_by_id_strict(calendar_id)?;
     if spec.rate_spec.reset_lag_days == 0 {
         return Ok(start);
     }
@@ -63,7 +63,7 @@ pub(super) fn build_overnight_coupon(
         .fixing_calendar_id
         .as_deref()
         .unwrap_or(&spec.schedule.calendar_id);
-    let calendar = resolve_calendar_strict(calendar_id)?;
+    let calendar = calendar_by_id_strict(calendar_id)?;
     let observations = OvernightObservationSchedule::compile(start, end, method, calendar)?;
     if observations.observations().is_empty() && start < end {
         return Err(Error::Validation(format!(

@@ -6,7 +6,6 @@
 //! - Binary operations and conditionals
 //! - Metadata handling in results
 //! - DAG planning integration
-//! - Cache configuration
 //!
 //! Function-specific behavior tests are in functions.rs.
 

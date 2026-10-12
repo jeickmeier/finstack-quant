@@ -647,8 +647,11 @@ export interface DC3A357E95F2E04D3518D {
  * # Settlement
  *
  * When `settlement_days` is `None`, the pair-aware default is T+1 for
- * USD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit
- * `settlement_days` overrides that default; `settlement_date` overrides both.
+ * USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB and T+2 otherwise (including
+ * EUR/USD). An explicit `settlement_days` is the contractual lag and overrides
+ * that default in either direction (for example tom-next T+1 on EUR/USD);
+ * `settlement_date` overrides both. Without calendars the USD leg uses the
+ * `usny` calendar and other currencies count weekdays only.
  *
  * See module-level documentation for comprehensive FX quoting conventions.
  */

@@ -167,35 +167,12 @@ impl PeriodKind {
         }
     }
 
-    #[inline]
-    fn build_id(self, year: i32, index: u16) -> PeriodId {
-        PeriodId {
-            year,
-            index,
-            kind: self,
-            fiscal: false,
-        }
-    }
-
-    #[inline]
-    fn build_fiscal_id(self, year: i32, index: u16) -> PeriodId {
-        PeriodId {
-            year,
-            index,
-            kind: self,
-            fiscal: true,
-        }
-    }
-
-    #[inline]
-    fn relative_max_index(self) -> u16 {
+    /// Highest index `self` can take in any year (Gregorian or fiscal).
+    fn capacity(self) -> u16 {
         match self {
             PeriodKind::Daily => 366,
-            PeriodKind::Quarterly => 4,
-            PeriodKind::Monthly => 12,
             PeriodKind::Weekly => 53,
-            PeriodKind::SemiAnnual => 2,
-            PeriodKind::Annual => 1,
+            _ => self.periods_per_year(),
         }
     }
 
@@ -211,44 +188,6 @@ impl PeriodKind {
         }
         Ok(index)
     }
-
-    fn gregorian_bounds(self, year: i32, index: u16) -> crate::Result<(Date, Date)> {
-        match self {
-            PeriodKind::Daily => daily_bounds(year, index),
-            PeriodKind::Quarterly => quarter_bounds(year, index as u8),
-            PeriodKind::Monthly => month_bounds(year, index as u8),
-            PeriodKind::Weekly => week_bounds(year, index as u8),
-            PeriodKind::SemiAnnual => half_bounds(year, index as u8),
-            PeriodKind::Annual => annual_bounds(year),
-        }
-    }
-
-    fn fiscal_bounds(
-        self,
-        fiscal_year: i32,
-        index: u16,
-        config: FiscalConfig,
-    ) -> crate::Result<(Date, Date)> {
-        match self {
-            PeriodKind::Daily => fiscal_daily_bounds(fiscal_year, index, config),
-            PeriodKind::Quarterly => fiscal_quarter_bounds(fiscal_year, index as u8, config),
-            PeriodKind::Monthly => fiscal_month_bounds(fiscal_year, index as u8, config),
-            PeriodKind::Weekly => fiscal_week_bounds(fiscal_year, index as u8, config),
-            PeriodKind::SemiAnnual => fiscal_half_bounds(fiscal_year, index as u8, config),
-            PeriodKind::Annual => fiscal_annual_bounds(fiscal_year, config),
-        }
-    }
-
-    fn max_index_for_year(self, year: i32) -> u16 {
-        match self {
-            PeriodKind::Daily => days_in_year(year),
-            PeriodKind::Quarterly => 4,
-            PeriodKind::Monthly => 12,
-            PeriodKind::Weekly => iso_weeks_in_year(year) as u16,
-            PeriodKind::SemiAnnual => 2,
-            PeriodKind::Annual => 1,
-        }
-    }
 }
 
 /// Identifier for a Gregorian period like `2025Q1` or a fiscal period like
@@ -259,15 +198,9 @@ impl PeriodKind {
 #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
 pub struct PeriodId {
     /// Gregorian or fiscal year label.
-    pub year: i32,
-    /// Ordinal index within the year (depends on `kind`).
-    /// - Daily:   1..=366 (ordinal day of the calendar year)
-    /// - Quarter: 1..=4
-    /// - Month:   1..=12
-    /// - Week:    1..=53 (ISO 8601 week-year numbering)
-    /// - Half:    1..=2
-    /// - Annual:  1
-    pub index: u16,
+    year: i32,
+    /// One-based index within the year; see [`PeriodId::index`].
+    index: u16,
     /// Kind of the period.
     kind: PeriodKind,
     /// Whether this identifier uses fiscal (`FY...`) rather than Gregorian/ISO semantics.
@@ -315,7 +248,7 @@ impl PeriodId {
     /// * `year` - Calendar or fiscal year used to construct the period identifier.
     /// * `ordinal` - One-based day ordinal valid for the supplied Gregorian year.
     pub fn day(year: i32, ordinal: u16) -> crate::Result<Self> {
-        Self::try_new(year, ordinal, PeriodKind::Daily, days_in_year(year))
+        Self::try_new(year, ordinal, PeriodKind::Daily)
     }
     /// Try to build a quarterly identifier.
     ///
@@ -328,7 +261,7 @@ impl PeriodId {
     /// * `year` - Calendar or fiscal year containing the quarter.
     /// * `q` - One-based quarter number in the inclusive range `1..=4`.
     pub fn quarter(year: i32, q: u8) -> crate::Result<Self> {
-        Self::try_new(year, u16::from(q), PeriodKind::Quarterly, 4)
+        Self::try_new(year, u16::from(q), PeriodKind::Quarterly)
     }
     /// Try to build a monthly identifier.
     ///
@@ -341,7 +274,7 @@ impl PeriodId {
     /// * `year` - Calendar or fiscal year used to construct the period identifier.
     /// * `m` - One-based month number in the inclusive range `1..=12`.
     pub fn month(year: i32, m: u8) -> crate::Result<Self> {
-        Self::try_new(year, u16::from(m), PeriodKind::Monthly, 12)
+        Self::try_new(year, u16::from(m), PeriodKind::Monthly)
     }
     /// Try to build a weekly identifier for a Gregorian ISO week-year.
     ///
@@ -355,12 +288,7 @@ impl PeriodId {
     /// * `year` - Calendar or fiscal year used to construct the period identifier.
     /// * `w` - One-based ISO week number valid for the supplied ISO week-year.
     pub fn week(year: i32, w: u8) -> crate::Result<Self> {
-        Self::try_new(
-            year,
-            u16::from(w),
-            PeriodKind::Weekly,
-            u16::from(iso_weeks_in_year(year)),
-        )
+        Self::try_new(year, u16::from(w), PeriodKind::Weekly)
     }
     /// Try to build a semi-annual identifier.
     ///
@@ -373,7 +301,7 @@ impl PeriodId {
     /// * `year` - Calendar or fiscal year used to construct the period identifier.
     /// * `h` - One-based half-year number in the inclusive range `1..=2`.
     pub fn half(year: i32, h: u8) -> crate::Result<Self> {
-        Self::try_new(year, u16::from(h), PeriodKind::SemiAnnual, 2)
+        Self::try_new(year, u16::from(h), PeriodKind::SemiAnnual)
     }
     /// Build an annual identifier.
     pub fn annual(year: i32) -> Self {
@@ -385,7 +313,8 @@ impl PeriodId {
         }
     }
 
-    fn try_new(year: i32, index: u16, kind: PeriodKind, max: u16) -> crate::Result<Self> {
+    fn try_new(year: i32, index: u16, kind: PeriodKind) -> crate::Result<Self> {
+        let max = Calendar::Gregorian.max_index(year, kind)?;
         if !(1..=max).contains(&index) {
             return Err(invalid_period(
                 &format!("{kind} {year} index {index}"),
@@ -398,6 +327,23 @@ impl PeriodId {
             kind,
             fiscal: false,
         })
+    }
+
+    /// Gregorian (or ISO week-year) or fiscal year label.
+    pub fn year(&self) -> i32 {
+        self.year
+    }
+
+    /// One-based index within the year, by kind.
+    ///
+    /// - Daily: 1..=366, ordinal day of the Gregorian or fiscal year
+    /// - Weekly: 1..=53, ISO 8601 week, or 7-day block from the fiscal-year start
+    /// - Monthly: 1..=12
+    /// - Quarterly: 1..=4
+    /// - Semi-annual: 1..=2
+    /// - Annual: 1
+    pub fn index(&self) -> u16 {
+        self.index
     }
 
     /// Get the period kind (frequency).
@@ -416,12 +362,8 @@ impl PeriodId {
 
     /// Get the number of periods per year for this frequency.
     ///
-    /// # Returns
-    /// - Quarterly: 4
-    /// - Monthly: 12
-    /// - Weekly: 52
-    /// - Semi-Annual: 2
-    /// - Annual: 1
+    /// Same table as [`PeriodKind::periods_per_year`]: Daily 252 (trading
+    /// days), Weekly 52, Monthly 12, Quarterly 4, Semi-Annual 2, Annual 1.
     ///
     /// # Example
     /// ```
@@ -454,16 +396,10 @@ impl PeriodId {
     ///
     /// # Errors
     ///
-    /// Returns an error for fiscal (`FY...`) identifiers because their year
-    /// capacity depends on a [`FiscalConfig`]. Use [`Self::next_fiscal`].
+    /// Same as [`Self::shift`] with `periods = 1`; a fiscal daily identifier
+    /// at its year's day 365 needs [`Self::next_fiscal`].
     pub fn next(self) -> crate::Result<Self> {
-        if self.fiscal {
-            return Err(crate::Error::Validation(
-                "PeriodId::next cannot step a fiscal identifier; use next_fiscal with an explicit FiscalConfig"
-                    .to_string(),
-            ));
-        }
-        step(self)
+        self.shift(1)
     }
 
     /// Step backward to the previous period.
@@ -483,23 +419,122 @@ impl PeriodId {
     ///
     /// # Errors
     ///
-    /// Returns an error for fiscal (`FY...`) identifiers because their year
-    /// capacity depends on a [`FiscalConfig`]. Use [`Self::prev_fiscal`].
+    /// Same as [`Self::shift`] with `periods = -1`; a fiscal daily identifier
+    /// at its year's first day needs [`Self::prev_fiscal`].
     pub fn prev(self) -> crate::Result<Self> {
-        if self.fiscal {
-            return Err(crate::Error::Validation(
-                "PeriodId::prev cannot step a fiscal identifier; use prev_fiscal with an explicit FiscalConfig"
-                    .to_string(),
+        self.shift(-1)
+    }
+
+    /// Move by a whole number of periods of the same kind and calendar.
+    ///
+    /// Gregorian daily and weekly identifiers move by 1 or 7 calendar days
+    /// (ISO week-years for weekly). Every other kind, fiscal weeks included,
+    /// has a fixed number of periods per year (fiscal years always hold 53
+    /// weekly blocks), so the year rolls over at that count. Fiscal daily
+    /// identifiers can only move within days `1..=365`, the part of a fiscal
+    /// year that does not depend on its [`FiscalConfig`].
+    ///
+    /// # Arguments
+    ///
+    /// * `periods` - Signed number of periods to move; negative moves back
+    ///   and `0` returns the identifier unchanged after validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when the identifier's index is outside its
+    /// year's range, the result's year or date is outside the supported range,
+    /// or a fiscal daily result would leave days `1..=365` (step with
+    /// [`Self::next_fiscal`] / [`Self::prev_fiscal`] instead).
+    ///
+    /// # Example
+    /// ```
+    /// use finstack_quant_core::dates::PeriodId;
+    ///
+    /// let q3 = PeriodId::quarter(2025, 3)?;
+    /// assert_eq!(q3.shift(-6)?, PeriodId::quarter(2024, 1)?);
+    /// let fiscal = "FY2025M11".parse::<PeriodId>()?;
+    /// assert_eq!(fiscal.shift(2)?.to_string(), "FY2026M01");
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn shift(self, periods: i32) -> crate::Result<Self> {
+        let out_of_range = || {
+            invalid_period(
+                &self.to_string(),
+                &format!("shifting by {periods} periods leaves the supported range"),
+            )
+        };
+        let max = if self.fiscal {
+            self.kind.capacity()
+        } else {
+            Calendar::Gregorian.max_index(self.year, self.kind)?
+        };
+        if !(1..=max).contains(&self.index) {
+            return Err(invalid_period(
+                &self.to_string(),
+                "period index is outside this year's range",
             ));
         }
-        step_backward(self)
+        match (self.kind, self.fiscal) {
+            (PeriodKind::Daily, true) => {
+                if periods == 0 {
+                    return Ok(self);
+                }
+                let index = i32::from(self.index)
+                    .checked_add(periods)
+                    .ok_or_else(out_of_range)?;
+                if !(1..=365).contains(&index) {
+                    return Err(invalid_period(
+                        &self.to_string(),
+                        &format!(
+                            "shifting by {periods} days crosses a fiscal-year boundary; \
+                             use next_fiscal/prev_fiscal with an explicit FiscalConfig"
+                        ),
+                    ));
+                }
+                Ok(Self {
+                    index: index as u16,
+                    ..self
+                })
+            }
+            (PeriodKind::Daily | PeriodKind::Weekly, false) => {
+                let (start, days) = if self.kind == PeriodKind::Daily {
+                    (Date::from_ordinal_date(self.year, self.index), 1)
+                } else {
+                    (
+                        Date::from_iso_week_date(
+                            self.year,
+                            self.index as u8,
+                            time::Weekday::Monday,
+                        ),
+                        7,
+                    )
+                };
+                let date = start
+                    .ok()
+                    .and_then(|start| {
+                        start.checked_add(time::Duration::days(i64::from(periods) * days))
+                    })
+                    .ok_or_else(out_of_range)?;
+                Ok(Self::from_date(date, self.kind))
+            }
+            _ => {
+                let n = i64::from(max);
+                let ordinal =
+                    i64::from(self.year) * n + i64::from(self.index) - 1 + i64::from(periods);
+                Ok(Self {
+                    year: i32::try_from(ordinal.div_euclid(n)).map_err(|_| out_of_range())?,
+                    index: (ordinal.rem_euclid(n) + 1) as u16,
+                    ..self
+                })
+            }
+        }
     }
 
     /// Step forward using the capacity of the supplied fiscal calendar.
     ///
-    /// This differs from [`Self::next`] for weekly and daily identifiers:
-    /// fiscal years may contain a partial week 53 or a leap-day ordinal even
-    /// when the corresponding Gregorian/ISO year does not.
+    /// Unlike [`Self::next`], this can step fiscal daily identifiers across a
+    /// fiscal-year end, whose length (365 or 366 days) depends on `config`.
+    /// The result is always marked fiscal.
     ///
     /// # Errors
     ///
@@ -508,9 +543,10 @@ impl PeriodId {
     ///
     /// # Arguments
     ///
-    /// * `config` - Configuration object controlling validation, rounding, or solver behavior
+    /// * `config` - Fiscal-year start that sizes the fiscal year's week and
+    ///   day capacity (a fiscal year holds 365 or 366 days and 53 weeks).
     pub fn next_fiscal(self, config: FiscalConfig) -> crate::Result<Self> {
-        let mut next = step_with_calendar(self, &FiscalCalendar { config }, true)?;
+        let mut next = step(self, Calendar::Fiscal(config), true)?;
         next.fiscal = true;
         Ok(next)
     }
@@ -526,21 +562,41 @@ impl PeriodId {
     ///
     /// # Arguments
     ///
-    /// * `config` - Configuration object controlling validation, rounding, or solver behavior
+    /// * `config` - Fiscal-year start that sizes the preceding fiscal year's
+    ///   week and day capacity.
     pub fn prev_fiscal(self, config: FiscalConfig) -> crate::Result<Self> {
-        let mut prev = step_with_calendar(self, &FiscalCalendar { config }, false)?;
+        let mut prev = step(self, Calendar::Fiscal(config), false)?;
         prev.fiscal = true;
         Ok(prev)
     }
 }
 
 /// Configuration for fiscal year periods.
+///
+/// Always holds a start month in `1..=12` and a start day in `1..=31`;
+/// deserialization applies the same validation as [`FiscalConfig::new`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "FiscalConfigFields")]
 pub struct FiscalConfig {
     /// The month when the fiscal year starts (1-12).
-    pub start_month: u8,
+    start_month: u8,
     /// The day of the month when the fiscal year starts (1-31).
-    pub start_day: u8,
+    start_day: u8,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FiscalConfigFields {
+    start_month: u8,
+    start_day: u8,
+}
+
+impl TryFrom<FiscalConfigFields> for FiscalConfig {
+    type Error = crate::Error;
+
+    fn try_from(fields: FiscalConfigFields) -> crate::Result<Self> {
+        Self::new(fields.start_month, fields.start_day)
+    }
 }
 
 /// The calendar year (January 1), the fiscal year used when none is given.
@@ -616,6 +672,50 @@ impl FiscalConfig {
         Self::new(start_month.unwrap_or(1), start_day.unwrap_or(1)).map(Some)
     }
 
+    /// Month the fiscal year starts in (1 = January … 12).
+    pub fn start_month(&self) -> u8 {
+        self.start_month
+    }
+
+    /// Day of [`Self::start_month`] the fiscal year starts on (1-31).
+    pub fn start_day(&self) -> u8 {
+        self.start_day
+    }
+
+    /// First calendar date of a fiscal year.
+    ///
+    /// Fiscal years are labelled by the calendar year they end in, so every
+    /// start other than January 1 falls in the previous calendar year
+    /// (FY2025 under an October 1 start begins 2024-10-01). A start day past
+    /// the month's end (for example February 30) clamps to its last day.
+    ///
+    /// # Arguments
+    ///
+    /// * `fiscal_year` - Fiscal-year label, such as the `2025` in `FY2025`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when the start date falls outside the
+    /// supported calendar range.
+    pub fn year_start(self, fiscal_year: i32) -> crate::Result<Date> {
+        let calendar_year = if self.start_month == 1 && self.start_day == 1 {
+            fiscal_year
+        } else {
+            checked_year_offset(fiscal_year, -1)?
+        };
+        let month = Month::try_from(self.start_month).map_err(|_| {
+            crate::Error::Validation(format!(
+                "fiscal start_month must be in 1..=12, got {}",
+                self.start_month
+            ))
+        })?;
+        crate::dates::create_date(
+            calendar_year,
+            month,
+            self.start_day.min(month.length(calendar_year)),
+        )
+    }
+
     /// Standard calendar year (January 1).
     pub fn calendar_year() -> Self {
         Self {
@@ -682,16 +782,10 @@ pub struct Period {
 /// `start` of the next.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PeriodPlan {
     /// Ordered periods produced by the parser.
     pub periods: Vec<Period>,
-}
-
-impl PeriodPlan {
-    /// Iterate over periods in ascending order.
-    pub fn iter(&self) -> impl Iterator<Item = &Period> {
-        self.periods.iter()
-    }
 }
 
 /// Build periods from a range expression (e.g., "2025Q1..Q4" or "2024Q4..2025Q2").
@@ -735,7 +829,7 @@ impl PeriodPlan {
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn build_periods(range: &str, actuals_until: Option<&str>) -> crate::Result<PeriodPlan> {
-    build_periods_with_calendar(range, Gregorian, actuals_until)
+    build_periods_with_calendar(range, Calendar::Gregorian, actuals_until)
 }
 
 /// Build fiscal periods from a range expression with custom fiscal year configuration.
@@ -767,16 +861,9 @@ pub fn build_fiscal_periods(
     fiscal_config: FiscalConfig,
     actuals_until: Option<&str>,
 ) -> crate::Result<PeriodPlan> {
-    build_periods_with_calendar(
-        range,
-        FiscalCalendar {
-            config: fiscal_config,
-        },
-        actuals_until,
-    )
+    build_periods_with_calendar(range, Calendar::Fiscal(fiscal_config), actuals_until)
 }
 
-// Minimal calendar abstraction to unify bounds computation across calendar and fiscal paths.
 impl PartialOrd for PeriodId {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
@@ -802,9 +889,8 @@ impl Ord for PeriodId {
 
         // Mixed frequencies in the same year: order by actual calendar span
         // (start date, then end date) using Gregorian bounds.
-        let greg = Gregorian;
-        let self_bounds = greg.bounds(self.year, self.kind, self.index);
-        let other_bounds = greg.bounds(other.year, other.kind, other.index);
+        let self_bounds = Calendar::Gregorian.bounds(self.year, self.kind, self.index);
+        let other_bounds = Calendar::Gregorian.bounds(other.year, other.kind, other.index);
 
         // Malformed PeriodId still needs a total ordering.
         let (Ok((self_start, self_end)), Ok((other_start, other_end))) =
@@ -852,18 +938,16 @@ impl fmt::Display for PeriodId {
 impl FromStr for PeriodId {
     type Err = crate::error::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse_id(s)
+        parse_id(s, Calendar::Gregorian)
     }
 }
 
-// Implement From<PeriodId> for String to enable serde(into = "String")
 impl From<PeriodId> for String {
     fn from(period: PeriodId) -> Self {
         period.to_string()
     }
 }
 
-// Implement TryFrom<String> for PeriodId to enable serde(try_from = "String")
 impl TryFrom<String> for PeriodId {
     type Error = crate::error::Error;
     fn try_from(s: String) -> Result<Self, Self::Error> {

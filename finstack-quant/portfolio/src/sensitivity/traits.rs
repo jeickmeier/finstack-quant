@@ -75,10 +75,9 @@ fn exact_curve_key(market: &MarketContext, curve_id: &CurveId) -> Option<MarketF
         CurveStorage::BaseCorrelation(_) => {
             return Some(MarketFactorKey::BaseCorrelation(curve_id.clone()));
         }
-        CurveStorage::Price(_)
-        | CurveStorage::VolIndex(_)
-        | CurveStorage::BasisSpread(_)
-        | CurveStorage::Parametric(_) => return None,
+        CurveStorage::Price(_) | CurveStorage::BasisSpread(_) | CurveStorage::Parametric(_) => {
+            return None
+        }
     };
     Some(MarketFactorKey::curve(curve_id.clone(), kind))
 }

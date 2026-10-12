@@ -73,12 +73,12 @@ fn provider_cache_hits_refresh_recency_and_evict_the_least_recent_quote() {
         matrix.rate(query(day)).expect("provider rate");
     }
     assert_eq!(provider.0.load(Ordering::Relaxed), 3);
-    assert_eq!(matrix.cache_stats(), 2);
+    assert_eq!(matrix.stored_quote_count(), 2);
     matrix
         .rate(query(2))
         .expect("evicted quote is fetched again");
     assert_eq!(provider.0.load(Ordering::Relaxed), 4);
-    assert_eq!(matrix.cache_stats(), 2);
+    assert_eq!(matrix.stored_quote_count(), 2);
 }
 
 #[test]
@@ -91,7 +91,7 @@ fn provider_cache_allocates_for_observations_instead_of_the_capacity_limit() {
         },
     )
     .expect("nonzero capacity is valid");
-    assert_eq!(matrix.cache_stats(), 0);
+    assert_eq!(matrix.stored_quote_count(), 0);
     let date = Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
     assert_eq!(
         matrix
@@ -100,7 +100,7 @@ fn provider_cache_allocates_for_observations_instead_of_the_capacity_limit() {
             .rate,
         1.2
     );
-    assert_eq!(matrix.cache_stats(), 1);
+    assert_eq!(matrix.stored_quote_count(), 1);
 }
 
 #[test]
@@ -296,8 +296,8 @@ fn providers_without_revisions_do_not_cache_observations() {
     provider.0.store(120, Ordering::Relaxed);
     assert_eq!(matrix.rate(query).expect("updated live rate").rate, 1.2);
     assert!((bumped.rate(query).expect("updated bumped rate").rate - 1.212).abs() < 1e-12);
-    assert_eq!(matrix.cache_stats(), 0);
-    assert_eq!(bumped.cache_stats(), 0);
+    assert_eq!(matrix.stored_quote_count(), 0);
+    assert_eq!(bumped.stored_quote_count(), 0);
 }
 
 #[test]
@@ -2088,6 +2088,16 @@ fn reciprocal_of_subnormal_rate_is_rejected() {
         result.is_err(),
         "infinite reciprocal must be rejected, got {result:?}"
     );
+    let err = matrix
+        .validate_triangular(5.0)
+        .expect_err("subnormal reciprocal is not a cycle product");
+    assert!(matches!(
+        err,
+        finstack_quant_core::Error::Input(finstack_quant_core::InputError::InvalidFxRate { .. })
+            | finstack_quant_core::Error::Input(
+                finstack_quant_core::InputError::NonFiniteValue { .. }
+            )
+    ));
 }
 
 /// Provider-observed rates must not depend on which pair direction warmed the

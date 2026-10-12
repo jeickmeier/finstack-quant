@@ -4300,11 +4300,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Money"
   },
   {
-    "path": "#/$defs/d_743863a8885ce3c595b4",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeId",
-    "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`]."
-  },
-  {
     "path": "#/$defs/d_743b3dc0bceb8c74b135",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FeeTier",
     "description": "Fee tier for utilization-based fee structures.\n\nTiers are evaluated in order: the first tier where utilization >= threshold applies.\nTiers must be sorted by threshold (ascending); [`evaluate_fee_tiers`]\nrejects unordered tiers."
@@ -5139,8 +5134,8 @@ export default [
     "path": "#/$defs/d_7b4cd44901322286925a/properties/node_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeSpec/properties/node_id",
     "description": "Unique identifier for this node",
-    "ref": "#/$defs/NodeId",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeId"
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_7b4cd44901322286925a/properties/node_type",
@@ -5431,7 +5426,7 @@ export default [
   {
     "path": "#/$defs/d_87642a02554ab08b56e3",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Attributes",
-    "description": "User-defined tags and key-value metadata for instrument classification."
+    "description": "User-defined tags and key-value metadata for instrument classification.\n\nTags are a sorted set of labels. Metadata is a sorted string-to-string map.\nBoth fields are public so callers can insert, remove, and iterate entries\ndirectly. [`Attributes::add_tag`] and [`Attributes::set_meta`] are the\nin-place writers; [`Attributes::with_tag`] and [`Attributes::with_meta`]\nreturn the bag for construction chains.\n\n[`Attributes::matches_selector`] accepts three forms:\n\n- `\"*\"` matches every attribute set\n- `\"tag:<name>\"` matches when that tag is present\n- `\"meta:<key>=<value>\"` matches an exact metadata entry\n\nAny other selector text returns `false`.\n\n# Examples\n\n```\nuse finstack_quant_core::types::Attributes;\n\nlet attrs = Attributes::new()\n    .with_tag(\"energy\")\n    .with_meta(\"region\", \"NA\");\nassert!(attrs.has_tag(\"energy\"));\nassert_eq!(attrs.get_meta(\"region\"), Some(\"NA\"));\nassert!(attrs.matches_selector(\"meta:region=NA\"));\nassert!(!attrs.matches_selector(\"sector:energy\"));\n```"
   },
   {
     "path": "#/$defs/d_87642a02554ab08b56e3/properties/meta",
@@ -5937,7 +5932,7 @@ export default [
   {
     "path": "#/$defs/d_8ee3d9187956de7832b9",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CFKind",
-    "description": "Enumeration of cash-flow kinds for classification and ordering.\n\nUsed to distinguish between different types of cashflows for\nproper sequencing, risk calculation, and accounting treatment.\n\n# Sign Convention\n\nThe enum itself is **view agnostic**: individual instruments are\nresponsible for mapping these kinds into a holder or issuer view.\nBy convention in this crate:\n\n| Kind | Holder View (Long) | Issuer View (Short) |\n|------|-------------------|---------------------|\n| Interest (Fixed/Float) | Positive (receive) | Negative (pay) |\n| Notional (initial) | Negative (pay) | Positive (receive) |\n| Notional (final) | Positive (receive) | Negative (pay) |\n| Amortization | Positive (receive) | Negative (pay) |\n| PIK | Increases notional | Increases liability |\n| Fee | Negative (pay) | Positive (receive) |\n\nWhen constructing cashflow schedules, instruments should apply the appropriate\nsign based on the economic perspective being represented.\n\n# Cashflow Categories\n\nVariants are grouped by category:\n- **Interest**: `Fixed`, `FloatReset`, `Stub`\n- **Inflation**: `InflationCoupon`\n- **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`\n- **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`\n- **Revolving**: `RevolvingDraw`, `RevolvingRepayment`\n- **Credit Events**: `DefaultedNotional`, `Recovery`\n- **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc."
+    "description": "Enumeration of cash-flow kinds for classification and ordering.\n\nUsed to distinguish between different types of cashflows for\nproper sequencing, risk calculation, and accounting treatment.\n\n# Sign Convention\n\nThe enum itself is **view agnostic**: individual instruments are\nresponsible for mapping these kinds into a holder or issuer view.\nBy convention in this crate:\n\n| Kind | Holder View (Long) | Issuer View (Short) |\n|------|-------------------|---------------------|\n| Interest (Fixed/Float) | Positive (receive) | Negative (pay) |\n| Notional (initial) | Negative (pay) | Positive (receive) |\n| Notional (final) | Positive (receive) | Negative (pay) |\n| Amortization | Positive (receive) | Negative (pay) |\n| PIK | Increases notional | Increases liability |\n| Fee | Negative (pay) | Positive (receive) |\n\nWhen constructing cashflow schedules, instruments should apply the appropriate\nsign based on the economic perspective being represented.\n\n# Cashflow Categories\n\nVariants are grouped by category:\n- **Interest**: `Fixed`, `FloatReset`, `Stub`\n- **Inflation**: `InflationCoupon`\n- **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`\n- **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`\n- **Revolving**: `RevolvingDraw`, `RevolvingRepayment`\n- **Credit Events**: `DefaultedNotional`, `Recovery`\n- **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.\n\n# Labels\n\n`Display`, `FromStr`, and serde share one snake_case label per kind\n(`\"fixed\"`, `\"float_reset\"`, `\"pre_payment\"`); `FromStr` matches it\nexactly, with no aliases or case folding. [`CFKind::parse_label`] adds the\ncase-insensitive reporting aliases."
   },
   {
     "path": "#/$defs/d_8ee3d9187956de7832b9/oneOf/0",

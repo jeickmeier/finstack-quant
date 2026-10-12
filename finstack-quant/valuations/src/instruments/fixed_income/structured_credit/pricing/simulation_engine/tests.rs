@@ -732,8 +732,8 @@ mod cases {
         .build()
         .expect("forward curve should build");
         let start_date = Date::from_calendar_date(2025, Month::April, 1).expect("valid start date");
-        let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")
-            .expect("calendar");
+        let calendar =
+            finstack_quant_core::dates::calendar_by_id_strict("weekends_only").expect("calendar");
         let fixing_date = start_date
             .add_business_days(-curve.reset_lag(), calendar)
             .expect("fixing date");

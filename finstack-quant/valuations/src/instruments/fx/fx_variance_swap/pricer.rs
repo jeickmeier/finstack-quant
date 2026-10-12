@@ -38,7 +38,7 @@ pub(crate) fn compute_pv(
     let obs_dates = observation_dates(inst)?;
     let expected_var = expected_variance_with_dates(inst, context, as_of, &obs_dates)?;
     let df = dom.df_between_dates(as_of, settlement_date)?;
-    Ok(inst.payoff(expected_var)? * df)
+    inst.payoff(expected_var)?.checked_mul_f64(df)
 }
 
 pub(crate) fn observation_dates(inst: &FxVarianceSwap) -> Result<Vec<Date>> {
@@ -1004,7 +1004,11 @@ mod tests {
         let df = dom
             .df_between_dates(as_of, swap.maturity)
             .expect("date-based df");
-        let expected_pv = swap.payoff(expected_var).expect("valid payoff") * df;
+        let expected_pv = swap
+            .payoff(expected_var)
+            .expect("valid payoff")
+            .checked_mul_f64(df)
+            .expect("finite discount factor");
 
         assert!(
             (pv.amount() - expected_pv.amount()).abs() < 1e-6,
@@ -1014,7 +1018,11 @@ mod tests {
         );
 
         let count_var = realized * time_w + forward * (1.0 - time_w);
-        let count_pv = swap.payoff(count_var).expect("valid payoff") * df;
+        let count_pv = swap
+            .payoff(count_var)
+            .expect("valid payoff")
+            .checked_mul_f64(df)
+            .expect("finite discount factor");
         assert!(
             (pv.amount() - count_pv.amount()).abs() > 1e-6,
             "FX seasoned MTM must differ from calendar-time weighting"
@@ -1298,7 +1306,11 @@ mod tests {
         let df_correct = dom
             .df_between_dates(as_of, maturity)
             .expect("date-based df");
-        let expected_pv = swap.payoff(forward).expect("valid payoff") * df_correct;
+        let expected_pv = swap
+            .payoff(forward)
+            .expect("valid payoff")
+            .checked_mul_f64(df_correct)
+            .expect("finite discount factor");
         assert!(
             (pv.amount() - expected_pv.amount()).abs() < 1e-6,
             "terminal PV must use date-based discounting: pv={} expected={}",

@@ -149,10 +149,14 @@ def test_fiscal_week_stepping_includes_week_53() -> None:
 
     assert PeriodId.parse("2025W52").next().code == "2026W01"
 
+    assert week_52.next() == week_53
+    assert week_53.next().code == "FY2026W01"
+    assert PeriodId.parse("FY2026W01").prev() == week_53
+
     with pytest.raises(ValueError, match="next_fiscal"):
-        week_52.next()
+        PeriodId.parse("FY2025D365").next()
     with pytest.raises(ValueError, match="prev_fiscal"):
-        week_52.prev()
+        PeriodId.parse("FY2025D001").prev()
 
 
 def test_schedule_builder_from_spec_and_dataframe() -> None:

@@ -249,7 +249,7 @@ impl HaircutImCalculator {
         let entry = self.matching_entry(asset_class)?;
         let total_haircut = entry.total_haircut(currency_mismatch);
 
-        let amount = collateral_value * total_haircut;
+        let amount = collateral_value.checked_mul_f64(total_haircut)?;
         Ok(Self::result_from_amount(
             amount,
             as_of,

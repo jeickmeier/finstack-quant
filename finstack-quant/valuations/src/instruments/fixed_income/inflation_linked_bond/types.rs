@@ -313,7 +313,7 @@ impl InflationLinkedBond {
                 "{context} UK linkers require a 3-month modern or 8-month legacy lag"
             )));
         }
-        crate::cashflow::builder::calendar::resolve_calendar_strict(self.schedule_calendar_id())?;
+        finstack_quant_core::dates::calendar_by_id_strict(self.schedule_calendar_id())?;
         let periods = self.periods()?;
         if periods.is_empty() {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -855,7 +855,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
             detailed_flows.push(crate::cashflow::primitives::CashFlow::new(
                 principal_date,
                 None,
-                self.notional * principal_ratio,
+                self.notional.checked_mul_f64(principal_ratio)?,
                 crate::cashflow::primitives::CFKind::Notional,
                 0.0,
                 None,

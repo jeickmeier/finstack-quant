@@ -297,10 +297,44 @@ fn fiscal_config_constructors_and_validation() {
     assert!(FiscalConfig::new(13, 1).is_err());
     assert!(FiscalConfig::new(1, 32).is_err());
     let uk = FiscalConfig::uk();
-    assert_eq!(uk.start_month, 4);
+    assert_eq!(uk.start_month(), 4);
     let feb_edge = FiscalConfig::new(2, 30).expect("feb clamp path");
     let plan = build_fiscal_periods("2025Q1..Q1", feb_edge, None).expect("fiscal quarter");
     assert_eq!(plan.periods.len(), 1);
+}
+
+#[test]
+fn fiscal_config_deserialization_validates_and_year_start_clamps() {
+    let uk: FiscalConfig =
+        serde_json::from_str(r#"{"start_month":4,"start_day":6}"#).expect("valid config");
+    assert_eq!(uk, FiscalConfig::uk());
+    assert_eq!(
+        serde_json::to_string(&uk).expect("serialize"),
+        r#"{"start_month":4,"start_day":6}"#
+    );
+    for json in [
+        r#"{"start_month":4,"start_day":0}"#,
+        r#"{"start_month":4,"start_day":40}"#,
+        r#"{"start_month":13,"start_day":1}"#,
+        r#"{"start_month":4,"start_day":6,"extra":1}"#,
+    ] {
+        assert!(
+            serde_json::from_str::<FiscalConfig>(json).is_err(),
+            "{json}"
+        );
+    }
+
+    assert_eq!(
+        FiscalConfig::calendar_year().year_start(2025),
+        Ok(d(2025, Month::January, 1))
+    );
+    assert_eq!(
+        FiscalConfig::us_federal().year_start(2025),
+        Ok(d(2024, Month::October, 1))
+    );
+    let feb_30 = FiscalConfig::new(2, 30).expect("clamped start");
+    assert_eq!(feb_30.year_start(2025), Ok(d(2024, Month::February, 29)));
+    assert_eq!(feb_30.year_start(2026), Ok(d(2025, Month::February, 28)));
 }
 
 #[test]
@@ -419,14 +453,36 @@ fn fiscal_week_53_display_parse_and_serde_roundtrip() {
 }
 
 #[test]
-fn fiscal_ids_reject_ambiguous_gregorian_stepping() {
+fn fiscal_stepping_needs_a_calendar_only_across_fiscal_day_365() {
+    let federal = FiscalConfig::us_federal();
     let week = PeriodId::from_str("FY2025W52").expect("fiscal week");
+    for id in [week, week.next_fiscal(federal).expect("FY2025W53")] {
+        assert_eq!(id.next(), id.next_fiscal(federal));
+    }
+    assert_eq!(
+        PeriodId::from_str("FY2026W01").expect("fiscal week").prev(),
+        PeriodId::from_str("FY2026W01")
+            .expect("fiscal week")
+            .prev_fiscal(federal)
+    );
+    assert_eq!(
+        PeriodId::from_str("FY2025Q1")
+            .expect("fiscal quarter")
+            .prev(),
+        PeriodId::from_str("FY2024Q4")
+    );
 
-    let next_error = week.next().expect_err("fiscal next requires a calendar");
+    let day_365 = PeriodId::from_str("FY2025D365").expect("fiscal day");
+    let next_error = day_365
+        .next()
+        .expect_err("FY day 366 depends on the calendar");
     assert!(next_error.to_string().contains("next_fiscal"));
-
-    let prev_error = week.prev().expect_err("fiscal prev requires a calendar");
+    let day_1 = PeriodId::from_str("FY2025D001").expect("fiscal day");
+    let prev_error = day_1
+        .prev()
+        .expect_err("prior FY length depends on the calendar");
     assert!(prev_error.to_string().contains("prev_fiscal"));
+    assert_eq!(day_365.shift(-364), Ok(day_1));
 
     assert_eq!(
         PeriodId::from_str("2025W52")
@@ -448,13 +504,50 @@ fn fallible_period_id_constructors_reject_invalid_indices() {
 }
 
 #[test]
-fn period_plan_iter_and_serde_roundtrip() {
+fn period_plan_serde_roundtrip() {
     let plan = build_periods("2025Q1..Q2", None).expect("plan");
-    let count = plan.iter().count();
-    assert_eq!(count, 2);
+    assert_eq!(plan.periods.len(), 2);
     let json = serde_json::to_string(&plan).expect("serialize plan");
     let back: PeriodPlan = serde_json::from_str(&json).expect("deserialize plan");
     assert_eq!(back.periods.len(), plan.periods.len());
+}
+
+#[test]
+fn fiscal_daily_shift_is_overflow_safe_and_zero_is_identity() {
+    let leap_day = PeriodId::from_str("FY2024D366").expect("leap fiscal day");
+    assert_eq!(leap_day.shift(0), Ok(leap_day));
+    let day = PeriodId::from_str("FY2025D010").expect("fiscal day");
+    assert!(day.shift(i32::MAX).is_err());
+    assert!(day.shift(i32::MIN).is_err());
+}
+
+#[test]
+fn shift_matches_repeated_stepping_and_rolls_years() {
+    for code in ["2024D360", "2020W50", "2025M11", "2025Q3", "2025H2", "2025"] {
+        let id = PeriodId::from_str(code).expect("period");
+        let mut forward = id;
+        let mut backward = id;
+        for n in 1..=60 {
+            forward = step(forward, Calendar::Gregorian, true).expect("next");
+            backward = step(backward, Calendar::Gregorian, false).expect("prev");
+            assert_eq!(id.shift(n), Ok(forward), "{code} +{n}");
+            assert_eq!(id.shift(-n), Ok(backward), "{code} -{n}");
+        }
+        assert_eq!(id.shift(0), Ok(id));
+    }
+    assert_eq!(
+        PeriodId::quarter(2025, 3).expect("q").shift(-10),
+        PeriodId::quarter(2023, 1)
+    );
+    assert_eq!(
+        PeriodId::day(2024, 366).expect("leap day").shift(1),
+        PeriodId::day(2025, 1)
+    );
+    assert_eq!(
+        PeriodId::week(2020, 53).expect("ISO week 53").shift(1),
+        PeriodId::week(2021, 1)
+    );
+    assert!(PeriodId::annual(i32::MAX).shift(1).is_err());
 }
 
 #[test]

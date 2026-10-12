@@ -712,8 +712,7 @@
   "quarter": 3,
   "rate_zero": [
     0.0,
-    0,
-    0.0
+    0
   ],
   "rating_registry": {
     "default_scale_id": "sp",

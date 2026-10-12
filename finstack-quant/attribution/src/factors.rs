@@ -78,6 +78,7 @@ use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_core::market_data::term_structures::ParametricCurve;
 use finstack_quant_core::market_data::term_structures::PriceCurve;
+use finstack_quant_core::market_data::term_structures::PriceCurveKind;
 use finstack_quant_core::money::fx::FxMatrix;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::HashMap;
@@ -409,12 +410,18 @@ impl MarketSnapshot {
                             .base_correlation_curves
                             .insert(curve_id.clone(), Arc::clone(curve));
                     }
-                    CurveStorage::VolIndex(curve) if flags.contains(MarketRestoreFlags::VOL) => {
+                    CurveStorage::Price(curve)
+                        if curve.kind() == PriceCurveKind::VolIndex
+                            && flags.contains(MarketRestoreFlags::VOL) =>
+                    {
                         snapshot
                             .vol_index_curves
                             .insert(curve_id.clone(), Arc::clone(curve));
                     }
-                    CurveStorage::Price(curve) if flags.contains(MarketRestoreFlags::SCALARS) => {
+                    CurveStorage::Price(curve)
+                        if curve.kind() == PriceCurveKind::Price
+                            && flags.contains(MarketRestoreFlags::SCALARS) =>
+                    {
                         snapshot
                             .price_curves
                             .insert(curve_id.clone(), Arc::clone(curve));
@@ -597,7 +604,7 @@ impl MarketSnapshot {
                 !restore_flags.contains(MarketRestoreFlags::CORRELATION)
                     || snapshot.base_correlation_curves.contains_key(id)
             }
-            CurveStorage::VolIndex(_) => {
+            CurveStorage::Price(curve) if curve.kind() == PriceCurveKind::VolIndex => {
                 !restore_flags.contains(MarketRestoreFlags::VOL)
                     || snapshot.vol_index_curves.contains_key(id)
             }

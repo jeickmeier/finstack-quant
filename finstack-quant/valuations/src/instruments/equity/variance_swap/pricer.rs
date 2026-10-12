@@ -63,7 +63,7 @@ pub(crate) fn compute_pv(
             as_of,
             settlement_date,
         )?;
-        return Ok(inst.payoff(realized_var)? * df);
+        return inst.payoff(realized_var)?.checked_mul_f64(df);
     }
 
     if as_of < inst.start_date {
@@ -74,7 +74,7 @@ pub(crate) fn compute_pv(
             as_of,
             settlement_date,
         )?;
-        return Ok(undiscounted * df);
+        return undiscounted.checked_mul_f64(df);
     }
 
     // Seasoned mark-to-market: the observation-count blend of realized-to-date
@@ -88,7 +88,7 @@ pub(crate) fn compute_pv(
         as_of,
         settlement_date,
     )?;
-    Ok(undiscounted * df)
+    undiscounted.checked_mul_f64(df)
 }
 
 /// Expected annualized variance using the same sample-count basis as settlement.
@@ -841,7 +841,11 @@ mod tests {
             swap.maturity,
         )
         .expect("df");
-        let expected_pv = swap.payoff(expected_var).expect("valid payoff") * df;
+        let expected_pv = swap
+            .payoff(expected_var)
+            .expect("valid payoff")
+            .checked_mul_f64(df)
+            .expect("finite discount factor");
 
         assert!(
             (pv.amount() - expected_pv.amount()).abs() < 1e-6,
@@ -851,7 +855,11 @@ mod tests {
         );
 
         let time_var = realized * time_w + forward * (1.0 - time_w);
-        let time_pv = swap.payoff(time_var).expect("payoff") * df;
+        let time_pv = swap
+            .payoff(time_var)
+            .expect("payoff")
+            .checked_mul_f64(df)
+            .expect("finite discount factor");
         assert!((pv.amount() - time_pv.amount()).abs() > 1e-6);
     }
 

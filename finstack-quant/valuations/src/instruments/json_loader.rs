@@ -5,8 +5,7 @@
 
 use super::*;
 use finstack_quant_core::contract::{
-    deserialize_json_value, parse_json_value, ContractDescriptor, ContractError, LoadLimits,
-    ValidationReport,
+    deserialize_json_value, parse_json_value, ContractError, LoadLimits, ValidationReport,
 };
 use finstack_quant_core::Result;
 use serde::{Deserialize, Serialize};
@@ -47,10 +46,6 @@ fn decode_json<T: serde::de::DeserializeOwned>(
 ) -> std::result::Result<T, ContractError> {
     deserialize_json_value(parse_json_value(bytes, limits)?, limits)
 }
-
-/// Persistence contract for [`InstrumentEnvelope`].
-pub const INSTRUMENT_CONTRACT: ContractDescriptor =
-    ContractDescriptor::new("finstack_quant.instrument");
 
 /// Canonical schema marker for persisted instrument envelopes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

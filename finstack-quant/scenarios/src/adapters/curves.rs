@@ -1094,7 +1094,10 @@ mod tests {
         let bumped = effects
             .iter()
             .find_map(|e| match e {
-                ScenarioEffect::UpdateCurve(storage) => storage.vol_index().map(|c| (**c).clone()),
+                ScenarioEffect::UpdateCurve(storage) => storage
+                    .price()
+                    .filter(|curve| curve.kind() == PriceCurveKind::VolIndex)
+                    .map(|curve| (**curve).clone()),
                 _ => None,
             })
             .expect("vol-index update");

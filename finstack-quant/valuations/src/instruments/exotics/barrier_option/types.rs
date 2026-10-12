@@ -393,24 +393,4 @@ mod tests {
             "unexpected error: {err}"
         );
     }
-
-    #[test]
-    fn barrier_type_fromstr_display_roundtrip() {
-        use std::str::FromStr;
-
-        let variants = [
-            super::BarrierType::UpAndOut,
-            super::BarrierType::UpAndIn,
-            super::BarrierType::DownAndOut,
-            super::BarrierType::DownAndIn,
-        ];
-        for v in variants {
-            let s = v.to_string();
-            let parsed = super::BarrierType::from_str(&s).expect("roundtrip parse should succeed");
-            assert_eq!(v, parsed, "roundtrip failed for {s}");
-        }
-        assert!(super::BarrierType::from_str("upandin").is_err());
-        assert!(super::BarrierType::from_str("downandout").is_err());
-        assert!(super::BarrierType::from_str("invalid").is_err());
-    }
 }

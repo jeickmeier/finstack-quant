@@ -271,7 +271,7 @@ impl MetricCalculator for AllInRateCalculator {
             flows.push(finstack_quant_core::cashflow::CashFlow::new(
                 facility.issue_date,
                 None,
-                facility.drawn * -1.0,
+                facility.drawn.checked_neg(),
                 CFKind::Notional,
                 0.0,
                 None,

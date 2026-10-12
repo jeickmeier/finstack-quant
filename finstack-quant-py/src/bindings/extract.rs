@@ -369,16 +369,17 @@ pub fn extract_valuation_ref<'py>(
 
 // Rate / spread — typed-or-float unit extraction
 
-/// Extract a decimal rate from a `float | int | Rate | Bps | Percentage`.
+/// Extract a decimal rate from a `float | int | Rate | Bps`.
 ///
-/// A `Rate` wrapper contributes `Rate::as_decimal()`; `Bps` and `Percentage`
-/// are converted through their Rust `as_decimal()`. A bare number is taken as
-/// an already-decimal rate (`0.05` for 5%). No percent/bp coercion is applied
-/// to bare numbers — a caller holding basis points should pass a `Bps`.
+/// A `Rate` wrapper contributes `Rate::as_decimal()`; `Bps` is converted
+/// through `as_decimal()`. A bare number is taken as an already-decimal rate
+/// (`0.05` for 5%). No percent/bp coercion is applied to bare numbers — a
+/// caller holding basis points should pass a `Bps`. Percent quotes should be
+/// converted with `Rate::from_percent` before extraction.
 ///
 /// # Errors
 ///
-/// Returns `TypeError` when `obj` is neither numeric nor a `Rate`/`Bps`/`Percentage`.
+/// Returns `TypeError` when `obj` is neither numeric nor a `Rate`/`Bps`.
 pub fn extract_rate_decimal(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
     if let Ok(rate) = obj.cast::<crate::bindings::core::types::PyRate>() {
         return Ok(rate.borrow().inner.as_decimal());
@@ -386,12 +387,9 @@ pub fn extract_rate_decimal(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
     if let Ok(bps) = obj.cast::<crate::bindings::core::types::PyBps>() {
         return Ok(bps.borrow().inner.as_decimal());
     }
-    if let Ok(pct) = obj.cast::<crate::bindings::core::types::PyPercentage>() {
-        return Ok(pct.borrow().inner.as_decimal());
-    }
     obj.extract::<f64>().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(
-            "expected a decimal rate (float, e.g. 0.05 for 5%) or a Rate/Bps/Percentage \
+            "expected a decimal rate (float, e.g. 0.05 for 5%) or a Rate/Bps \
              instance, got {}",
             obj.get_type()
                 .name()
@@ -401,17 +399,17 @@ pub fn extract_rate_decimal(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
     })
 }
 
-/// Extract a basis-point spread from a `float | int | Bps | Rate | Percentage`.
+/// Extract a basis-point spread from a `float | int | Bps | Rate`.
 ///
 /// A `Bps` wrapper contributes its integer basis points as `f64`; a bare
-/// number is taken as already in basis points (`25.0` for 25 bp). A `Rate` or
-/// `Percentage` reports its fractional basis points through the Rust
-/// `as_bp_f64` accessor, so a caller holding a decimal rate never has to
+/// number is taken as already in basis points (`25.0` for 25 bp). A `Rate`
+/// reports its fractional basis points through the Rust `as_bp_f64` accessor,
+/// so a caller holding a decimal rate never has to
 /// rescale by hand.
 ///
 /// # Errors
 ///
-/// Returns `TypeError` when `obj` is neither numeric nor a `Bps`/`Rate`/`Percentage`.
+/// Returns `TypeError` when `obj` is neither numeric nor a `Bps`/`Rate`.
 pub fn extract_basis_points(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
     if let Ok(bps) = obj.cast::<crate::bindings::core::types::PyBps>() {
         return Ok(f64::from(bps.borrow().inner.as_bp()));
@@ -419,12 +417,9 @@ pub fn extract_basis_points(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
     if let Ok(rate) = obj.cast::<crate::bindings::core::types::PyRate>() {
         return Ok(rate.borrow().inner.as_bp_f64());
     }
-    if let Ok(pct) = obj.cast::<crate::bindings::core::types::PyPercentage>() {
-        return Ok(pct.borrow().inner.as_bp_f64());
-    }
     obj.extract::<f64>().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(
-            "expected a spread in basis points (float, e.g. 25.0) or a Bps/Rate/Percentage \
+            "expected a spread in basis points (float, e.g. 25.0) or a Bps/Rate \
              instance, got {}",
             obj.get_type()
                 .name()

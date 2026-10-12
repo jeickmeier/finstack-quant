@@ -1667,6 +1667,13 @@
               "$ref": "#/$defs/DateWire",
               "description": "Base date"
             },
+            "calendar_id": {
+              "description": "Registered holiday calendar id of the business-day time axis (for\nexample `\"brbd\"` for a Bus/252 curve). Omitted when the day count needs\nno calendar.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "calibration_ois_cutoff_days": {
               "description": "OIS cut-off (business days) the curve was calibrated under, if any.",
               "format": "int32",
@@ -2066,6 +2073,17 @@
               },
               "type": "array"
             },
+            "roll_transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/InterpRollState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source interpolation and accumulated time origin for a rolled curve."
+            },
             "type": {
               "const": "inflation",
               "type": "string"
@@ -2159,6 +2177,17 @@
               },
               "type": "array"
             },
+            "roll_transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/InterpRollState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source interpolation and accumulated time origin for a rolled curve."
+            },
             "spot_level": {
               "description": "Spot index level (volatility index curves)",
               "format": "double",
@@ -2177,81 +2206,6 @@
             },
             "type": {
               "const": "price",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type",
-            "id",
-            "base",
-            "day_count",
-            "knot_points",
-            "interp_style",
-            "extrapolation"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "VolIndex curve state",
-          "properties": {
-            "base": {
-              "$ref": "#/$defs/DateWire",
-              "description": "Base date"
-            },
-            "day_count": {
-              "$ref": "#/$defs/DayCount",
-              "description": "Day count convention"
-            },
-            "extrapolation": {
-              "$ref": "#/$defs/ExtrapolationPolicy",
-              "description": "Extrapolation policy"
-            },
-            "id": {
-              "description": "Curve identifier",
-              "type": "string"
-            },
-            "interp_style": {
-              "$ref": "#/$defs/InterpStyle",
-              "description": "Interpolation style"
-            },
-            "knot_points": {
-              "description": "Time/value pairs used to construct the curve",
-              "items": {
-                "maxItems": 2,
-                "minItems": 2,
-                "prefixItems": [
-                  {
-                    "format": "double",
-                    "type": "number"
-                  },
-                  {
-                    "format": "double",
-                    "type": "number"
-                  }
-                ],
-                "type": "array"
-              },
-              "type": "array"
-            },
-            "spot_level": {
-              "description": "Spot index level (volatility index curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "spot_price": {
-              "description": "Spot price (signed price curves)",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "type": {
-              "const": "vol_index",
               "type": "string"
             }
           },
@@ -2309,6 +2263,17 @@
               },
               "type": "array"
             },
+            "roll_transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/InterpRollState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source interpolation and accumulated time origin for a rolled curve."
+            },
             "type": {
               "const": "basis_spread",
               "type": "string"
@@ -2344,6 +2309,12 @@
             "model": {
               "$ref": "#/$defs/NelsonSiegelModel",
               "description": "Nelson-Siegel model parameters."
+            },
+            "time_offset": {
+              "default": 0.0,
+              "description": "Current origin in the source model's year-fraction coordinates;\nomitted means `0.0` (a curve that has never been rolled).",
+              "format": "double",
+              "type": "number"
             },
             "type": {
               "const": "parametric",
@@ -2950,7 +2921,7 @@
         "factor_ids": {
           "description": "Factor IDs in row/column order.",
           "items": {
-            "$ref": "#/$defs/FactorId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         }
@@ -2976,7 +2947,7 @@
         "factor_ids": {
           "description": "Factor identifiers, in the row and column order of `data`.",
           "items": {
-            "$ref": "#/$defs/FactorId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
@@ -3010,7 +2981,7 @@
           "description": "Broad factor classification."
         },
         "id": {
-          "$ref": "#/$defs/FactorId",
+          "$ref": "#/$defs/Id",
           "description": "Unique factor identifier."
         },
         "market_mapping": {
@@ -3052,10 +3023,6 @@
         "values"
       ],
       "type": "object"
-    },
-    "FactorId": {
-      "description": "Unique identifier for a risk factor.",
-      "type": "string"
     },
     "FactorModelConfig": {
       "additionalProperties": false,
@@ -3125,7 +3092,7 @@
         "factor_id": {
           "anyOf": [
             {
-              "$ref": "#/$defs/FactorId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -3953,6 +3920,39 @@
       ],
       "type": "object"
     },
+    "InterpRollState": {
+      "additionalProperties": false,
+      "description": "Serialized source grid and time origin for a rolled interpolation.",
+      "properties": {
+        "offset": {
+          "format": "double",
+          "type": "number"
+        },
+        "source_points": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_points",
+        "offset"
+      ],
+      "type": "object"
+    },
     "InterpStyle": {
       "description": "Enum of supported interpolation styles. The default is `Linear`.",
       "oneOf": [
@@ -4235,7 +4235,7 @@
           "description": "Dependency-side filter."
         },
         "factor_id": {
-          "$ref": "#/$defs/FactorId",
+          "$ref": "#/$defs/Id",
           "description": "Factor assigned when both filters match."
         }
       },
@@ -5076,10 +5076,6 @@
         }
       ]
     },
-    "RateCalibrationFutureContractId": {
-      "description": "Serialized identifier for an interest-rate futures convention.",
-      "type": "string"
-    },
     "RateCalibrationMethod": {
       "description": "Numerical method used to calibrate a rate curve.",
       "oneOf": [
@@ -5309,7 +5305,7 @@
               "additionalProperties": false,
               "properties": {
                 "contract": {
-                  "$ref": "#/$defs/RateCalibrationFutureContractId",
+                  "$ref": "#/$defs/Id",
                   "description": "Convention-registry identifier for the futures contract."
                 },
                 "convexity_adjustment": {

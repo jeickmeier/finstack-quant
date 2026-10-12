@@ -80,11 +80,9 @@ impl Discounting for FlatRateCurve {
     }
 
     fn df(&self, t: f64) -> f64 {
-        // The t <= 0 clamp only matters for direct df() property tests below
-        // (and for npv_with_options with include_past_flows): since the
-        // the default npv excludes flows on/before the
-        // valuation date and never requests a non-positive abscissa relative
-        // to the valuation date.
+        // The t <= 0 clamp matters for the direct df() property tests below.
+        // `npv` excludes flows on or before the valuation date, so those
+        // calls do not request a non-positive year fraction from this curve.
         if t <= 0.0 {
             1.0
         } else {

@@ -99,12 +99,28 @@ pub trait Discounting: Send + Sync {
         DayCount::Act365F
     }
 
+    /// Day-count context of the curve's own time axis.
+    ///
+    /// Supplies the holiday calendar a business-day day count (Bus/252) needs
+    /// to map dates to curve time. The context belongs to the curve, never to
+    /// the instrument being discounted. Defaults to no calendar and no coupon
+    /// metadata, which every other supported curve day count accepts.
+    fn day_count_context(&self) -> DayCountContext<'_> {
+        DayCountContext::default()
+    }
+
     /// Discount factor from `from` to `to` using the curve's day-count.
     ///
     /// Canonical helper for the common "relative DF" pattern:
-    /// `DF(from→to) = DF(0→to) / DF(0→from)`.
+    /// `DF(from→to) = DF(0→to) / DF(0→from)`. Both dates map to curve time
+    /// with [`Self::day_count`] and [`Self::day_count_context`].
     ///
     /// Returns `Ok(1.0)` when `from == to`.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - Start date of the relative discounting interval.
+    /// * `to` - End date of the interval; an earlier date inverts the ratio.
     ///
     /// # Errors
     ///
@@ -119,8 +135,9 @@ pub trait Discounting: Send + Sync {
 
         let day_count = self.day_count();
         let base = self.base_date();
+        let ctx = self.day_count_context();
 
-        let t_from = day_count.signed_year_fraction(base, from, DayCountContext::default())?;
+        let t_from = day_count.signed_year_fraction(base, from, ctx)?;
         let df_from = self.df(t_from);
         if !df_from.is_finite() || df_from <= 0.0 {
             return Err(crate::Error::Validation(format!(
@@ -128,7 +145,7 @@ pub trait Discounting: Send + Sync {
             )));
         }
 
-        let t_to = day_count.signed_year_fraction(base, to, DayCountContext::default())?;
+        let t_to = day_count.signed_year_fraction(base, to, ctx)?;
         let df_to = self.df(t_to);
         if !df_to.is_finite() || df_to <= 0.0 {
             return Err(crate::Error::Validation(format!(
