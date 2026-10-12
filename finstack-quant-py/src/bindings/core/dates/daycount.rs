@@ -490,7 +490,6 @@ impl PyDayCountContext {
     }
 
     /// Serialize to the canonical JSON wire form (strict field names).
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner)
             .map_err(|e| crate::errors::serde_json_to_py(e, "cannot serialize DayCountContext"))

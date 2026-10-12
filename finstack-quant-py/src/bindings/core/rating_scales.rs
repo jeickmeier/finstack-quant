@@ -209,7 +209,6 @@ impl PyRatingLevel {
     }
 
     /// Serialize to a JSON string.
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner)
             .map_err(|err| serde_json_to_py(err, "invalid RatingLevel"))
@@ -379,7 +378,6 @@ impl PyScorecardScale {
     }
 
     /// Serialize to a JSON string.
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner)
             .map_err(|err| serde_json_to_py(err, "invalid ScorecardScale"))
@@ -501,7 +499,6 @@ impl PyRatingScaleRegistry {
     }
 
     /// Serialize the registry to a JSON string.
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner)
             .map_err(|err| serde_json_to_py(err, "invalid RatingScaleRegistry"))

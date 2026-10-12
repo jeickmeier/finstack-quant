@@ -809,7 +809,6 @@ impl PyCurveId {
     }
 
     /// Serialize to JSON (a quoted string).
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         to_json_impl(&self.inner, "invalid CurveId")
     }
@@ -902,7 +901,6 @@ impl PyInstrumentId {
     }
 
     /// Serialize to JSON (a quoted string).
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         to_json_impl(&self.inner, "invalid InstrumentId")
     }
@@ -1055,7 +1053,6 @@ impl PyAttributes {
     }
 
     /// Serialize to JSON (``{"tags": [...], "meta": {...}}``; empty parts are omitted).
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         to_json_impl(&self.inner, "invalid Attributes")
     }

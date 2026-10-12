@@ -119,8 +119,6 @@
 //! // yf_isma ≈ 0.5 (one full semi-annual period in years)
 //! ```
 
-#![allow(clippy::many_single_char_names)]
-
 mod act_act;
 mod context;
 mod other;

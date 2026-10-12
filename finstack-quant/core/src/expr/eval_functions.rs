@@ -598,7 +598,6 @@ impl CompiledExpr {
         if arg_results.len() >= 2 && !arg_results[1].is_empty() {
             let base = arg_results[0];
             let raw = arg_results[1][0];
-            #[allow(clippy::as_conversions)]
             let n = if raw.is_finite() && raw >= f64::from(i32::MIN) && raw <= f64::from(i32::MAX) {
                 raw as i32
             } else {

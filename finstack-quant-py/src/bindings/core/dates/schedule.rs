@@ -349,7 +349,6 @@ impl PySchedule {
     /// Accrual periods as a pandas DataFrame with ``datetime64`` columns
     /// ``period_start``, ``period_end``, ``payment_date`` and ``fixing_date``
     /// (``NaT`` when no fixing lag is configured); one row per period.
-    #[allow(clippy::wrong_self_convention)]
     #[pyo3(text_signature = "(self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let n = self.inner.dates.len().saturating_sub(1);
@@ -373,7 +372,6 @@ impl PySchedule {
     }
 
     /// Serialize to the canonical JSON wire form (strict field names).
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner)
             .map_err(|e| crate::errors::serde_json_to_py(e, "cannot serialize Schedule"))
@@ -574,7 +572,6 @@ impl PyScheduleBuilder {
 
     /// Current builder state as a ``ScheduleSpec`` dict (the input accepted by
     /// ``Schedule.from_spec``).
-    #[allow(clippy::wrong_self_convention)]
     #[pyo3(text_signature = "(self)")]
     fn to_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.spec)

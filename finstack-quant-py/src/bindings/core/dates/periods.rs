@@ -378,7 +378,6 @@ impl PyPeriod {
     }
 
     /// Serialize to the canonical JSON wire form.
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner)
             .map_err(|e| crate::errors::serde_json_to_py(e, "cannot serialize Period"))
@@ -462,7 +461,6 @@ impl PyPeriodPlan {
 
     /// Periods as a pandas DataFrame with columns ``id``, ``start``, ``end``,
     /// ``is_actual`` (``start``/``end`` as ``datetime64``).
-    #[allow(clippy::wrong_self_convention)]
     #[pyo3(text_signature = "(self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let ids: Vec<String> = self
@@ -489,7 +487,6 @@ impl PyPeriodPlan {
     }
 
     /// Serialize to the canonical JSON wire form.
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner)
             .map_err(|e| crate::errors::serde_json_to_py(e, "cannot serialize PeriodPlan"))
