@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/dates/1/schedule.schema.json",
-      "bytes": 5350,
+      "bytes": 5241,
       "kind": "output",
       "path": "schemas/dates/1/schedule.schema.json",
       "summary": "Generated accrual, payment and fixing dates with any construction warnings.",

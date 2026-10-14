@@ -213,7 +213,7 @@ fn py_estimated_sifma_settlement_date_for_class<'py>(
     )
 }
 
-/// Next published SIFMA settlement date on or after `date`.
+/// Next published SIFMA settlement date strictly after `date`.
 ///
 /// # Arguments
 ///

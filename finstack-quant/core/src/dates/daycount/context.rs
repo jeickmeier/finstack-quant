@@ -16,7 +16,7 @@ pub struct DayCountContext<'a> {
     pub calendar: Option<&'a dyn HolidayCalendar>,
     /// Payment frequency (required for ACT/ACT ISMA and ACT/365L).
     pub frequency: Option<Tenor>,
-    /// Business day convention (required for Bus/252)
+    /// Business-day divisor for Bus/252 (for example 252); `None` uses 252.
     pub bus_basis: Option<u16>,
     /// Unadjusted regular reference coupon period for ACT/ACT ISMA, or the
     /// enclosing contractual coupon period for ACT/365L, as `(start, end)`.

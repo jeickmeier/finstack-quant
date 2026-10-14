@@ -250,7 +250,7 @@ def estimated_sifma_settlement_date_for_class(
 
 def next_sifma_settlement(date: datetime.date | str) -> datetime.date | None:
     """
-    Return the next published SIFMA settlement date on or after a date.
+    Return the next published SIFMA settlement date strictly after a date.
 
     Parameters
     ----------

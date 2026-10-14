@@ -299,7 +299,7 @@ fn parse_method(method: &str) -> PyResult<RealizedVarMethod> {
     finstack_quant_core::wire::serde_parse(method).map_err(core_to_py)
 }
 
-/// Annualized realized variance of a close price series (sum of squared log
+/// Annualized realized variance of a close price series (mean of squared log
 /// returns, no mean subtraction, times ``annualization_factor``).
 ///
 /// ``method`` must be ``"close_to_close"``; the OHLC estimators require

@@ -8771,7 +8771,7 @@ export interface CoreNamespace {
    *
    * @param date - Start date as days since 1970-01-01.
    * @param other - End date as days since 1970-01-01.
-   * @returns `(other.year - date.year) * 12 + (other.month - date.month)`, ignoring the day of month; `0` when `other` is before `date`.
+   * @returns Completed months: `(other.year - date.year) * 12 + (other.month - date.month)`, minus one when the day of `date` is later than the day of `other`, unless both are month-ends; `0` when `other` is before `date`.
    * @throws `TypeError` if a date is not an integer; `FinstackError` (kind `validation`) if a date is outside the supported range.
    */
   monthsUntil(date: number, other: number): number;

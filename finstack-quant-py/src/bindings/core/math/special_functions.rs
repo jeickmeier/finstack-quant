@@ -36,7 +36,8 @@ fn norm_pdf(x: f64) -> f64 {
 
 /// Normal CDF with explicit mean and standard deviation: P(X ≤ x), X ~ N(mean, std_dev²).
 ///
-/// Raises ``ValueError`` if ``std_dev`` is not strictly positive or any input is non-finite.
+/// Raises ``ValueError`` if ``std_dev`` is not finite and strictly positive.
+/// Non-finite ``x`` or ``mean`` are not rejected; they follow IEEE-754 arithmetic.
 #[pyfunction]
 #[pyo3(text_signature = "(x, mean, std_dev)")]
 fn norm_cdf_with_params(x: f64, mean: f64, std_dev: f64) -> PyResult<f64> {
@@ -45,7 +46,8 @@ fn norm_cdf_with_params(x: f64, mean: f64, std_dev: f64) -> PyResult<f64> {
 
 /// Normal PDF with explicit mean and standard deviation.
 ///
-/// Raises ``ValueError`` if ``std_dev`` is not strictly positive or any input is non-finite.
+/// Raises ``ValueError`` if ``std_dev`` is not finite and strictly positive.
+/// Non-finite ``x`` or ``mean`` are not rejected; they follow IEEE-754 arithmetic.
 #[pyfunction]
 #[pyo3(text_signature = "(x, mean, std_dev)")]
 fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> PyResult<f64> {
@@ -70,7 +72,7 @@ fn erf(x: f64) -> f64 {
 
 /// Natural logarithm of the Gamma function ln(Γ(x)).
 ///
-/// Returns `f64::INFINITY` for x ≤ 0.
+/// Defined for x > 0. Returns positive infinity at x = 0; negative inputs are outside the supported domain and can return NaN.
 #[pyfunction]
 #[pyo3(text_signature = "(x)")]
 fn ln_gamma(x: f64) -> f64 {

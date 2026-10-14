@@ -122,52 +122,6 @@ use time::Date;
 use super::{adjust, next_imm, prev_cds_date, BusinessDayConvention, DateExt, HolidayCalendar};
 use crate::error::InputError;
 
-/// Payment or coupon frequency for schedule generation.
-///
-/// This is a re-export of [`crate::dates::Tenor`] documented here because it is
-/// the canonical schedule frequency type used by [`ScheduleBuilder`].
-///
-/// Month-based tenors (for example monthly or quarterly) advance by calendar
-/// months and therefore interact with end-of-month rules. Day-based tenors
-/// (for example weekly) advance by a fixed number of days.
-///
-/// # Common usages
-///
-/// - Month-based coupon schedules such as monthly, quarterly, or semi-annual
-/// - Day-based operational schedules such as weekly or biweekly
-/// - ACT/ACT (ICMA) frequency metadata via [`crate::dates::DayCountContext`]
-///
-/// # Examples
-///
-/// Using predefined tenor constructors:
-/// ```rust
-/// use finstack_quant_core::dates::Tenor;
-///
-/// let quarterly = Tenor::quarterly();
-/// assert_eq!(quarterly.months(), Some(3));
-///
-/// let weekly = Tenor::weekly();
-/// assert_eq!(weekly.days(), Some(7));
-/// ```
-///
-/// Creating from payments per year:
-/// ```rust
-/// use finstack_quant_core::dates::Tenor;
-///
-/// // 4 payments per year = quarterly
-/// let frequency = Tenor::from_payments_per_year(4)?;
-/// assert_eq!(frequency, Tenor::quarterly());
-///
-/// // 2 payments per year = semi-annual
-/// let frequency = Tenor::from_payments_per_year(2)?;
-/// assert_eq!(frequency, Tenor::semi_annual());
-/// # Ok::<(), finstack_quant_core::Error>(())
-/// ```
-///
-/// # See Also
-///
-/// - [`ScheduleBuilder::frequency`] to use with schedule builder
-/// - [`crate::dates::DayCountContext`] for conventions that also require frequency metadata
 use crate::dates::Tenor;
 
 /// Stub period handling when start/end dates don't align with payment frequency.
@@ -283,14 +237,13 @@ impl std::str::FromStr for StubKind {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::{ScheduleBuilder, Tenor, ScheduleWarning};
+/// use finstack_quant_core::dates::ScheduleBuilder;
 /// use time::{Date, Month};
 ///
 /// let start = Date::from_calendar_date(2025, Month::December, 31)?;
 /// let end = Date::from_calendar_date(2025, Month::January, 1)?; // Invalid: end before start
 ///
-/// // Invalid date ranges are rejected by new() before an error policy applies.
-/// // rather than an error. Note: new() itself returns Result, so we handle the error
+/// // Invalid date ranges are rejected by new() before any error policy applies.
 /// let result = ScheduleBuilder::new(start, end);
 /// assert!(result.is_err()); // new() validates start <= end
 /// # Ok::<(), Box<dyn std::error::Error>>(())

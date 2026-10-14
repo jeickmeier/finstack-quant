@@ -164,7 +164,7 @@ pub fn erf(x: f64) -> f64 {
 ///
 /// # Returns
 ///
-/// ln(Γ(x)). Returns `f64::INFINITY` for x ≤ 0.
+/// ln(Γ(x)). Defined for x > 0. Returns positive infinity at x = 0; negative inputs are outside the supported domain and can return NaN.
 #[inline]
 pub fn ln_gamma(x: f64) -> f64 {
     statrs::function::gamma::ln_gamma(x)
@@ -473,7 +473,6 @@ pub fn standard_normal_inv_cdf(p: f64) -> f64 {
 /// Student-t cumulative distribution function.
 ///
 /// Computes the CDF of the Student-t distribution with the specified degrees of freedom.
-/// For high degrees of freedom (df > 100), uses the normal approximation for efficiency.
 ///
 /// # Definition
 ///

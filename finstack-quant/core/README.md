@@ -117,8 +117,10 @@ live in `finstack-quant-models::credit`.
 
 ### Expression engine
 
-`expr` is a scalar DAG engine over `&[f64]` columns, used by `statements` for
-formula evaluation. `Expr`/`ExprNode` build the AST, `Function` enumerates the
+`expr` is a scalar DAG engine over `&[f64]` columns. `statements` shares its AST
+(`Expr`, `Function`) but evaluates formulas with its own per-period evaluator;
+the in-workspace caller of `CompiledExpr::eval` is the valuations composite
+instrument. `Expr`/`ExprNode` build the AST, `Function` enumerates the
 supported operators (lags, diffs, cumulatives, rolling windows, EWM, reducers),
 `SimpleContext` maps column names to positions, `CompiledExpr::eval` plans and
 runs it, and `EvaluationResult` carries values plus metadata. Windows are

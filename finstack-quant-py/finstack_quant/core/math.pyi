@@ -648,7 +648,7 @@ class stats:
         """
         Annualized realized variance of a close price series.
 
-        Sums squared log returns without mean subtraction (market
+        Averages squared log returns without mean subtraction (market
         convention) and scales by *annualization_factor*.
 
         Parameters
@@ -1006,7 +1006,8 @@ class special_functions:
         Raises
         ------
         ValueError
-            If *std_dev* is not strictly positive or any input is non-finite.
+            If *std_dev* is not finite and strictly positive. Non-finite *x* or
+            *mean* are not rejected; they follow IEEE-754 arithmetic.
 
         Examples
         --------
@@ -1039,7 +1040,8 @@ class special_functions:
         Raises
         ------
         ValueError
-            If *std_dev* is not strictly positive or any input is non-finite.
+            If *std_dev* is not finite and strictly positive. Non-finite *x* or
+            *mean* are not rejected; they follow IEEE-754 arithmetic.
 
         Examples
         --------
@@ -1209,7 +1211,9 @@ class special_functions:
         Returns
         -------
         float
-            Natural logarithm of the gamma function; returns positive infinity for ``x <= 0``.
+            Natural logarithm of the gamma function for ``x > 0``. Returns positive
+            infinity at ``x = 0``; negative inputs are outside the supported domain
+            and can return ``nan``.
 
         Raises
         ------

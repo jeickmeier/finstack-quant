@@ -1,5 +1,3 @@
-#![warn(missing_docs)]
-
 //! Opt-in explainability infrastructure for financial computations.
 //!
 //! This module provides types for capturing detailed execution traces of complex
