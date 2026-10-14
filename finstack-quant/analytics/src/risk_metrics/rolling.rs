@@ -280,19 +280,10 @@ pub(crate) fn rolling_sortino(
     rolling_sortino_kernel(returns, n, window, mar, |sum, sum_ds| {
         let m = sum / w - mar;
         let dd = (sum_ds / w).sqrt();
-        out.values.push(if !m.is_finite() || !dd.is_finite() {
-            f64::NAN
-        } else if dd == 0.0 {
-            if m > 0.0 {
-                f64::INFINITY
-            } else if m < 0.0 {
-                f64::NEG_INFINITY
-            } else {
-                0.0
-            }
-        } else {
-            (m * ann_factor) / (dd * ann_factor.sqrt())
-        });
+        out.values
+            .push(crate::drawdown::annualized_ratio_or_sign_infinity(
+                m, dd, ann_factor,
+            ));
         out.dates.push(dates[date_idx]);
         date_idx += 1;
     });
@@ -508,7 +499,7 @@ mod tests {
         let returns: Vec<f64> = (0..10).map(|i| (i as f64 - 5.0) * 0.01).collect();
         let dates: Vec<Date> = (0..10).map(|i| jan1(2025) + Duration::days(i)).collect();
         let rs = rolling_sortino(&returns, &dates, 5, 252.0, 0.0);
-        let first_window = sortino(&returns[0..5], true, 252.0, 0.0);
+        let first_window = sortino(&returns[0..5], 252.0, 0.0);
         assert!((rs.values[0] - first_window).abs() < 1e-12);
     }
 
@@ -522,7 +513,7 @@ mod tests {
         let mar = 0.005;
         let rs = rolling_sortino(&returns, &dates, 5, 252.0, mar);
         for window_start in 0..=returns.len() - 5 {
-            let expected = sortino(&returns[window_start..window_start + 5], true, 252.0, mar);
+            let expected = sortino(&returns[window_start..window_start + 5], 252.0, mar);
             let got = rs.values[window_start];
             assert!(
                 (got - expected).abs() < 1e-10,
@@ -543,7 +534,7 @@ mod tests {
                     .collect();
                 let rolling = rolling_sortino(&returns, &dates, 3, 252.0, 0.0);
                 for (start, window) in returns.windows(3).enumerate() {
-                    let expected = sortino(window, true, 252.0, 0.0);
+                    let expected = sortino(window, 252.0, 0.0);
                     let actual = rolling.values[start];
                     if expected.is_infinite() {
                         assert_eq!(actual, expected);
@@ -567,7 +558,7 @@ mod tests {
             .collect();
         let rolling = rolling_sortino(&returns, &dates, 2, 252.0, 0.0);
         assert!(rolling.values[0].is_nan());
-        assert!(sortino(&returns[..2], true, 252.0, 0.0).is_nan());
+        assert!(sortino(&returns[..2], 252.0, 0.0).is_nan());
         assert_eq!(rolling.values[1], f64::INFINITY);
         assert_eq!(rolling.values[2], 0.0);
     }

@@ -569,11 +569,10 @@ pub(crate) fn mean_drawdown(drawdowns: &[f64]) -> f64 {
 }
 
 /// `numerator / denominator` with signed infinity when `denominator == 0.0`
-/// and `0.0` when both are zero. NaN inputs remain NaN. Shared by all six
-/// drawdown-derived ratios.
+/// and `0.0` when both are zero. Non-finite inputs return `NaN`.
 #[inline]
-fn ratio_or_sign_infinity(numerator: f64, denominator: f64) -> f64 {
-    if numerator.is_nan() || denominator.is_nan() {
+pub(crate) fn ratio_or_sign_infinity(numerator: f64, denominator: f64) -> f64 {
+    if !numerator.is_finite() || !denominator.is_finite() {
         return f64::NAN;
     }
     if denominator == 0.0 {
@@ -586,6 +585,25 @@ fn ratio_or_sign_infinity(numerator: f64, denominator: f64) -> f64 {
         }
     } else {
         numerator / denominator
+    }
+}
+
+/// Annualized ratio `(period_excess * ann_factor) / (period_risk * sqrt(ann_factor))`
+/// that checks finiteness and zero-risk sentinels on the unscaled per-period
+/// statistics before multiplying by `ann_factor`.
+#[inline]
+pub(crate) fn annualized_ratio_or_sign_infinity(
+    period_excess: f64,
+    period_risk: f64,
+    ann_factor: f64,
+) -> f64 {
+    if !period_excess.is_finite() || !period_risk.is_finite() {
+        return f64::NAN;
+    }
+    if period_risk == 0.0 {
+        ratio_or_sign_infinity(period_excess, 0.0)
+    } else {
+        (period_excess * ann_factor) / (period_risk * ann_factor.sqrt())
     }
 }
 

@@ -964,6 +964,18 @@ impl Performance {
         (0..self.ticker_names.len()).map(f).collect()
     }
 
+    /// Map a closure over each ticker's overlapping `(portfolio, benchmark)` return slices.
+    #[inline]
+    fn map_pair_returns<T, F>(&self, mut f: F) -> Vec<T>
+    where
+        F: FnMut(&[f64], &[f64]) -> T,
+    {
+        self.map_tickers(|i| {
+            let (r, bench) = self.active_pair_returns(i);
+            f(r, bench)
+        })
+    }
+
     /// Full return-aligned date vector (independent of any active window).
     ///
     /// Returns the date grid that pairs with each row of internal returns,

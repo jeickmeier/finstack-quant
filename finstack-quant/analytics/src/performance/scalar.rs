@@ -158,13 +158,8 @@ impl Performance {
     /// Returns [`f64::NAN`] when the active window has fewer than 2
     /// observations (downside deviation is not estimable from one point).
     pub fn sortino(&self, mar: f64) -> Vec<f64> {
-        self.map_tickers(|i| {
-            let r = self.active_returns(i);
-            if r.len() < 2 {
-                return f64::NAN;
-            }
-            risk_metrics::sortino(r, true, self.ann(), mar)
-        })
+        let ann = self.ann();
+        self.map_tickers(|i| crate::sortino(self.active_returns(i), mar, ann))
     }
 
     /// Calmar ratio for each ticker.

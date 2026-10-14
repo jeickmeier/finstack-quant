@@ -56,7 +56,7 @@ pub fn sharpe(returns: &[f64], risk_free_rate: f64, periods_per_year: f64) -> f6
 /// `periods_per_year`, or fewer than two observations.
 #[must_use]
 pub fn sortino(returns: &[f64], mar: f64, periods_per_year: f64) -> f64 {
-    risk_metrics::sortino(returns, true, periods_per_year, mar)
+    risk_metrics::sortino(returns, periods_per_year, mar)
 }
 
 /// Annualized sample volatility (n−1 denominator) of one return series.

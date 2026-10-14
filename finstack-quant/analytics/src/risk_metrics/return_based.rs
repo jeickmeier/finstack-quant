@@ -273,19 +273,7 @@ pub(crate) fn volatility(returns: &[f64], annualize: bool, ann_factor: f64) -> f
 #[must_use]
 pub(crate) fn sharpe(ann_return: f64, ann_vol: f64, risk_free_rate: f64, ann_factor: f64) -> f64 {
     let excess = crate::returns::annualized_excess_return(ann_return, risk_free_rate, ann_factor);
-    if !excess.is_finite() || !ann_vol.is_finite() {
-        return f64::NAN;
-    }
-    if ann_vol == 0.0 {
-        return if excess > 0.0 {
-            f64::INFINITY
-        } else if excess < 0.0 {
-            f64::NEG_INFINITY
-        } else {
-            0.0
-        };
-    }
-    excess / ann_vol
+    crate::drawdown::ratio_or_sign_infinity(excess, ann_vol)
 }
 
 /// Downside deviation: semi-standard deviation below a minimum acceptable return.
@@ -359,44 +347,27 @@ pub(crate) fn downside_deviation(
 /// # Arguments
 ///
 /// * `returns` - Slice of period simple returns.
-/// * `annualize` - Whether to annualize both numerator and denominator.
 /// * `ann_factor` - Number of periods per year.
 /// * `mar` - Minimum acceptable return per period in decimal form.
 ///
 /// # Returns
 ///
-/// The Sortino ratio. Returns `±∞` when the mean is nonzero but there
-/// are no negative returns (zero downside risk), and `0.0` when the
-/// mean is zero or the downside deviation is zero. When `annualize` is
-/// `true`, returns [`f64::NAN`] if `ann_factor` is not finite or is `<= 0`.
+/// The annualized Sortino ratio. Returns `±∞` when the excess mean is nonzero
+/// but there are no returns below `mar` (zero downside risk), `0.0` when both
+/// are zero, and [`f64::NAN`] if fewer than 2 returns are supplied or
+/// `ann_factor` is not finite or is `<= 0`.
 ///
 /// # References
 ///
 /// - Sortino & van der Meer (1991): see docs/REFERENCES.md#sortinoVanDerMeer1991
 #[must_use]
-pub(crate) fn sortino(returns: &[f64], annualize: bool, ann_factor: f64, mar: f64) -> f64 {
-    if returns.len() < 2 || invalid_annualization_factor(annualize, ann_factor) {
+pub(crate) fn sortino(returns: &[f64], ann_factor: f64, mar: f64) -> f64 {
+    if returns.len() < 2 || invalid_annualization_factor(true, ann_factor) {
         return f64::NAN;
     }
     let excess_mean = mean(returns) - mar;
     let dd = downside_deviation(returns, mar, false, ann_factor);
-    if !excess_mean.is_finite() || !dd.is_finite() {
-        return f64::NAN;
-    }
-    if dd == 0.0 {
-        return if excess_mean > 0.0 {
-            f64::INFINITY
-        } else if excess_mean < 0.0 {
-            f64::NEG_INFINITY
-        } else {
-            0.0
-        };
-    }
-    if annualize {
-        (excess_mean * ann_factor) / (dd * ann_factor.sqrt())
-    } else {
-        excess_mean / dd
-    }
+    crate::drawdown::annualized_ratio_or_sign_infinity(excess_mean, dd, ann_factor)
 }
 /// Geometric mean return per period.
 ///
@@ -661,7 +632,7 @@ mod tests {
     fn downside_deviation_and_sortino_nan_when_annualized_with_invalid_factor() {
         let r = [0.01_f64, -0.02, 0.03];
         assert!(downside_deviation(&r, 0.0, true, 0.0).is_nan());
-        assert!(sortino(&r, true, 0.0, 0.0).is_nan());
+        assert!(sortino(&r, 0.0, 0.0).is_nan());
     }
 
     #[test]
@@ -746,7 +717,7 @@ mod tests {
     #[test]
     fn sortino_positive_returns() {
         let r = [0.01, 0.02, 0.03, -0.005, 0.01];
-        let s = sortino(&r, false, 252.0, 0.0);
+        let s = sortino(&r, 1.0, 0.0);
         assert!(s > 0.0);
     }
 
@@ -789,7 +760,7 @@ mod tests {
         let r = [0.01, 0.02, 0.03, -0.005, 0.01];
         let m = mean(&r);
         let dd = downside_deviation(&r, 0.0, false, 252.0);
-        let s = sortino(&r, false, 252.0, 0.0);
+        let s = sortino(&r, 1.0, 0.0);
         assert!((s - m / dd).abs() < 1e-12);
     }
 
@@ -798,7 +769,7 @@ mod tests {
         let r = [0.01, 0.02, 0.03, 0.04];
         let mar = 0.02;
         let expected = (mean(&r) - mar) / downside_deviation(&r, mar, false, 252.0);
-        let actual = sortino(&r, false, 252.0, mar);
+        let actual = sortino(&r, 1.0, mar);
         assert!((actual - expected).abs() < 1e-12);
     }
 
@@ -1061,10 +1032,7 @@ mod tests {
                 expected.cagr_factor,
             );
             assert_close(sharpe(0.12, 0.18, 0.02, 1.0), expected.sharpe);
-            assert_close(
-                sortino(&fixture.returns, true, 252.0, 0.0),
-                expected.sortino,
-            );
+            assert_close(sortino(&fixture.returns, 252.0, 0.0), expected.sortino);
             assert_close(
                 value_at_risk(&fixture.returns, 0.95),
                 expected.value_at_risk,
