@@ -143,6 +143,33 @@ impl ScorecardScale {
         validate_scorecard_scale(&scale, &scale.scale_name)?;
         Ok(scale)
     }
+
+    /// Export the rating levels in best-to-worst order as a [`TableEnvelope`](crate::table::TableEnvelope)
+    /// with columns `name` (`String`), `score` (`Float64`), and `min_score` (`Float64`).
+    #[must_use]
+    pub fn to_table(&self) -> crate::table::TableEnvelope {
+        use crate::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
+        let mut names = Vec::with_capacity(self.ratings.len());
+        let mut scores = Vec::with_capacity(self.ratings.len());
+        let mut min_scores = Vec::with_capacity(self.ratings.len());
+        for level in &self.ratings {
+            names.push(level.name.clone());
+            scores.push(level.score);
+            min_scores.push(level.min_score);
+        }
+        TableEnvelope {
+            row_count: self.ratings.len(),
+            columns: vec![
+                TableColumn::new("name", TableColumnData::String(names))
+                    .with_role(TableColumnRole::Dimension),
+                TableColumn::new("score", TableColumnData::Float64(scores))
+                    .with_role(TableColumnRole::Measure),
+                TableColumn::new("min_score", TableColumnData::Float64(min_scores))
+                    .with_role(TableColumnRole::Measure),
+            ],
+            metadata: indexmap::IndexMap::new(),
+        }
+    }
 }
 
 /// Policy for unknown scorecard rating-scale names.

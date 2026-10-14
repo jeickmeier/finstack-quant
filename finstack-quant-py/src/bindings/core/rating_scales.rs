@@ -366,15 +366,7 @@ impl PyScorecardScale {
     /// ``name``, ``score``, ``min_score`` (one row per level, best first).
     #[pyo3(text_signature = "(self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema(
-            py,
-            &self.inner.ratings,
-            &[
-                ("name", "str"),
-                ("score", "float64"),
-                ("min_score", "float64"),
-            ],
-        )
+        crate::bindings::pandas_utils::table_to_dataframe(py, &self.inner.to_table())
     }
 
     /// Serialize to a JSON string.

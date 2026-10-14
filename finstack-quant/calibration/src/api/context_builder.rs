@@ -20,9 +20,7 @@
 use crate::api::market_datum::MarketDatum;
 use crate::api::prior_market::PriorMarketObject;
 use crate::config::CalibrationConfig;
-use finstack_quant_core::market_data::context::{
-    build_snapshot_fx_matrix, CurveState, CurveStorage, MarketContext,
-};
+use finstack_quant_core::market_data::context::{build_snapshot_fx_matrix, MarketContext};
 use finstack_quant_core::market_data::term_structures::{CreditIndexData, PriceCurveKind};
 use finstack_quant_core::types::CurveId;
 use std::collections::BTreeMap;
@@ -61,27 +59,25 @@ pub(crate) fn build_initial_context(
     for obj in prior {
         match obj {
             PriorMarketObject::DiscountCurve(c) => {
-                ctx.insert_mut(CurveStorage::from_state(CurveState::Discount(c.clone())));
+                ctx.insert_mut(c.clone());
             }
             PriorMarketObject::ForwardCurve(c) => {
-                ctx.insert_mut(CurveStorage::from_state(CurveState::Forward(c.clone())));
+                ctx.insert_mut(c.clone());
             }
             PriorMarketObject::HazardCurve(c) => {
-                ctx.insert_mut(CurveStorage::from_state(CurveState::Hazard(c.clone())));
+                ctx.insert_mut(c.clone());
             }
             PriorMarketObject::InflationCurve(c) => {
-                ctx.insert_mut(CurveStorage::from_state(CurveState::Inflation(c.clone())));
+                ctx.insert_mut(c.clone());
             }
             PriorMarketObject::BaseCorrelationCurve(c) => {
-                ctx.insert_mut(CurveStorage::from_state(CurveState::BaseCorrelation(
-                    c.clone(),
-                )));
+                ctx.insert_mut(c.clone());
             }
             PriorMarketObject::BasisSpreadCurve(c) => {
-                ctx.insert_mut(CurveStorage::from_state(CurveState::BasisSpread(c.clone())));
+                ctx.insert_mut(c.clone());
             }
             PriorMarketObject::ParametricCurve(c) => {
-                ctx.insert_mut(CurveStorage::from_state(CurveState::Parametric(c.clone())));
+                ctx.insert_mut(c.clone());
             }
             PriorMarketObject::PriceCurve(c) | PriorMarketObject::VolatilityIndexCurve(c) => {
                 // The tag states the curve family; a vol-index curve is the one
@@ -98,7 +94,7 @@ pub(crate) fn build_initial_context(
                         c.kind()
                     )));
                 }
-                ctx.insert_mut(CurveStorage::from_state(CurveState::Price(c.clone())));
+                ctx.insert_mut(c.clone());
             }
             PriorMarketObject::VolSurface(s) => {
                 ctx.insert_surface_mut(s.clone());

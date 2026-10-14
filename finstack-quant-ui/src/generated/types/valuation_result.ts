@@ -259,41 +259,6 @@ export type D_35C446142142801Cbb82 =
     }
   | {
       /**
-       * Cash inflow amount
-       */
-      cash_in_amount: number;
-      /**
-       * Cash inflow currency
-       */
-      cash_in_currency: string;
-      /**
-       * Cash outflow amount
-       */
-      cash_out_amount: number;
-      /**
-       * Cash outflow currency
-       */
-      cash_out_currency: string;
-      kind: "waterfall_step";
-      /**
-       * Period index
-       */
-      period: number;
-      /**
-       * Shortfall amount if any
-       */
-      shortfall_amount?: number | null;
-      /**
-       * Shortfall currency
-       */
-      shortfall_currency?: string | null;
-      /**
-       * Step name/description
-       */
-      step_name: string;
-    }
-  | {
-      /**
        * Step description
        */
       description: string;

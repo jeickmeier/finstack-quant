@@ -307,98 +307,139 @@ impl PartialEq for Expr {
 
 impl Eq for Expr {}
 
-/// Built-in function identifiers.
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum Function {
+macro_rules! for_all_functions {
+    ($(
+        $(#[$meta:meta])*
+        $variant:ident => ($name:literal, $scalar:literal),
+    )*) => {
+        /// Built-in function identifiers.
+        #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+        #[serde(rename_all = "snake_case")]
+        pub enum Function {
+            $(
+                $(#[$meta])*
+                $variant,
+            )*
+        }
+
+        impl Function {
+            /// Whether this function can be evaluated by the core scalar evaluator.
+            ///
+            /// A small set of period-aware variants (`Ttm`, `Ytd`, `Qtd`, `FiscalYtd`,
+            /// `GrowthRate`, the n-ary reducers `Sum`/`Mean`/`Min`/`Max`/`Coalesce`,
+            /// and the annualization helpers) live in the AST so that the
+            /// `statements` crate can parse and evaluate them with knowledge of the
+            /// period grid; they are deliberately rejected by `core::expr::eval`.
+            ///
+            /// This is the single source of truth for that layering boundary.
+            #[must_use]
+            pub const fn is_scalar_evaluable(&self) -> bool {
+                match self {
+                    $(Self::$variant => $scalar,)*
+                }
+            }
+
+            const fn as_str(&self) -> &'static str {
+                match self {
+                    $(Self::$variant => $name,)*
+                }
+            }
+        }
+
+        impl std::fmt::Display for Function {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+    };
+}
+
+for_all_functions! {
     /// Previous N values (shift down).
-    Lag,
+    Lag => ("lag", true),
     /// Next N values (shift up).
-    Lead,
+    Lead => ("lead", true),
     /// First/lagged difference with step N (default 1).
-    Diff,
+    Diff => ("diff", true),
     /// Percentage change over step N (default 1).
-    PctChange,
+    PctChange => ("pct_change", true),
     /// Cumulative sum.
-    CumSum,
+    CumSum => ("cumsum", true),
     /// Cumulative product.
-    CumProd,
+    CumProd => ("cumprod", true),
     /// Cumulative minimum.
-    CumMin,
+    CumMin => ("cummin", true),
     /// Cumulative maximum.
-    CumMax,
+    CumMax => ("cummax", true),
     /// Rolling arithmetic mean over a fixed row window size.
-    RollingMean,
+    RollingMean => ("rolling_mean", true),
     /// Rolling sum over a fixed row window size.
-    RollingSum,
+    RollingSum => ("rolling_sum", true),
     /// `ewm_mean(series, alpha, adjust?)`, with `alpha` normalized to
     /// `[1e-12, 1]`. An omitted or nonzero `adjust` uses normalized weights;
     /// zero selects the recursive form. Leading and interior NaNs are preserved,
     /// and the recursion starts at the first non-NaN observation.
-    EwmMean,
+    EwmMean => ("ewm_mean", true),
     /// Population standard deviation (denominator `n`, pandas `ddof=0`),
     /// broadcast over the input length. NaNs are excluded; fewer than two
     /// non-NaN observations produce NaN.
-    Std,
+    Std => ("std", true),
     /// Population variance (denominator `n`, pandas `ddof=0`), broadcast over
     /// the input length. NaNs are excluded; fewer than two non-NaN
     /// observations produce NaN.
-    Var,
+    Var => ("var", true),
     /// Median.
-    Median,
+    Median => ("median", true),
     /// Rolling population standard deviation (`ddof=0`) over a fixed row
     /// window size. Incomplete windows and windows containing NaN return NaN.
-    RollingStd,
+    RollingStd => ("rolling_std", true),
     /// Rolling population variance (`ddof=0`) over a fixed row window size.
     /// Incomplete windows and windows containing NaN return NaN.
-    RollingVar,
+    RollingVar => ("rolling_var", true),
     /// Rolling median over a fixed row window size.
-    RollingMedian,
-
+    RollingMedian => ("rolling_median", true),
     /// Shift values by N positions (positive = shift down, negative = shift up).
-    Shift,
+    Shift => ("shift", true),
     /// Rank values (min ranking; ties share the minimum rank, pandas
     /// `method='min'`).
-    Rank,
+    Rank => ("rank", true),
     /// Calculate quantile/percentile of values.
     ///
     /// Note: This function reduces the entire series to a single scalar value
     /// and broadcasts that scalar across the output length. It is not a
     /// rolling/windowed quantile. For windowed behavior, prefer `RollingMedian`
     /// or a domain-specific rolling estimator.
-    Quantile,
+    Quantile => ("quantile", true),
     /// Rolling minimum over a fixed row window size.
-    RollingMin,
+    RollingMin => ("rolling_min", true),
     /// Rolling maximum over a fixed row window size.
-    RollingMax,
+    RollingMax => ("rolling_max", true),
     /// Count non-null values in rolling window.
-    RollingCount,
+    RollingCount => ("rolling_count", true),
     /// `ewm_std(series, alpha, adjust?)`, with `alpha` normalized to
     /// `[1e-12, 1]`. An omitted or positive `adjust` uses adjusted weights;
     /// zero or a negative value selects the recursive form. Leading and interior
     /// NaNs are preserved, and the recursion starts at the first non-NaN value.
     /// Returns weighted population standard deviation without a sample-bias
     /// correction; the first non-NaN observation has standard deviation zero.
-    EwmStd,
+    EwmStd => ("ewm_std", true),
     /// `ewm_var(series, alpha, adjust?)`, with `alpha` normalized to
     /// `[1e-12, 1]`. An omitted or positive `adjust` uses adjusted weights;
     /// zero or a negative value selects the recursive form. Leading and interior
     /// NaNs are preserved, and the recursion starts at the first non-NaN value.
     /// Returns weighted population variance without a sample-bias correction;
     /// the first non-NaN observation has variance zero.
-    EwmVar,
-
-    // Custom financial functions
+    EwmVar => ("ewm_var", true),
     /// Sum multiple values, skipping NaN values.
-    Sum,
+    Sum => ("sum", false),
     /// Average of multiple values, skipping NaN values.
-    Mean,
+    Mean => ("mean", false),
     /// Annualize a flow value by multiplying by periods per year.
     ///
     /// Use this for cash flows, income, and expense items.
     /// For periodic rates, use `AnnualizeRate` instead.
-    Annualize,
+    Annualize => ("annualize", false),
     /// Annualize a periodic rate with simple or compound methodology.
     ///
     /// Arguments: (rate, periods_per_year, compounding)
@@ -407,28 +448,28 @@ pub enum Function {
     ///
     /// Use this for interest rates, returns, and growth rates.
     /// For cash flows, use `Annualize` instead.
-    AnnualizeRate,
+    AnnualizeRate => ("annualize_rate", false),
     /// Trailing twelve months over a window of `periods_per_year` periods.
     ///
     /// Evaluated in the `statements` layer (not in `core::expr`), where the
     /// period frequency (monthly, quarterly, etc.) is known.
-    Ttm,
+    Ttm => ("ttm", false),
     /// Calendar year-to-date sum.
     ///
     /// Evaluated in the `statements` layer, using the period's calendar year
     /// and frequency (monthly, quarterly, weekly, semi-annual, annual).
-    Ytd,
+    Ytd => ("ytd", false),
     /// Quarter-to-date sum for monthly statement models.
     ///
     /// Evaluated in the `statements` layer; only valid for monthly periods.
-    Qtd,
+    Qtd => ("qtd", false),
     /// Fiscal year-to-date sum with configurable fiscal start month.
     ///
     /// Evaluated in the `statements` layer for monthly periods. The fiscal
     /// start month is provided as a numeric argument (1-12).
-    FiscalYtd,
+    FiscalYtd => ("fiscal_ytd", false),
     /// Return first non-NaN/non-zero value (coalesce).
-    Coalesce,
+    Coalesce => ("coalesce", false),
     /// Minimum of two or more values.
     ///
     /// Evaluated in the `statements` layer as an n-ary reducer. NaN handling
@@ -436,142 +477,55 @@ pub enum Function {
     /// left-to-right fold of `if acc < arg { acc } else { arg }`, a leading
     /// `NaN` is dropped in favor of a finite peer while a trailing `NaN`
     /// propagates.
-    Min,
+    Min => ("min", false),
     /// Maximum of two or more values.
     ///
     /// Evaluated in the `statements` layer as an n-ary reducer. NaN handling
     /// is order-dependent and follows IEEE 754 comparison semantics (see
     /// [`Function::Min`]).
-    Max,
+    Max => ("max", false),
     /// Absolute value helper (`abs(expr)`).
-    Abs,
+    Abs => ("abs", true),
     /// Sign helper returning -1, 0, or 1 (`sign(expr)`).
-    Sign,
+    Sign => ("sign", true),
     /// Compound annual growth rate between current and lagged periods.
     ///
     /// Evaluated in the statements layer where period spacing is known.
-    GrowthRate,
+    GrowthRate => ("growth_rate", false),
     /// Exponentiation (`pow(base, exp)`), computed as `base^exp` with IEEE 754
     /// semantics: `pow(-1, 0.5)` is NaN, `pow(0, -1)` is +inf, and overflow
     /// saturates to ±inf.
-    Pow,
+    Pow => ("pow", true),
     /// Round to a number of decimal digits (`round(expr[, digits])`).
     ///
     /// Ties round half away from zero (Excel convention): `round(2.5)` is 3,
     /// `round(-2.5)` is -3. `digits` defaults to 0 and may be negative to
     /// round to tens/hundreds (`round(1234, -2)` is 1200). Non-finite inputs
     /// pass through unchanged.
-    Round,
+    Round => ("round", true),
     /// Largest integer less than or equal to the value (`floor(expr)`).
-    Floor,
+    Floor => ("floor", true),
     /// Smallest integer greater than or equal to the value (`ceil(expr)`).
-    Ceil,
+    Ceil => ("ceil", true),
     /// Natural logarithm (`ln(expr)`), IEEE semantics: `ln(0)` is -inf and
     /// `ln(x)` for `x < 0` is NaN.
-    Ln,
+    Ln => ("ln", true),
     /// Natural exponential (`exp(expr)`); overflow saturates to +inf.
-    Exp,
+    Exp => ("exp", true),
     /// Base-10 logarithm (`log10(expr)`), IEEE semantics: `log10(0)` is -inf
     /// and `log10(x)` for `x < 0` is NaN.
-    Log10,
+    Log10 => ("log10", true),
     /// Square root (`sqrt(expr)`), IEEE semantics: `sqrt(x)` for `x < 0` is
     /// NaN.
-    Sqrt,
+    Sqrt => ("sqrt", true),
     /// Clamp a value to an inclusive range (`clamp(expr, lo, hi)`),
     /// equivalent to `min(max(expr, lo), hi)`. Returns NaN when any argument
     /// is NaN or when `lo > hi`; it never panics on an inverted range.
-    Clamp,
+    Clamp => ("clamp", true),
     /// Missing-value predicate (`is_missing(expr)`), returning 1 when the
     /// value is non-finite (NaN or ±inf) and 0 otherwise — the same
     /// "finite" convention used by `coalesce`.
-    IsMissing,
-}
-
-impl Function {
-    /// Whether this function can be evaluated by the core scalar evaluator.
-    ///
-    /// A small set of period-aware variants (`Ttm`, `Ytd`, `Qtd`, `FiscalYtd`,
-    /// `GrowthRate`, the n-ary reducers `Sum`/`Mean`/`Min`/`Max`/`Coalesce`,
-    /// and the annualization helpers) live in the AST so that the
-    /// `statements` crate can parse and evaluate them with knowledge of the
-    /// period grid; they are deliberately rejected by `core::expr::eval`.
-    ///
-    /// This is the single source of truth for that layering boundary.
-    #[must_use]
-    pub fn is_scalar_evaluable(&self) -> bool {
-        !matches!(
-            self,
-            Function::Sum
-                | Function::Mean
-                | Function::Ttm
-                | Function::Ytd
-                | Function::Qtd
-                | Function::FiscalYtd
-                | Function::Annualize
-                | Function::AnnualizeRate
-                | Function::Coalesce
-                | Function::GrowthRate
-                | Function::Min
-                | Function::Max
-        )
-    }
-}
-
-impl std::fmt::Display for Function {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let name = match self {
-            Self::Lag => "lag",
-            Self::Lead => "lead",
-            Self::Diff => "diff",
-            Self::PctChange => "pct_change",
-            Self::CumSum => "cumsum",
-            Self::CumProd => "cumprod",
-            Self::CumMin => "cummin",
-            Self::CumMax => "cummax",
-            Self::RollingMean => "rolling_mean",
-            Self::RollingSum => "rolling_sum",
-            Self::RollingStd => "rolling_std",
-            Self::RollingVar => "rolling_var",
-            Self::RollingMedian => "rolling_median",
-            Self::RollingMin => "rolling_min",
-            Self::RollingMax => "rolling_max",
-            Self::RollingCount => "rolling_count",
-            Self::EwmMean => "ewm_mean",
-            Self::EwmStd => "ewm_std",
-            Self::EwmVar => "ewm_var",
-            Self::Std => "std",
-            Self::Var => "var",
-            Self::Median => "median",
-            Self::Shift => "shift",
-            Self::Rank => "rank",
-            Self::Quantile => "quantile",
-            Self::Sum => "sum",
-            Self::Mean => "mean",
-            Self::Annualize => "annualize",
-            Self::AnnualizeRate => "annualize_rate",
-            Self::Ttm => "ttm",
-            Self::Ytd => "ytd",
-            Self::Qtd => "qtd",
-            Self::FiscalYtd => "fiscal_ytd",
-            Self::Coalesce => "coalesce",
-            Self::Min => "min",
-            Self::Max => "max",
-            Self::Abs => "abs",
-            Self::Sign => "sign",
-            Self::GrowthRate => "growth_rate",
-            Self::Pow => "pow",
-            Self::Round => "round",
-            Self::Floor => "floor",
-            Self::Ceil => "ceil",
-            Self::Ln => "ln",
-            Self::Exp => "exp",
-            Self::Log10 => "log10",
-            Self::Sqrt => "sqrt",
-            Self::Clamp => "clamp",
-            Self::IsMissing => "is_missing",
-        };
-        f.write_str(name)
-    }
+    IsMissing => ("is_missing", true),
 }
 
 /// Result envelope that includes execution metadata.

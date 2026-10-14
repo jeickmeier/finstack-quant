@@ -71,24 +71,6 @@ fn test_explanation_trace_serialization() {
 }
 
 #[test]
-fn test_waterfall_trace_entry() {
-    let entry = TraceEntry::WaterfallStep {
-        period: 1,
-        step_name: "Senior Tranche Interest".to_string(),
-        cash_in_amount: 100000.0,
-        cash_in_currency: "USD".to_string(),
-        cash_out_amount: 95000.0,
-        cash_out_currency: "USD".to_string(),
-        shortfall_amount: Some(5000.0),
-        shortfall_currency: Some("USD".to_string()),
-    };
-
-    let json = serde_json::to_string(&entry).expect("Failed to serialize");
-    assert!(json.contains("\"kind\":\"waterfall_step\""));
-    assert!(json.contains("Senior Tranche Interest"));
-}
-
-#[test]
 fn test_computation_step_extensibility() {
     let mut trace = ExplanationTrace::new("custom");
     trace.push(

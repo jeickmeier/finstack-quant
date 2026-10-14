@@ -478,69 +478,6 @@
         },
         {
           "additionalProperties": false,
-          "description": "Structured credit waterfall step",
-          "properties": {
-            "cash_in_amount": {
-              "description": "Cash inflow amount",
-              "format": "double",
-              "type": "number"
-            },
-            "cash_in_currency": {
-              "description": "Cash inflow currency",
-              "type": "string"
-            },
-            "cash_out_amount": {
-              "description": "Cash outflow amount",
-              "format": "double",
-              "type": "number"
-            },
-            "cash_out_currency": {
-              "description": "Cash outflow currency",
-              "type": "string"
-            },
-            "kind": {
-              "const": "waterfall_step",
-              "type": "string"
-            },
-            "period": {
-              "description": "Period index",
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "shortfall_amount": {
-              "description": "Shortfall amount if any",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "shortfall_currency": {
-              "description": "Shortfall currency",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "step_name": {
-              "description": "Step name/description",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "period",
-            "step_name",
-            "cash_in_amount",
-            "cash_in_currency",
-            "cash_out_amount",
-            "cash_out_currency"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
           "description": "Generic computation step (extensible)",
           "properties": {
             "description": {

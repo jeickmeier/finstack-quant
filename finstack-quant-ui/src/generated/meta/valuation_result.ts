@@ -395,81 +395,26 @@ export default [
   {
     "path": "#/$defs/d_35c446142142801cbb82/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1",
-    "description": "Structured credit waterfall step"
+    "description": "Generic computation step (extensible)"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/cash_in_amount",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/cash_in_amount",
-    "description": "Cash inflow amount",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/cash_in_currency",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/cash_in_currency",
-    "description": "Cash inflow currency"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/cash_out_amount",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/cash_out_amount",
-    "description": "Cash outflow amount",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/cash_out_currency",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/cash_out_currency",
-    "description": "Cash outflow currency"
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/description",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/description",
+    "description": "Step description"
   },
   {
     "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/kind",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/kind",
-    "const": "waterfall_step"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/period",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/period",
-    "description": "Period index",
-    "format": "uint",
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/shortfall_amount",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/shortfall_amount",
-    "description": "Shortfall amount if any",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/shortfall_currency",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/shortfall_currency",
-    "description": "Shortfall currency"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/step_name",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/step_name",
-    "description": "Step name/description"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2",
-    "description": "Generic computation step (extensible)"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/description",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/description",
-    "description": "Step description"
-  },
-  {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/kind",
     "const": "computation_step"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/metadata",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/metadata",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/metadata",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/metadata",
     "description": "Arbitrary metadata (JSON object)"
   },
   {
-    "path": "#/$defs/d_35c446142142801cbb82/oneOf/2/properties/name",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/2/properties/name",
+    "path": "#/$defs/d_35c446142142801cbb82/oneOf/1/properties/name",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TraceEntry/oneOf/1/properties/name",
     "description": "Step name"
   },
   {

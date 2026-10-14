@@ -139,6 +139,21 @@ pub(super) struct ScratchArena {
     pub(super) offsets: Vec<Option<(usize, usize)>>,
 }
 
+struct EvalNodeContext<'a> {
+    ctx: &'a SimpleContext,
+    cols: &'a [&'a [f64]],
+    arena: &'a [f64],
+    offsets: &'a [Option<(usize, usize)>],
+}
+
+impl<'a> EvalNodeContext<'a> {
+    #[inline]
+    fn dep_slice(&self, id: u64) -> Option<&'a [f64]> {
+        let (start, end) = self.offsets.get(id as usize).copied().flatten()?;
+        Some(&self.arena[start..end])
+    }
+}
+
 impl Clone for CompiledExpr {
     fn clone(&self) -> Self {
         Self {
@@ -371,7 +386,13 @@ impl CompiledExpr {
                     // Split the arena to avoid borrow conflicts
                     let (arena_deps, arena_out) = arena.split_at_mut(start);
                     let out_slice = &mut arena_out[..len];
-                    self.eval_node_into(ctx, cols, node, arena_deps, &offsets, out_slice)?;
+                    let env = EvalNodeContext {
+                        ctx,
+                        cols,
+                        arena: arena_deps,
+                        offsets: &offsets,
+                    };
+                    self.eval_node_into(&env, node, out_slice)?;
 
                     offsets[node.id as usize] = Some((start, end));
                     cursor = end;
@@ -409,27 +430,22 @@ impl CompiledExpr {
     /// Evaluate a single DAG node directly into a provided output slice (arena-based).
     fn eval_node_into(
         &self,
-        ctx: &SimpleContext,
-        cols: &[&[f64]],
+        env: &EvalNodeContext<'_>,
         node: &super::dag::DagNode,
-        arena: &[f64],
-        offsets: &[Option<(usize, usize)>],
         out: &mut [f64],
     ) -> crate::Result<()> {
-        // Look up a dependency's arena offset by (dense) node id.
-        let dep_offset = |id: u64| offsets.get(id as usize).copied().flatten();
         match &node.expr.node {
             ExprNode::Column(name) => {
-                let Some(idx) = ctx.index_of(name) else {
+                let Some(idx) = env.ctx.index_of(name) else {
                     return Err(crate::error::InputError::NotFound {
                         id: format!("expr column:{name}"),
                     }
                     .into());
                 };
-                let Some(col_data) = cols.get(idx) else {
+                let Some(col_data) = env.cols.get(idx) else {
                     return Err(crate::Error::Validation(format!(
                         "Expression context resolved column '{name}' to index {idx}, but only {} data columns were provided",
-                        cols.len()
+                        env.cols.len()
                     )));
                 };
                 let len = out.len().min(col_data.len());
@@ -448,7 +464,7 @@ impl CompiledExpr {
                 let arg_slices: SmallVec<[&[f64]; 4]> = node
                     .dependencies
                     .iter()
-                    .filter_map(|&dep_id| dep_offset(dep_id).map(|(start, end)| &arena[start..end]))
+                    .filter_map(|&dep_id| env.dep_slice(dep_id))
                     .collect();
 
                 if arg_slices.len() != node.dependencies.len() {
@@ -468,22 +484,18 @@ impl CompiledExpr {
                         node.id
                     )));
                 }
-                let left = dep_offset(node.dependencies[0])
-                    .map(|(start, end)| &arena[start..end])
-                    .ok_or_else(|| {
-                        crate::Error::Validation(format!(
-                            "Binary expression node {} is missing its left dependency result",
-                            node.id
-                        ))
-                    })?;
-                let right = dep_offset(node.dependencies[1])
-                    .map(|(start, end)| &arena[start..end])
-                    .ok_or_else(|| {
-                        crate::Error::Validation(format!(
-                            "Binary expression node {} is missing its right dependency result",
-                            node.id
-                        ))
-                    })?;
+                let left = env.dep_slice(node.dependencies[0]).ok_or_else(|| {
+                    crate::Error::Validation(format!(
+                        "Binary expression node {} is missing its left dependency result",
+                        node.id
+                    ))
+                })?;
+                let right = env.dep_slice(node.dependencies[1]).ok_or_else(|| {
+                    crate::Error::Validation(format!(
+                        "Binary expression node {} is missing its right dependency result",
+                        node.id
+                    ))
+                })?;
                 Self::eval_bin_op_into(*op, left, right, out);
             }
             ExprNode::UnaryOp { op, .. } => {
@@ -494,14 +506,12 @@ impl CompiledExpr {
                         node.id
                     )));
                 }
-                let operand = dep_offset(node.dependencies[0])
-                    .map(|(start, end)| &arena[start..end])
-                    .ok_or_else(|| {
-                        crate::Error::Validation(format!(
-                            "Unary expression node {} is missing its operand result",
-                            node.id
-                        ))
-                    })?;
+                let operand = env.dep_slice(node.dependencies[0]).ok_or_else(|| {
+                    crate::Error::Validation(format!(
+                        "Unary expression node {} is missing its operand result",
+                        node.id
+                    ))
+                })?;
                 Self::eval_unary_op_into(*op, operand, out);
             }
             ExprNode::IfThenElse { .. } => {
@@ -512,30 +522,24 @@ impl CompiledExpr {
                         node.id
                     )));
                 }
-                let condition = dep_offset(node.dependencies[0])
-                    .map(|(start, end)| &arena[start..end])
-                    .ok_or_else(|| {
-                        crate::Error::Validation(format!(
-                            "If-then-else node {} is missing its condition result",
-                            node.id
-                        ))
-                    })?;
-                let then_vals = dep_offset(node.dependencies[1])
-                    .map(|(start, end)| &arena[start..end])
-                    .ok_or_else(|| {
-                        crate::Error::Validation(format!(
-                            "If-then-else node {} is missing its then-branch result",
-                            node.id
-                        ))
-                    })?;
-                let else_vals = dep_offset(node.dependencies[2])
-                    .map(|(start, end)| &arena[start..end])
-                    .ok_or_else(|| {
-                        crate::Error::Validation(format!(
-                            "If-then-else node {} is missing its else-branch result",
-                            node.id
-                        ))
-                    })?;
+                let condition = env.dep_slice(node.dependencies[0]).ok_or_else(|| {
+                    crate::Error::Validation(format!(
+                        "If-then-else node {} is missing its condition result",
+                        node.id
+                    ))
+                })?;
+                let then_vals = env.dep_slice(node.dependencies[1]).ok_or_else(|| {
+                    crate::Error::Validation(format!(
+                        "If-then-else node {} is missing its then-branch result",
+                        node.id
+                    ))
+                })?;
+                let else_vals = env.dep_slice(node.dependencies[2]).ok_or_else(|| {
+                    crate::Error::Validation(format!(
+                        "If-then-else node {} is missing its else-branch result",
+                        node.id
+                    ))
+                })?;
                 Self::eval_if_then_else_into(condition, then_vals, else_vals, out);
             }
         }

@@ -158,24 +158,16 @@ pub fn sample_std_or_nan(xs: &[f64]) -> f64 {
     sample_variance_or_nan(xs).sqrt()
 }
 
-/// Median of the input values, returning [`f64::NAN`] for empty input.
+/// Median of the input values, returning [`f64::NAN`] for empty input or when
+/// any observation is non-finite.
 ///
 /// # Arguments
 ///
-/// * `xs` - Observations whose median is required. The input is copied before
-///   sorting, and an empty slice returns `NaN`.
+/// * `xs` - Finite observations whose median is required. The input is copied
+///   into a scratch buffer for partial selection, and an empty slice or
+///   non-finite value returns `NaN`.
 pub fn median_or_nan(xs: &[f64]) -> f64 {
-    if xs.is_empty() {
-        return f64::NAN;
-    }
-    let mut sorted = xs.to_vec();
-    sorted.sort_by(|a, b| a.total_cmp(b));
-    let len = sorted.len();
-    if len.is_multiple_of(2) {
-        (sorted[len / 2 - 1] + sorted[len / 2]) / 2.0
-    } else {
-        sorted[len / 2]
-    }
+    quantile_linear_or_nan(xs, 0.5)
 }
 
 /// Linear-interpolation quantile (R-7 / NumPy / Excel style), returning [`f64::NAN`] for
@@ -185,31 +177,15 @@ pub fn median_or_nan(xs: &[f64]) -> f64 {
 /// # Arguments
 ///
 /// * `xs` - Observations whose order statistic is required. Values must be
-///   finite; the slice is copied before sorting.
+///   finite; the slice is copied into a scratch buffer for partial selection.
 /// * `q` - Quantile probability. Values outside the inclusive `0.0..=1.0`
 ///   range are clamped to the nearest endpoint; NaN returns `NaN`.
 pub fn quantile_linear_or_nan(xs: &[f64], q: f64) -> f64 {
-    if xs.is_empty() || q.is_nan() {
+    if q.is_nan() {
         return f64::NAN;
     }
-    // Same non-finite policy as `quantile`: NaN/±inf entries have no
-    // meaningful order statistics, so reject them instead of letting
-    // total_cmp sort NaN to the top.
-    if xs.iter().any(|x| !x.is_finite()) {
-        return f64::NAN;
-    }
-    let mut sorted = xs.to_vec();
-    sorted.sort_by(|a, b| a.total_cmp(b));
-    let q = q.clamp(0.0, 1.0);
-    let index = q * (sorted.len() - 1) as f64;
-    let lower = index.floor() as usize;
-    let upper = index.ceil() as usize;
-    if lower == upper {
-        sorted[lower]
-    } else {
-        let weight = index - lower as f64;
-        sorted[lower] * (1.0 - weight) + sorted[upper] * weight
-    }
+    let mut buf = xs.to_vec();
+    quantile(&mut buf, q.clamp(0.0, 1.0))
 }
 
 /// Minimum finite value, ignoring NaN / infinite entries. Returns [`f64::NAN`] if none are finite.

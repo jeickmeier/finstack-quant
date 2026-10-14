@@ -187,29 +187,6 @@ pub enum TraceEntry {
         survival_probability: Option<f64>,
     },
 
-    /// Structured credit waterfall step
-    #[serde(rename = "waterfall_step")]
-    WaterfallStep {
-        /// Period index
-        period: usize,
-        /// Step name/description
-        step_name: String,
-        /// Cash inflow amount
-        cash_in_amount: f64,
-        /// Cash inflow currency
-        cash_in_currency: String,
-        /// Cash outflow amount
-        cash_out_amount: f64,
-        /// Cash outflow currency
-        cash_out_currency: String,
-        /// Shortfall amount if any
-        #[serde(skip_serializing_if = "Option::is_none")]
-        shortfall_amount: Option<f64>,
-        /// Shortfall currency
-        #[serde(skip_serializing_if = "Option::is_none")]
-        shortfall_currency: Option<String>,
-    },
-
     /// Generic computation step (extensible)
     #[serde(rename = "computation_step")]
     ComputationStep {
