@@ -143,7 +143,7 @@ pub mod summation;
 pub mod time_grid;
 
 pub use compounding::Compounding;
-pub use consecutive::{count_consecutive, longest_positive_run};
+pub use consecutive::longest_positive_run;
 pub use distributions::{
     binomial_pmf_all, binomial_pmf_all_into, binomial_probability, chi_squared_quantile,
     log_factorial,

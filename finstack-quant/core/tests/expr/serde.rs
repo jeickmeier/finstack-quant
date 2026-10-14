@@ -238,9 +238,6 @@ fn test_compiled_expr_serde() {
 
     // Verify AST is preserved
     assert_eq!(compiled.get_ast(), deserialized.get_ast());
-
-    // Verify plan is preserved if it existed
-    assert_eq!(compiled.has_plan(), deserialized.has_plan());
 }
 
 #[test]

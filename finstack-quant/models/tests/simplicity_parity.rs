@@ -12,14 +12,14 @@
 //!    evaluation points (the shared bilinear kernel regression test).
 //! 5. `Rate::try_from(f64)` / `Bps::try_from(f64)` match the validating
 //!    constructors `from_decimal` and `try_new`.
-//! 6. `[(Date, f64)]::irr(None)` equals
-//!    `xirr_with_daycount_ctx(.., Act365F, DayCountContext::default(), None)`.
+//! 6. `xirr(flows, None)` equals
+//!    `xirr_with_daycount(flows, DayCount::Act365F, None)`.
 //!
 //! These tests lock the canonical APIs produced by the simplicity audit.
 
-use finstack_quant_core::cashflow::{xirr, xirr_with_daycount_ctx};
+use finstack_quant_core::cashflow::{xirr, xirr_with_daycount};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::surfaces::{
     VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
 };
@@ -316,17 +316,16 @@ fn bp_try_from_f64_rejects_non_finite() {
     assert!(Bps::try_from(f64::INFINITY).is_err());
 }
 
-// XIRR: trait irr() delegation to xirr_with_daycount_ctx(Act365F, default ctx)
+// XIRR: xirr() delegation to xirr_with_daycount(Act365F)
 
 #[test]
-fn xirr_trait_matches_ctx_helper_on_act365f_default() {
+fn xirr_trait_matches_daycount_helper_on_act365f_default() {
     let flows = [
         (d(2024, 1, 1), -100_000.0),
         (d(2024, 7, 1), 50_000.0),
         (d(2025, 1, 1), 60_000.0),
     ];
     let a = xirr(&flows, None).expect("xirr converges");
-    let b = xirr_with_daycount_ctx(&flows, DayCount::Act365F, DayCountContext::default(), None)
-        .expect("ctx helper converges");
+    let b = xirr_with_daycount(&flows, DayCount::Act365F, None).expect("daycount helper converges");
     assert_eq!(a, b, "XIRR parity mismatch");
 }

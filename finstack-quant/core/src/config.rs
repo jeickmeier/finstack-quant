@@ -545,12 +545,8 @@ impl RoundingContext {
     }
 
     /// Money epsilon derived from the currency output scale (half ULP at that scale).
-    ///
-    /// # Arguments
-    ///
-    /// * `ccy` - ISO 4217 currency used for configuration or market-data lookup.
     #[inline]
-    pub fn money_epsilon(&self, ccy: crate::currency::Currency) -> f64 {
+    fn money_epsilon(&self, ccy: crate::currency::Currency) -> f64 {
         let scale = self.output_scale(ccy) as i32;
         // Half of one unit in the last place at the configured scale.
         0.5 * 10f64.powi(-scale)
@@ -567,7 +563,7 @@ impl RoundingContext {
     /// Uses tolerance values from the context's [`ToleranceConfig`]:
     /// - Rate: uses [`ToleranceConfig::rate_epsilon`] (default: 1e-12)
     /// - Generic: uses [`ToleranceConfig::generic_epsilon`] (default: 1e-10)
-    /// - Money: uses [`Self::money_epsilon`] (derived from currency scale)
+    /// - Money: uses half ULP at the currency's configured output scale
     #[inline]
     pub fn is_effectively_zero(&self, x: f64, kind: ZeroKind) -> bool {
         match kind {

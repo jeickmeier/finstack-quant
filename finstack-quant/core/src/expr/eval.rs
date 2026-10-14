@@ -83,13 +83,12 @@ impl Default for EvalOpts {
 pub struct CompiledExpr {
     /// Immutable expression AST from which every execution plan is derived.
     ast: Expr,
-    /// Optional execution plan for complex expressions.
-    pub(crate) plan: Option<ExecutionPlan>,
+    /// Optional explicit result metadata supplied via [`Self::with_planning`].
+    meta: Option<crate::config::ResultsMeta>,
     /// Small scratch arena to reuse temporary buffers within hot paths.
     pub(super) scratch: Mutex<ScratchArena>,
-    /// Lazily-built fallback plan, populated on first `eval()` when `plan` is None.
-    /// Prevents rebuilding the DAG on every call for expressions created via `new()`.
-    lazy_plan: OnceLock<ExecutionPlan>,
+    /// Execution plan (built eagerly by [`Self::with_planning`] or lazily on first [`Self::eval`]).
+    plan: OnceLock<ExecutionPlan>,
 }
 
 impl serde::Serialize for CompiledExpr {
@@ -100,7 +99,7 @@ impl serde::Serialize for CompiledExpr {
         use serde::ser::SerializeStruct;
         let mut state = serializer.serialize_struct("CompiledExpr", 2)?;
         state.serialize_field("ast", &self.ast)?;
-        state.serialize_field("meta", &self.plan.as_ref().map(|plan| &plan.meta))?;
+        state.serialize_field("meta", &self.meta)?;
         state.end()
     }
 }
@@ -144,10 +143,10 @@ impl Clone for CompiledExpr {
     fn clone(&self) -> Self {
         Self {
             ast: self.ast.clone(),
-            plan: self.plan.clone(),
-            // Fresh scratch and lazy_plan for clones; per-instance reuse only.
+            meta: self.meta.clone(),
+            // Fresh scratch for clones; per-instance reuse only.
             scratch: Mutex::new(ScratchArena::default()),
-            lazy_plan: OnceLock::new(),
+            plan: self.plan.clone(),
         }
     }
 }
@@ -182,9 +181,9 @@ impl CompiledExpr {
     pub fn new(ast: Expr) -> Self {
         Self {
             ast,
-            plan: None,
+            meta: None,
             scratch: Mutex::new(ScratchArena::default()),
-            lazy_plan: OnceLock::new(),
+            plan: OnceLock::new(),
         }
     }
 
@@ -235,19 +234,14 @@ impl CompiledExpr {
     /// valid execution plan, for example because planning detects an invalid
     /// dependency structure or more than 512 nested expression levels.
     pub fn with_planning(ast: Expr, meta: crate::config::ResultsMeta) -> crate::Result<Self> {
-        let plan = DagBuilder::default().build_plan(vec![ast.clone()], meta)?;
+        let plan = DagBuilder::default().build_plan(vec![ast.clone()], meta.clone())?;
 
         Ok(Self {
             ast,
-            plan: Some(plan),
+            meta: Some(meta),
             scratch: Mutex::new(ScratchArena::default()),
-            lazy_plan: OnceLock::new(),
+            plan: OnceLock::from(plan),
         })
-    }
-
-    /// Return whether this compiled expression has a pre-built execution plan.
-    pub fn has_plan(&self) -> bool {
-        self.plan.is_some()
     }
 
     /// Unified evaluation entrypoint returning values with execution metadata.
@@ -290,23 +284,23 @@ impl CompiledExpr {
         opts: EvalOpts,
     ) -> crate::Result<EvaluationResult> {
         let owned_plan;
-        let plan_to_use: &ExecutionPlan = if let Some(ref plan) = self.plan {
-            plan
-        } else if let Some(plan) = self.lazy_plan.get() {
+        let plan_to_use: &ExecutionPlan = if let Some(plan) = self.plan.get() {
             plan
         } else {
-            let meta = crate::config::results_meta(&crate::config::FinstackConfig::default());
+            let meta = self.meta.clone().unwrap_or_else(|| {
+                crate::config::results_meta(&crate::config::FinstackConfig::default())
+            });
             let plan = DagBuilder::default().build_plan(vec![self.ast.clone()], meta)?;
             // Try to cache for future calls; if a racing thread beat us, use theirs.
-            match self.lazy_plan.set(plan) {
-                Ok(()) => self.lazy_plan.get().ok_or_else(|| {
+            match self.plan.set(plan) {
+                Ok(()) => self.plan.get().ok_or_else(|| {
                     crate::Error::Internal(
                         "expression lazy plan missing immediately after OnceLock::set".to_string(),
                     )
                 })?,
                 Err(plan) => {
                     owned_plan = plan;
-                    self.lazy_plan.get().unwrap_or(&owned_plan)
+                    self.plan.get().unwrap_or(&owned_plan)
                 }
             }
         };

@@ -323,29 +323,6 @@ impl TableColumnRole {
             Self::Attribute => "attribute",
         }
     }
-
-    /// Parse a serde snake_case role name.
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - Wire-format role name (`dimension`, `index`, `measure`, or
-    ///   `attribute`), matching `#[serde(rename_all = "snake_case")]`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error string when `value` is not one of the known role names.
-    pub fn from_str_name(value: &str) -> std::result::Result<Self, String> {
-        match value {
-            "dimension" => Ok(Self::Dimension),
-            "index" => Ok(Self::Index),
-            "measure" => Ok(Self::Measure),
-            "attribute" => Ok(Self::Attribute),
-            other => Err(format!(
-                "unknown column role '{other}' \
-                 (expected dimension|index|measure|attribute)"
-            )),
-        }
-    }
 }
 
 impl std::fmt::Display for TableColumnRole {
@@ -358,7 +335,16 @@ impl std::str::FromStr for TableColumnRole {
     type Err = String;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Self::from_str_name(s)
+        match s {
+            "dimension" => Ok(Self::Dimension),
+            "index" => Ok(Self::Index),
+            "measure" => Ok(Self::Measure),
+            "attribute" => Ok(Self::Attribute),
+            other => Err(format!(
+                "unknown column role '{other}' \
+                 (expected dimension|index|measure|attribute)"
+            )),
+        }
     }
 }
 
@@ -458,10 +444,10 @@ mod tests {
             let json = serde_json::to_string(&role).expect("serializes");
             assert_eq!(json, format!("\"{}\"", role.as_str()));
             assert_eq!(
-                TableColumnRole::from_str_name(role.as_str()).expect("parses"),
+                role.as_str().parse::<TableColumnRole>().expect("parses"),
                 role
             );
         }
-        assert!(TableColumnRole::from_str_name("bogus").is_err());
+        assert!("bogus".parse::<TableColumnRole>().is_err());
     }
 }

@@ -67,7 +67,7 @@ fn currency_scale_boundaries_roundtrip_and_keep_money_epsilon_finite_positive() 
             serde_json::from_value(serde_json::to_value(&context).expect("context JSON"))
                 .expect("valid context");
         assert_eq!(restored, context);
-        let epsilon = restored.money_epsilon(Currency::USD);
+        let epsilon = 0.5 * 10f64.powi(-(scale as i32));
         assert!(epsilon.is_finite() && epsilon > 0.0);
         assert!(!restored.is_effectively_zero_money(1.0, Currency::USD));
         assert!(restored.is_effectively_zero_money(epsilon, Currency::USD));

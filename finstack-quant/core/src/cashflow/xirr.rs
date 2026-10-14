@@ -2,7 +2,7 @@
 //!
 //! This module provides:
 //! - `irr` for periodic cashflows (`[f64]`): Standard IRR
-//! - `xirr` / `xirr_with_daycount` / `xirr_with_daycount_ctx` for irregular
+//! - `xirr` / `xirr_with_daycount` for irregular
 //!   cashflows (`[(Date, f64)]`): XIRR (Extended internal rate of return)
 //!
 //! # Mathematical Foundation
@@ -150,12 +150,11 @@ pub fn xirr(cashflows: &[(Date, f64)], guess: Option<f64>) -> crate::Result<f64>
 /// Calculate XIRR for dated cashflows with an explicit day-count convention.
 ///
 /// Use this overload when the annualization basis matters for pricing,
-/// reporting, or reconciliation. For conventions that require coupon or
-/// calendar context, use [`xirr_with_daycount_ctx`].
+/// reporting, or reconciliation.
 ///
 /// # Arguments
 ///
-/// - `cashflows`: `(date, amount)` pairs with finite amounts. The input may be
+/// - `flows`: `(date, amount)` pairs with finite amounts. The input may be
 ///   unsorted; same-date flows are netted and zero net dates are ignored before
 ///   selecting the time origin. Amounts at identical year fractions are netted
 ///   again before solving; the resulting flows must change sign exactly once.
@@ -192,74 +191,12 @@ pub fn xirr(cashflows: &[(Date, f64)], guess: Option<f64>) -> crate::Result<f64>
 /// assert!((rate - 0.10).abs() < 1e-8);
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
-#[inline]
 pub fn xirr_with_daycount(
-    cashflows: &[(Date, f64)],
-    day_count: DayCount,
-    guess: Option<f64>,
-) -> crate::Result<f64> {
-    xirr_with_daycount_ctx(cashflows, day_count, DayCountContext::default(), guess)
-}
-
-/// Calculate XIRR with an explicit day-count context.
-///
-/// Use this helper for day-count conventions that require additional context,
-/// such as `ActActIsma` coupon metadata or `Bus252` holiday calendars.
-///
-/// # Arguments
-///
-/// - `flows`: `(date, amount)` pairs with finite amounts. The input may be
-///   unsorted; same-date flows are netted before selecting the time origin.
-///   Remaining dates are converted to year fractions from the earliest nonzero
-///   net dated flow, with amounts at identical year fractions netted again.
-///   The resulting nonzero flows must change sign exactly once.
-/// - `day_count`: Convention used to convert dates into year fractions.
-/// - `ctx`: Supplemental day-count context, such as coupon schedule information
-///   or business-day calendar data. `Act365L` requires frequency and one full
-///   enclosing coupon period containing the earliest nonzero net flow and all
-///   remaining flow dates.
-/// - `guess`: Optional finite decimal annual rate greater than -1 used to
-///   split the search bracket. `None` uses 10%; it does not select a root.
-///
-/// # Returns
-///
-/// Returns the annualized rate `r` that makes the dated NPV approximately zero
-/// under the supplied day-count convention and context.
-///
-/// # Errors
-///
-/// Returns an error if an amount or net amount is non-finite, there are fewer
-/// than two nonzero net flows, there is not exactly one net sign change, the
-/// guess is non-finite or at most -1, the day-count convention rejects the
-/// context or produces a non-finite year fraction, or no sufficiently accurate
-/// finite rate greater than -1 can be found.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::cashflow::xirr_with_daycount_ctx;
-/// use finstack_quant_core::dates::{create_date, DayCount, DayCountContext};
-/// use time::Month;
-///
-/// let flows = [
-///     (create_date(2025, Month::January, 1)?, -100.0),
-///     (create_date(2026, Month::January, 1)?, 110.0),
-/// ];
-/// let rate = xirr_with_daycount_ctx(
-///     &flows,
-///     DayCount::Act365F,
-///     DayCountContext::default(),
-///     None,
-/// )?;
-/// assert!((rate - 0.10).abs() < 1e-8);
-/// # Ok::<(), finstack_quant_core::Error>(())
-/// ```
-pub fn xirr_with_daycount_ctx(
     flows: &[(Date, f64)],
     day_count: DayCount,
-    ctx: DayCountContext<'_>,
     guess: Option<f64>,
 ) -> crate::Result<f64> {
+    let ctx = DayCountContext::default();
     if flows.len() < 2 {
         return Err(crate::Error::Validation(
             "Cashflows must contain at least two cashflows".to_string(),
