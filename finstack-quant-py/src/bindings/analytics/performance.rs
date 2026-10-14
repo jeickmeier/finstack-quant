@@ -8,7 +8,6 @@ use crate::bindings::pandas_utils::{
     values_to_series,
 };
 use crate::errors::analytics_to_py as core_to_py;
-use crate::errors::display_to_py;
 use finstack_quant_analytics as fa;
 use finstack_quant_core::dates::{FiscalConfig, HolidayCalendar, PeriodKind};
 use numpy::PyArray1;
@@ -183,42 +182,27 @@ fn series_to_frame<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>
     value.call_method1("to_frame", (label,))
 }
 
-/// Build a `Performance` from pre-extracted arrays.
-fn build_performance(
-    py: Python<'_>,
-    dates: Vec<time::Date>,
-    prices: Vec<Vec<f64>>,
-    ticker_names: Vec<String>,
-    benchmark_ticker: Option<&str>,
-    frequency: Option<&str>,
-) -> PyResult<PyPerformance> {
-    let period_kind = parse_frequency(frequency, fa::DEFAULT_FREQUENCY)?;
-    let inner = py
-        .detach(|| fa::Performance::new(dates, prices, ticker_names, benchmark_ticker, period_kind))
-        .map_err(core_to_py)?;
-    Ok(PyPerformance { inner })
-}
+type PerformanceBuilder = fn(
+    Vec<time::Date>,
+    Vec<Vec<f64>>,
+    Vec<String>,
+    Option<&str>,
+    PeriodKind,
+) -> finstack_quant_core::Result<fa::Performance>;
 
-/// Build a `Performance` from pre-extracted return arrays.
-fn build_returns_performance(
+/// Build a `Performance` from pre-extracted panel arrays using the given Rust constructor.
+fn build_performance_with(
     py: Python<'_>,
     dates: Vec<time::Date>,
-    returns: Vec<Vec<f64>>,
+    columns: Vec<Vec<f64>>,
     ticker_names: Vec<String>,
     benchmark_ticker: Option<&str>,
     frequency: Option<&str>,
+    ctor: PerformanceBuilder,
 ) -> PyResult<PyPerformance> {
     let period_kind = parse_frequency(frequency, fa::DEFAULT_FREQUENCY)?;
     let inner = py
-        .detach(|| {
-            fa::Performance::from_returns(
-                dates,
-                returns,
-                ticker_names,
-                benchmark_ticker,
-                period_kind,
-            )
-        })
+        .detach(|| ctor(dates, columns, ticker_names, benchmark_ticker, period_kind))
         .map_err(core_to_py)?;
     Ok(PyPerformance { inner })
 }
@@ -289,16 +273,6 @@ impl PyPerformance {
             PyTypeError::new_err("ticker_idx must be an int column index or a str ticker name")
         })
     }
-
-    fn lookback_returns_inner(
-        &self,
-        ref_date: time::Date,
-        fiscal_year_start_month: Option<u8>,
-        fiscal_year_start_day: Option<u8>,
-    ) -> PyResult<fa::LookbackReturns> {
-        let fc = make_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
-        Ok(self.inner.lookback_returns(ref_date, fc))
-    }
 }
 
 #[pymethods]
@@ -341,13 +315,14 @@ impl PyPerformance {
             &prices,
             "Expected a pandas DataFrame; use Performance.from_arrays() for raw lists",
         )?;
-        build_performance(
+        build_performance_with(
             py,
             panel.dates,
             panel.columns,
             panel.ticker_names,
             benchmark_ticker,
             frequency,
+            fa::Performance::new,
         )
     }
 
@@ -363,13 +338,14 @@ impl PyPerformance {
         frequency: Option<&str>,
     ) -> PyResult<Self> {
         let rust_dates = dates.iter().map(py_to_date).collect::<PyResult<Vec<_>>>()?;
-        build_performance(
+        build_performance_with(
             py,
             rust_dates,
             prices,
             ticker_names,
             benchmark_ticker,
             frequency,
+            fa::Performance::new,
         )
     }
 
@@ -392,13 +368,14 @@ impl PyPerformance {
             &returns,
             "Expected a pandas DataFrame or Series; use Performance.from_returns_arrays() for raw lists",
         )?;
-        build_returns_performance(
+        build_performance_with(
             py,
             panel.dates,
             panel.columns,
             panel.ticker_names,
             benchmark_ticker,
             frequency,
+            fa::Performance::from_returns,
         )
     }
 
@@ -414,13 +391,14 @@ impl PyPerformance {
         frequency: Option<&str>,
     ) -> PyResult<Self> {
         let rust_dates = dates.iter().map(py_to_date).collect::<PyResult<Vec<_>>>()?;
-        build_returns_performance(
+        build_performance_with(
             py,
             rust_dates,
             returns,
             ticker_names,
             benchmark_ticker,
             frequency,
+            fa::Performance::from_returns,
         )
     }
 
@@ -1314,12 +1292,9 @@ impl PyPerformance {
         fiscal_year_start_day: Option<u8>,
     ) -> PyResult<PyLookbackReturns> {
         let d = py_to_date(&ref_date)?;
+        let fc = make_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
         Ok(PyLookbackReturns {
-            inner: self.lookback_returns_inner(
-                d,
-                fiscal_year_start_month,
-                fiscal_year_start_day,
-            )?,
+            inner: self.inner.lookback_returns(d, fc),
         })
     }
 
@@ -1538,7 +1513,7 @@ impl PyPerformance {
     /// Serialize authoritative engine inputs (dates, returns, spans, benchmark,
     /// frequency, active window) to compact JSON.
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serde_to_json(&self.inner)
     }
 
     /// Rebuild an engine from :meth:`to_json` output.
@@ -1557,8 +1532,7 @@ impl PyPerformance {
     /// Support ``pickle`` (and therefore ``copy.deepcopy``, ``joblib``,
     /// ``multiprocessing``) via the :meth:`to_json` / :meth:`from_json` pair.
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
+        pickle_reduce_json::<Self>(py, self.to_json()?)
     }
 
     /// Identify this value in notebooks and logs.

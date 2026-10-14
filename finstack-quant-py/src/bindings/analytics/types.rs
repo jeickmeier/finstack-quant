@@ -21,16 +21,20 @@ fn serde_from_json<T: DeserializeOwned>(json: &str) -> PyResult<T> {
     serde_json::from_str(json).map_err(display_to_py)
 }
 
-fn serde_to_json<T: Serialize>(value: &T) -> PyResult<String> {
+pub(super) fn serde_to_json<T: Serialize>(value: &T) -> PyResult<String> {
     serde_json::to_string(value).map_err(display_to_py)
 }
 
-fn pickle_reduce_json<'py, T: pyo3::PyTypeInfo>(
+pub(super) fn pickle_reduce_json<'py, T: pyo3::PyTypeInfo>(
     py: Python<'py>,
     json: String,
 ) -> PyResult<(Bound<'py, PyAny>, (String,))> {
     let from_json = py.get_type::<T>().getattr("from_json")?;
     crate::bindings::pickle_support::reduce_via_json(from_json, json)
+}
+
+fn dataframe_repr_html(frame: PyResult<Bound<'_, PyAny>>) -> Option<String> {
+    frame.ok()?.call_method0("_repr_html_").ok()?.extract().ok()
 }
 
 /// Aggregated statistics for grouped periodic returns.
@@ -176,8 +180,7 @@ impl PyPeriodStats {
     /// Render as an HTML table in Jupyter notebooks (delegates to
     /// ``to_dataframe``; ``None`` falls back to ``__repr__``).
     fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+        dataframe_repr_html(self.to_dataframe(py))
     }
 }
 
@@ -309,8 +312,7 @@ impl PyBetaResult {
     /// `None` if the frame cannot be built, which makes IPython fall back to
     /// `__repr__` instead of raising from the display hook.
     fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+        dataframe_repr_html(self.to_dataframe(py))
     }
 }
 
@@ -400,8 +402,7 @@ impl PyGreeksResult {
     /// `None` if the frame cannot be built, which makes IPython fall back to
     /// `__repr__` instead of raising from the display hook.
     fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+        dataframe_repr_html(self.to_dataframe(py))
     }
 }
 
@@ -477,8 +478,7 @@ impl PyRollingGreeks {
     /// `None` if the frame cannot be built, which makes IPython fall back to
     /// `__repr__` instead of raising from the display hook.
     fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+        dataframe_repr_html(self.to_dataframe(py))
     }
 }
 
@@ -725,8 +725,7 @@ impl PyDrawdownEpisode {
     /// Render as an HTML table in Jupyter notebooks (delegates to
     /// ``to_dataframe``; ``None`` falls back to ``__repr__``).
     fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+        dataframe_repr_html(self.to_dataframe(py))
     }
 }
 
@@ -791,7 +790,7 @@ impl PyLookbackReturns {
     /// Convert to a pandas ``DataFrame`` indexed by :attr:`ticker_names`.
     ///
     /// Columns: mtd, qtd, ytd, and fytd.
-    pub(super) fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         data.set_item("mtd", slice_to_pyarray(py, &self.inner.mtd))?;
         data.set_item("qtd", slice_to_pyarray(py, &self.inner.qtd))?;
@@ -809,8 +808,7 @@ impl PyLookbackReturns {
     /// Render as an HTML table in Jupyter notebooks (delegates to
     /// ``to_dataframe``; ``None`` falls back to ``__repr__``).
     fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+        dataframe_repr_html(self.to_dataframe(py))
     }
 
     fn __repr__(&self) -> String {
@@ -907,8 +905,7 @@ impl PyDatedSeries {
     /// `None` if the frame cannot be built, which makes IPython fall back to
     /// `__repr__` instead of raising from the display hook.
     fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+        dataframe_repr_html(self.to_dataframe(py))
     }
 }
 
