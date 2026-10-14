@@ -3039,18 +3039,9 @@ export type NotionalExchange =
  */
 export type ResettingSide = "leg1" | "leg2";
 /**
- * Interpolation method for CPI/RPI values between monthly observations.
- *
- * Determines how index values are computed for dates between published
- * monthly levels. Different markets use different conventions.
- *
- * # Market Conventions
- *
- * - **US TIPS**: Linear interpolation (daily pro-rata)
- * - **UK Index-Linked Gilts**: Linear interpolation with 3-month lag
- * - **Euro inflation bonds**: Varies by issuer (typically linear)
+ * Interpolation strategy for [`ScalarTimeSeries`].
  */
-export type InflationInterpolation = "step" | "linear";
+export type SeriesInterpolation = "step" | "linear";
 /**
  * Type of interest rate option
  */
@@ -4909,10 +4900,6 @@ export type MarketScalar =
  * Numeric schema revision for contracts whose sole supported revision is v1.
  */
 export type SchemaVersion = number;
-/**
- * Interpolation strategy for [`ScalarTimeSeries`].
- */
-export type SeriesInterpolation = "step" | "linear";
 /**
  * Interpolation contract for vol surfaces.
  */
@@ -11508,7 +11495,7 @@ export interface InflationSwap {
    * Contractual monthly reference-index interpolation; takes precedence over index metadata;
    * without either source the default is monthly step interpolation.
    */
-  interpolation?: InflationInterpolation | null;
+  interpolation?: SeriesInterpolation | null;
   /**
    * Contractual CPI observation lag; when `None` the index lag, then the
    * curve's indexation lag, applies.
@@ -11594,7 +11581,7 @@ export interface YoYInflationSwap {
    * Contractual monthly reference-index interpolation; takes precedence over index metadata;
    * without either source the default is monthly step interpolation.
    */
-  interpolation?: InflationInterpolation | null;
+  interpolation?: SeriesInterpolation | null;
   /**
    * Contractual CPI observation lag; when `None` the index lag, then the
    * curve's indexation lag, applies.
@@ -11669,7 +11656,7 @@ export interface InflationCapFloor {
    * Contractual monthly CPI interpolation; takes precedence over index metadata.
    * Defaults to monthly step interpolation when neither source supplies it.
    */
-  interpolation?: InflationInterpolation | null;
+  interpolation?: SeriesInterpolation | null;
   /**
    * Contractual CPI observation lag; when `None` the index lag, then the
    * curve's indexation lag, applies.
@@ -20071,7 +20058,7 @@ export interface InflationIndex {
   /**
    * Interpolation method
    */
-  interpolation: InflationInterpolation;
+  interpolation: SeriesInterpolation;
   /**
    * Lag policy
    */

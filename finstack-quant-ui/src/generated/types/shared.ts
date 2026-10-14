@@ -3952,30 +3952,32 @@ export type Id55 = string;
  */
 export type Id56 = string;
 /**
- * Interpolation method for CPI/RPI values between monthly observations.
- *
- * Determines how index values are computed for dates between published
- * monthly levels. Different markets use different conventions.
- *
- * # Market Conventions
- *
- * - **US TIPS**: Linear interpolation (daily pro-rata)
- * - **UK Index-Linked Gilts**: Linear interpolation with 3-month lag
- * - **Euro inflation bonds**: Varies by issuer (typically linear)
+ * Interpolation strategy for [`ScalarTimeSeries`].
  *
  * # Examples
- *
  * ```rust
- * use finstack_quant_core::market_data::scalars::InflationInterpolation;
+ * use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};
+ * use finstack_quant_core::dates::Date;
+ * use time::Month;
  *
- * let linear = InflationInterpolation::Linear; // TIPS standard
- * let step = InflationInterpolation::Step;     // Conservative approach
+ * let series = ScalarTimeSeries::new(
+ *     "TS",
+ *     vec![
+ *         (Date::from_calendar_date(2024, Month::January, 1).expect("Valid date"), 100.0),
+ *         (Date::from_calendar_date(2024, Month::February, 1).expect("Valid date"), 105.0),
+ *     ],
+ *     None,
+ * )
+ * .expect("Series creation should succeed");
+ * let stepped = series.clone().with_interpolation(SeriesInterpolation::Step);
+ * let mid_date = Date::from_calendar_date(2024, Month::January, 15).expect("Valid date");
+ * assert_eq!(stepped.value_on(mid_date).expect("Value lookup should succeed"), 100.0);
  * ```
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "InflationInterpolation".
+ * via the `definition` "SeriesInterpolation".
  */
-export type InflationInterpolation = "step" | "linear";
+export type SeriesInterpolation = "step" | "linear";
 /**
  * Contractual observation lag for inflation index reference dates.
  *
@@ -16711,7 +16713,6 @@ export interface SharedDefs {
   IndexUnderlyingParams?: IndexUnderlyingParams1;
   IndexationMethod?: IndexationMethod;
   InflationCapFloor?: InflationCapFloor;
-  InflationInterpolation?: InflationInterpolation;
   InflationLag?: InflationLag;
   InflationLinkedBond?: InflationLinkedBond;
   InflationSwap?: InflationSwap;
@@ -16824,6 +16825,7 @@ export interface SharedDefs {
   RoundingConvention?: RoundingConvention;
   SabrParameters?: SabrParameters;
   ScheduledFee?: ScheduledFee;
+  SeriesInterpolation?: SeriesInterpolation;
   SettlementType?: SettlementType;
   ShiftMode?: ShiftMode;
   ShiftingInterestSpec?: ShiftingInterestSpec;
@@ -33991,7 +33993,7 @@ export interface InflationSwap {
    * Contractual monthly reference-index interpolation; takes precedence over index metadata;
    * without either source the default is monthly step interpolation.
    */
-  interpolation?: InflationInterpolation | null;
+  interpolation?: SeriesInterpolation | null;
   /**
    * Contractual CPI observation lag; when `None` the index lag, then the
    * curve's indexation lag, applies.
@@ -34293,7 +34295,7 @@ export interface YoYInflationSwap {
    * Contractual monthly reference-index interpolation; takes precedence over index metadata;
    * without either source the default is monthly step interpolation.
    */
-  interpolation?: InflationInterpolation | null;
+  interpolation?: SeriesInterpolation | null;
   /**
    * Contractual CPI observation lag; when `None` the index lag, then the
    * curve's indexation lag, applies.
@@ -34602,7 +34604,7 @@ export interface InflationCapFloor {
    * Contractual monthly CPI interpolation; takes precedence over index metadata.
    * Defaults to monthly step interpolation when neither source supplies it.
    */
-  interpolation?: InflationInterpolation | null;
+  interpolation?: SeriesInterpolation | null;
   /**
    * Contractual CPI observation lag; when `None` the index lag, then the
    * curve's indexation lag, applies.

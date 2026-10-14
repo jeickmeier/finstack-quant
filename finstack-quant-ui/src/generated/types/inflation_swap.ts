@@ -138,27 +138,29 @@ export type D_02A11B30Ee627630F221 = "per_name" | "large_homogeneous";
  */
 export type D_948Cdc4Db846A21357A4 = "hull_white" | "black_derman_toy" | "black_karasinski";
 /**
- * Interpolation method for CPI/RPI values between monthly observations.
- *
- * Determines how index values are computed for dates between published
- * monthly levels. Different markets use different conventions.
- *
- * # Market Conventions
- *
- * - **US TIPS**: Linear interpolation (daily pro-rata)
- * - **UK Index-Linked Gilts**: Linear interpolation with 3-month lag
- * - **Euro inflation bonds**: Varies by issuer (typically linear)
+ * Interpolation strategy for [`ScalarTimeSeries`].
  *
  * # Examples
- *
  * ```rust
- * use finstack_quant_core::market_data::scalars::InflationInterpolation;
+ * use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};
+ * use finstack_quant_core::dates::Date;
+ * use time::Month;
  *
- * let linear = InflationInterpolation::Linear; // TIPS standard
- * let step = InflationInterpolation::Step;     // Conservative approach
+ * let series = ScalarTimeSeries::new(
+ *     "TS",
+ *     vec![
+ *         (Date::from_calendar_date(2024, Month::January, 1).expect("Valid date"), 100.0),
+ *         (Date::from_calendar_date(2024, Month::February, 1).expect("Valid date"), 105.0),
+ *     ],
+ *     None,
+ * )
+ * .expect("Series creation should succeed");
+ * let stepped = series.clone().with_interpolation(SeriesInterpolation::Step);
+ * let mid_date = Date::from_calendar_date(2024, Month::January, 15).expect("Valid date");
+ * assert_eq!(stepped.value_on(mid_date).expect("Value lookup should succeed"), 100.0);
  * ```
  */
-export type DEab7092063462662C68F = "step" | "linear";
+export type D_3Fd72Dbffa7F4Eae9C48 = "step" | "linear";
 /**
  * Contractual observation lag for inflation index reference dates.
  *
@@ -441,7 +443,7 @@ export interface DCf4B2B6Fb1De084C8028 {
    * Contractual monthly reference-index interpolation; takes precedence over index metadata;
    * without either source the default is monthly step interpolation.
    */
-  interpolation?: DEab7092063462662C68F | null;
+  interpolation?: D_3Fd72Dbffa7F4Eae9C48 | null;
   /**
    * Contractual CPI observation lag; when `None` the index lag, then the
    * curve's indexation lag, applies.

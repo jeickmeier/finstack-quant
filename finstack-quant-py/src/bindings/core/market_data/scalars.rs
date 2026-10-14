@@ -380,7 +380,7 @@ impl PyInflationIndex {
         let interpolation = interpolation
             .map(InflationInterpolation::from_str)
             .transpose()
-            .map_err(crate::errors::value_error)?
+            .map_err(core_to_py)?
             .unwrap_or_default();
         let mut inner = InflationIndex::new(id, observations, currency)
             .map_err(core_to_py)?

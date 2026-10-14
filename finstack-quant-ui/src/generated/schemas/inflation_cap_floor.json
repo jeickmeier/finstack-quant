@@ -436,21 +436,6 @@
       },
       "type": "object"
     },
-    "d_248b18283cf30a5fa9bc": {
-      "description": "Interpolation method for CPI/RPI values between monthly observations.\n\nDetermines how index values are computed for dates between published\nmonthly levels. Different markets use different conventions.\n\n# Market Conventions\n\n- **US TIPS**: Linear interpolation (daily pro-rata)\n- **UK Index-Linked Gilts**: Linear interpolation with 3-month lag\n- **Euro inflation bonds**: Varies by issuer (typically linear)\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationInterpolation;\n\nlet linear = InflationInterpolation::Linear; // TIPS standard\nlet step = InflationInterpolation::Step;     // Conservative approach\n```",
-      "oneOf": [
-        {
-          "const": "step",
-          "description": "Last observation carried forward until next publication.\n\nConservative approach: assumes no intra-month inflation.",
-          "type": "string"
-        },
-        {
-          "const": "linear",
-          "description": "Linear interpolation between monthly observations.\n\nStandard for TIPS and most inflation-linked bonds.\nAssumes constant daily inflation rate within each month.",
-          "type": "string"
-        }
-      ]
-    },
     "d_2572320f93343dabe361": {
       "additionalProperties": false,
       "description": "YoY inflation cap/floor instrument.",
@@ -502,7 +487,7 @@
         "interpolation": {
           "anyOf": [
             {
-              "$ref": "#/$defs/d_248b18283cf30a5fa9bc"
+              "$ref": "#/$defs/d_a3b019065dc7c1f4e426"
             },
             {
               "type": "null"
@@ -2547,6 +2532,21 @@
       ],
       "title": "Id",
       "type": "string"
+    },
+    "d_a3b019065dc7c1f4e426": {
+      "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n)\n.expect(\"Series creation should succeed\");\nlet stepped = series.clone().with_interpolation(SeriesInterpolation::Step);\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(stepped.value_on(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```",
+      "oneOf": [
+        {
+          "const": "step",
+          "description": "Last observation carried forward",
+          "type": "string"
+        },
+        {
+          "const": "linear",
+          "description": "Linear interpolation between observed points",
+          "type": "string"
+        }
+      ]
     },
     "d_ae5d75ed4e313ae3bc25": {
       "description": "Which valuation parameter to solve the breakeven for.\n\n# Result units\n\nThe breakeven metric is a bare `f64` whose unit depends on the target. Read\nthe per-variant docs before interpreting a value:\n\n| Target             | Sensitivity     | Result unit          |\n|--------------------|-----------------|----------------------|\n| `ZSpread`          | CS01            | basis points         |\n| `Ytm`              | DV01            | basis points         |\n| `Oas`              | CS01            | basis points         |\n| `ImpliedVol`       | Vega            | vol points (1 = 1%)  |\n| `BaseCorrelation`  | Correlation01   | correlation points   |",

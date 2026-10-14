@@ -692,6 +692,23 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_3fd72dbffa7f4eae9c48",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json#/$defs/SeriesInterpolation",
+    "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n)\n.expect(\"Series creation should succeed\");\nlet stepped = series.clone().with_interpolation(SeriesInterpolation::Step);\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(stepped.value_on(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```"
+  },
+  {
+    "path": "#/$defs/d_3fd72dbffa7f4eae9c48/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json#/$defs/SeriesInterpolation/oneOf/0",
+    "const": "step",
+    "description": "Last observation carried forward"
+  },
+  {
+    "path": "#/$defs/d_3fd72dbffa7f4eae9c48/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json#/$defs/SeriesInterpolation/oneOf/1",
+    "const": "linear",
+    "description": "Linear interpolation between observed points"
+  },
+  {
     "path": "#/$defs/d_44e203fc4369b4a47168",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json#/$defs/InflationLag",
     "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```"
@@ -3717,8 +3734,8 @@ export default [
   {
     "path": "#/$defs/d_cf4b2b6fb1de084c8028/properties/interpolation/anyOf/0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json#/$defs/InflationSwap/properties/interpolation/anyOf/0",
-    "ref": "#/$defs/InflationInterpolation",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json#/$defs/InflationInterpolation"
+    "ref": "#/$defs/SeriesInterpolation",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json#/$defs/SeriesInterpolation"
   },
   {
     "path": "#/$defs/d_cf4b2b6fb1de084c8028/properties/interpolation/anyOf/1",
@@ -3965,23 +3982,6 @@ export default [
   {
     "path": "#/$defs/d_e49387f97c0f9d510642/properties/reporting_currency/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarConfig/properties/reporting_currency/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_eab7092063462662c68f",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json#/$defs/InflationInterpolation",
-    "description": "Interpolation method for CPI/RPI values between monthly observations.\n\nDetermines how index values are computed for dates between published\nmonthly levels. Different markets use different conventions.\n\n# Market Conventions\n\n- **US TIPS**: Linear interpolation (daily pro-rata)\n- **UK Index-Linked Gilts**: Linear interpolation with 3-month lag\n- **Euro inflation bonds**: Varies by issuer (typically linear)\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationInterpolation;\n\nlet linear = InflationInterpolation::Linear; // TIPS standard\nlet step = InflationInterpolation::Step;     // Conservative approach\n```"
-  },
-  {
-    "path": "#/$defs/d_eab7092063462662c68f/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json#/$defs/InflationInterpolation/oneOf/0",
-    "const": "step",
-    "description": "Last observation carried forward until next publication.\n\nConservative approach: assumes no intra-month inflation."
-  },
-  {
-    "path": "#/$defs/d_eab7092063462662c68f/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json#/$defs/InflationInterpolation/oneOf/1",
-    "const": "linear",
-    "description": "Linear interpolation between monthly observations.\n\nStandard for TIPS and most inflation-linked bonds.\nAssumes constant daily inflation rate within each month."
   },
   {
     "path": "#/$defs/d_ec4e993309e09fe83294",

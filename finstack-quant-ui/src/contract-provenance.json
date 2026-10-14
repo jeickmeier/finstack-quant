@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "3dcff031776f60f4c21dae4e82fb5ae2948ae925c441ac23ed513e77f33fdd79",
+          "sha256": "5bc07f93841ec131d05f29ede48e41938380bae21f94e5a1bcac209e6c286fa4",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "3a8c1b573b197100a360eb9d112450d062fb5aac3f6dd7f786367abda52a2d3c",
+          "sha256": "a4babe6769132fc14f3119d4a1c9168aa9994177764dd5c2fe729fc8e1c4ea1a",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -495,14 +495,14 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/inflation_cap_floor.schema.json",
-          "sha256": "d62e6c79a8785595355be43a8d9b682cd5735134602820f49a3ea44f7f4e3ff2",
+          "sha256": "a497403686da479221ce3453404f0e97c86433351da75994c82907165f2e0307",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/inflation_swap.schema.json",
-          "sha256": "06f30d5d0c63fe308e8c3c64434f696ca43c0c06b9dde406269c860f504af7be",
+          "sha256": "c7353e8a7e7752dfd5a8d415f932dcc5cf4e5fa7f3d8f198081d51aeb612199c",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -551,7 +551,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/yoy_inflation_swap.schema.json",
-          "sha256": "c7a91e51f64dcb7a0f5474b404e0d46f326153637f12acc3c7f578ff35c2bc0d",
+          "sha256": "41536cc67b135b13d014c5a6b7ceb4dcf1bcb68d9a4c5fd2e0ffe1e675c111eb",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         }
       ]
@@ -565,7 +565,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "3b5864effe840069495f59a728fb0eb3425d441241ecb861dcc82e5b5df992ed",
+          "sha256": "baf3e3766854d7d29920e0441971332a01f01312f91f5c949ca162a79bff3e76",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -579,7 +579,7 @@
           "uri": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "pointer": "#",
           "source": "finstack-quant/calibration/schemas/calibration/1/calibration.schema.json",
-          "sha256": "a87e8fda5363506555601d3f930def223637ad34410f7a00eaf4558ad246cf57",
+          "sha256": "e13f1ce89e399574ecaeafa9c1786f1538ef8b200cf4d656535b6cb378599076",
           "description": "Canonical typed calibration request and result envelope."
         }
       ]
@@ -1189,7 +1189,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "3b5864effe840069495f59a728fb0eb3425d441241ecb861dcc82e5b5df992ed",
+          "sha256": "baf3e3766854d7d29920e0441971332a01f01312f91f5c949ca162a79bff3e76",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]

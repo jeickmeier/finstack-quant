@@ -403,80 +403,11 @@ impl VolSurface {
         (self.expiries.len(), self.strikes.len())
     }
 
-    /// Create a new volatility surface with a single point bumped.
-    ///
-    /// Bumps the volatility at the specified (expiry, strike) point by a relative amount.
-    /// Uses bilinear interpolation to find the grid cell containing the point and bumps
-    /// the nearest grid point. This is useful for bucketed Vega calculations.
-    ///
-    /// # Arguments
-    /// * `expiry` - Expiry time in years
-    /// * `strike` - Strike price
-    /// * `bump_pct` - Relative bump size (e.g., 0.01 for 1% increase)
-    ///
-    /// # Returns
-    /// New VolSurface with bumped volatility at the specified point
-    ///
-    /// # Errors
-    /// Returns error if expiry or strike is out of bounds (even after clamping)
-    ///
-    /// # Examples
-    /// ```rust
-    /// use finstack_quant_core::market_data::surfaces::VolSurface;
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///
-    /// let surface = VolSurface::builder("EQ-VOL")
-    ///     .expiries(&[1.0, 2.0])
-    ///     .strikes(&[90.0, 100.0, 110.0])
-    ///     .row(&[0.2, 0.21, 0.22])
-    ///     .row(&[0.19, 0.2, 0.21])
-    ///     .build()
-    ///     .expect("VolSurface builder should succeed");
-    ///
-    /// // Bump vol at (1.5 years, 100.0 strike) by 1%
-    /// let bumped = surface.bump_point(1.5, 100.0, 0.01)?;
-    /// assert!(bumped.vols()[1] > surface.vols()[1]);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn bump_point(&self, expiry: f64, strike: f64, bump_pct: f64) -> crate::Result<Self> {
-        if !expiry.is_finite() || !strike.is_finite() || !bump_pct.is_finite() {
-            return Err(InputError::Invalid.into());
-        }
-        let (Some(&exp_min), Some(&exp_max)) = (self.expiries.first(), self.expiries.last()) else {
-            return Err(crate::error::InputError::TooFewPoints.into());
-        };
-        let (Some(&str_min), Some(&str_max)) = (self.strikes.first(), self.strikes.last()) else {
-            return Err(crate::error::InputError::TooFewPoints.into());
-        };
-
-        let clamped_expiry = expiry.clamp(exp_min, exp_max);
-        let clamped_strike = strike.clamp(str_min, str_max);
-
-        let expiry_idx = find_closest_grid_index(self.expiries.as_ref(), clamped_expiry);
-        let strike_idx = find_closest_grid_index(self.strikes.as_ref(), clamped_strike);
-
-        let n_strikes = self.strikes.len();
-        let idx = expiry_idx * n_strikes + strike_idx;
-
-        let current_vol = self.vols[idx];
-        let bumped_vol = current_vol * (1.0 + bump_pct).max(0.0);
-
-        let mut bumped_vols = self.vols.clone();
-        bumped_vols[idx] = bumped_vol;
-
-        if bumped_vols.iter().any(|v| !v.is_finite()) {
-            return Err(InputError::Invalid.into());
-        }
-        let mut bumped = self.clone();
-        bumped.vols = bumped_vols;
-        Ok(bumped)
-    }
     /// Add an absolute bump to one grid point in place.
     ///
     /// Coordinates map to the nearest clamped grid node. The updated
     /// volatility is floored at zero, and the original value is returned for
-    /// reversal with [`Self::unbump_point_in_place`].
+    /// reversal after a scratch bump.
     ///
     /// # Arguments
     ///
@@ -516,18 +447,7 @@ impl VolSurface {
     }
 
     /// Restore a grid point to a previously saved vol value.
-    ///
-    /// # Arguments
-    ///
-    /// * `expiry` - Option expiry date or year-fraction used to locate the volatility point
-    /// * `strike` - Option strike in the surface's quote units (absolute or relative)
-    /// * `original_vol` - Original annualized volatility restored after the temporary bump.
-    ///
-    /// # Errors
-    ///
-    /// Rejects non-finite coordinates or a non-finite/negative restored value
-    /// without modifying the surface.
-    pub fn unbump_point_in_place(
+    pub(crate) fn unbump_point_in_place(
         &mut self,
         expiry: f64,
         strike: f64,
@@ -676,17 +596,28 @@ impl VolSurface {
     /// Filter values must equal the surface's own grid values (a tiny relative
     /// tolerance of `BUCKET_BUMP_MATCH_TOLERANCE` absorbs floating-point
     /// round-off only); values that fall between grid points match nothing.
+    ///
+    /// # Arguments
+    ///
+    /// * `expiries_filter` - Optional expiry coordinates in years; `None` selects all expiries.
+    /// * `strikes_filter` - Optional secondary-axis coordinates; `None` selects all strikes/tenors.
+    /// * `pct` - Finite percentage bump (for example, `10.0` scales matching quotes by `1.10`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InputError::Invalid`] when `pct` or any filter entry is non-finite or when a
+    /// scaled volatility overflows.
     pub fn apply_bucket_bump(
         &self,
         expiries_filter: Option<&[f64]>,
         strikes_filter: Option<&[f64]>,
         pct: f64,
-    ) -> Option<Self> {
+    ) -> crate::Result<Self> {
         if !pct.is_finite()
             || expiries_filter.is_some_and(|values| values.iter().any(|v| !v.is_finite()))
             || strikes_filter.is_some_and(|values| values.iter().any(|v| !v.is_finite()))
         {
-            return None;
+            return Err(InputError::Invalid.into());
         }
         let factor = 1.0 + pct / 100.0;
         let (n_expiries, n_strikes) = self.grid_shape();
@@ -703,12 +634,12 @@ impl VolSurface {
                     let index = ei * n_strikes + si;
                     bumped.vols[index] = (self.vols[index] * factor).max(0.0);
                     if !bumped.vols[index].is_finite() {
-                        return None;
+                        return Err(InputError::Invalid.into());
                     }
                 }
             }
         }
-        Some(bumped)
+        Ok(bumped)
     }
 }
 
@@ -945,41 +876,6 @@ impl VolSurface {
         strikes: &[f64],
         vol_rows: &[Vec<f64>],
     ) -> crate::Result<Self> {
-        Self::from_rows_opts(
-            id,
-            expiries,
-            strikes,
-            vol_rows,
-            VolGridOpts::default(),
-            None,
-        )
-    }
-
-    /// Construct a validated rectangular volatility grid from rows and quote conventions.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Market-data identifier used for context lookup.
-    /// * `expiries` - Strictly increasing option expiries in year fractions.
-    /// * `strikes` - Strictly increasing strike, tenor, or moneyness coordinates,
-    ///   interpreted according to `opts.secondary_axis`.
-    /// * `vol_rows` - One row per expiry, each containing one finite non-negative
-    ///   annualized decimal volatility per secondary-axis coordinate.
-    /// * `opts` - Secondary-axis meaning, quote type, and interpolation convention.
-    /// * `displacements` - One finite additive shift per expiry for shifted Black quotes; absent for other quote conventions.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error for mismatched row dimensions and the same
-    /// axis, value, and size-overflow errors as [`Self::from_grid_opts`].
-    pub fn from_rows_opts(
-        id: impl AsRef<str>,
-        expiries: &[f64],
-        strikes: &[f64],
-        vol_rows: &[Vec<f64>],
-        opts: VolGridOpts,
-        displacements: Option<&[f64]>,
-    ) -> crate::Result<Self> {
         if vol_rows.len() != expiries.len() {
             return Err(Error::Validation(format!(
                 "vol_rows has {} rows but expiries has {} entries",
@@ -1005,7 +901,7 @@ impl VolSurface {
         for row in vol_rows {
             flat.extend_from_slice(row);
         }
-        Self::from_grid_opts(id, expiries, strikes, &flat, opts, displacements)
+        Self::from_grid_opts(id, expiries, strikes, &flat, VolGridOpts::default(), None)
     }
 }
 
@@ -1023,19 +919,7 @@ pub(super) fn validate_displacements(
     }
 }
 
-fn validate_axis(axis: &[f64]) -> crate::Result<()> {
-    if axis.is_empty() {
-        return Err(InputError::TooFewPoints.into());
-    }
-    if axis.iter().any(|x| !x.is_finite()) {
-        return Err(InputError::Invalid.into());
-    }
-    // Allow singleton axes (e.g., a 1xN “surface”) for clamped evaluation.
-    if axis.len() > 1 {
-        crate::math::interp::utils::validate_knots(axis)?;
-    }
-    Ok(())
-}
+use super::validate_axis;
 
 /// Validate axes, row-major dimensions and annualized decimal quotes.
 pub(super) fn validate_grid(
@@ -1096,11 +980,11 @@ mod displacement_tests {
             .with_quote_type(VolQuoteType::ShiftedBlackLognormal)
             .is_err());
 
-        let surface = VolSurface::from_rows_opts(
+        let surface = VolSurface::from_grid_opts(
             "SHIFT",
             &[1.0, 2.0],
             &[0.03],
-            &[vec![0.2], vec![0.2]],
+            &[0.2, 0.2],
             opts,
             Some(&[0.02, 0.03]),
         )

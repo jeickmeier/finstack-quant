@@ -18,7 +18,7 @@
             "$id": "https://finstack_quant.dev/schemas/dates/1/schedule.schema.json",
             "type_name": "Schedule",
             "kind": "output",
-            "bytes": 5350
+            "bytes": 5241
           },
           {
             "path": "schemas/dates/1/schedule_spec.schema.json",
@@ -32,7 +32,7 @@
             "$id": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
             "type_name": "MarketContextState",
             "kind": "input",
-            "bytes": 131349
+            "bytes": 130116
           },
           {
             "path": "schemas/market_data/1/vol_cube_expiry_slice.schema.json",
@@ -112,14 +112,14 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1257560
+            "bytes": 1256318
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 232634
+            "bytes": 231401
           },
           {
             "path": "schemas/attribution/1/attribution_result.schema.json",
@@ -422,7 +422,6 @@
           "IndexationMethod",
           "InflationCapFloor",
           "InflationIndex",
-          "InflationInterpolation",
           "InflationLag",
           "InflationLinkedBond",
           "InflationPublicationWire",
@@ -746,7 +745,6 @@
           "Id",
           "IdiosyncraticVolModel",
           "InflationIndex",
-          "InflationInterpolation",
           "InflationLag",
           "InflationPublicationWire",
           "InstrumentJson",
@@ -825,14 +823,14 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 217319
+            "bytes": 216086
           },
           {
             "path": "schemas/calibration/1/calibration_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
             "type_name": "CalibrationResultEnvelope",
             "kind": "output",
-            "bytes": 135103
+            "bytes": 132026
           },
           {
             "path": "schemas/calibration/1/calibration_validation_report.schema.json",
@@ -969,7 +967,6 @@
           "HierarchyNode",
           "HullWhiteVolatilityMode",
           "InflationCurveSolveConfig",
-          "InflationInterpolation",
           "InflationLag",
           "InflationPublicationWire",
           "InflationSwapConventionId",
@@ -2010,7 +2007,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1151362
+            "bytes": 1151288
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
@@ -2664,14 +2661,14 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/inflation_swap_conventions.schema.json",
             "type_name": "InflationSwapConventions",
             "kind": "component",
-            "bytes": 2946
+            "bytes": 2878
           },
           {
             "path": "schemas/common/1/instrument_json.schema.json",
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
             "type_name": "InstrumentJson",
             "kind": "component",
-            "bytes": 1004157
+            "bytes": 1004083
           },
           {
             "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -2811,7 +2808,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1012070
+            "bytes": 1011996
           },
           {
             "path": "schemas/instruments/1/credit_derivatives/cds_index.schema.json",
@@ -2965,7 +2962,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1011047
+            "bytes": 1010973
           },
           {
             "path": "schemas/instruments/1/exotics/callable_range_accrual.schema.json",
@@ -3182,7 +3179,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
             "type_name": "InstrumentEnvelope",
             "kind": "input",
-            "bytes": 1102161
+            "bytes": 1102087
           },
           {
             "path": "schemas/instruments/1/rates/basis_swap.schema.json",
@@ -3245,14 +3242,14 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 15123
+            "bytes": 15055
           },
           {
             "path": "schemas/instruments/1/rates/inflation_swap.schema.json",
             "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 11411
+            "bytes": 11343
           },
           {
             "path": "schemas/instruments/1/rates/interest_rate_future.schema.json",
@@ -3301,7 +3298,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 11031
+            "bytes": 10963
           },
           {
             "path": "schemas/results/1/borrowing_base_report.schema.json",
@@ -3322,7 +3319,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
             "type_name": "CompositeRebalanceResult",
             "kind": "output",
-            "bytes": 1013678
+            "bytes": 1013604
           },
           {
             "path": "schemas/results/1/convertible_greeks.schema.json",
@@ -3434,7 +3431,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
             "type_name": "ValuationResult",
             "kind": "output",
-            "bytes": 67044
+            "bytes": 65200
           },
           {
             "path": "schemas/results/1/var_result.schema.json",
@@ -3582,7 +3579,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1257560
+            "bytes": 1256318
           },
           {
             "domain": "attribution",
@@ -3590,7 +3587,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 232634
+            "bytes": 231401
           },
           {
             "domain": "attribution",
@@ -3606,7 +3603,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 217319
+            "bytes": 216086
           },
           {
             "domain": "calibration",
@@ -3614,7 +3611,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
             "type_name": "CalibrationResultEnvelope",
             "kind": "output",
-            "bytes": 135103
+            "bytes": 132026
           },
           {
             "domain": "calibration",
@@ -3846,7 +3843,7 @@
             "$id": "https://finstack_quant.dev/schemas/dates/1/schedule.schema.json",
             "type_name": "Schedule",
             "kind": "output",
-            "bytes": 5350
+            "bytes": 5241
           },
           {
             "domain": "core",
@@ -3862,7 +3859,7 @@
             "$id": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
             "type_name": "MarketContextState",
             "kind": "input",
-            "bytes": 131349
+            "bytes": 130116
           },
           {
             "domain": "core",
@@ -4486,7 +4483,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1151362
+            "bytes": 1151288
           },
           {
             "domain": "scenarios",
@@ -4678,7 +4675,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/inflation_swap_conventions.schema.json",
             "type_name": "InflationSwapConventions",
             "kind": "component",
-            "bytes": 2946
+            "bytes": 2878
           },
           {
             "domain": "valuations",
@@ -4686,7 +4683,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
             "type_name": "InstrumentJson",
             "kind": "component",
-            "bytes": 1004157
+            "bytes": 1004083
           },
           {
             "domain": "valuations",
@@ -4846,7 +4843,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1012070
+            "bytes": 1011996
           },
           {
             "domain": "valuations",
@@ -5022,7 +5019,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1011047
+            "bytes": 1010973
           },
           {
             "domain": "valuations",
@@ -5270,7 +5267,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
             "type_name": "InstrumentEnvelope",
             "kind": "input",
-            "bytes": 1102161
+            "bytes": 1102087
           },
           {
             "domain": "valuations",
@@ -5342,7 +5339,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 15123
+            "bytes": 15055
           },
           {
             "domain": "valuations",
@@ -5350,7 +5347,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 11411
+            "bytes": 11343
           },
           {
             "domain": "valuations",
@@ -5406,7 +5403,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 11031
+            "bytes": 10963
           },
           {
             "domain": "valuations",
@@ -5430,7 +5427,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
             "type_name": "CompositeRebalanceResult",
             "kind": "output",
-            "bytes": 1013678
+            "bytes": 1013604
           },
           {
             "domain": "valuations",
@@ -5558,7 +5555,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
             "type_name": "ValuationResult",
             "kind": "output",
-            "bytes": 67044
+            "bytes": 65200
           },
           {
             "domain": "valuations",

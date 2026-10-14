@@ -110,19 +110,7 @@ impl TryFrom<VolCubeWire> for VolCube {
     }
 }
 
-/// Validate an axis: non-empty, finite, and strictly increasing if len > 1.
-fn validate_axis(axis: &[f64]) -> crate::Result<()> {
-    if axis.is_empty() {
-        return Err(InputError::TooFewPoints.into());
-    }
-    if axis.iter().any(|x| !x.is_finite()) {
-        return Err(InputError::Invalid.into());
-    }
-    if axis.len() > 1 {
-        crate::math::interp::utils::validate_knots(axis)?;
-    }
-    Ok(())
-}
+use super::validate_axis;
 
 // VolCube impl — construction and accessors
 

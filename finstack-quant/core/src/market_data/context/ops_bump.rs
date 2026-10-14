@@ -250,9 +250,8 @@ impl MarketContext {
                     // semantics (vol × (1 + pct/100)) are identical with or without
                     // filters.
                     let surface = ctx.get_surface(vol_surface_id.as_str())?;
-                    let bumped = surface
-                        .apply_bucket_bump(expiries.as_deref(), strikes.as_deref(), pct)
-                        .ok_or(InputError::DimensionMismatch)?;
+                    let bumped =
+                        surface.apply_bucket_bump(expiries.as_deref(), strikes.as_deref(), pct)?;
                     ctx.insert_surface_mut(bumped);
                 }
                 MarketBump::BaseCorrBucketPts {
@@ -261,9 +260,7 @@ impl MarketContext {
                     points,
                 } => {
                     let curve = ctx.get_base_correlation(surface_id.as_str())?;
-                    let bumped = curve
-                        .apply_bucket_bump(detachments.as_deref(), points)
-                        .ok_or(InputError::DimensionMismatch)?;
+                    let bumped = curve.apply_bucket_bump(detachments.as_deref(), points)?;
                     needs_credit_rebind |= ctx.curve_affects_credit_indices(&surface_id);
                     Arc::make_mut(&mut ctx.curves)
                         .insert(surface_id, CurveStorage::BaseCorrelation(Arc::new(bumped)));

@@ -449,23 +449,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_248b18283cf30a5fa9bc",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationInterpolation",
-    "description": "Interpolation method for CPI/RPI values between monthly observations.\n\nDetermines how index values are computed for dates between published\nmonthly levels. Different markets use different conventions.\n\n# Market Conventions\n\n- **US TIPS**: Linear interpolation (daily pro-rata)\n- **UK Index-Linked Gilts**: Linear interpolation with 3-month lag\n- **Euro inflation bonds**: Varies by issuer (typically linear)\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationInterpolation;\n\nlet linear = InflationInterpolation::Linear; // TIPS standard\nlet step = InflationInterpolation::Step;     // Conservative approach\n```"
-  },
-  {
-    "path": "#/$defs/d_248b18283cf30a5fa9bc/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationInterpolation/oneOf/0",
-    "const": "step",
-    "description": "Last observation carried forward until next publication.\n\nConservative approach: assumes no intra-month inflation."
-  },
-  {
-    "path": "#/$defs/d_248b18283cf30a5fa9bc/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationInterpolation/oneOf/1",
-    "const": "linear",
-    "description": "Linear interpolation between monthly observations.\n\nStandard for TIPS and most inflation-linked bonds.\nAssumes constant daily inflation rate within each month."
-  },
-  {
     "path": "#/$defs/d_2572320f93343dabe361",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor",
     "description": "YoY inflation cap/floor instrument."
@@ -550,8 +533,8 @@ export default [
   {
     "path": "#/$defs/d_2572320f93343dabe361/properties/interpolation/anyOf/0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/interpolation/anyOf/0",
-    "ref": "#/$defs/InflationInterpolation",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationInterpolation"
+    "ref": "#/$defs/SeriesInterpolation",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/SeriesInterpolation"
   },
   {
     "path": "#/$defs/d_2572320f93343dabe361/properties/interpolation/anyOf/1",
@@ -2666,6 +2649,23 @@ export default [
       "US912828XG33"
     ],
     "title": "Id"
+  },
+  {
+    "path": "#/$defs/d_a3b019065dc7c1f4e426",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/SeriesInterpolation",
+    "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n)\n.expect(\"Series creation should succeed\");\nlet stepped = series.clone().with_interpolation(SeriesInterpolation::Step);\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(stepped.value_on(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```"
+  },
+  {
+    "path": "#/$defs/d_a3b019065dc7c1f4e426/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/SeriesInterpolation/oneOf/0",
+    "const": "step",
+    "description": "Last observation carried forward"
+  },
+  {
+    "path": "#/$defs/d_a3b019065dc7c1f4e426/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/SeriesInterpolation/oneOf/1",
+    "const": "linear",
+    "description": "Linear interpolation between observed points"
   },
   {
     "path": "#/$defs/d_ae5d75ed4e313ae3bc25",

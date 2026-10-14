@@ -690,23 +690,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_3f9f853d11e3e642afa6",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/InflationInterpolation",
-    "description": "Interpolation method for CPI/RPI values between monthly observations.\n\nDetermines how index values are computed for dates between published\nmonthly levels. Different markets use different conventions.\n\n# Market Conventions\n\n- **US TIPS**: Linear interpolation (daily pro-rata)\n- **UK Index-Linked Gilts**: Linear interpolation with 3-month lag\n- **Euro inflation bonds**: Varies by issuer (typically linear)\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationInterpolation;\n\nlet linear = InflationInterpolation::Linear; // TIPS standard\nlet step = InflationInterpolation::Step;     // Conservative approach\n```"
-  },
-  {
-    "path": "#/$defs/d_3f9f853d11e3e642afa6/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/InflationInterpolation/oneOf/0",
-    "const": "step",
-    "description": "Last observation carried forward until next publication.\n\nConservative approach: assumes no intra-month inflation."
-  },
-  {
-    "path": "#/$defs/d_3f9f853d11e3e642afa6/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/InflationInterpolation/oneOf/1",
-    "const": "linear",
-    "description": "Linear interpolation between monthly observations.\n\nStandard for TIPS and most inflation-linked bonds.\nAssumes constant daily inflation rate within each month."
-  },
-  {
     "path": "#/$defs/d_46455be5cce6b8020e50",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/AssetDynamics",
     "description": "Asset dynamics specification for the Merton model.\n\nControls the stochastic process assumed for the firm's asset value."
@@ -847,6 +830,23 @@ export default [
     "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion.",
     "ref": "#/$defs/Currency",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#/$defs/Currency"
+  },
+  {
+    "path": "#/$defs/d_51b337737d55f08f74b6",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/SeriesInterpolation",
+    "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n)\n.expect(\"Series creation should succeed\");\nlet stepped = series.clone().with_interpolation(SeriesInterpolation::Step);\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(stepped.value_on(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```"
+  },
+  {
+    "path": "#/$defs/d_51b337737d55f08f74b6/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/SeriesInterpolation/oneOf/0",
+    "const": "step",
+    "description": "Last observation carried forward"
+  },
+  {
+    "path": "#/$defs/d_51b337737d55f08f74b6/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/SeriesInterpolation/oneOf/1",
+    "const": "linear",
+    "description": "Linear interpolation between observed points"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652",
@@ -1309,8 +1309,8 @@ export default [
   {
     "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/interpolation/anyOf/0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/YoYInflationSwap/properties/interpolation/anyOf/0",
-    "ref": "#/$defs/InflationInterpolation",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/InflationInterpolation"
+    "ref": "#/$defs/SeriesInterpolation",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json#/$defs/SeriesInterpolation"
   },
   {
     "path": "#/$defs/d_6c7cf0810b445d318ec1/properties/interpolation/anyOf/1",

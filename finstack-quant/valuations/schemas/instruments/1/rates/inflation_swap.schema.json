@@ -1,20 +1,5 @@
 {
   "$defs": {
-    "InflationInterpolation": {
-      "description": "Interpolation method for CPI/RPI values between monthly observations.\n\nDetermines how index values are computed for dates between published\nmonthly levels. Different markets use different conventions.\n\n# Market Conventions\n\n- **US TIPS**: Linear interpolation (daily pro-rata)\n- **UK Index-Linked Gilts**: Linear interpolation with 3-month lag\n- **Euro inflation bonds**: Varies by issuer (typically linear)\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationInterpolation;\n\nlet linear = InflationInterpolation::Linear; // TIPS standard\nlet step = InflationInterpolation::Step;     // Conservative approach\n```",
-      "oneOf": [
-        {
-          "const": "step",
-          "description": "Last observation carried forward until next publication.\n\nConservative approach: assumes no intra-month inflation.",
-          "type": "string"
-        },
-        {
-          "const": "linear",
-          "description": "Linear interpolation between monthly observations.\n\nStandard for TIPS and most inflation-linked bonds.\nAssumes constant daily inflation rate within each month.",
-          "type": "string"
-        }
-      ]
-    },
     "InflationLag": {
       "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```",
       "oneOf": [
@@ -116,7 +101,7 @@
         "interpolation": {
           "anyOf": [
             {
-              "$ref": "#/$defs/InflationInterpolation"
+              "$ref": "#/$defs/SeriesInterpolation"
             },
             {
               "type": "null"
@@ -190,6 +175,21 @@
         {
           "const": "receive",
           "description": "Receive the primary leg (fixed rate in IRS, protection premium in CDS, long variance)",
+          "type": "string"
+        }
+      ]
+    },
+    "SeriesInterpolation": {
+      "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n)\n.expect(\"Series creation should succeed\");\nlet stepped = series.clone().with_interpolation(SeriesInterpolation::Step);\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(stepped.value_on(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```",
+      "oneOf": [
+        {
+          "const": "step",
+          "description": "Last observation carried forward",
+          "type": "string"
+        },
+        {
+          "const": "linear",
+          "description": "Linear interpolation between observed points",
           "type": "string"
         }
       ]

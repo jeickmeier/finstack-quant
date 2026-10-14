@@ -58,23 +58,11 @@ impl_simple_rebuildable_with_id!(
     ForwardCurve,
     HazardCurve,
     InflationCurve,
+    BaseCorrelationCurve,
     PriceCurve,
     BasisSpreadCurve,
     ParametricCurve,
 );
-
-impl RebuildableWithId for BaseCorrelationCurve {
-    fn rebuild_with_id(&self, id: CurveId) -> Result<Self> {
-        BaseCorrelationCurve::builder(id)
-            .knots(
-                self.detachment_points()
-                    .iter()
-                    .copied()
-                    .zip(self.correlations().iter().copied()),
-            )
-            .build()
-    }
-}
 
 macro_rules! define_curve_storage {
     ($( $variant:ident => {

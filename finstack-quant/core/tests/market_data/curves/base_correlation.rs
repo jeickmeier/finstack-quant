@@ -152,8 +152,8 @@ fn constructors_and_bucket_bumps_reject_invalid_domains() {
         .build()
         .unwrap();
     for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-        assert!(curve.apply_bucket_bump(None, value).is_none());
-        assert!(curve.apply_bucket_bump(Some(&[value]), 0.01).is_none());
+        assert!(curve.apply_bucket_bump(None, value).is_err());
+        assert!(curve.apply_bucket_bump(Some(&[value]), 0.01).is_err());
     }
 }
 

@@ -294,6 +294,21 @@ impl BaseCorrelationCurve {
         &self.id
     }
 
+    /// Create a builder initialized with this curve's knots under a new identifier.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Replacement curve identifier assigned to the returned builder.
+    #[must_use]
+    pub fn to_builder_with_id(&self, id: impl Into<CurveId>) -> BaseCorrelationCurveBuilder {
+        BaseCorrelationCurve::builder(id).knots(
+            self.detachment_points
+                .iter()
+                .copied()
+                .zip(self.correlations.iter().copied()),
+        )
+    }
+
     /// Apply a filtered additive bump to matching detachment points.
     ///
     /// # Arguments
@@ -303,17 +318,19 @@ impl BaseCorrelationCurve {
     /// * `points` - Finite additive decimal correlation change, such as `0.01`
     ///   for one correlation point. Bumped correlations are clamped to `[0, 1]`.
     ///
-    /// Returns `None` for non-finite inputs or an invalid reconstructed curve.
+    /// # Errors
+    ///
+    /// Returns [`InputError::Invalid`] for non-finite inputs or an invalid reconstructed curve.
     /// The resulting correlation shape may be nonmonotonic.
     pub fn apply_bucket_bump(
         &self,
         detachment_filter: Option<&[f64]>,
         points: f64,
-    ) -> Option<Self> {
+    ) -> crate::Result<Self> {
         if !points.is_finite()
             || detachment_filter.is_some_and(|values| values.iter().any(|v| !v.is_finite()))
         {
-            return None;
+            return Err(InputError::Invalid.into());
         }
         let new_points: Vec<(f64, f64)> = self
             .detachment_points
@@ -337,7 +354,6 @@ impl BaseCorrelationCurve {
         BaseCorrelationCurve::builder(self.id.clone())
             .knots(new_points)
             .build()
-            .ok()
     }
 
     /// Diagnose monotonicity and boundary proximity of the quoted correlations.

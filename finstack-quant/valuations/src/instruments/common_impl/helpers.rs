@@ -1422,8 +1422,7 @@ pub(crate) fn realized_inflation_index_value(
             InflationInterpolation::Step => {
                 (effective_date.year(), effective_date.month()) <= (last.year(), last.month())
             }
-            #[allow(unreachable_patterns)]
-            _ => effective_date <= last,
+            InflationInterpolation::Linear => effective_date <= last,
         }
     };
 

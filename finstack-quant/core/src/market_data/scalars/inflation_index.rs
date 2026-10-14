@@ -78,61 +78,10 @@ use std::collections::BTreeMap;
 
 /// Interpolation method for CPI/RPI values between monthly observations.
 ///
-/// Determines how index values are computed for dates between published
-/// monthly levels. Different markets use different conventions.
-///
-/// # Market Conventions
-///
-/// - **US TIPS**: Linear interpolation (daily pro-rata)
-/// - **UK Index-Linked Gilts**: Linear interpolation with 3-month lag
-/// - **Euro inflation bonds**: Varies by issuer (typically linear)
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::market_data::scalars::InflationInterpolation;
-///
-/// let linear = InflationInterpolation::Linear; // TIPS standard
-/// let step = InflationInterpolation::Step;     // Conservative approach
-/// ```
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum InflationInterpolation {
-    /// Last observation carried forward until next publication.
-    ///
-    /// Conservative approach: assumes no intra-month inflation.
-    #[default]
-    Step,
-
-    /// Linear interpolation between monthly observations.
-    ///
-    /// Standard for TIPS and most inflation-linked bonds.
-    /// Assumes constant daily inflation rate within each month.
-    Linear,
-}
-
-impl core::fmt::Display for InflationInterpolation {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            InflationInterpolation::Step => write!(f, "step"),
-            InflationInterpolation::Linear => write!(f, "linear"),
-        }
-    }
-}
-
-impl core::str::FromStr for InflationInterpolation {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "step" => Ok(InflationInterpolation::Step),
-            "linear" => Ok(InflationInterpolation::Linear),
-            other => Err(format!("Unknown inflation interpolation: {}", other)),
-        }
-    }
-}
+/// Alias for [`SeriesInterpolation`]: [`SeriesInterpolation::Linear`] is the
+/// daily pro-rata convention used by US TIPS and modern UK Index-Linked Gilts,
+/// while [`SeriesInterpolation::Step`] carries the last published level forward.
+pub type InflationInterpolation = SeriesInterpolation;
 
 /// Contractual observation lag for inflation index reference dates.
 ///
@@ -389,11 +338,7 @@ impl InflationIndex {
 
     /// Set the interpolation method between observations.
     pub fn with_interpolation(mut self, interpolation: InflationInterpolation) -> Self {
-        let interp = match interpolation {
-            InflationInterpolation::Step => SeriesInterpolation::Step,
-            InflationInterpolation::Linear => SeriesInterpolation::Linear,
-        };
-        self.series = self.series.with_interpolation(interp);
+        self.series = self.series.with_interpolation(interpolation);
         self
     }
 
@@ -645,10 +590,7 @@ impl InflationIndex {
 
     /// Expose current interpolation setting for bump/rebuild helpers.
     pub fn interpolation(&self) -> InflationInterpolation {
-        match self.series.interpolation() {
-            SeriesInterpolation::Step => InflationInterpolation::Step,
-            SeriesInterpolation::Linear => InflationInterpolation::Linear,
-        }
+        self.series.interpolation()
     }
     /// Expose current lag setting for bump/rebuild helpers.
     pub fn lag(&self) -> InflationLag {

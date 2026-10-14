@@ -1781,23 +1781,6 @@ export default [
     "description": "Use analytical Jacobian if available (otherwise finite-difference)."
   },
   {
-    "path": "#/$defs/d_3ca171eec58c0e91c94b",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationInterpolation",
-    "description": "Interpolation method for CPI/RPI values between monthly observations.\n\nDetermines how index values are computed for dates between published\nmonthly levels. Different markets use different conventions.\n\n# Market Conventions\n\n- **US TIPS**: Linear interpolation (daily pro-rata)\n- **UK Index-Linked Gilts**: Linear interpolation with 3-month lag\n- **Euro inflation bonds**: Varies by issuer (typically linear)\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationInterpolation;\n\nlet linear = InflationInterpolation::Linear; // TIPS standard\nlet step = InflationInterpolation::Step;     // Conservative approach\n```"
-  },
-  {
-    "path": "#/$defs/d_3ca171eec58c0e91c94b/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationInterpolation/oneOf/0",
-    "const": "step",
-    "description": "Last observation carried forward until next publication.\n\nConservative approach: assumes no intra-month inflation."
-  },
-  {
-    "path": "#/$defs/d_3ca171eec58c0e91c94b/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationInterpolation/oneOf/1",
-    "const": "linear",
-    "description": "Linear interpolation between monthly observations.\n\nStandard for TIPS and most inflation-linked bonds.\nAssumes constant daily inflation rate within each month."
-  },
-  {
     "path": "#/$defs/d_3d7928f8797773779aed",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsValuationConvention",
     "description": "Valuation presentation and pricing policy for CDS marks.\n\nEach variant bundles a coherent set of choices (premium-leg accrual schedule,\nAct/360 accrual day counting, accrual-on-default bias, clean/dirty NPV,\npar-spread denominator). Mixing those choices via separate boolean\noverrides is intentionally not supported — the variants here are the only\nconventions traded in practice."
@@ -3005,8 +2988,8 @@ export default [
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/interpolation",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/10/properties/interpolation",
     "description": "Interpolation method",
-    "ref": "#/$defs/InflationInterpolation",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationInterpolation"
+    "ref": "#/$defs/SeriesInterpolation",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SeriesInterpolation"
   },
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/kind",

@@ -969,18 +969,9 @@ export type DividendKind =
  */
 export type FxConversionPolicy = "cashflow_date" | "period_end" | "period_average";
 /**
- * Interpolation method for CPI/RPI values between monthly observations.
- *
- * Determines how index values are computed for dates between published
- * monthly levels. Different markets use different conventions.
- *
- * # Market Conventions
- *
- * - **US TIPS**: Linear interpolation (daily pro-rata)
- * - **UK Index-Linked Gilts**: Linear interpolation with 3-month lag
- * - **Euro inflation bonds**: Varies by issuer (typically linear)
+ * Interpolation strategy for [`ScalarTimeSeries`].
  */
-export type InflationInterpolation = "step" | "linear";
+export type SeriesInterpolation = "step" | "linear";
 /**
  * Contractual observation lag for inflation index reference dates.
  *
@@ -1037,10 +1028,6 @@ export type MarketScalar =
  * Numeric schema revision for contracts whose sole supported revision is v1.
  */
 export type SchemaVersion = number;
-/**
- * Interpolation strategy for [`ScalarTimeSeries`].
- */
-export type SeriesInterpolation = "step" | "linear";
 /**
  * Interpolation contract for vol surfaces.
  */
@@ -1661,7 +1648,7 @@ export interface InflationIndex {
   /**
    * Interpolation method
    */
-  interpolation: InflationInterpolation;
+  interpolation: SeriesInterpolation;
   /**
    * Lag policy
    */

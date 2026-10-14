@@ -316,11 +316,7 @@ pub(crate) fn vol_bucket_effects(
         None
     };
 
-    let preview = surface
-        .apply_bucket_bump(exp_years.as_deref(), strikes, pct)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::DimensionMismatch)
-        })?;
+    let preview = surface.apply_bucket_bump(exp_years.as_deref(), strikes, pct)?;
     warnings.extend(arbitrage_warnings_for_surface(vol_surface_id, &preview)?);
 
     let bump = MarketBump::VolBucketPct {

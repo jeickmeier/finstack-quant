@@ -232,13 +232,15 @@ fn volatility_mutations_reject_invalid_values_without_changing_the_source() {
     let original = surface.vols().to_vec();
     for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         assert!(surface.scaled(invalid).is_err());
-        assert!(surface.bump_point(1.0, 90.0, invalid).is_err());
-        assert!(surface.bump_point(invalid, 90.0, 0.01).is_err());
-        assert!(surface.bump_point(1.0, invalid, 0.01).is_err());
         assert!(surface
             .bump_point_absolute_in_place(1.0, 90.0, invalid)
             .is_err());
-        assert!(surface.unbump_point_in_place(1.0, 90.0, invalid).is_err());
+        assert!(surface
+            .bump_point_absolute_in_place(invalid, 90.0, 0.01)
+            .is_err());
+        assert!(surface
+            .bump_point_absolute_in_place(1.0, invalid, 0.01)
+            .is_err());
     }
     assert!(surface.scaled(-1.0).is_err());
     assert_eq!(surface.scaled(1.0).unwrap().vols(), original);

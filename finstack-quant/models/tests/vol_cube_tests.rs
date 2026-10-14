@@ -359,7 +359,9 @@ fn shifted_materialization_preserves_convention_and_displacement_rows() {
     for artifact in [
         restored,
         surface.scaled(1.01).unwrap(),
-        surface.bump_point(1.0, 0.03, 0.01).unwrap(),
+        surface
+            .apply_bucket_bump(Some(&[1.0]), Some(&[0.03]), 1.0)
+            .unwrap(),
         surface.apply_bucket_bump(None, None, 1.0).unwrap(),
     ] {
         assert_eq!(artifact.get_displacements(), surface.get_displacements());

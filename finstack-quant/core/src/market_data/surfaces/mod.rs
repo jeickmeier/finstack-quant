@@ -60,3 +60,17 @@ pub use vol_cube_expiry_slice::VolCubeExpirySlice;
 pub use vol_surface::{
     VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis, VolSurfaceBuilder,
 };
+
+/// Validate a surface axis: non-empty, finite, and strictly increasing if `len > 1`.
+pub(super) fn validate_axis(axis: &[f64]) -> crate::Result<()> {
+    if axis.is_empty() {
+        return Err(crate::error::InputError::TooFewPoints.into());
+    }
+    if axis.iter().any(|x| !x.is_finite()) {
+        return Err(crate::error::InputError::Invalid.into());
+    }
+    if axis.len() > 1 {
+        crate::math::interp::utils::validate_knots(axis)?;
+    }
+    Ok(())
+}
