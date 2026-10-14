@@ -369,13 +369,6 @@ impl InflationCurve {
 
     /// Annualised inflation rate between `t1` and `t2` using CAGR formula.
     ///
-    /// # NaN contract
-    ///
-    /// Returns [`f64::NAN`] (rather than an error) when `t2 <= t1` or when
-    /// `t1` / `t2` are non-finite — misuse is a caller bug and a `Result`
-    /// signature would be too breaking. A `debug_assert` fires in debug
-    /// builds; callers must be prepared for NaN to propagate otherwise.
-    ///
     /// Uses the Compound Annual Growth Rate, which is the market-standard
     /// formula for annualised inflation:
     /// ```text

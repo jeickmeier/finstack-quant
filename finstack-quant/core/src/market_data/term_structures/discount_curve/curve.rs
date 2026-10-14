@@ -210,15 +210,6 @@ impl DiscountCurve {
         self.rate_calibration.as_ref()
     }
 
-    /// OIS rate cut-off (business days) this curve was calibrated under, if any.
-    ///
-    /// Returns `None` for curves calibrated under a non-cut-off convention or
-    /// hand-built curves with no calibration provenance.
-    #[inline]
-    pub fn calibration_ois_cutoff_days(&self) -> Option<i32> {
-        self.calibration_ois_cutoff_days
-    }
-
     /// Opaque FX policy stamp from curve construction, if any.
     ///
     /// Propagated onto `ResultsMeta.fx_policy_applied` for dependent instruments.

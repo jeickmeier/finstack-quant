@@ -267,24 +267,6 @@ impl DividendScheduleBuilder {
         self
     }
 
-    /// Add a yield dividend.
-    pub fn yield_div(mut self, date: Date, y: f64) -> Self {
-        self.events.push(DividendEvent {
-            date,
-            kind: DividendKind::Yield(y),
-        });
-        self
-    }
-
-    /// Add a stock dividend.
-    pub fn stock(mut self, date: Date, ratio: f64) -> Self {
-        self.events.push(DividendEvent {
-            date,
-            kind: DividendKind::Stock { ratio },
-        });
-        self
-    }
-
     /// Build the schedule (events are sorted by date).
     pub fn build(mut self) -> Result<DividendSchedule> {
         self.events.sort_by_key(|e| e.date);
@@ -320,7 +302,10 @@ mod tests {
                 d2,
                 Money::new(0.24, Currency::USD).expect("valid money fixture"),
             )
-            .stock(d3, 0.02)
+            .cash(
+                d3,
+                Money::new(0.24, Currency::USD).expect("valid money fixture"),
+            )
             .build()
             .expect("DividendScheduleBuilder should succeed in test");
 

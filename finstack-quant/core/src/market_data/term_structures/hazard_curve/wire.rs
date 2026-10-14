@@ -28,7 +28,7 @@ pub(super) struct RawHazardCurve {
     /// Par spread points for reporting
     pub par_points: Vec<(f64, f64)>,
     /// Par interpolation method
-    #[serde(default = "default_par_interp")]
+    #[serde(default)]
     pub par_interp: ParInterp,
     /// Exact calibration replay inputs.
     #[serde(default)]
@@ -36,10 +36,6 @@ pub(super) struct RawHazardCurve {
     /// Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].
     #[serde(default)]
     pub fx_policy: Option<String>,
-}
-
-fn default_par_interp() -> ParInterp {
-    ParInterp::Linear
 }
 
 impl From<HazardCurve> for RawHazardCurve {

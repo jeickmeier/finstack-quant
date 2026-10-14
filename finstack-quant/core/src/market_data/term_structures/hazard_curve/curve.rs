@@ -6,11 +6,9 @@ impl HazardCurve {
     /// Start building a hazard curve with identifier `id`.
     #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> HazardCurveBuilder {
-        let base =
-            Date::from_calendar_date(1970, time::Month::January, 1).unwrap_or(time::Date::MIN);
         HazardCurveBuilder {
             id: id.into(),
-            base,
+            base: None,
             points: Vec::new(),
             recovery_rate: None,
             issuer: None,
@@ -19,7 +17,6 @@ impl HazardCurve {
             day_count: DayCount::Act365F,
             par_points: Vec::new(),
             par_interp: ParInterp::Linear,
-
             max_hazard_rate: 10.0,
             hazard_calibration: None,
             fx_policy: None,

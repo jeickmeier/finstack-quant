@@ -8,7 +8,7 @@ use crate::types::CurveId;
 use crate::Result;
 use std::sync::Arc;
 
-use super::{ContextMutationInfo, ContextScratchBump, CurveStorage, MarketContext};
+use super::{ContextScratchBump, CurveStorage, MarketContext};
 
 impl MarketContext {
     /// Apply a scalar price bump in place and return a token that restores the
@@ -214,25 +214,6 @@ impl MarketContext {
     where
         I: IntoIterator<Item = MarketBump>,
     {
-        let (ctx, _info) = self.bump_observed(bumps)?;
-        Ok(ctx)
-    }
-
-    /// Like [`bump`](Self::bump), but also returns a [`ContextMutationInfo`]
-    /// describing any credit indices that were invalidated.
-    ///
-    /// Use this in production workflows where silent credit-index invalidation
-    /// is a risk.
-    ///
-    /// # Arguments
-    ///
-    /// * `bumps` - Shocks applied in iterator order to a cloned context.
-    ///   Repeated or overlapping targets compose sequentially. Failure returns
-    ///   no partially bumped context and leaves the source unchanged.
-    pub fn bump_observed<I>(&self, bumps: I) -> Result<(Self, ContextMutationInfo)>
-    where
-        I: IntoIterator<Item = MarketBump>,
-    {
         use crate::error::InputError;
 
         let mut ctx = self.clone();
@@ -290,23 +271,20 @@ impl MarketContext {
             }
         }
 
-        let invalidated_credit_indices = if needs_credit_rebind {
-            ctx.rebind_all_credit_indices()
+        let invalidated_count = if needs_credit_rebind {
+            ctx.rebind_all_credit_indices().len()
         } else {
-            Vec::new()
-        };
-        let mutation_info = ContextMutationInfo {
-            invalidated_credit_indices,
+            0
         };
 
         tracing::debug!(
             processed_bumps,
             needs_credit_rebind,
-            invalidated_count = mutation_info.invalidated_credit_indices.len(),
+            invalidated_count,
             "applied MarketContext bumps"
         );
 
-        Ok((ctx, mutation_info))
+        Ok(ctx)
     }
 
     /// Apply one curve, surface, price, or series bump and report whether credit
@@ -473,47 +451,6 @@ mod tests {
         for value in scale_then_add.get_surface("VOL").expect("surface").vols() {
             assert!((*value - 0.4).abs() < 1e-12);
         }
-    }
-
-    #[test]
-    fn projection_bump_preserves_published_inflation_index_history() {
-        let index = InflationIndex::new(
-            "US-CPI",
-            vec![
-                (
-                    Date::from_calendar_date(2024, Month::January, 1).expect("date"),
-                    300.0,
-                ),
-                (
-                    Date::from_calendar_date(2024, Month::May, 1).expect("date"),
-                    302.0,
-                ),
-                (
-                    Date::from_calendar_date(2025, Month::January, 1).expect("date"),
-                    306.0,
-                ),
-            ],
-            Currency::USD,
-        )
-        .expect("inflation index");
-        let cutoff = Date::from_calendar_date(2024, Month::June, 1).expect("date");
-        let bumped_index = index
-            .apply_projection_bump(cutoff, BumpSpec::inflation_shift_pct(0.01))
-            .expect("index projection bump");
-        assert_eq!(
-            bumped_index
-                .value_on(Date::from_calendar_date(2024, Month::January, 1).expect("date"))
-                .expect("published CPI"),
-            300.0
-        );
-        assert_eq!(
-            bumped_index
-                .value_on(Date::from_calendar_date(2024, Month::May, 1).expect("date"))
-                .expect("published CPI"),
-            302.0
-        );
-        let end = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-        assert!(bumped_index.value_on(end).expect("CPI") > 306.0);
     }
 
     #[test]

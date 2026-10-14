@@ -22,7 +22,7 @@ use super::*;
 /// ```
 pub struct HazardCurveBuilder {
     pub(super) id: CurveId,
-    pub(super) base: Date,
+    pub(super) base: Option<Date>,
     pub(super) points: Vec<(f64, f64)>, // (t, lambda)
     pub(super) recovery_rate: Option<f64>,
     pub(super) issuer: Option<String>,
@@ -42,7 +42,7 @@ pub struct HazardCurveBuilder {
 impl HazardCurveBuilder {
     /// Set the **base date** for the curve.
     pub fn base_date(mut self, d: Date) -> Self {
-        self.base = d;
+        self.base = Some(d);
         self
     }
     /// Set issuer metadata.
@@ -130,19 +130,19 @@ impl HazardCurveBuilder {
     }
 
     /// Optionally set issuer metadata (no-op if `None`).
-    pub fn issuer_opt(mut self, name: Option<impl Into<String>>) -> Self {
+    pub(crate) fn issuer_opt(mut self, name: Option<impl Into<String>>) -> Self {
         self.issuer = name.map(Into::into);
         self
     }
 
     /// Optionally set seniority metadata (no-op if `None`).
-    pub fn seniority_opt(mut self, s: Option<Seniority>) -> Self {
+    pub(crate) fn seniority_opt(mut self, s: Option<Seniority>) -> Self {
         self.seniority = s;
         self
     }
 
     /// Optionally set currency metadata (no-op if `None`).
-    pub fn currency_opt(mut self, ccy: Option<Currency>) -> Self {
+    pub(crate) fn currency_opt(mut self, ccy: Option<Currency>) -> Self {
         self.currency = ccy;
         self
     }
@@ -164,7 +164,7 @@ impl HazardCurveBuilder {
     ///
     /// # Validation
     ///
-    /// - Base date must be explicitly set (not the default 1970-01-01)
+    /// - Base date must be explicitly set
     /// - At least one knot point required
     /// - All hazard rates must be non-negative and finite
     /// - Hazard rates > `max_hazard_rate` (default 10.0) trigger an error
@@ -187,12 +187,7 @@ impl HazardCurveBuilder {
     /// Input points are sorted by time before the curve is
     /// constructed; callers need not pre-sort them.
     pub fn build(self) -> crate::Result<HazardCurve> {
-        // Require explicit base_date to avoid accidentally anchoring to 1970-01-01
-        let default_base =
-            Date::from_calendar_date(1970, time::Month::January, 1).unwrap_or(time::Date::MIN);
-        if self.base == default_base {
-            return Err(InputError::Invalid.into());
-        }
+        let base = self.base.ok_or(InputError::Invalid)?;
         if self.points.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
@@ -226,7 +221,7 @@ impl HazardCurveBuilder {
             if lambda > self.max_hazard_rate {
                 return Err(crate::Error::Validation(format!(
                     "Hazard rate {lambda:.4} at t={t:.4}y exceeds maximum {:.4}. \
-                     Use .allow_high_hazard_rates() or .max_hazard_rate() to override.",
+                     Use .max_hazard_rate() to override.",
                     self.max_hazard_rate
                 )));
             }
@@ -276,7 +271,7 @@ impl HazardCurveBuilder {
 
         Ok(HazardCurve {
             id: self.id,
-            base: self.base,
+            base,
             knots: kvec.into_boxed_slice(),
             lambdas: lvec.into_boxed_slice(),
             recovery_rate,

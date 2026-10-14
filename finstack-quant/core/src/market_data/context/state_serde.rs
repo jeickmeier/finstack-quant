@@ -67,7 +67,7 @@ macro_rules! define_curve_state {
             /// Convert to serializable state.
             ///
             /// This conversion is infallible - all curve types can be converted to their state representation.
-            pub fn to_state(&self) -> CurveState {
+            pub(crate) fn to_state(&self) -> CurveState {
                 match self {
                     $( Self::$variant(curve) => CurveState::$variant((**curve).clone()), )*
                 }
@@ -76,7 +76,7 @@ macro_rules! define_curve_state {
             /// Reconstruct from serializable state.
             ///
             /// This conversion is infallible - all state variants map directly to storage variants.
-            pub fn from_state(state: CurveState) -> Self {
+            pub(crate) fn from_state(state: CurveState) -> Self {
                 match state {
                     $( CurveState::$variant(curve) => Self::$variant(Arc::new(curve)), )*
                 }

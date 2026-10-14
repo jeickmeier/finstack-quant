@@ -47,11 +47,17 @@ fn dividend_schedule_builds_and_filters() {
         .underlying("AAPL")
         .currency(Currency::USD)
         .cash(
+            jan(20),
+            Money::new(1.30, Currency::USD).expect("valid money fixture"),
+        )
+        .cash(
             jan(5),
             Money::new(1.25, Currency::USD).expect("valid money fixture"),
         )
-        .yield_div(jan(12), 0.03)
-        .stock(jan(20), 0.05)
+        .cash(
+            jan(12),
+            Money::new(1.28, Currency::USD).expect("valid money fixture"),
+        )
         .build()
         .expect("valid dividend schedule");
 

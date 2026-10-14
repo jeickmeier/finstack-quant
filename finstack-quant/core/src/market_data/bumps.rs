@@ -325,7 +325,7 @@ impl BumpSpec {
     /// Returns an error if any numeric bump input is non-finite or the bump is
     /// a triangular key-rate bump rather than [`BumpType::Parallel`]. The
     /// `context` string is included in the unsupported-bump diagnostic.
-    pub fn validate_parallel(&self, context: &str) -> crate::Result<()> {
+    pub(crate) fn validate_parallel(&self, context: &str) -> crate::Result<()> {
         self.validate_finite()?;
         if !matches!(self.bump_type, BumpType::Parallel) {
             return Err(crate::error::InputError::UnsupportedBump {

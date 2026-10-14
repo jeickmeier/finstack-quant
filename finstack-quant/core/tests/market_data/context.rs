@@ -819,7 +819,7 @@ fn market_context_update_and_bump_failures() {
 }
 
 #[test]
-fn market_context_observed_mutations_report_credit_index_rebind_status() {
+fn market_context_mutations_preserve_and_report_credit_index_rebind_status() {
     let hazard = sample_hazard_curve("CDX");
     let base_corr = sample_base_correlation_curve("CDX-BC");
     let credit_index = CreditIndexData::builder()
@@ -836,18 +836,14 @@ fn market_context_observed_mutations_report_credit_index_rebind_status() {
         .insert_credit_index("CDX-IG", credit_index)
         .expect("canonical credit index");
 
-    let (bumped, info) = ctx
-        .bump_observed([MarketBump::BaseCorrBucketPts {
+    let bumped = ctx
+        .bump([MarketBump::BaseCorrBucketPts {
             surface_id: CurveId::from("CDX-BC"),
             detachments: Some(vec![7.0]),
             points: 0.01,
         }])
         .expect("base-correlation bump should succeed");
 
-    assert!(
-        info.invalidated_credit_indices.is_empty(),
-        "same-type base-correlation bump should rebind without invalidating indices"
-    );
     assert!(bumped.get_credit_index("CDX-IG").is_ok());
 
     let mut cross_type = bumped;
@@ -860,13 +856,10 @@ fn market_context_observed_mutations_report_credit_index_rebind_status() {
 }
 
 #[test]
-fn market_context_roll_forward_observed_propagates_errors_and_metadata() {
+fn market_context_roll_forward_propagates_errors_and_metadata() {
     let stable = MarketContext::new().insert(sample_discount_curve("USD-OIS"));
-    let (rolled, info) = stable
-        .roll_forward_observed(30)
-        .expect("short roll should succeed");
+    let rolled = stable.roll_forward(30).expect("short roll should succeed");
 
-    assert!(info.invalidated_credit_indices.is_empty());
     assert!(rolled.get_discount("USD-OIS").is_ok());
 
     let sparse =
@@ -877,7 +870,7 @@ fn market_context_roll_forward_observed_propagates_errors_and_metadata() {
             .unwrap();
     MarketContext::new()
         .insert(sparse)
-        .roll_forward_observed(400)
+        .roll_forward(400)
         .expect_err("rolling past sparse curve support should fail");
 }
 

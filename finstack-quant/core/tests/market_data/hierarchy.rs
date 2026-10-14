@@ -227,7 +227,7 @@ fn resolve_returns_empty_for_nonexistent_path() {
 }
 
 #[test]
-fn query_by_tags_finds_curves_where_node_tag_matches() {
+fn resolve_with_tag_filter_finds_curves_where_node_tag_matches() {
     let h = MarketDataHierarchy::builder()
         .add_node("Credit/US/IG/Financials")
         .tag("sector", "Financials")
@@ -240,14 +240,17 @@ fn query_by_tags_finds_curves_where_node_tag_matches() {
         .build()
         .unwrap();
 
-    let filter = TagFilter {
-        predicates: vec![TagPredicate::Equals {
-            key: "sector".into(),
-            value: "Financials".into(),
-        }],
+    let target = HierarchyTarget {
+        path: vec!["Credit".into()],
+        tag_filter: Some(TagFilter {
+            predicates: vec![TagPredicate::Equals {
+                key: "sector".into(),
+                value: "Financials".into(),
+            }],
+        }),
     };
 
-    let mut ids = h.query_by_tags(&filter);
+    let mut ids = h.resolve(&target, ResolutionMode::MostSpecificWins);
     ids.sort();
 
     assert_eq!(ids.len(), 2);
@@ -258,7 +261,7 @@ fn query_by_tags_finds_curves_where_node_tag_matches() {
 }
 
 #[test]
-fn query_by_tags_includes_descendant_curves_of_matching_parent() {
+fn resolve_with_tag_filter_includes_descendant_curves_of_matching_parent() {
     let h = MarketDataHierarchy::builder()
         .add_node("Credit/US")
         .tag("region", "us")
@@ -268,14 +271,17 @@ fn query_by_tags_includes_descendant_curves_of_matching_parent() {
         .build()
         .unwrap();
 
-    let filter = TagFilter {
-        predicates: vec![TagPredicate::Equals {
-            key: "region".into(),
-            value: "us".into(),
-        }],
+    let target = HierarchyTarget {
+        path: vec!["Credit".into()],
+        tag_filter: Some(TagFilter {
+            predicates: vec![TagPredicate::Equals {
+                key: "region".into(),
+                value: "us".into(),
+            }],
+        }),
     };
 
-    let ids = h.query_by_tags(&filter);
+    let ids = h.resolve(&target, ResolutionMode::MostSpecificWins);
     assert_eq!(ids, vec![CurveId::from("JPM-5Y")]);
 }
 
@@ -291,24 +297,32 @@ fn tag_predicate_equals_matches_exact_value_only() {
         .build()
         .unwrap();
 
-    let filter = TagFilter {
-        predicates: vec![TagPredicate::Equals {
-            key: "rating".into(),
-            value: "A".into(),
-        }],
+    let target = HierarchyTarget {
+        path: vec!["Credit".into()],
+        tag_filter: Some(TagFilter {
+            predicates: vec![TagPredicate::Equals {
+                key: "rating".into(),
+                value: "A".into(),
+            }],
+        }),
     };
-    let ids = h.query_by_tags(&filter);
+    let ids = h.resolve(&target, ResolutionMode::MostSpecificWins);
     assert_eq!(ids.len(), 1);
     assert_eq!(ids[0], CurveId::from("JPM-5Y"));
 
     // A predicate for a value that doesn't exist should return nothing.
-    let filter_none = TagFilter {
-        predicates: vec![TagPredicate::Equals {
-            key: "rating".into(),
-            value: "AAA".into(),
-        }],
+    let target_none = HierarchyTarget {
+        path: vec!["Credit".into()],
+        tag_filter: Some(TagFilter {
+            predicates: vec![TagPredicate::Equals {
+                key: "rating".into(),
+                value: "AAA".into(),
+            }],
+        }),
     };
-    assert!(h.query_by_tags(&filter_none).is_empty());
+    assert!(h
+        .resolve(&target_none, ResolutionMode::MostSpecificWins)
+        .is_empty());
 }
 
 #[test]
@@ -326,13 +340,16 @@ fn tag_predicate_in_matches_any_of_the_given_values() {
         .build()
         .unwrap();
 
-    let filter = TagFilter {
-        predicates: vec![TagPredicate::In {
-            key: "rating".into(),
-            values: vec!["A".into(), "AA".into()],
-        }],
+    let target = HierarchyTarget {
+        path: vec!["Credit".into()],
+        tag_filter: Some(TagFilter {
+            predicates: vec![TagPredicate::In {
+                key: "rating".into(),
+                values: vec!["A".into(), "AA".into()],
+            }],
+        }),
     };
-    let mut ids = h.query_by_tags(&filter);
+    let mut ids = h.resolve(&target, ResolutionMode::MostSpecificWins);
     ids.sort();
 
     assert_eq!(ids.len(), 2);
@@ -350,24 +367,27 @@ fn tag_predicate_exists_matches_key_regardless_of_value() {
         .add_node("Credit/EU/IG")
         .tag("sector", "Industrials")
         .curve_ids(&["BASF-5Y"])
-        .add_node("Rates/USD/OIS")
+        .add_node("Credit/Sovereign")
         // No sector tag
-        .curve_ids(&["USD-OIS"])
+        .curve_ids(&["UST-10Y"])
         .build()
         .unwrap();
 
-    let filter = TagFilter {
-        predicates: vec![TagPredicate::Exists {
-            key: "sector".into(),
-        }],
+    let target = HierarchyTarget {
+        path: vec!["Credit".into()],
+        tag_filter: Some(TagFilter {
+            predicates: vec![TagPredicate::Exists {
+                key: "sector".into(),
+            }],
+        }),
     };
-    let mut ids = h.query_by_tags(&filter);
+    let mut ids = h.resolve(&target, ResolutionMode::MostSpecificWins);
     ids.sort();
 
     assert_eq!(ids.len(), 2);
     assert!(ids.contains(&CurveId::from("JPM-5Y")));
     assert!(ids.contains(&CurveId::from("BASF-5Y")));
-    assert!(!ids.contains(&CurveId::from("USD-OIS")));
+    assert!(!ids.contains(&CurveId::from("UST-10Y")));
 }
 
 #[test]
@@ -378,12 +398,17 @@ fn tag_predicate_exists_returns_empty_when_key_absent_from_all_nodes() {
         .build()
         .unwrap();
 
-    let filter = TagFilter {
-        predicates: vec![TagPredicate::Exists {
-            key: "nonexistent-key".into(),
-        }],
+    let target = HierarchyTarget {
+        path: vec!["Rates".into()],
+        tag_filter: Some(TagFilter {
+            predicates: vec![TagPredicate::Exists {
+                key: "nonexistent-key".into(),
+            }],
+        }),
     };
-    assert!(h.query_by_tags(&filter).is_empty());
+    assert!(h
+        .resolve(&target, ResolutionMode::MostSpecificWins)
+        .is_empty());
 }
 
 #[test]

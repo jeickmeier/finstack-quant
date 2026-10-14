@@ -420,17 +420,6 @@ impl BaseCorrelationCurveBuilder {
         }
     }
 
-    /// Add a single detachment-correlation observation.
-    ///
-    /// # Arguments
-    ///
-    /// * `detachment_pct` - Detachment in percent of portfolio notional, within `[0, 100]`.
-    /// * `correlation` - Decimal implied base correlation in `[0, 1]`.
-    pub fn add_point(mut self, detachment_pct: f64, correlation: f64) -> Self {
-        self.points.push((detachment_pct, correlation));
-        self
-    }
-
     /// Append detachment-correlation observations.
     ///
     /// # Arguments

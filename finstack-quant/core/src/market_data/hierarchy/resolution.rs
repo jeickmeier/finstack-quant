@@ -168,27 +168,6 @@ impl MarketDataHierarchy {
             }
         }
     }
-
-    /// Find all curves matching a tag filter across the entire hierarchy.
-    ///
-    /// Tag predicates are matched against the **node's** tags, not the curve's.
-    pub fn query_by_tags(&self, filter: &TagFilter) -> Vec<CurveId> {
-        let mut matches = Vec::new();
-        for root in self.roots.values() {
-            collect_filtered_matches(root, filter, 1, &mut matches);
-        }
-        let mut seen = HashSet::default();
-        matches
-            .into_iter()
-            .filter_map(|matched| {
-                if seen.insert(matched.curve_id.clone()) {
-                    Some(matched.curve_id)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
 }
 
 fn collect_subtree_matches(

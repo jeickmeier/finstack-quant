@@ -31,15 +31,10 @@ impl DiscountCurve {
     /// Merges shocks into a flat piecewise-quadratic log-DF adjustment. Repeated
     /// shocks on the same grid do not create nested curves or extra breakpoints.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
-        spec.validate_finite()?;
-        let (val, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
-            crate::error::InputError::UnsupportedBump {
-                reason: format!(
-                    "DiscountCurve only supports Additive/{{RateBp,Percent,Fraction}} bumps, got {:?}/{:?}",
-                    spec.mode, spec.units
-                ),
-            }
-        })?;
+        let (val, is_multiplicative) = spec.resolve_standard_values_or_error(
+            "DiscountCurve",
+            "only supports Additive/{RateBp,Percent,Fraction} bumps",
+        )?;
         if is_multiplicative {
             return Err(crate::error::InputError::UnsupportedBump {
                 reason: "DiscountCurve does not support Multiplicative bumps".to_string(),
@@ -337,33 +332,6 @@ impl Bumpable for DiscountCurve {
     /// analogue for key-rate bumps). This does **not** re-bootstrap from
     /// stored [`crate::market_data::term_structures::RateCalibrationRecipe`] quotes.
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        let (val, is_multiplicative) = spec.resolve_standard_values_or_error(
-            "DiscountCurve",
-            "only supports Additive/{RateBp,Percent,Fraction} bumps",
-        )?;
-
-        if is_multiplicative {
-            return Err(crate::error::InputError::UnsupportedBump {
-                reason: "DiscountCurve does not support Multiplicative bumps".to_string(),
-            }
-            .into());
-        }
-
-        // Internal methods take basis points; `val` is a decimal rate.
-        let bp = val * 10_000.0;
-
-        match spec.bump_type {
-            BumpType::Parallel => self.with_parallel_bump(bp),
-            BumpType::TriangularKeyRate {
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-            } => self.with_triangular_key_rate_bump_neighbors(
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-                bp,
-            ),
-        }
+        self.bumped_with_id(spec.standard_bump_id(self.id()), &spec)
     }
 }
