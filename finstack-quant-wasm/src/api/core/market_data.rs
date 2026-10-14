@@ -101,14 +101,7 @@ impl JsDiscountCurve {
 
     fn build(options: DiscountCurveOptions) -> Result<JsDiscountCurve, JsValue> {
         let base = parse_iso_date(&options.base_date)?;
-        if !options.knots.len().is_multiple_of(2) {
-            return Err(to_js_err("knots array must have even length (t, df pairs)"));
-        }
-        let pairs: Vec<(f64, f64)> = options
-            .knots
-            .chunks_exact(2)
-            .map(|c| (c[0], c[1]))
-            .collect();
+        let pairs = flat_pairs(&options.knots, "knots")?;
 
         let mut builder = RustDiscountCurve::builder(options.id)
             .base_date(base)
@@ -996,17 +989,7 @@ pub struct JsForwardCurve {
 impl JsForwardCurve {
     fn build(options: ForwardCurveOptions) -> Result<JsForwardCurve, JsValue> {
         let base = parse_iso_date(&options.base_date)?;
-
-        if !options.knots.len().is_multiple_of(2) {
-            return Err(to_js_err(
-                "knots array must have even length (t, rate pairs)",
-            ));
-        }
-        let pairs = options
-            .knots
-            .chunks_exact(2)
-            .map(|c| (c[0], c[1]))
-            .collect::<Vec<_>>();
+        let pairs = flat_pairs(&options.knots, "knots")?;
 
         let mut builder = RustForwardCurve::builder(options.id, options.tenor)
             .base_date(base)

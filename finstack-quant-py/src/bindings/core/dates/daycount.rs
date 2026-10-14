@@ -309,58 +309,6 @@ impl PyDayCount {
     }
 }
 
-/// Shared constructor for the two context wrappers: validates through
-/// [`DayCountContextState::try_new`] so an inverted ``coupon_period`` is
-/// rejected in Rust.
-fn build_state(
-    calendar_id: Option<String>,
-    frequency: Option<&Bound<'_, PyAny>>,
-    bus_basis: Option<u16>,
-    coupon_period: Option<(Bound<'_, PyAny>, Bound<'_, PyAny>)>,
-    end_is_termination_date: bool,
-) -> PyResult<DayCountContextState> {
-    let coupon_period = coupon_period
-        .map(|(s, e)| Ok::<_, PyErr>((py_to_date(&s)?, py_to_date(&e)?)))
-        .transpose()?;
-    let frequency = frequency.map(extract_tenor).transpose()?;
-    DayCountContextState::try_new(
-        calendar_id,
-        frequency,
-        bus_basis,
-        coupon_period,
-        end_is_termination_date,
-    )
-    .map_err(core_to_py)
-}
-
-/// Python-style rendering shared by both context wrappers.
-fn state_repr(name: &str, state: &DayCountContextState) -> String {
-    let opt_str = |v: &Option<String>| match v {
-        Some(s) => format!("'{s}'"),
-        None => "None".to_string(),
-    };
-    let frequency = match state.frequency {
-        Some(t) => format!("Tenor('{t}')"),
-        None => "None".to_string(),
-    };
-    let bus_basis = state
-        .bus_basis
-        .map_or_else(|| "None".to_string(), |b| b.to_string());
-    let coupon_period = match state.coupon_period {
-        Some((s, e)) => format!("('{s}', '{e}')"),
-        None => "None".to_string(),
-    };
-    let flag = if state.end_is_termination_date {
-        "True"
-    } else {
-        "False"
-    };
-    format!(
-        "{name}(calendar_id={}, frequency={frequency}, bus_basis={bus_basis}, coupon_period={coupon_period}, end_is_termination_date={flag})",
-        opt_str(&state.calendar_id),
-    )
-}
-
 /// Optional context for day-count calculations.
 ///
 /// Certain conventions require additional information:
@@ -442,15 +390,19 @@ impl PyDayCountContext {
         coupon_period: Option<(Bound<'_, PyAny>, Bound<'_, PyAny>)>,
         end_is_termination_date: bool,
     ) -> PyResult<Self> {
-        Ok(Self {
-            inner: build_state(
-                calendar_id,
-                frequency,
-                bus_basis,
-                coupon_period,
-                end_is_termination_date,
-            )?,
-        })
+        let coupon_period = coupon_period
+            .map(|(s, e)| Ok::<_, PyErr>((py_to_date(&s)?, py_to_date(&e)?)))
+            .transpose()?;
+        let frequency = frequency.map(extract_tenor).transpose()?;
+        let inner = DayCountContextState::try_new(
+            calendar_id,
+            frequency,
+            bus_basis,
+            coupon_period,
+            end_is_termination_date,
+        )
+        .map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Optional calendar identifier.
@@ -511,7 +463,30 @@ impl PyDayCountContext {
     }
 
     fn __repr__(&self) -> String {
-        state_repr("DayCountContext", &self.inner)
+        let state = &self.inner;
+        let calendar_id = match &state.calendar_id {
+            Some(s) => format!("'{s}'"),
+            None => "None".to_string(),
+        };
+        let frequency = match state.frequency {
+            Some(t) => format!("Tenor('{t}')"),
+            None => "None".to_string(),
+        };
+        let bus_basis = state
+            .bus_basis
+            .map_or_else(|| "None".to_string(), |b| b.to_string());
+        let coupon_period = match state.coupon_period {
+            Some((s, e)) => format!("('{s}', '{e}')"),
+            None => "None".to_string(),
+        };
+        let flag = if state.end_is_termination_date {
+            "True"
+        } else {
+            "False"
+        };
+        format!(
+            "DayCountContext(calendar_id={calendar_id}, frequency={frequency}, bus_basis={bus_basis}, coupon_period={coupon_period}, end_is_termination_date={flag})"
+        )
     }
 }
 

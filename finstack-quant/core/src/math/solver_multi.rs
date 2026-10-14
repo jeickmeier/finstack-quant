@@ -580,6 +580,11 @@ impl LevenbergMarquardtSolver {
         })
     }
 
+    fn check_residual_norm(&self, r: &[f64]) -> Option<LmTerminationReason> {
+        let resid_norm: f64 = r.iter().map(|val| val * val).sum::<f64>().sqrt();
+        (resid_norm < self.tolerance).then_some(LmTerminationReason::ConvergedResidualNorm)
+    }
+
     /// Solve system of equations with explicit residual dimension and stats.
     pub fn solve_system_with_dim_stats<Res>(
         &self,
@@ -604,21 +609,11 @@ impl LevenbergMarquardtSolver {
             out.copy_from_slice(&jac_scratch.jacobian);
         };
 
-        let convergence_check =
-            |_p: &[f64], r: &[f64], _jac: &[f64]| -> Option<LmTerminationReason> {
-                let resid_norm: f64 = r.iter().map(|val| val * val).sum::<f64>().sqrt();
-                if resid_norm < self.tolerance {
-                    Some(LmTerminationReason::ConvergedResidualNorm)
-                } else {
-                    None
-                }
-            };
-
         self.solve_lm_core_with_stats(
             initial.to_vec(),
             &residuals,
             jacobian_func,
-            convergence_check,
+            |_p, r, _jac| self.check_residual_norm(r),
             n_residuals,
         )
     }
@@ -670,22 +665,11 @@ impl LevenbergMarquardtSolver {
             out.copy_from_slice(&jac_scratch.jacobian);
         };
 
-        // Convergence check: Residual Norm
-        let convergence_check =
-            |_p: &[f64], r: &[f64], _jac: &[f64]| -> Option<LmTerminationReason> {
-                let resid_norm: f64 = r.iter().map(|val| val * val).sum::<f64>().sqrt();
-                if resid_norm < self.tolerance {
-                    Some(LmTerminationReason::ConvergedResidualNorm)
-                } else {
-                    None
-                }
-            };
-
         self.solve_lm_core_with_stats(
             initial.to_vec(),
             &residuals,
             jacobian_func,
-            convergence_check,
+            |_p, r, _jac| self.check_residual_norm(r),
             n_residuals,
         )
     }

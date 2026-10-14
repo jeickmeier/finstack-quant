@@ -205,14 +205,6 @@ impl ScheduleSpec {
     /// instead produce an empty schedule with a graceful-fallback warning;
     /// mutually exclusive IMM modes always remain errors.
     pub fn build(&self) -> crate::Result<Schedule> {
-        if self.imm_mode && self.cds_imm_mode {
-            return Err(crate::Error::Validation(
-                "standard IMM and CDS IMM modes are mutually exclusive".to_string(),
-            ));
-        }
-        if self.start > self.end {
-            return Err(crate::error::InputError::InvalidDateRange.into());
-        }
         let mut spec = self.clone();
         if spec.business_day_convention.is_none() {
             spec.calendar_id = None;

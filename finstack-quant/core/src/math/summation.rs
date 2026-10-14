@@ -136,18 +136,11 @@ pub fn neumaier_sum<I>(iter: I) -> f64
 where
     I: IntoIterator<Item = f64>,
 {
-    let mut sum = 0.0;
-    let mut c = 0.0; // running compensation
+    let mut acc = NeumaierAccumulator::new();
     for x in iter {
-        let t = sum + x;
-        c += if sum.abs() >= x.abs() {
-            (sum - t) + x
-        } else {
-            (x - t) + sum
-        };
-        sum = t;
+        acc.add(x);
     }
-    sum + c
+    acc.total()
 }
 
 /// Incremental Neumaier compensated summation.

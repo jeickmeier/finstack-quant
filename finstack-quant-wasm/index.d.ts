@@ -6462,7 +6462,7 @@ export interface CurveId extends WasmOwned {
   /**
    * Serialize to the canonical JSON wire form (a quoted string).
    *
-   * @returns JSON text such as `"\"USD-OIS\""`.
+   * @returns JSON text holding the quoted identifier.
    * @throws If serialization fails (not expected).
    */
   toJson(): string;
@@ -6488,18 +6488,18 @@ export interface CurveId extends WasmOwned {
  */
 export interface CurveIdConstructor {
   /**
-   * Wrap identifier text (Rust `CurveId::new`); the text is stored unchanged.
+   * Wrap identifier text; the text is stored unchanged.
    *
-   * @param value - Identifier text, such as `"USD-OIS"`; it is not trimmed or case-folded.
-   * @returns The `CurveId`.
+   * @param value - Identifier text; it is not trimmed or case-folded.
+   * @returns The identifier wrapper.
    * @throws `TypeError` (kind `invalid_type`) if `value` is not a string.
    */
   new (value: string): CurveId;
   /**
    * Deserialize from the canonical JSON wire form produced by `toJson`.
    *
-   * @param json - JSON text holding the quoted identifier, such as `"\"USD-OIS\""`.
-   * @returns The parsed `CurveId`.
+   * @param json - JSON text holding the quoted identifier.
+   * @returns The parsed identifier wrapper.
    * @throws `TypeError` if `json` is not a string; `FinstackError` (kind `validation`) if it is not a JSON string.
    */
   fromJson(json: string): CurveId;
@@ -6533,7 +6533,7 @@ export interface InstrumentId extends WasmOwned {
   /**
    * Serialize to the canonical JSON wire form (a quoted string).
    *
-   * @returns JSON text such as `"\"BOND_A\""`.
+   * @returns JSON text holding the quoted identifier.
    * @throws If serialization fails (not expected).
    */
   toJson(): string;
@@ -6559,18 +6559,18 @@ export interface InstrumentId extends WasmOwned {
  */
 export interface InstrumentIdConstructor {
   /**
-   * Wrap identifier text (Rust `InstrumentId::new`); the text is stored unchanged.
+   * Wrap identifier text; the text is stored unchanged.
    *
-   * @param value - Identifier text, such as `"BOND_A"`; it is not trimmed or case-folded.
-   * @returns The `InstrumentId`.
+   * @param value - Identifier text; it is not trimmed or case-folded.
+   * @returns The identifier wrapper.
    * @throws `TypeError` (kind `invalid_type`) if `value` is not a string.
    */
   new (value: string): InstrumentId;
   /**
    * Deserialize from the canonical JSON wire form produced by `toJson`.
    *
-   * @param json - JSON text holding the quoted identifier, such as `"\"BOND_A\""`.
-   * @returns The parsed `InstrumentId`.
+   * @param json - JSON text holding the quoted identifier.
+   * @returns The parsed identifier wrapper.
    * @throws `TypeError` if `json` is not a string; `FinstackError` (kind `validation`) if it is not a JSON string.
    */
   fromJson(json: string): InstrumentId;

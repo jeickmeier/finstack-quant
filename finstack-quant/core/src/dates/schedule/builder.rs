@@ -377,6 +377,9 @@ impl<'a> ScheduleBuilder<'a> {
                 "standard IMM and CDS IMM modes are mutually exclusive".to_string(),
             ));
         }
+        if self.spec.start > self.spec.end {
+            return Err(crate::error::InputError::InvalidDateRange.into());
+        }
         let error_policy = self.spec.error_policy;
         let result = self.build_impl();
 
@@ -401,10 +404,6 @@ impl<'a> ScheduleBuilder<'a> {
     /// Internal implementation of schedule building.
     fn build_impl(self) -> crate::Result<Schedule> {
         use crate::dates::calendar::calendar_by_id_strict;
-
-        if self.spec.start > self.spec.end {
-            return Err(crate::error::InputError::InvalidDateRange.into());
-        }
 
         let mut warnings: Vec<ScheduleWarning> = Vec::new();
 
