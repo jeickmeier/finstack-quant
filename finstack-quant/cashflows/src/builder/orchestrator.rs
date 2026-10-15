@@ -21,7 +21,7 @@ use super::compiler::{
     build_fee_schedules, compute_coupon_schedules, CompiledSchedules, CouponProgramPiece,
     FixedSchedule, FloatSchedule, PaymentProgramPiece, PeriodicFee,
 };
-use super::pipeline::DateProcessor;
+use super::emission::ResolvedFloatMarket;
 use super::specs::FeeSpec;
 use smallvec::SmallVec;
 use tracing::debug;
@@ -841,11 +841,17 @@ impl CompiledCashFlowPlan {
             }
         }
 
-        let processor =
-            DateProcessor::new(self, observation_date, &resolved_curves, &resolved_fixings);
-        processor.process_issue_amortization(&mut state)?;
+        self.process_issue_amortization(&mut state)?;
         for &d in self.dates.iter().filter(|&&d| d > self.issue) {
-            state = processor.process(d, state)?;
+            self.process_date(
+                d,
+                &mut state,
+                ResolvedFloatMarket {
+                    curves: &resolved_curves,
+                    observation_date,
+                    fixings: &resolved_fixings,
+                },
+            )?;
         }
 
         let threshold = Decimal::new(1, 4); // 1e-4 = 1 bp relative
