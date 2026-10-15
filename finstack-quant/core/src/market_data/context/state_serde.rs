@@ -7,13 +7,13 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::collections::HashSet;
 use crate::contract::{
     deserialize_json_value, parse_json_value, ContractDescriptor, ContractError, Diagnostic,
     LoadLimits, LoadPhase, Severity, ValidationReport,
 };
 use crate::types::CurveId;
 use crate::wire::SchemaVersion;
+use crate::HashSet;
 
 use super::{CurveStorage, MarketContext};
 

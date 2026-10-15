@@ -2,7 +2,7 @@
 
 use crate::metrics::PortfolioMetrics;
 use crate::valuation::PortfolioValuation;
-use finstack_quant_core::config::{results_meta_with_timestamp, FinstackConfig, ResultsMeta};
+use finstack_quant_core::config::{results_meta, FinstackConfig, ResultsMeta};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::wire::SchemaVersion;
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,8 @@ impl PortfolioResult {
         config: &FinstackConfig,
         timestamp: Option<OffsetDateTime>,
     ) -> Self {
-        let mut meta = results_meta_with_timestamp(config, timestamp);
+        let mut meta = results_meta(config);
+        meta.timestamp = timestamp;
         meta.fx_policy_applied = Some(valuation.fx_collapse_policy.to_string());
         Self {
             schema_version: SchemaVersion::CURRENT,

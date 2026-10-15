@@ -9,7 +9,7 @@
 //! roll-then-reprice theta capture both carry and roll-down. Vol surfaces,
 //! FX spot rates, and historical fixings remain static across the roll.
 
-use crate::collections::HashMap;
+use crate::HashMap;
 use std::sync::Arc;
 
 use super::MarketContext;

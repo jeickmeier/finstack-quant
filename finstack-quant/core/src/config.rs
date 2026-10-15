@@ -524,6 +524,28 @@ impl Default for RoundingContext {
     }
 }
 
+#[inline]
+fn output_scale_from_map(
+    overrides: &BTreeMap<crate::currency::Currency, u32>,
+    ccy: crate::currency::Currency,
+) -> u32 {
+    overrides
+        .get(&ccy)
+        .copied()
+        .unwrap_or_else(|| ccy.decimals() as u32)
+}
+
+#[inline]
+fn ingest_scale_from_map(
+    overrides: &BTreeMap<crate::currency::Currency, u32>,
+    ccy: crate::currency::Currency,
+) -> u32 {
+    overrides
+        .get(&ccy)
+        .copied()
+        .unwrap_or_else(|| core::cmp::max(6, ccy.decimals() as u32))
+}
+
 impl RoundingContext {
     /// Borrow the validated ingest overrides captured by this rounding snapshot.
     pub fn get_ingest_scale_by_currency(&self) -> &BTreeMap<crate::currency::Currency, u32> {
@@ -538,10 +560,7 @@ impl RoundingContext {
     /// Effective output scale for the provided currency within this context.
     #[inline]
     pub fn output_scale(&self, ccy: crate::currency::Currency) -> u32 {
-        if let Some(&s) = self.output_scale_by_currency.get(&ccy) {
-            return s;
-        }
-        ccy.decimals() as u32
+        output_scale_from_map(&self.output_scale_by_currency, ccy)
     }
 
     /// Money epsilon derived from the currency output scale (half ULP at that scale).
@@ -550,12 +569,6 @@ impl RoundingContext {
         let scale = self.output_scale(ccy) as i32;
         // Half of one unit in the last place at the configured scale.
         0.5 * 10f64.powi(-scale)
-    }
-
-    /// Returns true if a money amount (in the given currency) is effectively zero under this context.
-    #[inline]
-    pub fn is_effectively_zero_money(&self, amount: f64, ccy: crate::currency::Currency) -> bool {
-        amount.abs() <= self.money_epsilon(ccy)
     }
 
     /// Returns true if a floating value is effectively zero for the specified kind.
@@ -567,7 +580,7 @@ impl RoundingContext {
     #[inline]
     pub fn is_effectively_zero(&self, x: f64, kind: ZeroKind) -> bool {
         match kind {
-            ZeroKind::Money(ccy) => self.is_effectively_zero_money(x, ccy),
+            ZeroKind::Money(ccy) => x.abs() <= self.money_epsilon(ccy),
             ZeroKind::Rate => x.abs() <= self.tolerances.rate_epsilon,
             ZeroKind::Generic => x.abs() <= self.tolerances.generic_epsilon,
         }
@@ -673,19 +686,13 @@ impl Default for ResultsMeta {
 impl FinstackConfig {
     /// Effective output scale for a currency. Falls back to ISO-4217 `Currency::decimals()`.
     pub fn output_scale(&self, ccy: crate::currency::Currency) -> u32 {
-        if let Some(&s) = self.rounding.output_scale.overrides.get(&ccy) {
-            return s;
-        }
-        ccy.decimals() as u32
+        output_scale_from_map(&self.rounding.output_scale.overrides, ccy)
     }
 
     /// Effective ingest scale for a currency. Falls back to a high precision default
     /// to preserve inputs unless explicitly overridden (min of 6 decimals).
     pub fn ingest_scale(&self, ccy: crate::currency::Currency) -> u32 {
-        if let Some(&s) = self.rounding.ingest_scale.overrides.get(&ccy) {
-            return s;
-        }
-        core::cmp::max(6, ccy.decimals() as u32)
+        ingest_scale_from_map(&self.rounding.ingest_scale.overrides, ccy)
     }
 }
 
@@ -736,7 +743,14 @@ pub fn rounding_context_from(cfg: &FinstackConfig) -> RoundingContext {
 /// * `cfg` - Library configuration used to derive the result's rounding
 ///   snapshot. The returned metadata has no timestamp.
 pub fn results_meta(cfg: &FinstackConfig) -> ResultsMeta {
-    results_meta_with_timestamp(cfg, None)
+    ResultsMeta {
+        numeric_mode: NUMERIC_MODE_F64.to_owned(),
+        rounding: rounding_context_from(cfg),
+        fx_policy_applied: None,
+        parallel: false,
+        timestamp: None,
+        version: Some(env!("CARGO_PKG_VERSION").to_string()),
+    }
 }
 
 /// Construct a [`ResultsMeta`] snapshot and stamp a timestamp of "now".
@@ -750,31 +764,9 @@ pub fn results_meta(cfg: &FinstackConfig) -> ResultsMeta {
 ///   snapshot before the current UTC timestamp is added.
 pub fn results_meta_now(cfg: &FinstackConfig) -> ResultsMeta {
     // On wasm32, core enables time's `wasm-bindgen` feature so `now_utc()` works.
-    results_meta_with_timestamp(cfg, Some(time::OffsetDateTime::now_utc()))
-}
-
-/// Construct a [`ResultsMeta`] snapshot with an explicitly provided timestamp.
-///
-/// This is useful for deterministic injection (tests) or when a higher-level layer
-/// controls timestamping.
-///
-/// # Arguments
-///
-/// * `cfg` - Library configuration used to derive the result's rounding
-///   snapshot.
-/// * `timestamp` - Optional UTC audit timestamp. Use `None` for deterministic
-///   metadata without a time-of-construction value.
-pub fn results_meta_with_timestamp(
-    cfg: &FinstackConfig,
-    timestamp: Option<time::OffsetDateTime>,
-) -> ResultsMeta {
     ResultsMeta {
-        numeric_mode: NUMERIC_MODE_F64.to_owned(),
-        rounding: rounding_context_from(cfg),
-        fx_policy_applied: None,
-        parallel: false,
-        timestamp,
-        version: Some(env!("CARGO_PKG_VERSION").to_string()),
+        timestamp: Some(time::OffsetDateTime::now_utc()),
+        ..results_meta(cfg)
     }
 }
 

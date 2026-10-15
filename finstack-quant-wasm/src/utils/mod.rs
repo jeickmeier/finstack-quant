@@ -486,29 +486,32 @@ mod tests {
                 "computation",
             ),
             (
-                Error::metric_calculation_failed(
-                    "dv01",
-                    Error::Calibration {
+                Error::MetricCalculationFailed {
+                    metric_id: "dv01".to_string(),
+                    cause: Box::new(Error::Calibration {
                         message: "solver stalled".to_string(),
                         category: String::new(),
-                    },
-                ),
+                    }),
+                },
                 "computation",
             ),
             (
-                Error::metric_calculation_failed(
-                    "dv01",
-                    Error::Input(InputError::SolverConvergenceFailed {
+                Error::MetricCalculationFailed {
+                    metric_id: "dv01".to_string(),
+                    cause: Box::new(Error::Input(InputError::SolverConvergenceFailed {
                         iterations: 1,
                         residual: 1.0,
                         last_x: 0.0,
                         reason: "x".to_string(),
-                    }),
-                ),
+                    })),
+                },
                 "computation",
             ),
             (
-                Error::metric_calculation_failed("ytm", Error::Validation("bad quote".to_string())),
+                Error::MetricCalculationFailed {
+                    metric_id: "ytm".to_string(),
+                    cause: Box::new(Error::Validation("bad quote".to_string())),
+                },
                 "validation",
             ),
         ];

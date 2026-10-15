@@ -195,7 +195,8 @@ fn json_fixed_point_value<T>(value: &T) -> finstack_quant_core::Result<serde_jso
 where
     T: serde::Serialize + serde::de::DeserializeOwned,
 {
-    use finstack_quant_core::{to_canonical_bytes, Error};
+    use finstack_quant_core::canonical::to_canonical_bytes;
+    use finstack_quant_core::Error;
 
     let mut bytes = to_canonical_bytes(value)?;
     for _ in 0..8 {

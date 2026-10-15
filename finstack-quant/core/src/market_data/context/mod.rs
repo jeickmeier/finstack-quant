@@ -62,13 +62,13 @@ pub use super::bumps::{BumpMode, BumpSpec, BumpUnits};
 
 use std::sync::Arc;
 
-use crate::collections::HashMap;
 use crate::currency::Currency;
 use crate::dates::Date;
 use crate::error::InputError;
 use crate::money::fx::{FxMatrix, FxQuery};
 use crate::money::Money;
 use crate::types::CurveId;
+use crate::HashMap;
 
 use super::{
     dividends::DividendSchedule,

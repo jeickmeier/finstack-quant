@@ -65,11 +65,6 @@ fn scale_decimal(value: f64, factor: u32, divide: bool) -> f64 {
         .unwrap_or(float_result)
 }
 
-/// Multiply `value` by a power of ten. See [`scale_decimal`].
-fn shift_decimal_point(value: f64, factor: u32) -> f64 {
-    scale_decimal(value, factor, false)
-}
-
 fn ensure_finite(value: f64) -> Result<f64> {
     if value.is_finite() {
         Ok(value)
@@ -229,7 +224,7 @@ impl Rate {
     /// instead of a binary product such as `1.1000000000000001`.
     #[must_use]
     pub fn as_percent(self) -> f64 {
-        shift_decimal_point(self.0, 100)
+        scale_decimal(self.0, 100, false)
     }
 
     /// Get the rate as basis points (rounded to nearest integer).
@@ -263,7 +258,7 @@ impl Rate {
     /// ```
     #[must_use]
     pub fn as_bp_f64(self) -> f64 {
-        shift_decimal_point(self.0, 10_000)
+        scale_decimal(self.0, 10_000, false)
     }
 
     /// The zero rate, represented as decimal value 0.0.
@@ -698,7 +693,7 @@ impl From<Rate> for Bps {
 
 impl From<Bps> for Rate {
     fn from(bp: Bps) -> Self {
-        bp.as_rate()
+        Rate::from_bp(bp.0)
     }
 }
 

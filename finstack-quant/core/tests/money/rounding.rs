@@ -23,8 +23,12 @@ fn money_preserves_nonzero_amount_at_maximum_configured_scale() {
         money.format_with_config(&cfg),
         "USD 0.0000000000000000000000000001"
     );
-    assert!(!finstack_quant_core::config::rounding_context_from(&cfg)
-        .is_effectively_zero_money(money.amount(), Currency::USD));
+    assert!(
+        !finstack_quant_core::config::rounding_context_from(&cfg).is_effectively_zero(
+            money.amount(),
+            finstack_quant_core::config::ZeroKind::Money(Currency::USD)
+        )
+    );
 }
 
 #[test]

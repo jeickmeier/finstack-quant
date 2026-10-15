@@ -30,13 +30,10 @@ pub(crate) fn reciprocal_rate_or_err(
         }
         .into());
     }
-    if rate == 0.0 {
-        return Err(crate::error::InputError::InvalidFxRate { from, to, rate }.into());
-    }
-    let reciprocal = 1.0 / rate;
-    // Validate the OUTPUT: tiny (subnormal) or negative inputs produce a
-    // reciprocal that is infinite, zero, or negative — never a valid FX rate.
-    validate_fx_rate(to, from, reciprocal)
+    validate_fx_rate(from, to, rate)?;
+    // Validate the OUTPUT: tiny (subnormal) inputs produce a reciprocal
+    // that overflows to +inf — never a valid FX rate.
+    validate_fx_rate(to, from, 1.0 / rate)
 }
 
 /// Resolve `from → to` from one quote store: the direct quote, otherwise the

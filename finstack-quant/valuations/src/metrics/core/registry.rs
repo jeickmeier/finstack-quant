@@ -415,10 +415,10 @@ impl MetricRegistry {
                     context.computed.insert(metric_id, value);
                 }
                 Err(err) => {
-                    return Err(finstack_quant_core::Error::metric_calculation_failed(
-                        metric_id.as_str(),
-                        err,
-                    ));
+                    return Err(finstack_quant_core::Error::MetricCalculationFailed {
+                        metric_id: metric_id.as_str().to_string(),
+                        cause: Box::new(err),
+                    });
                 }
             }
         }
@@ -472,20 +472,20 @@ impl MetricRegistry {
                 continue;
             }
             let Some(entry) = self.entries.get(metric_id) else {
-                return Err(finstack_quant_core::Error::unknown_metric(
-                    metric_id.as_str(),
-                    super::ids::closest_metric_names(
+                return Err(finstack_quant_core::Error::UnknownMetric {
+                    metric_id: metric_id.as_str().to_string(),
+                    available: super::ids::closest_metric_names(
                         metric_id.as_str(),
                         self.available_metrics().iter().map(MetricId::as_str),
                         super::ids::MAX_METRIC_SUGGESTIONS,
                     ),
-                ));
+                });
             };
             if !entry.applies_to(instrument_type) {
-                return Err(finstack_quant_core::Error::metric_not_applicable(
-                    metric_id.as_str(),
-                    instrument_type.to_string(),
-                ));
+                return Err(finstack_quant_core::Error::MetricNotApplicable {
+                    metric_id: metric_id.as_str().to_string(),
+                    instrument_type: instrument_type.to_string(),
+                });
             }
         }
         Ok(())
@@ -558,7 +558,7 @@ impl MetricRegistry {
                 .map(|m| m.as_str().to_string())
                 .collect();
 
-            return Err(finstack_quant_core::Error::circular_dependency(cycle_path));
+            return Err(finstack_quant_core::Error::CircularDependency { path: cycle_path });
         }
 
         state.temp_mark.insert(id.clone());

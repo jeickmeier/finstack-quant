@@ -1853,15 +1853,15 @@ fn calibrate_canonical_credit_model() -> CreditFactorModel {
 }
 
 fn stabilize_canonical_bytes(model: &CreditFactorModel) -> Vec<u8> {
-    let mut bytes =
-        finstack_quant_core::to_canonical_bytes(model).expect("credit factor model canonicalizes");
+    let mut bytes = finstack_quant_core::canonical::to_canonical_bytes(model)
+        .expect("credit factor model canonicalizes");
     for _ in 0..8 {
         let (reloaded, _) = CreditFactorModel::from_slice_strict(
             &bytes,
             &finstack_quant_core::contract::LoadLimits::default(),
         )
         .expect("reload while stabilizing canonical bytes");
-        let next = finstack_quant_core::to_canonical_bytes(&reloaded)
+        let next = finstack_quant_core::canonical::to_canonical_bytes(&reloaded)
             .expect("reloaded model canonicalizes");
         if next == bytes {
             return bytes;
@@ -1896,7 +1896,8 @@ fn generate_golden_artifact() {
         &finstack_quant_core::contract::LoadLimits::default(),
     )
     .expect("reload stabilized golden");
-    let hash = finstack_quant_core::content_hash(&reloaded).expect("hash canonical model JSON");
+    let hash =
+        finstack_quant_core::canonical::content_hash(&reloaded).expect("hash canonical model JSON");
     std::fs::create_dir_all(std::path::Path::new(golden_path).parent().unwrap())
         .expect("create golden dir");
     std::fs::write(golden_path, &json).expect("write golden file");

@@ -4,8 +4,8 @@
 //! configurable inheritance modes (most-specific-wins vs. cumulative).
 
 use super::{HierarchyNode, MarketDataHierarchy};
-use crate::collections::{HashMap, HashSet};
 use crate::types::CurveId;
+use crate::{HashMap, HashSet};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 

@@ -630,7 +630,8 @@ impl<'a> CashflowEngine<'a> {
                 None
             };
 
-            if !rc.is_effectively_zero_money(total_interest.amount(), ccy) {
+            let money_zero = finstack_quant_core::config::ZeroKind::Money(ccy);
+            if !rc.is_effectively_zero(total_interest.amount(), money_zero) {
                 flows.push(CashFlow::new(
                     payment_date,
                     reset_date_opt,
@@ -644,7 +645,7 @@ impl<'a> CashflowEngine<'a> {
                 ));
             }
 
-            if !rc.is_effectively_zero_money(total_commitment_fee.amount(), ccy) {
+            if !rc.is_effectively_zero(total_commitment_fee.amount(), money_zero) {
                 flows.push(CashFlow::new(
                     payment_date,
                     None,
@@ -655,7 +656,7 @@ impl<'a> CashflowEngine<'a> {
                 ));
             }
 
-            if !rc.is_effectively_zero_money(total_usage_fee.amount(), ccy) {
+            if !rc.is_effectively_zero(total_usage_fee.amount(), money_zero) {
                 flows.push(CashFlow::new(
                     payment_date,
                     None,
@@ -666,7 +667,7 @@ impl<'a> CashflowEngine<'a> {
                 ));
             }
 
-            if !rc.is_effectively_zero_money(total_facility_fee.amount(), ccy) {
+            if !rc.is_effectively_zero(total_facility_fee.amount(), money_zero) {
                 flows.push(CashFlow::new(
                     payment_date,
                     None,
@@ -685,7 +686,7 @@ impl<'a> CashflowEngine<'a> {
                     weighted_fronting_fee_rate,
                 ),
             ] {
-                if !rc.is_effectively_zero_money(amount.amount(), ccy) {
+                if !rc.is_effectively_zero(amount.amount(), money_zero) {
                     let rate = (total_accrual > 0.0).then(|| weighted / total_accrual);
                     flows.push(CashFlow::new(
                         payment_date,
@@ -1142,7 +1143,7 @@ impl<'a> CashflowEngine<'a> {
             let avg = |weighted: f64| (accrual > 0.0 && weighted > 0.0).then(|| weighted / accrual);
 
             if payment_date > self.as_of {
-                if !rc.is_effectively_zero_money(interest.amount(), ccy) {
+                if !rc.is_effectively_zero(interest.amount(), ZeroKind::Money(ccy)) {
                     flows.push(CashFlow::new(
                         payment_date,
                         first_fixing,
@@ -1166,7 +1167,7 @@ impl<'a> CashflowEngine<'a> {
                     (lc_fee, CFKind::LcFee, avg(weighted_lc_bp)),
                     (fronting_fee, CFKind::FrontingFee, avg(weighted_fronting_bp)),
                 ] {
-                    if !rc.is_effectively_zero_money(amount.amount(), ccy) {
+                    if !rc.is_effectively_zero(amount.amount(), ZeroKind::Money(ccy)) {
                         flows.push(CashFlow::new(
                             payment_date,
                             None,

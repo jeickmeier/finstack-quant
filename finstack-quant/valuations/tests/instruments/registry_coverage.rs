@@ -631,7 +631,7 @@ fn every_registered_instrument_satisfies_persistence_contract() {
         .iter()
         .map(|entry| (entry.tag.as_str(), entry))
         .collect();
-    let limits = finstack_quant_core::LoadLimits::default();
+    let limits = finstack_quant_core::contract::LoadLimits::default();
     let mut failures = Vec::new();
 
     for tag in registry_tags() {
@@ -677,8 +677,10 @@ fn every_registered_instrument_satisfies_persistence_contract() {
 
             let first_envelope: InstrumentEnvelope = serde_json::from_slice(&bytes)
                 .unwrap_or_else(|error| panic!("{tag}: typed envelope decode failed: {error}"));
-            let first_canonical = finstack_quant_core::to_canonical_bytes(&first_envelope)
-                .unwrap_or_else(|error| panic!("{tag}: canonical serialization failed: {error}"));
+            let first_canonical = finstack_quant_core::canonical::to_canonical_bytes(
+                &first_envelope,
+            )
+            .unwrap_or_else(|error| panic!("{tag}: canonical serialization failed: {error}"));
 
             let (second_runtime, second_report) =
                 InstrumentEnvelope::from_slice_strict(&first_canonical, &limits)
@@ -696,10 +698,11 @@ fn every_registered_instrument_satisfies_persistence_contract() {
 
             let second_envelope: InstrumentEnvelope = serde_json::from_slice(&first_canonical)
                 .unwrap_or_else(|error| panic!("{tag}: canonical typed decode failed: {error}"));
-            let second_canonical = finstack_quant_core::to_canonical_bytes(&second_envelope)
-                .unwrap_or_else(|error| {
-                    panic!("{tag}: second canonical serialization failed: {error}")
-                });
+            let second_canonical =
+                finstack_quant_core::canonical::to_canonical_bytes(&second_envelope)
+                    .unwrap_or_else(|error| {
+                        panic!("{tag}: second canonical serialization failed: {error}")
+                    });
             assert_eq!(
                 first_canonical, second_canonical,
                 "{tag}: canonical bytes changed after strict decode"

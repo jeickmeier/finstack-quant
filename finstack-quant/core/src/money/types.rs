@@ -359,28 +359,6 @@ impl Money {
     }
 
     #[inline]
-    fn try_new_finite(
-        amount: f64,
-        currency: Currency,
-        cfg: Option<&FinstackConfig>,
-    ) -> Result<Self, Error> {
-        let rounded = if let Some(cfg) = cfg {
-            try_round_f64(amount, cfg.ingest_scale(currency) as i32, cfg.rounding.mode)?
-        } else {
-            // Shortest round-trip conversion (`Decimal::from_f64`): `0.1_f64`
-            // ingests as `0.1`, not the 28-digit IEEE expansion that
-            // `from_f64_retain` would embed. `from_f64` can also fail when a
-            // finite f64 lies outside Decimal's representable range.
-            <AmountRepr as rust_decimal::prelude::FromPrimitive>::from_f64(amount)
-                .ok_or(InputError::ConversionOverflow)?
-        };
-        Ok(Self {
-            amount: rounded,
-            currency,
-        })
-    }
-
-    #[inline]
     fn try_new_impl(
         amount: f64,
         currency: Currency,
@@ -395,7 +373,20 @@ impl Money {
         // as "-0" and re-parses as "0"; normalize so wire round trips are
         // identities.
         let amount = if amount == 0.0 { 0.0 } else { amount };
-        Self::try_new_finite(amount, currency, cfg)
+        let rounded = if let Some(cfg) = cfg {
+            try_round_f64(amount, cfg.ingest_scale(currency) as i32, cfg.rounding.mode)?
+        } else {
+            // Shortest round-trip conversion (`Decimal::from_f64`): `0.1_f64`
+            // ingests as `0.1`, not the 28-digit IEEE expansion that
+            // `from_f64_retain` would embed. `from_f64` can also fail when a
+            // finite f64 lies outside Decimal's representable range.
+            <AmountRepr as rust_decimal::prelude::FromPrimitive>::from_f64(amount)
+                .ok_or(InputError::ConversionOverflow)?
+        };
+        Ok(Self {
+            amount: rounded,
+            currency,
+        })
     }
 
     /// Amount accessor (by value).

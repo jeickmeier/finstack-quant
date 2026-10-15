@@ -3,7 +3,7 @@
 //! Provides [`SimpleContext`], the single concrete context type used by
 //! expression evaluators to resolve column references to array indices.
 
-use crate::collections::HashMap;
+use crate::HashMap;
 
 /// Column name → index context for expression evaluation.
 ///

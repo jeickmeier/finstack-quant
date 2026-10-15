@@ -30,8 +30,6 @@ use crate::currency::Currency;
 use crate::dates::fx::fx_standard_settlement_days;
 use crate::Result;
 
-use super::reciprocal_rate_or_err;
-
 /// USD quotation style for a market FX pair.
 ///
 /// **Direct** means USD is the quote currency (EURUSD, GBPUSD). **Indirect**
@@ -203,7 +201,24 @@ pub fn fx_pip_size(base: Currency, quote: Currency) -> f64 {
 ///
 /// `1 / rate` when that reciprocal is a valid FX rate.
 pub fn invert_fx_rate(rate: f64) -> Result<f64> {
-    reciprocal_rate_or_err(rate, Currency::USD, Currency::USD)
+    if !rate.is_finite() {
+        return Err(crate::error::InputError::NonFiniteValue {
+            kind: crate::error::NonFiniteKind::classify(rate),
+        }
+        .into());
+    }
+    if rate <= 0.0 {
+        return Err(crate::Error::Validation(format!(
+            "Invalid FX rate: expected positive finite rate, got {rate}"
+        )));
+    }
+    let reciprocal = 1.0 / rate;
+    if !reciprocal.is_finite() || reciprocal <= 0.0 {
+        return Err(crate::Error::Validation(format!(
+            "Invalid FX rate reciprocal: 1 / {rate} = {reciprocal}"
+        )));
+    }
+    Ok(reciprocal)
 }
 
 #[cfg(test)]

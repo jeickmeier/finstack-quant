@@ -446,7 +446,7 @@ mod tests {
 
     #[test]
     fn id_hashing() {
-        use crate::collections::HashMap;
+        use crate::HashMap;
 
         let mut map = HashMap::default();
         let id1 = Id::<User>::new("user123");

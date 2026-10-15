@@ -4,10 +4,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use finstack_quant_core::cashflow::CFKind;
+use finstack_quant_core::contract::ContractDescriptor;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Month, PeriodId};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::ContractDescriptor;
 use finstack_quant_statements::adjustments::types::CapBaseMode;
 use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
 use finstack_quant_statements::checks::{

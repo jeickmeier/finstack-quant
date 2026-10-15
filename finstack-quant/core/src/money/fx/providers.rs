@@ -5,10 +5,10 @@
 
 use super::provider::{directional_rate, recover};
 use super::{FxConversionPolicy, FxProvider};
-use crate::collections::HashMap;
 use crate::currency::Currency;
 use crate::dates::Date;
 use crate::error::InputError;
+use crate::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 
@@ -91,7 +91,10 @@ impl SimpleFxProvider {
     /// provider.set_quote(Currency::GBP, Currency::USD, 1.25);
     /// ```
     pub fn set_quote(&self, from: Currency, to: Currency, rate: f64) -> crate::Result<()> {
-        self.set_quotes(&[(from, to, rate)])
+        let rate = super::validate_fx_rate(from, to, rate)?;
+        recover(self.quotes.write()).insert((from, to), rate);
+        self.advance_revision();
+        Ok(())
     }
 
     /// Bulk insert or update FX quotes.

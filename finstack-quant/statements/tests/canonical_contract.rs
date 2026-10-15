@@ -1,7 +1,7 @@
 //! Canonical bytes, hash, and insertion-order invariance for financial models.
 
+use finstack_quant_core::canonical::to_canonical_bytes;
 use finstack_quant_core::contract::LoadLimits;
-use finstack_quant_core::to_canonical_bytes;
 use finstack_quant_statements::types::FinancialModelSpec;
 
 fn model_bytes(meta: &str) -> Vec<u8> {

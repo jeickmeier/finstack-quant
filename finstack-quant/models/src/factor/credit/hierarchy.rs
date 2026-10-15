@@ -1252,7 +1252,7 @@ mod tests {
         let bytes = serde_json::to_vec(&model).expect("serialize model");
         let (loaded, report) = CreditFactorModel::from_slice_strict(
             &bytes,
-            &finstack_quant_core::LoadLimits::default(),
+            &finstack_quant_core::contract::LoadLimits::default(),
         )
         .expect("valid model");
         assert_eq!(loaded.schema, CreditFactorModelSchema::CreditFactorModel);
@@ -1278,7 +1278,7 @@ mod tests {
             assert!(
                 CreditFactorModel::from_slice_strict(
                     &serde_json::to_vec(&value).expect("serialize fixture"),
-                    &finstack_quant_core::LoadLimits::default(),
+                    &finstack_quant_core::contract::LoadLimits::default(),
                 )
                 .is_err(),
                 "invalid schema must fail"
@@ -1290,7 +1290,7 @@ mod tests {
         assert!(
             CreditFactorModel::from_slice_strict(
                 &serde_json::to_vec(&invalid).expect("serialize fixture"),
-                &finstack_quant_core::LoadLimits::default(),
+                &finstack_quant_core::contract::LoadLimits::default(),
             )
             .is_err(),
             "semantic validation must run"

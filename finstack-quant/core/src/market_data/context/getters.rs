@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use crate::collections::HashMap;
 use crate::market_data::dividends::DividendSchedule;
 use crate::market_data::scalars::{InflationIndex, MarketScalar, ScalarTimeSeries};
 use crate::market_data::surfaces::{FxDeltaVolSurface, VolCube, VolSurface};
@@ -12,6 +11,7 @@ use crate::market_data::term_structures::{
 };
 use crate::market_data::traits::Discounting;
 use crate::types::CurveId;
+use crate::HashMap;
 use crate::Result;
 
 use super::{CurveStorage, MarketContext};

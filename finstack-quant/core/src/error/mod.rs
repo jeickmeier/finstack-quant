@@ -397,88 +397,6 @@ impl Error {
         })
     }
 
-    /// Create an UnknownMetric error with the list of available standard metrics.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use finstack_quant_core::Error;
-    ///
-    /// let available = vec!["dv01".to_string(), "duration_mod".to_string(), "ytm".to_string()];
-    /// let err = Error::unknown_metric("dv1", available);
-    ///
-    /// let msg = format!("{}", err);
-    /// assert!(msg.contains("dv01") || msg.contains("Did you mean"));
-    /// ```
-    pub fn unknown_metric(metric_id: impl Into<String>, available: Vec<String>) -> Self {
-        Self::UnknownMetric {
-            metric_id: metric_id.into(),
-            available,
-        }
-    }
-
-    /// Create a MetricNotApplicable error.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use finstack_quant_core::Error;
-    ///
-    /// let err = Error::metric_not_applicable("ytm", "Swap");
-    ///
-    /// let msg = format!("{}", err);
-    /// assert!(msg.contains("ytm"));
-    /// assert!(msg.contains("Swap"));
-    /// ```
-    pub fn metric_not_applicable(
-        metric_id: impl Into<String>,
-        instrument_type: impl Into<String>,
-    ) -> Self {
-        Self::MetricNotApplicable {
-            metric_id: metric_id.into(),
-            instrument_type: instrument_type.into(),
-        }
-    }
-
-    /// Create a MetricCalculationFailed error wrapping an underlying cause.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use finstack_quant_core::{Error, InputError};
-    ///
-    /// let cause = Error::Input(InputError::NotFound { id: "curve".to_string() });
-    /// let err = Error::metric_calculation_failed("dv01", cause);
-    ///
-    /// let msg = format!("{}", err);
-    /// assert!(msg.contains("dv01"));
-    /// assert!(msg.contains("calculation failed"));
-    /// ```
-    pub fn metric_calculation_failed(metric_id: impl Into<String>, cause: Error) -> Self {
-        Self::MetricCalculationFailed {
-            metric_id: metric_id.into(),
-            cause: Box::new(cause),
-        }
-    }
-
-    /// Create a CircularDependency error with the dependency path.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use finstack_quant_core::Error;
-    ///
-    /// let path = vec!["metric_a".to_string(), "metric_b".to_string(), "metric_a".to_string()];
-    /// let err = Error::circular_dependency(path);
-    ///
-    /// let msg = format!("{}", err);
-    /// assert!(msg.contains("metric_a"));
-    /// assert!(msg.contains("->"));
-    /// ```
-    pub fn circular_dependency(path: Vec<String>) -> Self {
-        Self::CircularDependency { path }
-    }
-
     /// Create an internal error with invariant/debugging context.
     pub fn internal(message: impl Into<String>) -> Self {
         Self::Internal(message.into())
@@ -562,7 +480,10 @@ mod tests {
             "duration_mod".to_string(),
             "ytm".to_string(),
         ];
-        let err = Error::unknown_metric("dv1", available);
+        let err = Error::UnknownMetric {
+            metric_id: "dv1".to_string(),
+            available,
+        };
 
         let msg = format!("{}", err);
         assert!(msg.contains("Unknown metric 'dv1'"));
@@ -582,7 +503,10 @@ mod tests {
 
     #[test]
     fn test_metric_not_applicable() {
-        let err = Error::metric_not_applicable("ytm", "Swap");
+        let err = Error::MetricNotApplicable {
+            metric_id: "ytm".to_string(),
+            instrument_type: "Swap".to_string(),
+        };
 
         let msg = format!("{}", err);
         assert!(msg.contains("ytm"));
@@ -606,7 +530,10 @@ mod tests {
         let cause = Error::Input(InputError::NotFound {
             id: "missing_curve".to_string(),
         });
-        let err = Error::metric_calculation_failed("dv01", cause.clone());
+        let err = Error::MetricCalculationFailed {
+            metric_id: "dv01".to_string(),
+            cause: Box::new(cause.clone()),
+        };
 
         let msg = format!("{}", err);
         assert!(msg.contains("dv01"));
@@ -633,7 +560,7 @@ mod tests {
             "metric_c".to_string(),
             "metric_a".to_string(),
         ];
-        let err = Error::circular_dependency(path.clone());
+        let err = Error::CircularDependency { path: path.clone() };
 
         let msg = format!("{}", err);
         assert!(msg.contains("Circular dependency"));
@@ -651,20 +578,31 @@ mod tests {
 
     #[test]
     fn test_metric_errors_are_clonable() {
-        let err1 = Error::unknown_metric("test", vec!["dv01".to_string()]);
+        let err1 = Error::UnknownMetric {
+            metric_id: "test".to_string(),
+            available: vec!["dv01".to_string()],
+        };
         let err2 = err1.clone();
         assert_eq!(err1, err2);
 
-        let err3 = Error::metric_not_applicable("ytm", "Swap");
+        let err3 = Error::MetricNotApplicable {
+            metric_id: "ytm".to_string(),
+            instrument_type: "Swap".to_string(),
+        };
         let err4 = err3.clone();
         assert_eq!(err3, err4);
 
         let cause = Error::internal("metric test failure");
-        let err5 = Error::metric_calculation_failed("test", cause);
+        let err5 = Error::MetricCalculationFailed {
+            metric_id: "test".to_string(),
+            cause: Box::new(cause),
+        };
         let err6 = err5.clone();
         assert_eq!(err5, err6);
 
-        let err7 = Error::circular_dependency(vec!["a".to_string(), "b".to_string()]);
+        let err7 = Error::CircularDependency {
+            path: vec!["a".to_string(), "b".to_string()],
+        };
         let err8 = err7.clone();
         assert_eq!(err7, err8);
     }

@@ -89,12 +89,10 @@
 //! - Discounting and curve construction: `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
 //! - Interpolation: `docs/REFERENCES.md#hagan-west-monotone-convex`
 
-// `collections` stays crate-private; import `HashMap`/`HashSet` from the crate root.
 /// Deterministic JSON canonicalization and content hashing.
 pub mod canonical;
 /// Foundational cashflow primitives and discounting helpers.
 pub mod cashflow;
-pub(crate) mod collections;
 /// Caller-supplied configuration and rounding policy.
 pub mod config;
 /// Persisted-contract descriptors, loading limits, and diagnostics.
@@ -138,23 +136,10 @@ pub mod validation;
 /// Canonical serde representations used by generated JSON contracts.
 pub mod wire;
 
-/// Hash map type alias used across Finstack.
-///
-/// Uses `rustc_hash::FxHashMap` for fast deterministic hashing.
-pub use collections::HashMap;
-/// Hash set type alias used across Finstack.
-///
-/// Uses `rustc_hash::FxHashSet` for fast deterministic hashing.
-pub use collections::HashSet;
-
-pub use canonical::{
-    canonical_bytes_of_value, content_hash, to_canonical_bytes, CANONICAL_VERSION,
-};
-pub use contract::{
-    ContractDescriptor, ContractError, Diagnostic, LoadLimits, LoadPhase, Severity,
-    ValidationReport, DEFAULT_MAX_ARTIFACTS, DEFAULT_MAX_BYTES, DEFAULT_MAX_DEPTH,
-    DEFAULT_MAX_DIAGNOSTICS, DEFAULT_MAX_POSITIONS,
-};
+/// Hash map type alias used across Finstack (`rustc_hash::FxHashMap`).
+pub use rustc_hash::FxHashMap as HashMap;
+/// Hash set type alias used across Finstack (`rustc_hash::FxHashSet`).
+pub use rustc_hash::FxHashSet as HashSet;
 
 pub use error::{Error, InputError, NonFiniteKind, Result};
 

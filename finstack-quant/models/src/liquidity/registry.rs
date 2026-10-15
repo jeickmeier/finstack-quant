@@ -3,8 +3,9 @@
 use serde::Deserialize;
 
 use super::LiquidityConfig;
+use finstack_quant_core::contract::ContractDescriptor;
 use finstack_quant_core::embedded_registry::EmbeddedJsonRegistry;
-use finstack_quant_core::{ContractDescriptor, Error, Result};
+use finstack_quant_core::{Error, Result};
 
 const LIQUIDITY_DEFAULTS: &str = include_str!("../../data/defaults/liquidity_defaults.v1.json");
 pub(crate) const LIQUIDITY_DEFAULTS_CONTRACT: ContractDescriptor =

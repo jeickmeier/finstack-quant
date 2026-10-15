@@ -4,10 +4,10 @@ use std::any::Any;
 use std::sync::{Arc, Barrier};
 use std::thread;
 
+use finstack_quant_core::canonical::{content_hash, to_canonical_bytes};
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::{content_hash, to_canonical_bytes};
 use finstack_quant_portfolio::materialization::{
     InstrumentArtifact, InstrumentArtifactCache, MaterializedPosition, PortfolioHeader,
     PortfolioMaterializationEnvelope,

@@ -457,7 +457,7 @@ mod tests {
         })?;
         let (loaded, report) = InstrumentEnvelope::from_slice_strict(
             &json,
-            &finstack_quant_core::LoadLimits::default(),
+            &finstack_quant_core::contract::LoadLimits::default(),
         )
         .map_err(|error| Error::Validation(error.to_string()))?;
         assert!(!report.has_errors());

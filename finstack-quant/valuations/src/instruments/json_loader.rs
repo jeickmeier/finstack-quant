@@ -956,13 +956,10 @@ mod tests {
         .expect("valid bond");
         let tagged = InstrumentJson::Bond(bond);
         let bare = serde_json::to_vec(&tagged).expect("serialize tagged instrument");
-        let error = InstrumentEnvelope::from_slice_strict(
-            &bare,
-            &finstack_quant_core::LoadLimits::default(),
-        )
-        .err()
-        .expect("strict loading rejects bare instrument payloads");
-        let finstack_quant_core::ContractError::Report(report) = error else {
+        let error = InstrumentEnvelope::from_slice_strict(&bare, &LoadLimits::default())
+            .err()
+            .expect("strict loading rejects bare instrument payloads");
+        let ContractError::Report(report) = error else {
             panic!("expected structured report");
         };
         assert_eq!(report.diagnostics[0].code, "contract/structure-invalid");
@@ -975,11 +972,11 @@ mod tests {
             let envelope = serde_json::json!({"schema": schema, "instrument": tagged});
             let error = InstrumentEnvelope::from_slice_strict(
                 &serde_json::to_vec(&envelope).expect("serialize envelope"),
-                &finstack_quant_core::LoadLimits::default(),
+                &LoadLimits::default(),
             )
             .err()
             .expect("invalid schema must fail");
-            let finstack_quant_core::ContractError::Report(report) = error else {
+            let ContractError::Report(report) = error else {
                 panic!("expected structured schema report");
             };
             assert!(

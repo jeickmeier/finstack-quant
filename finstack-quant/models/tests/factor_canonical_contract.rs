@@ -2,10 +2,10 @@
 
 use std::collections::BTreeMap;
 
+use finstack_quant_core::canonical::{content_hash, to_canonical_bytes};
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::dates::{create_date, Date, DateExt};
 use finstack_quant_core::types::IssuerId;
-use finstack_quant_core::{content_hash, to_canonical_bytes};
 use finstack_quant_models::factor::credit::calibration::{
     BucketSizeThresholds, BucketWeighting, CovarianceStrategy, CreditCalibrationConfig,
     CreditCalibrationInputs, CreditCalibrator, GenericFactorSeries, HistoryPanel, IssuerTagPanel,

@@ -1,4 +1,4 @@
-use finstack_quant_core::{
+use finstack_quant_core::contract::{
     ContractDescriptor, ContractError, LoadLimits, DEFAULT_MAX_ARTIFACTS, DEFAULT_MAX_BYTES,
     DEFAULT_MAX_DEPTH, DEFAULT_MAX_DIAGNOSTICS, DEFAULT_MAX_POSITIONS,
 };

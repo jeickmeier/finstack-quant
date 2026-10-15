@@ -241,31 +241,19 @@ macro_rules! decl_typed_accessors {
             )
         ),* $(,)?
     ) => {
-        impl TableColumnData {
+        impl TableColumn {
             $(
                 #[doc = $doc_fn]
                 #[must_use]
                 pub fn $as_fn(&self) -> Option<&[$ty]> {
-                    match self { Self::$variant(values) => Some(values), _ => None }
+                    match &self.data { TableColumnData::$variant(values) => Some(values), _ => None }
                 }
 
                 #[doc = $doc_nullable_fn]
                 #[must_use]
                 pub fn $as_nullable_fn(&self) -> Option<&[Option<$ty>]> {
-                    match self { Self::$nullable_variant(values) => Some(values), _ => None }
+                    match &self.data { TableColumnData::$nullable_variant(values) => Some(values), _ => None }
                 }
-            )*
-        }
-
-        impl TableColumn {
-            $(
-                #[doc = $doc_fn]
-                #[must_use]
-                pub fn $as_fn(&self) -> Option<&[$ty]> { self.data.$as_fn() }
-
-                #[doc = $doc_nullable_fn]
-                #[must_use]
-                pub fn $as_nullable_fn(&self) -> Option<&[Option<$ty>]> { self.data.$as_nullable_fn() }
             )*
         }
     };
@@ -403,8 +391,11 @@ mod tests {
             "score",
             TableColumnData::NullableFloat64(vec![Some(1.5), None]),
         );
-        let uints = TableColumnData::UInt32(vec![1, 2]);
-        let nullable_ints = TableColumnData::NullableInt64(vec![Some(-1), None]);
+        let uints = TableColumn::new("count", TableColumnData::UInt32(vec![1, 2]));
+        let nullable_ints = TableColumn::new(
+            "delta",
+            TableColumnData::NullableInt64(vec![Some(-1), None]),
+        );
 
         assert_eq!(
             strings.as_strings(),

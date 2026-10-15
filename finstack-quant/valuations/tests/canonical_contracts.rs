@@ -1,8 +1,8 @@
 //! Canonical bytes, hashes, and insertion-order invariance for valuation contracts.
 
 use finstack_quant_calibration::api::schema::CalibrationEnvelope;
+use finstack_quant_core::canonical::to_canonical_bytes;
 use finstack_quant_core::contract::LoadLimits;
-use finstack_quant_core::to_canonical_bytes;
 use finstack_quant_valuations::instruments::InstrumentEnvelope;
 
 fn document_with_replacement(document: &str, from: &str, to: &str) -> Vec<u8> {

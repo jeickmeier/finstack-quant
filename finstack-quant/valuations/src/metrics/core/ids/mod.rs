@@ -136,14 +136,14 @@ impl MetricId {
         if let Some(id) = metric_lookup().get(s) {
             Ok(id.clone())
         } else {
-            Err(finstack_quant_core::Error::unknown_metric(
-                s,
-                closest_metric_names(
+            Err(finstack_quant_core::Error::UnknownMetric {
+                metric_id: s.to_string(),
+                available: closest_metric_names(
                     s,
                     Self::get_standard().iter().map(MetricId::as_str),
                     MAX_METRIC_SUGGESTIONS,
                 ),
-            ))
+            })
         }
     }
 }

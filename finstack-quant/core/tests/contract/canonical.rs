@@ -2,12 +2,12 @@ use std::cell::Cell;
 use std::fs;
 use std::path::Path;
 
+use finstack_quant_core::canonical::{
+    canonical_bytes_of_value, content_hash, to_canonical_bytes, CANONICAL_VERSION,
+};
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
-use finstack_quant_core::{
-    canonical_bytes_of_value, content_hash, to_canonical_bytes, Error, InputError,
-    CANONICAL_VERSION,
-};
+use finstack_quant_core::{Error, InputError};
 use indexmap::IndexMap;
 use serde::Serialize;
 use serde_json::json;

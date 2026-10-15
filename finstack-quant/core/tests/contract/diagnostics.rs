@@ -1,4 +1,4 @@
-use finstack_quant_core::{
+use finstack_quant_core::contract::{
     ContractError, Diagnostic, LoadLimits, LoadPhase, Severity, ValidationReport,
 };
 #[cfg(feature = "json-schema")]

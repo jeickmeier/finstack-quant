@@ -926,11 +926,10 @@ impl PnlAttribution {
     #[must_use]
     pub fn pct_of_total(&self, amount: f64) -> Option<f64> {
         let total = &self.total_pnl;
-        if self
-            .meta
-            .rounding
-            .is_effectively_zero_money(total.amount(), total.currency())
-        {
+        if self.meta.rounding.is_effectively_zero(
+            total.amount(),
+            finstack_quant_core::config::ZeroKind::Money(total.currency()),
+        ) {
             None
         } else {
             Some(amount / total.amount() * 100.0)
@@ -973,10 +972,10 @@ impl PnlAttribution {
         // "is total_pnl effectively zero?" gate uses the attribution's stored
         // RoundingContext (MI4) rather than a hardcoded 1e-10 — keeps the
         // semantic consistent with the rest of `PnlAttribution`'s zero checks.
-        let total_is_zero = self
-            .meta
-            .rounding
-            .is_effectively_zero_money(abs_total, self.total_pnl.currency());
+        let total_is_zero = self.meta.rounding.is_effectively_zero(
+            abs_total,
+            finstack_quant_core::config::ZeroKind::Money(self.total_pnl.currency()),
+        );
         let tolerance = if total_is_zero {
             abs_tolerance
         } else {
@@ -1031,7 +1030,11 @@ impl PnlAttribution {
         };
 
         let show = |m: &Money| -> bool {
-            show_zeros || !rc.is_effectively_zero_money(m.amount(), m.currency())
+            show_zeros
+                || !rc.is_effectively_zero(
+                    m.amount(),
+                    finstack_quant_core::config::ZeroKind::Money(m.currency()),
+                )
         };
 
         let child = |label: &dyn std::fmt::Display, pnl: &Money| format!("  │   ├─ {label}: {pnl}");

@@ -69,9 +69,10 @@ fn currency_scale_boundaries_roundtrip_and_keep_money_epsilon_finite_positive() 
         assert_eq!(restored, context);
         let epsilon = 0.5 * 10f64.powi(-(scale as i32));
         assert!(epsilon.is_finite() && epsilon > 0.0);
-        assert!(!restored.is_effectively_zero_money(1.0, Currency::USD));
-        assert!(restored.is_effectively_zero_money(epsilon, Currency::USD));
-        assert!(!restored.is_effectively_zero_money(2.0 * epsilon, Currency::USD));
+        let usd_zero = finstack_quant_core::config::ZeroKind::Money(Currency::USD);
+        assert!(!restored.is_effectively_zero(1.0, usd_zero));
+        assert!(restored.is_effectively_zero(epsilon, usd_zero));
+        assert!(!restored.is_effectively_zero(2.0 * epsilon, usd_zero));
     }
 }
 

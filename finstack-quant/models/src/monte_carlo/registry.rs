@@ -4,8 +4,9 @@
 //! defaults, and convenience-layer defaults can be reviewed and changed
 //! without hunting through constructor bodies.
 
+use finstack_quant_core::contract::ContractDescriptor;
 use finstack_quant_core::embedded_registry::EmbeddedJsonRegistry;
-use finstack_quant_core::{ContractDescriptor, Error, Result};
+use finstack_quant_core::{Error, Result};
 use serde::Deserialize;
 
 const PRICER_DEFAULTS: &str = include_str!("../../data/defaults/pricer_defaults.v1.json");

@@ -5,7 +5,7 @@ use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::collections::{HashMap, HashSet};
+use crate::{HashMap, HashSet};
 
 use super::provider::recover;
 

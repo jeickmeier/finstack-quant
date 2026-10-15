@@ -6,7 +6,7 @@
 //! of interdependent formulas.
 
 use super::ast::*;
-use crate::collections::{HashMap, HashSet};
+use crate::{HashMap, HashSet};
 use std::vec::Vec;
 
 /// A node in the execution DAG.
@@ -156,9 +156,9 @@ impl DagBuilder {
                 return Ok(());
             }
             if visiting.contains(&node_id) {
-                return Err(crate::Error::circular_dependency(vec![format!(
-                    "expr_node_{node_id}"
-                )]));
+                return Err(crate::Error::CircularDependency {
+                    path: vec![format!("expr_node_{node_id}")],
+                });
             }
 
             visiting.insert(node_id);
