@@ -147,7 +147,7 @@ pub trait CashflowProvider: CashflowScheduleSource {
         as_of: Date,
     ) -> finstack_quant_core::Result<DatedFlows> {
         let schedule = self.cashflow_schedule(curves, as_of)?;
-        Ok(settlement_rows(&schedule))
+        Ok(schedule.settlement_rows())
     }
 }
 
@@ -190,18 +190,7 @@ impl<T> CashflowProvider for T where T: CashflowScheduleSource + ?Sized {}
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn dated_flows(schedule: &CashFlowSchedule) -> finstack_quant_core::Result<DatedFlows> {
-    schedule.validate_native_cash()?;
-    Ok(settlement_rows(schedule))
-}
-
-fn settlement_rows(schedule: &CashFlowSchedule) -> DatedFlows {
-    schedule
-        .get_flows()
-        .iter()
-        .filter(|flow| flow.kind.is_cash_settlement())
-        .filter(|flow| flow.amount.amount() != 0.0 || flow.principal_delta.is_none())
-        .map(|flow| (flow.date, flow.amount))
-        .collect()
+    schedule.dated_flows()
 }
 
 /// Resolve the schedule-level notional from an optional `Money` hint and a

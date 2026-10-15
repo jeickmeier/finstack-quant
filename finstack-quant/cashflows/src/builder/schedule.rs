@@ -872,7 +872,7 @@ impl CashFlowSchedule {
     /// Returns error if:
     /// - `meta.issue_date` is unset
     /// - Currency mismatch between flows and notional
-    pub fn outstanding_by_date(&self) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
+    pub fn outstanding_by_date(&self) -> finstack_quant_core::Result<crate::DatedFlows> {
         let issue = self.meta.issue_date.ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "outstanding_by_date: schedule.meta.issue_date is required to identify the initial funding flow"
@@ -892,6 +892,52 @@ impl CashFlowSchedule {
             result.push((date, after));
         }
         Ok(result)
+    }
+
+    /// Extract currency-tagged settlement cashflows `(Date, Money)` from this schedule.
+    ///
+    /// Preserves schedule order and payment dates. PIK capitalizations and
+    /// default write-downs are non-cash state changes and are omitted.
+    ///
+    /// # Returns
+    ///
+    /// Validated [`crate::DatedFlows`] in schedule order.
+    ///
+    /// # Errors
+    ///
+    /// Returns the schedule validation error for invalid amounts, accrual
+    /// metadata, currencies within a row, dates, or single-currency principal movements.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_cashflows::{schedule_from_dated_flows, ScheduleBuildOpts};
+    /// use finstack_quant_cashflows::primitives::CFKind;
+    /// use finstack_quant_core::{currency::Currency, dates::{Date, DayCount}, money::Money};
+    /// use time::Month;
+    ///
+    /// let date = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
+    /// let schedule = schedule_from_dated_flows(
+    ///     vec![(date, Money::from((100_i64, Currency::USD)))],
+    ///     CFKind::Fixed,
+    ///     DayCount::Act360,
+    ///     ScheduleBuildOpts::default(),
+    /// );
+    /// assert_eq!(schedule.dated_flows()?[0].1.currency(), Currency::USD);
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn dated_flows(&self) -> finstack_quant_core::Result<crate::DatedFlows> {
+        self.validate_native_cash()?;
+        Ok(self.settlement_rows())
+    }
+
+    pub(crate) fn settlement_rows(&self) -> crate::DatedFlows {
+        self.flows
+            .iter()
+            .filter(|flow| flow.kind.is_cash_settlement())
+            .filter(|flow| flow.amount.amount() != 0.0 || flow.principal_delta.is_none())
+            .map(|flow| (flow.date, flow.amount))
+            .collect()
     }
 
     /// Return the outstanding principal at each requested date.
@@ -1301,7 +1347,7 @@ impl CashFlowSchedule {
             return Ok(crate::aggregation::PeriodAggregation::default());
         }
 
-        let raw = if let Some(PvCreditAdjustment {
+        if let Some(PvCreditAdjustment {
             hazard: Some(hazard_curve),
             recovery_rate,
         }) = credit
@@ -1313,16 +1359,15 @@ impl CashFlowSchedule {
                 Some(hazard_curve),
                 recovery_rate,
                 date_ctx,
-            )?
+            )
         } else {
             crate::aggregation::pv_by_period_cashflows_sorted_checked(
                 &self.flows,
                 periods,
                 disc,
                 date_ctx,
-            )?
-        };
-        crate::aggregation::PeriodAggregation::try_from(raw)
+            )
+        }
     }
 
     /// Periodized PVs from a market context using the default day-count context.
