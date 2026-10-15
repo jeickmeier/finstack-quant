@@ -623,7 +623,7 @@ fn group_contributions(
                 .map(|group| {
                     let mut present = NeumaierAccumulator::new();
                     for value in group.values() {
-                        present.add(value.current());
+                        present.add(value.total());
                     }
                     present.total()
                 })

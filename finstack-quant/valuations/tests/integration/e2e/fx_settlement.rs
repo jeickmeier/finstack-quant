@@ -32,8 +32,8 @@
 //! - ECB TARGET2 calendar: https://www.ecb.europa.eu/paym/target/target2/profuse/calendar/html/index.en.html
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::create_date;
-use finstack_quant_core::dates::fx::{add_joint_business_days, fx_spot_date, resolve_calendar};
+use finstack_quant_core::dates::fx::fx_spot_date;
+use finstack_quant_core::dates::{add_joint_business_days, create_date, resolve_calendar};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::FxSpot;

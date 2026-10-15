@@ -8,9 +8,9 @@
 //! - [`RandomNumberGenerator`]: Trait for pluggable RNG implementations
 //! - [`Pcg64Rng`]: Deterministic PCG64 generator
 //! - [`box_muller_transform`]: Normal variate generation from uniform samples
-//! - [`sobol::SobolRng`]: Sobol low-discrepancy sequence with Owen scrambling
-//! - [`brownian_bridge::BrownianBridge`]: Brownian bridge construction order
-//! - [`poisson::poisson_inverse_cdf`]: Poisson sampling utilities
+//! - [`SobolRng`]: Sobol low-discrepancy sequence with Owen scrambling
+//! - [`BrownianBridge`]: Brownian bridge construction order
+//! - [`poisson_inverse_cdf`]: Poisson sampling utilities
 //!
 //! # Quick Start
 //!
@@ -54,12 +54,13 @@
 //! - **Box-Muller**: Box, G. E. P., & Muller, M. E. (1958). "A Note on the
 //!   Generation of Random Normal Deviates." `docs/REFERENCES.md#box-muller-1958`
 
-pub mod brownian_bridge;
-pub mod poisson;
-pub mod sobol;
+mod brownian_bridge;
+mod poisson;
+mod sobol;
 
 pub use brownian_bridge::BrownianBridge;
 pub use poisson::poisson_inverse_cdf;
+pub use sobol::{SobolRng, MAX_SOBOL_DIMENSION};
 
 /// Random number generator trait for statistical sampling.
 ///

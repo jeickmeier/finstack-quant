@@ -10,7 +10,7 @@
 use super::super::paths::ProcessParams;
 use super::super::traits::StochasticProcess;
 use super::metadata::ProcessMetadata;
-use finstack_quant_core::math::linalg::check_correlation_matrix;
+use finstack_quant_core::math::linalg::validate_correlation_matrix;
 
 /// Parameters for a multi-dimensional Ornstein-Uhlenbeck process.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -97,7 +97,7 @@ impl MultiOuParams {
             ));
         }
         if let Some(ref corr) = self.correlation {
-            check_correlation_matrix(corr, n)?;
+            validate_correlation_matrix(corr, n)?;
         }
         Ok(())
     }

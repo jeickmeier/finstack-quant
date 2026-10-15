@@ -842,7 +842,7 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
         }
 
         let i = locate_segment_unchecked(knots, x);
-        self.interpolate_segment(i, x, knots)
+        self.segment_df_and_forward(i, x, knots).0
     }
 
     fn interp_prime(
@@ -1026,18 +1026,6 @@ impl MonotoneConvexStrategy {
             f[i] = f[i].clamp(0.0, 2.0 * fd[i - 1].min(fd[i]));
         }
         f[last] = f[last].clamp(0.0, 2.0 * fd[last - 1]);
-    }
-
-    /// Interpolate the discount factor at time t within segment i.
-    ///
-    /// DF(t) = DF(t_i) * exp(-∫_{t_i}^{t} f(s) ds)
-    ///
-    /// The integral of f(s) = f^d + g(x) from t_i to t is:
-    /// ∫ = f^d * (t - t_i) + dt * G(x)
-    ///
-    /// where `G(x)` is the analytic integral of the applicable Hagan-West region.
-    fn interpolate_segment(&self, i: usize, t: f64, knots: &[f64]) -> f64 {
-        self.segment_df_and_forward(i, t, knots).0
     }
 
     /// Compute both the discount factor `DF(t)` and the instantaneous forward

@@ -2,7 +2,7 @@
 //! two-class deal, the facility note's flows, the commitment fee and
 //! the residual, plus the `Instrument` / `CashflowScheduleSource` impls.
 
-use finstack_quant_core::cashflow::{CFKind, CashFlow, Discountable};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
@@ -497,7 +497,7 @@ impl Instrument for AssetBackedFacility {
     ) -> finstack_quant_core::Result<Money> {
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let flows = self.dated_cashflows(market, as_of)?;
-        flows.npv(disc.as_ref(), as_of)
+        finstack_quant_core::cashflow::npv(disc.as_ref(), as_of, &flows)
     }
 
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();

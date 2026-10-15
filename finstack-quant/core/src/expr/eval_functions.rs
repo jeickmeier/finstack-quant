@@ -509,23 +509,8 @@ impl CompiledExpr {
         let tmp = &mut guard.tmp;
         tmp.clear();
         tmp.extend(data.iter().copied().filter(|v| !v.is_nan()));
-        let median = Self::median_of_unsorted(tmp);
+        let median = quantile(tmp, 0.5);
         out.fill(median);
-    }
-
-    /// Sort the buffer in place and return its median, or NaN when empty.
-    #[inline]
-    fn median_of_unsorted(buf: &mut [f64]) -> f64 {
-        let n = buf.len();
-        if n == 0 {
-            return f64::NAN;
-        }
-        buf.sort_unstable_by(|a, b| a.total_cmp(b));
-        if n % 2 == 1 {
-            buf[n / 2]
-        } else {
-            (buf[n / 2 - 1] + buf[n / 2]) * 0.5
-        }
     }
 
     pub(super) fn eval_rolling_std_into(
@@ -589,7 +574,7 @@ impl CompiledExpr {
             Self::rolling_apply_into(base, win, out, &mut |window| {
                 wbuf.clear();
                 wbuf.extend(window.iter().copied().filter(|v| !v.is_nan()));
-                Self::median_of_unsorted(wbuf)
+                quantile(wbuf, 0.5)
             });
         })
     }
@@ -753,7 +738,7 @@ impl CompiledExpr {
         out[n..].fill(f64::NAN);
     }
 
-    pub(super) fn eval_quantile_into(arg_results: &[&[f64]], out: &mut [f64]) {
+    pub(super) fn eval_quantile_into(&self, arg_results: &[&[f64]], out: &mut [f64]) {
         let Some(base) = arg_results.first() else {
             out.fill(f64::NAN);
             return;
@@ -763,12 +748,14 @@ impl CompiledExpr {
             return;
         }
         let q = arg_results[1][0].clamp(0.0, 1.0);
-        let mut valid_values: Vec<f64> = base.iter().copied().filter(|x| !x.is_nan()).collect();
-        let quantile_value = if valid_values.is_empty() {
-            f64::NAN
-        } else {
-            quantile(&mut valid_values, q)
-        };
+        let mut guard = self
+            .scratch
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let tmp = &mut guard.tmp;
+        tmp.clear();
+        tmp.extend(base.iter().copied().filter(|x| !x.is_nan()));
+        let quantile_value = quantile(tmp, q);
         let n = out.len().min(base.len());
         out[..n].fill(quantile_value);
         out[n..].fill(f64::NAN);

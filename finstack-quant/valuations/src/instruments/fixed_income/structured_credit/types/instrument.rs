@@ -6,7 +6,6 @@ use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::model_params::ModelParamsSnapshot;
-use finstack_quant_core::cashflow::Discountable;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
@@ -145,7 +144,7 @@ impl Instrument for StructuredCredit {
         let disc = context.get_discount(self.discount_curve_id.as_str())?;
         let flows = self.dated_cashflows(context, as_of)?;
 
-        flows.npv(disc.as_ref(), as_of)
+        finstack_quant_core::cashflow::npv(disc.as_ref(), as_of, &flows)
     }
 
     fn seed_metric_context(

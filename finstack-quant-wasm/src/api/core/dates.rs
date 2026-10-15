@@ -7,7 +7,7 @@ use crate::utils::input::{
 use crate::utils::to_js_err;
 use finstack_quant_core::dates::{
     adjust as core_adjust, available_calendars as core_available_calendars,
-    fx::resolve_calendar as rust_resolve_calendar, BusinessDayConvention, Date,
+    resolve_calendar as rust_resolve_calendar, BusinessDayConvention, Date,
     DayCount as RustDayCount, DayCountContext as RustDayCountContext, DayCountContextState,
     HolidayCalendar, Tenor as RustTenor,
 };

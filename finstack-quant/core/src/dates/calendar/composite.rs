@@ -30,7 +30,7 @@
 //! # }
 //! ```
 
-use crate::dates::calendar::{HolidayCalendar, WeekendRule};
+use crate::dates::{canonical_calendar_id, HolidayCalendar, WeekendRule};
 use time::Date;
 
 /// A lightweight view combining several holiday calendars (union semantics).
@@ -85,7 +85,7 @@ impl HolidayCalendar for CompositeCalendar<'_> {
         }
         member_ids.sort_unstable();
         member_ids.dedup();
-        crate::dates::calendar::canonical_calendar_id(&member_ids.join("+")).ok()
+        canonical_calendar_id(&member_ids.join("+")).ok()
     }
 }
 

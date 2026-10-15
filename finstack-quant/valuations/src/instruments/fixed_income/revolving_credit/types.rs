@@ -697,7 +697,7 @@ impl McConfig {
         // Validate correlation matrix if provided
         if let Some(corr) = self.correlation_matrix {
             // Check positive semi-definiteness
-            finstack_quant_core::math::linalg::check_correlation_matrix(
+            finstack_quant_core::math::linalg::validate_correlation_matrix(
                 &corr.iter().flatten().copied().collect::<Vec<_>>(),
                 3,
             )?;

@@ -454,12 +454,17 @@ pub(crate) fn generate() -> io::Result<()> {
         ));
     }
 
+    output.push_str("pub(in crate::dates) mod registry {\n");
+    output.push_str("    use super::*;\n\n");
+
     // Generate ALL_IDS array
-    output.push_str("/// All available calendar identifiers.\npub static ALL_IDS: &[&str] = &[\n");
+    output.push_str(
+        "    /// All available calendar identifiers.\n    pub static ALL_IDS: &[&str] = &[\n",
+    );
     for (id, _) in &calendar_names {
-        output.push_str(&format!("    \"{}\",\n", id));
+        output.push_str(&format!("        \"{}\",\n", id));
     }
-    output.push_str("];\n\n");
+    output.push_str("    ];\n\n");
 
     // Generate calendar_by_id function. The inner `lookup` matches against the
     // canonical lowercase ids; the outer function tries the input verbatim first
@@ -467,32 +472,33 @@ pub(crate) fn generate() -> io::Result<()> {
     // falls back to an ASCII-lowercased copy in a stack buffer for mixed-case
     // input. All built-in ids are short ASCII, so the 32-byte buffer never
     // truncates a known id.
-    output.push_str("/// Resolve a calendar by its identifier (ASCII case-insensitive).\n///\n/// # Arguments\n///\n/// * `id` - Built-in calendar identifier. Matching is ASCII case-insensitive;\n///   unknown or non-ASCII identifiers return `None`.\npub fn calendar_by_id(id: &str) -> Option<&'static dyn HolidayCalendar> {\n");
-    output.push_str("    fn lookup(id: &str) -> Option<&'static dyn HolidayCalendar> {\n");
-    output.push_str("        match id {\n");
+    output.push_str("    /// Resolve a calendar by its identifier (ASCII case-insensitive).\n    ///\n    /// # Arguments\n    ///\n    /// * `id` - Built-in calendar identifier. Matching is ASCII case-insensitive;\n    ///   unknown or non-ASCII identifiers return `None`.\n    pub fn calendar_by_id(id: &str) -> Option<&'static dyn HolidayCalendar> {\n");
+    output.push_str("        fn lookup(id: &str) -> Option<&'static dyn HolidayCalendar> {\n");
+    output.push_str("            match id {\n");
     for (id, const_name) in &calendar_names {
         output.push_str(&format!(
-            "            \"{}\" => Some(&{}),\n",
+            "                \"{}\" => Some(&{}),\n",
             id, const_name
         ));
     }
-    output.push_str("            _ => None,\n");
+    output.push_str("                _ => None,\n");
+    output.push_str("            }\n");
     output.push_str("        }\n");
-    output.push_str("    }\n");
-    output.push_str("    if let Some(c) = lookup(id) {\n");
-    output.push_str("        return Some(c);\n");
-    output.push_str("    }\n");
-    output.push_str("    let bytes = id.as_bytes();\n");
-    output.push_str("    if id.is_ascii() && bytes.len() <= 32 {\n");
-    output.push_str("        let mut buf = [0u8; 32];\n");
-    output.push_str("        for (b, s) in buf.iter_mut().zip(bytes) {\n");
-    output.push_str("            *b = s.to_ascii_lowercase();\n");
+    output.push_str("        if let Some(c) = lookup(id) {\n");
+    output.push_str("            return Some(c);\n");
     output.push_str("        }\n");
-    output.push_str("        if let Ok(lower) = core::str::from_utf8(&buf[..bytes.len()]) {\n");
-    output.push_str("            return lookup(lower);\n");
+    output.push_str("        let bytes = id.as_bytes();\n");
+    output.push_str("        if id.is_ascii() && bytes.len() <= 32 {\n");
+    output.push_str("            let mut buf = [0u8; 32];\n");
+    output.push_str("            for (b, s) in buf.iter_mut().zip(bytes) {\n");
+    output.push_str("                *b = s.to_ascii_lowercase();\n");
+    output.push_str("            }\n");
+    output.push_str("            if let Ok(lower) = core::str::from_utf8(&buf[..bytes.len()]) {\n");
+    output.push_str("                return lookup(lower);\n");
+    output.push_str("            }\n");
     output.push_str("        }\n");
+    output.push_str("        None\n");
     output.push_str("    }\n");
-    output.push_str("    None\n");
     output.push_str("}\n\n");
 
     fs::write(out_path, output)?;

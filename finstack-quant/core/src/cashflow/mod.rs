@@ -88,6 +88,6 @@ mod discounting;
 mod primitives;
 mod xirr;
 
-pub use discounting::{flat_discount_factor, npv, npv_amounts_with_curve, Discountable};
+pub use discounting::{flat_discount_factor, npv, npv_amounts_with_curve};
 pub use primitives::{CFKind, CashFlow, CashFlowAccrual};
 pub use xirr::{irr, xirr, xirr_with_daycount};

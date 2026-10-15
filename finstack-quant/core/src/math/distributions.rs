@@ -254,15 +254,10 @@ pub fn binomial_pmf_all_into(out: &mut Vec<f64>, n: usize, p: f64) -> crate::Res
     Ok(())
 }
 
-/// Calculate log factorial ln(n!) with automatic method selection.
+/// Calculate log factorial ln(n!).
 ///
-/// Uses exact calculation for small n and Stirling's approximation for large n
-/// to balance accuracy and numerical stability.
-///
-/// # Algorithm
-///
-/// - **n < 20**: Exact via Σ ln(i) for i = 2..n
-/// - **n ≥ 20**: Stirling's approximation
+/// Delegates to [`statrs::function::factorial::ln_factorial`], which uses a
+/// precomputed lookup table for small `n` and `ln_gamma(n + 1)` for larger `n`.
 ///
 /// # Arguments
 ///

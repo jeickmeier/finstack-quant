@@ -6,7 +6,7 @@
 use super::super::process::gbm::{GbmProcess, MultiGbmProcess};
 use super::super::traits::{Discretization, ProportionalDiffusion, StochasticProcess};
 use finstack_quant_core::math::linalg::{
-    check_correlation_matrix, cholesky_correlation, CholeskyError,
+    cholesky_correlation, validate_correlation_matrix, CholeskyError,
 };
 
 /// Exact GBM discretization using the analytical log-normal solution:
@@ -196,7 +196,7 @@ impl ExactMultiGbmCorrelated {
     ///
     /// Returns error if correlation matrix is indefinite or has wrong size.
     pub fn new(correlation_matrix: &[f64], dim: usize) -> finstack_quant_core::Result<Self> {
-        check_correlation_matrix(correlation_matrix, dim).map_err(|_| {
+        validate_correlation_matrix(correlation_matrix, dim).map_err(|_| {
             finstack_quant_core::Error::Input(finstack_quant_core::InputError::Invalid)
         })?;
         let cholesky_factor =

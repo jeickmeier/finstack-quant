@@ -7,8 +7,7 @@
 
 use crate::builder::schedule::CashFlowSchedule;
 use crate::primitives::CFKind;
-use finstack_quant_core::dates::calendar::calendar_by_id;
-use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Tenor};
+use finstack_quant_core::dates::{calendar_by_id, Date, DateExt, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::money::Money;
 
 /// Generic accrual method usable across instruments.

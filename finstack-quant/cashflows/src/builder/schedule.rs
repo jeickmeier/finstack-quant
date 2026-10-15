@@ -6,7 +6,6 @@
 use crate::builder::Notional;
 use crate::primitives::{is_cash_settlement_kind, CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
-use finstack_quant_core::cashflow::Discountable;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Period, PeriodId};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -299,8 +298,25 @@ where
     Ok(flows)
 }
 
-impl Discountable for CashFlowSchedule {
-    fn npv(&self, disc: &dyn Discounting, base: Date) -> finstack_quant_core::Result<Money> {
+impl CashFlowSchedule {
+    /// Compute the present value of strictly future cash-settlement flows using `disc`.
+    ///
+    /// Flows dated on or before `base` and non-cash rows (such as PIK or
+    /// notional events) are excluded. When no cash-settlement flows remain,
+    /// returns zero in the schedule's initial notional currency.
+    ///
+    /// # Arguments
+    ///
+    /// * `disc` - Discount curve that supplies discount factors using its own
+    ///   base date, day-count convention, and time-axis calendar.
+    /// * `base` - Valuation date to which strictly future cashflows are
+    ///   discounted; flows dated on or before it are excluded.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if discounting fails or if cashflows have mismatched
+    /// currencies.
+    pub fn npv(&self, disc: &dyn Discounting, base: Date) -> finstack_quant_core::Result<Money> {
         let flows = self
             .flows
             .iter()
@@ -316,9 +332,6 @@ impl Discountable for CashFlowSchedule {
 
         finstack_quant_core::cashflow::npv(disc, base, &flows)
     }
-}
-
-impl CashFlowSchedule {
     /// Construct a canonical schedule from already-classified flows.
     ///
     /// Flows are sorted into deterministic schedule order. Call [`Self::validate`]

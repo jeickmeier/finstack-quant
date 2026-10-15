@@ -20,7 +20,6 @@ use finstack_quant_cashflows::builder::specs::{
     FloatingRateSpec, OvernightIndexConstraintApplication,
 };
 use finstack_quant_cashflows::builder::{AmortizationSpec, CashFlowSchedule, PrincipalExchange};
-use finstack_quant_core::cashflow::Discountable;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;

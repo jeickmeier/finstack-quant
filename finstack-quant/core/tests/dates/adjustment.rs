@@ -377,7 +377,7 @@ fn calendar_metadata_override_is_respected() {
 
 #[test]
 fn add_joint_business_days_t0_returns_start_unadjusted() {
-    use finstack_quant_core::dates::fx::add_joint_business_days;
+    use finstack_quant_core::dates::add_joint_business_days;
 
     // Saturday Jan 4, 2025 is not a business day on either calendar, but
     // n_days = 0 pins the documented behavior: return start unadjusted.

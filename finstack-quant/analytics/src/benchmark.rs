@@ -645,10 +645,10 @@ pub(crate) fn rolling_greeks(
     for i in window..=n {
         // Shifted sums: correct for beta (shift-invariant) as they stand.
         let (mut sr, mut sb, mut srb, mut sb2) = (
-            acc_sr.current(),
-            acc_sb.current(),
-            acc_srb.current(),
-            acc_sb2.current(),
+            acc_sr.total(),
+            acc_sb.total(),
+            acc_srb.total(),
+            acc_sb2.total(),
         );
         let mut denom = w * sb2 - sb * sb;
         // Remember the largest power-sum scale since the last rebuild:

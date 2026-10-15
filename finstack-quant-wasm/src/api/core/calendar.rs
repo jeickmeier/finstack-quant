@@ -9,7 +9,7 @@ use crate::utils::input::{js_epoch_days, js_int, js_string};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::dates::{
     canonical_calendar_id, days_since_epoch as rust_days_since_epoch,
-    fx::resolve_calendar as rust_resolve_calendar, BusinessDayConvention, DateExt, HolidayCalendar,
+    resolve_calendar as rust_resolve_calendar, BusinessDayConvention, DateExt, HolidayCalendar,
 };
 use wasm_bindgen::prelude::*;
 

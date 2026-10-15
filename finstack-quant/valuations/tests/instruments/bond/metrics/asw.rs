@@ -232,9 +232,7 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
         .expect("schedule builder")
         .frequency(spec.schedule.frequency)
         .stub_rule(spec.schedule.stub);
-    if let Some(cal) =
-        finstack_quant_core::dates::calendar::calendar_by_id(&spec.schedule.calendar_id)
-    {
+    if let Some(cal) = finstack_quant_core::dates::calendar_by_id(&spec.schedule.calendar_id) {
         builder = builder.adjust_with(spec.schedule.business_day_convention, cal);
     }
     let sched: Vec<time::Date> = builder.build().expect("schedule").into_iter().collect();
@@ -252,8 +250,7 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
         .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
         .build()
         .unwrap();
-    let calendar =
-        finstack_quant_core::dates::calendar::calendar_by_id(&spec.schedule.calendar_id).unwrap();
+    let calendar = finstack_quant_core::dates::calendar_by_id(&spec.schedule.calendar_id).unwrap();
     let float_dates: Vec<_> = float_dates
         .into_iter()
         .map(|date| {

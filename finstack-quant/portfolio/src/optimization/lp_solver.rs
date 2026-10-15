@@ -590,7 +590,7 @@ fn reconstruct_result(
         let w_star = solution.value(*w_var);
         objective_acc.add(*coef * w_star);
     }
-    let objective_value = objective_acc.current();
+    let objective_value = objective_acc.total();
 
     let mut metric_values: IndexMap<String, f64> = IndexMap::new();
     metric_values.insert("objective".to_string(), objective_value);

@@ -279,7 +279,7 @@ impl PyPeriodId {
     /// Number of periods per year for this kind.
     #[getter]
     fn periods_per_year(&self) -> u16 {
-        self.inner.periods_per_year()
+        self.inner.kind().periods_per_year()
     }
 
     /// Next period of the same kind and calendar (fiscal daily ids at day 365 need ``next_fiscal``).

@@ -11,7 +11,7 @@ mod bench_utils;
 
 use bench_utils::bench_iter;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_core::cashflow::{npv, Discountable};
+use finstack_quant_core::cashflow::npv;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -97,27 +97,5 @@ fn bench_npv_shaped_curve(c: &mut Criterion) {
 
     group.finish();
 }
-fn bench_discountable_trait(c: &mut Criterion) {
-    let mut group = c.benchmark_group("discountable_trait");
-    let curve = shaped_curve();
-    let flows = money_flows(60);
-
-    bench_iter(&mut group, "via_trait", || {
-        let pv = flows.npv(black_box(&curve), base_date()).unwrap();
-        black_box(pv);
-    });
-
-    bench_iter(&mut group, "via_fn", || {
-        let pv = npv(black_box(&curve), base_date(), &flows).unwrap();
-        black_box(pv);
-    });
-
-    group.finish();
-}
-criterion_group!(
-    benches,
-    bench_npv_flat_curve,
-    bench_npv_shaped_curve,
-    bench_discountable_trait,
-);
+criterion_group!(benches, bench_npv_flat_curve, bench_npv_shaped_curve);
 criterion_main!(benches);

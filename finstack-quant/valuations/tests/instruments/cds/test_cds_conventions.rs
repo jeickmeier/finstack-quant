@@ -11,8 +11,7 @@
 //! - ISDA "Big Bang" Protocol (June 20, 2009) - European T+1 settlement
 //! - ISDA "Small Bang" Protocol (July 27, 2009) - European convention updates
 
-use finstack_quant_core::dates::calendar::calendar_by_id;
-use finstack_quant_core::dates::DayCount;
+use finstack_quant_core::dates::{calendar_by_id, DayCount};
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CdsConvention;
 use time::{Date, Month};
 

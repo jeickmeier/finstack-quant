@@ -19,7 +19,7 @@
 use super::super::paths::ProcessParams;
 use super::super::traits::StochasticProcess;
 use super::metadata::ProcessMetadata;
-use finstack_quant_core::math::linalg::check_correlation_matrix;
+use finstack_quant_core::math::linalg::validate_correlation_matrix;
 
 /// Parameters for one-dimensional Brownian motion with drift.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -179,7 +179,7 @@ impl MultiBrownianProcess {
             ));
         }
         if let Some(ref corr) = correlation {
-            check_correlation_matrix(corr, n)?;
+            validate_correlation_matrix(corr, n)?;
         }
         Ok(Self {
             mus,

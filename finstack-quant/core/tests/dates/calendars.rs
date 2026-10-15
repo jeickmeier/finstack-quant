@@ -2,13 +2,14 @@
 
 use super::common::make_date;
 use finstack_quant_core::dates::calendar::{
-    calendar_by_id, ALL_IDS, ASX as Asx, AUCE as Auce, BRBD as Brbd, BSE as Bse, CATO as Cato,
-    CHZH as Chzh, CME as Cme, CNBE as Cnbe, DEFR as Defr, EUREX as Eurex, GBLO as Gblo,
-    HKEX as Hkex, HKHK as Hkhk, NSE as Nse, NYSE as Nyse, SGSI as Sgsi, SIFMA as Sifma, SIX as Six,
-    SSE as Sse, TARGET2 as Target2, TSX as Tsx, USNY as Usny,
+    ASX as Asx, AUCE as Auce, BRBD as Brbd, BSE as Bse, CATO as Cato, CHZH as Chzh, CME as Cme,
+    CNBE as Cnbe, DEFR as Defr, EUREX as Eurex, GBLO as Gblo, HKEX as Hkex, HKHK as Hkhk,
+    NSE as Nse, NYSE as Nyse, SGSI as Sgsi, SIFMA as Sifma, SIX as Six, SSE as Sse,
+    TARGET2 as Target2, TSX as Tsx, USNY as Usny,
 };
 use finstack_quant_core::dates::{
-    adjust, available_calendars, BusinessDayConvention, Date, DateExt, HolidayCalendar, Month, Rule,
+    adjust, available_calendars, calendar_by_id, BusinessDayConvention, Date, DateExt,
+    HolidayCalendar, Month, Rule,
 };
 use std::collections::HashSet;
 use time::Weekday;
@@ -798,7 +799,7 @@ fn calendars_match_sample_expectations() {
 
 #[test]
 fn test_calendar_by_id_lookup() {
-    for &id in ALL_IDS {
+    for &id in available_calendars() {
         let cal = calendar_by_id(id);
         assert!(cal.is_some(), "Calendar '{}' should be found", id);
 

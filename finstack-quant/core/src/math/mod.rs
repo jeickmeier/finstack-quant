@@ -124,9 +124,7 @@ pub fn clamp_or_nan(x: f64, lo: f64, hi: f64) -> f64 {
     x.min(hi).max(lo)
 }
 
-pub mod compounding;
-/// Consecutive streak counter for return series analysis.
-pub mod consecutive;
+mod compounding;
 pub mod distributions;
 pub mod fractional;
 pub mod integration;
@@ -143,7 +141,6 @@ pub mod summation;
 pub mod time_grid;
 
 pub use compounding::Compounding;
-pub use consecutive::longest_positive_run;
 pub use distributions::{
     binomial_pmf_all, binomial_pmf_all_into, binomial_probability, chi_squared_quantile,
     log_factorial,
@@ -157,13 +154,13 @@ pub use interp::{
     MonotoneConvexStrategy, PiecewiseQuadraticForwardStrategy,
 };
 pub use linalg::{
-    apply_lower_triangular, check_correlation_matrix, cholesky_correlation, cholesky_decomposition,
-    symmetric_eigen, validate_correlation_matrix, CholeskyError, CorrelationError,
-    CorrelationFactor,
+    apply_lower_triangular, cholesky_correlation, cholesky_decomposition, symmetric_eigen,
+    validate_correlation_matrix, CholeskyError, CorrelationError, CorrelationFactor,
 };
 pub use probability::{correlation_bounds, joint_probabilities, CorrelatedBernoulli};
-pub use random::sobol::{SobolRng, MAX_SOBOL_DIMENSION};
-pub use random::{box_muller_transform, Pcg64Rng, RandomNumberGenerator};
+pub use random::{
+    box_muller_transform, Pcg64Rng, RandomNumberGenerator, SobolRng, MAX_SOBOL_DIMENSION,
+};
 pub use solver::BrentSolver;
 pub use solver_multi::{AnalyticalDerivatives, LevenbergMarquardtSolver};
 pub use special_functions::{
@@ -171,9 +168,9 @@ pub use special_functions::{
     student_t_inv_cdf,
 };
 pub use stats::{
-    correlation, covariance, finite_count, finite_max_or_nan, finite_min_or_nan, mean, mean_or_nan,
-    mean_var, median_or_nan, population_variance, quantile, sample_std_or_nan,
-    sample_variance_or_nan, variance, OnlineCovariance, OnlineStats,
+    correlation, covariance, finite_count, finite_max_or_nan, finite_min_or_nan,
+    longest_positive_run, mean, mean_or_nan, mean_var, median_or_nan, population_variance,
+    quantile, sample_std_or_nan, sample_variance_or_nan, variance, OnlineCovariance, OnlineStats,
 };
 pub use summation::{kahan_sum, neumaier_sum, NeumaierAccumulator};
 pub use time_grid::{map_date_to_step, map_exercise_dates_to_steps, TimeGrid, TimeGridError};

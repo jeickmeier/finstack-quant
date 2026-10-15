@@ -310,7 +310,7 @@ pub(crate) fn trailing_sum_at(
                 .ok()?;
             usize::try_from((end - start).whole_days()).ok()?
         }
-        _ => usize::from(at.periods_per_year()),
+        _ => usize::from(at.kind().periods_per_year()),
     };
     let mut period = *at;
     let mut total = 0.0;

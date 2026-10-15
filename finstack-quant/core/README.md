@@ -85,7 +85,7 @@ want it; domain-specific numerics (stochastic processes, payoffs) belong in
 
 | Path | What it is |
 |------|------------|
-| `math::stats` | `mean`, `variance`, `correlation`, `covariance`, `quantile`, NaN-tolerant `*_or_nan` variants, streaming `OnlineStats`/`OnlineCovariance`, realized-variance estimators. |
+| `math::stats` | `mean`, `variance`, `correlation`, `covariance`, `quantile`, NaN-tolerant `*_or_nan` variants, streaming `OnlineStats`/`OnlineCovariance`, realized-variance estimators, `longest_positive_run`. |
 | `math::summation` | `kahan_sum`, `neumaier_sum`, `NeumaierAccumulator`. |
 | `math::special_functions` | `norm_cdf`, `norm_pdf`, `erf`, `ln_gamma`, `standard_normal_inv_cdf`, Student-t CDF/inverse. |
 | `math::linalg` | Cholesky (`cholesky_decomposition`, `cholesky_correlation`), `symmetric_eigen`, correlation-matrix construction and validation. |
@@ -94,8 +94,8 @@ want it; domain-specific numerics (stochastic processes, payoffs) belong in
 | `math::integration` | Gauss-Legendre (fixed, composite, adaptive), Gauss-Hermite, Gauss-Laguerre. |
 | `math::random` | `Pcg64Rng`, `RandomNumberGenerator`, `SobolRng` (up to `MAX_SOBOL_DIMENSION` = 40), `BrownianBridge`, Poisson inversion, `box_muller_transform`. |
 | `math::distributions` / `math::probability` | Binomial and chi-squared helpers, `CorrelatedBernoulli`, `correlation_bounds`. |
-| `math::compounding` | `Compounding` conversions between simple, periodic, and continuous rates. |
-| `math::{time_grid, piecewise, fractional, consecutive}` | `TimeGrid` with `map_date_to_step`/`map_exercise_dates_to_steps`; validated left-continuous piecewise-constant curves; fractional Brownian motion kernels, fBM covariance, and Mittag-Leffler for rough-vol models; `count_consecutive` streaks. |
+| `math::Compounding` | `Compounding` conversions between simple, periodic, and continuous rates. |
+| `math::{time_grid, piecewise, fractional}` | `TimeGrid` with `map_date_to_step`/`map_exercise_dates_to_steps`; validated left-continuous piecewise-constant curves; fractional Brownian motion kernels, fBM covariance, and Mittag-Leffler for rough-vol models. |
 
 ### Types, errors, and configuration
 

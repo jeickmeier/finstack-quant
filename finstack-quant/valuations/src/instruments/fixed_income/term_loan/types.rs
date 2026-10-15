@@ -39,7 +39,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    calendar::calendar_by_id, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
+    calendar_by_id, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};

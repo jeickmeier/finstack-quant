@@ -12,9 +12,9 @@ use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContex
 use crate::instruments::fixed_income::bond::CashflowSpec;
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
-use finstack_quant_core::dates::calendar::calendar_by_id;
 use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DayCount, HolidayCalendar, ScheduleBuilder, StubKind, Tenor,
+    calendar_by_id, BusinessDayConvention, Date, DayCount, HolidayCalendar, ScheduleBuilder,
+    StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};

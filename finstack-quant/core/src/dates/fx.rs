@@ -1,6 +1,4 @@
-//! FX date utilities for joint calendar adjustments and spot rolls.
-//!
-//! Symmetric joint-calendar helpers and pair-aware FX settlement-date rolls.
+//! FX date utilities for spot settlement rolls and standard pair settlement lags.
 //!
 //! [`fx_spot_date`] counts each currency's settlement lag separately on that
 //! currency's own calendar (CAD and TRY settle one day sooner than other
@@ -10,15 +8,15 @@
 //! and South American pairs count USD business days. The USD calendar must also
 //! be open on the final date of every USD pair and non-USD cross. T+0 returns
 //! the trade date unchanged; signed business-day arithmetic remains in
-//! [`DateExt::add_business_days`]. The symmetric helper
-//! [`add_joint_business_days`] gates every counted day on all supplied calendars.
+//! [`DateExt::add_business_days`]. Symmetric joint-calendar counting lives in
+//! [`crate::dates::add_joint_business_days`].
 //!
 //! # Typical usage
 //!
-//! - [`adjust_joint_calendar`] for applying a business-day convention on a joint calendar
-//! - [`add_joint_business_days`] for T+n style symmetric joint counting
 //! - [`fx_spot_date`] for market-convention (USD-aware) spot rolling
 //! - [`fx_standard_settlement_days`] for the pair-aware T+1 / T+2 spot lag
+//! - [`crate::dates::adjust_joint_calendar`] for applying a business-day convention on a joint calendar
+//! - [`crate::dates::add_joint_business_days`] for T+n style symmetric joint counting
 //!
 //! # References
 //!
@@ -31,9 +29,10 @@
 //!   <https://www.cmegroup.com/content/dam/cmegroup/documents/ebs_value-date-calendar.pdf>.
 
 use crate::currency::Currency;
+use crate::dates::calendar::business_days::add_business_days_on;
 use crate::dates::{
-    adjust, calendar_by_id_strict, BusinessDayConvention, CompositeCalendar, Date, DateExt,
-    HolidayCalendar, WEEKENDS_ONLY,
+    adjust, calendar_by_id_strict, resolve_calendar, BusinessDayConvention, CompositeCalendar,
+    Date, DateExt, HolidayCalendar,
 };
 use crate::{Error, Result};
 
@@ -85,159 +84,6 @@ const USD_BUSINESS_DAY_COUNT_CURRENCIES: [Currency; 7] = [
     Currency::PEN,
     Currency::UYU,
 ];
-
-/// Resolve a calendar ID to a calendar reference.
-///
-/// # Errors
-///
-/// Returns an error if the calendar ID is not recognized.
-/// If `cal_id` is `None`, returns the weekends-only calendar (does not error).
-///
-/// # Examples
-///
-/// ```
-/// # use finstack_quant_core::dates::fx::resolve_calendar;
-/// // Valid calendar ID
-/// let cal = resolve_calendar(Some("nyse")).expect("NYSE calendar should exist");
-///
-/// // Explicit None uses weekends-only calendar (no error)
-/// let weekends = resolve_calendar(None).expect("None should use weekends-only");
-///
-/// // Unknown calendar ID errors
-/// let err = resolve_calendar(Some("unknown_cal"));
-/// assert!(err.is_err());
-/// ```
-///
-/// # Arguments
-///
-/// * `cal_id` - Optional canonical calendar ID. `None` explicitly selects the
-///   weekends-only calendar; an unrecognized ID returns an error. `+`-joined
-///   ids such as `"nyse+gblo"` resolve to a union calendar (see
-///   [`calendar_by_id_strict`]).
-pub fn resolve_calendar(cal_id: Option<&str>) -> Result<&'static dyn HolidayCalendar> {
-    match cal_id {
-        Some(id) => calendar_by_id_strict(id),
-        // Only use weekends_only if explicitly None (not as fallback)
-        None => Ok(&WEEKENDS_ONLY),
-    }
-}
-
-fn with_joint_calendar<R>(
-    base: &dyn HolidayCalendar,
-    quote: &dyn HolidayCalendar,
-    f: impl FnOnce(&CompositeCalendar<'_>) -> R,
-) -> R {
-    let calendars = [base, quote];
-    let joint = CompositeCalendar::new(&calendars);
-    f(&joint)
-}
-
-/// Adjust a date so it is a business day for both base and quote calendars.
-///
-/// Applies the business day convention on the true union calendar, where a day
-/// is a holiday if either currency market is closed.
-///
-/// # Arguments
-///
-/// * `date` - Unadjusted settlement or payment date to normalize.
-/// * `business_day_convention` - Business-day convention governing the roll direction and
-///   month-crossing behavior.
-/// * `base_cal_id` - Optional base-currency holiday calendar ID; `None` uses
-///   the weekends-only calendar.
-/// * `quote_cal_id` - Optional quote-currency holiday calendar ID; `None` uses
-///   the weekends-only calendar.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - Either calendar ID is not recognized (see [`resolve_calendar`])
-/// - Date adjustment fails
-pub fn adjust_joint_calendar(
-    date: Date,
-    business_day_convention: BusinessDayConvention,
-    base_cal_id: Option<&str>,
-    quote_cal_id: Option<&str>,
-) -> Result<Date> {
-    ResolvedCalendarPair::resolve(base_cal_id, quote_cal_id)?
-        .adjust_joint_calendar(date, business_day_convention)
-}
-
-fn add_business_days_on(start: Date, n_days: u32, calendar: &dyn HolidayCalendar) -> Result<Date> {
-    let n_days = i32::try_from(n_days)
-        .map_err(|_| Error::Validation("business-day offset exceeds the supported range".into()))?;
-    start.add_business_days(n_days, calendar)
-}
-
-/// Add N business days on all supplied calendars.
-///
-/// A day is counted only when it is a business day on both currency calendars
-/// and, when provided, the settlement calendar.
-///
-/// # T+0 behavior
-///
-/// With `n_days = 0` the function returns `start` **unadjusted**, even when
-/// `start` is not a business day on one or both calendars. T+0 (same-day)
-/// settlement pairs that require a good business day must adjust separately,
-/// e.g. via [`adjust_joint_calendar`].
-///
-/// # Arguments
-///
-/// * `start` - Trade or value date from which to advance; it is not counted as
-///   one of the requested business days.
-/// * `n_days` - Number of joint business days to add
-/// * `base_cal_id` - Optional calendar ID for the base currency
-/// * `quote_cal_id` - Optional calendar ID for the quote currency
-/// * `settlement_cal_id` - Optional third settlement calendar
-///
-/// # Returns
-///
-/// The date that is `n_days` joint business days after `start`.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - Either calendar ID is not recognized (see [`resolve_calendar`])
-/// - A counted step finds no joint business day within 100 calendar days
-///   (`InputError::AdjustmentFailed`), suggesting a calendar configuration issue
-/// - Advancing would exceed the supported date range
-///
-/// For FX cross pairs that do not involve USD (e.g. EUR/JPY), USD-good days
-/// matter because the cross settles as two USD legs. This helper implements the
-/// **strict (conservative) variant**: every counted day — including the
-/// intermediate day(s) **and the final value date** — must be good in USD as
-/// well as in the two named currencies. Passing `settlement_cal_id =
-/// Some("usny")` enforces that; `None` reproduces the two-calendar rule of
-/// [`add_joint_business_days`].
-///
-/// # Convention note
-///
-/// The market convention implemented by [`fx_spot_date`] is asymmetric: USD
-/// does not gate intermediate counted days, but it **does** gate the final value
-/// date. This helper is symmetric and stricter when a settlement calendar is
-/// supplied: that calendar gates every counted day, including intermediates
-/// and the final value date. Use [`fx_spot_date`] for the USD-aware market rule;
-/// use this helper only when symmetric joint-calendar counting is intended.
-///
-/// # Arguments
-///
-/// * `start` - Starting date
-/// * `n_days` - Number of joint business days to add
-pub fn add_joint_business_days(
-    start: Date,
-    n_days: u32,
-    base_cal_id: Option<&str>,
-    quote_cal_id: Option<&str>,
-    settlement_cal_id: Option<&str>,
-) -> Result<Date> {
-    let pair = ResolvedCalendarPair::resolve(base_cal_id, quote_cal_id)?;
-    match settlement_cal_id {
-        Some(id) => {
-            let calendars = [pair.base, pair.quote, calendar_by_id_strict(id)?];
-            add_business_days_on(start, n_days, &CompositeCalendar::new(&calendars))
-        }
-        None => pair.add_joint_business_days(start, n_days),
-    }
-}
 
 /// Roll a trade date to spot under the pair's contractual spot lag.
 ///
@@ -368,102 +214,12 @@ fn add_weekdays_on(start: Date, n_days: u32) -> Result<Date> {
     start.add_weekdays(n_days)
 }
 
-// Batch-optimized variants (pre-resolved calendars)
-
-/// Pre-resolved calendar pair for batch FX date operations.
-///
-/// Use this when processing many dates with the same calendar pair to avoid
-/// repeated registry lookups. The calendars are resolved once and can be
-/// reused for multiple operations.
-///
-/// # Example
-///
-/// ```
-/// # use finstack_quant_core::dates::{create_date, BusinessDayConvention};
-/// # use time::Month;
-/// # use finstack_quant_core::dates::fx::ResolvedCalendarPair;
-/// // Resolve once
-/// let cals = ResolvedCalendarPair::resolve(Some("nyse"), Some("gblo"))
-///     .expect("Valid calendars");
-///
-/// // Use many times without registry lookup overhead
-/// for _ in 0..1000 {
-///     let start = create_date(2024, Month::January, 15).unwrap();
-///     let _result = cals
-///         .add_joint_business_days(start, 2)
-///         .expect("valid joint calendar roll");
-/// }
-/// ```
-pub struct ResolvedCalendarPair {
-    base: &'static dyn HolidayCalendar,
-    quote: &'static dyn HolidayCalendar,
-}
-
-impl ResolvedCalendarPair {
-    /// Resolve a calendar pair from optional calendar IDs.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if either calendar ID is not recognized.
-    pub fn resolve(base_cal_id: Option<&str>, quote_cal_id: Option<&str>) -> Result<Self> {
-        let base = resolve_calendar(base_cal_id)?;
-        let quote = resolve_calendar(quote_cal_id)?;
-        Ok(Self { base, quote })
-    }
-
-    /// Check if a date is a business day on both calendars.
-    #[inline]
-    pub fn is_joint_business_day(&self, date: Date) -> bool {
-        self.base.is_business_day(date) && self.quote.is_business_day(date)
-    }
-
-    /// Add N business days using pre-resolved calendars.
-    ///
-    /// This is the batch-optimized variant of [`add_joint_business_days`]. Use this
-    /// when processing many dates with the same calendar pair to avoid repeated
-    /// registry lookups.
-    ///
-    /// # Arguments
-    ///
-    /// * `start` - Starting date
-    /// * `n_days` - Number of joint business days to add
-    ///
-    /// # Returns
-    ///
-    /// The date that is `n_days` joint business days after `start`.
-    pub fn add_joint_business_days(&self, start: Date, n_days: u32) -> Result<Date> {
-        with_joint_calendar(self.base, self.quote, |joint_calendar| {
-            add_business_days_on(start, n_days, joint_calendar)
-        })
-    }
-
-    /// Adjust a date using pre-resolved calendars.
-    ///
-    /// This is the batch-optimized variant of [`adjust_joint_calendar`].
-    ///
-    /// # Arguments
-    ///
-    /// * `date` - Date to adjust
-    /// * `business_day_convention` - Business day convention
-    ///
-    /// # Returns
-    ///
-    /// The adjusted date that is a business day on both calendars.
-    pub fn adjust_joint_calendar(
-        &self,
-        date: Date,
-        business_day_convention: BusinessDayConvention,
-    ) -> Result<Date> {
-        with_joint_calendar(self.base, self.quote, |joint_calendar| {
-            adjust(date, business_day_convention, joint_calendar)
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::create_date;
+    use crate::dates::{
+        add_joint_business_days, adjust_joint_calendar, create_date, WEEKENDS_ONLY,
+    };
     use time::Month;
 
     fn spot(
@@ -485,32 +241,6 @@ mod tests {
             usd_cal_id,
         )
     }
-
-    struct Jan29Holiday;
-    struct Jan30And31Holidays;
-
-    impl HolidayCalendar for Jan29Holiday {
-        fn is_holiday(&self, date: Date) -> bool {
-            date.year() == 2025 && date.month() == Month::January && date.day() == 29
-        }
-
-        fn is_business_day(&self, date: Date) -> bool {
-            !date.is_weekend() && !self.is_holiday(date)
-        }
-    }
-
-    impl HolidayCalendar for Jan30And31Holidays {
-        fn is_holiday(&self, date: Date) -> bool {
-            date.year() == 2025 && date.month() == Month::January && matches!(date.day(), 30 | 31)
-        }
-
-        fn is_business_day(&self, date: Date) -> bool {
-            !date.is_weekend() && !self.is_holiday(date)
-        }
-    }
-
-    static JAN_29_HOLIDAY: Jan29Holiday = Jan29Holiday;
-    static JAN_30_AND_31_HOLIDAYS: Jan30And31Holidays = Jan30And31Holidays;
 
     #[test]
     fn fx_date_range_boundaries_return_errors() {
@@ -739,25 +469,6 @@ mod tests {
         let result = add_joint_business_days(trade_date, 2, Some("unknown_cal"), None, None);
 
         assert!(result.is_err(), "Unknown calendar should error");
-    }
-
-    #[test]
-    fn test_adjust_joint_calendar_uses_union_calendar_modified_following() {
-        let pair = ResolvedCalendarPair {
-            base: &JAN_29_HOLIDAY,
-            quote: &JAN_30_AND_31_HOLIDAYS,
-        };
-
-        let date = create_date(2025, Month::January, 29).unwrap();
-        let adjusted = pair
-            .adjust_joint_calendar(date, BusinessDayConvention::ModifiedFollowing)
-            .expect("Union calendar adjustment should succeed");
-
-        let expected = create_date(2025, Month::January, 28).unwrap();
-        assert_eq!(
-            adjusted, expected,
-            "ModifiedFollowing must be evaluated on the joint calendar, not sequentially"
-        );
     }
 
     #[test]

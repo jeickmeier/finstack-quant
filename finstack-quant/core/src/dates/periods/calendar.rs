@@ -4,14 +4,14 @@ use super::*;
 
 /// Year convention used to bound and step period identifiers.
 #[derive(Clone, Copy, Debug)]
-pub(super) enum Calendar {
+pub(super) enum PeriodCalendar {
     /// Gregorian years with ISO 8601 weeks.
     Gregorian,
     /// Fiscal years starting on the configured month and day.
     Fiscal(FiscalConfig),
 }
 
-impl Calendar {
+impl PeriodCalendar {
     pub(super) fn is_fiscal(self) -> bool {
         matches!(self, Self::Fiscal(_))
     }
@@ -81,7 +81,7 @@ impl Calendar {
 /// Build the contiguous period plan for `range` under `calendar`.
 pub(super) fn build_periods_with_calendar(
     range: &str,
-    calendar: Calendar,
+    calendar: PeriodCalendar,
     actuals_until: Option<&str>,
 ) -> crate::Result<PeriodPlan> {
     let (start, end) = parse_range(range, calendar)?;

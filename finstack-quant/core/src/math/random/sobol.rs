@@ -90,7 +90,7 @@ fn hash_combine(seed: u64, value: u64) -> u32 {
 /// # Example
 ///
 /// ```rust
-/// use finstack_quant_core::math::random::sobol::SobolRng;
+/// use finstack_quant_core::math::random::SobolRng;
 ///
 /// // Create 3D Sobol sequence with Owen scrambling
 /// let mut sobol = SobolRng::try_new(3, 12345).expect("valid dimension");

@@ -15,8 +15,7 @@ use finstack_quant_analytics::correlation::{
     validate_correlation_matrix as analytics_validate, Error,
 };
 use finstack_quant_core::math::linalg::{
-    check_correlation_matrix as core_validate,
-    validate_correlation_matrix as core_validate_detailed, CorrelationError,
+    validate_correlation_matrix as core_validate, CorrelationError,
 };
 use serde_json::json;
 
@@ -27,9 +26,8 @@ fn assert_detailed_rejection(matrix: &[f64], n: usize, expected: impl FnOnce(&Er
         "unexpected analytics error: {analytics_error:?}"
     );
 
-    let core_error = core_validate_detailed(matrix, n).expect_err("core should reject input");
+    let core_error = core_validate(matrix, n).expect_err("core should reject input");
     assert_eq!(analytics_error, core_error);
-    assert!(core_validate(matrix, n).is_err());
 }
 
 /// Cases spanning both former divergence directions plus the boundaries.
@@ -118,7 +116,7 @@ fn diagonal_within_tolerance_is_accepted_by_both() {
 fn diagonal_nan_reports_out_of_bounds_from_both_detailed_validators() {
     let matrix = [f64::NAN];
     let analytics_error = analytics_validate(&matrix, 1).expect_err("analytics should reject NaN");
-    let core_error = core_validate_detailed(&matrix, 1).expect_err("core should reject NaN");
+    let core_error = core_validate(&matrix, 1).expect_err("core should reject NaN");
 
     for error in [&analytics_error, &core_error] {
         assert!(matches!(
@@ -126,7 +124,6 @@ fn diagonal_nan_reports_out_of_bounds_from_both_detailed_validators() {
             Error::OutOfBounds { i: 0, j: 0, value } if value.is_nan()
         ));
     }
-    assert!(core_validate(&matrix, 1).is_err());
 }
 
 #[test]

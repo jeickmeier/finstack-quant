@@ -16,7 +16,7 @@
 
 use crate::monte_carlo::traits::RandomStream;
 
-pub use finstack_quant_core::math::random::sobol::{SobolRng, MAX_SOBOL_DIMENSION};
+pub use finstack_quant_core::math::random::{SobolRng, MAX_SOBOL_DIMENSION};
 
 impl RandomStream for SobolRng {
     /// Sobol sequences do not admit independent sub-streams. Always returns

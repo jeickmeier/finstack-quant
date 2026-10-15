@@ -2,7 +2,10 @@
 
 use super::*;
 
-pub(super) fn parse_range(s: &str, calendar: Calendar) -> crate::Result<(PeriodId, PeriodId)> {
+pub(super) fn parse_range(
+    s: &str,
+    calendar: PeriodCalendar,
+) -> crate::Result<(PeriodId, PeriodId)> {
     let s = s.trim();
     let (lhs, rhs_raw) = s
         .split_once("..")
@@ -63,7 +66,7 @@ fn parse_designated_id(
     s: &str,
     split_index: usize,
     kind: PeriodKind,
-    calendar: Calendar,
+    calendar: PeriodCalendar,
 ) -> crate::Result<PeriodId> {
     let explicit_fiscal = s.starts_with("FY");
     let year_raw = s[..split_index]
@@ -87,7 +90,7 @@ fn parse_designated_id(
 }
 
 /// Parse one period id; unprefixed ids take the fiscal flag of `calendar`.
-pub(super) fn parse_id(s: &str, calendar: Calendar) -> crate::Result<PeriodId> {
+pub(super) fn parse_id(s: &str, calendar: PeriodCalendar) -> crate::Result<PeriodId> {
     let s = s.trim();
     // Normalize to uppercase to accept lowercase inputs.
     let s = s.to_ascii_uppercase();
@@ -146,7 +149,11 @@ pub(super) fn checked_year_offset(year: i32, offset: i32) -> crate::Result<i32> 
 }
 
 /// Step one period forward or backward using the year capacity of `calendar`.
-pub(super) fn step(mut id: PeriodId, calendar: Calendar, forward: bool) -> crate::Result<PeriodId> {
+pub(super) fn step(
+    mut id: PeriodId,
+    calendar: PeriodCalendar,
+    forward: bool,
+) -> crate::Result<PeriodId> {
     let max = calendar.max_index(id.year, id.kind)?;
     if id.index == 0 || id.index > max {
         return Err(invalid_period(

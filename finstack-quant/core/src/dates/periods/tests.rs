@@ -528,8 +528,8 @@ fn shift_matches_repeated_stepping_and_rolls_years() {
         let mut forward = id;
         let mut backward = id;
         for n in 1..=60 {
-            forward = step(forward, Calendar::Gregorian, true).expect("next");
-            backward = step(backward, Calendar::Gregorian, false).expect("prev");
+            forward = step(forward, PeriodCalendar::Gregorian, true).expect("next");
+            backward = step(backward, PeriodCalendar::Gregorian, false).expect("prev");
             assert_eq!(id.shift(n), Ok(forward), "{code} +{n}");
             assert_eq!(id.shift(-n), Ok(backward), "{code} -{n}");
         }

@@ -232,7 +232,7 @@ impl FactorAccumulator {
     }
 
     fn total(&self, b: FactorBucket) -> f64 {
-        self.buckets[b as usize].current()
+        self.buckets[b as usize].total()
     }
 
     fn add_converted(

@@ -1276,22 +1276,25 @@ fn test_periods_per_year() {
     assert_eq!(
         PeriodId::quarter(2025, 1)
             .expect("valid period fixture")
+            .kind()
             .periods_per_year(),
         4
     );
     assert_eq!(
         PeriodId::month(2025, 1)
             .expect("valid period fixture")
+            .kind()
             .periods_per_year(),
         12
     );
     assert_eq!(
         PeriodId::half(2025, 1)
             .expect("valid period fixture")
+            .kind()
             .periods_per_year(),
         2
     );
-    assert_eq!(PeriodId::annual(2025).periods_per_year(), 1);
+    assert_eq!(PeriodId::annual(2025).kind().periods_per_year(), 1);
 }
 
 #[test]

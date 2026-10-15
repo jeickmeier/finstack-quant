@@ -179,8 +179,8 @@ pub(super) fn count_business_days_cached(cal: &Calendar, start: Date, end: Date)
 mod tests {
     use super::*;
     use crate::dates::calendar::rule::Rule;
-    use crate::dates::calendar::{Calendar, WeekendRule, BSE, CNBE, NYSE, TARGET2};
-    use crate::dates::HolidayCalendar;
+    use crate::dates::calendar::{BSE, CNBE, NYSE, TARGET2};
+    use crate::dates::{Calendar, HolidayCalendar, WeekendRule};
     use time::Month;
 
     fn date(year: i32, month: Month, day: u8) -> Date {

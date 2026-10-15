@@ -1370,7 +1370,7 @@ fn validate_simm_correlations_psd(p: &SimmParams) -> Result<()> {
             p.commodity_inter_bucket_correlations.len()
         )));
     }
-    finstack_quant_core::math::linalg::check_correlation_matrix(
+    finstack_quant_core::math::linalg::validate_correlation_matrix(
         &p.commodity_inter_bucket_correlations,
         n,
     )
@@ -1415,7 +1415,7 @@ where
             matrix[j * n + i] = rho;
         }
     }
-    finstack_quant_core::math::linalg::check_correlation_matrix(&matrix, n).map_err(|_| {
+    finstack_quant_core::math::linalg::validate_correlation_matrix(&matrix, n).map_err(|_| {
         Error::Validation(format!(
             "SIMM registry {version:?}: {matrix_name} is not a valid correlation matrix (failed diagonal / range / symmetry / PSD check — see finstack_quant_core::math::linalg::validate_correlation_matrix)"
         ))

@@ -314,7 +314,7 @@ impl PeriodId {
     }
 
     fn try_new(year: i32, index: u16, kind: PeriodKind) -> crate::Result<Self> {
-        let max = Calendar::Gregorian.max_index(year, kind)?;
+        let max = PeriodCalendar::Gregorian.max_index(year, kind)?;
         if !(1..=max).contains(&index) {
             return Err(invalid_period(
                 &format!("{kind} {year} index {index}"),
@@ -358,25 +358,6 @@ impl PeriodId {
     #[must_use]
     pub fn is_fiscal(&self) -> bool {
         self.fiscal
-    }
-
-    /// Get the number of periods per year for this frequency.
-    ///
-    /// Same table as [`PeriodKind::periods_per_year`]: Daily 252 (trading
-    /// days), Weekly 52, Monthly 12, Quarterly 4, Semi-Annual 2, Annual 1.
-    ///
-    /// # Example
-    /// ```
-    /// use finstack_quant_core::dates::PeriodId;
-    ///
-    /// let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    /// assert_eq!(q1.periods_per_year(), 4);
-    ///
-    /// let m1 = PeriodId::month(2025, 1).expect("valid period fixture");
-    /// assert_eq!(m1.periods_per_year(), 12);
-    /// ```
-    pub fn periods_per_year(&self) -> u16 {
-        self.kind.periods_per_year()
     }
 
     /// Step forward to the next period.
@@ -466,7 +447,7 @@ impl PeriodId {
         let max = if self.fiscal {
             self.kind.capacity()
         } else {
-            Calendar::Gregorian.max_index(self.year, self.kind)?
+            PeriodCalendar::Gregorian.max_index(self.year, self.kind)?
         };
         if !(1..=max).contains(&self.index) {
             return Err(invalid_period(
@@ -546,7 +527,7 @@ impl PeriodId {
     /// * `config` - Fiscal-year start that sizes the fiscal year's week and
     ///   day capacity (a fiscal year holds 365 or 366 days and 53 weeks).
     pub fn next_fiscal(self, config: FiscalConfig) -> crate::Result<Self> {
-        let mut next = step(self, Calendar::Fiscal(config), true)?;
+        let mut next = step(self, PeriodCalendar::Fiscal(config), true)?;
         next.fiscal = true;
         Ok(next)
     }
@@ -565,7 +546,7 @@ impl PeriodId {
     /// * `config` - Fiscal-year start that sizes the preceding fiscal year's
     ///   week and day capacity.
     pub fn prev_fiscal(self, config: FiscalConfig) -> crate::Result<Self> {
-        let mut prev = step(self, Calendar::Fiscal(config), false)?;
+        let mut prev = step(self, PeriodCalendar::Fiscal(config), false)?;
         prev.fiscal = true;
         Ok(prev)
     }
@@ -829,7 +810,7 @@ pub struct PeriodPlan {
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn build_periods(range: &str, actuals_until: Option<&str>) -> crate::Result<PeriodPlan> {
-    build_periods_with_calendar(range, Calendar::Gregorian, actuals_until)
+    build_periods_with_calendar(range, PeriodCalendar::Gregorian, actuals_until)
 }
 
 /// Build fiscal periods from a range expression with custom fiscal year configuration.
@@ -861,7 +842,7 @@ pub fn build_fiscal_periods(
     fiscal_config: FiscalConfig,
     actuals_until: Option<&str>,
 ) -> crate::Result<PeriodPlan> {
-    build_periods_with_calendar(range, Calendar::Fiscal(fiscal_config), actuals_until)
+    build_periods_with_calendar(range, PeriodCalendar::Fiscal(fiscal_config), actuals_until)
 }
 
 impl PartialOrd for PeriodId {
@@ -889,8 +870,8 @@ impl Ord for PeriodId {
 
         // Mixed frequencies in the same year: order by actual calendar span
         // (start date, then end date) using Gregorian bounds.
-        let self_bounds = Calendar::Gregorian.bounds(self.year, self.kind, self.index);
-        let other_bounds = Calendar::Gregorian.bounds(other.year, other.kind, other.index);
+        let self_bounds = PeriodCalendar::Gregorian.bounds(self.year, self.kind, self.index);
+        let other_bounds = PeriodCalendar::Gregorian.bounds(other.year, other.kind, other.index);
 
         // Malformed PeriodId still needs a total ordering.
         let (Ok((self_start, self_end)), Ok((other_start, other_end))) =
@@ -938,7 +919,7 @@ impl fmt::Display for PeriodId {
 impl FromStr for PeriodId {
     type Err = crate::error::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse_id(s, Calendar::Gregorian)
+        parse_id(s, PeriodCalendar::Gregorian)
     }
 }
 

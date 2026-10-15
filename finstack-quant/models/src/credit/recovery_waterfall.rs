@@ -142,7 +142,7 @@ pub fn allocate_recovery(
             .unwrap_or(0.0)
             .min(total_claim);
         total_collateral_sum.add(collateral_recovery);
-        if !total_collateral_sum.current().is_finite() {
+        if !total_collateral_sum.total().is_finite() {
             return Err(validation_error(
                 "aggregate collateral recovery must be finite",
             ));

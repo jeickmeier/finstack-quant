@@ -1,9 +1,8 @@
 //! Shared observation schedule generation for realized-variance instruments.
 
-use finstack_quant_core::dates::fx::ResolvedCalendarPair;
 use finstack_quant_core::dates::{
-    adjust, BusinessDayConvention, Date, DateExt, HolidayCalendar, ScheduleBuilder, StubKind,
-    Tenor, TenorUnit,
+    adjust, BusinessDayConvention, Date, DateExt, HolidayCalendar, ResolvedCalendarPair,
+    ScheduleBuilder, StubKind, Tenor, TenorUnit,
 };
 
 /// Calendar convention for a realized-variance observation schedule.

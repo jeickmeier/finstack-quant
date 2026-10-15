@@ -711,7 +711,7 @@ impl CompiledExpr {
             Function::CumMin => Self::eval_cum_min_into(arg_slices, out),
             Function::CumMax => Self::eval_cum_max_into(arg_slices, out),
             Function::Rank => Self::eval_rank_into(arg_slices, out),
-            Function::Quantile => Self::eval_quantile_into(arg_slices, out),
+            Function::Quantile => self.eval_quantile_into(arg_slices, out),
             Function::EwmStd => Self::eval_ewm_variance_into(arg_slices, out, true),
             Function::EwmVar => Self::eval_ewm_variance_into(arg_slices, out, false),
             Function::Abs => Self::eval_unary_into(arg_slices, out, f64::abs),

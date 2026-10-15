@@ -19,7 +19,7 @@
 //!
 //! # Valuation-Date Cutoff (IMPORTANT)
 //!
-//! [`npv`] and the [`Discountable`] trait follow
+//! [`npv`] follows
 //! **market-standard pricing semantics**: cashflows dated **on or before** the
 //! valuation date are excluded (only strictly-future flows are discounted).
 //! A flow that has already paid is not part of the instrument's present value.
@@ -74,82 +74,6 @@ use crate::dates::DayCount;
 use crate::market_data::traits::Discounting;
 use crate::math::NeumaierAccumulator;
 use crate::money::Money;
-
-/// Objects that can be present-valued against a `Discount` curve.
-///
-/// Provides a unified interface for NPV calculations across different
-/// cashflow representations and instrument types. Implemented for any
-/// type that implements `AsRef<[(Date, Money)]>` (including `&[(..)]`
-/// and `Vec<(..)>`).
-///
-/// # Required Methods
-///
-/// Implementors must provide:
-/// - [`npv`](Self::npv): Compute present value against a discount curve
-///
-/// # Provided Implementations
-///
-/// This trait is automatically implemented for any type `T` where
-/// `T: AsRef<[(Date, Money)]>`, including:
-/// - `&[(Date, Money)]`
-/// - `Vec<(Date, Money)>`
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::cashflow::Discountable;
-/// use finstack_quant_core::market_data::term_structures::DiscountCurve;
-/// use finstack_quant_core::market_data::traits::Discounting;
-/// use finstack_quant_core::dates::{Date, DayCount};
-/// use finstack_quant_core::money::Money;
-/// use finstack_quant_core::currency::Currency;
-/// use time::Month;
-///
-/// let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
-/// let curve = DiscountCurve::builder("USD-OIS")
-///     .base_date(base)
-///     .knots([(0.0, 1.0), (1.0, 0.95)])
-///     .build()?;
-///
-/// let flows = vec![(
-///     Date::from_calendar_date(2026, Month::January, 1).expect("Valid date"),
-///     Money::from((100_i64, Currency::USD)),
-/// )];
-///
-/// // Use the trait method
-/// let pv = flows.npv(&curve, base)?;
-/// # Ok::<(), finstack_quant_core::Error>(())
-/// ```
-pub trait Discountable: Send + Sync {
-    /// Compute present value using the given discount curve.
-    ///
-    /// Follows market-standard pricing semantics: flows dated on or before
-    /// `base` are excluded. See the module docs ("Valuation-Date Cutoff").
-    ///
-    /// # Arguments
-    ///
-    /// * `disc` - Discount curve that supplies discount factors using its own
-    ///   base date, day-count convention, and time-axis calendar.
-    /// * `base` - Valuation date to which strictly future cashflows are
-    ///   discounted; flows dated on or before it are excluded.
-    ///
-    /// # Returns
-    ///
-    /// Present value of all strictly-future cashflows discounted to the base date.
-    ///
-    /// # Errors
-    ///
-    /// The blanket implementation for `AsRef<[(Date, Money)]>` returns `Err` when:
-    /// - [`InputError::TooFewPoints`](crate::error::InputError::TooFewPoints): the
-    ///   slice is empty, so there is no currency for a zero result
-    /// - Day count calculation fails on the curve's time axis
-    /// - [`Error::CurrencyMismatch`](crate::Error::CurrencyMismatch): the flows
-    ///   do not share one currency
-    ///
-    /// An implementor that already carries a currency returns zero in that
-    /// currency when every flow is excluded from the present value.
-    fn npv(&self, disc: &dyn Discounting, base: Date) -> crate::Result<Money>;
-}
 
 /// Discount factor for a flat, continuously compounded rate over `years`.
 ///
@@ -491,19 +415,6 @@ mod hardening_tests {
     }
 }
 
-/// Compute NPV of dated `Money` flows using a discount curve.
-///
-/// Discounts each cashflow to the base date using the provided curve.
-/// All flows must be in the same currency for the calculation to succeed.
-impl<T> Discountable for T
-where
-    T: AsRef<[(Date, Money)]> + Send + Sync,
-{
-    fn npv(&self, disc: &dyn Discounting, base: Date) -> crate::Result<Money> {
-        npv(disc, base, self.as_ref())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -627,7 +538,7 @@ mod tests {
     }
 
     #[test]
-    fn tuples_discountable_paths_through() {
+    fn tuples_npv_sums_future_flows() {
         let curve = ZeroRateCurve {
             id: CurveId::new("USD-OIS"),
         };
@@ -637,9 +548,7 @@ mod tests {
             (pay, Money::from((10_i64, crate::currency::Currency::USD))),
             (pay, Money::from((5_i64, crate::currency::Currency::USD))),
         ];
-        let pv = flows
-            .npv(&curve, base)
-            .expect("NPV calculation should succeed in test");
+        let pv = npv(&curve, base, &flows).expect("NPV calculation should succeed in test");
         assert!((pv.amount() - 15.0).abs() < 1e-12);
     }
 

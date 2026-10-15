@@ -193,10 +193,4 @@ impl NeumaierAccumulator {
     pub fn total(self) -> f64 {
         self.sum + self.c
     }
-
-    /// Return the current sum without consuming the accumulator.
-    #[inline]
-    pub fn current(&self) -> f64 {
-        self.sum + self.c
-    }
 }

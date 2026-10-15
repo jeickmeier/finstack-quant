@@ -348,7 +348,7 @@ impl Repo {
         calendar_id: impl Into<CalendarId>,
         discount_curve_id: impl Into<CurveId>,
     ) -> Result<Self> {
-        use finstack_quant_core::dates::calendar::calendar_by_id;
+        use finstack_quant_core::dates::calendar_by_id;
 
         let defaults =
             embedded_registry()?.repo_defaults(repo_specs_id(cash_amount.currency())?)?;

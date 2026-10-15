@@ -3,8 +3,8 @@
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{
-    adjust, available_calendars, canonical_calendar_id, fx::resolve_calendar,
-    BusinessDayConvention, CalendarMetadata, HolidayCalendar, WeekendRule,
+    adjust, available_calendars, canonical_calendar_id, resolve_calendar, BusinessDayConvention,
+    CalendarMetadata, HolidayCalendar, WeekendRule,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyType};

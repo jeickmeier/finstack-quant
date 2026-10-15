@@ -88,35 +88,7 @@ pub fn joint_probabilities(
     p2: f64,
     correlation: f64,
 ) -> crate::Result<(f64, f64, f64, f64)> {
-    validate_inputs(p1, p2, Some(correlation))?;
-
-    let var1 = p1 * (1.0 - p1);
-    let var2 = p2 * (1.0 - p2);
-
-    if var1 < DEGENERATE_VARIANCE_THRESHOLD || var2 < DEGENERATE_VARIANCE_THRESHOLD {
-        // Degenerate Bernoulli: correlation is unidentified, so use independence.
-        return Ok((
-            p1 * p2,
-            p1 * (1.0 - p2),
-            (1.0 - p1) * p2,
-            (1.0 - p1) * (1.0 - p2),
-        ));
-    }
-
-    // Clamp correlation to Fréchet-Hoeffding bounds to ensure valid probabilities
-    let (rho_min, rho_max) = correlation_bounds(p1, p2)?;
-    let rho = correlation.clamp(rho_min, rho_max);
-
-    let cov = rho * (var1 * var2).sqrt();
-
-    // Joint probabilities via Bernoulli coupling
-    // With correlation clamped to feasible bounds, these are guaranteed to be in [0, 1]
-    let p11 = p1 * p2 + cov;
-    let p10 = p1 * (1.0 - p2) - cov;
-    let p01 = (1.0 - p1) * p2 - cov;
-    let p00 = (1.0 - p1) * (1.0 - p2) + cov;
-
-    Ok((p11, p10, p01, p00))
+    Ok(CorrelatedBernoulli::new(p1, p2, correlation)?.joint_probabilities())
 }
 
 /// Correlated Bernoulli distribution for scenario generation.
@@ -163,9 +135,30 @@ impl CorrelatedBernoulli {
     pub fn new(p1: f64, p2: f64, correlation: f64) -> crate::Result<Self> {
         validate_inputs(p1, p2, Some(correlation))?;
         let requested_correlation = correlation;
+        let var1 = p1 * (1.0 - p1);
+        let var2 = p2 * (1.0 - p2);
+
+        if var1 < DEGENERATE_VARIANCE_THRESHOLD || var2 < DEGENERATE_VARIANCE_THRESHOLD {
+            return Ok(Self {
+                p1,
+                p2,
+                requested_correlation,
+                correlation: 0.0,
+                p11: p1 * p2,
+                p10: p1 * (1.0 - p2),
+                p01: (1.0 - p1) * p2,
+                p00: (1.0 - p1) * (1.0 - p2),
+            });
+        }
+
         let (rho_min, rho_max) = correlation_bounds(p1, p2)?;
         let effective_correlation = requested_correlation.clamp(rho_min, rho_max);
-        let (p11, p10, p01, p00) = joint_probabilities(p1, p2, requested_correlation)?;
+        let cov = effective_correlation * (var1 * var2).sqrt();
+        let p11 = p1 * p2 + cov;
+        let p10 = p1 * (1.0 - p2) - cov;
+        let p01 = (1.0 - p1) * p2 - cov;
+        let p00 = (1.0 - p1) * (1.0 - p2) + cov;
+
         Ok(Self {
             p1,
             p2,

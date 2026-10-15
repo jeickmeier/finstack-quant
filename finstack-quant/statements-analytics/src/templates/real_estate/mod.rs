@@ -573,7 +573,7 @@ pub fn add_rent_roll(
     let ppy = builder
         .periods_slice()
         .first()
-        .map(|p| p.id.periods_per_year() as usize)
+        .map(|p| p.id.kind().periods_per_year() as usize)
         .unwrap_or(4);
 
     for lease in leases {

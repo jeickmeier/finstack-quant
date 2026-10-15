@@ -5,7 +5,7 @@ use finstack_quant_core::dates::fx::fx_spot_date;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, Tenor};
 use finstack_quant_core::Result;
 
-pub use finstack_quant_core::dates::fx::{
+pub use finstack_quant_core::dates::{
     add_joint_business_days, adjust_joint_calendar, ResolvedCalendarPair,
 };
 

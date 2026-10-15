@@ -45,7 +45,7 @@
 //! are exact in f64 (33-bit numerator, power-of-two divisor), so all
 //! comparisons below use exact `f64` equality.
 
-use finstack_quant_core::math::random::sobol::{SobolRng, MAX_SOBOL_DIMENSION};
+use finstack_quant_core::math::random::{SobolRng, MAX_SOBOL_DIMENSION};
 use std::path::Path;
 
 /// One parsed row of the Joe & Kuo table.

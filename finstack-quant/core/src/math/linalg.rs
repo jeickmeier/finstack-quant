@@ -1115,51 +1115,6 @@ pub fn cholesky_solve(chol: &[f64], b: &[f64], x: &mut [f64]) -> Result<()> {
 
     Ok(())
 }
-/// Validate that a matrix is a valid correlation matrix.
-///
-/// Checks:
-/// 1. Diagonal elements are 1.0
-/// 2. Off-diagonal elements are in [-1, 1]
-/// 3. Matrix is symmetric
-/// 4. Matrix is positive semi-definite (via Cholesky)
-///
-/// `matrix` is row-major and must contain exactly `n * n` elements. The
-/// diagonal and symmetry checks use this module's numerical tolerances, rather
-/// than requiring exact binary equality. Positive semidefiniteness is checked
-/// through the correlation-specific pivoted Cholesky path, allowing nearly
-/// rank-deficient but otherwise valid correlation matrices.
-///
-/// # Errors
-///
-/// Returns an error if the matrix shape is wrong; a diagonal differs from one
-/// beyond tolerance; an off-diagonal entry is outside `[-1, 1]`; the matrix is
-/// not symmetric within tolerance; or the Cholesky check finds it not positive
-/// semidefinite.
-///
-/// # Example
-///
-/// ```
-/// use finstack_quant_core::math::linalg::check_correlation_matrix;
-///
-/// let valid = vec![1.0, 0.5, 0.5, 1.0];
-/// assert!(check_correlation_matrix(&valid, 2).is_ok());
-///
-/// let invalid = vec![1.0, 1.5, 1.5, 1.0]; // Correlation > 1
-/// assert!(check_correlation_matrix(&invalid, 2).is_err());
-/// ```
-///
-/// # Arguments
-///
-/// * `matrix` - Candidate correlation matrix in row-major order with exactly
-///   `n * n` finite entries.
-/// * `n` - Matrix dimension used to interpret the flat row-major buffer.
-pub fn check_correlation_matrix(matrix: &[f64], n: usize) -> Result<()> {
-    validate_correlation_matrix(matrix, n).map_err(|error| match error {
-        CorrelationError::InvalidSize { .. } => error::InputError::DimensionMismatch.into(),
-        _ => error::InputError::Invalid.into(),
-    })
-}
-
 /// Validate a flattened row-major correlation matrix with located diagnostics.
 ///
 /// Checks matrix size, unit diagonal, coefficient bounds, symmetry, and

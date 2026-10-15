@@ -403,7 +403,7 @@ impl<'a> ScheduleBuilder<'a> {
 
     /// Internal implementation of schedule building.
     fn build_impl(self) -> crate::Result<Schedule> {
-        use crate::dates::calendar::calendar_by_id_strict;
+        use crate::dates::calendar_by_id_strict;
 
         let mut warnings: Vec<ScheduleWarning> = Vec::new();
 

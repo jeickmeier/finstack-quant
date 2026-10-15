@@ -98,16 +98,6 @@ impl Calendar {
         self
     }
 
-    /// Get the calendar identifier.
-    pub const fn id(&self) -> &'static str {
-        self.id
-    }
-
-    /// Get the calendar display name.
-    pub const fn name(&self) -> &'static str {
-        self.name
-    }
-
     /// Evaluates the raw holiday rules without warnings or weekend overrides.
     pub(super) fn holiday_from_rules(&self, date: Date) -> bool {
         self.rules.iter().any(|rule| rule.applies(date))

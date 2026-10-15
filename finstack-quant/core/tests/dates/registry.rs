@@ -32,7 +32,7 @@ fn resolution_is_case_insensitive_and_unknown_is_none() {
 
 #[test]
 fn typed_id_resolves() {
-    let id = CalendarId::from(TARGET2.id());
+    let id = CalendarId::from(TARGET2.id);
     let cal = calendar_by_id(id.as_str()).expect("TARGET2 resolves");
     assert!(cal.is_holiday(make_date(2025, 1, 1)));
 }
@@ -40,9 +40,9 @@ fn typed_id_resolves() {
 #[test]
 fn strict_many_resolution_preserves_order_and_builds_composite() {
     let ids = [
-        CalendarId::from(GBLO.id()),
-        CalendarId::from(TARGET2.id()),
-        CalendarId::from(NYSE.id()),
+        CalendarId::from(GBLO.id),
+        CalendarId::from(TARGET2.id),
+        CalendarId::from(NYSE.id),
     ];
     let calendars = calendars_by_ids(&ids).expect("known calendars resolve");
     assert_eq!(calendars.len(), 3);
@@ -58,9 +58,9 @@ fn strict_many_resolution_preserves_order_and_builds_composite() {
 #[test]
 fn strict_many_resolution_rejects_unknown_ids() {
     let ids = [
-        CalendarId::from(TARGET2.id()),
+        CalendarId::from(TARGET2.id),
         CalendarId::from("unknown_calendar"),
-        CalendarId::from(GBLO.id()),
+        CalendarId::from(GBLO.id),
     ];
     let error = calendars_by_ids(&ids)
         .err()

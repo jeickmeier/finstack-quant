@@ -498,7 +498,7 @@ fn non_finite_speed_multiplier_rejected() {
 fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
     use finstack_quant_cashflows::builder::schedule::CashFlowMeta;
     use finstack_quant_cashflows::builder::Notional;
-    use finstack_quant_core::cashflow::{CFKind, CashFlow, Discountable};
+    use finstack_quant_core::cashflow::{CFKind, CashFlow};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
