@@ -11,6 +11,7 @@ use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
+use crate::bindings::macros::wire_methods;
 use crate::errors::core_to_py;
 
 /// Convert Python ``[(date, Money), ...]`` into Rust dated flows.
@@ -75,6 +76,8 @@ impl PyPeriodAggregation {
         Ok(out)
     }
 }
+
+wire_methods!(PyPeriodAggregation, PeriodAggregation, "PeriodAggregation");
 
 #[pymethods]
 impl PyPeriodAggregation {
@@ -147,35 +150,6 @@ impl PyPeriodAggregation {
     /// Number of non-empty periods.
     fn __len__(&self) -> usize {
         self.inner.len()
-    }
-
-    /// Serialize to JSON (``{period: {currency: money}}``).
-    #[allow(clippy::wrong_self_convention)]
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| {
-            crate::errors::serde_json_to_py(e, "failed to serialize PeriodAggregation")
-        })
-    }
-
-    /// Deserialize from the JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed or a currency key differs from its Money currency.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str::<PeriodAggregation>(json)
-            .map(Self::from_inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid PeriodAggregation JSON"))
-    }
-
-    /// Support ``pickle`` through the JSON wire form.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
     /// Tidy ``pandas.DataFrame`` with columns ``period, currency, amount``.

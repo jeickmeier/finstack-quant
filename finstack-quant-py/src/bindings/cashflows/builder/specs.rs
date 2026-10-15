@@ -437,21 +437,15 @@ pub struct PyFloatingRateFallback {
 #[pymethods]
 impl PyFloatingRateFallback {
     /// Fail when required observations need missing market data (default).
-    #[allow(non_snake_case)]
     #[classattr]
-    fn ERROR() -> Self {
-        Self {
-            inner: FloatingRateFallback::Error,
-        }
-    }
+    const ERROR: Self = Self {
+        inner: FloatingRateFallback::Error,
+    };
     /// Use a zero index rate for eligible missing market data (explicit opt-in).
-    #[allow(non_snake_case)]
     #[classattr]
-    fn SPREAD_ONLY() -> Self {
-        Self {
-            inner: FloatingRateFallback::SpreadOnly,
-        }
-    }
+    const SPREAD_ONLY: Self = Self {
+        inner: FloatingRateFallback::SpreadOnly,
+    };
 
     /// Use ``rate`` (decimal annual rate, e.g. ``0.045``) as the index component
     /// for eligible missing market data. Supplied historical gaps and genuine
@@ -1314,13 +1308,10 @@ wire_methods!(PyAmortizationSpec, AmortizationSpec, "AmortizationSpec");
 #[pymethods]
 impl PyAmortizationSpec {
     /// No amortization (bullet).
-    #[allow(non_snake_case)]
     #[classattr]
-    fn NONE() -> Self {
-        Self {
-            inner: AmortizationSpec::None,
-        }
-    }
+    const NONE: Self = Self {
+        inner: AmortizationSpec::None,
+    };
 
     /// Linear paydown towards ``final_notional`` over all coupon periods.
     #[staticmethod]
@@ -1654,13 +1645,10 @@ wire_methods!(PyFeeBase, FeeBase, "FeeBase");
 #[pymethods]
 impl PyFeeBase {
     /// Fee accrues on the drawn outstanding balance.
-    #[allow(non_snake_case)]
     #[classattr]
-    fn DRAWN() -> Self {
-        Self {
-            inner: FeeBase::Drawn,
-        }
-    }
+    const DRAWN: Self = Self {
+        inner: FeeBase::Drawn,
+    };
 
     /// Fee accrues on undrawn = max(commitment - outstanding, 0).
     #[staticmethod]
