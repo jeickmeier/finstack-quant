@@ -29,7 +29,7 @@ use crate::errors::core_to_py;
 /// 0.02
 #[pyclass(
     name = "InflationCurve",
-    module = "finstack_quant.core.market_data.curves",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]
@@ -145,28 +145,6 @@ impl PyInflationCurve {
             TimePoint::Years(t) => Ok(self.inner.cpi(t)),
             TimePoint::Date(d) => self.inner.cpi_on_date(d).map_err(core_to_py),
         }
-    }
-
-    /// CPI level on a date using the curve day count (no indexation lag).
-    ///
-    /// Parameters
-    /// ----------
-    /// date : datetime.date | str
-    ///     Target date on or after ``base_date``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the year fraction cannot be computed.
-    #[pyo3(text_signature = "(self, date)")]
-    fn cpi_on_date(&self, date: &Bound<'_, PyAny>) -> PyResult<f64> {
-        self.inner
-            .cpi_on_date(py_to_date(date)?)
-            .map_err(core_to_py)
     }
 
     /// CPI level at year fraction ``t`` with the configured indexation lag applied.

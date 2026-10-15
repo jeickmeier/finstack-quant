@@ -13,7 +13,7 @@ import math
 
 import pytest
 
-from finstack_quant.core.market_data.curves import DiscountCurve, HazardCurve
+from finstack_quant.core.market_data import DiscountCurve, HazardCurve
 from finstack_quant.margin import (
     CsaSpec,
     ExposureProfile,

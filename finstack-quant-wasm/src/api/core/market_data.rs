@@ -42,6 +42,26 @@ pub(crate) fn parse_extrapolation(s: &str) -> Result<ExtrapolationPolicy, JsValu
     s.parse::<ExtrapolationPolicy>().map_err(to_js_err)
 }
 
+/// Curve query point: either a year fraction (`number`) or an ISO date (`string`).
+pub(crate) enum TimePoint {
+    Years(f64),
+    Date(finstack_quant_core::dates::Date),
+}
+
+/// Parse a curve query point (`number` year fraction or ISO `"YYYY-MM-DD"` date string).
+pub(crate) fn js_time_point(value: &JsValue, label: &str) -> Result<TimePoint, JsValue> {
+    if let Some(t) = value.as_f64() {
+        return Ok(TimePoint::Years(t));
+    }
+    if let Some(s) = value.as_string() {
+        return parse_iso_date(&s).map(TimePoint::Date);
+    }
+    Err(crate::utils::input::invalid_type(
+        label,
+        "expected a number (years) or ISO date string",
+    ))
+}
+
 /// Discount factor curve for present-value calculations.
 ///
 /// Built from `(time, discount_factor)` pillars where `time` is a year
@@ -194,18 +214,43 @@ impl JsDiscountCurve {
         })
     }
 
-    /// Discount factor at year fraction `t`.
-    /// @param t - Time from the curve base date in years.
+    /// Discount factor at year fraction `t` or on an ISO-8601 date.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
+    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    ///
+    /// @returns The discount factor from the base date to `t`.
+    /// @throws `TypeError` if `t` is neither a number nor a string;
+    /// `FinstackError` (kind `validation`) for a malformed date or a year
+    /// fraction that cannot be computed.
     pub fn df(&self, t: JsValue) -> Result<f64, JsValue> {
-        let t = js_f64(&t, "t")?;
-        Ok(self.inner.df(t))
+        match js_time_point(&t, "t")? {
+            TimePoint::Years(t) => Ok(self.inner.df(t)),
+            TimePoint::Date(d) => self.inner.df_on_date(d).map_err(to_js_err),
+        }
     }
 
-    /// Continuously-compounded zero rate at year fraction `t`.
-    /// @param t - Time from the curve base date in years.
+    /// Continuously-compounded zero rate at year fraction `t` or on an ISO-8601 date.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
+    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    ///
+    /// @returns The continuously-compounded zero rate as a decimal.
+    /// @throws `TypeError` if `t` is neither a number nor a string;
+    /// `FinstackError` (kind `validation`) for a malformed date or a year
+    /// fraction that cannot be computed.
     pub fn zero(&self, t: JsValue) -> Result<f64, JsValue> {
-        let t = js_f64(&t, "t")?;
-        Ok(self.inner.zero(t))
+        match js_time_point(&t, "t")? {
+            TimePoint::Years(t) => Ok(self.inner.zero(t)),
+            TimePoint::Date(d) => self
+                .inner
+                .zero_rate_on_date(d, Compounding::Continuous)
+                .map_err(to_js_err),
+        }
     }
 
     /// Continuously-compounded forward rate between `t1` and `t2`.
@@ -318,68 +363,28 @@ impl JsDiscountCurve {
         serde_json::to_string(&*self.inner).map_err(to_js_err)
     }
 
-    /// Zero rate at year fraction `t` under a compounding convention (Rust
-    /// `DiscountCurve::zero_rate`).
+    /// Zero rate at year fraction `t` or on an ISO-8601 date under a compounding
+    /// convention (Rust `DiscountCurve::zero_rate` / `DiscountCurve::zero_rate_on_date`).
     ///
     /// # Arguments
     ///
-    /// * `t` - Time from the curve base date in years.
+    /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
+    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
     /// * `compounding` - `"continuous"`, `"simple"`, `"annual"`,
     ///   `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means
     ///   `"continuous"`.
     ///
     /// @returns The zero rate as a decimal; `0` at `t = 0`.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-    /// `validation`) for an unknown compounding.
-    #[wasm_bindgen(js_name = zeroRate)]
-    pub fn zero_rate(&self, t: JsValue, compounding: Option<JsValue>) -> Result<f64, JsValue> {
-        let t = js_f64(&t, "t")?;
-        Ok(self
-            .inner
-            .zero_rate(t, compounding_arg(compounding.as_ref())?))
-    }
-
-    /// Zero rate to a date, measured with the curve day count (Rust
-    /// `DiscountCurve::zero_rate_on_date`).
-    ///
-    /// # Arguments
-    ///
-    /// * `date` - ISO-8601 target date.
-    /// * `compounding` - `"continuous"`, `"simple"`, `"annual"`,
-    ///   `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means
-    ///   `"continuous"`.
-    ///
-    /// @returns The zero rate as a decimal.
-    /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) for a malformed date, an unknown compounding, or a year
     /// fraction that cannot be computed.
-    #[wasm_bindgen(js_name = zeroRateOnDate)]
-    pub fn zero_rate_on_date(
-        &self,
-        date: JsValue,
-        compounding: Option<JsValue>,
-    ) -> Result<f64, JsValue> {
-        let date = parse_iso_date(&js_string(&date, "date")?)?;
-        self.inner
-            .zero_rate_on_date(date, compounding_arg(compounding.as_ref())?)
-            .map_err(to_js_err)
-    }
-
-    /// Discount factor to a date, measured with the curve day count (Rust
-    /// `DiscountCurve::df_on_date`).
-    ///
-    /// # Arguments
-    ///
-    /// * `date` - ISO-8601 target date.
-    ///
-    /// @returns The discount factor from the base date to `date`.
-    /// @throws `TypeError` if `date` is not a string; `FinstackError` (kind
-    /// `validation`) for a malformed date or a year fraction that cannot be
-    /// computed.
-    #[wasm_bindgen(js_name = dfOnDate)]
-    pub fn df_on_date(&self, date: JsValue) -> Result<f64, JsValue> {
-        let date = parse_iso_date(&js_string(&date, "date")?)?;
-        self.inner.df_on_date(date).map_err(to_js_err)
+    #[wasm_bindgen(js_name = zeroRate)]
+    pub fn zero_rate(&self, t: JsValue, compounding: Option<JsValue>) -> Result<f64, JsValue> {
+        let comp = compounding_arg(compounding.as_ref())?;
+        match js_time_point(&t, "t")? {
+            TimePoint::Years(t) => Ok(self.inner.zero_rate(t, comp)),
+            TimePoint::Date(d) => self.inner.zero_rate_on_date(d, comp).map_err(to_js_err),
+        }
     }
 
     /// Forward discount factor between two dates, `df(toDate) / df(fromDate)`
@@ -745,55 +750,41 @@ impl JsHazardCurve {
         serde_json::to_string(&*self.inner).map_err(to_js_err)
     }
 
-    /// Survival probability `S(t)` at year fraction `t`.
-    /// @param t - Time from the curve base date in years.
+    /// Survival probability `S(t)` at year fraction `t` or on an ISO-8601 date.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
+    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    ///
     /// @returns The probability of surviving from the base date through `t`, in `[0, 1]`.
-    /// This operation does not throw.
+    /// @throws `TypeError` if `t` is neither a number nor a string;
+    /// `FinstackError` (kind `validation`) for a malformed date or a year
+    /// fraction that cannot be computed.
     pub fn sp(&self, t: JsValue) -> Result<f64, JsValue> {
-        let t = js_f64(&t, "t")?;
-        Ok(self.inner.sp(t))
+        match js_time_point(&t, "t")? {
+            TimePoint::Years(t) => Ok(self.inner.sp(t)),
+            TimePoint::Date(d) => self.inner.sp_on_date(d).map_err(to_js_err),
+        }
     }
 
-    /// Instantaneous hazard rate `lambda(t)` at year fraction `t`.
-    /// @param t - Time from the curve base date in years.
+    /// Instantaneous hazard rate `lambda(t)` at year fraction `t` or on an ISO-8601 date.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
+    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    ///
     /// @returns The annualized default intensity at `t`, expressed as a decimal rate.
-    /// This operation does not throw.
+    /// @throws `TypeError` if `t` is neither a number nor a string;
+    /// `FinstackError` (kind `validation`) for a malformed date or a year
+    /// fraction that cannot be computed.
     #[wasm_bindgen(js_name = hazardRate)]
     pub fn hazard_rate(&self, t: JsValue) -> Result<f64, JsValue> {
-        let t = js_f64(&t, "t")?;
-        Ok(self.inner.hazard_rate(t))
-    }
-
-    /// Survival probability on a date, measured with the curve day count.
-    ///
-    /// # Arguments
-    ///
-    /// * `date` - ISO-8601 target date on or after `baseDate`.
-    ///
-    /// @returns Survival probability in `(0, 1]`.
-    /// @throws If `date` is not an ISO date or the year fraction cannot be computed.
-    #[wasm_bindgen(js_name = spOnDate)]
-    pub fn sp_on_date(&self, date: JsValue) -> Result<f64, JsValue> {
-        let date = js_string(&date, "date")?;
-        self.inner
-            .sp_on_date(parse_iso_date(&date)?)
-            .map_err(to_js_err)
-    }
-
-    /// Hazard rate (decimal per year) on a date, measured with the curve day count.
-    ///
-    /// # Arguments
-    ///
-    /// * `date` - ISO-8601 target date on or after `baseDate`.
-    ///
-    /// @returns Annual default intensity as a decimal.
-    /// @throws If `date` is not an ISO date or the year fraction cannot be computed.
-    #[wasm_bindgen(js_name = hazardRateOnDate)]
-    pub fn hazard_rate_on_date(&self, date: JsValue) -> Result<f64, JsValue> {
-        let date = js_string(&date, "date")?;
-        self.inner
-            .hazard_rate_on_date(parse_iso_date(&date)?)
-            .map_err(to_js_err)
+        match js_time_point(&t, "t")? {
+            TimePoint::Years(t) => Ok(self.inner.hazard_rate(t)),
+            TimePoint::Date(d) => self.inner.hazard_rate_on_date(d).map_err(to_js_err),
+        }
     }
 
     /// Survival probabilities on several dates.
@@ -1018,18 +1009,28 @@ impl JsForwardCurve {
         Self::build(options)
     }
 
-    /// Forward rate at year fraction `t`.
+    /// Forward rate at year fraction `t` or on an ISO-8601 date.
     ///
     /// The stored rate is annualized on the curve's day-count basis. Convert
     /// its accrual growth to the contractual index basis before calculating a
     /// coupon with a different accrual convention; Rust instrument pricing
     /// performs this conversion from the contractual schedule.
-    /// @param t - Time from the curve base date in years using the curve day count.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
+    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    ///
     /// @returns Simple forward rate as a decimal, annualized on the curve day count.
+    /// @throws `TypeError` if `t` is neither a number nor a string;
+    /// `FinstackError` (kind `validation`) for a malformed date or a year
+    /// fraction that cannot be computed.
     #[wasm_bindgen(js_name = rate)]
     pub fn rate(&self, t: JsValue) -> Result<f64, JsValue> {
-        let t = js_f64(&t, "t")?;
-        Ok(self.inner.rate(t))
+        match js_time_point(&t, "t")? {
+            TimePoint::Years(t) => Ok(self.inner.rate(t)),
+            TimePoint::Date(d) => self.inner.rate_on_date(d).map_err(to_js_err),
+        }
     }
 
     /// Discount-factor-implied simple forward over `(t1, t2)`.
@@ -1149,34 +1150,23 @@ impl JsForwardCurve {
         Ok(self.inner.rate_period(t1, t2))
     }
 
-    /// Projection discount factor implied by the forwards at year fraction `t`.
+    /// Projection discount factor implied by the forwards at year fraction `t`
+    /// or on an ISO-8601 date.
     ///
     /// # Arguments
     ///
-    /// * `t` - Time from `baseDate` in years.
+    /// * `t` - Time from `baseDate` in years (`number`) or an ISO-8601 target
+    ///   date (`"YYYY-MM-DD"`, converted with the curve day count).
     ///
     /// @returns Projection discount factor.
-    /// @throws If the implied discount factor is non-finite or non-positive.
+    /// @throws `TypeError` if `t` is neither a number nor a string;
+    /// `FinstackError` (kind `validation`) for a malformed date, a year
+    /// fraction that cannot be computed, or an invalid implied discount factor.
     pub fn df(&self, t: JsValue) -> Result<f64, JsValue> {
-        let t = js_f64(&t, "t")?;
-        self.inner.df(t).map_err(to_js_err)
-    }
-
-    /// Projection discount factor on a date, measured with the curve day count.
-    ///
-    /// # Arguments
-    ///
-    /// * `date` - ISO-8601 target date.
-    ///
-    /// @returns Projection discount factor.
-    /// @throws If `date` is not an ISO date, the year fraction cannot be
-    /// computed, or the implied discount factor is invalid.
-    #[wasm_bindgen(js_name = dfOnDate)]
-    pub fn df_on_date(&self, date: JsValue) -> Result<f64, JsValue> {
-        let date = js_string(&date, "date")?;
-        self.inner
-            .df_on_date(parse_iso_date(&date)?)
-            .map_err(to_js_err)
+        match js_time_point(&t, "t")? {
+            TimePoint::Years(t) => self.inner.df(t).map_err(to_js_err),
+            TimePoint::Date(d) => self.inner.df_on_date(d).map_err(to_js_err),
+        }
     }
 
     /// Index tenor in years.

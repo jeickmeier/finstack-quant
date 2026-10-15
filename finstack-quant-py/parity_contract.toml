@@ -92,14 +92,10 @@ public = [
     "VolCube",
     "VolCubeExpirySlice",
     "VolSurface",
-    "context",
-    "curves",
-    "fx",
     "fx_market_pair",
     "fx_pair_convention",
     "fx_pip_size",
     "invert_fx_rate",
-    "scalars",
 ]
 
 # Symbol-level contracts for every exposed core submodule. These are checked
@@ -154,7 +150,6 @@ note = "DayCountContext is the sole owned host context; it stores Rust DayCountC
 [crates.core.module_symbols.market_data]
 python_package = "finstack_quant.core.market_data"
 public = [
-    "curves", "fx", "context", "scalars",
     "BaseCorrelationCurve", "CreditIndexData", "DiscountCurve", "ForwardCurve",
     "FxDeltaVolSurface", "HazardCurve", "InflationCurve", "PriceCurve", "VolSurface",
     "VolCube", "VolCubeExpirySlice", "SabrParameterData", "FxConversionPolicy", "FxRateResult", "FxMatrix",
@@ -1981,18 +1976,9 @@ constants_on = "core.Currency"
 js = "core"
 types = { CalendarMetadata = "CalendarMetadata", Period = "Period", PeriodPlan = "PeriodPlan" }
 
-[parity.modules."finstack_quant.core.market_data.context"]
-js = "core"
-
-[parity.modules."finstack_quant.core.market_data.curves"]
+[parity.modules."finstack_quant.core.market_data"]
 js = "core"
 types = { SabrParameterData = "SabrParameterData" }
-
-[parity.modules."finstack_quant.core.market_data.fx"]
-js = "core"
-
-[parity.modules."finstack_quant.core.market_data.scalars"]
-js = "core"
 
 [parity.modules."finstack_quant.core.math"]
 js = "core"
@@ -2696,10 +2682,10 @@ renames = { synthesized_deal = { js = "synthesizedDealJson", reason = "the Rust 
 renames = { from_arrays = { js = "constructor", reason = "Python distinguishes its pandas constructor from the Rust-shaped array adapter; WASM's constructor already accepts arrays (Rust Performance::new)" }, from_returns_arrays = { js = "fromReturns", reason = "Python distinguishes pandas and array input adapters; WASM fromReturns already accepts arrays (Rust Performance::from_returns)" } }
 wasm_only = { summary = "WASM twin of the pandas exit Performance.to_dataframe, returned as a TableEnvelope" }
 
-[parity.members."finstack_quant.core.market_data.context.MarketContext"]
+[parity.members."finstack_quant.core.market_data.MarketContext"]
 wasm_only = { len = "JavaScript twin of Python __len__ (Rust MarketContext::len); JS has no length protocol for class handles" }
 
-[parity.members."finstack_quant.core.market_data.fx.FxMatrix"]
+[parity.members."finstack_quant.core.market_data.FxMatrix"]
 excluded = { quotes = "pandas" }
 
 [parity.members."finstack_quant.core.money.Money"]

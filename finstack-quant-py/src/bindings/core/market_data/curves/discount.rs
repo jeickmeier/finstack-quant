@@ -34,7 +34,7 @@ use crate::errors::core_to_py;
 /// 0.95
 #[pyclass(
     name = "DiscountCurve",
-    module = "finstack_quant.core.market_data.curves",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]
@@ -328,12 +328,12 @@ impl PyDiscountCurve {
         }
     }
 
-    /// Zero rate at year fraction ``t`` under an explicit compounding convention.
+    /// Zero rate at a year fraction or date under an explicit compounding convention.
     ///
     /// Parameters
     /// ----------
-    /// t : float
-    ///     Year fraction from ``base_date``.
+    /// t : float | datetime.date | str
+    ///     Year fraction from ``base_date``, or a date converted with the curve day count.
     /// compounding : str, optional
     ///     ``"continuous"`` (default), ``"simple"``, ``"annual"``, ``"semi_annual"``,
     ///     ``"quarterly"`` or ``"monthly"``.
@@ -346,55 +346,14 @@ impl PyDiscountCurve {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``compounding`` is not a recognised label.
+    ///     If ``t`` is a date preceding ``base_date`` or ``compounding`` is not a recognised label.
     #[pyo3(signature = (t, compounding="continuous"))]
-    fn zero_rate(&self, t: f64, compounding: &str) -> PyResult<f64> {
-        Ok(self.inner.zero_rate(t, parse_compounding(compounding)?))
-    }
-
-    /// Zero rate on a date under an explicit compounding convention.
-    ///
-    /// Parameters
-    /// ----------
-    /// date : datetime.date | str
-    ///     Target date, converted with the curve day count.
-    /// compounding : str, optional
-    ///     Compounding label; see :meth:`zero_rate`. Default ``"continuous"``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Zero rate as a decimal.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``date`` precedes ``base_date`` or the label is unknown.
-    #[pyo3(signature = (date, compounding="continuous"))]
-    fn zero_rate_on_date(&self, date: &Bound<'_, PyAny>, compounding: &str) -> PyResult<f64> {
-        self.inner
-            .zero_rate_on_date(py_to_date(date)?, parse_compounding(compounding)?)
-            .map_err(core_to_py)
-    }
-
-    /// Discount factor on a date using the curve day count.
-    ///
-    /// Parameters
-    /// ----------
-    /// date : datetime.date | str
-    ///     Target date on or after ``base_date``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the year fraction cannot be computed.
-    #[pyo3(text_signature = "(self, date)")]
-    fn df_on_date(&self, date: &Bound<'_, PyAny>) -> PyResult<f64> {
-        self.inner.df_on_date(py_to_date(date)?).map_err(core_to_py)
+    fn zero_rate(&self, t: &Bound<'_, PyAny>, compounding: &str) -> PyResult<f64> {
+        let comp = parse_compounding(compounding)?;
+        match extract_time_point(t)? {
+            TimePoint::Years(t) => Ok(self.inner.zero_rate(t, comp)),
+            TimePoint::Date(d) => self.inner.zero_rate_on_date(d, comp).map_err(core_to_py),
+        }
     }
 
     /// Forward discount factor between two dates: ``DF(0, to) / DF(0, from)``.

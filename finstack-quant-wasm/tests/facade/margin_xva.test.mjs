@@ -332,7 +332,7 @@ test('HazardCurve JSON round trip and members pass through Rust', () => {
     () => hz.defaultProb(5.0, 1.0),
     (error) => error.kind === 'validation'
   );
-  assert.equal(hz.spOnDate('2025-01-01'), 1.0);
+  assert.equal(hz.sp('2025-01-01'), 1.0);
   assert.deepEqual([...hz.survivalAtDates(['2025-01-01'])], [1.0]);
   assert.equal(hz.withRecoveryRate(0.25).recoveryRate, 0.25);
   assert.equal(new core.HazardCurve(hazardOptions([1.0, 0.02], 0.4)).currency, undefined);

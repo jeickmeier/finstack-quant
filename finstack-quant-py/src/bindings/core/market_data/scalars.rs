@@ -7,7 +7,7 @@ use finstack_quant_core::market_data::scalars::{
     InflationIndex, InflationLag, ScalarTimeSeries, SeriesInterpolation,
 };
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyModule};
+use pyo3::types::{PyDict, PyModule};
 
 use crate::bindings::core::currency::{extract_currency, PyCurrency};
 use crate::bindings::core::money::{decimal_from_py, is_python_decimal};
@@ -15,6 +15,18 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::impl_repr_html_via_dataframe;
 use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
 use crate::errors::core_to_py;
+
+fn observations_to_dataframe<'py>(
+    py: Python<'py>,
+    observations: Vec<(time::Date, f64)>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let dates: Vec<time::Date> = observations.iter().map(|(date, _)| *date).collect();
+    let values: Vec<f64> = observations.iter().map(|(_, value)| *value).collect();
+    let data = PyDict::new(py);
+    data.set_item("value", values)?;
+    let index = dates_to_datetime_index(py, &dates)?;
+    dict_to_dataframe(py, &data, Some(index))
+}
 
 /// Extract an `f64` observation from a `float`, `int` or `decimal.Decimal`.
 ///
@@ -36,7 +48,7 @@ pub(crate) fn extract_f64(value: &Bound<'_, PyAny>, field: &str) -> PyResult<f64
 /// Date-indexed scalar market observations with Rust-owned interpolation.
 #[pyclass(
     name = "ScalarTimeSeries",
-    module = "finstack_quant.core.market_data.scalars",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]
@@ -217,13 +229,7 @@ impl PyScalarTimeSeries {
         // id/currency/interpolation metadata alongside the observations, so
         // the columns are built explicitly to keep the frame purely the
         // date-indexed series it represents.
-        let observations = self.inner.observations();
-        let dates: Vec<time::Date> = observations.iter().map(|(date, _)| *date).collect();
-        let values: Vec<f64> = observations.iter().map(|(_, value)| *value).collect();
-        let data = PyDict::new(py);
-        data.set_item("value", values)?;
-        let index = dates_to_datetime_index(py, &dates)?;
-        dict_to_dataframe(py, &data, Some(index))
+        observations_to_dataframe(py, self.inner.observations())
     }
 
     /// Serialize the canonical Rust series state to JSON.
@@ -271,7 +277,7 @@ impl_repr_html_via_dataframe!(PyScalarTimeSeries);
 /// Inflation index observations with Rust-owned interpolation and validation.
 #[pyclass(
     name = "InflationIndex",
-    module = "finstack_quant.core.market_data.scalars",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]
@@ -603,13 +609,7 @@ impl PyInflationIndex {
     ///
     /// Columns: ``value``.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let observations = self.inner.observations();
-        let dates: Vec<time::Date> = observations.iter().map(|(date, _)| *date).collect();
-        let values: Vec<f64> = observations.iter().map(|(_, value)| *value).collect();
-        let data = PyDict::new(py);
-        data.set_item("value", values)?;
-        let index = dates_to_datetime_index(py, &dates)?;
-        dict_to_dataframe(py, &data, Some(index))
+        observations_to_dataframe(py, self.inner.observations())
     }
 
     /// Serialize the canonical Rust inflation-index state to JSON.
@@ -656,20 +656,9 @@ impl_repr_html_via_dataframe!(PyInflationIndex);
 
 pub(super) const EXPORTS: &[&str] = &["InflationIndex", "ScalarTimeSeries"];
 
-/// Register the `finstack_quant.core.market_data.scalars` submodule.
-pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = crate::bindings::module_utils::new_submodule(parent, "scalars")?;
-    m.setattr(
-        "__doc__",
-        "Scalar market time-series bindings (finstack-quant-core).",
-    )?;
+/// Register scalar time-series classes on `finstack_quant.core.market_data`.
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyScalarTimeSeries>()?;
     m.add_class::<PyInflationIndex>()?;
-    m.setattr("__all__", PyList::new(py, EXPORTS)?)?;
-
-    crate::bindings::module_utils::attach_submodule(
-        parent,
-        &m,
-        crate::bindings::module_utils::Exposure::Compiled,
-    )
+    Ok(())
 }

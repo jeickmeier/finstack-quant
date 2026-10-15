@@ -5,11 +5,11 @@ Provides term-structure curve types (discount, forward, hazard, price incl.
 volatility-index, inflation), volatility surfaces and cubes, the FX rate matrix,
 scalar series and the unified :class:`MarketContext` container.
 
-Every curve query (``df``, ``zero``, ``rate``, ``sp``, ``hazard_rate``,
-``price``, ``cpi``) accepts either a year fraction (``float``) or a date
-(``datetime.date`` or ISO ``"YYYY-MM-DD"`` string); dates are converted with
-the curve's own day count by Rust. Constructor options after ``knots`` are
-keyword-only.
+Every curve query (``df``, ``zero``, ``zero_rate``, ``rate``, ``sp``,
+``hazard_rate``, ``price``, ``cpi``) accepts either a year fraction (``float``)
+or a date (``datetime.date`` or ISO ``"YYYY-MM-DD"`` string); dates are
+converted with the curve's own day count by Rust. Constructor options after
+``knots`` are keyword-only.
 
 Examples
 --------
@@ -31,10 +31,6 @@ import pandas as pd
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount
 from finstack_quant.core.money import Money
-from finstack_quant.core.market_data import context as context
-from finstack_quant.core.market_data import curves as curves
-from finstack_quant.core.market_data import fx as fx
-from finstack_quant.core.market_data import scalars as scalars
 
 __all__ = [
     "BaseCorrelationCurve",
@@ -57,14 +53,10 @@ __all__ = [
     "VolCube",
     "VolCubeExpirySlice",
     "VolSurface",
-    "context",
-    "curves",
-    "fx",
     "fx_market_pair",
     "fx_pair_convention",
     "fx_pip_size",
     "invert_fx_rate",
-    "scalars",
 ]
 
 DateLike = Union[datetime.date, str]
@@ -396,14 +388,15 @@ class DiscountCurve:
         """
         ...
 
-    def zero_rate(self, t: float, compounding: str = "continuous") -> float:
+    def zero_rate(self, t: TimeOrDate, compounding: str = "continuous") -> float:
         """
-        Zero rate at year fraction ``t`` under an explicit compounding convention.
+        Zero rate at a year fraction or date under an explicit compounding convention.
 
         Parameters
         ----------
-        t : float
-            Year fraction from ``base_date``.
+        t : float, datetime.date or str
+            Year fraction from ``base_date``, or a date converted with the
+            curve day count.
         compounding : str, optional
             ``"continuous"`` (default), ``"simple"``, ``"annual"``,
             ``"semi_annual"``, ``"quarterly"`` or ``"monthly"``.
@@ -416,51 +409,8 @@ class DiscountCurve:
         Raises
         ------
         ValueError
-            If ``compounding`` is not a recognised label.
-        """
-        ...
-
-    def zero_rate_on_date(self, date: DateLike, compounding: str = "continuous") -> float:
-        """
-        Zero rate on a date under an explicit compounding convention.
-
-        Parameters
-        ----------
-        date : datetime.date or str
-            Target date, converted with the curve day count.
-        compounding : str, optional
-            Compounding label; see :meth:`zero_rate`. Default ``"continuous"``.
-
-        Returns
-        -------
-        float
-            Zero rate as a decimal.
-
-        Raises
-        ------
-        ValueError
-            If ``date`` precedes ``base_date`` or the label is unknown.
-        """
-        ...
-
-    def df_on_date(self, date: DateLike) -> float:
-        """
-        Discount factor on a date using the curve day count.
-
-        Parameters
-        ----------
-        date : datetime.date or str
-            Target date on or after ``base_date``.
-
-        Returns
-        -------
-        float
-            Unitless discount factor.
-
-        Raises
-        ------
-        ValueError
-            If the year fraction cannot be computed.
+            If ``t`` is a date preceding ``base_date`` or ``compounding`` is
+            not a recognised label.
         """
         ...
 
@@ -973,27 +923,6 @@ class ForwardCurve:
         """
         ...
 
-    def df_on_date(self, date: DateLike) -> float:
-        """
-        Discount factor on a date using the curve day count.
-
-        Parameters
-        ----------
-        date : datetime.date or str
-            Target date on or after ``base_date``.
-
-        Returns
-        -------
-        float
-            Unitless discount factor.
-
-        Raises
-        ------
-        ValueError
-            If the year fraction cannot be computed.
-        """
-        ...
-
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export knots as a pandas ``DataFrame``.
@@ -1452,48 +1381,6 @@ class HazardCurve:
         ------
         ValueError
             If a date precedes ``base_date``.
-        """
-        ...
-
-    def sp_on_date(self, date: DateLike) -> float:
-        """
-        Survival probability on a date using the curve day count.
-
-        Parameters
-        ----------
-        date : datetime.date or str
-            Target date on or after ``base_date``.
-
-        Returns
-        -------
-        float
-            Survival probability.
-
-        Raises
-        ------
-        ValueError
-            If the year fraction cannot be computed.
-        """
-        ...
-
-    def hazard_rate_on_date(self, date: DateLike) -> float:
-        """
-        Hazard rate (decimal per year) on a date using the curve day count.
-
-        Parameters
-        ----------
-        date : datetime.date or str
-            Target date on or after ``base_date``.
-
-        Returns
-        -------
-        float
-            Hazard rate.
-
-        Raises
-        ------
-        ValueError
-            If the year fraction cannot be computed.
         """
         ...
 
@@ -2485,27 +2372,6 @@ class PriceCurve:
         """
         ...
 
-    def price_on_date(self, date: DateLike) -> float:
-        """
-        Forward price on a date using the curve day count.
-
-        Parameters
-        ----------
-        date : datetime.date or str
-            Target date on or after ``base_date``.
-
-        Returns
-        -------
-        float
-            Price in the curve's units.
-
-        Raises
-        ------
-        ValueError
-            If the year fraction cannot be computed.
-        """
-        ...
-
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export knots as a pandas ``DataFrame``.
@@ -2807,27 +2673,6 @@ class InflationCurve:
         ------
         ValueError
             If a date precedes ``base_date``.
-        """
-        ...
-
-    def cpi_on_date(self, date: DateLike) -> float:
-        """
-        CPI level on a date using the curve day count (no indexation lag).
-
-        Parameters
-        ----------
-        date : datetime.date or str
-            Target date on or after ``base_date``.
-
-        Returns
-        -------
-        float
-            Absolute CPI index level.
-
-        Raises
-        ------
-        ValueError
-            If the year fraction cannot be computed.
         """
         ...
 

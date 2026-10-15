@@ -10264,7 +10264,7 @@ def compute_bilateral_xva(
     Examples
     --------
     >>> import datetime as dt
-    >>> from finstack_quant.core.market_data.curves import DiscountCurve, HazardCurve
+    >>> from finstack_quant.core.market_data import DiscountCurve, HazardCurve
     >>> profile = ExposureProfile([1.0, 2.0], [1e6, 1e6], [1e6, 1e6], [0.0, 0.0])
     >>> df = DiscountCurve(
     ...     "USD-OIS",

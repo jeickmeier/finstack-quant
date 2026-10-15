@@ -20,7 +20,6 @@ pub use price::PyPriceCurve;
 pub use surfaces::{PyFxDeltaVolSurface, PySabrParameterData, PyVolCube, PyVolSurface};
 
 use pyo3::prelude::*;
-use pyo3::types::PyList;
 
 pub(super) const EXPORTS: &[&str] = &[
     "BaseCorrelationCurve",
@@ -37,14 +36,8 @@ pub(super) const EXPORTS: &[&str] = &[
     "VolSurface",
 ];
 
-/// Register the `finstack_quant.core.market_data.curves` submodule.
-pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = crate::bindings::module_utils::new_submodule(parent, "curves")?;
-    m.setattr(
-        "__doc__",
-        "Market-data bindings: discount, forward, hazard, inflation, price (incl. vol-index) curves, vol surfaces, SABR cubes and FX delta surfaces.",
-    )?;
-
+/// Register curve and surface classes on `finstack_quant.core.market_data`.
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDiscountCurve>()?;
     m.add_class::<PyForwardCurve>()?;
     m.add_class::<PyHazardCurve>()?;
@@ -57,15 +50,5 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySabrParameterData>()?;
     m.add_class::<PyVolCube>()?;
     m.add_class::<PyVolCubeExpirySlice>()?;
-
-    let all = PyList::new(py, EXPORTS)?;
-    m.setattr("__all__", all)?;
-
-    crate::bindings::module_utils::attach_submodule(
-        parent,
-        &m,
-        crate::bindings::module_utils::Exposure::Compiled,
-    )?;
-
     Ok(())
 }

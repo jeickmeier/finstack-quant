@@ -3061,17 +3061,19 @@ export interface DiscountCurve extends WasmOwned {
    */
   readonly baseDate: string;
   /**
-   * Discount factor at year fraction `t`.
-   * @returns Discount factor for 1 unit paid at time `t`.
-   * @param t - Time from the curve base date in years.
+   * Discount factor at year fraction or ISO date `t`.
+   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
+   * @returns The discount factor from the base date to `t`.
+   * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
    */
-  df(t: number): number;
+  df(t: number | string): number;
   /**
-   * Continuously-compounded zero rate at year fraction `t`.
-   * @returns Continuously compounded zero rate as a decimal, such as `0.04` for 4%.
-   * @param t - Time from the curve base date in years.
+   * Continuously-compounded zero rate at year fraction or ISO date `t`.
+   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
+   * @returns The continuously-compounded zero rate as a decimal.
+   * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
    */
-  zero(t: number): number;
+  zero(t: number | string): number;
   /**
    * Continuously-compounded forward rate between `t1` and `t2`.
    * @returns Continuously compounded forward rate as a decimal over `(t1, t2)`.
@@ -3123,34 +3125,15 @@ export interface DiscountCurve extends WasmOwned {
    */
   toJson(): string;
   /**
-   * Zero rate at year fraction `t` under a compounding convention (Rust
-   * `DiscountCurve::zero_rate`).
+   * Zero rate at year fraction or ISO date `t` under a compounding convention
+   * (Rust `DiscountCurve::zero_rate` / `DiscountCurve::zero_rate_on_date`).
    *
-   * @param t - Time from the curve base date in years.
+   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
    * @param compounding - `"continuous"`, `"simple"`, `"annual"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
    * @returns The zero rate as a decimal; `0` at `t = 0`.
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an unknown compounding.
-   */
-  zeroRate(t: number, compounding?: string | null): number;
-  /**
-   * Zero rate to a date, measured with the curve day count (Rust
-   * `DiscountCurve::zero_rate_on_date`).
-   *
-   * @param date - ISO-8601 target date.
-   * @param compounding - `"continuous"`, `"simple"`, `"annual"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
-   * @returns The zero rate as a decimal.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for a malformed date, an unknown compounding, or a year fraction that cannot be computed.
    */
-  zeroRateOnDate(date: string, compounding?: string | null): number;
-  /**
-   * Discount factor to a date, measured with the curve day count (Rust
-   * `DiscountCurve::df_on_date`).
-   *
-   * @param date - ISO-8601 target date.
-   * @returns The discount factor from the base date to `date`.
-   * @throws `TypeError` if `date` is not a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
-   */
-  dfOnDate(date: string): number;
+  zeroRate(t: number | string, compounding?: string | null): number;
   /**
    * Forward discount factor between two dates, `df(toDate) / df(fromDate)`
    * (Rust `DiscountCurve::df_between_dates`).
@@ -3297,17 +3280,19 @@ export interface HazardCurve extends WasmOwned {
    */
   readonly recoveryRate: number;
   /**
-   * Survival probability `S(t)` at year fraction `t`.
-   * @param t - Time from the curve base date in years.
-   * @returns The probability of surviving from the base date through `t`, in `[0, 1]`. This operation does not throw.
+   * Survival probability `S(t)` at year fraction or ISO date `t`.
+   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
+   * @returns The probability of surviving from the base date through `t`, in `[0, 1]`.
+   * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
    */
-  sp(t: number): number;
+  sp(t: number | string): number;
   /**
-   * Instantaneous hazard rate `lambda(t)` at year fraction `t`.
-   * @param t - Time from the curve base date in years.
-   * @returns The annualized default intensity at `t`, expressed as a decimal rate. This operation does not throw.
+   * Instantaneous hazard rate `lambda(t)` at year fraction or ISO date `t`.
+   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
+   * @returns The annualized default intensity at `t`, expressed as a decimal rate.
+   * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
    */
-  hazardRate(t: number): number;
+  hazardRate(t: number | string): number;
   /**
    * Knots as a flat `[t0, lambda0, t1, lambda1, …]` array (years, decimal intensities).
    */
@@ -3356,22 +3341,6 @@ export interface HazardCurve extends WasmOwned {
    * @throws If serialization fails (not expected for a valid curve).
    */
   toJson(): string;
-  /**
-   * Survival probability on a date, measured with the curve day count.
-   *
-   * @param date - ISO-8601 target date on or after `baseDate`.
-   * @returns Survival probability in `(0, 1]`.
-   * @throws If `date` is not an ISO date or the year fraction cannot be computed.
-   */
-  spOnDate(date: string): number;
-  /**
-   * Hazard rate (decimal per year) on a date, measured with the curve day count.
-   *
-   * @param date - ISO-8601 target date on or after `baseDate`.
-   * @returns Annual default intensity as a decimal.
-   * @throws If `date` is not an ISO date or the year fraction cannot be computed.
-   */
-  hazardRateOnDate(date: string): number;
   /**
    * Survival probabilities on several dates.
    *
@@ -3553,16 +3522,17 @@ export interface ForwardCurve extends WasmOwned {
    */
   readonly resetLag: number;
   /**
-   * Forward rate at year fraction `t`.
+   * Forward rate at year fraction or ISO date `t`.
    *
    * The stored rate is annualized on the curve's day-count basis. Convert its
    * accrual growth to the contractual index basis before calculating a coupon
    * with a different accrual convention. Rust instrument pricing performs this
    * conversion from the contractual schedule.
-   * @param t - Time from the curve base date in years using the curve day count.
+   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
    * @returns Simple forward rate as a decimal, annualized on the curve day count.
+   * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
    */
-  rate(t: number): number;
+  rate(t: number | string): number;
   /**
    * Discount-factor-implied simple forward over `(t1, t2)`.
    *
@@ -3626,21 +3596,13 @@ export interface ForwardCurve extends WasmOwned {
    */
   ratePeriod(t1: number, t2: number): number;
   /**
-   * Projection discount factor implied by the forwards at year fraction `t`.
+   * Projection discount factor implied by the forwards at year fraction or ISO date `t`.
    *
-   * @param t - Time from `baseDate` in years.
+   * @param t - Time from `baseDate` in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
    * @returns Projection discount factor.
-   * @throws If the implied discount factor is non-finite or non-positive.
+   * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date, a year fraction that cannot be computed, or an invalid implied discount factor.
    */
-  df(t: number): number;
-  /**
-   * Projection discount factor on a date, measured with the curve day count.
-   *
-   * @param date - ISO-8601 target date.
-   * @returns Projection discount factor.
-   * @throws If `date` is not an ISO date, the year fraction cannot be computed, or the implied discount factor is invalid.
-   */
-  dfOnDate(date: string): number;
+  df(t: number | string): number;
 }
 
 /**
@@ -6765,23 +6727,14 @@ export interface InflationCurve extends WasmOwned {
    */
   toJson(): string;
   /**
-   * Projected CPI level at year fraction `t`, without indexation lag (Rust
-   * `InflationCurve::cpi`).
+   * Projected CPI level at year fraction or ISO date `t`, without indexation
+   * lag (Rust `InflationCurve::cpi` / `InflationCurve::cpi_on_date`).
    *
-   * @param t - Time from the curve base date in years.
+   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
    * @returns The interpolated index level.
-   * @throws `TypeError` if `t` is not a number.
+   * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
    */
-  cpi(t: number): number;
-  /**
-   * Projected CPI level on a date, measured with the curve day count (Rust
-   * `InflationCurve::cpi_on_date`).
-   *
-   * @param date - ISO-8601 target date.
-   * @returns The interpolated index level.
-   * @throws `TypeError` if `date` is not a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
-   */
-  cpiOnDate(date: string): number;
+  cpi(t: number | string): number;
   /**
    * CPI level at `t` shifted back by the indexation lag (Rust
    * `InflationCurve::cpi_with_lag`).
@@ -6955,22 +6908,14 @@ export interface PriceCurve extends WasmOwned {
    */
   toJson(): string;
   /**
-   * Forward price at year fraction `t` (Rust `PriceCurve::price`).
-   *
-   * @param t - Time from the curve base date in years.
-   * @returns The interpolated forward price (or index level).
-   * @throws `TypeError` if `t` is not a number.
-   */
-  price(t: number): number;
-  /**
-   * Forward price on a date, measured with the curve day count (Rust
+   * Forward price at year fraction or ISO date `t` (Rust `PriceCurve::price` /
    * `PriceCurve::price_on_date`).
    *
-   * @param date - ISO-8601 target date.
+   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
    * @returns The interpolated forward price (or index level).
-   * @throws `TypeError` if `date` is not a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
+   * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
    */
-  priceOnDate(date: string): number;
+  price(t: number | string): number;
 }
 
 /**

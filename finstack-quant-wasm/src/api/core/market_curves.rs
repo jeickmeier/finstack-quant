@@ -5,7 +5,8 @@
 //! Curve dates are ISO-8601 strings (`"YYYY-MM-DD"`), as for `DiscountCurve`.
 
 use crate::api::core::market_data::{
-    flat_pairs, parse_day_count, parse_extrapolation, parse_interp_style, JsHazardCurve,
+    flat_pairs, js_time_point, parse_day_count, parse_extrapolation, parse_interp_style,
+    JsHazardCurve, TimePoint,
 };
 use crate::utils::input::{from_js_json, js_f64, js_f64_seq, js_string, js_uint};
 use crate::utils::{date_to_iso, parse_iso_date, to_js_err};
@@ -140,35 +141,24 @@ impl JsInflationCurve {
         serde_json::to_string(&*self.inner).map_err(to_js_err)
     }
 
-    /// Projected CPI level at year fraction `t`, without indexation lag (Rust
-    /// `InflationCurve::cpi`).
+    /// Projected CPI level at year fraction `t` or on an ISO-8601 date, without
+    /// indexation lag (Rust `InflationCurve::cpi` / `InflationCurve::cpi_on_date`).
     ///
     /// # Arguments
     ///
-    /// * `t` - Time from the curve base date in years.
+    /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
+    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
     ///
     /// @returns The interpolated index level.
-    /// @throws `TypeError` if `t` is not a number.
+    /// @throws `TypeError` if `t` is neither a number nor a string;
+    /// `FinstackError` (kind `validation`) for a malformed date or a year
+    /// fraction that cannot be computed.
     #[wasm_bindgen(js_name = cpi)]
     pub fn cpi(&self, t: JsValue) -> Result<f64, JsValue> {
-        Ok(self.inner.cpi(js_f64(&t, "t")?))
-    }
-
-    /// Projected CPI level on a date, measured with the curve day count (Rust
-    /// `InflationCurve::cpi_on_date`).
-    ///
-    /// # Arguments
-    ///
-    /// * `date` - ISO-8601 target date.
-    ///
-    /// @returns The interpolated index level.
-    /// @throws `TypeError` if `date` is not a string; `FinstackError` (kind
-    /// `validation`) for a malformed date or a year fraction that cannot be
-    /// computed.
-    #[wasm_bindgen(js_name = cpiOnDate)]
-    pub fn cpi_on_date(&self, date: JsValue) -> Result<f64, JsValue> {
-        let date = parse_iso_date(&js_string(&date, "date")?)?;
-        self.inner.cpi_on_date(date).map_err(to_js_err)
+        match js_time_point(&t, "t")? {
+            TimePoint::Years(t) => Ok(self.inner.cpi(t)),
+            TimePoint::Date(d) => self.inner.cpi_on_date(d).map_err(to_js_err),
+        }
     }
 
     /// CPI level at `t` shifted back by the indexation lag (Rust
@@ -402,34 +392,24 @@ impl JsPriceCurve {
         serde_json::to_string(&*self.inner).map_err(to_js_err)
     }
 
-    /// Forward price at year fraction `t` (Rust `PriceCurve::price`).
+    /// Forward price at year fraction `t` or on an ISO-8601 date (Rust
+    /// `PriceCurve::price` / `PriceCurve::price_on_date`).
     ///
     /// # Arguments
     ///
-    /// * `t` - Time from the curve base date in years.
+    /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
+    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
     ///
     /// @returns The interpolated forward price (or index level).
-    /// @throws `TypeError` if `t` is not a number.
+    /// @throws `TypeError` if `t` is neither a number nor a string;
+    /// `FinstackError` (kind `validation`) for a malformed date or a year
+    /// fraction that cannot be computed.
     #[wasm_bindgen(js_name = price)]
     pub fn price(&self, t: JsValue) -> Result<f64, JsValue> {
-        Ok(self.inner.price(js_f64(&t, "t")?))
-    }
-
-    /// Forward price on a date, measured with the curve day count (Rust
-    /// `PriceCurve::price_on_date`).
-    ///
-    /// # Arguments
-    ///
-    /// * `date` - ISO-8601 target date.
-    ///
-    /// @returns The interpolated forward price (or index level).
-    /// @throws `TypeError` if `date` is not a string; `FinstackError` (kind
-    /// `validation`) for a malformed date or a year fraction that cannot be
-    /// computed.
-    #[wasm_bindgen(js_name = priceOnDate)]
-    pub fn price_on_date(&self, date: JsValue) -> Result<f64, JsValue> {
-        let date = parse_iso_date(&js_string(&date, "date")?)?;
-        self.inner.price_on_date(date).map_err(to_js_err)
+        match js_time_point(&t, "t")? {
+            TimePoint::Years(t) => Ok(self.inner.price(t)),
+            TimePoint::Date(d) => self.inner.price_on_date(d).map_err(to_js_err),
+        }
     }
 
     /// Curve identifier (the `MarketContext` lookup key).

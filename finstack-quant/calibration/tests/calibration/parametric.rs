@@ -308,7 +308,6 @@ fn parametric_delivered_models_reprice_short_end_deposits_analytically() {
     use finstack_quant_core::dates::{DayCount, DayCountContext};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{NelsonSiegelModel, ParametricCurve};
-    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;

@@ -126,7 +126,7 @@ test('ForwardCurve flat, queries, getters and JSON round trip', () => {
   assert.ok(curve.forwards.every((f) => f === 0.04));
   assert.ok(Math.abs(curve.ratePeriod(0.5, 1.0) - 0.04) < 1e-12);
   assert.ok(curve.df(1.0) > 0 && curve.df(1.0) < 1);
-  assert.equal(curve.dfOnDate('2025-01-02'), 1);
+  assert.equal(curve.df('2025-01-02'), 1);
   const back = core.ForwardCurve.fromJson(curve.toJson());
   assert.equal(back.toJson(), curve.toJson());
 });

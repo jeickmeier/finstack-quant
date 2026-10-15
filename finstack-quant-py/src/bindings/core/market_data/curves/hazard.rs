@@ -43,7 +43,7 @@ struct HazardCurveOptions<'a> {
 /// 0.980199
 #[pyclass(
     name = "HazardCurve",
-    module = "finstack_quant.core.market_data.curves",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]
@@ -311,48 +311,6 @@ impl PyHazardCurve {
             TimePoint::Years(t) => Ok(self.inner.hazard_rate(t)),
             TimePoint::Date(d) => self.inner.hazard_rate_on_date(d).map_err(core_to_py),
         }
-    }
-
-    /// Survival probability on a date using the curve day count.
-    ///
-    /// Parameters
-    /// ----------
-    /// date : datetime.date | str
-    ///     Target date on or after ``base_date``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the year fraction cannot be computed.
-    #[pyo3(text_signature = "(self, date)")]
-    fn sp_on_date(&self, date: &Bound<'_, PyAny>) -> PyResult<f64> {
-        self.inner.sp_on_date(py_to_date(date)?).map_err(core_to_py)
-    }
-
-    /// Hazard rate (decimal per year) on a date using the curve day count.
-    ///
-    /// Parameters
-    /// ----------
-    /// date : datetime.date | str
-    ///     Target date on or after ``base_date``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the year fraction cannot be computed.
-    #[pyo3(text_signature = "(self, date)")]
-    fn hazard_rate_on_date(&self, date: &Bound<'_, PyAny>) -> PyResult<f64> {
-        self.inner
-            .hazard_rate_on_date(py_to_date(date)?)
-            .map_err(core_to_py)
     }
 
     /// Survival probabilities on several dates.

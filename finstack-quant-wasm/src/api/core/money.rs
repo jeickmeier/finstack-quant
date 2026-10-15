@@ -1,9 +1,7 @@
 //! WASM bindings for [`finstack_quant_core::money::Money`].
 
 use crate::api::core::currency::JsCurrency;
-use crate::utils::input::{
-    invalid_type, js_f64, js_opt_bool, js_opt_string, js_opt_uint, js_string, json_text,
-};
+use crate::utils::input::{js_f64, js_opt_bool, js_opt_string, js_opt_uint, js_string, json_text};
 use crate::utils::to_js_err;
 use finstack_quant_core::config::RoundingMode;
 use finstack_quant_core::money::{FormatOpts, Money as RustMoney};

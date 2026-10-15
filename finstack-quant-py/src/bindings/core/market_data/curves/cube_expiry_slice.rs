@@ -15,7 +15,7 @@ use crate::errors::core_to_py;
 /// quotes retain one displacement per tenor, in the same units as the strikes.
 #[pyclass(
     name = "VolCubeExpirySlice",
-    module = "finstack_quant.core.market_data.curves",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]

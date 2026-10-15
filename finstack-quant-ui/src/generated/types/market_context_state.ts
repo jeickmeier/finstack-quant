@@ -2074,7 +2074,7 @@ export interface D_467E0D727Ff2Ae92C819 {
  *
  * ```rust
  * use finstack_quant_core::market_data::scalars::{
- *     InflationIndex, InflationInterpolation, InflationLag,
+ *     InflationIndex, SeriesInterpolation, InflationLag,
  * };
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
@@ -2094,7 +2094,7 @@ export interface D_467E0D727Ff2Ae92C819 {
  *
  * let index = InflationIndex::new("US-CPI-U", observations, Currency::USD)
  *     .expect("Index creation should succeed")
- *     .with_interpolation(InflationInterpolation::Linear)
+ *     .with_interpolation(SeriesInterpolation::Linear)
  *     .with_lag(InflationLag::Months(3)); // TIPS standard
  *
  * // Calculate inflation ratio for TIPS coupon indexation

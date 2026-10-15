@@ -8,22 +8,6 @@ pub mod scalars;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
-const ROOT_SUBMODULES: &[&str] = &["curves", "fx", "context", "scalars"];
-
-/// Promote an explicit export list from a submodule onto the parent module.
-fn promote_exports(
-    parent: &Bound<'_, PyModule>,
-    submod_name: &str,
-    exports: &[&str],
-) -> PyResult<()> {
-    let sub = parent.getattr(submod_name)?;
-    for name in exports {
-        let obj = sub.getattr(*name)?;
-        parent.add(*name, obj)?;
-    }
-    Ok(())
-}
-
 /// Register the `finstack_quant.core.market_data` submodule on the parent module.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "market_data")?;
@@ -32,16 +16,14 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "Bindings for finstack-quant-core market data: curves, vol surfaces, FX, and market context.",
     )?;
 
-    curves::register(py, &m)?;
-    fx::register(py, &m)?;
-    scalars::register(py, &m)?;
-    context::register(py, &m)?;
-    promote_exports(&m, "curves", curves::EXPORTS)?;
-    promote_exports(&m, "fx", fx::EXPORTS)?;
-    promote_exports(&m, "scalars", scalars::EXPORTS)?;
-    promote_exports(&m, "context", context::EXPORTS)?;
+    curves::register(&m)?;
+    fx::register(&m)?;
+    scalars::register(&m)?;
+    context::register(&m)?;
 
-    let mut all_names = ROOT_SUBMODULES.to_vec();
+    let mut all_names = Vec::with_capacity(
+        curves::EXPORTS.len() + fx::EXPORTS.len() + scalars::EXPORTS.len() + context::EXPORTS.len(),
+    );
     all_names.extend_from_slice(curves::EXPORTS);
     all_names.extend_from_slice(fx::EXPORTS);
     all_names.extend_from_slice(scalars::EXPORTS);

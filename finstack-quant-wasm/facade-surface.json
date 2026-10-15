@@ -1461,14 +1461,12 @@
     "methods": [
       "df",
       "dfBetweenDates",
-      "dfOnDate",
       "forward",
       "free",
       "toForwardCurve",
       "toJson",
       "zero",
-      "zeroRate",
-      "zeroRateOnDate"
+      "zeroRate"
     ],
     "getters": [
       "baseDate",
@@ -1490,9 +1488,7 @@
       "defaultProb",
       "free",
       "hazardRate",
-      "hazardRateOnDate",
       "sp",
-      "spOnDate",
       "survivalAtDates",
       "toJson",
       "withRecoveryRate"
@@ -1514,7 +1510,7 @@
   "core.ForwardCurve": {
     "kind": "class",
     "statics": ["flat", "fromJson"],
-    "methods": ["df", "dfOnDate", "free", "rate", "rateBetween", "ratePeriod", "toJson"],
+    "methods": ["df", "free", "rate", "rateBetween", "ratePeriod", "toJson"],
     "getters": [
       "baseDate",
       "dayCount",
@@ -1532,7 +1528,7 @@
   "core.InflationCurve": {
     "kind": "class",
     "statics": ["fromJson"],
-    "methods": ["cpi", "cpiOnDate", "cpiWithLag", "free", "indexRatio", "inflationRate", "toJson"],
+    "methods": ["cpi", "cpiWithLag", "free", "indexRatio", "inflationRate", "toJson"],
     "getters": [
       "baseCpi",
       "baseDate",
@@ -1548,7 +1544,7 @@
   "core.PriceCurve": {
     "kind": "class",
     "statics": ["fromJson"],
-    "methods": ["free", "price", "priceOnDate", "toJson"],
+    "methods": ["free", "price", "toJson"],
     "getters": [
       "baseDate",
       "dayCount",

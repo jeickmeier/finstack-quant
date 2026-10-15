@@ -59,7 +59,7 @@ fn extract_vol_grid(obj: &Bound<'_, PyAny>) -> PyResult<VolInput> {
 /// 0.205
 #[pyclass(
     name = "VolSurface",
-    module = "finstack_quant.core.market_data.curves",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]
@@ -326,7 +326,7 @@ impl_repr_html_via_dataframe!(PyVolSurface);
 /// 2
 #[pyclass(
     name = "FxDeltaVolSurface",
-    module = "finstack_quant.core.market_data.curves",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]
@@ -492,7 +492,7 @@ impl_repr_html_via_dataframe!(PyFxDeltaVolSurface);
 /// (0.02, None)
 #[pyclass(
     name = "SabrParameterData",
-    module = "finstack_quant.core.market_data.curves",
+    module = "finstack_quant.core.market_data",
     frozen,
     eq,
     skip_from_py_object
@@ -685,7 +685,7 @@ fn extract_sabr_node(obj: &Bound<'_, PyAny>, idx: usize) -> PyResult<SabrParamet
 /// 0.032
 #[pyclass(
     name = "VolCube",
-    module = "finstack_quant.core.market_data.curves",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]

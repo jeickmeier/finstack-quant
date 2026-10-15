@@ -25,7 +25,7 @@ use crate::errors::core_to_py;
 /// 0.325
 #[pyclass(
     name = "BaseCorrelationCurve",
-    module = "finstack_quant.core.market_data.curves",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]
@@ -171,7 +171,7 @@ impl_repr_html_via_dataframe!(PyBaseCorrelationCurve);
 /// 125
 #[pyclass(
     name = "CreditIndexData",
-    module = "finstack_quant.core.market_data.curves",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]

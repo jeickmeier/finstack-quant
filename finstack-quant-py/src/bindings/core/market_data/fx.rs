@@ -9,7 +9,7 @@ use finstack_quant_core::money::fx::{
     SimpleFxProvider,
 };
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PyModule};
+use pyo3::types::PyModule;
 use pyo3::wrap_pyfunction;
 
 use crate::bindings::core::currency::{extract_currency, PyCurrency};
@@ -40,7 +40,7 @@ fn extract_fx_policy(value: &Bound<'_, PyAny>) -> PyResult<FxConversionPolicy> {
 /// Wraps [`FxConversionPolicy`] from `finstack-quant-core`.
 #[pyclass(
     name = "FxConversionPolicy",
-    module = "finstack_quant.core.market_data.fx",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]
@@ -95,7 +95,7 @@ impl PyFxConversionPolicy {
 /// Wraps [`FxRateResult`] from `finstack-quant-core`.
 #[pyclass(
     name = "FxRateResult",
-    module = "finstack_quant.core.market_data.fx",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]
@@ -189,7 +189,7 @@ impl PyFxRateResult {
 /// from a `MarketContext` share state with the underlying context.
 #[pyclass(
     name = "FxMatrix",
-    module = "finstack_quant.core.market_data.fx",
+    module = "finstack_quant.core.market_data",
     skip_from_py_object
 )]
 pub struct PyFxMatrix {
@@ -408,7 +408,7 @@ fn parse_fx_quote_convention(s: &str) -> PyResult<FxQuoteConvention> {
 /// Wraps [`FxQuoteConvention`] from `finstack-quant-core`.
 #[pyclass(
     name = "FxQuoteConvention",
-    module = "finstack_quant.core.market_data.fx",
+    module = "finstack_quant.core.market_data",
     frozen,
     eq,
     skip_from_py_object
@@ -464,7 +464,7 @@ impl PyFxQuoteConvention {
 /// [`fx_pair_convention`].
 #[pyclass(
     name = "FxPairConvention",
-    module = "finstack_quant.core.market_data.fx",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]
@@ -607,32 +607,16 @@ pub(super) const EXPORTS: &[&str] = &[
     "invert_fx_rate",
 ];
 
-/// Register the `finstack_quant.core.market_data.fx` submodule.
-pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = crate::bindings::module_utils::new_submodule(parent, "fx")?;
-    m.setattr(
-        "__doc__",
-        "FX rate matrix and conversion policy bindings (finstack-quant-core).",
-    )?;
-
+/// Register FX classes and convention helpers on `finstack_quant.core.market_data`.
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFxConversionPolicy>()?;
     m.add_class::<PyFxRateResult>()?;
     m.add_class::<PyFxMatrix>()?;
     m.add_class::<PyFxQuoteConvention>()?;
     m.add_class::<PyFxPairConvention>()?;
-    m.add_function(wrap_pyfunction!(fx_market_pair, &m)?)?;
-    m.add_function(wrap_pyfunction!(fx_pair_convention, &m)?)?;
-    m.add_function(wrap_pyfunction!(fx_pip_size, &m)?)?;
-    m.add_function(wrap_pyfunction!(invert_fx_rate, &m)?)?;
-
-    let all = PyList::new(py, EXPORTS)?;
-    m.setattr("__all__", all)?;
-
-    crate::bindings::module_utils::attach_submodule(
-        parent,
-        &m,
-        crate::bindings::module_utils::Exposure::Compiled,
-    )?;
-
+    m.add_function(wrap_pyfunction!(fx_market_pair, m)?)?;
+    m.add_function(wrap_pyfunction!(fx_pair_convention, m)?)?;
+    m.add_function(wrap_pyfunction!(fx_pip_size, m)?)?;
+    m.add_function(wrap_pyfunction!(invert_fx_rate, m)?)?;
     Ok(())
 }

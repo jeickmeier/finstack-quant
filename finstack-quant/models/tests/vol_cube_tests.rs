@@ -562,10 +562,7 @@ fn test_vol_cube_vol_normal_price_consistency_positive_rates() {
 #[test]
 fn test_vol_cube_vol_normal_negative_rates_with_shift() {
     let shift = 0.02;
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4)
-        .unwrap()
-        .with_shift(shift)
-        .unwrap();
+    let p = SabrParameterData::new_with_shift(0.035, 0.5, -0.2, 0.4, Some(shift)).unwrap();
     let fwd = -0.005;
     let cube = VolCube::from_grid("EUR-SWPT", &[1.0], &[5.0], &[p], &[fwd]).unwrap();
     let t = 1.0;

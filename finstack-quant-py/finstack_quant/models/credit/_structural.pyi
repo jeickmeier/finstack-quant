@@ -19,7 +19,7 @@ import datetime
 import pandas as pd
 
 from finstack_quant.core.dates import DayCount
-from finstack_quant.core.market_data.curves import HazardCurve
+from finstack_quant.core.market_data import HazardCurve
 from finstack_quant.core.types import CreditRating
 from typing import Any
 

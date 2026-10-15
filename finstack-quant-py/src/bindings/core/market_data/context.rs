@@ -9,7 +9,7 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::types::CurveId;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PyModule};
+use pyo3::types::PyModule;
 use pyo3::IntoPyObjectExt;
 
 use crate::bindings::core::currency::extract_currency;
@@ -38,7 +38,7 @@ use super::scalars::{extract_f64, PyInflationIndex, PyScalarTimeSeries};
 /// (True, 1)
 #[pyclass(
     name = "MarketContext",
-    module = "finstack_quant.core.market_data.context",
+    module = "finstack_quant.core.market_data",
     skip_from_py_object
 )]
 #[derive(Clone)]
@@ -737,24 +737,7 @@ impl PyMarketContext {
 
 pub(super) const EXPORTS: &[&str] = &["MarketContext"];
 
-/// Register the `finstack_quant.core.market_data.context` submodule.
-pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = crate::bindings::module_utils::new_submodule(parent, "context")?;
-    m.setattr(
-        "__doc__",
-        "Market data context container bindings (finstack-quant-core).",
-    )?;
-
-    m.add_class::<PyMarketContext>()?;
-
-    let all = PyList::new(py, EXPORTS)?;
-    m.setattr("__all__", all)?;
-
-    crate::bindings::module_utils::attach_submodule(
-        parent,
-        &m,
-        crate::bindings::module_utils::Exposure::Compiled,
-    )?;
-
-    Ok(())
+/// Register `MarketContext` on `finstack_quant.core.market_data`.
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyMarketContext>()
 }

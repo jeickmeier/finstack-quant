@@ -33,7 +33,7 @@ use crate::errors::core_to_py;
 /// 'vol_index'
 #[pyclass(
     name = "PriceCurve",
-    module = "finstack_quant.core.market_data.curves",
+    module = "finstack_quant.core.market_data",
     frozen,
     skip_from_py_object
 )]
@@ -155,28 +155,6 @@ impl PyPriceCurve {
             TimePoint::Years(t) => Ok(self.inner.price(t)),
             TimePoint::Date(d) => self.inner.price_on_date(d).map_err(core_to_py),
         }
-    }
-
-    /// Forward price on a date using the curve day count.
-    ///
-    /// Parameters
-    /// ----------
-    /// date : datetime.date | str
-    ///     Target date on or after ``base_date``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the year fraction cannot be computed.
-    #[pyo3(text_signature = "(self, date)")]
-    fn price_on_date(&self, date: &Bound<'_, PyAny>) -> PyResult<f64> {
-        self.inner
-            .price_on_date(py_to_date(date)?)
-            .map_err(core_to_py)
     }
 
     /// Export knots as a pandas ``DataFrame`` with columns ``t`` (years) and ``price``.
