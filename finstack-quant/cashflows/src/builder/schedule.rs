@@ -7,15 +7,13 @@ use crate::builder::Notional;
 use crate::primitives::{is_cash_settlement_kind, CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::cashflow::Discountable;
-use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Period, PeriodId};
+use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Period};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::market_data::traits::{Discounting, Survival};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use indexmap::IndexMap;
 use std::sync::Arc;
 
 use super::compiler::{FixedSchedule, FloatSchedule};
@@ -1259,8 +1257,8 @@ impl CashFlowSchedule {
     ///
     /// # Returns
     ///
-    /// Map from `PeriodId` to per-currency present-value totals. Empty periods
-    /// are omitted.
+    /// [`crate::aggregation::PeriodAggregation`] mapping `PeriodId` to
+    /// per-currency present-value totals. Empty periods are omitted.
     ///
     /// # Errors
     ///
@@ -1298,12 +1296,12 @@ impl CashFlowSchedule {
         disc: &dyn Discounting,
         credit: Option<PvCreditAdjustment<'_>>,
         date_ctx: crate::aggregation::DateContext<'_>,
-    ) -> finstack_quant_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
+    ) -> finstack_quant_core::Result<crate::aggregation::PeriodAggregation> {
         if self.flows.is_empty() || periods.is_empty() {
-            return Ok(IndexMap::new());
+            return Ok(crate::aggregation::PeriodAggregation::default());
         }
 
-        if let Some(PvCreditAdjustment {
+        let raw = if let Some(PvCreditAdjustment {
             hazard: Some(hazard_curve),
             recovery_rate,
         }) = credit
@@ -1315,15 +1313,16 @@ impl CashFlowSchedule {
                 Some(hazard_curve),
                 recovery_rate,
                 date_ctx,
-            )
+            )?
         } else {
             crate::aggregation::pv_by_period_cashflows_sorted_checked(
                 &self.flows,
                 periods,
                 disc,
                 date_ctx,
-            )
-        }
+            )?
+        };
+        crate::aggregation::PeriodAggregation::try_from(raw)
     }
 
     /// Periodized PVs from a market context using the default day-count context.
@@ -1366,7 +1365,6 @@ impl CashFlowSchedule {
                 DayCountContext::default(),
             ),
         )
-        .and_then(crate::aggregation::PeriodAggregation::try_from)
     }
 
     /// Calendar-year ladder of this schedule's flows against caller-supplied PVs.
@@ -1503,6 +1501,7 @@ impl<'a> IntoIterator for &'a CashFlowSchedule {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use time::Month;
 
