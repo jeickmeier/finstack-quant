@@ -386,10 +386,15 @@ fn finalize_correlation_matrix(matrix: Vec<Vec<f64>>) -> crate::Result<(Vec<Vec<
 }
 
 #[cfg(test)]
-mod periodic_returns_tests {
+mod tests {
     use super::*;
+    use crate::correlation::validate_correlation_matrix;
     use crate::dates::{Month, PeriodKind};
     use crate::Performance;
+
+    fn jan(day: u8) -> Date {
+        Date::from_calendar_date(2024, Month::January, day).expect("valid date")
+    }
 
     /// Build a single-ticker `Performance` with daily returns spanning
     /// January and February 2021 (2021-01-04 through 2021-02-26).
@@ -417,41 +422,6 @@ mod periodic_returns_tests {
         .unwrap()
     }
 
-    #[test]
-    fn lookback_returns_default_fiscal_year_is_calendar_year() {
-        let perf = sample_two_month_daily_performance();
-        let ref_date = *perf.dates().last().unwrap();
-        let omitted = perf.lookback_returns(ref_date, None);
-        let explicit = perf.lookback_returns(ref_date, Some(FiscalConfig::calendar_year()));
-        assert_eq!(omitted.fytd, explicit.fytd);
-        assert_eq!(omitted.ytd, explicit.fytd);
-    }
-
-    #[test]
-    fn periodic_returns_monthly_has_one_bucket_per_month() {
-        let perf = sample_two_month_daily_performance();
-        let periodic = perf.periodic_returns(PeriodKind::Monthly);
-        assert_eq!(periodic.len(), perf.ticker_names().len());
-        assert_eq!(periodic[0].len(), 2);
-        assert_eq!(periodic[0][0].date.month(), Month::January);
-        assert_eq!(periodic[0][1].date.month(), Month::February);
-        let cum = perf.cumulative_returns();
-        let total = *cum[0].last().unwrap();
-        let chained = (1.0 + periodic[0][0].value) * (1.0 + periodic[0][1].value) - 1.0;
-        assert!((chained - total).abs() < 1e-12);
-    }
-}
-
-#[cfg(test)]
-mod excess_returns_tests {
-    use super::*;
-    use crate::dates::{Month, PeriodKind};
-    use crate::Performance;
-
-    fn jan(day: u8) -> Date {
-        Date::from_calendar_date(2024, Month::January, day).expect("valid date")
-    }
-
     fn rectangular_perf() -> Performance {
         let dates = vec![jan(2), jan(3), jan(4), jan(5)];
         Performance::from_returns(
@@ -477,6 +447,30 @@ mod excess_returns_tests {
             PeriodKind::Daily,
         )
         .expect("ragged panel")
+    }
+
+    #[test]
+    fn lookback_returns_default_fiscal_year_is_calendar_year() {
+        let perf = sample_two_month_daily_performance();
+        let ref_date = *perf.dates().last().unwrap();
+        let omitted = perf.lookback_returns(ref_date, None);
+        let explicit = perf.lookback_returns(ref_date, Some(FiscalConfig::calendar_year()));
+        assert_eq!(omitted.fytd, explicit.fytd);
+        assert_eq!(omitted.ytd, explicit.fytd);
+    }
+
+    #[test]
+    fn periodic_returns_monthly_has_one_bucket_per_month() {
+        let perf = sample_two_month_daily_performance();
+        let periodic = perf.periodic_returns(PeriodKind::Monthly);
+        assert_eq!(periodic.len(), perf.ticker_names().len());
+        assert_eq!(periodic[0].len(), 2);
+        assert_eq!(periodic[0][0].date.month(), Month::January);
+        assert_eq!(periodic[0][1].date.month(), Month::February);
+        let cum = perf.cumulative_returns();
+        let total = *cum[0].last().unwrap();
+        let chained = (1.0 + periodic[0][0].value) * (1.0 + periodic[0][1].value) - 1.0;
+        assert!((chained - total).abs() < 1e-12);
     }
 
     #[test]
@@ -517,18 +511,6 @@ mod excess_returns_tests {
             msg.contains("rf.len()") || msg.contains("active date"),
             "unexpected error: {msg}"
         );
-    }
-}
-
-#[cfg(test)]
-mod correlation_matrix_tests {
-    use super::*;
-    use crate::correlation::validate_correlation_matrix;
-    use crate::dates::{Month, PeriodKind};
-    use crate::Performance;
-
-    fn jan(day: u8) -> Date {
-        Date::from_calendar_date(2024, Month::January, day).expect("valid date")
     }
 
     #[test]

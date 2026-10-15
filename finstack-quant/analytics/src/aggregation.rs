@@ -304,12 +304,13 @@ pub(crate) fn period_stats_inner(returns: impl Iterator<Item = f64>) -> PeriodSt
 }
 
 #[cfg(test)]
-mod periodic_dated_tests {
+mod tests {
     use super::*;
     use crate::dates::{Month, PeriodKind};
 
     fn d(y: i32, m: u8, day: u8) -> Date {
-        crate::dates::create_date(y, Month::try_from(m).unwrap(), day).unwrap()
+        crate::dates::create_date(y, Month::try_from(m).expect("valid month"), day)
+            .expect("valid date")
     }
 
     #[test]
@@ -338,10 +339,7 @@ mod periodic_dated_tests {
         let out = group_period_buckets(&[], &[], PeriodKind::Monthly, None);
         assert!(out.is_empty());
     }
-}
 
-#[cfg(test)]
-mod tests {
     #[test]
     fn period_stats_non_finite_fields_match_serde_sentinels() {
         let stats = PeriodStats {
@@ -359,14 +357,6 @@ mod tests {
             kelly_criterion: f64::NAN,
         };
         crate::test_support::assert_non_finite_fields(&stats);
-    }
-
-    use super::*;
-    use crate::dates::Month;
-
-    fn d(y: i32, m: u8, day: u8) -> Date {
-        crate::dates::create_date(y, Month::try_from(m).expect("valid month"), day)
-            .expect("valid date")
     }
 
     #[test]
