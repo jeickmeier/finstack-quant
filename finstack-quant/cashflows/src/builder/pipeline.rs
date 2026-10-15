@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::decimal::f64_to_decimal;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
@@ -10,41 +9,20 @@ use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 
-use crate::builder::compiler::{FixedSchedule, FloatSchedule, PeriodicFee};
 use crate::builder::emission::{
     emit_amortization_on, emit_fees_on, emit_fixed_coupons_on, emit_float_coupons_on,
     FloatEmissionOutput, ResolvedFloatMarket,
 };
 use crate::builder::orchestrator::{
-    apply_principal_event, AmortizationSetup, BuildState, PreparedAmortization, PrincipalEvent,
+    apply_principal_event, BuildState, CompiledCashFlowPlan, PreparedAmortization,
 };
 use crate::builder::PrincipalExchange;
 use crate::primitives::{CFKind, CashFlow};
 
-#[derive(Clone, Copy)]
-pub(super) struct BuildContext<'a> {
-    pub(super) ccy: Currency,
-    pub(super) issue: Date,
-    pub(super) observation_date: Option<Date>,
-    /// Payment date of the coupon window ending at maturity, including its
-    /// business-day adjustment and payment lag. Equals the raw `maturity`
-    /// when no coupon schedule exists.
-    pub(super) redemption_date: Date,
-    /// Contractual accrual boundary at which final principal ceases accruing.
-    pub(super) redemption_effective_date: Date,
-    /// Whether to emit the maturity balloon as `CFKind::Notional`.
-    pub(super) principal_exchange: PrincipalExchange,
-    pub(super) fixed_schedules: &'a [FixedSchedule],
-    pub(super) float_schedules: &'a [FloatSchedule],
-    pub(super) periodic_fees: &'a [PeriodicFee],
-    pub(super) fixed_fees: &'a [(Date, Money)],
-    pub(super) principal_events: &'a [PrincipalEvent],
-}
-
 /// Processes cashflows for a single schedule date.
 pub(super) struct DateProcessor<'a> {
-    ctx: &'a BuildContext<'a>,
-    amort_setup: &'a AmortizationSetup,
+    plan: &'a CompiledCashFlowPlan,
+    observation_date: Option<Date>,
     resolved_curves: &'a [Option<Arc<ForwardCurve>>],
     /// Per-float-schedule historical fixing series (`FIXING:{forward_curve_id}`),
     /// aligned with `resolved_curves`; used for seasoned coupons whose
@@ -54,14 +32,14 @@ pub(super) struct DateProcessor<'a> {
 
 impl<'a> DateProcessor<'a> {
     pub(super) fn new(
-        ctx: &'a BuildContext<'a>,
-        amort_setup: &'a AmortizationSetup,
+        plan: &'a CompiledCashFlowPlan,
+        observation_date: Option<Date>,
         resolved_curves: &'a [Option<Arc<ForwardCurve>>],
         resolved_fixings: &'a [Option<ScalarTimeSeries>],
     ) -> Self {
         Self {
-            ctx,
-            amort_setup,
+            plan,
+            observation_date,
             resolved_curves,
             resolved_fixings,
         }
@@ -69,23 +47,24 @@ impl<'a> DateProcessor<'a> {
 
     /// Emit fixed and floating coupons, returning total PIK amount to capitalize.
     fn emit_coupons(&self, d: Date, state: &mut BuildState) -> finstack_quant_core::Result<f64> {
+        let ccy = self.plan.notional.initial.currency();
         let pik_f = emit_fixed_coupons_on(
             d,
-            self.ctx.fixed_schedules,
+            &self.plan.fixed_schedules,
             &state.outstanding_history,
             state.outstanding,
-            self.ctx.ccy,
+            ccy,
             &mut state.flows,
         )?;
         let pik_fl = emit_float_coupons_on(
             d,
-            self.ctx.float_schedules,
+            &self.plan.float_schedules,
             &state.outstanding_history,
             state.outstanding,
-            self.ctx.ccy,
+            ccy,
             ResolvedFloatMarket {
                 curves: self.resolved_curves,
-                observation_date: self.ctx.observation_date,
+                observation_date: self.observation_date,
                 fixings: self.resolved_fixings,
             },
             FloatEmissionOutput {
@@ -103,18 +82,19 @@ impl<'a> DateProcessor<'a> {
         state: &mut BuildState,
     ) -> finstack_quant_core::Result<()> {
         let first_flow = state.flows.len();
+        let amort_setup = &self.plan.amort_setup;
         emit_amortization_on(
             d,
-            self.ctx.ccy,
+            self.plan.notional.initial.currency(),
             &mut state.outstanding,
-            self.amort_setup,
+            amort_setup,
             state.linear_between_installment,
-            self.amort_setup.final_amortization_date == Some(d),
+            amort_setup.final_amortization_date == Some(d),
             &mut state.flows,
         )?;
         for flow in &mut state.flows[first_flow..] {
             flow.principal_date = Some(d);
-            flow.date = self.amort_setup.payment_dates.get(&d).copied().unwrap_or(d);
+            flow.date = amort_setup.payment_dates.get(&d).copied().unwrap_or(d);
         }
         Ok(())
     }
@@ -124,17 +104,19 @@ impl<'a> DateProcessor<'a> {
         &self,
         state: &mut BuildState,
     ) -> finstack_quant_core::Result<()> {
-        self.emit_amortization(self.ctx.issue, state)?;
+        self.emit_amortization(self.plan.issue, state)?;
         if let Some((_, balance)) = state.outstanding_history.last_mut() {
             *balance = state.outstanding;
         }
-        self.initialize_linear_between(self.ctx.issue, state);
+        self.initialize_linear_between(self.plan.issue, state);
         Ok(())
     }
 
     /// Fix equal installments from the balance after all start-date movements.
     fn initialize_linear_between(&self, d: Date, state: &mut BuildState) {
-        if let PreparedAmortization::LinearBetween { start, count, .. } = &self.amort_setup.rule {
+        if let PreparedAmortization::LinearBetween { start, count, .. } =
+            &self.plan.amort_setup.rule
+        {
             if *start == d {
                 state.linear_between_installment =
                     Some(state.outstanding / Decimal::from(*count as u64));
@@ -146,11 +128,11 @@ impl<'a> DateProcessor<'a> {
     fn emit_fees(&self, d: Date, state: &mut BuildState) -> finstack_quant_core::Result<()> {
         emit_fees_on(
             d,
-            self.ctx.periodic_fees,
-            self.ctx.fixed_fees,
+            &self.plan.periodic_fees,
+            &self.plan.fixed_fees,
             state.outstanding,
             &state.outstanding_history,
-            self.ctx.ccy,
+            self.plan.notional.initial.currency(),
             &mut state.flows,
         )
     }
@@ -161,9 +143,9 @@ impl<'a> DateProcessor<'a> {
         d: Date,
         state: &mut BuildState,
     ) -> finstack_quant_core::Result<Decimal> {
-        let first = self.ctx.principal_events.partition_point(|ev| ev.date < d);
+        let first = self.plan.principal_events.partition_point(|ev| ev.date < d);
         let mut funded = Decimal::ZERO;
-        for ev in self.ctx.principal_events[first..]
+        for ev in self.plan.principal_events[first..]
             .iter()
             .take_while(|ev| ev.date == d)
         {
@@ -186,16 +168,16 @@ impl<'a> DateProcessor<'a> {
     /// Computes at the terminal accrual boundary after PIK capitalization.
     /// Cash settles on the independently adjusted redemption payment date.
     fn handle_maturity(&self, d: Date, state: &mut BuildState) -> finstack_quant_core::Result<()> {
-        if d == self.ctx.redemption_effective_date
-            && self.ctx.principal_exchange == PrincipalExchange::InitialAndFinal
+        if d == self.plan.redemption_effective_date
+            && self.plan.principal_exchange == PrincipalExchange::InitialAndFinal
             && state.outstanding > Decimal::ZERO
         {
             let outstanding_f64 = finstack_quant_core::decimal::decimal_to_f64(state.outstanding)?;
             state.flows.push(
                 CashFlow::new(
-                    self.ctx.redemption_date,
+                    self.plan.redemption_date,
                     None,
-                    Money::new(outstanding_f64, self.ctx.ccy)?,
+                    Money::new(outstanding_f64, self.plan.notional.initial.currency())?,
                     CFKind::Notional,
                     0.0,
                     None,
@@ -228,12 +210,14 @@ impl<'a> DateProcessor<'a> {
         self.emit_amortization(d, &mut state)?;
         self.emit_fees(d, &mut state)?;
         self.initialize_linear_between(d, &mut state);
-        if let PreparedAmortization::LinearBetween { start, end, .. } = &self.amort_setup.rule {
+        if let PreparedAmortization::LinearBetween { start, end, .. } = &self.plan.amort_setup.rule
+        {
             if funded > Decimal::ZERO && d > *start && d < *end {
                 // Each later draw repays equally over its remaining dates.
                 // Add after today's payment: a same-day draw first amortizes
                 // at the next contractual boundary, never at its funding date.
                 let remaining = self
+                    .plan
                     .amort_setup
                     .amort_dates
                     .iter()

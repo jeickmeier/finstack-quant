@@ -21,7 +21,7 @@ use super::compiler::{
     build_fee_schedules, compute_coupon_schedules, CompiledSchedules, CouponProgramPiece,
     FixedSchedule, FloatSchedule, PaymentProgramPiece, PeriodicFee,
 };
-use super::pipeline::{BuildContext, DateProcessor};
+use super::pipeline::DateProcessor;
 use super::specs::FeeSpec;
 use smallvec::SmallVec;
 use tracing::debug;
@@ -530,20 +530,20 @@ impl Default for CashFlowBuilder {
 }
 
 #[derive(Clone)]
-struct CompiledCashFlowPlan {
-    notional: Notional,
-    issue: Date,
-    maturity: Date,
-    fixed_schedules: Vec<FixedSchedule>,
-    float_schedules: Vec<FloatSchedule>,
-    periodic_fees: Vec<PeriodicFee>,
-    fixed_fees: Vec<(Date, Money)>,
-    principal_events: Vec<PrincipalEvent>,
-    dates: Vec<Date>,
-    amort_setup: AmortizationSetup,
-    redemption_date: Date,
-    redemption_effective_date: Date,
-    principal_exchange: PrincipalExchange,
+pub(super) struct CompiledCashFlowPlan {
+    pub(super) notional: Notional,
+    pub(super) issue: Date,
+    pub(super) maturity: Date,
+    pub(super) fixed_schedules: Vec<FixedSchedule>,
+    pub(super) float_schedules: Vec<FloatSchedule>,
+    pub(super) periodic_fees: Vec<PeriodicFee>,
+    pub(super) fixed_fees: Vec<(Date, Money)>,
+    pub(super) principal_events: Vec<PrincipalEvent>,
+    pub(super) dates: Vec<Date>,
+    pub(super) amort_setup: AmortizationSetup,
+    pub(super) redemption_date: Date,
+    pub(super) redemption_effective_date: Date,
+    pub(super) principal_exchange: PrincipalExchange,
 }
 
 impl CashFlowBuilder {
@@ -773,7 +773,6 @@ impl CompiledCashFlowPlan {
             &self.principal_events,
             self.principal_exchange,
         )?;
-        let ccy = self.notional.initial.currency();
         // Pre- and at-issue fees emit here; the date loop only covers dates after issue.
         for (fee_date, amount) in &self.fixed_fees {
             if *fee_date <= self.issue && amount.amount() != 0.0 {
@@ -787,19 +786,6 @@ impl CompiledCashFlowPlan {
                 ));
             }
         }
-        let ctx = BuildContext {
-            ccy,
-            observation_date,
-            issue: self.issue,
-            redemption_date: self.redemption_date,
-            redemption_effective_date: self.redemption_effective_date,
-            principal_exchange: self.principal_exchange,
-            fixed_schedules: &self.fixed_schedules,
-            float_schedules: &self.float_schedules,
-            periodic_fees: &self.periodic_fees,
-            fixed_fees: &self.fixed_fees,
-            principal_events: &self.principal_events,
-        };
 
         let (resolved_curves, resolved_fixings): (
             Vec<Option<Arc<ForwardCurve>>>,
@@ -856,7 +842,7 @@ impl CompiledCashFlowPlan {
         }
 
         let processor =
-            DateProcessor::new(&ctx, &self.amort_setup, &resolved_curves, &resolved_fixings);
+            DateProcessor::new(self, observation_date, &resolved_curves, &resolved_fixings);
         processor.process_issue_amortization(&mut state)?;
         for &d in self.dates.iter().filter(|&&d| d > self.issue) {
             state = processor.process(d, state)?;

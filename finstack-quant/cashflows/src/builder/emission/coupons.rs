@@ -8,7 +8,7 @@ use crate::builder::FloatingLegCompounding;
 use crate::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::fixings::{fixing_series_id, require_fixing_value_exact};
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
@@ -283,35 +283,23 @@ pub(crate) fn emit_fixed_coupons_on(
                 let is_stub = entry.is_stub;
                 let is_termination_date = schedule.terminal_accrual_end == Some(accrual_end);
 
-                // ACT/ACT ICMA: regular periods use the unadjusted span; stubs use the adjacent regular coupon.
-                let coupon_period = if spec.schedule.day_count == DayCount::Act365L {
-                    Some((period.accrual_start, period.accrual_end))
-                } else {
-                    crate::builder::date_generation::icma_coupon_period(
-                        period.unadjusted_start,
-                        period.unadjusted_end,
-                        spec.schedule.frequency,
-                        if matches!(spec.schedule.roll_rule, crate::builder::RollRule::None) {
-                            spec.schedule.stub
-                        } else {
-                            finstack_quant_core::dates::StubKind::ShortBack
-                        },
-                        spec.schedule.end_of_month,
-                        spec.schedule.roll_rule,
-                    )
-                };
+                let day_count_ctx = crate::builder::periods::period_day_count_context(
+                    period,
+                    calendar,
+                    spec.schedule.frequency,
+                    spec.schedule.day_count,
+                    spec.schedule.stub,
+                    spec.schedule.end_of_month,
+                    spec.schedule.roll_rule,
+                    is_termination_date,
+                );
+                let coupon_period = day_count_ctx.coupon_period;
                 let yf = crate::builder::periods::contractual_accrual(
                     spec.schedule.day_count,
                     (period.accrual_start, period.accrual_end),
                     accrual_start,
                     accrual_end,
-                    finstack_quant_core::dates::DayCountContext {
-                        calendar: Some(calendar),
-                        frequency: Some(spec.schedule.frequency),
-                        bus_basis: None,
-                        coupon_period,
-                        end_is_termination_date: is_termination_date,
-                    },
+                    day_count_ctx,
                 )?;
 
                 let yf_dec = f64_to_decimal(yf)?;
@@ -427,28 +415,16 @@ fn floating_accrual_context(
     end: Date,
 ) -> finstack_quant_core::dates::DayCountContext<'static> {
     let params = &schedule.spec.schedule;
-    finstack_quant_core::dates::DayCountContext {
-        calendar: Some(schedule.calendar),
-        frequency: Some(params.frequency),
-        bus_basis: None,
-        coupon_period: if params.day_count == DayCount::Act365L {
-            Some((period.accrual_start, period.accrual_end))
-        } else {
-            crate::builder::date_generation::icma_coupon_period(
-                period.unadjusted_start,
-                period.unadjusted_end,
-                params.frequency,
-                if matches!(params.roll_rule, crate::builder::RollRule::None) {
-                    params.stub
-                } else {
-                    finstack_quant_core::dates::StubKind::ShortBack
-                },
-                params.end_of_month,
-                params.roll_rule,
-            )
-        },
-        end_is_termination_date: schedule.terminal_accrual_end == Some(end),
-    }
+    crate::builder::periods::period_day_count_context(
+        period,
+        schedule.calendar,
+        params.frequency,
+        params.day_count,
+        params.stub,
+        params.end_of_month,
+        params.roll_rule,
+        schedule.terminal_accrual_end == Some(end),
+    )
 }
 
 fn floating_year_fraction(
@@ -891,7 +867,7 @@ pub(crate) fn emit_float_coupons_on(
 mod tests {
     use super::*;
     use crate::builder::FloatingLegCompounding;
-    use finstack_quant_core::dates::calendar_by_id_strict;
+    use finstack_quant_core::dates::{calendar_by_id_strict, DayCount};
     use time::Month;
 
     #[test]

@@ -148,6 +148,45 @@ impl<'a> BuildPeriodsParams<'a> {
     }
 }
 
+/// Build a [`DayCountContext`] for `period`, resolving `Act365L` full-period
+/// bounds vs ICMA reference coupon dates.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn period_day_count_context<'a>(
+    period: &SchedulePeriod,
+    calendar: &'a dyn finstack_quant_core::dates::HolidayCalendar,
+    frequency: Tenor,
+    day_count: DayCount,
+    stub: StubKind,
+    end_of_month: bool,
+    roll_rule: RollRule,
+    end_is_termination_date: bool,
+) -> DayCountContext<'a> {
+    // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)); ICMA stubs use the adjacent regular coupon.
+    let coupon_period = if day_count == DayCount::Act365L {
+        Some((period.accrual_start, period.accrual_end))
+    } else {
+        icma_coupon_period(
+            period.unadjusted_start,
+            period.unadjusted_end,
+            frequency,
+            if matches!(roll_rule, RollRule::None) {
+                stub
+            } else {
+                StubKind::ShortBack
+            },
+            end_of_month,
+            roll_rule,
+        )
+    };
+    DayCountContext {
+        calendar: Some(calendar),
+        frequency: Some(frequency),
+        bus_basis: None,
+        coupon_period,
+        end_is_termination_date,
+    }
+}
+
 /// Calculate accrual over a subinterval using the original period's reference grid.
 ///
 /// # Arguments
@@ -173,25 +212,16 @@ pub fn period_accrual(
         ));
     }
     let cal = calendar_by_id_strict(params.calendar_id)?;
-    // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)); ICMA stubs use the adjacent regular coupon.
-    let day_count_context = DayCountContext {
-        calendar: Some(cal),
-        frequency: Some(params.frequency),
-        bus_basis: None,
-        coupon_period: icma_coupon_period(
-            period.unadjusted_start,
-            period.unadjusted_end,
-            params.frequency,
-            if matches!(params.roll_rule, RollRule::None) {
-                params.stub
-            } else {
-                StubKind::ShortBack
-            },
-            params.end_of_month,
-            params.roll_rule,
-        ),
-        end_is_termination_date: period.unadjusted_end == params.end,
-    };
+    let day_count_context = period_day_count_context(
+        period,
+        cal,
+        params.frequency,
+        params.day_count,
+        params.stub,
+        params.end_of_month,
+        params.roll_rule,
+        period.unadjusted_end == params.end,
+    );
     contractual_accrual(
         params.day_count,
         (period.accrual_start, period.accrual_end),
