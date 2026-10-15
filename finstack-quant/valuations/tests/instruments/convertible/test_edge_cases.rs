@@ -151,7 +151,7 @@ fn test_very_few_tree_steps() {
 
 #[test]
 fn test_time_mapping_with_quarterly_coupons() {
-    use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec};
+    use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 
     let issue = dates::issue();
@@ -186,7 +186,7 @@ fn test_time_mapping_with_quarterly_coupons() {
             payment_lag_days: 0,
 
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 

@@ -27,7 +27,7 @@
 //! ```
 
 use super::helpers::d;
-use finstack_quant_cashflows::builder::schedule::CashflowRepresentation;
+use finstack_quant_cashflows::builder::CashflowRepresentation;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;

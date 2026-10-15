@@ -4,12 +4,12 @@
 //! prepayment and default modeling for structured credit instruments.
 
 use super::{DealType, StructuredCredit};
-use crate::cashflow::builder::DefaultModelSpec;
-use crate::cashflow::builder::PrepaymentModelSpec;
 use crate::instruments::fixed_income::structured_credit::pricing::stochastic::calibrations::{
     abs_auto_correlation_structure, clo_correlation_structure, clo_default_spec, clo_prepay_spec,
     cmbs_correlation_structure, rmbs_correlation_structure, rmbs_default_spec, rmbs_prepay_spec,
 };
+use finstack_quant_cashflows::builder::DefaultModelSpec;
+use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::Result;
 use finstack_quant_models::credit::pool::{
     CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,

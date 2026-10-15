@@ -13,11 +13,11 @@
 //! Hagan, P. S. (2003). "Convexity Conundrums: Pricing CMS Swaps, Caps,
 //! and Floors." *Wilmott Magazine*, March, 38-44. `docs/REFERENCES.md#hagan-2003-cms-convexity`
 
-use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::rates::cms_common::CmsReferenceSwap;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
@@ -184,14 +184,14 @@ pub struct FundingPeriod {
     pub accrual_year_fraction: f64,
 }
 
-impl From<crate::cashflow::builder::periods::SchedulePeriod> for FundingPeriod {
+impl From<finstack_quant_cashflows::builder::SchedulePeriod> for FundingPeriod {
     /// Retain the contractual dates and accrual of a generated funding period.
     ///
     /// # Arguments
     ///
     /// * `period` - Canonical generated schedule period; an absent reset date
     ///   denotes a simple funding coupon observed on its accrual start.
-    fn from(period: crate::cashflow::builder::periods::SchedulePeriod) -> Self {
+    fn from(period: finstack_quant_cashflows::builder::SchedulePeriod) -> Self {
         Self {
             accrual_start: period.accrual_start,
             accrual_end: period.accrual_end,
@@ -343,7 +343,7 @@ impl CmsSwap {
         forward_curve_id: impl Into<CurveId>,
         vol_surface_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
-        use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
+        use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
         use finstack_quant_core::dates::{BusinessDayConvention, StubKind};
 
         let reference_conventions = crate::market::conventions::ConventionRegistry::try_global()?
@@ -363,7 +363,7 @@ impl CmsSwap {
             payment_lag_days: 0,
             reset_lag_days: Some(reset_lag_days),
             adjust_accrual_dates: false,
-            roll_rule: crate::cashflow::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         })?;
 
         if cms_periods.is_empty() {
@@ -399,7 +399,7 @@ impl CmsSwap {
                     payment_lag_days: 0,
                     reset_lag_days: None,
                     adjust_accrual_dates: false,
-                    roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                    roll_rule: finstack_quant_cashflows::builder::RollRule::None,
                 })?;
                 FundingLeg::Fixed {
                     rate,
@@ -424,7 +424,7 @@ impl CmsSwap {
                     payment_lag_days: 0,
                     reset_lag_days: None,
                     adjust_accrual_dates: false,
-                    roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                    roll_rule: finstack_quant_cashflows::builder::RollRule::None,
                 })?;
                 FundingLeg::Floating {
                     spread_bp,
@@ -687,7 +687,7 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSwap {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Option<finstack_quant_core::dates::Date>> {
         let schedule =
-            crate::cashflow::traits::CashflowProvider::cashflow_schedule(self, curves, as_of)?;
+            finstack_quant_cashflows::CashflowProvider::cashflow_schedule(self, curves, as_of)?;
         Ok(schedule
             .get_flows()
             .iter()
@@ -775,7 +775,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
         let mut projected_fixings = Vec::new();
         for &fixing_date in &self.fixing_dates {
             if fixing_date > as_of {
-                projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
+                projected_fixings.push(finstack_quant_cashflows::fixings::ProjectedFixing {
                     series_id: finstack_quant_core::market_data::fixings::cms_fixing_series_id(
                         self.forward_curve_id.as_str(),
                         self.cms_tenor.to_years(),
@@ -794,7 +794,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
         {
             for flow in &funding_flows {
                 if let (Some(date), Some(accrual)) = (flow.reset_date, &flow.accrual) {
-                    projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
+                    projected_fixings.push(finstack_quant_cashflows::fixings::ProjectedFixing {
                         series_id: finstack_quant_core::market_data::fixings::fixing_series_id(
                             forward_curve_id.as_str(),
                         ),
@@ -809,20 +809,22 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
             .into_iter()
             .chain(funding_flows)
             .collect();
-        let schedule = crate::cashflow::traits::schedule_from_classified_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             self.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
-                meta: crate::cashflow::builder::CashFlowMeta {
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
                     projected_fixings,
-                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                     ..Default::default()
                 },
             },
         );
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 
@@ -863,9 +865,9 @@ mod tests {
     }
 
     use super::*;
-    use crate::cashflow::CashflowProvider;
     use date_support::date;
     use discount_forward_curve_support::{flat_discount_with_tenor, flat_forward_with_tenor};
+    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::fixings::{cms_fixing_series_id, fixing_series_id};
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;

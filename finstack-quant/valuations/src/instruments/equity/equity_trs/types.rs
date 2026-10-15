@@ -2,13 +2,13 @@
 
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::{
-    cashflow::builder::ScheduleParams,
     instruments::common_impl::parameters::{
         legs::FinancingLegSpec, legs::PayReceive, trs_common::TrsScheduleSpec,
         underlying::EquityUnderlyingParams,
     },
     instruments::Attributes,
 };
+use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::{
     currency::Currency,
     dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor},
@@ -335,7 +335,7 @@ impl EquityTotalReturnSwap {
                     end_of_month: false,
                     payment_lag_days: 0,
                     adjust_accrual_dates: false,
-                    roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                    roll_rule: finstack_quant_cashflows::builder::RollRule::None,
                 },
             ))
             .side(PayReceive::Receive)
@@ -628,12 +628,12 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
         &self,
         context: &MarketContext,
         _as_of: Date,
-    ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
-        let mut builder = crate::cashflow::builder::CashFlowSchedule::builder();
+    ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
+        let mut builder = finstack_quant_cashflows::builder::CashFlowSchedule::builder();
         let _ = builder
             .principal(self.notional, self.schedule.start, self.schedule.end)
-            .floating_cf(crate::cashflow::builder::FloatingCouponSpec {
-                rate_spec: crate::cashflow::builder::FloatingRateSpec {
+            .floating_cf(finstack_quant_cashflows::builder::FloatingCouponSpec {
+                rate_spec: finstack_quant_cashflows::builder::FloatingRateSpec {
                     forward_curve_id: self.financing_leg.forward_curve_id.clone(),
                     spread_bp: self.financing_leg.spread_bp,
                     gearing: Decimal::ONE,
@@ -649,9 +649,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
                     fixing_calendar_id: None,
                     compounding: None,
                     overnight_basis: None,
-                    fallback: crate::cashflow::builder::FloatingRateFallback::Error,
+                    fallback: finstack_quant_cashflows::builder::FloatingRateFallback::Error,
                 },
-                coupon_type: crate::cashflow::builder::CouponType::Cash,
+                coupon_type: finstack_quant_cashflows::builder::CouponType::Cash,
                 schedule: finstack_quant_cashflows::builder::ScheduleParams {
                     frequency: self.schedule.params.frequency,
                     day_count: self.financing_leg.day_count,
@@ -661,12 +661,13 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
                     end_of_month: self.schedule.params.end_of_month,
                     payment_lag_days: self.schedule.params.payment_lag_days,
                     adjust_accrual_dates: false,
-                    roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                    roll_rule: finstack_quant_cashflows::builder::RollRule::None,
                 },
             });
         let schedule = builder.build(Some(context))?;
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 

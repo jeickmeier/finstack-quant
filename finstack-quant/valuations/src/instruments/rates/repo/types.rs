@@ -1,9 +1,9 @@
 //! Core types for Repurchase Agreement (Repo) instruments.
 
-use crate::cashflow::traits::CashflowProvider;
 use crate::contract_specs::embedded_registry;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
+use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::dates::{adjust, BusinessDayConvention, Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -663,49 +663,50 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
         &self,
         _context: &MarketContext,
         _as_of: Date,
-    ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let (adj_start, adj_maturity) = self.adjusted_dates()?;
 
         let cash_outflow = Money::new(-self.cash_amount.amount(), self.cash_amount.currency())?;
         let total_repayment = self.total_repayment()?;
         let interest = total_repayment.checked_sub(self.cash_amount)?;
         let flows = vec![
-            crate::cashflow::primitives::CashFlow::new(
+            finstack_quant_cashflows::primitives::CashFlow::new(
                 adj_start,
                 None,
                 cash_outflow,
-                crate::cashflow::primitives::CFKind::Notional,
+                finstack_quant_cashflows::primitives::CFKind::Notional,
                 0.0,
                 None,
             ),
-            crate::cashflow::primitives::CashFlow::new(
+            finstack_quant_cashflows::primitives::CashFlow::new(
                 adj_maturity,
                 None,
                 self.cash_amount,
-                crate::cashflow::primitives::CFKind::Notional,
+                finstack_quant_cashflows::primitives::CFKind::Notional,
                 0.0,
                 None,
             ),
-            crate::cashflow::primitives::CashFlow::new(
+            finstack_quant_cashflows::primitives::CashFlow::new(
                 adj_maturity,
                 None,
                 interest,
-                crate::cashflow::primitives::CFKind::Fixed,
+                finstack_quant_cashflows::primitives::CFKind::Fixed,
                 0.0,
                 None,
             ),
         ];
 
-        let schedule = crate::cashflow::traits::schedule_from_classified_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             self.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: self.notional()?,
                 ..Default::default()
             },
         );
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Contractual))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Contractual,
+        ))
     }
 }
 
@@ -801,7 +802,7 @@ mod tests {
     /// - PV is deterministic and stable
     #[test]
     fn term_repo_weekend_business_day_convention_adjustment_target2() {
-        use crate::cashflow::traits::CashflowProvider;
+        use finstack_quant_cashflows::CashflowProvider;
         use finstack_quant_core::dates::calendar::TARGET2;
         use finstack_quant_core::dates::HolidayCalendar;
 

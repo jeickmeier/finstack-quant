@@ -4,11 +4,11 @@ use super::config::{
     validate_copula_spec, CdsTranchePricer, DiscountAt, EffectiveStructure, ProjectedDiscountedRow,
     ProjectionInputs, BESPOKE_SETTLEMENT_DAYS, INDEX_SETTLEMENT_DAYS, PROBABILITY_CLIP,
 };
-use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule};
-use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::constants::BASIS_POINTS_PER_UNIT;
 use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use crate::instruments::PayReceive;
+use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
+use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::dates::{calendar_by_id, Date, DateExt, HolidayCalendar};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -151,14 +151,15 @@ impl CdsTranchePricer {
     ) -> Result<CashFlowSchedule> {
         tranche.validate()?;
         if as_of >= tranche.maturity {
-            return Ok(crate::cashflow::traits::schedule_from_classified_flows(
+            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 tranche.day_count,
-                crate::cashflow::traits::ScheduleBuildOpts {
+                finstack_quant_cashflows::ScheduleBuildOpts {
                     notional_hint: Some(tranche.notional),
                     meta: CashFlowMeta {
                         projected_fixings: Vec::new(),
-                        representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                        representation:
+                            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                         calendar_ids: tranche
                             .calendar_id
                             .iter()
@@ -178,14 +179,15 @@ impl CdsTranchePricer {
             .map(|row| row.cashflow)
             .collect();
 
-        Ok(crate::cashflow::traits::schedule_from_classified_flows(
+        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             tranche.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(tranche.notional),
                 meta: CashFlowMeta {
                     projected_fixings: Vec::new(),
-                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                     calendar_ids: tranche
                         .calendar_id
                         .iter()

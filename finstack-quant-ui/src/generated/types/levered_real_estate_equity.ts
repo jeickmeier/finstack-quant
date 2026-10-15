@@ -3379,7 +3379,7 @@ export interface Tenor3 {
  *         end_of_month: false,
  *         payment_lag_days: 0,
  *         adjust_accrual_dates: false,
- *         roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+ *         roll_rule: finstack_quant_cashflows::builder::RollRule::None,
  *     },
  * };
  * ```
@@ -4678,7 +4678,7 @@ export interface ScenarioPricingOverrides1 {
  *
  * # Cashflow Generation
  *
- * Uses the [`CashflowProvider`](crate::cashflow::traits::CashflowProvider) trait:
+ * Uses the [`CashflowProvider`](finstack_quant_cashflows::CashflowProvider) trait:
  * - `dated_cashflows()` returns signed canonical schedule flows (coupons, amortization, redemptions)
  * - `cashflow_schedule()` returns the signed canonical schedule with `CFKind` metadata
  *

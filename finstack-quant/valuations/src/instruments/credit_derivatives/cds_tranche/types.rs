@@ -1,9 +1,9 @@
 //! CDS Tranche types, builder entrypoint, and pricing impl.
 
-use crate::cashflow::builder::specs::RollRule;
-use crate::cashflow::builder::ScheduleParams;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::PayReceive;
+use finstack_quant_cashflows::builder::RollRule;
+use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::dates::{
     is_cds_date, BusinessDayConvention, Date, DayCount, StubKind, Tenor,
 };
@@ -348,8 +348,8 @@ impl CdsTranche {
         credit_index_id: impl Into<CurveId>,
         side: PayReceive,
     ) -> finstack_quant_core::Result<Self> {
-        use crate::cashflow::builder::specs::RollRule;
-        use crate::cashflow::builder::ScheduleParams;
+        use finstack_quant_cashflows::builder::RollRule;
+        use finstack_quant_cashflows::builder::ScheduleParams;
         let sched = ScheduleParams {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
@@ -501,11 +501,12 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CdsTranche {
         &self,
         curves: &MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let pricer = pricing::CdsTranchePricer::new();
         let schedule = pricer.build_projected_schedule(self, curves, as_of)?;
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 

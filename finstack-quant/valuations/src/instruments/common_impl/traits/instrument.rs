@@ -1,10 +1,10 @@
 //! Instrument implementation used by the traits subsystem.
 //!
-use crate::cashflow::traits::CashflowProvider;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::model_params::ModelParamsSnapshot;
 use crate::metrics::MetricId;
 use crate::pricer::{shared_standard_registry, InstrumentType, ModelKey};
+use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::{currency::Currency, dates::Date, money::Money, types::CurveId, Error};

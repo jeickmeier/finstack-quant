@@ -2,9 +2,7 @@
 //!
 //! Validates period generation for multi-period caps and floors.
 
-use finstack_quant_cashflows::builder::periods::{
-    build_periods, BuildPeriodsParams, SchedulePeriod,
-};
+use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams, SchedulePeriod};
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::Result;
 use time::macros::date;
@@ -27,7 +25,7 @@ fn build_schedule(
         payment_lag_days: 0,
         reset_lag_days: None,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     })
 }
 

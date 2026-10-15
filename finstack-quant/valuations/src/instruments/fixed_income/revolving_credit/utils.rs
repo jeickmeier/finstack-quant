@@ -26,8 +26,8 @@ use finstack_quant_core::Result;
 /// payment-date adjustment from changing contractual accrual.
 pub(super) fn build_payment_periods(
     facility: &RevolvingCredit,
-) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
-    use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
+) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
+    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 
     let periods = build_periods(BuildPeriodsParams {
         start: facility.issue_date,
@@ -41,7 +41,7 @@ pub(super) fn build_payment_periods(
         payment_lag_days: facility.payment_lag_days as i32,
         reset_lag_days: None,
         adjust_accrual_dates: false,
-        roll_rule: crate::cashflow::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     })?;
 
     if periods.is_empty() {
@@ -130,10 +130,10 @@ pub(super) fn build_observation_dates(facility: &RevolvingCredit) -> Result<Vec<
 /// * `date` - Accrual date the margin is evaluated on.
 pub(super) fn floating_params_at(
     facility: &RevolvingCredit,
-    spec: &crate::cashflow::builder::FloatingRateSpec,
+    spec: &finstack_quant_cashflows::builder::FloatingRateSpec,
     date: Date,
-) -> Result<crate::cashflow::builder::FloatingRateParams> {
-    let mut params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
+) -> Result<finstack_quant_cashflows::builder::FloatingRateParams> {
+    let mut params = finstack_quant_cashflows::builder::FloatingRateParams::try_from(spec)?;
     params.spread_bp += facility.margin_delta_bp_at(date);
     Ok(params)
 }
@@ -183,7 +183,7 @@ pub(super) fn index_basis_at(
 ) -> Result<f64> {
     use finstack_quant_models::rates::clock::{model_time, ModelDiscountCurve};
 
-    let index_forward = crate::cashflow::builder::rate_helpers::project_index_rate(
+    let index_forward = finstack_quant_cashflows::builder::project_index_rate(
         date,
         fwd,
         accrual_start,
@@ -216,7 +216,7 @@ pub(super) fn index_basis_at(
 pub(super) fn build_reset_dates(facility: &RevolvingCredit) -> Result<Option<Vec<Date>>> {
     match &facility.rate {
         RateSpec::Floating(spec) => {
-            use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
+            use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 
             let periods = build_periods(BuildPeriodsParams {
                 start: facility.issue_date,
@@ -230,7 +230,7 @@ pub(super) fn build_reset_dates(facility: &RevolvingCredit) -> Result<Option<Vec
                 payment_lag_days: 0,
                 reset_lag_days: None,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             })?;
             Ok(Some(
                 periods
@@ -249,7 +249,7 @@ pub(super) fn schedule_calendar_id(facility: &RevolvingCredit) -> &str {
     facility
         .calendar_id
         .as_deref()
-        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
+        .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
 }
 
 /// Convert a reset-effective date to its contractual fixing observation date.
@@ -262,7 +262,7 @@ pub(super) fn schedule_calendar_id(facility: &RevolvingCredit) -> &str {
 /// * `facility_calendar_id` - The facility's `calendar_id`, used when the
 ///   spec carries no fixing calendar; `None` rolls on weekends only.
 pub(super) fn floating_fixing_date(
-    spec: &crate::cashflow::builder::FloatingRateSpec,
+    spec: &finstack_quant_cashflows::builder::FloatingRateSpec,
     reset_effective_date: Date,
     facility_calendar_id: Option<&str>,
 ) -> Result<Date> {
@@ -276,7 +276,7 @@ pub(super) fn floating_fixing_date(
         .fixing_calendar_id
         .as_deref()
         .or(facility_calendar_id)
-        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
+        .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID);
     let calendar = finstack_quant_core::dates::calendar_by_id_strict(calendar_id)?;
     reset_effective_date.add_business_days(-spec.reset_lag_days, calendar)
 }
@@ -290,7 +290,7 @@ pub(super) struct RevolverFloatingProjection<'a> {
     /// Valuation date separating realized fixings from projected observations.
     pub as_of: Date,
     /// Floating-rate specification on the facility.
-    pub spec: &'a crate::cashflow::builder::FloatingRateSpec,
+    pub spec: &'a finstack_quant_cashflows::builder::FloatingRateSpec,
     /// Forward curve for the index.
     pub fwd: &'a ForwardCurve,
     /// Facility accrual day count (used when `overnight_basis` is unset).
@@ -316,7 +316,7 @@ pub(super) struct RevolverFloatingProjection<'a> {
 /// index (for example `USD-SOFR-OIS`) selects compounded-in-arrears. Term
 /// indices such as `USD-SOFR-3M` stay on the simple term path.
 pub(super) fn resolved_overnight_compounding(
-    spec: &crate::cashflow::builder::FloatingRateSpec,
+    spec: &finstack_quant_cashflows::builder::FloatingRateSpec,
 ) -> Result<Option<FloatingLegCompounding>> {
     overnight_conventions::resolved_overnight_compounding(
         spec.forward_curve_id.as_str(),
@@ -338,9 +338,9 @@ pub(super) fn resolved_overnight_compounding(
 /// or curve lookups fail.
 pub(super) fn project_revolver_floating_rate(
     input: RevolverFloatingProjection<'_>,
-    projected_fixings: Option<&mut Vec<crate::cashflow::fixings::ProjectedFixing>>,
+    projected_fixings: Option<&mut Vec<finstack_quant_cashflows::fixings::ProjectedFixing>>,
 ) -> Result<f64> {
-    let mut params = crate::cashflow::builder::FloatingRateParams::try_from(input.spec)?;
+    let mut params = finstack_quant_cashflows::builder::FloatingRateParams::try_from(input.spec)?;
     params.spread_bp += input.margin_delta_bp;
     let Some(compounding) = resolved_overnight_compounding(input.spec)? else {
         let (coupon_start, coupon_end) = input.coupon_period;
@@ -357,7 +357,7 @@ pub(super) fn project_revolver_floating_rate(
             input
                 .day_count
                 .year_fraction(coupon_start, coupon_end, accrual_context)?;
-        return crate::cashflow::builder::project_floating_rate(
+        return finstack_quant_cashflows::builder::project_floating_rate(
             input.accrual_start,
             input.fwd,
             &params,
@@ -386,14 +386,16 @@ pub(super) fn project_revolver_floating_rate(
         calendar,
     )?;
     if accrual_end <= accrual_start {
-        return Ok(crate::cashflow::builder::rate_helpers::calculate_floating_rate(0.0, &params));
+        return Ok(finstack_quant_cashflows::builder::calculate_floating_rate(
+            0.0, &params,
+        ));
     }
 
     // Index bounds applied per daily fixing (the default for floored SOFR
     // loans) act on each observation before compounding, as in the cashflows
     // builder's overnight replay; `Period` bounds act on the compounded rate.
     let daily_constraints = input.spec.overnight_index_constraints
-        == crate::cashflow::builder::OvernightIndexConstraintApplication::Daily
+        == finstack_quant_cashflows::builder::OvernightIndexConstraintApplication::Daily
         && (params.index_floor_bp.is_some() || params.index_cap_bp.is_some());
     let projection = project_overnight_coupon(OvernightCouponProjectionInput {
         curve: OvernightProjectionCurve::Forward(input.fwd),
@@ -412,7 +414,7 @@ pub(super) fn project_revolver_floating_rate(
     })?;
     if let Some(out) = projected_fixings {
         out.extend(projection.observation_exposures.iter().map(|observation| {
-            crate::cashflow::fixings::ProjectedFixing {
+            finstack_quant_cashflows::fixings::ProjectedFixing {
                 series_id: format!("FIXING:{}", input.spec.forward_curve_id),
                 date: observation.observation_start,
                 value: Some(observation.projected_rate),
@@ -443,7 +445,9 @@ pub(super) fn project_revolver_floating_rate(
     } else {
         projection.rate
     };
-    Ok(crate::cashflow::builder::rate_helpers::calculate_floating_rate(index_rate, &params))
+    Ok(finstack_quant_cashflows::builder::calculate_floating_rate(
+        index_rate, &params,
+    ))
 }
 
 /// Apply a draw/repay event to current balance with commitment limit validation.
@@ -645,7 +649,7 @@ mod tests {
             start,
             end,
             Tenor::quarterly(),
-            RateSpec::Floating(crate::cashflow::builder::FloatingRateSpec {
+            RateSpec::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
                 forward_curve_id: "USD-SOFR-3M".into(),
                 spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),
                 gearing: rust_decimal::Decimal::ONE,
@@ -679,7 +683,7 @@ mod tests {
         use rust_decimal::Decimal;
 
         let reset = Date::from_calendar_date(2025, Month::January, 2).expect("date");
-        let spec = crate::cashflow::builder::FloatingRateSpec {
+        let spec = finstack_quant_cashflows::builder::FloatingRateSpec {
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: Decimal::from(100),
             gearing: Decimal::new(5, 1),
@@ -703,10 +707,11 @@ mod tests {
             .build()
             .expect("forward curve");
 
-        let rate = crate::cashflow::builder::project_floating_rate(
+        let rate = finstack_quant_cashflows::builder::project_floating_rate(
             reset,
             &forward,
-            &crate::cashflow::builder::FloatingRateParams::try_from(&spec).expect("rate params"),
+            &finstack_quant_cashflows::builder::FloatingRateParams::try_from(&spec)
+                .expect("rate params"),
             reset,
             Date::from_calendar_date(2025, Month::April, 2).expect("date"),
             90.0 / 360.0,
@@ -726,7 +731,7 @@ mod tests {
 
         let start = Date::from_calendar_date(2025, Month::January, 2).expect("date");
         let end = Date::from_calendar_date(2025, Month::April, 2).expect("date");
-        let spec = crate::cashflow::builder::FloatingRateSpec {
+        let spec = finstack_quant_cashflows::builder::FloatingRateSpec {
             forward_curve_id: "USD-SOFR-OIS".into(),
             spread_bp: Decimal::ZERO,
             gearing: Decimal::ONE,
@@ -805,7 +810,7 @@ mod tests {
         let coupon_start = date!(2023 - 03 - 01);
         let coupon_end = date!(2024 - 03 - 01);
         let split = date!(2023 - 06 - 01);
-        let spec = crate::cashflow::builder::FloatingRateSpec {
+        let spec = finstack_quant_cashflows::builder::FloatingRateSpec {
             forward_curve_id: "USD-SOFR-OIS".into(),
             spread_bp: Decimal::ZERO,
             gearing: Decimal::ONE,
@@ -875,7 +880,7 @@ mod tests {
     /// The expected rates are compounded by hand over the usny business days.
     #[test]
     fn overnight_index_floor_applies_daily_or_per_period() {
-        use crate::cashflow::builder::{
+        use finstack_quant_cashflows::builder::{
             FloatingLegCompounding, OvernightIndexConstraintApplication,
         };
         use finstack_quant_core::dates::{calendar_by_id, DateExt};
@@ -925,7 +930,7 @@ mod tests {
             .build()
             .expect("forward curve");
         let rate = |application: OvernightIndexConstraintApplication| -> f64 {
-            let spec = crate::cashflow::builder::FloatingRateSpec {
+            let spec = finstack_quant_cashflows::builder::FloatingRateSpec {
                 forward_curve_id: "USD-SOFR-OIS".into(),
                 spread_bp: Decimal::ZERO,
                 gearing: Decimal::ONE,

@@ -207,7 +207,7 @@ enum PreparedTree {
 
 impl PreparedTree {
     /// Pricing schedule the valuator was built from.
-    fn schedule(&self) -> &crate::cashflow::builder::schedule::CashFlowSchedule {
+    fn schedule(&self) -> &finstack_quant_cashflows::builder::CashFlowSchedule {
         match self {
             Self::RatesCredit { valuator, .. } | Self::ShortRate { valuator, .. } => {
                 &valuator.schedule
@@ -255,7 +255,7 @@ struct TermLoanValuator {
     /// Settlement origin — the tree's `t = 0`.
     origin: Date,
     /// Pricing schedule (fixings applied) the step vectors were built from.
-    schedule: crate::cashflow::builder::schedule::CashFlowSchedule,
+    schedule: finstack_quant_cashflows::builder::CashFlowSchedule,
 }
 
 impl TermLoanValuator {
@@ -268,7 +268,7 @@ impl TermLoanValuator {
         tree_steps: usize,
         recovery_rate: Option<f64>,
     ) -> Result<Self> {
-        use crate::cashflow::primitives::CFKind;
+        use finstack_quant_cashflows::primitives::CFKind;
         let dt = time_to_maturity / tree_steps as f64;
         let time_steps: Vec<f64> = (0..=tree_steps).map(|i| i as f64 * dt).collect();
         let num_steps = tree_steps + 1;
@@ -1055,9 +1055,9 @@ mod tests {
             call_friction_cents,
             time_steps: vec![0.0, 1.0],
             origin: date!(2025 - 01 - 01),
-            schedule: crate::cashflow::builder::schedule::CashFlowSchedule::from_parts(
+            schedule: finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
                 Vec::new(),
-                crate::cashflow::builder::Notional::par(outstanding, Currency::USD)
+                finstack_quant_cashflows::builder::Notional::par(outstanding, Currency::USD)
                     .expect("notional"),
                 finstack_quant_core::dates::DayCount::Act360,
                 Default::default(),

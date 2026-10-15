@@ -4,11 +4,11 @@
 //! currency pairs. Pricing uses covered interest rate parity (CIRP) with
 //! optional contract rate override.
 
-use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::CFKind;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -647,14 +647,14 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         self.validate()?;
         if crate::instruments::fx::shared::event_has_occurred(self.maturity, as_of) {
-            return Ok(crate::cashflow::traits::schedule_from_classified_flows(
+            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 finstack_quant_core::dates::DayCount::Act365F,
-                crate::cashflow::traits::ScheduleBuildOpts {
+                finstack_quant_cashflows::ScheduleBuildOpts {
                     notional_hint: Some(Money::from((0_i64, self.base_currency))),
-                    meta: crate::cashflow::builder::CashFlowMeta {
+                    meta: finstack_quant_cashflows::builder::CashFlowMeta {
                         representation:
-                            crate::cashflow::builder::CashflowRepresentation::NoResidual,
+                            finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual,
                         ..Default::default()
                     },
                 },
@@ -668,17 +668,17 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
         let base_flow = (self.maturity, base_amount);
         let quote_schedule = (self.maturity, quote_amount);
         let representation = if self.contract_rate.is_some() {
-            crate::cashflow::builder::CashflowRepresentation::Contractual
+            finstack_quant_cashflows::builder::CashflowRepresentation::Contractual
         } else {
-            crate::cashflow::builder::CashflowRepresentation::Projected
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected
         };
-        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
             vec![base_flow, quote_schedule],
             CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(Money::from((0_i64, self.base_currency))),
-                meta: crate::cashflow::builder::CashFlowMeta {
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
                     representation,
                     ..Default::default()
                 },
@@ -691,8 +691,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::CashflowProvider;
     use crate::instruments::common_impl::traits::Instrument;
+    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};

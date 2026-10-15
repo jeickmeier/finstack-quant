@@ -23,7 +23,7 @@ use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
-use crate::cashflow::builder::{periods::SchedulePeriod, CashFlowSchedule};
+use finstack_quant_cashflows::builder::{CashFlowSchedule, SchedulePeriod};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 
 use super::types::{DrawRepaySpec, RevolvingCredit};
@@ -155,10 +155,10 @@ pub struct CashflowEngine<'a> {
 }
 
 impl<'a> CashflowEngine<'a> {
-    fn schedule_meta(&self) -> crate::cashflow::builder::CashFlowMeta {
-        crate::cashflow::builder::CashFlowMeta {
+    fn schedule_meta(&self) -> finstack_quant_cashflows::builder::CashFlowMeta {
+        finstack_quant_cashflows::builder::CashFlowMeta {
             projected_fixings: Vec::new(),
-            representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+            representation: finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
             calendar_ids: Vec::new(),
             commitment: Some(self.facility.commitment),
             issue_date: Some(self.facility.issue_date),
@@ -509,12 +509,14 @@ impl<'a> CashflowEngine<'a> {
                                     fixing_date,
                                     self.as_of,
                                 )?;
-                            projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
-                                series_id: format!("FIXING:{}", spec.forward_curve_id),
-                                date: fixing_date,
-                                value: Some(fixing_rate),
-                            });
-                            crate::cashflow::builder::rate_helpers::calculate_floating_rate(
+                            projected_fixings.push(
+                                finstack_quant_cashflows::fixings::ProjectedFixing {
+                                    series_id: format!("FIXING:{}", spec.forward_curve_id),
+                                    date: fixing_date,
+                                    value: Some(fixing_rate),
+                                },
+                            );
+                            finstack_quant_cashflows::builder::calculate_floating_rate(
                                 fixing_rate,
                                 &params,
                             )
@@ -524,20 +526,21 @@ impl<'a> CashflowEngine<'a> {
                                     "forward curve required for floating rate".into(),
                                 )
                             })?;
-                            let index_rate =
-                                crate::cashflow::builder::rate_helpers::project_index_rate(
-                                    reset_effective,
-                                    fwd.as_ref(),
-                                    period_start,
-                                    period_end,
-                                    period.accrual_year_fraction,
-                                )?;
-                            projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
-                                series_id: format!("FIXING:{}", spec.forward_curve_id),
-                                date: fixing_date,
-                                value: Some(index_rate),
-                            });
-                            crate::cashflow::builder::rate_helpers::calculate_floating_rate(
+                            let index_rate = finstack_quant_cashflows::builder::project_index_rate(
+                                reset_effective,
+                                fwd.as_ref(),
+                                period_start,
+                                period_end,
+                                period.accrual_year_fraction,
+                            )?;
+                            projected_fixings.push(
+                                finstack_quant_cashflows::fixings::ProjectedFixing {
+                                    series_id: format!("FIXING:{}", spec.forward_curve_id),
+                                    date: fixing_date,
+                                    value: Some(index_rate),
+                                },
+                            );
+                            finstack_quant_cashflows::builder::calculate_floating_rate(
                                 index_rate, &params,
                             )
                         };
@@ -751,12 +754,12 @@ impl<'a> CashflowEngine<'a> {
             ));
         }
 
-        Ok(crate::cashflow::traits::schedule_from_classified_flows(
+        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             self.facility.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(Money::from((0_i64, self.facility.commitment.currency()))),
-                meta: crate::cashflow::builder::CashFlowMeta {
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
                     projected_fixings,
                     ..self.schedule_meta()
                 },
@@ -1065,7 +1068,7 @@ impl<'a> CashflowEngine<'a> {
                                     }
                                     None => match deterministic_fwd.as_ref() {
                                         Some(fwd) => {
-                                            let contractual_index = crate::cashflow::builder::rate_helpers::project_index_rate(
+                                            let contractual_index = finstack_quant_cashflows::builder::project_index_rate(
                                                 reset_effective,
                                                 fwd.as_ref(),
                                                 period_start,
@@ -1083,7 +1086,7 @@ impl<'a> CashflowEngine<'a> {
                                     },
                                 }
                             };
-                            crate::cashflow::builder::rate_helpers::calculate_floating_rate(
+                            finstack_quant_cashflows::builder::calculate_floating_rate(
                                 base_rate, &params,
                             )
                         }
@@ -1250,10 +1253,10 @@ impl<'a> CashflowEngine<'a> {
             ));
         }
 
-        Ok(crate::cashflow::traits::schedule_from_classified_flows(
+        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             self.facility.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(Money::from((0_i64, self.facility.commitment.currency()))),
                 meta: self.schedule_meta(),
             },
@@ -1312,11 +1315,11 @@ mod tests {
 
     #[test]
     fn term_projection_converts_curve_basis_and_preserves_fixings_and_path_shocks() {
-        use crate::cashflow::builder::FloatingRateSpec;
         use crate::instruments::fixed_income::loan_terms::MarginStep;
         use crate::instruments::fixed_income::revolving_credit::{
             StochasticUtilizationSpec, UtilizationProcess,
         };
+        use finstack_quant_cashflows::builder::FloatingRateSpec;
         use finstack_quant_core::dates::BusinessDayConvention;
         use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
         use rust_decimal::Decimal;
@@ -1448,8 +1451,8 @@ mod tests {
 
     #[test]
     fn act365l_slices_preserve_actual_coupon_denominators_in_both_engines() {
-        use crate::cashflow::builder::FloatingRateSpec;
         use crate::instruments::fixed_income::loan_terms::MarginStep;
+        use finstack_quant_cashflows::builder::FloatingRateSpec;
         use finstack_quant_core::dates::{BusinessDayConvention, StubKind};
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
         use rust_decimal::Decimal;

@@ -370,7 +370,7 @@ impl crate::instruments::common_impl::traits::Instrument for Snowball {
 
 crate::impl_empty_cashflow_provider!(
     Snowball,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
 
 #[cfg(test)]

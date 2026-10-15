@@ -20,7 +20,7 @@ use finstack_quant_attribution::{
     attribute_pnl, attribute_pnl_metrics_based, AttributionMethod, AttributionRequest,
     ExecutionPolicy, TaylorAttributionConfig,
 };
-use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec};
+use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
 };
@@ -64,7 +64,7 @@ fn convertible_with_credit() -> Arc<dyn Instrument> {
             payment_lag_days: 0,
 
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
     Arc::new(ConvertibleBond {

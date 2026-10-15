@@ -3,7 +3,7 @@
 //! This module provides shared types used by both `EquityTotalReturnSwap`
 //! and `FiIndexTotalReturnSwap` instruments.
 
-use crate::cashflow::builder::ScheduleParams;
+use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::dates::{Date, DateExt, Schedule};
 
 /// Schedule specification for TRS payment periods.
@@ -30,7 +30,7 @@ use finstack_quant_core::dates::{Date, DateExt, Schedule};
 ///         end_of_month: false,
 ///         payment_lag_days: 0,
 ///         adjust_accrual_dates: false,
-///         roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+///         roll_rule: finstack_quant_cashflows::builder::RollRule::None,
 ///     },
 /// );
 /// ```
@@ -89,7 +89,7 @@ impl TrsScheduleSpec {
 
     /// Builds the period date schedule in a canonical way.
     pub fn period_schedule(&self) -> finstack_quant_core::Result<Schedule> {
-        use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
+        use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 
         let periods = build_periods(BuildPeriodsParams::from_schedule(
             &self.params,

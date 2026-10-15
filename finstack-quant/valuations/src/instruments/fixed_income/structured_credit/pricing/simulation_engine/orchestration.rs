@@ -373,7 +373,7 @@ pub(crate) struct PreparedDealSimulation {
     /// Valuation date the simulation was prepared for (`as_of`).
     pub(crate) valuation_date: Date,
     /// Future-dated contractual payment dates (>= `valuation_date`).
-    pub(crate) periods: Vec<crate::cashflow::builder::periods::SchedulePeriod>,
+    pub(crate) periods: Vec<finstack_quant_cashflows::builder::SchedulePeriod>,
     /// Last contractual boundary before `valuation_date`; anchors first accrual.
     pub(crate) state_anchor: Date,
     /// Concrete base waterfall (available-funds cap layered per period).
@@ -489,10 +489,10 @@ pub(crate) fn prepare_deal_simulation(
     // Generate the full contractual payment schedule, then filter future dates.
     // Re-anchoring the schedule at `as_of` would shift legal coupon dates for
     // seasoned deals valued between payment dates.
-    use crate::cashflow::builder::periods::{
+    use finstack_quant_cashflows::builder::{
         build_periods, build_single_period, BuildPeriodsParams,
     };
-    let schedule_params = crate::cashflow::builder::ScheduleParams {
+    let schedule_params = finstack_quant_cashflows::builder::ScheduleParams {
         frequency: instrument.frequency,
         day_count: DayCount::Act360,
         business_day_convention: convention,
@@ -501,7 +501,7 @@ pub(crate) fn prepare_deal_simulation(
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: crate::cashflow::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     };
     let first_period = build_single_period(BuildPeriodsParams::from_schedule(
         &schedule_params,

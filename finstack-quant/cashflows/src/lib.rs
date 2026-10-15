@@ -21,9 +21,9 @@
 //!
 //! [`builder`] creates currency-tagged [`builder::CashFlowSchedule`] values;
 //! [`accrual`] and [`aggregation`] provide schedule-level calculations;
-//! [`traits`] integrates instrument cashflow providers; and [`json`] plus
-//! [`schema`] expose serde and schema boundaries. Instrument pricing belongs in
-//! the valuation crates.
+//! [`CashflowProvider`] integrates instrument cashflow providers; and
+//! [`build_cashflow_schedule_json`] plus [`schema`] expose serde and schema
+//! boundaries. Instrument pricing belongs in the valuation crates.
 //!
 //! # Conventions
 //!
@@ -89,17 +89,15 @@ pub mod fixings;
 /// Composable cashflow builder.
 pub mod builder;
 
-/// Cashflow-related traits and aliases.
-pub mod traits;
+mod traits;
 
 /// Generic schedule-driven interest accrual engine.
 pub mod accrual;
-pub mod json;
+mod json;
 #[cfg(feature = "json-schema")]
 pub mod schema;
 
-/// Serde default helpers shared by the spec types and host bindings.
-pub mod serde_defaults;
+pub(crate) mod serde_defaults;
 
 pub use accrual::{
     accrued_interest_amount, AccrualConfig, AccrualIndex, AccrualMethod, ExCouponRule,

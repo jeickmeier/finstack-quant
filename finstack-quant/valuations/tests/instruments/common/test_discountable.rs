@@ -52,7 +52,7 @@ fn test_schedule_discountable_simple() {
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     };
     let fixed = FixedCouponSpec {
         coupon_type: CouponType::Cash,
@@ -73,7 +73,7 @@ fn test_schedule_discountable_simple() {
             payment_lag_days: params.payment_lag_days,
 
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -121,7 +121,7 @@ fn test_npv_zero_rate() {
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     };
     let fixed = FixedCouponSpec {
         coupon_type: CouponType::Cash,
@@ -142,7 +142,7 @@ fn test_npv_zero_rate() {
             payment_lag_days: params.payment_lag_days,
 
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 

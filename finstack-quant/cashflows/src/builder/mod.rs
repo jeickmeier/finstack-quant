@@ -41,23 +41,28 @@
 //! # }
 //! ```
 
+pub(crate) mod calendar;
 pub(crate) mod compiler;
 mod coupon_api;
-pub mod emission;
-mod floating_replay;
-mod orchestrator;
-pub mod overnight;
-pub(crate) mod pipeline;
-mod principal;
-
-pub mod calendar;
 pub(crate) mod credit_rates;
 pub(crate) mod date_generation;
-pub mod periods;
-pub mod rate_helpers;
-pub mod schedule;
-pub mod specs;
+pub(crate) mod emission;
+mod floating_replay;
+mod orchestrator;
+pub(crate) mod overnight;
+pub(crate) mod periods;
+pub(crate) mod pipeline;
+mod principal;
+pub(crate) mod rate_helpers;
+pub(crate) mod schedule;
+pub(crate) mod specs;
 
+pub use calendar::{adjust_date, WEEKENDS_ONLY_ID};
+pub use credit_rates::{
+    abs_to_smm, cdr_to_mdr, cpr_to_smm, mdr_to_cdr, psa_cpr, smm_to_cpr, PSA_RAMP_MONTHS,
+    PSA_TERMINAL_CPR,
+};
+pub use emission::emit_inflation_coupons;
 pub use floating_replay::{
     CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
     FloatingCouponReplayState, FloatingCouponSettlement, FloatingRateObservation,
@@ -67,19 +72,20 @@ pub use overnight::{
     OvernightObservationSchedule, OvernightObservationSlice, OvernightRateAccumulator,
     OvernightRateConstraints, OvernightRateReplay,
 };
-
-pub use periods::SchedulePeriod;
-pub use rate_helpers::{project_floating_rate, FloatingRateParams};
-pub use schedule::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation, PvCreditAdjustment};
+pub use periods::{
+    build_periods, build_single_period, period_accrual, BuildPeriodsParams, SchedulePeriod,
+};
+pub use rate_helpers::{
+    calculate_floating_rate, project_floating_rate, project_index_rate, FloatingRateParams,
+};
+pub use schedule::{
+    merge_cashflow_schedules, weighted_average_life_from_principal, CashFlowMeta, CashFlowSchedule,
+    CashflowRepresentation, PvCreditAdjustment,
+};
 pub use specs::{
     evaluate_fee_tiers, AmortizationSpec, CouponType, DefaultModelSpec, FeeAccrualBasis, FeeBase,
     FeeSpec, FeeTier, FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding,
     FloatingRateFallback, FloatingRateSpec, Notional, OvernightIndexConstraintApplication,
     PrepaymentModelSpec, PrincipalExchange, RecoveryModelSpec, RollRule, ScheduleParams,
     StepUpCouponSpec,
-};
-
-pub use credit_rates::{
-    abs_to_smm, cdr_to_mdr, cpr_to_smm, mdr_to_cdr, psa_cpr, smm_to_cpr, PSA_RAMP_MONTHS,
-    PSA_TERMINAL_CPR,
 };

@@ -9,10 +9,10 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_core::Error;
 
-use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::bond::{CallPutSchedule, CashflowSpec};
 use crate::instruments::model_params::ModelParamsSnapshot;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
 
 use super::pricing;
 use crate::instruments::common_impl::traits::impl_instrument_base;
@@ -822,8 +822,8 @@ impl ConvertibleBond {
     ///
     /// Returns a 5-year convertible with fixed coupon and voluntary conversion.
     pub fn example() -> finstack_quant_core::Result<Self> {
-        use crate::cashflow::builder::specs::FixedCouponSpec;
-        use crate::cashflow::builder::CouponType;
+        use finstack_quant_cashflows::builder::CouponType;
+        use finstack_quant_cashflows::builder::FixedCouponSpec;
         use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
         use time::macros::date;
 
@@ -867,7 +867,7 @@ impl ConvertibleBond {
                     payment_lag_days: 0,
 
                     adjust_accrual_dates: false,
-                    roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                    roll_rule: finstack_quant_cashflows::builder::RollRule::None,
                 },
             }))
             .attributes(Attributes::new())
@@ -888,9 +888,9 @@ impl ConvertibleBond {
     /// - **Put schedule:** Holder can put at 100% after year 1
     #[allow(clippy::expect_used)] // Example uses hardcoded valid values
     pub fn example_mandatory() -> finstack_quant_core::Result<Self> {
-        use crate::cashflow::builder::specs::FixedCouponSpec;
-        use crate::cashflow::builder::CouponType;
         use crate::instruments::fixed_income::bond::CallPut;
+        use finstack_quant_cashflows::builder::CouponType;
+        use finstack_quant_cashflows::builder::FixedCouponSpec;
         use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
         use time::macros::date;
 
@@ -971,7 +971,7 @@ impl ConvertibleBond {
                     payment_lag_days: 0,
 
                     adjust_accrual_dates: false,
-                    roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                    roll_rule: finstack_quant_cashflows::builder::RollRule::None,
                 },
             }))
             .attributes(Attributes::new())
@@ -1206,12 +1206,12 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
             };
             return CashFlowSchedule::from_flows(
                 flows,
-                crate::cashflow::builder::Notional::par(
+                finstack_quant_cashflows::builder::Notional::par(
                     claim.cash.amount(),
                     self.notional.currency(),
                 )?,
                 self.cashflow_spec.day_count(),
-                crate::cashflow::builder::CashFlowMeta {
+                finstack_quant_cashflows::builder::CashFlowMeta {
                     issue_date: Some(claim.exercise_date),
                     maturity: Some(claim.delivery_date),
                     ..Default::default()
@@ -1236,8 +1236,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
                         .is_some_and(|period| period.end <= date)
             });
         }
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Contractual))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Contractual,
+        ))
     }
 }
 
@@ -1245,8 +1246,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::CashflowProvider;
     use crate::instruments::common_impl::traits::Instrument;
+    use finstack_quant_cashflows::CashflowProvider;
 
     #[test]
     fn market_dependencies_use_typed_equity_ids_only() {

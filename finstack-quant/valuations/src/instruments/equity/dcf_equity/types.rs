@@ -1102,7 +1102,7 @@ impl Instrument for DiscountedCashFlow {
 
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
-impl crate::cashflow::traits::CashflowScheduleSource for DiscountedCashFlow {
+impl finstack_quant_cashflows::CashflowScheduleSource for DiscountedCashFlow {
     /// Projected cash-flow schedule containing only the explicit `flows` on
     /// or after `as_of`.
     ///
@@ -1118,7 +1118,7 @@ impl crate::cashflow::traits::CashflowScheduleSource for DiscountedCashFlow {
         &self,
         _curves: &MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let flows = self
             .flows
             .iter()
@@ -1126,13 +1126,14 @@ impl crate::cashflow::traits::CashflowScheduleSource for DiscountedCashFlow {
             .map(|(date, amount)| Money::new(*amount, self.currency).map(|money| (*date, money)))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
-        Ok(crate::cashflow::traits::schedule_from_dated_flows(
+        Ok(finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
-            crate::cashflow::primitives::CFKind::Fixed,
+            finstack_quant_cashflows::primitives::CFKind::Fixed,
             finstack_quant_core::dates::DayCount::Act365F,
-            crate::cashflow::traits::ScheduleBuildOpts {
-                meta: crate::cashflow::builder::CashFlowMeta {
-                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+            finstack_quant_cashflows::ScheduleBuildOpts {
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                     ..Default::default()
                 },
                 ..Default::default()
@@ -1144,8 +1145,8 @@ impl crate::cashflow::traits::CashflowScheduleSource for DiscountedCashFlow {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::CashflowProvider;
     use crate::metrics::{MetricContext, MetricId};
+    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::{
@@ -1773,7 +1774,7 @@ mod tests {
 
         assert_eq!(
             schedule.get_meta().representation,
-            crate::cashflow::builder::CashflowRepresentation::Projected
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected
         );
         assert_eq!(schedule.get_flows().len(), 1);
         assert_eq!(schedule.get_flows()[0].date, dcf.flows[0].0);

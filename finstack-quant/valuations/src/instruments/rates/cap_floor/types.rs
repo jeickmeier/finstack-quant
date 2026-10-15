@@ -508,12 +508,12 @@ impl CapFloor {
 
     pub(crate) fn pricing_periods(
         &self,
-    ) -> finstack_quant_core::Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+    ) -> finstack_quant_core::Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
         let overnight_payment_delay = self
             .overnight_coupon
             .as_ref()
             .map(|terms| terms.payment_lag_days);
-        let params = crate::cashflow::builder::periods::BuildPeriodsParams {
+        let params = finstack_quant_cashflows::builder::BuildPeriodsParams {
             start: self.start_date,
             end: self.maturity,
             frequency: self.frequency,
@@ -529,18 +529,18 @@ impl CapFloor {
             },
             reset_lag_days: self.resolved_reset_lag_days(),
             adjust_accrual_dates: false,
-            roll_rule: crate::cashflow::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         };
 
         let mut periods = if matches!(
             self.rate_option_type,
             RateOptionType::Caplet | RateOptionType::Floorlet
         ) {
-            vec![crate::cashflow::builder::periods::build_single_period(
+            vec![finstack_quant_cashflows::builder::build_single_period(
                 params,
             )?]
         } else {
-            crate::cashflow::builder::periods::build_periods(params)?
+            finstack_quant_cashflows::builder::build_periods(params)?
         };
         if let Some(terms) = &self.overnight_coupon {
             let fixing_calendar_id = terms
@@ -881,7 +881,7 @@ impl crate::instruments::common_impl::traits::Instrument for CapFloor {
 
 crate::impl_empty_cashflow_provider!(
     CapFloor,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
 
 #[cfg(test)]
@@ -998,8 +998,8 @@ mod tests {
 
         // Use the instrument's resolved market calendar and stub so the parity
         // reference shares exactly the priced schedule.
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start: start_date,
                 end: end_date,
                 frequency: Tenor::quarterly(),
@@ -1013,7 +1013,7 @@ mod tests {
                 payment_lag_days: 0,
                 reset_lag_days: None,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )
         .expect("periods");

@@ -146,12 +146,12 @@ mod production_mortgage_audit {
 /// response and gives a different number.
 #[cfg(test)]
 mod rate_risk_rebuild_tests {
-    use crate::cashflow::builder::specs::PrepaymentModelSpec;
     use crate::instruments::fixed_income::cmo::pricer::{price_cmo, resolve_collateral};
     use crate::instruments::fixed_income::dollar_roll::pricer::price_dollar_roll;
     use crate::instruments::fixed_income::tba::pricer::{create_assumed_pool, price_tba};
     use crate::instruments::{AgencyCmo, AgencyTba, DollarRoll, Instrument, PricingOptions};
     use crate::metrics::MetricId;
+    use finstack_quant_cashflows::builder::PrepaymentModelSpec;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
     use finstack_quant_core::market_data::context::MarketContext;

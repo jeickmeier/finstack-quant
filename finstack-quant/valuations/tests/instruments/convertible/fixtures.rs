@@ -13,7 +13,7 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use time::Month;
 
-use finstack_quant_cashflows::builder::specs::{
+use finstack_quant_cashflows::builder::{
     CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingRateSpec,
 };
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
@@ -179,7 +179,7 @@ pub fn create_convertible_with_policy(policy: ConversionPolicy) -> ConvertibleBo
             payment_lag_days: 0,
 
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -243,7 +243,7 @@ pub fn create_convertible_with_conversion_price() -> ConvertibleBond {
             payment_lag_days: 0,
 
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -317,7 +317,7 @@ pub fn create_floating_convertible() -> ConvertibleBond {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 

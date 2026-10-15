@@ -5,11 +5,11 @@
 //! - `SpreadOnly`: build succeeds, rate == spread (legacy behavior)
 //! - `FixedRate(r)`: build succeeds, rate == r + spread (through params pipeline)
 
-use finstack_quant_cashflows::builder::specs::{
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::builder::{
     CouponType, FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec,
     OvernightIndexConstraintApplication,
 };
-use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
@@ -53,7 +53,7 @@ fn make_float_spec(fallback: FloatingRateFallback, spread_bp: Decimal) -> Floati
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     }
 }
@@ -952,7 +952,7 @@ fn test_floating_rate_all_in_floor() {
     }
 }
 
-use finstack_quant_cashflows::builder::specs::FloatingLegCompounding;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 
 /// Helper: create a floating coupon spec with overnight compounding enabled.
 fn make_overnight_float_spec(
@@ -989,7 +989,7 @@ fn make_overnight_float_spec(
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     }
 }
@@ -1485,7 +1485,7 @@ fn test_overnight_vs_term_rate_flat_curve_equivalence() {
 /// Without the fix, the Saturday-start schedule would lose 2 days of accrual.
 #[test]
 fn test_overnight_compounding_weekend_start_no_lost_days() {
-    use finstack_quant_cashflows::builder::specs::FloatingLegCompounding;
+    use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::math::interp::InterpStyle;
@@ -1539,7 +1539,7 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -1651,7 +1651,7 @@ fn test_weekend_only_stub_requires_and_carries_preceding_fixing() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 

@@ -191,7 +191,7 @@ The parts this directory owns:
    requires fields `id: InstrumentId` and `attributes: Attributes`, and `Clone`.
 2. Store the three override bags and add `impl_focused_pricing_overrides!()` if
    the instrument accepts pricing/metric/scenario overrides.
-3. Implement `finstack_quant_cashflows::traits::CashflowScheduleSource`.
+3. Implement `finstack_quant_cashflows::CashflowScheduleSource`.
    `CashflowProvider` — the `Instrument` supertrait that owns
    `cashflow_schedule` and `dated_cashflows` — is blanket-implemented for it, so
    normalization and dated-flow meaning cannot be overridden per instrument.

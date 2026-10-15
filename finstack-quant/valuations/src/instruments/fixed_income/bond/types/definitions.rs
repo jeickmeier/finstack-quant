@@ -1,15 +1,18 @@
 //! Bond type definitions and deserialization.
 
-use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::common_impl::traits::Attributes;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
 use super::CashflowSpec;
 
-fn is_linear_accrual_method(method: &crate::cashflow::accrual::AccrualMethod) -> bool {
-    matches!(method, crate::cashflow::accrual::AccrualMethod::Linear)
+fn is_linear_accrual_method(method: &finstack_quant_cashflows::accrual::AccrualMethod) -> bool {
+    matches!(
+        method,
+        finstack_quant_cashflows::accrual::AccrualMethod::Linear
+    )
 }
 
 /// Bond settlement and ex-coupon conventions.
@@ -124,7 +127,7 @@ pub struct Bond {
     #[serde(default, skip_serializing_if = "is_linear_accrual_method")]
     #[cfg_attr(feature = "json-schema", schemars(extend("default" = "linear")))]
     #[builder(default)]
-    pub accrual_method: crate::cashflow::accrual::AccrualMethod,
+    pub accrual_method: finstack_quant_cashflows::accrual::AccrualMethod,
     /// Attributes for scenario selection and tagging.
     pub attributes: Attributes,
     /// Settlement and ex-coupon conventions.
@@ -161,7 +164,7 @@ impl<'de> serde::Deserialize<'de> for Bond {
             #[serde(default)]
             custom_cashflows: Option<CashFlowSchedule>,
             #[serde(default)]
-            accrual_method: crate::cashflow::accrual::AccrualMethod,
+            accrual_method: finstack_quant_cashflows::accrual::AccrualMethod,
             attributes: Attributes,
             settlement_days: Option<u32>,
             ex_coupon_days: Option<u32>,

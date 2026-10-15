@@ -1,8 +1,8 @@
 //! Bond constructors, factory methods, and schedule building.
 
-use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::InstrumentPricingOverrides;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, StubKind};
 use finstack_quant_core::money::Money;
@@ -225,7 +225,7 @@ impl Bond {
             spec.schedule.business_day_convention = convention.business_day_convention();
             spec.schedule.calendar_id = convention
                 .calendar_id()
-                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
+                .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
                 .into();
             spec.schedule.end_of_month =
                 issue_date.end_of_month() == issue_date && maturity.end_of_month() == maturity;
@@ -449,7 +449,7 @@ impl Bond {
             spec.schedule.business_day_convention = convention.business_day_convention();
             spec.schedule.calendar_id = convention
                 .calendar_id()
-                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
+                .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
                 .into();
         }
         let bond = Self::builder()
@@ -590,7 +590,7 @@ impl Bond {
     ///         end_of_month: false,
     ///         payment_lag_days: 0,
     ///         adjust_accrual_dates: false,
-    ///         roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+    ///         roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     ///     },
     /// };
     /// let schedule = CashFlowSchedule::builder()
@@ -638,7 +638,7 @@ impl Bond {
         // We compute the mode (most frequent) interval across all consecutive
         // coupon dates, ignoring potential stubs at the front or back. This is
         // more robust than using just the first interval, which may be a stub.
-        use crate::cashflow::primitives::CFKind;
+        use finstack_quant_cashflows::primitives::CFKind;
         use finstack_quant_core::dates::Tenor;
         use std::collections::BTreeMap;
 
@@ -791,18 +791,18 @@ impl Bond {
     /// # let bond = Bond::example().unwrap();
     /// let accrual_config = bond.accrual_config();
     /// ```
-    pub fn accrual_config(&self) -> crate::cashflow::accrual::AccrualConfig {
-        crate::cashflow::accrual::AccrualConfig {
+    pub fn accrual_config(&self) -> finstack_quant_cashflows::accrual::AccrualConfig {
+        finstack_quant_cashflows::accrual::AccrualConfig {
             method: self.accrual_method.clone(),
-            ex_coupon: self
-                .ex_coupon_days()
-                .map(|d| crate::cashflow::accrual::ExCouponRule {
+            ex_coupon: self.ex_coupon_days().map(|d| {
+                finstack_quant_cashflows::accrual::ExCouponRule {
                     days_before_coupon: d,
                     calendar_id: self
                         .settlement_convention
                         .as_ref()
                         .and_then(|c| c.ex_coupon_calendar_id.clone()),
-                }),
+                }
+            }),
             include_pik: true,
             frequency: Some(self.cashflow_spec.frequency()),
         }
@@ -836,7 +836,7 @@ impl Bond {
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
     ) -> Result<CashFlowSchedule> {
-        use crate::cashflow::builder::CashFlowSchedule;
+        use finstack_quant_cashflows::builder::CashFlowSchedule;
 
         // If custom cashflows are set, return them directly
         if let Some(ref custom) = self.custom_cashflows {
@@ -862,7 +862,7 @@ impl Bond {
     /// - 0% index floor
     /// - T-2 reset lag
     pub fn example_floating() -> finstack_quant_core::Result<Self> {
-        use crate::cashflow::builder::specs::{CouponType, FloatingCouponSpec, FloatingRateSpec};
+        use finstack_quant_cashflows::builder::{CouponType, FloatingCouponSpec, FloatingRateSpec};
         use finstack_quant_core::dates::{BusinessDayConvention, StubKind, Tenor};
         use rust_decimal::Decimal;
 
@@ -895,7 +895,7 @@ impl Bond {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         });
 
@@ -982,8 +982,8 @@ impl Bond {
     /// - $1M notional, 4% semi-annual coupon, 30/360
     /// - Linear amortization to $200K final notional
     pub fn example_amortizing() -> finstack_quant_core::Result<Self> {
-        use crate::cashflow::builder::specs::{CouponType, FixedCouponSpec};
-        use crate::cashflow::builder::AmortizationSpec;
+        use finstack_quant_cashflows::builder::AmortizationSpec;
+        use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
         use finstack_quant_core::dates::{BusinessDayConvention, StubKind, Tenor};
         use rust_decimal::Decimal;
 
@@ -999,7 +999,7 @@ impl Bond {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         });
 

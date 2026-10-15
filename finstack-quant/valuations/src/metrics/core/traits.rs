@@ -4,12 +4,12 @@
 //! metrics. The `MetricCalculator` trait enables custom metric implementations,
 //! while `MetricContext` provides the execution environment with caching.
 
-use crate::cashflow::builder::schedule::CashFlowSchedule;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::structured_credit::TrancheCashflows;
 use crate::metrics::risk::MarketHistory;
 use crate::metrics::MetricId;
 use crate::pricer::PricingDispatch;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;

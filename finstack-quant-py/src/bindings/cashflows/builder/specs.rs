@@ -1,4 +1,4 @@
-//! Spec-type bindings for `finstack_quant_cashflows::builder::specs`.
+//! Spec-type bindings for `finstack_quant_cashflows::builder`.
 
 use crate::bindings::macros::wire_methods;
 use finstack_quant_cashflows::builder::{
@@ -7,8 +7,7 @@ use finstack_quant_cashflows::builder::{
     FloatingRateSpec, Notional, OvernightIndexConstraintApplication, PrepaymentModelSpec,
     PrincipalExchange, RecoveryModelSpec, RollRule, ScheduleParams, StepUpCouponSpec,
 };
-use finstack_quant_cashflows::serde_defaults;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{BusinessDayConvention, Date, StubKind};
 use finstack_quant_core::money::Money;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
@@ -637,14 +636,14 @@ impl PyScheduleParams {
     ) -> PyResult<Self> {
         let business_day_convention = match business_day_convention {
             Some(obj) => extract_business_day_convention(obj)?,
-            None => serde_defaults::bdc_modified_following(),
+            None => BusinessDayConvention::ModifiedFollowing,
         };
         let inner = ScheduleParams {
             frequency: extract_tenor(frequency)?,
             day_count: day_count.inner,
             business_day_convention,
             calendar_id: calendar_id.into(),
-            stub: stub.map_or_else(serde_defaults::stub_short_front, |s| s.inner),
+            stub: stub.map_or(StubKind::ShortFront, |s| s.inner),
             end_of_month,
             payment_lag_days,
             adjust_accrual_dates,
@@ -1774,10 +1773,10 @@ impl PyFeeSpec {
                 day_count: day_count.inner,
                 business_day_convention: match business_day_convention {
                     Some(obj) => extract_business_day_convention(obj)?,
-                    None => serde_defaults::bdc_modified_following(),
+                    None => BusinessDayConvention::ModifiedFollowing,
                 },
                 calendar_id: calendar_id.to_string(),
-                stub: stub.map_or_else(serde_defaults::stub_short_front, |s| s.inner),
+                stub: stub.map_or(StubKind::ShortFront, |s| s.inner),
                 accrual_basis: accrual_basis.map(|a| a.inner.clone()).unwrap_or_default(),
             },
         })

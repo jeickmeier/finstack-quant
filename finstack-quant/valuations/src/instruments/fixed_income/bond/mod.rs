@@ -120,8 +120,8 @@ pub(crate) mod metrics;
 pub mod pricing;
 mod types;
 
-pub use crate::cashflow::accrual::AccrualMethod;
 pub use cashflow_spec::CashflowSpec;
+pub use finstack_quant_cashflows::accrual::AccrualMethod;
 pub use json::bond_from_cashflows_json;
 #[doc(hidden)]
 pub use metrics::price_yield_spread::asw::{asw_market_with_forward, asw_par_with_forward};
@@ -463,7 +463,7 @@ mod tests {
 
     #[test]
     fn test_bond_with_calendar() {
-        use crate::cashflow::builder::specs::{CouponType, FixedCouponSpec};
+        use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
 
         let spec = FixedCouponSpec {
             coupon_type: CouponType::Cash,
@@ -484,7 +484,7 @@ mod tests {
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         };
 
@@ -513,7 +513,7 @@ mod tests {
 
     #[test]
     fn test_bond_stub_conventions() {
-        use crate::cashflow::builder::specs::{CouponType, FixedCouponSpec};
+        use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
 
         // Short front stub
         let spec_short = FixedCouponSpec {
@@ -535,7 +535,7 @@ mod tests {
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         };
 
@@ -575,7 +575,7 @@ mod tests {
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         };
 

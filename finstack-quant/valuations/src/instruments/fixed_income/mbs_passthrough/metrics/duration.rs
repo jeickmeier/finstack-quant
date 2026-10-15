@@ -4,9 +4,9 @@
 //! to parallel shifts in interest rates, accounting for the change in
 //! prepayment behavior as rates change.
 
-use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::instruments::fixed_income::mbs_passthrough::pricer::price_mbs;
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
+use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::market_data::context::BumpSpec;
@@ -158,8 +158,8 @@ pub(crate) fn duration_convexity(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::builder::specs::PrepaymentModelSpec;
     use crate::instruments::fixed_income::mbs_passthrough::{AgencyProgram, PoolType};
+    use finstack_quant_cashflows::builder::PrepaymentModelSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::bumps::BumpSpec;

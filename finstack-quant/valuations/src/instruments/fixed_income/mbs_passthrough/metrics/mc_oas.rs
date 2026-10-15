@@ -475,8 +475,8 @@ pub(crate) fn calculate_mc_oas(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::builder::specs::PrepaymentModelSpec;
     use crate::instruments::fixed_income::mbs_passthrough::{AgencyProgram, PoolType};
+    use finstack_quant_cashflows::builder::PrepaymentModelSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -775,8 +775,8 @@ mod tests {
     /// flat-rate path when the correct base-seasoning is applied.
     #[test]
     fn mc_oas_projects_prepayment_from_actual_pool_seasoning() {
-        use crate::cashflow::builder::specs::PrepaymentModelSpec;
         use crate::instruments::fixed_income::mbs_passthrough::{AgencyProgram, PoolType};
+        use finstack_quant_cashflows::builder::PrepaymentModelSpec;
         use finstack_quant_core::currency::Currency;
         use finstack_quant_core::dates::DayCount;
         use finstack_quant_core::money::Money;

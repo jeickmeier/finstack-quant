@@ -26,7 +26,7 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Through
 use finstack_quant_cashflows::aggregation::{
     aggregate_by_period, aggregate_cashflows_checked, calendar_year_ladder, DateContext,
 };
-use finstack_quant_cashflows::builder::schedule::merge_cashflow_schedules;
+use finstack_quant_cashflows::builder::merge_cashflow_schedules;
 use finstack_quant_cashflows::builder::{
     CashFlowMeta, CashFlowSchedule, CouponType, FixedCouponSpec, Notional,
 };
@@ -109,7 +109,7 @@ fn make_fixed_schedule(base: Date, years: i32, frequency: Tenor) -> CashFlowSche
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         })
         .build(None)
@@ -328,7 +328,7 @@ fn bench_build_fixed_schedule(c: &mut Criterion) {
                             payment_lag_days: 0,
 
                             adjust_accrual_dates: false,
-                            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
                         },
                     })
                     .build(None)

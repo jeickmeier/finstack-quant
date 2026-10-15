@@ -1,7 +1,8 @@
-//! Python bindings for `finstack_quant_cashflows::builder::schedule`.
+//! Python bindings for `finstack_quant_cashflows::builder` schedule types.
 
-use finstack_quant_cashflows::builder::schedule::merge_cashflow_schedules;
-use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
+use finstack_quant_cashflows::builder::{
+    merge_cashflow_schedules, CashFlowMeta, CashFlowSchedule, CashflowRepresentation,
+};
 use finstack_quant_cashflows::primitives::CashFlow;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;

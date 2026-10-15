@@ -1,9 +1,5 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::cashflow::{
-    builder::{CashFlowSchedule, ScheduleParams},
-    primitives::CFKind,
-};
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
     asset_swap_forward_components, fixed_leg_annuity, floating_leg_pv_and_annuity,
     par_rate_and_annuity_from_discount,
@@ -12,6 +8,10 @@ use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContex
 use crate::instruments::fixed_income::bond::CashflowSpec;
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_cashflows::{
+    builder::{CashFlowSchedule, ScheduleParams},
+    primitives::CFKind,
+};
 use finstack_quant_core::dates::calendar::calendar_by_id;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, HolidayCalendar, ScheduleBuilder, StubKind, Tenor,

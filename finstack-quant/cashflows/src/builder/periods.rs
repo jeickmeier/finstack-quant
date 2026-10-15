@@ -349,8 +349,8 @@ fn enrich_periods(
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_cashflows::builder::periods::{build_single_period, BuildPeriodsParams};
-/// use finstack_quant_cashflows::builder::specs::RollRule;
+/// use finstack_quant_cashflows::builder::{build_single_period, BuildPeriodsParams};
+/// use finstack_quant_cashflows::builder::RollRule;
 /// use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 /// use time::Month;
 ///
@@ -420,8 +420,8 @@ pub fn build_single_period(
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
-/// use finstack_quant_cashflows::builder::specs::RollRule;
+/// use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+/// use finstack_quant_cashflows::builder::RollRule;
 /// use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 /// use time::Month;
 ///

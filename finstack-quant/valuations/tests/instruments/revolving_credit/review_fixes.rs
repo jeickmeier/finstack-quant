@@ -11,7 +11,7 @@
 //! 5. Loan-equivalent exposure (`leq`) adds the cost of draws at default.
 
 use finstack_quant_cashflows::builder::FloatingRateSpec;
-use finstack_quant_cashflows::traits::CashflowScheduleSource;
+use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor, TenorUnit};

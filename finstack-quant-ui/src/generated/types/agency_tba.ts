@@ -576,7 +576,7 @@ export interface D_54049D1588E6Ed129Bca {
  * use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{
  *     AgencyMbsPassthrough, AgencyProgram, PoolType,
  * };
- * use finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;
+ * use finstack_quant_cashflows::builder::PrepaymentModelSpec;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::money::Money;
  * use finstack_quant_core::dates::Date;

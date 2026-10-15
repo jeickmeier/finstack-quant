@@ -293,7 +293,7 @@ fn base_correlation_preflight_rejects_invalid_attachment_detachment() {
             business_day_convention: None,
             calendar_id: None,
             detachment_points: Vec::new(),
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         }),
     };
 
@@ -343,7 +343,7 @@ fn base_correlation_preflight_requires_credit_index_data() {
             business_day_convention: None,
             calendar_id: None,
             detachment_points: vec![0.03],
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         }),
     };
 
@@ -424,7 +424,7 @@ fn base_correlation_preflight_rejects_non_monotone_tranche_points() {
             business_day_convention: None,
             calendar_id: None,
             detachment_points: vec![0.03],
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         }),
     };
 

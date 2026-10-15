@@ -5,10 +5,10 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::{Error, Result};
 
-use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::fixed_income::convertible::{
     ConversionEvent, ConversionPolicy, ConvertibleBond, PriceTrigger,
 };
+use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::math::map_date_to_step;
 
 /// Contractual debt events and exercise decisions for the defaultable-equity tree.

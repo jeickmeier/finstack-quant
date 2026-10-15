@@ -1,12 +1,18 @@
 //! Shared serde default helpers for instrument structs.
 
-use finstack_quant_core::dates::DayCount;
+use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind};
 
 use crate::instruments::SettlementType;
 
-pub(crate) use finstack_quant_cashflows::serde_defaults::{
-    bdc_modified_following, stub_short_front,
-};
+/// Default business day convention (`ModifiedFollowing`).
+pub(crate) fn bdc_modified_following() -> BusinessDayConvention {
+    BusinessDayConvention::ModifiedFollowing
+}
+
+/// Default stub convention (`ShortFront`).
+pub(crate) fn stub_short_front() -> StubKind {
+    StubKind::ShortFront
+}
 
 /// Default day count convention for option instruments (ACT/365F).
 pub(crate) fn day_count_act365f() -> DayCount {

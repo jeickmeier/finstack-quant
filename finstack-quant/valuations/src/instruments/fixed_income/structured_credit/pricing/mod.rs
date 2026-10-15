@@ -18,11 +18,11 @@ pub(crate) mod waterfall;
 
 pub use waterfall::execute_waterfall;
 
-use crate::cashflow::traits::DatedFlows;
 use crate::instruments::fixed_income::structured_credit::pricing::simulation_engine::DeterministicPoolFlowSource;
 use crate::instruments::fixed_income::structured_credit::types::{
     StructuredCredit, TrancheCashflows,
 };
+use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::HashMap;

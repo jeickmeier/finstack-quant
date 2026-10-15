@@ -283,7 +283,7 @@ impl CashflowScheduleBuildSpec {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_cashflows::json::CashflowScheduleBuildSpec;
+    /// use finstack_quant_cashflows::CashflowScheduleBuildSpec;
     /// use finstack_quant_core::dates::Date;
     /// use time::Month;
     ///

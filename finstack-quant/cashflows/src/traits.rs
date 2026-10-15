@@ -6,10 +6,9 @@
 //! [`schedule_from_dated_flows`] and [`schedule_from_classified_flows`] wrap
 //! ad-hoc flow lists using [`ScheduleBuildOpts`].
 
-use crate::builder::schedule::{CashFlowMeta, CashFlowSchedule};
-use crate::builder::Notional;
+use crate::builder::{CashFlowMeta, CashFlowSchedule, Notional};
 use crate::primitives::{CFKind, CashFlow};
-pub use crate::DatedFlows;
+use crate::DatedFlows;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;

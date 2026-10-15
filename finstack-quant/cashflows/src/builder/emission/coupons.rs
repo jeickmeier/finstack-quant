@@ -68,7 +68,7 @@ pub fn emit_inflation_coupons(
 /// `MarketContext` under the canonical id `FIXING:{forward_curve_id}` (see
 /// [`finstack_quant_core::market_data::fixings`]). This error is raised only when
 /// no such series was provided; the emission layer routes it through the
-/// spec's [`crate::builder::specs::FloatingRateFallback`] policy.
+/// spec's [`crate::builder::FloatingRateFallback`] policy.
 fn pre_base_observation_error(obs_date: Date, fwd: &ForwardCurve) -> finstack_quant_core::Error {
     finstack_quant_core::Error::Validation(format!(
         "overnight observation date {} is before the '{}' curve base date {}; the realized \
@@ -388,7 +388,7 @@ pub(crate) struct ResolvedFloatMarket<'a> {
 /// index fixings from `market.fixings` — the per-schedule `FIXING:{forward_curve_id}`
 /// series aligned with `market.curves` (exact-date observations for both
 /// overnight and term resets). Without a series, pre-base observations route
-/// through the spec's [`crate::builder::specs::FloatingRateFallback`] policy.
+/// through the spec's [`crate::builder::FloatingRateFallback`] policy.
 ///
 /// # Returns
 ///

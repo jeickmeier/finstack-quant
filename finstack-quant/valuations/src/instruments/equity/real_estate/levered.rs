@@ -51,7 +51,7 @@ impl RealEstateFinancing {
         &self,
         market: &MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         self.as_instrument().cashflow_schedule(market, as_of)
     }
 }
@@ -152,7 +152,7 @@ impl LeveredRealEstateEquity {
         &self,
         market: &MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<Vec<crate::cashflow::builder::CashFlowSchedule>> {
+    ) -> finstack_quant_core::Result<Vec<finstack_quant_cashflows::builder::CashFlowSchedule>> {
         levered_pricer::financing_schedules_supported(self, market, as_of)
     }
 
@@ -210,25 +210,26 @@ impl Instrument for LeveredRealEstateEquity {
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
-impl crate::cashflow::traits::CashflowScheduleSource for LeveredRealEstateEquity {
+impl finstack_quant_cashflows::CashflowScheduleSource for LeveredRealEstateEquity {
     fn raw_cashflow_schedule(
         &self,
         market: &MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let flows = self
             .equity_cashflows(market, as_of)?
             .into_iter()
             .map(|(date, amount)| Money::new(amount, self.currency).map(|money| (date, money)))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
-        Ok(crate::cashflow::traits::schedule_from_dated_flows(
+        Ok(finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
-            crate::cashflow::primitives::CFKind::Fixed,
+            finstack_quant_cashflows::primitives::CFKind::Fixed,
             self.asset.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
-                meta: crate::cashflow::builder::CashFlowMeta {
-                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+            finstack_quant_cashflows::ScheduleBuildOpts {
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                     ..Default::default()
                 },
                 ..Default::default()
@@ -240,8 +241,8 @@ impl crate::cashflow::traits::CashflowScheduleSource for LeveredRealEstateEquity
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::CashflowProvider;
     use crate::instruments::equity::real_estate::types::RealEstateValuationMethod;
+    use finstack_quant_cashflows::CashflowProvider;
 
     #[test]
     fn levered_real_estate_cashflow_schedule_emits_projected_equity_flows() {
@@ -277,7 +278,7 @@ mod tests {
 
         assert_eq!(
             schedule.get_meta().representation,
-            crate::cashflow::builder::CashflowRepresentation::Projected
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected
         );
         assert_eq!(
             schedule.get_flows().first().expect("initial flow").date,

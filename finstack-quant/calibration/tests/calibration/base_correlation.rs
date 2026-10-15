@@ -9,7 +9,7 @@ use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
 use finstack_quant_calibration::quotes::ids::QuoteId;
 use finstack_quant_calibration::quotes::market_quote::MarketQuote;
 use finstack_quant_calibration::CalibrationConfig;
-use finstack_quant_cashflows::builder::specs::RollRule;
+use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     adjust, calendar_by_id_strict, prev_cds_date, Date, DateExt, DayCount,

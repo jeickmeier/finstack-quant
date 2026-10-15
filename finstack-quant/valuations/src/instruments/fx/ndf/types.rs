@@ -4,10 +4,10 @@
 //! restricted currencies. Supports both pre-fixing (forward rate estimation)
 //! and post-fixing (observed rate) valuation modes.
 
-use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::CFKind;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -955,14 +955,14 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         self.validate()?;
         if crate::instruments::fx::shared::event_has_occurred(self.maturity, as_of) {
-            return Ok(crate::cashflow::traits::schedule_from_classified_flows(
+            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 finstack_quant_core::dates::DayCount::Act365F,
-                crate::cashflow::traits::ScheduleBuildOpts {
+                finstack_quant_cashflows::ScheduleBuildOpts {
                     notional_hint: Some(Money::from((0_i64, self.settlement_currency))),
-                    meta: crate::cashflow::builder::CashFlowMeta {
+                    meta: finstack_quant_cashflows::builder::CashFlowMeta {
                         representation:
-                            crate::cashflow::builder::CashflowRepresentation::NoResidual,
+                            finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual,
                         ..Default::default()
                     },
                 },
@@ -970,14 +970,15 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
         }
         let settlement_amount = self.settlement_amount(market, as_of)?;
         let ccy = self.settlement_currency;
-        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
             vec![(self.maturity, Money::new(settlement_amount, ccy)?)],
             CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(Money::from((0_i64, ccy))),
-                meta: crate::cashflow::builder::CashFlowMeta {
-                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                     ..Default::default()
                 },
             },
@@ -989,7 +990,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::CashflowProvider;
+    use finstack_quant_cashflows::CashflowProvider;
     use std::sync::Arc;
     use time::Month;
 
@@ -1448,7 +1449,7 @@ mod tests {
 
         assert_eq!(
             schedule.get_meta().representation,
-            crate::cashflow::builder::CashflowRepresentation::Projected
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected
         );
     }
 }

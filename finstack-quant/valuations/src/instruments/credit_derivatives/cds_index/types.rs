@@ -255,7 +255,7 @@ impl CdsIndex {
             side: PayReceive::Pay,
             convention,
             premium_leg: PremiumLegSpec {
-                roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
                 start: date!(2024 - 03 - 20),
                 end: date!(2029 - 12 - 20),
                 frequency,
@@ -345,7 +345,7 @@ impl CdsIndex {
             side,
             convention,
             premium_leg: PremiumLegSpec {
-                roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
                 start,
                 end,
                 frequency,
@@ -598,11 +598,12 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CdsIndex {
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let pricer = CdsIndexPricer::new();
         let schedule = pricer.build_projected_schedule(self, curves, as_of)?;
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 

@@ -130,7 +130,7 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Option<finstack_quant_core::dates::Date>> {
         let schedule =
-            crate::cashflow::traits::CashflowProvider::cashflow_schedule(self, curves, as_of)?;
+            finstack_quant_cashflows::CashflowProvider::cashflow_schedule(self, curves, as_of)?;
         Ok(schedule
             .get_flows()
             .iter()
@@ -152,7 +152,7 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
     }
 
     fn metrics_equivalent(&self) -> Box<dyn crate::instruments::common_impl::traits::Instrument> {
-        use crate::cashflow::builder::specs::CouponType;
+        use finstack_quant_cashflows::builder::CouponType;
 
         let mut clone = self.clone();
 
@@ -273,10 +273,10 @@ impl Bond {
     ) -> finstack_quant_core::Result<
         crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcResult,
     > {
-        use crate::cashflow::builder::specs::CouponType;
         use crate::instruments::fixed_income::bond::pricing::engine::merton_mc::{
             MertonBondTerms, MertonMcConfig, MertonMcEngine, PikMode, PikSchedule,
         };
+        use finstack_quant_cashflows::builder::CouponType;
         use rust_decimal::prelude::ToPrimitive;
 
         self.validate_merton_mc_embedded_rights()?;

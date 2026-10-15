@@ -35,14 +35,14 @@
 //! # See Also
 //!
 //! - [`crate::instruments::fixed_income::bond::Bond`] for bond construction using cashflow specs
-//! - [`crate::cashflow::builder::specs`] for full builder coupon specifications
+//! - [`finstack_quant_cashflows::builder::specs`] for full builder coupon specifications
 
-use crate::cashflow::builder::specs::{
-    CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingRateSpec, StepUpCouponSpec,
-};
-use crate::cashflow::builder::AmortizationSpec;
 use crate::market::conventions::ConventionRegistry;
 use crate::market::conventions::RateIndexConventions;
+use finstack_quant_cashflows::builder::AmortizationSpec;
+use finstack_quant_cashflows::builder::{
+    CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingRateSpec, StepUpCouponSpec,
+};
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{Bps, CurveId, Rate};
@@ -150,7 +150,7 @@ impl CashflowSpec {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         })
     }
@@ -175,7 +175,7 @@ impl CashflowSpec {
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }
     }
@@ -501,7 +501,7 @@ impl CashflowSpec {
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }))
     }
@@ -602,7 +602,7 @@ impl CashflowSpec {
     /// as the base of an amortizing spec).
     pub(crate) fn floating_rate_spec(
         &self,
-    ) -> Option<&crate::cashflow::builder::specs::FloatingRateSpec> {
+    ) -> Option<&finstack_quant_cashflows::builder::FloatingRateSpec> {
         match self {
             Self::Floating(spec) => Some(&spec.rate_spec),
             Self::Amortizing { base, .. } => base.floating_rate_spec(),
@@ -623,7 +623,7 @@ impl CashflowSpec {
     /// another amortizing spec.
     pub(crate) fn add_to_builder(
         &self,
-        builder: &mut crate::cashflow::builder::CashFlowBuilder,
+        builder: &mut finstack_quant_cashflows::builder::CashFlowBuilder,
     ) -> finstack_quant_core::Result<()> {
         match self {
             Self::Fixed(spec) => {
@@ -713,7 +713,7 @@ impl Default for CashflowSpec {
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         })
     }

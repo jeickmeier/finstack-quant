@@ -4,9 +4,9 @@ use super::config::{
     CdsTranchePricer, CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORRELATION, NUMERICAL_TOLERANCE,
     PAR_SPREAD_TOLERANCE,
 };
-use crate::cashflow::primitives::CFKind;
 use crate::constants::BASIS_POINTS_PER_UNIT;
 use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
+use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::CreditIndexData};
 use finstack_quant_core::math::binomial_pmf_all_into;
@@ -362,13 +362,13 @@ impl CdsTranchePricer {
         &self,
         tranche: &CdsTranche,
         as_of: Date,
-    ) -> Result<Vec<crate::cashflow::builder::SchedulePeriod>> {
+    ) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
         let start = tranche.contractual_start_date(as_of).unwrap_or(as_of);
         if start >= tranche.maturity {
             return Ok(Vec::new());
         }
-        crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+        finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start,
                 end: tranche.maturity,
                 frequency: tranche.frequency,
@@ -377,7 +377,7 @@ impl CdsTranchePricer {
                 calendar_id: tranche
                     .calendar_id
                     .as_deref()
-                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                    .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
                 end_of_month: false,
                 day_count: tranche.day_count,
                 payment_lag_days: 0,

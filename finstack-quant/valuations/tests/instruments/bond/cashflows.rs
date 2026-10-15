@@ -221,7 +221,7 @@ fn test_custom_cashflows_from_schedule() {
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     };
 
     let custom_schedule = CashFlowSchedule::builder()
@@ -279,7 +279,7 @@ fn test_pik_cashflows() {
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         })
         .build(None)
@@ -348,7 +348,7 @@ fn test_cashflows_with_short_front_stub() {
     let as_of = date!(2025 - 01 - 15); // Mid-month start
     let maturity = date!(2027 - 01 - 01);
 
-    use finstack_quant_cashflows::builder::specs::CouponType;
+    use finstack_quant_cashflows::builder::CouponType;
     let bond = Bond::builder()
         .id("STUB_SHORT".into())
         .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
@@ -373,7 +373,7 @@ fn test_cashflows_with_short_front_stub() {
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }))
         .discount_curve_id("USD-OIS".into())
@@ -599,7 +599,7 @@ fn test_actact_isma_daycount_context() {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }))
         .discount_curve_id("USD-OIS".into())
@@ -688,7 +688,7 @@ fn test_bus252_daycount_with_calendar() {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }))
         .discount_curve_id("USD-OIS".into())

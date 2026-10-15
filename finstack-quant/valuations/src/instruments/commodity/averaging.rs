@@ -25,8 +25,8 @@ pub(crate) fn commodity_periods(
     frequency: finstack_quant_core::dates::Tenor,
     calendar_id: Option<&str>,
     business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
-) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
-    use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
+) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
+    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind};
     build_periods(BuildPeriodsParams {
         start,
@@ -38,13 +38,13 @@ pub(crate) fn commodity_periods(
         } else {
             BusinessDayConvention::Unadjusted
         },
-        calendar_id: calendar_id.unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+        calendar_id: calendar_id.unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
         end_of_month: false,
         day_count: DayCount::Act365F,
         payment_lag_days: 0,
         reset_lag_days: None,
         adjust_accrual_dates: false,
-        roll_rule: crate::cashflow::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     })
 }
 

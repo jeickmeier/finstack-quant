@@ -449,8 +449,8 @@ fn parametric_delivered_models_reprice_short_end_deposits_analytically() {
 
 #[test]
 fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
-    use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
-    use finstack_quant_cashflows::builder::specs::RollRule;
+    use finstack_quant_cashflows::builder::RollRule;
+    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{adjust, calendar_by_id, DayCount, DayCountContext};
     use finstack_quant_core::market_data::context::MarketContext;

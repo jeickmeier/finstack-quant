@@ -1,11 +1,11 @@
 use super::{DealType, StructuredCredit, TrancheSeniority};
-use crate::cashflow::traits::{
-    schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
-};
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::model_params::ModelParamsSnapshot;
+use finstack_quant_cashflows::{
+    schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
+};
 use finstack_quant_core::cashflow::Discountable;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -22,7 +22,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCredit {
         &self,
         context: &MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let detailed_flows =
             crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
                 self, context, as_of,
@@ -43,8 +43,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCredit {
             day_count,
             ScheduleBuildOpts {
                 notional_hint: self.notional()?,
-                meta: crate::cashflow::builder::CashFlowMeta {
-                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                     ..Default::default()
                 },
             },
@@ -404,8 +405,8 @@ impl StructuredCredit {
             // the bucket entries; a bucket that never rolls cannot be.
             let charge_off_curve = matches!(
                 self.credit_model.default_spec,
-                crate::cashflow::builder::DefaultModelSpec::CumulativeLoss { .. }
-                    | crate::cashflow::builder::DefaultModelSpec::Timing { .. }
+                finstack_quant_cashflows::builder::DefaultModelSpec::CumulativeLoss { .. }
+                    | finstack_quant_cashflows::builder::DefaultModelSpec::Timing { .. }
             );
             if charge_off_curve && model.roll_rates.iter().any(|roll| *roll <= 0.0) {
                 return Err(invalid(

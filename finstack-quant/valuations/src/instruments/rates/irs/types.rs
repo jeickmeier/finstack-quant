@@ -618,7 +618,7 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateSwap {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Option<finstack_quant_core::dates::Date>> {
         let schedule =
-            crate::cashflow::traits::CashflowProvider::cashflow_schedule(self, curves, as_of)?;
+            finstack_quant_cashflows::CashflowProvider::cashflow_schedule(self, curves, as_of)?;
         Ok(schedule
             .get_flows()
             .iter()
@@ -664,15 +664,16 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InterestRateSwap {
         &self,
         curves: &MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let schedule =
             crate::instruments::rates::irs::cashflow::full_signed_schedule_with_curves_as_of(
                 self,
                 Some(curves),
                 Some(as_of),
             )?;
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 

@@ -91,7 +91,7 @@ fn test_trs_schedule_spec_period_schedule_semiannual() {
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     };
     let spec = TrsScheduleSpec::from_params(start, end, params);
 
@@ -123,7 +123,7 @@ fn test_trs_schedule_spec_period_schedule_monthly() {
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     };
     let spec = TrsScheduleSpec::from_params(start, end, params);
 
@@ -157,7 +157,7 @@ fn test_trs_schedule_spec_different_day_counts() {
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     };
 
     // Act

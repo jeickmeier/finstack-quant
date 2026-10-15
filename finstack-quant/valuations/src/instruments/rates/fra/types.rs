@@ -4,13 +4,13 @@
 //! used across valuations. Core PV logic is delegated to the pricing engine in
 //! `pricing::engine`, and metrics are provided in the `metrics` submodule.
 
-use crate::cashflow::traits::CashflowProvider;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::legs::PayReceive;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use crate::market::conventions::ConventionRegistry;
+use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{adjust, calendar_by_id, BusinessDayConvention, Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -451,17 +451,17 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
         &self,
         curves: &MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         // Settlement at start of accrual period; if already settled, no flows
         if self.start_date <= as_of {
-            return Ok(crate::cashflow::traits::schedule_from_classified_flows(
+            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 self.day_count,
-                crate::cashflow::traits::ScheduleBuildOpts {
+                finstack_quant_cashflows::ScheduleBuildOpts {
                     notional_hint: self.notional()?,
-                    meta: crate::cashflow::builder::CashFlowMeta {
+                    meta: finstack_quant_cashflows::builder::CashFlowMeta {
                         representation:
-                            crate::cashflow::builder::CashflowRepresentation::NoResidual,
+                            finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual,
                         ..Default::default()
                     },
                 },
@@ -476,17 +476,18 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
             )]
         };
 
-        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
-            crate::cashflow::primitives::CFKind::Fixed,
+            finstack_quant_cashflows::primitives::CFKind::Fixed,
             self.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: self.notional()?,
                 ..Default::default()
             },
         );
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 

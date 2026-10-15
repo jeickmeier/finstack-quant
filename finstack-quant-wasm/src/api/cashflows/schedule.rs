@@ -9,10 +9,9 @@ use crate::api::core::market_context::JsMarketContext;
 use crate::utils::input::{js_f64, js_f64_seq, js_string, json_text};
 use crate::utils::wire::{js_date, js_opt_wire, js_wire};
 use crate::utils::{date_to_iso, to_js_err, to_js_value};
-use finstack_quant_cashflows::builder::schedule::merge_cashflow_schedules;
 use finstack_quant_cashflows::builder::{
-    CashFlowBuilder, CashFlowMeta, CashFlowSchedule, CashflowRepresentation, CouponType,
-    FixedCouponSpec, FloatingCouponSpec, Notional,
+    merge_cashflow_schedules, CashFlowBuilder, CashFlowMeta, CashFlowSchedule,
+    CashflowRepresentation, CouponType, FixedCouponSpec, FloatingCouponSpec, Notional,
 };
 use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_cashflows::{CashflowScheduleBuildSpec, DatedFlowJson, ScheduleBuildOpts};

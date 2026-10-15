@@ -60,19 +60,19 @@ fn test_dated_cashflows_annual() {
     // Check annual spacing with BDC adjustments
     let cal_id = "weekends_only";
     let business_day_convention = finstack_quant_core::dates::BusinessDayConvention::Following;
-    let expected_2021 = finstack_quant_cashflows::builder::calendar::adjust_date(
+    let expected_2021 = finstack_quant_cashflows::builder::adjust_date(
         d(2021, 1, 15),
         business_day_convention,
         cal_id,
     )
     .unwrap();
-    let expected_2022 = finstack_quant_cashflows::builder::calendar::adjust_date(
+    let expected_2022 = finstack_quant_cashflows::builder::adjust_date(
         d(2022, 1, 15),
         business_day_convention,
         cal_id,
     )
     .unwrap();
-    let expected_2023 = finstack_quant_cashflows::builder::calendar::adjust_date(
+    let expected_2023 = finstack_quant_cashflows::builder::adjust_date(
         d(2023, 1, 15),
         business_day_convention,
         cal_id,

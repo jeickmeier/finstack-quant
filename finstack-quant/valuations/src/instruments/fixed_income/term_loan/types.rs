@@ -49,13 +49,13 @@ use rust_decimal::Decimal;
 use super::spec::{
     AmortizationSpec, DdtlSpec, LoanCallSchedule, OidEirSpec, TermLoanCovenantEvents,
 };
-use crate::cashflow::builder::specs::CouponType;
-use crate::cashflow::builder::FloatingRateSpec;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 pub use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::loan_terms::UpfrontFee;
 use crate::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::FloatingRateSpec;
 
 fn default_settlement_days() -> u32 {
     2
@@ -88,7 +88,7 @@ fn default_settlement_days() -> u32 {
 ///
 /// # Cashflow Generation
 ///
-/// Uses the [`CashflowProvider`](crate::cashflow::traits::CashflowProvider) trait:
+/// Uses the [`CashflowProvider`](finstack_quant_cashflows::CashflowProvider) trait:
 /// - `dated_cashflows()` returns signed canonical schedule flows (coupons, amortization, redemptions)
 /// - `cashflow_schedule()` returns the signed canonical schedule with `CFKind` metadata
 ///
@@ -340,9 +340,9 @@ impl TermLoan {
         let calendar_id = self
             .calendar_id
             .as_deref()
-            .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+            .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID);
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start: self.issue_date,
                 end: self.maturity,
                 frequency: self.frequency,
@@ -354,7 +354,7 @@ impl TermLoan {
                 payment_lag_days: 0,
                 reset_lag_days: None,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )?;
         if periods.is_empty() {
@@ -635,7 +635,7 @@ impl TermLoan {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .amortization(AmortizationSpec::PercentOfRemainingPerPeriod { pct: 0.025 })
-            .coupon_type(crate::cashflow::builder::specs::CouponType::Cash)
+            .coupon_type(finstack_quant_cashflows::builder::CouponType::Cash)
             .upfront_fee_opt(None)
             .ddtl_opt(None)
             .covenants_opt(None)
@@ -829,9 +829,9 @@ impl TermLoan {
     /// frequency (required for ACT/ACT ISMA day counts). PIK is excluded
     /// because capitalized interest accretes to the outstanding balance rather
     /// than being paid to the seller as cash accrued.
-    pub fn accrual_config(&self) -> crate::cashflow::accrual::AccrualConfig {
-        crate::cashflow::accrual::AccrualConfig {
-            method: crate::cashflow::accrual::AccrualMethod::Linear,
+    pub fn accrual_config(&self) -> finstack_quant_cashflows::accrual::AccrualConfig {
+        finstack_quant_cashflows::accrual::AccrualConfig {
+            method: finstack_quant_cashflows::accrual::AccrualMethod::Linear,
             ex_coupon: None,
             include_pik: false,
             frequency: Some(self.frequency),
@@ -912,7 +912,7 @@ impl crate::instruments::common_impl::traits::Instrument for TermLoan {
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
-impl crate::cashflow::traits::CashflowScheduleSource for TermLoan {
+impl finstack_quant_cashflows::CashflowScheduleSource for TermLoan {
     fn notional(&self) -> finstack_quant_core::Result<Option<finstack_quant_core::money::Money>> {
         Ok(Some(self.notional_limit))
     }
@@ -921,13 +921,14 @@ impl crate::cashflow::traits::CashflowScheduleSource for TermLoan {
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         _as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let schedule = crate::instruments::fixed_income::term_loan::cashflows::generate_cashflows(
             self, curves,
         )?;
 
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 

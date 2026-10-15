@@ -552,7 +552,7 @@ impl FxTouchOption {
 
 crate::impl_empty_cashflow_provider!(
     FxTouchOption,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
 
 #[cfg(test)]

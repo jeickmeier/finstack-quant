@@ -15,11 +15,11 @@
 //! - `financial_tolerance(notional)`: For money amounts
 
 use crate::cashflows::helpers::financial_tolerance;
-use finstack_quant_cashflows::builder::specs::{
+use finstack_quant_cashflows::builder::{AmortizationSpec, CashFlowSchedule, PrincipalExchange};
+use finstack_quant_cashflows::builder::{
     CouponType, FeeSpec, FixedCouponSpec, FloatingCouponSpec, FloatingRateFallback,
     FloatingRateSpec, OvernightIndexConstraintApplication,
 };
-use finstack_quant_cashflows::builder::{AmortizationSpec, CashFlowSchedule, PrincipalExchange};
 use finstack_quant_core::cashflow::Discountable;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
@@ -49,7 +49,7 @@ fn linear_vs_step_parity() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -64,8 +64,8 @@ fn linear_vs_step_parity() {
         .fixed_cf(fixed.clone());
     let s1 = b1.build(None).unwrap();
 
-    let sched = finstack_quant_cashflows::builder::periods::build_periods(
-        finstack_quant_cashflows::builder::periods::BuildPeriodsParams {
+    let sched = finstack_quant_cashflows::builder::build_periods(
+        finstack_quant_cashflows::builder::BuildPeriodsParams {
             start: issue,
             end: maturity,
             frequency: Tenor::quarterly(),
@@ -77,7 +77,7 @@ fn linear_vs_step_parity() {
             payment_lag_days: 0,
             reset_lag_days: None,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     )
     .unwrap();
@@ -131,7 +131,7 @@ fn pik_capitalization_increases_outstanding() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -168,7 +168,7 @@ fn linear_amortization_spans_fixed_to_float_cadences() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
     let quarterly_float = FloatingCouponSpec {
@@ -200,7 +200,7 @@ fn linear_amortization_spans_fixed_to_float_cadences() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -252,7 +252,7 @@ fn fixed_to_float_window_has_fresh_front_stub_at_switch() {
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     };
     let fixed = FixedCouponSpec {
         coupon_type: CouponType::Cash,
@@ -330,7 +330,7 @@ fn ordering_invariants_within_date() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -379,7 +379,7 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -436,7 +436,7 @@ fn detects_stub_periods() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -496,7 +496,7 @@ fn negative_rate_fixed_coupons_are_emitted() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -583,7 +583,7 @@ fn outstanding_by_date_dedup_and_values() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -644,7 +644,7 @@ fn outstanding_by_date_dedup_and_values() {
 #[test]
 fn outstanding_by_date_includes_prepayment() {
     let prepay_date = Date::from_calendar_date(2025, Month::March, 15).unwrap();
-    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule::from_parts(
+    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
         vec![CashFlow::new(
             prepay_date,
             None,
@@ -656,7 +656,7 @@ fn outstanding_by_date_includes_prepayment() {
         finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD)
             .expect("valid notional fixture"),
         DayCount::Act365F,
-        finstack_quant_cashflows::builder::schedule::CashFlowMeta {
+        finstack_quant_cashflows::builder::CashFlowMeta {
             issue_date: Some(prepay_date),
             ..Default::default()
         },
@@ -675,7 +675,7 @@ fn outstanding_by_date_includes_prepayment() {
 fn outstanding_by_date_includes_defaulted_notional() {
     let default_date = Date::from_calendar_date(2025, Month::March, 15).unwrap();
     let recovery_date = Date::from_calendar_date(2025, Month::September, 15).unwrap();
-    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule::from_parts(
+    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
         vec![
             CashFlow::new(
                 default_date,
@@ -697,7 +697,7 @@ fn outstanding_by_date_includes_defaulted_notional() {
         finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD)
             .expect("valid notional fixture"),
         DayCount::Act365F,
-        finstack_quant_cashflows::builder::schedule::CashFlowMeta {
+        finstack_quant_cashflows::builder::CashFlowMeta {
             issue_date: Some(default_date),
             ..Default::default()
         },
@@ -734,7 +734,7 @@ fn builder_created_schedule_sets_issue_date_for_outstanding_by_date() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -749,7 +749,7 @@ fn builder_created_schedule_sets_issue_date_for_outstanding_by_date() {
 #[test]
 fn outstanding_by_date_requires_issue_date() {
     let prepay_date = Date::from_calendar_date(2025, Month::March, 15).unwrap();
-    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule::from_parts(
+    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
         vec![CashFlow::new(
             prepay_date,
             None,
@@ -761,7 +761,7 @@ fn outstanding_by_date_requires_issue_date() {
         finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD)
             .expect("valid notional fixture"),
         DayCount::Act365F,
-        finstack_quant_cashflows::builder::schedule::CashFlowMeta::default(),
+        finstack_quant_cashflows::builder::CashFlowMeta::default(),
     );
 
     let err = schedule
@@ -819,7 +819,7 @@ fn schedule_errors_on_unknown_calendar() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -857,7 +857,7 @@ fn stub_period_thirty360_produces_proportional_accrual() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -947,7 +947,7 @@ fn coupon_amount_golden_values() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -1041,7 +1041,7 @@ fn cashflow_conservation_bond_principal() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -1088,7 +1088,7 @@ fn cashflow_conservation_amortizing_bond_principal() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -1136,7 +1136,7 @@ fn outstanding_never_negative() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -1181,7 +1181,7 @@ fn npv_decreases_with_higher_discount_rate() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -1231,7 +1231,7 @@ fn npv_decreases_with_higher_discount_rate() {
 fn test_weighted_average_life_two_amort() {
     // Two equal amortization payments at ~1y and ~2y from as_of
     // WAL should be ~1.5 years
-    use finstack_quant_cashflows::builder::schedule::CashFlowMeta;
+    use finstack_quant_cashflows::builder::CashFlowMeta;
     use finstack_quant_cashflows::builder::Notional;
 
     let as_of = Date::from_calendar_date(2025, Month::January, 15).unwrap();
@@ -1278,7 +1278,7 @@ fn test_weighted_average_life_two_amort() {
 fn test_weighted_average_life_bullet() {
     // Single notional payment at 5y (bullet bond)
     // WAL should be ~5.0 years
-    use finstack_quant_cashflows::builder::schedule::CashFlowMeta;
+    use finstack_quant_cashflows::builder::CashFlowMeta;
     use finstack_quant_cashflows::builder::Notional;
 
     let as_of = Date::from_calendar_date(2025, Month::January, 15).unwrap();
@@ -1312,7 +1312,7 @@ fn test_weighted_average_life_bullet() {
 #[test]
 fn test_weighted_average_life_empty() {
     // No flows => WAL = 0.0
-    use finstack_quant_cashflows::builder::schedule::CashFlowMeta;
+    use finstack_quant_cashflows::builder::CashFlowMeta;
     use finstack_quant_cashflows::builder::Notional;
 
     let as_of = Date::from_calendar_date(2025, Month::January, 15).unwrap();
@@ -1332,7 +1332,7 @@ fn test_weighted_average_life_empty() {
 fn test_weighted_average_life_ignores_coupons() {
     // Mix of coupon and principal flows
     // WAL should only count principal flows
-    use finstack_quant_cashflows::builder::schedule::CashFlowMeta;
+    use finstack_quant_cashflows::builder::CashFlowMeta;
     use finstack_quant_cashflows::builder::Notional;
 
     let as_of = Date::from_calendar_date(2025, Month::January, 15).unwrap();
@@ -1425,7 +1425,7 @@ fn lagged_redemption_matches_final_coupon_on_weekend_maturity() {
             end_of_month: false,
             payment_lag_days: 2,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -1478,7 +1478,7 @@ fn pik_then_redemption_on_lagged_payment_date() {
             end_of_month: false,
             payment_lag_days: 2,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -1543,7 +1543,7 @@ fn lag_zero_weekend_maturity_redeems_on_adjusted_business_day() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -1586,7 +1586,7 @@ fn principal_exchange_fixed_spec() -> FixedCouponSpec {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     }
 }

@@ -1,8 +1,8 @@
 //! Inflation-Linked Bond (ILB) types and implementation.
 
-use crate::cashflow::traits::DatedFlows;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::common_impl::traits::Attributes;
+use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
@@ -368,7 +368,7 @@ impl InflationLinkedBond {
     fn schedule_calendar_id(&self) -> &str {
         self.calendar_id
             .as_deref()
-            .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
+            .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
     }
 
     /// Coupon periods from issue to maturity under the bond's schedule
@@ -377,9 +377,9 @@ impl InflationLinkedBond {
     ///
     /// Shared by validation, the real schedule and the projected schedule so
     /// every view sees the same periods.
-    fn periods(&self) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
-        crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+    fn periods(&self) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
+        finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start: self.issue_date,
                 end: self.maturity,
                 frequency: self.frequency,
@@ -391,7 +391,7 @@ impl InflationLinkedBond {
                 payment_lag_days: 0,
                 reset_lag_days: None,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )
     }
@@ -409,7 +409,7 @@ impl InflationLinkedBond {
     /// Shared by the projected (PV) schedule and the real-yield schedule so
     /// both pay principal on the same date as the final coupon.
     fn principal_payment_date(&self) -> Result<Date> {
-        crate::cashflow::builder::calendar::adjust_date(
+        finstack_quant_cashflows::builder::adjust_date(
             self.maturity,
             self.business_day_convention,
             self.schedule_calendar_id(),
@@ -420,8 +420,10 @@ impl InflationLinkedBond {
     /// contractual accrual boundaries, plus principal at the adjusted maturity.
     ///
     /// The coupon's ACT/ACT ICMA reference period is its own accrual period.
-    fn real_cashflow_schedule(&self) -> Result<crate::cashflow::builder::CashFlowSchedule> {
-        use crate::cashflow::primitives::{CFKind, CashFlow, CashFlowAccrual};
+    fn real_cashflow_schedule(
+        &self,
+    ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
+        use finstack_quant_cashflows::primitives::{CFKind, CashFlow, CashFlowAccrual};
 
         let coupon_rate = self.real_coupon_rate()?;
         let currency = self.notional.currency();
@@ -466,12 +468,12 @@ impl InflationLinkedBond {
                 None,
             ));
         }
-        Ok(crate::cashflow::traits::schedule_from_classified_flows(
+        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             self.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
-                meta: crate::cashflow::builder::CashFlowMeta {
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
                     issue_date: Some(self.issue_date),
                     ..Default::default()
                 },
@@ -484,12 +486,12 @@ impl InflationLinkedBond {
     /// coupon frequency).
     fn real_accrued_from(
         &self,
-        schedule: &crate::cashflow::builder::CashFlowSchedule,
+        schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
         as_of: Date,
     ) -> Result<f64> {
-        crate::cashflow::accrual::AccrualIndex::build(
+        finstack_quant_cashflows::accrual::AccrualIndex::build(
             schedule,
-            &crate::cashflow::accrual::AccrualConfig {
+            &finstack_quant_cashflows::accrual::AccrualConfig {
                 frequency: Some(self.frequency),
                 ..Default::default()
             },
@@ -499,7 +501,7 @@ impl InflationLinkedBond {
 
     /// Real flows paid on or after `as_of` (earlier flows are settled).
     fn real_flows_from(
-        schedule: &crate::cashflow::builder::CashFlowSchedule,
+        schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
         as_of: Date,
     ) -> DatedFlows {
         schedule
@@ -513,7 +515,7 @@ impl InflationLinkedBond {
     /// Contractual yield times retaining the real schedule's coupon metadata.
     fn real_flow_times(
         &self,
-        schedule: &crate::cashflow::builder::CashFlowSchedule,
+        schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
         as_of: Date,
     ) -> Result<Vec<(Date, f64, Money)>> {
         use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
@@ -806,12 +808,12 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
         &self,
         curves: &MarketContext,
         as_of: Date,
-    ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         if self.issue_date >= self.maturity {
-            return Ok(crate::cashflow::traits::schedule_from_classified_flows(
+            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 self.day_count,
-                crate::cashflow::traits::ScheduleBuildOpts {
+                finstack_quant_cashflows::ScheduleBuildOpts {
                     notional_hint: Some(self.notional),
                     ..Default::default()
                 },
@@ -838,7 +840,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
                 coupon_rate,
             ));
         }
-        crate::cashflow::builder::emission::emit_inflation_coupons(
+        finstack_quant_cashflows::builder::emit_inflation_coupons(
             self.notional.currency(),
             &coupon_rows,
             &mut detailed_flows,
@@ -852,33 +854,34 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
                 as_of,
                 self.deflation_protection != DeflationProtection::None,
             )?;
-            detailed_flows.push(crate::cashflow::primitives::CashFlow::new(
+            detailed_flows.push(finstack_quant_cashflows::primitives::CashFlow::new(
                 principal_date,
                 None,
                 self.notional.checked_mul_f64(principal_ratio)?,
-                crate::cashflow::primitives::CFKind::Notional,
+                finstack_quant_cashflows::primitives::CFKind::Notional,
                 0.0,
                 None,
             ));
         }
 
-        let schedule = crate::cashflow::traits::schedule_from_classified_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
             detailed_flows,
             self.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
                 ..Default::default()
             },
         );
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::traits::CashflowProvider;
+    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::scalars::{InflationIndex, InflationInterpolation};

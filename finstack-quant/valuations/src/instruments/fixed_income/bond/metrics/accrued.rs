@@ -20,7 +20,7 @@ use crate::metrics::{MetricCalculator, MetricContext};
 /// # See Also
 ///
 /// - [`Bond::accrual_config`] for accrual configuration
-/// - [`crate::cashflow::accrual`] for the accrual engine
+/// - [`finstack_quant_cashflows::accrual`] for the accrual engine
 pub(crate) struct AccruedInterestCalculator;
 
 impl MetricCalculator for AccruedInterestCalculator {
@@ -35,7 +35,7 @@ impl MetricCalculator for AccruedInterestCalculator {
             let accrual_date = settlement_date(bond, context.as_of)?;
 
             // Use generic cashflow accrual engine with bond's config.
-            let accrued_amt = crate::cashflow::accrual::accrued_interest_amount(
+            let accrued_amt = finstack_quant_cashflows::accrual::accrued_interest_amount(
                 &schedule,
                 accrual_date,
                 &bond.accrual_config(),

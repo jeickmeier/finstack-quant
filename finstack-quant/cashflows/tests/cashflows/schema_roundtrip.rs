@@ -7,7 +7,7 @@
 //!
 //! Also verifies that deserialized values match expected market-standard conventions.
 
-use finstack_quant_cashflows::builder::specs::{
+use finstack_quant_cashflows::builder::{
     AmortizationSpec, CouponType, DefaultModelSpec, FeeSpec, FeeTier, FixedCouponSpec,
     FloatingCouponSpec, FloatingRateSpec, Notional, PrepaymentModelSpec, RecoveryModelSpec,
     ScheduleParams, StepUpCouponSpec,
@@ -499,7 +499,7 @@ fn test_step_up_coupon_preserves_adjusted_accruals() {
         step_schedule: Vec::<(Date, Decimal)>::new(),
         schedule: ScheduleParams {
             adjust_accrual_dates: true,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             ..ScheduleParams::semiannual_30360()
         },
     };

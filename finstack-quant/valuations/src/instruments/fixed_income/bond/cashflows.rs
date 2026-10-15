@@ -11,7 +11,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
-use crate::cashflow::builder::CashflowRepresentation;
+use finstack_quant_cashflows::builder::CashflowRepresentation;
 
 use super::types::Bond;
 
@@ -24,7 +24,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Bond {
         &self,
         curves: &MarketContext,
         _as_of: Date,
-    ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let schedule = if let Some(ref custom) = self.custom_cashflows {
             custom.clone()
         } else {

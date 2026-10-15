@@ -1221,7 +1221,7 @@ impl AssetPool {
         cashflows: &[(Date, Money)],
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        crate::cashflow::builder::schedule::weighted_average_life_from_principal(
+        finstack_quant_cashflows::builder::weighted_average_life_from_principal(
             cashflows.iter().copied(),
             as_of,
         )

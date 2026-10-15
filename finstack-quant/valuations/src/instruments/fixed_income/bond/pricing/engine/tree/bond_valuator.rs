@@ -217,7 +217,7 @@ impl BondValuator {
     /// Sorted, distinct dates of every flow in `schedule`: the event dates
     /// that split an exercise window into candidate decisions.
     pub(crate) fn exercise_event_dates(
-        schedule: &crate::cashflow::builder::CashFlowSchedule,
+        schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
     ) -> Vec<Date> {
         let mut dates: Vec<Date> = schedule.get_flows().iter().map(|flow| flow.date).collect();
         dates.sort_unstable();
@@ -350,7 +350,7 @@ impl BondValuator {
         time_steps: Vec<f64>,
         grid_day_count: DayCount,
     ) -> Result<Self> {
-        use crate::cashflow::primitives::CFKind;
+        use finstack_quant_cashflows::primitives::CFKind;
 
         if time_steps.len() < 2
             || time_steps[0].abs() > 1e-12
@@ -624,8 +624,10 @@ impl BondValuator {
         }
         if let Some(ref call_put) = bond.call_put {
             let accrual_cfg = bond.accrual_config();
-            let accrual_index =
-                crate::cashflow::accrual::AccrualIndex::build(&full_schedule, &accrual_cfg)?;
+            let accrual_index = finstack_quant_cashflows::accrual::AccrualIndex::build(
+                &full_schedule,
+                &accrual_cfg,
+            )?;
             for call in &call_put.calls {
                 let make_whole_reference = call
                     .make_whole
@@ -1227,11 +1229,11 @@ const _: () = {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-    use crate::cashflow::primitives::{CFKind, CashFlow};
     use crate::instruments::fixed_income::bond::{
         Bond, CallPut, CallPutSchedule, CashflowSpec, MakeWholeSpec,
     };
+    use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
+    use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, DayCountContext, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;

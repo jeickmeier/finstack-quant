@@ -299,14 +299,15 @@ impl finstack_quant_cashflows::CashflowScheduleSource for VolatilityIndexFuture 
         &self,
         _curves: &MarketContext,
         _as_of: Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
-        Ok(crate::cashflow::traits::schedule_from_classified_flows(
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
+        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             Vec::new(),
             finstack_quant_core::dates::DayCount::Act365F, // Standard for vol index futures
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: self.notional()?,
-                meta: crate::cashflow::builder::CashFlowMeta {
-                    representation: crate::cashflow::builder::CashflowRepresentation::NoResidual,
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual,
                     ..Default::default()
                 },
             },

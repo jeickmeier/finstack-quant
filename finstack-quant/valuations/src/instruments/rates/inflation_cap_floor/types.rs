@@ -300,18 +300,18 @@ impl InflationCapFloor {
             self.rate_option_type,
             RateOptionType::Caplet | RateOptionType::Floorlet
         ) {
-            let pay = crate::cashflow::builder::calendar::adjust_date(
+            let pay = finstack_quant_cashflows::builder::adjust_date(
                 self.maturity,
                 self.business_day_convention,
                 self.calendar_id
                     .as_deref()
-                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                    .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
             )?;
             return Ok(vec![(self.start_date, self.maturity, pay)]);
         }
 
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start: self.start_date,
                 end: self.maturity,
                 frequency: self.frequency,
@@ -320,13 +320,13 @@ impl InflationCapFloor {
                 calendar_id: self
                     .calendar_id
                     .as_deref()
-                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                    .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
                 end_of_month: false,
                 day_count: self.day_count,
                 payment_lag_days: 0,
                 reset_lag_days: None,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )?;
 
@@ -578,5 +578,5 @@ impl crate::instruments::common_impl::traits::Instrument for InflationCapFloor {
 
 crate::impl_empty_cashflow_provider!(
     InflationCapFloor,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );

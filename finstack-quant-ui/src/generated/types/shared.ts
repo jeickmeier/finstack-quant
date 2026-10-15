@@ -15190,7 +15190,7 @@ export type ReturnFloorKind =
  * # Examples
  *
  * ```rust
- * use finstack_quant_cashflows::builder::specs::RollRule;
+ * use finstack_quant_cashflows::builder::RollRule;
  *
  * let rule = RollRule::default();
  * assert_eq!(rule, RollRule::None);
@@ -15688,7 +15688,7 @@ export type D_305C1A38Cfd98Cc3Ea44 =
  * # Examples
  *
  * ```rust
- * use finstack_quant_cashflows::builder::specs::RollRule;
+ * use finstack_quant_cashflows::builder::RollRule;
  *
  * let rule = RollRule::default();
  * assert_eq!(rule, RollRule::None);
@@ -15901,7 +15901,7 @@ export type D_780B68Ee5D41351B65Ca =
  * # Examples
  *
  * ```rust
- * use finstack_quant_cashflows::builder::specs::RollRule;
+ * use finstack_quant_cashflows::builder::RollRule;
  *
  * let rule = RollRule::default();
  * assert_eq!(rule, RollRule::None);
@@ -17041,7 +17041,7 @@ export interface Attributes {
  * use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{
  *     AgencyMbsPassthrough, AgencyProgram, PoolType,
  * };
- * use finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;
+ * use finstack_quant_cashflows::builder::PrepaymentModelSpec;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::money::Money;
  * use finstack_quant_core::dates::Date;
@@ -22607,7 +22607,7 @@ export interface Tenor3 {
  *         end_of_month: false,
  *         payment_lag_days: 0,
  *         adjust_accrual_dates: false,
- *         roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+ *         roll_rule: finstack_quant_cashflows::builder::RollRule::None,
  *     },
  * };
  * ```
@@ -25984,7 +25984,7 @@ export interface Money24 {
  *
  * # Cashflow Generation
  *
- * Uses the [`CashflowProvider`](crate::cashflow::traits::CashflowProvider) trait:
+ * Uses the [`CashflowProvider`](finstack_quant_cashflows::CashflowProvider) trait:
  * - `dated_cashflows()` returns signed canonical schedule flows (coupons, amortization, redemptions)
  * - `cashflow_schedule()` returns the signed canonical schedule with `CFKind` metadata
  *
@@ -58022,7 +58022,7 @@ export interface TrancheStructure1 {
  *         end_of_month: false,
  *         payment_lag_days: 0,
  *         adjust_accrual_dates: false,
- *         roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+ *         roll_rule: finstack_quant_cashflows::builder::RollRule::None,
  *     },
  * );
  * ```

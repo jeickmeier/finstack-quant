@@ -685,7 +685,7 @@ fn weekend_maturity_redemption_matches_final_coupon_date() {
             payment_lag_days: 0,
 
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -793,7 +793,7 @@ fn order_independence_fixed_spec() -> FixedCouponSpec {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     }
 }
@@ -828,7 +828,7 @@ fn order_independence_float_spec() -> FloatingCouponSpec {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     }
 }
@@ -914,7 +914,7 @@ fn full_horizon_coupon_programs_are_order_independent() {
             payment_lag_days: 0,
 
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
     assert_program_order_independent(principal, issue, maturity, |builder| {
