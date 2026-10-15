@@ -35,7 +35,7 @@
 //! # See Also
 //!
 //! - [`crate::instruments::fixed_income::bond::Bond`] for bond construction using cashflow specs
-//! - [`finstack_quant_cashflows::builder::specs`] for full builder coupon specifications
+//! - [`finstack_quant_cashflows::builder`] for full builder coupon specifications
 
 use crate::market::conventions::ConventionRegistry;
 use crate::market::conventions::RateIndexConventions;

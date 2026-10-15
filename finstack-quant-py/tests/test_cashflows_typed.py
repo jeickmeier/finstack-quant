@@ -1283,6 +1283,7 @@ class TestTypedTwinsAndWire:
         import json
 
         from finstack_quant.cashflows import build_cashflow_schedule, build_cashflow_schedule_json, dated_flows
+        from finstack_quant.cashflows.builder import CashFlowSchedule
 
         spec = {
             "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
@@ -1306,7 +1307,7 @@ class TestTypedTwinsAndWire:
         flows = dated_flows(typed)
         assert flows
         assert isinstance(flows[0][1], Money)
-        assert dated_flows(typed.to_json()) == flows
+        assert dated_flows(CashFlowSchedule.from_json(typed.to_json())) == flows
 
     def test_schedule_from_flows_and_meta(self) -> None:
         import pickle

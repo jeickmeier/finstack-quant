@@ -187,18 +187,6 @@ impl PyCashFlowSchedule {
 
 wire_methods!(PyCashFlowSchedule, CashFlowSchedule, "CashFlowSchedule");
 
-/// Extract a `CashFlowSchedule` from a wrapper or its JSON string.
-pub(crate) fn extract_schedule(obj: &Bound<'_, PyAny>) -> PyResult<CashFlowSchedule> {
-    if let Ok(schedule) = obj.extract::<PyRef<'_, PyCashFlowSchedule>>() {
-        return Ok(schedule.inner.clone());
-    }
-    let json: String = obj.extract().map_err(|_| {
-        pyo3::exceptions::PyTypeError::new_err("expected CashFlowSchedule or JSON str")
-    })?;
-    serde_json::from_str::<CashFlowSchedule>(&json)
-        .map_err(|e| crate::errors::serde_json_to_py(e, "invalid CashFlowSchedule JSON"))
-}
-
 /// Extract one string column of a DataFrame-like object as Python objects.
 fn frame_column<'py>(
     frame: &Bound<'py, PyAny>,
