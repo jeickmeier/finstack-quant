@@ -62,7 +62,7 @@ pub use floating_replay::{
     CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
     FloatingCouponReplayState, FloatingCouponSettlement, FloatingRateObservation,
 };
-pub use orchestrator::{CashFlowBuilder, PrincipalEvent};
+pub use orchestrator::CashFlowBuilder;
 pub use overnight::{
     OvernightObservationSchedule, OvernightObservationSlice, OvernightRateAccumulator,
     OvernightRateConstraints, OvernightRateReplay,

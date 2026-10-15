@@ -354,7 +354,7 @@ public = [
     "DefaultModelSpec", "FeeAccrualBasis", "FeeBase",
     "FeeSpec", "FixedCouponSpec", "FloatingCouponSpec", "FloatingLegCompounding",
     "FloatingRateFallback", "FloatingRateSpec", "Notional",
-    "OvernightIndexConstraintApplication", "PrepaymentModelSpec", "PrincipalEvent",
+    "OvernightIndexConstraintApplication", "PrepaymentModelSpec",
     "PrincipalExchange",
     "RecoveryModelSpec", "RollRule", "ScheduleParams", "StepUpCouponSpec",
     "abs_to_smm", "cdr_to_mdr", "cpr_to_smm", "mdr_to_cdr",
@@ -1948,8 +1948,7 @@ types = { PeriodAggregation = "PeriodAggregation" }
 
 [parity.modules."finstack_quant.cashflows.builder"]
 js = "cashflows"
-# PrincipalEvent crosses as the build-spec row type (optional `cash`).
-types = { AmortizationSpec = "AmortizationSpec", CashFlowMeta = "CashFlowMeta", CouponType = "CouponType", DefaultModelSpec = "DefaultModelSpec", FeeAccrualBasis = "FeeAccrualBasis", FeeBase = "FeeBase", FeeSpec = "FeeSpec", FixedCouponSpec = "FixedCouponSpec", FloatingCouponSpec = "FloatingCouponSpec", FloatingLegCompounding = "FloatingLegCompounding", FloatingRateFallback = "FloatingRateFallback", FloatingRateSpec = "FloatingRateSpec", Notional = "Notional", OvernightIndexConstraintApplication = "OvernightIndexConstraintApplication", PrepaymentModelSpec = "PrepaymentModelSpec", PrincipalEvent = "PrincipalEventSpec", PrincipalExchange = "PrincipalExchange", RecoveryModelSpec = "RecoveryModelSpec", RollRule = "RollRule", ScheduleParams = "ScheduleParams", StepUpCouponSpec = "StepUpCouponSpec" }
+types = { AmortizationSpec = "AmortizationSpec", CashFlowMeta = "CashFlowMeta", CouponType = "CouponType", DefaultModelSpec = "DefaultModelSpec", FeeAccrualBasis = "FeeAccrualBasis", FeeBase = "FeeBase", FeeSpec = "FeeSpec", FixedCouponSpec = "FixedCouponSpec", FloatingCouponSpec = "FloatingCouponSpec", FloatingLegCompounding = "FloatingLegCompounding", FloatingRateFallback = "FloatingRateFallback", FloatingRateSpec = "FloatingRateSpec", Notional = "Notional", OvernightIndexConstraintApplication = "OvernightIndexConstraintApplication", PrepaymentModelSpec = "PrepaymentModelSpec", PrincipalExchange = "PrincipalExchange", RecoveryModelSpec = "RecoveryModelSpec", RollRule = "RollRule", ScheduleParams = "ScheduleParams", StepUpCouponSpec = "StepUpCouponSpec" }
 
 [parity.modules."finstack_quant.cashflows.fixings"]
 js = "cashflows"

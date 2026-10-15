@@ -62,17 +62,17 @@ pub(super) struct BuildState {
 /// change the balance at the contractual accrual boundary, independently of
 /// adjusted cash payment dates. Term-index reset dates remain contractual.
 #[derive(Debug, Clone)]
-pub struct PrincipalEvent {
+pub(super) struct PrincipalEvent {
     /// Economic date on which outstanding principal changes.
-    pub date: Date,
+    pub(super) date: Date,
     /// Cash settlement date, independent of the economic balance date.
-    pub payment_date: Date,
+    pub(super) payment_date: Date,
     /// Outstanding delta (positive = increases balance, negative = repays)
-    pub delta: Money,
+    pub(super) delta: Money,
     /// Cash leg paid/received (may differ from delta for OID/fees)
-    pub cash: Money,
+    pub(super) cash: Money,
     /// Classification for emitted cashflow
-    pub kind: CFKind,
+    pub(super) kind: CFKind,
 }
 
 #[derive(Debug, Clone)]
@@ -563,8 +563,8 @@ impl CashFlowBuilder {
     /// # Conventions
     ///
     /// - **Interest base:** coupons accrue on each constant-balance interval;
-    ///   principal events change interest from their economic effective date
-    ///   (see [`PrincipalEvent`]'s interest-base convention).
+    ///   principal events change interest from their economic effective date,
+    ///   independently of adjusted cash payment dates.
     /// - **Redemption conventions:** business-day adjustment and payment lag
     ///   follow the coupon window ending at maturity. Principal events must
     ///   occur on or before its effective terminal accrual boundary; when

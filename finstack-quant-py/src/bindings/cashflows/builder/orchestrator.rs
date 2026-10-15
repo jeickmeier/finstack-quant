@@ -1,11 +1,11 @@
-//! Python bindings for `CashFlowBuilder` and `PrincipalEvent`.
+//! Python bindings for `CashFlowBuilder`.
 
-use finstack_quant_cashflows::builder::{CashFlowBuilder, PrincipalEvent};
+use finstack_quant_cashflows::builder::CashFlowBuilder;
 use pyo3::prelude::*;
 
-use crate::bindings::cashflows::primitives::{extract_cf_kind, PyCFKind};
+use crate::bindings::cashflows::primitives::extract_cf_kind;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::date_utils::py_to_date;
 use crate::errors::core_to_py;
 
 use super::schedule::PyCashFlowSchedule;
@@ -13,101 +13,6 @@ use super::specs::{
     date_decimal_pairs, PyAmortizationSpec, PyCouponType, PyFeeSpec, PyFixedCouponSpec,
     PyFloatingCouponSpec, PyPrincipalExchange, PyStepUpCouponSpec,
 };
-
-/// Wrapper for [`PrincipalEvent`]
-/// (`finstack_quant.cashflows.builder.PrincipalEvent`).
-#[pyclass(
-    name = "PrincipalEvent",
-    module = "finstack_quant.cashflows.builder",
-    frozen,
-    skip_from_py_object
-)]
-#[derive(Clone, Debug)]
-pub struct PyPrincipalEvent {
-    /// Inner principal event.
-    pub(crate) inner: PrincipalEvent,
-}
-
-#[pymethods]
-impl PyPrincipalEvent {
-    /// Principal event applied during schedule build (draws/repays).
-    ///
-    /// Parameters
-    /// ----------
-    /// date : datetime.date
-    ///     Economic date when outstanding principal changes.
-    /// payment_date : datetime.date
-    ///     Cash settlement date, which may differ after business-day adjustment.
-    /// delta : Money
-    ///     Outstanding delta (positive increases balance, negative repays).
-    /// cash : Money
-    ///     Cash leg paid/received (may differ from delta for OID/fees).
-    /// kind : CFKind or str
-    ///     Classification for the emitted cashflow.
-    #[new]
-    #[pyo3(text_signature = "(date, payment_date, delta, cash, kind)")]
-    fn new(
-        date: &Bound<'_, PyAny>,
-        payment_date: &Bound<'_, PyAny>,
-        delta: PyMoney,
-        cash: PyMoney,
-        kind: &Bound<'_, PyAny>,
-    ) -> PyResult<Self> {
-        Ok(Self {
-            inner: PrincipalEvent {
-                date: py_to_date(date)?,
-                payment_date: py_to_date(payment_date)?,
-                delta: delta.inner,
-                cash: cash.inner,
-                kind: extract_cf_kind(kind)?,
-            },
-        })
-    }
-
-    /// Event date.
-    #[getter]
-    fn date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        date_to_py(py, self.inner.date)
-    }
-
-    /// Cash settlement date, independent of the economic event date.
-    #[getter]
-    fn payment_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        date_to_py(py, self.inner.payment_date)
-    }
-
-    /// Outstanding delta.
-    #[getter]
-    fn delta(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.delta)
-    }
-
-    /// Cash leg.
-    #[getter]
-    fn cash(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.cash)
-    }
-
-    /// Emitted cashflow classification.
-    #[getter]
-    fn kind(&self) -> PyCFKind {
-        PyCFKind::from_inner(self.inner.kind)
-    }
-
-    /// Debug-style representation.
-    fn __repr__(&self) -> String {
-        format!(
-            "PrincipalEvent(date='{}', payment_date='{}', delta={} {}, cash={} {}, kind='{}')",
-            self.inner.date,
-            self.inner.payment_date,
-            self.inner.delta.amount(),
-            self.inner.delta.currency(),
-            self.inner.cash.amount(),
-            self.inner.cash.currency(),
-            self.inner.kind
-        )
-    }
-}
 
 /// Wrapper for [`CashFlowBuilder`]
 /// (`finstack_quant.cashflows.builder.CashFlowBuilder`).

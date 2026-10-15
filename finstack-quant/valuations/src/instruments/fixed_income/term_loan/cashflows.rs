@@ -8,7 +8,7 @@ use crate::cashflow::builder::schedule::{merge_cashflow_schedules, CashFlowSched
 use crate::cashflow::builder::specs::{
     CouponType, FeeBase, FeeSpec, FloatingCouponSpec, FloatingRateSpec, StepUpCouponSpec,
 };
-use crate::cashflow::builder::{CashFlowBuilder, PrincipalEvent, ScheduleParams};
+use crate::cashflow::builder::{CashFlowBuilder, ScheduleParams};
 use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::instruments::fixed_income::term_loan::types::TermLoan;
 use finstack_quant_core::dates::Date;
@@ -17,6 +17,14 @@ use finstack_quant_core::money::Money;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use std::collections::BTreeMap;
+
+struct PrincipalEvent {
+    date: Date,
+    payment_date: Date,
+    delta: Money,
+    cash: Money,
+    kind: CFKind,
+}
 
 fn loan_schedule_params(loan: &TermLoan) -> ScheduleParams {
     ScheduleParams {
