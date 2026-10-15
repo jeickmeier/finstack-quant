@@ -1,19 +1,9 @@
 //! Rolling per-ticker metrics on [`Performance`].
 
 use super::Performance;
-use crate::math::summation::NeumaierAccumulator;
 use crate::risk_metrics::{
-    rolling_sharpe, rolling_sortino, rolling_volatility, DatedSeries, RollingMetric,
-    ROLLING_KERNEL_RECOMPUTE_INTERVAL,
+    rolling_returns, rolling_sharpe, rolling_sortino, rolling_volatility, DatedSeries,
 };
-
-fn recompute_log_sum(window: &[f64]) -> NeumaierAccumulator {
-    let mut acc = NeumaierAccumulator::new();
-    for &r in window {
-        acc.add(r.ln_1p());
-    }
-    acc
-}
 
 impl Performance {
     /// Rolling compounded returns for a specific ticker.
@@ -36,54 +26,11 @@ impl Performance {
     pub fn rolling_returns(&self, ticker_idx: usize, window: usize) -> crate::Result<DatedSeries> {
         self.ensure_ticker_idx(ticker_idx)?;
         Self::ensure_window(window)?;
-        let returns = self.active_returns(ticker_idx);
-        let dates = self.active_dates_for_ticker_unchecked(ticker_idx);
-        let n = returns.len().min(dates.len());
-        if window > n {
-            return Ok(DatedSeries::empty(RollingMetric::Return));
-        }
-        let count = n - window + 1;
-        let mut values = Vec::with_capacity(count);
-        let mut out_dates = Vec::with_capacity(count);
-
-        // Construction and deserialization guarantee finite returns > -1.
-        // Update their log growth directly, retaining numerical recovery.
-        let mut log_sum = recompute_log_sum(&returns[..window]);
-        let total = log_sum.total();
-        values.push(if total.is_finite() {
-            total.exp_m1()
-        } else {
-            f64::NAN
-        });
-        out_dates.push(dates[window - 1]);
-
-        let mut steps_since_recompute = 0_usize;
-        for end in (window + 1)..=n {
-            let add = returns[end - 1];
-            let rem = returns[end - 1 - window];
-            log_sum.add(add.ln_1p());
-            log_sum.add(-rem.ln_1p());
-            steps_since_recompute += 1;
-            if !log_sum.total().is_finite()
-                || steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
-            {
-                let start = end - window;
-                log_sum = recompute_log_sum(&returns[start..end]);
-                steps_since_recompute = 0;
-            }
-            let total = log_sum.total();
-            values.push(if total.is_finite() {
-                total.exp_m1()
-            } else {
-                f64::NAN
-            });
-            out_dates.push(dates[end - 1]);
-        }
-        Ok(DatedSeries {
-            values,
-            dates: out_dates,
-            value_column: RollingMetric::Return,
-        })
+        Ok(rolling_returns(
+            self.active_returns(ticker_idx),
+            self.active_dates_for_ticker_unchecked(ticker_idx),
+            window,
+        ))
     }
 
     /// Rolling annualized volatility for a specific ticker.

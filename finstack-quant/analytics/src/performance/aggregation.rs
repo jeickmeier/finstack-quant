@@ -238,9 +238,13 @@ impl Performance {
         fiscal_config: Option<FiscalConfig>,
     ) -> LookbackReturns {
         let fiscal_config = fiscal_config.unwrap_or_default();
-        let compute = |selector: &dyn Fn(&[Date]) -> core::ops::Range<usize>| -> Vec<f64> {
+        let compute = |period_start: Date| -> Vec<f64> {
             self.map_tickers(|i| {
-                let range = selector(self.active_dates_for_ticker_unchecked(i));
+                let range = lookback::select_range(
+                    self.active_dates_for_ticker_unchecked(i),
+                    period_start,
+                    ref_date,
+                );
                 let r = self.active_returns(i);
                 let start = range.start.min(r.len());
                 let end = range.end.min(r.len()).max(start);
@@ -250,10 +254,10 @@ impl Performance {
 
         LookbackReturns {
             ticker_names: self.ticker_names().to_vec(),
-            mtd: compute(&|dates| lookback::mtd_select(dates, ref_date)),
-            qtd: compute(&|dates| lookback::qtd_select(dates, ref_date)),
-            ytd: compute(&|dates| lookback::ytd_select(dates, ref_date)),
-            fytd: compute(&|dates| lookback::fytd_select(dates, ref_date, fiscal_config)),
+            mtd: compute(lookback::mtd_start_date(ref_date)),
+            qtd: compute(lookback::qtd_start_date(ref_date)),
+            ytd: compute(lookback::ytd_start_date(ref_date)),
+            fytd: compute(lookback::fytd_start_date(ref_date, fiscal_config)),
         }
     }
 

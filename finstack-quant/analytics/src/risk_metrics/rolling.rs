@@ -289,6 +289,65 @@ pub(crate) fn rolling_sortino(
     out
 }
 
+fn recompute_log_sum(window: &[f64]) -> NeumaierAccumulator {
+    let mut acc = NeumaierAccumulator::new();
+    for &r in window {
+        acc.add(r.ln_1p());
+    }
+    acc
+}
+
+/// Rolling compounded returns over a sliding window.
+///
+/// Computes the total compounded return over each `window`-length sub-slice
+/// of `returns`, right-labelled by the window-end date.
+pub(crate) fn rolling_returns(returns: &[f64], dates: &[Date], window: usize) -> DatedSeries {
+    let n = returns.len().min(dates.len());
+    if n < window || window == 0 {
+        return DatedSeries::empty(RollingMetric::Return);
+    }
+    let count = n - window + 1;
+    let mut values = Vec::with_capacity(count);
+    let mut out_dates = Vec::with_capacity(count);
+
+    let mut log_sum = recompute_log_sum(&returns[..window]);
+    let total = log_sum.total();
+    values.push(if total.is_finite() {
+        total.exp_m1()
+    } else {
+        f64::NAN
+    });
+    out_dates.push(dates[window - 1]);
+
+    let mut steps_since_recompute = 0_usize;
+    for end in (window + 1)..=n {
+        let add = returns[end - 1];
+        let rem = returns[end - 1 - window];
+        log_sum.add(add.ln_1p());
+        log_sum.add(-rem.ln_1p());
+        steps_since_recompute += 1;
+        if !log_sum.total().is_finite()
+            || steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
+        {
+            let start = end - window;
+            log_sum = recompute_log_sum(&returns[start..end]);
+            steps_since_recompute = 0;
+        }
+        let total = log_sum.total();
+        values.push(if total.is_finite() {
+            total.exp_m1()
+        } else {
+            f64::NAN
+        });
+        out_dates.push(dates[end - 1]);
+    }
+    DatedSeries {
+        values,
+        dates: out_dates,
+        value_column: RollingMetric::Return,
+    }
+}
+
 // Each kernel advances a sliding window over `returns[..n]` and calls
 // `emit` once per completed window. The metric functions assemble those
 // values and their window-end dates into a `DatedSeries`.

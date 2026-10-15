@@ -25,47 +25,18 @@ fn valid_horizon(ann_factor: Option<f64>) -> bool {
     ann_factor.is_none_or(|af| af.is_finite() && af > 0.0)
 }
 
-fn finite_returns_copy(returns: &[f64]) -> Option<Vec<f64>> {
+fn historical_sample(returns: &[f64], confidence: f64) -> Option<Vec<f64>> {
+    if returns.is_empty() || !has_strict_confidence(confidence) {
+        return None;
+    }
     let mut data = Vec::with_capacity(returns.len());
     for &value in returns {
         if !value.is_finite() {
-            tracing::debug!(
-                n_returns = returns.len(),
-                reason = "non_finite_return",
-                "tail-risk metric returning NaN"
-            );
             return None;
         }
         data.push(value);
     }
     Some(data)
-}
-
-fn historical_sample(
-    returns: &[f64],
-    confidence: f64,
-    invalid_confidence_message: Option<&str>,
-) -> Option<Vec<f64>> {
-    if returns.is_empty() {
-        return None;
-    }
-    if !has_strict_confidence(confidence) {
-        if let Some(message) = invalid_confidence_message {
-            tracing::debug!(confidence, reason = "invalid_confidence", "{message}");
-        }
-        return None;
-    }
-    finite_returns_copy(returns)
-}
-
-fn historical_var_data(
-    returns: &[f64],
-    confidence: f64,
-    invalid_confidence_message: Option<&str>,
-) -> Option<(Vec<f64>, f64)> {
-    let mut data = historical_sample(returns, confidence, invalid_confidence_message)?;
-    let var_threshold = quantile(&mut data, 1.0 - confidence);
-    Some((data, var_threshold))
 }
 
 fn expected_shortfall_from_data(data: &mut [f64], confidence: f64) -> f64 {
@@ -116,12 +87,10 @@ fn expected_shortfall_from_data(data: &mut [f64], confidence: f64) -> f64 {
 /// slice or an invalid confidence level.
 #[must_use]
 pub(crate) fn value_at_risk(returns: &[f64], confidence: f64) -> f64 {
-    let Some((_, var_threshold)) =
-        historical_var_data(returns, confidence, Some("value_at_risk returning NaN"))
-    else {
+    let Some(mut data) = historical_sample(returns, confidence) else {
         return f64::NAN;
     };
-    var_threshold
+    quantile(&mut data, 1.0 - confidence)
 }
 /// Expected Shortfall (CVaR / ES) at the given confidence level.
 ///
@@ -161,11 +130,7 @@ pub(crate) fn value_at_risk(returns: &[f64], confidence: f64) -> f64 {
 /// - Artzner et al. (1999): `docs/REFERENCES.md#artzner1999CoherentRisk`
 #[must_use]
 pub(crate) fn expected_shortfall(returns: &[f64], confidence: f64) -> f64 {
-    let Some(mut data) = historical_sample(
-        returns,
-        confidence,
-        Some("expected_shortfall returning NaN"),
-    ) else {
+    let Some(mut data) = historical_sample(returns, confidence) else {
         return f64::NAN;
     };
     expected_shortfall_from_data(&mut data, confidence)
@@ -183,9 +148,10 @@ pub(crate) fn expected_shortfall(returns: &[f64], confidence: f64) -> f64 {
 /// `confidence`.
 #[must_use]
 pub(crate) fn value_at_risk_and_es(returns: &[f64], confidence: f64) -> (f64, f64) {
-    let Some((mut data, var_threshold)) = historical_var_data(returns, confidence, None) else {
+    let Some(mut data) = historical_sample(returns, confidence) else {
         return (f64::NAN, f64::NAN);
     };
+    let var_threshold = quantile(&mut data, 1.0 - confidence);
     let es = expected_shortfall_from_data(&mut data, confidence);
     (var_threshold, es)
 }
@@ -214,13 +180,7 @@ pub(crate) fn value_at_risk_and_es(returns: &[f64], confidence: f64) -> (f64, f6
 /// upper tail is positive, and [`f64::NAN`] when both tails are zero.
 #[must_use]
 pub(crate) fn tail_ratio(returns: &[f64], confidence: f64) -> f64 {
-    if returns.is_empty() {
-        return f64::NAN;
-    }
-    if !has_strict_confidence(confidence) {
-        return f64::NAN;
-    }
-    let Some(mut data) = finite_returns_copy(returns) else {
+    let Some(mut data) = historical_sample(returns, confidence) else {
         return f64::NAN;
     };
     let upper = quantile(&mut data, confidence).abs();

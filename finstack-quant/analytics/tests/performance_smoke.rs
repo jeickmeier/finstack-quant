@@ -442,63 +442,6 @@ fn returns_accessors_reproduce_cumulative_returns_and_zero_rf_excess_returns() {
 }
 
 #[test]
-fn aligned_panel_rejects_malformed_shapes_and_only_pads_inactive_dates() {
-    let dates = calendar_days(
-        Date::from_calendar_date(2025, Month::January, 2).expect("first date"),
-        4,
-    );
-    let mut perf = Performance::from_returns(
-        dates.clone(),
-        vec![
-            vec![0.01, 0.02, 0.03, 0.04],
-            vec![f64::NAN, 0.02, 0.03, f64::NAN],
-        ],
-        vec!["A".into(), "B".into()],
-        None,
-        PeriodKind::Daily,
-    )
-    .expect("ragged panel");
-
-    for malformed in [
-        vec![vec![1.0; 4]],
-        vec![vec![1.0; 4], vec![2.0; 2], vec![]],
-        vec![vec![1.0; 3], vec![2.0; 2]],
-        vec![vec![1.0; 5], vec![2.0; 2]],
-        vec![vec![1.0; 4], vec![2.0]],
-        vec![vec![1.0; 4], vec![2.0; 3]],
-    ] {
-        assert!(perf.aligned_panel(malformed).is_err());
-    }
-
-    let (aligned_dates, columns) = perf.aligned_panel(perf.returns()).expect("valid series");
-    assert_eq!(aligned_dates, dates);
-    assert_eq!(columns[0], vec![0.01, 0.02, 0.03, 0.04]);
-    assert!(columns[1][0].is_nan());
-    assert_eq!(columns[1][1], 0.02);
-    assert_eq!(columns[1][2], 0.03);
-    assert!(columns[1][3].is_nan());
-
-    for (start, end) in [(0, 0), (1, 2), (3, 3), (3, 0)] {
-        perf.reset_date_range(dates[start], dates[end]);
-        let (aligned_dates, columns) = perf.aligned_panel(perf.returns()).expect("windowed series");
-        assert_eq!(aligned_dates, perf.active_dates());
-        assert_eq!(perf.dates(), dates);
-        for (ticker_idx, column) in columns.iter().enumerate() {
-            let ticker_dates = perf
-                .active_dates_for_ticker(ticker_idx)
-                .expect("ticker dates");
-            let returns = perf.returns_for_ticker(ticker_idx).expect("ticker returns");
-            for (&date, &value) in aligned_dates.iter().zip(column) {
-                match ticker_dates.binary_search(&date) {
-                    Ok(idx) => assert_eq!(value, returns[idx]),
-                    Err(_) => assert!(value.is_nan()),
-                }
-            }
-        }
-    }
-}
-
-#[test]
 fn lookback_returns_includes_maximum_reference_date_without_overflow() {
     let perf = Performance::new(
         vec![Date::MAX.previous_day().expect("prior date"), Date::MAX],

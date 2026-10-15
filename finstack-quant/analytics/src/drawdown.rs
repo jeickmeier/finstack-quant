@@ -1,14 +1,13 @@
-//! Drawdown computation: series, episode detection, averaging, and CDaR.
+//! Drawdown computation: series, episode detection, and drawdown-based ratios.
 //!
 //! Crate-internal except for [`DrawdownEpisode`] (re-exported at the crate root).
 //!
 //! Drawdown measures the peak-to-trough decline in cumulative wealth.
-//! This module provides five levels of granularity:
+//! This module provides four levels of granularity:
 //! - [`to_drawdown_series`]: per-period drawdown depth as a time series.
 //! - [`drawdown_details`]: structured episodes (start, valley, recovery).
 //! - [`mean_episode_drawdown`]: scalar average of the worst N episode minima.
 //! - [`mean_drawdown`]: arithmetic mean of a drawdown path.
-//! - [`cdar`]: Conditional Drawdown at Risk at a given confidence level.
 
 use crate::dates::Date;
 use crate::risk_metrics::ratio_or_sign_infinity;
@@ -300,185 +299,6 @@ pub(crate) fn max_drawdown_duration(drawdown: &[f64], dates: &[Date]) -> i64 {
     max_days
 }
 
-/// Conditional Drawdown at Risk (CDaR) at the given confidence level.
-///
-/// Mean signed drawdown over the worst `(1 - confidence)` empirical tail,
-/// using the same fractional-mass convention as expected shortfall.
-///
-/// # Arguments
-///
-/// * `drawdown`   - Pre-computed drawdown series (values ≤ 0), as produced
-///   by [`to_drawdown_series`].
-/// * `confidence` - Confidence level in `(0, 1)`, e.g. `0.95`.
-///
-/// # Returns
-///
-/// The CDaR as a **non-positive** scalar, matching the sign convention of
-/// the rest of the drawdown family ([`max_drawdown`], [`mean_drawdown`]).
-/// For example, a 95% CDaR of `-0.25` means the average drawdown depth in
-/// the worst 5% tail is 25%.
-/// Returns `0.0` for an empty slice.
-///
-/// # References
-///
-/// - Chekhlov, Uryasev & Zabarankin (2005): see docs/REFERENCES.md#chekhlov2005
-#[must_use]
-pub(crate) fn cdar(drawdown: &[f64], confidence: f64) -> f64 {
-    if drawdown.is_empty() {
-        return 0.0;
-    }
-    crate::risk_metrics::expected_shortfall(drawdown, confidence)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use crate::dates::{Duration, Month};
-
-    fn make_dates(n: usize) -> Vec<Date> {
-        (0..n)
-            .map(|i| {
-                Date::from_calendar_date(2025, Month::January, 1).expect("valid date")
-                    + Duration::days(i as i64)
-            })
-            .collect()
-    }
-
-    #[test]
-    fn drawdown_series_no_loss() {
-        let r = [0.01, 0.02, 0.03];
-        let dd = to_drawdown_series(&r);
-        assert!(dd.iter().all(|&v| v.abs() < 1e-12));
-    }
-
-    #[test]
-    fn drawdown_wealth_matches_comp_sum_on_long_mixed_sign_series() {
-        let r: Vec<f64> = (0..5000)
-            .map(|i| (((i % 17) as f64) - 8.0) * 0.0003)
-            .collect();
-        let cs = crate::returns::comp_sum(&r);
-        let mut engine = crate::returns::WealthEngine::new();
-        for &ret in &r {
-            engine.step(ret);
-        }
-        let last_wealth = engine.log_growth().exp();
-        let comp_wealth = 1.0 + cs.last().copied().unwrap_or(0.0);
-        assert!((comp_wealth - last_wealth).abs() < 1e-12);
-
-        let dd = to_drawdown_series(&r);
-        let mut engine = crate::returns::WealthEngine::new();
-        let mut peak = 1.0;
-        for (i, &ret) in r.iter().enumerate() {
-            engine.step(ret);
-            let wealth = engine.log_growth().exp();
-            if wealth > peak {
-                peak = wealth;
-            }
-            let expected_dd = wealth / peak - 1.0;
-            assert!(
-                (dd[i] - expected_dd).abs() < 1e-12,
-                "drawdown wealth path diverged at {i}: {} vs {expected_dd}",
-                dd[i]
-            );
-        }
-    }
-
-    #[test]
-    fn drawdown_series_propagates_nan() {
-        let dd = to_drawdown_series(&[0.05, f64::NAN, 0.10]);
-        assert!(dd[1].is_nan());
-        assert!(dd[2].is_nan());
-    }
-
-    #[test]
-    fn drawdown_series_handles_total_wipeout() {
-        let dd = to_drawdown_series(&[0.05, -1.0, 0.10]);
-        assert!(dd.iter().all(|v| v.is_finite()));
-        assert!(dd[1] < -0.99);
-    }
-
-    #[test]
-    fn drawdown_series_basic() {
-        let r = [0.10, -0.20, 0.05, 0.10];
-        let dd = to_drawdown_series(&r);
-        assert_eq!(dd.len(), 4);
-        assert!(dd[0].abs() < 1e-12); // no DD after gain
-        assert!(dd[1] < -0.1); // DD after big loss
-    }
-
-    #[test]
-    fn drawdown_details_basic() {
-        let r = [0.10, -0.20, 0.05, 0.10, -0.05, -0.03];
-        let dd = to_drawdown_series(&r);
-        let dates = make_dates(r.len());
-        let episodes = drawdown_details(&dd, &dates, 5);
-        assert!(!episodes.is_empty());
-        assert!(episodes[0].max_drawdown < 0.0);
-    }
-
-    #[test]
-    fn drawdown_details_bounds_unrecovered_episode_to_aligned_dates() {
-        let drawdown = [0.0, -0.10, -0.20, -0.15];
-        let dates = make_dates(6);
-        let episodes = drawdown_details(&drawdown, &dates, 5);
-        assert_eq!(episodes.len(), 1);
-        assert_eq!(episodes[0].start, dates[0]);
-        assert_eq!(episodes[0].valley, dates[2]);
-        assert_eq!(episodes[0].end, None);
-        assert_eq!(episodes[0].duration_days, 3);
-    }
-
-    #[test]
-    fn mean_episode_drawdown_empty() {
-        assert_eq!(mean_episode_drawdown(&[], 5), 0.0);
-    }
-
-    #[test]
-    fn mean_episode_drawdown_deterministic() {
-        let drawdown = [0.0, -0.10, -0.20, 0.0, -0.15, 0.0];
-        let avg = mean_episode_drawdown(&drawdown, 2);
-        assert!((avg - (-0.175)).abs() < 1e-12);
-    }
-
-    #[test]
-    fn cdar_hand_calc() {
-        let dd = [
-            -0.10, -0.20, -0.05, -0.15, -0.25, -0.30, -0.02, -0.08, -0.12, -0.18,
-        ];
-        let c = cdar(&dd, 0.80);
-        assert!((c - (-0.275)).abs() < 1e-10);
-    }
-
-    #[test]
-    fn cdar_worse_than_max_drawdown_var() {
-        let dd = [
-            -0.01, -0.05, -0.10, -0.15, -0.20, 0.0, -0.03, -0.08, -0.12, -0.18,
-        ];
-        let c95 = cdar(&dd, 0.95);
-        let c80 = cdar(&dd, 0.80);
-        assert!(c95 <= c80);
-    }
-
-    #[test]
-    fn cdar_empty() {
-        assert_eq!(cdar(&[], 0.95), 0.0);
-    }
-
-    #[test]
-    fn cdar_no_drawdown() {
-        let dd = [0.0, 0.0, 0.0];
-        assert_eq!(cdar(&dd, 0.95), 0.0);
-    }
-
-    #[test]
-    fn cdar_uniform_drawdown() {
-        let dd = [-0.05; 20];
-        let c = cdar(&dd, 0.95);
-        assert!((c - (-0.05)).abs() < 1e-12);
-    }
-}
-
 /// Ulcer index: root-mean-square of the drawdown series.
 ///
 /// Measures the depth and duration of drawdowns from a pre-computed
@@ -736,8 +556,114 @@ pub(crate) fn pain_ratio(cagr_val: f64, pain: f64, risk_free_rate: f64) -> f64 {
 }
 
 #[cfg(test)]
-mod drawdown_ratio_tests {
+mod tests {
     use super::*;
+    use crate::dates::{Duration, Month};
+
+    fn make_dates(n: usize) -> Vec<Date> {
+        (0..n)
+            .map(|i| {
+                Date::from_calendar_date(2025, Month::January, 1).expect("valid date")
+                    + Duration::days(i as i64)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn drawdown_series_no_loss() {
+        let r = [0.01, 0.02, 0.03];
+        let dd = to_drawdown_series(&r);
+        assert!(dd.iter().all(|&v| v.abs() < 1e-12));
+    }
+
+    #[test]
+    fn drawdown_wealth_matches_comp_sum_on_long_mixed_sign_series() {
+        let r: Vec<f64> = (0..5000)
+            .map(|i| (((i % 17) as f64) - 8.0) * 0.0003)
+            .collect();
+        let cs = crate::returns::comp_sum(&r);
+        let mut engine = crate::returns::WealthEngine::new();
+        for &ret in &r {
+            engine.step(ret);
+        }
+        let last_wealth = engine.log_growth().exp();
+        let comp_wealth = 1.0 + cs.last().copied().unwrap_or(0.0);
+        assert!((comp_wealth - last_wealth).abs() < 1e-12);
+
+        let dd = to_drawdown_series(&r);
+        let mut engine = crate::returns::WealthEngine::new();
+        let mut peak = 1.0;
+        for (i, &ret) in r.iter().enumerate() {
+            engine.step(ret);
+            let wealth = engine.log_growth().exp();
+            if wealth > peak {
+                peak = wealth;
+            }
+            let expected_dd = wealth / peak - 1.0;
+            assert!(
+                (dd[i] - expected_dd).abs() < 1e-12,
+                "drawdown wealth path diverged at {i}: {} vs {expected_dd}",
+                dd[i]
+            );
+        }
+    }
+
+    #[test]
+    fn drawdown_series_propagates_nan() {
+        let dd = to_drawdown_series(&[0.05, f64::NAN, 0.10]);
+        assert!(dd[1].is_nan());
+        assert!(dd[2].is_nan());
+    }
+
+    #[test]
+    fn drawdown_series_handles_total_wipeout() {
+        let dd = to_drawdown_series(&[0.05, -1.0, 0.10]);
+        assert!(dd.iter().all(|v| v.is_finite()));
+        assert!(dd[1] < -0.99);
+    }
+
+    #[test]
+    fn drawdown_series_basic() {
+        let r = [0.10, -0.20, 0.05, 0.10];
+        let dd = to_drawdown_series(&r);
+        assert_eq!(dd.len(), 4);
+        assert!(dd[0].abs() < 1e-12); // no DD after gain
+        assert!(dd[1] < -0.1); // DD after big loss
+    }
+
+    #[test]
+    fn drawdown_details_basic() {
+        let r = [0.10, -0.20, 0.05, 0.10, -0.05, -0.03];
+        let dd = to_drawdown_series(&r);
+        let dates = make_dates(r.len());
+        let episodes = drawdown_details(&dd, &dates, 5);
+        assert!(!episodes.is_empty());
+        assert!(episodes[0].max_drawdown < 0.0);
+    }
+
+    #[test]
+    fn drawdown_details_bounds_unrecovered_episode_to_aligned_dates() {
+        let drawdown = [0.0, -0.10, -0.20, -0.15];
+        let dates = make_dates(6);
+        let episodes = drawdown_details(&drawdown, &dates, 5);
+        assert_eq!(episodes.len(), 1);
+        assert_eq!(episodes[0].start, dates[0]);
+        assert_eq!(episodes[0].valley, dates[2]);
+        assert_eq!(episodes[0].end, None);
+        assert_eq!(episodes[0].duration_days, 3);
+    }
+
+    #[test]
+    fn mean_episode_drawdown_empty() {
+        assert_eq!(mean_episode_drawdown(&[], 5), 0.0);
+    }
+
+    #[test]
+    fn mean_episode_drawdown_deterministic() {
+        let drawdown = [0.0, -0.10, -0.20, 0.0, -0.15, 0.0];
+        let avg = mean_episode_drawdown(&drawdown, 2);
+        assert!((avg - (-0.175)).abs() < 1e-12);
+    }
 
     #[test]
     fn ulcer_index_flat() {
