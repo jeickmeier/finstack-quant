@@ -74,7 +74,7 @@ impl PyStubKind {
     fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
         name.parse::<StubKind>()
             .map(Self::from_inner)
-            .map_err(crate::errors::value_error)
+            .map_err(core_to_py)
     }
 
     /// Support ``pickle`` by reconstructing through ``from_name``.
@@ -98,7 +98,7 @@ fn extract_stub_kind(obj: &Bound<'_, PyAny>) -> PyResult<StubKind> {
         return Ok(s.inner);
     }
     if let Ok(s) = obj.extract::<String>() {
-        return s.parse::<StubKind>().map_err(crate::errors::value_error);
+        return s.parse::<StubKind>().map_err(core_to_py);
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
         "expected StubKind or str",

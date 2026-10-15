@@ -696,6 +696,18 @@ impl FinstackConfig {
     }
 }
 
+impl From<&FinstackConfig> for RoundingContext {
+    fn from(cfg: &FinstackConfig) -> Self {
+        Self {
+            mode: cfg.rounding.mode,
+            ingest_scale_by_currency: cfg.rounding.ingest_scale.overrides.clone(),
+            output_scale_by_currency: cfg.rounding.output_scale.overrides.clone(),
+            tolerances: cfg.tolerances,
+            version: 1,
+        }
+    }
+}
+
 /// Build a snapshot of the current rounding context from a config.
 ///
 /// The snapshot captures the concrete overrides used during valuation and can
@@ -714,13 +726,7 @@ impl FinstackConfig {
 /// * `cfg` - Library configuration whose rounding overrides, tolerance policy,
 ///   and rounding mode are copied into the immutable snapshot.
 pub fn rounding_context_from(cfg: &FinstackConfig) -> RoundingContext {
-    RoundingContext {
-        mode: cfg.rounding.mode,
-        ingest_scale_by_currency: cfg.rounding.ingest_scale.overrides.clone(),
-        output_scale_by_currency: cfg.rounding.output_scale.overrides.clone(),
-        tolerances: cfg.tolerances,
-        version: 1,
-    }
+    RoundingContext::from(cfg)
 }
 
 /// Construct a [`ResultsMeta`] snapshot for stamping into result envelopes.

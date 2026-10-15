@@ -785,7 +785,7 @@ fn roll_rule(
         .transpose()
         .map_err(to_js_err)?;
     let convention = match js_opt_string(convention.as_ref(), "convention")? {
-        Some(name) => name.parse().map_err(|e: String| to_js_err(e))?,
+        Some(name) => name.parse().map_err(to_js_err)?,
         None => BusinessDayConvention::default(),
     };
     Ok((calendar, convention))
@@ -850,8 +850,7 @@ pub fn adjust(
     let convention: &str = &js_string(&convention, "convention")?;
     let calendar_code: &str = &js_string(&calendar_code, "calendarCode")?;
     let date = js_epoch_days(&epoch_days, "epochDays")?;
-    let business_day_convention: BusinessDayConvention =
-        convention.parse().map_err(|e: String| to_js_err(e))?;
+    let business_day_convention: BusinessDayConvention = convention.parse().map_err(to_js_err)?;
     let cal = rust_resolve_calendar(Some(calendar_code)).map_err(to_js_err)?;
     let adjusted = core_adjust(date, business_day_convention, cal).map_err(to_js_err)?;
     Ok(finstack_quant_core::dates::days_since_epoch(adjusted))

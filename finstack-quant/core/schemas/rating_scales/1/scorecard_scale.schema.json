@@ -1,20 +1,16 @@
 {
   "$defs": {
-    "RatingLevel": {
+    "RatingLevelWire": {
       "additionalProperties": false,
-      "description": "Rating level for credit rating scales.",
       "properties": {
         "min_score": {
-          "description": "Minimum score threshold for this rating.",
           "format": "double",
           "type": "number"
         },
         "name": {
-          "description": "Rating name, for example `AAA` or `Aaa`.",
           "type": "string"
         },
         "score": {
-          "description": "Numeric score on a 0-100 scale.",
           "format": "double",
           "type": "number"
         }
@@ -151,21 +147,19 @@
   ],
   "properties": {
     "description": {
-      "description": "Human-readable description.",
+      "default": null,
       "type": [
         "string",
         "null"
       ]
     },
     "ratings": {
-      "description": "Ordered list of rating levels from best to worst.",
       "items": {
-        "$ref": "#/$defs/RatingLevel"
+        "$ref": "#/$defs/RatingLevelWire"
       },
       "type": "array"
     },
     "scale_name": {
-      "description": "Scale name, for example `S&P` or `Moody's`.",
       "type": "string"
     }
   },

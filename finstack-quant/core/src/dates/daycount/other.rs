@@ -53,22 +53,26 @@ pub(super) fn year_fraction_act_365l(
     Ok(actual_days / if leap { 366.0 } else { 365.0 })
 }
 
-/// Check if February 29 falls in the interval `(start, end]` (exclusive of
-/// start, inclusive of end) per ICMA Rule 251.
-fn interval_contains_feb_29(start: Date, end: Date) -> bool {
-    let start_year = start.year();
-    let end_year = end.year();
-
-    for year in start_year..=end_year {
+/// Count February 29 dates falling in the interval `(start, end]` (exclusive of
+/// start, inclusive of end).
+fn count_feb_29_in_interval(start: Date, end: Date) -> i64 {
+    let mut leap_days: i64 = 0;
+    for year in start.year()..=end.year() {
         if time::util::is_leap_year(year) {
             if let Ok(feb_29) = Date::from_calendar_date(year, Month::February, 29) {
                 if feb_29 > start && feb_29 <= end {
-                    return true;
+                    leap_days += 1;
                 }
             }
         }
     }
-    false
+    leap_days
+}
+
+/// Check if February 29 falls in the interval `(start, end]` (exclusive of
+/// start, inclusive of end) per ICMA Rule 251.
+fn interval_contains_feb_29(start: Date, end: Date) -> bool {
+    count_feb_29_in_interval(start, end) > 0
 }
 
 // NL/365 helper
@@ -82,16 +86,7 @@ pub(super) fn year_fraction_nl_365(start: Date, end: Date) -> f64 {
     }
 
     let actual_days = (end - start).whole_days();
-    let mut leap_days: i64 = 0;
-    for year in start.year()..=end.year() {
-        if time::util::is_leap_year(year) {
-            if let Ok(feb_29) = Date::from_calendar_date(year, Month::February, 29) {
-                if feb_29 > start && feb_29 <= end {
-                    leap_days += 1;
-                }
-            }
-        }
-    }
+    let leap_days = count_feb_29_in_interval(start, end);
     (actual_days - leap_days) as f64 / 365.0
 }
 

@@ -236,8 +236,10 @@ fn test_compiled_expr_serde() {
     let deserialized: CompiledExpr =
         serde_json::from_str(&json).expect("Failed to deserialize CompiledExpr");
 
-    // Verify AST is preserved
-    assert_eq!(compiled.get_ast(), deserialized.get_ast());
+    // Verify round-trip serialization preserves the expression and metadata
+    let reserialized =
+        serde_json::to_string(&deserialized).expect("Failed to re-serialize CompiledExpr");
+    assert_eq!(json, reserialized);
 }
 
 #[test]

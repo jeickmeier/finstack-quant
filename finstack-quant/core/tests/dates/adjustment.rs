@@ -318,14 +318,15 @@ fn business_day_convention_from_str_accepts_short_codes_case_insensitively() {
     ];
     for (input, expected) in cases {
         assert_eq!(
-            input.parse::<BusinessDayConvention>(),
-            Ok(expected),
+            input.parse::<BusinessDayConvention>().expect(input),
+            expected,
             "{input}"
         );
     }
     let err = "bogus"
         .parse::<BusinessDayConvention>()
-        .expect_err("unknown code");
+        .expect_err("unknown code")
+        .to_string();
     assert!(err.contains("bogus") && err.contains("modified_following"));
 }
 

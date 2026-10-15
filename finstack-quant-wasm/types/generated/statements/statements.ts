@@ -3396,7 +3396,6 @@ export interface ModelConfig {
 export interface PiecewiseConstantCurve {
   times: number[];
   values: number[];
-  [k: string]: unknown;
 }
 /**
  * Configuration for Monte Carlo PIK bond pricing.

@@ -48,6 +48,7 @@ pub struct HurstExponent {
 
 #[derive(serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 struct RawHurstExponent {
     h: f64,
 }

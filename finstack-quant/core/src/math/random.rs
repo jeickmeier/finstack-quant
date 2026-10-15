@@ -156,6 +156,7 @@ use rand_pcg::Pcg64;
 ///   Statistically Good Algorithms for Random Number Generation."
 ///   [https://www.pcg-random.org/](https://www.pcg-random.org/) `docs/REFERENCES.md#o-neill-2014-pcg`
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Pcg64Rng {
     inner: Pcg64,
     cached_normal: Option<f64>,

@@ -46,10 +46,7 @@ impl std::str::FromStr for CagrDayCount {
     fn from_str(label: &str) -> Result<Self, Self::Err> {
         match label {
             "act365_25" | "act_365_25" | "act/365.25" => Ok(Self::Act365_25),
-            other => other
-                .parse::<DayCount>()
-                .map(Self::DayCount)
-                .map_err(crate::error::Error::Validation),
+            other => other.parse::<DayCount>().map(Self::DayCount),
         }
     }
 }

@@ -20,6 +20,7 @@ pub struct PiecewiseConstantCurve {
 
 #[derive(serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 struct RawPiecewiseConstantCurve {
     times: Vec<f64>,
     values: Vec<f64>,

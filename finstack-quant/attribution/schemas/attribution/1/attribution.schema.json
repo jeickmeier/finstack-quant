@@ -23131,6 +23131,7 @@
       "type": "object"
     },
     "PiecewiseConstantCurve": {
+      "additionalProperties": false,
       "description": "A finite, left-continuous piecewise-constant curve.",
       "properties": {
         "times": {

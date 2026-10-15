@@ -741,7 +741,7 @@ impl DayCount {
             "30_360_it" | "30_360_italian" => "30_360_it",
             other => other,
         };
-        canonical.parse::<Self>().map_err(crate::Error::Validation)
+        canonical.parse::<Self>()
     }
 }
 
@@ -767,7 +767,7 @@ impl std::fmt::Display for DayCount {
 }
 
 impl std::str::FromStr for DayCount {
-    type Err = String;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -784,10 +784,10 @@ impl std::str::FromStr for DayCount {
             "act_act_isma" => Ok(Self::ActActIsma),
             "act_act_afb" => Ok(Self::ActActAfb),
             "bus_252" => Ok(Self::Bus252),
-            other => Err(format!(
+            other => Err(crate::Error::Validation(format!(
                 "unknown day-count convention: '{other}'; expected one of {}",
                 Self::NAMES.join(", ")
-            )),
+            ))),
         }
     }
 }
@@ -824,7 +824,10 @@ mod parse_tests {
 
     #[test]
     fn strict_from_str_rejects_lenient_spellings_and_lists_names() {
-        let err = "ACT/360".parse::<DayCount>().expect_err("strict");
+        let err = "ACT/360"
+            .parse::<DayCount>()
+            .expect_err("strict")
+            .to_string();
         assert!(err.contains("'ACT/360'") && err.contains("act_360") && err.contains("bus_252"));
         let err = DayCount::parse("nope").expect_err("unknown");
         assert!(err.to_string().contains("act_act_isma"));

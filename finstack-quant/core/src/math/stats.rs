@@ -369,7 +369,7 @@ impl std::fmt::Display for RealizedVarMethod {
 }
 
 impl std::str::FromStr for RealizedVarMethod {
-    type Err = String;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -378,7 +378,9 @@ impl std::str::FromStr for RealizedVarMethod {
             "garman_klass" => Ok(Self::GarmanKlass),
             "rogers_satchell" => Ok(Self::RogersSatchell),
             "yang_zhang" => Ok(Self::YangZhang),
-            _ => Err(format!("unknown realized-variance method {s:?}")),
+            _ => Err(crate::Error::Validation(format!(
+                "unknown realized-variance method {s:?}"
+            ))),
         }
     }
 }

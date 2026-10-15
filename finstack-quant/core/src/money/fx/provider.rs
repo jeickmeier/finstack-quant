@@ -5,11 +5,6 @@ use crate::dates::Date;
 
 use super::types::FxConversionPolicy;
 
-/// Keep serving quote state after a writer panicked while holding a lock.
-pub(super) fn recover<T>(res: Result<T, std::sync::PoisonError<T>>) -> T {
-    res.unwrap_or_else(std::sync::PoisonError::into_inner)
-}
-
 /// Helper to compute reciprocal rate safely, validating the output.
 ///
 /// Returns `1.0 / rate` if the reciprocal is a valid FX rate (finite and

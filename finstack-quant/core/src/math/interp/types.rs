@@ -140,14 +140,16 @@ impl std::fmt::Display for ExtrapolationPolicy {
 }
 
 impl std::str::FromStr for ExtrapolationPolicy {
-    type Err = String;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "flat_zero" => Ok(Self::FlatZero),
             "flat_forward" => Ok(Self::FlatForward),
             "none" => Ok(Self::None),
-            _ => Err(format!("unknown extrapolation policy {s:?}")),
+            _ => Err(crate::Error::Validation(format!(
+                "unknown extrapolation policy {s:?}"
+            ))),
         }
     }
 }
@@ -166,7 +168,7 @@ impl std::fmt::Display for InterpStyle {
 }
 
 impl std::str::FromStr for InterpStyle {
-    type Err = String;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -175,7 +177,9 @@ impl std::str::FromStr for InterpStyle {
             "monotone_convex" => Ok(Self::MonotoneConvex),
             "cubic_hermite" => Ok(Self::CubicHermite),
             "piecewise_quadratic_forward" => Ok(Self::PiecewiseQuadraticForward),
-            _ => Err(format!("unknown interpolation style {s:?}")),
+            _ => Err(crate::Error::Validation(format!(
+                "unknown interpolation style {s:?}"
+            ))),
         }
     }
 }

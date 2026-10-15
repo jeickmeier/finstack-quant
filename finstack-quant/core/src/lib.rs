@@ -143,6 +143,12 @@ pub use rustc_hash::FxHashSet as HashSet;
 
 pub use error::{Error, InputError, NonFiniteKind, Result};
 
+/// Recover the inner guard from a mutex or rwlock acquisition result if a previous holder panicked.
+#[inline]
+pub(crate) fn recover_lock<T>(res: std::result::Result<T, std::sync::PoisonError<T>>) -> T {
+    res.unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///
 /// The README is *not* included in the rendered crate documentation — this

@@ -611,13 +611,7 @@ impl JsTenorUnit {
     #[wasm_bindgen(js_name = fromChar)]
     pub fn from_char(ch: JsValue) -> Result<JsTenorUnit, JsValue> {
         let text = js_string(&ch, "ch")?;
-        let mut chars = text.chars();
-        match (chars.next(), chars.next()) {
-            (Some(c), None) => TenorUnit::from_char(c).map(Self::wrap).map_err(to_js_err),
-            _ => Err(to_js_err(format!(
-                "expected a single unit character D, W, M or Y, got {text:?}"
-            ))),
-        }
+        text.parse::<TenorUnit>().map(Self::wrap).map_err(to_js_err)
     }
 
     /// One-letter unit code: `"D"`, `"W"`, `"M"` or `"Y"`.

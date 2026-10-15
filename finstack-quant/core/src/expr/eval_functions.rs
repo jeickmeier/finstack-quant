@@ -31,12 +31,11 @@
 //!
 //! # Parameter arguments
 //!
-//! Window/step parameters (the second argument to `lag`, `diff`, `rolling_*`,
-//! etc.) must be **constant series** — normally `Expr::literal`, which
-//! broadcasts a constant. Passing a non-constant series (e.g. a data column)
-//! is a validation error. Other scalar parameters (`ewm_*` alpha/adjust,
-//! `quantile` q, `shift` n) read the first element of their argument series
-//! by convention.
+//! Scalar configuration parameters (the window/step argument to `lag`, `lead`,
+//! `diff`, `pct_change`, `shift`, and `rolling_*`; the `digits` argument to
+//! `round`; `alpha` and `adjust` for `ewm_*`; and `q` for `quantile`) must be
+//! **constant series** — normally `Expr::literal`, which broadcasts a constant.
+//! Passing a non-constant series (e.g. a data column) is a validation error.
 
 use super::eval::CompiledExpr;
 use crate::math::{
@@ -393,18 +392,19 @@ impl CompiledExpr {
         raw.clamp(EWM_ALPHA_FLOOR, 1.0)
     }
 
-    pub(super) fn eval_ewm_mean_into(arg_results: &[&[f64]], out: &mut [f64]) {
+    pub(super) fn eval_ewm_mean_into(arg_results: &[&[f64]], out: &mut [f64]) -> crate::Result<()> {
         if out.is_empty() {
-            return;
+            return Ok(());
         }
-        if arg_results.len() < 2 || arg_results[1].is_empty() {
+        if arg_results.len() < 2 || arg_results[0].is_empty() || arg_results[1].is_empty() {
             out.fill(f64::NAN);
-            return;
+            return Ok(());
         }
         let base = arg_results[0];
-        let alpha = Self::resolve_ewm_alpha(arg_results[1][0]);
+        let raw_alpha = Self::constant_scalar(arg_results[1], "ewm alpha")?;
+        let alpha = Self::resolve_ewm_alpha(raw_alpha);
         let adjust = if arg_results.len() >= 3 && !arg_results[2].is_empty() {
-            arg_results[2][0] != 0.0
+            Self::constant_scalar(arg_results[2], "ewm adjust")? != 0.0
         } else {
             true
         };
@@ -441,6 +441,7 @@ impl CompiledExpr {
         }
         // A short input leaves no observation for the tail.
         out[filled..].fill(f64::NAN);
+        Ok(())
     }
 
     /// Population variance, or standard deviation when `take_sqrt` is set.
@@ -502,10 +503,7 @@ impl CompiledExpr {
             out.fill(f64::NAN);
             return;
         };
-        let mut guard = self
-            .scratch
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut guard = crate::recover_lock(self.scratch.lock());
         let tmp = &mut guard.tmp;
         tmp.clear();
         tmp.extend(data.iter().copied().filter(|v| !v.is_nan()));
@@ -566,10 +564,7 @@ impl CompiledExpr {
         out: &mut [f64],
     ) -> crate::Result<()> {
         Self::rolling_with(arg_results, out, |base, win, out| {
-            let mut guard = self
-                .scratch
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut guard = crate::recover_lock(self.scratch.lock());
             let wbuf = &mut guard.window;
             Self::rolling_apply_into(base, win, out, &mut |window| {
                 wbuf.clear();
@@ -582,7 +577,7 @@ impl CompiledExpr {
     pub(super) fn eval_shift_into(arg_results: &[&[f64]], out: &mut [f64]) -> crate::Result<()> {
         if arg_results.len() >= 2 && !arg_results[1].is_empty() {
             let base = arg_results[0];
-            let raw = arg_results[1][0];
+            let raw = Self::constant_scalar(arg_results[1], "shift step")?;
             let n = if raw.is_finite() && raw >= f64::from(i32::MIN) && raw <= f64::from(i32::MAX) {
                 raw as i32
             } else {
@@ -738,20 +733,21 @@ impl CompiledExpr {
         out[n..].fill(f64::NAN);
     }
 
-    pub(super) fn eval_quantile_into(&self, arg_results: &[&[f64]], out: &mut [f64]) {
+    pub(super) fn eval_quantile_into(
+        &self,
+        arg_results: &[&[f64]],
+        out: &mut [f64],
+    ) -> crate::Result<()> {
         let Some(base) = arg_results.first() else {
             out.fill(f64::NAN);
-            return;
+            return Ok(());
         };
-        if arg_results.len() < 2 || arg_results[1].is_empty() {
+        if arg_results.len() < 2 || base.is_empty() || arg_results[1].is_empty() {
             out.fill(f64::NAN);
-            return;
+            return Ok(());
         }
-        let q = arg_results[1][0].clamp(0.0, 1.0);
-        let mut guard = self
-            .scratch
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let q = Self::constant_scalar(arg_results[1], "quantile q")?.clamp(0.0, 1.0);
+        let mut guard = crate::recover_lock(self.scratch.lock());
         let tmp = &mut guard.tmp;
         tmp.clear();
         tmp.extend(base.iter().copied().filter(|x| !x.is_nan()));
@@ -759,6 +755,7 @@ impl CompiledExpr {
         let n = out.len().min(base.len());
         out[..n].fill(quantile_value);
         out[n..].fill(f64::NAN);
+        Ok(())
     }
 
     pub(super) fn eval_rolling_min_into(
@@ -792,23 +789,28 @@ impl CompiledExpr {
     /// `take_sqrt` is set.
     ///
     /// A missing smoothing factor fills `out` with NaN. Variance of a single
-    /// observation is `0.0`. `adjust` is true only for a strictly positive flag.
-    pub(super) fn eval_ewm_variance_into(arg_results: &[&[f64]], out: &mut [f64], take_sqrt: bool) {
-        if arg_results.len() < 2 || arg_results[1].is_empty() {
+    /// observation is `0.0`. `adjust` is true for any non-zero flag (matching
+    /// `eval_ewm_mean_into`).
+    pub(super) fn eval_ewm_variance_into(
+        arg_results: &[&[f64]],
+        out: &mut [f64],
+        take_sqrt: bool,
+    ) -> crate::Result<()> {
+        if out.is_empty() {
+            return Ok(());
+        }
+        if arg_results.len() < 2 || arg_results[0].is_empty() || arg_results[1].is_empty() {
             out.fill(f64::NAN);
-            return;
+            return Ok(());
         }
         let base = arg_results[0];
-        if base.is_empty() {
-            out.fill(f64::NAN);
-            return;
-        }
-        let alpha = Self::resolve_ewm_alpha(arg_results[1][0]);
-        let adjust = arg_results
-            .get(2)
-            .and_then(|v| v.first())
-            .map(|&x| x > 0.0)
-            .unwrap_or(true);
+        let raw_alpha = Self::constant_scalar(arg_results[1], "ewm alpha")?;
+        let alpha = Self::resolve_ewm_alpha(raw_alpha);
+        let adjust = if arg_results.len() >= 3 && !arg_results[2].is_empty() {
+            Self::constant_scalar(arg_results[2], "ewm adjust")? != 0.0
+        } else {
+            true
+        };
 
         // Keep the mean as an offset from the latest observation. Both
         // the weighted variance recurrence and its mean differences then
@@ -852,5 +854,6 @@ impl CompiledExpr {
             out[i] = if take_sqrt { variance.sqrt() } else { variance };
         }
         out[n..].fill(f64::NAN);
+        Ok(())
     }
 }

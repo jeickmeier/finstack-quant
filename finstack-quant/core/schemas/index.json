@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/dates/1/schedule.schema.json",
-      "bytes": 5241,
+      "bytes": 5274,
       "kind": "output",
       "path": "schemas/dates/1/schedule.schema.json",
       "summary": "Generated accrual, payment and fixing dates with any construction warnings.",
@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/rating_scales/1/scorecard_scale.schema.json",
-      "bytes": 3882,
+      "bytes": 3458,
       "kind": "output",
       "path": "schemas/rating_scales/1/scorecard_scale.schema.json",
       "summary": "Named scorecard rating scale: rating levels ordered best to worst with score thresholds.",

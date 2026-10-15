@@ -42,9 +42,11 @@ fn extract_fx_policy(value: &Bound<'_, PyAny>) -> PyResult<FxConversionPolicy> {
     name = "FxConversionPolicy",
     module = "finstack_quant.core.market_data",
     frozen,
+    eq,
+    hash,
     skip_from_py_object
 )]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PyFxConversionPolicy {
     /// Inner Rust policy.
     pub(crate) inner: FxConversionPolicy,
@@ -79,6 +81,12 @@ impl PyFxConversionPolicy {
     #[pyo3(text_signature = "(cls, name)")]
     fn from_name(_cls: &Bound<'_, pyo3::types::PyType>, name: &str) -> PyResult<Self> {
         parse_fx_policy(name).map(Self::from_inner)
+    }
+
+    /// Support ``pickle`` by reconstructing through ``from_name``.
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
+        let from_name = py.get_type::<Self>().getattr("from_name")?;
+        Ok((from_name, (self.inner.to_string(),)))
     }
 
     fn __repr__(&self) -> String {
@@ -411,9 +419,10 @@ fn parse_fx_quote_convention(s: &str) -> PyResult<FxQuoteConvention> {
     module = "finstack_quant.core.market_data",
     frozen,
     eq,
+    hash,
     skip_from_py_object
 )]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PyFxQuoteConvention {
     /// Inner Rust convention.
     pub(crate) inner: FxQuoteConvention,
@@ -447,6 +456,12 @@ impl PyFxQuoteConvention {
     #[pyo3(text_signature = "(cls, name)")]
     fn from_name(_cls: &Bound<'_, pyo3::types::PyType>, name: &str) -> PyResult<Self> {
         parse_fx_quote_convention(name).map(Self::from_inner)
+    }
+
+    /// Support ``pickle`` by reconstructing through ``from_name``.
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
+        let from_name = py.get_type::<Self>().getattr("from_name")?;
+        Ok((from_name, (self.inner.to_string(),)))
     }
 
     fn __repr__(&self) -> String {

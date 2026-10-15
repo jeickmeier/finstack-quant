@@ -208,7 +208,7 @@ impl std::fmt::Display for StubKind {
 }
 
 impl std::str::FromStr for StubKind {
-    type Err = String;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
@@ -217,7 +217,10 @@ impl std::str::FromStr for StubKind {
             "short_back" => Ok(StubKind::ShortBack),
             "long_front" => Ok(StubKind::LongFront),
             "long_back" => Ok(StubKind::LongBack),
-            other => Err(format!("Unknown stub kind: {}", other)),
+            other => Err(crate::Error::Validation(format!(
+                "Unknown stub kind: {}",
+                other
+            ))),
         }
     }
 }
@@ -348,6 +351,7 @@ impl std::fmt::Display for ScheduleWarning {
 /// - [`ScheduleWarning`] for warning types
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct Schedule {
     /// Unadjusted accrual grid (period start plus each period end).
     ///

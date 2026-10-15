@@ -3,12 +3,12 @@
 //! This module provides reusable FX provider types that can be shared across
 //! bindings (Python, WASM, etc.) without duplication.
 
-use super::provider::{directional_rate, recover};
+use super::provider::directional_rate;
 use super::{FxConversionPolicy, FxProvider};
 use crate::currency::Currency;
 use crate::dates::Date;
 use crate::error::InputError;
-use crate::HashMap;
+use crate::{recover_lock as recover, HashMap};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 

@@ -63,15 +63,9 @@ impl PyTenorUnit {
     #[classmethod]
     #[pyo3(text_signature = "(cls, ch)")]
     fn from_char(_cls: &Bound<'_, PyType>, ch: &str) -> PyResult<Self> {
-        let mut chars = ch.chars();
-        match (chars.next(), chars.next()) {
-            (Some(c), None) => TenorUnit::from_char(c)
-                .map(Self::from_inner)
-                .map_err(core_to_py),
-            _ => Err(crate::errors::value_error(format!(
-                "expected a single unit character D, W, M or Y, got {ch:?}"
-            ))),
-        }
+        ch.parse::<TenorUnit>()
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Support ``pickle`` by reconstructing through ``TenorUnit.from_char``.

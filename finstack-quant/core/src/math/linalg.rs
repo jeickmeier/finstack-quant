@@ -745,10 +745,11 @@ pub fn symmetric_eigen(
 
 /// Reshape a row-major flat buffer of length `n * n` into `n` nested rows.
 ///
+/// Returns an empty vector when `n == 0` or `flat.len() != n * n`.
+///
 /// # Arguments
 ///
-/// * `flat` - Row-major square matrix storage; `flat.len()` must equal `n * n`
-///   (extra trailing elements are ignored, a short buffer panics on slicing).
+/// * `flat` - Row-major square matrix storage; `flat.len()` must equal `n * n`.
 /// * `n` - Matrix dimension (rows == columns).
 ///
 /// # Examples
@@ -759,27 +760,26 @@ pub fn symmetric_eigen(
 /// ```
 #[must_use]
 pub fn unflatten_square(flat: &[f64], n: usize) -> Vec<Vec<f64>> {
-    (0..n).map(|i| flat[i * n..(i + 1) * n].to_vec()).collect()
+    if n == 0 || square_len(n) != Some(flat.len()) {
+        return Vec::new();
+    }
+    flat.chunks_exact(n).map(<[f64]>::to_vec).collect()
 }
 
 /// Transpose a flat row-major `rows × cols` matrix into `cols × rows`.
 ///
+/// Returns an empty vector when `rows * cols` overflows or does not equal `data.len()`.
+///
 /// # Arguments
 ///
-/// * `data` - Row-major buffer with exactly `rows * cols` entries.
+/// * `data` - Row-major buffer with `rows * cols` entries.
 /// * `rows` - Number of rows in `data`.
 /// * `cols` - Number of columns in `data`.
-///
-/// # Panics
-///
-/// Panics if `data.len() != rows * cols`.
 #[must_use]
 pub fn transpose_row_major(data: &[f64], rows: usize, cols: usize) -> Vec<f64> {
-    assert_eq!(
-        data.len(),
-        rows * cols,
-        "transpose_row_major: shape mismatch"
-    );
+    if rows.checked_mul(cols) != Some(data.len()) {
+        return Vec::new();
+    }
     let mut out = Vec::with_capacity(data.len());
     for c in 0..cols {
         for r in 0..rows {

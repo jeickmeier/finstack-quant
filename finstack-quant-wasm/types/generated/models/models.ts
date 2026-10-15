@@ -2288,7 +2288,6 @@ export interface CheyetteRoughVolParams {
  */
 export interface HurstExponent {
   h: number;
-  [k: string]: unknown;
 }
 /**
  * Forward variance curve ξ₀(t) for rough volatility models.
@@ -3719,7 +3718,6 @@ export interface HullWhite1FParams {
 export interface PiecewiseConstantCurve {
   times: number[];
   values: number[];
-  [k: string]: unknown;
 }
 /**
  * Validated constant-parameter Hull-White one-factor model.

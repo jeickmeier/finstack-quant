@@ -363,13 +363,10 @@ fn sabr_termination_is_acceptable(
 ) -> bool {
     match reason {
         LmTerminationReason::ConvergedResidualNorm
-        | LmTerminationReason::ConvergedRelativeReduction
-        | LmTerminationReason::ConvergedGradient
         | LmTerminationReason::StepTooSmall
         | LmTerminationReason::MaxIterations => {
             final_residual_norm.is_finite() && final_residual_norm <= residual_tolerance
         }
-        LmTerminationReason::NumericalFailure => false,
     }
 }
 
@@ -1157,21 +1154,14 @@ mod acceptance_tests {
 
     #[test]
     fn sabr_genuine_convergence_reasons_remain_acceptable() {
-        for reason in [
-            LmTerminationReason::ConvergedResidualNorm,
-            LmTerminationReason::ConvergedRelativeReduction,
-            LmTerminationReason::ConvergedGradient,
-        ] {
-            assert!(!sabr_termination_is_acceptable(&reason, 1.0, 1.0e-4));
-            assert!(sabr_termination_is_acceptable(&reason, 1.0e-6, 1.0e-4));
-        }
-    }
-
-    #[test]
-    fn sabr_numerical_failure_is_never_acceptable() {
         assert!(!sabr_termination_is_acceptable(
-            &LmTerminationReason::NumericalFailure,
-            0.0,
+            &LmTerminationReason::ConvergedResidualNorm,
+            1.0,
+            1.0e-4,
+        ));
+        assert!(sabr_termination_is_acceptable(
+            &LmTerminationReason::ConvergedResidualNorm,
+            1.0e-6,
             1.0e-4,
         ));
     }
@@ -1186,9 +1176,9 @@ mod acceptance_tests {
             0.5,
             |start| {
                 let (score, reason, iterations) = if start == starts[0] {
-                    (1.0e-12, LmTerminationReason::NumericalFailure, 2)
+                    (1.0e-2, LmTerminationReason::MaxIterations, 2)
                 } else {
-                    (1.0e-5, LmTerminationReason::ConvergedGradient, 3)
+                    (1.0e-5, LmTerminationReason::ConvergedResidualNorm, 3)
                 };
                 Ok(LmSolution {
                     params: vec![0.02, start[1], start[2]],
@@ -1214,7 +1204,7 @@ mod acceptance_tests {
                 )
             },
         )
-        .expect("higher-residual converged candidate should win");
+        .expect("converged candidate within tolerance should win");
 
         assert_eq!(result.outcome.winning_start, starts[1]);
         assert_eq!(result.outcome.parameters.alpha, 0.02);
@@ -1224,8 +1214,8 @@ mod acceptance_tests {
         assert_eq!(result.rejected.solver_failures, 0);
         assert!(matches!(
             result.rejected.best_rejected,
-            Some((score, LmTerminationReason::NumericalFailure, 2))
-                if score == 1.0e-12
+            Some((score, LmTerminationReason::MaxIterations, 2))
+                if score == 1.0e-2
         ));
     }
 

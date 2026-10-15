@@ -184,7 +184,7 @@ impl PyDayCount {
     fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
         name.parse::<DayCount>()
             .map(Self::from_inner)
-            .map_err(crate::errors::value_error)
+            .map_err(core_to_py)
     }
 
     /// Leniently parse a day-count label as written on term sheets.

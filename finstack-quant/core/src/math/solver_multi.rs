@@ -119,16 +119,10 @@ pub trait AnalyticalDerivatives {
 pub enum LmTerminationReason {
     /// Residual norm fell below the configured tolerance.
     ConvergedResidualNorm,
-    /// Relative residual reduction fell below the configured tolerance.
-    ConvergedRelativeReduction,
-    /// Gradient norm fell below the configured tolerance.
-    ConvergedGradient,
     /// Parameter update step became smaller than `min_step_size`.
     StepTooSmall,
     /// Solver exhausted the iteration budget.
     MaxIterations,
-    /// Solver encountered an unrecoverable numerical failure.
-    NumericalFailure,
 }
 
 /// Solver statistics for diagnostics and monitoring.
@@ -239,6 +233,7 @@ pub const MARQUARDT_DIAG_FLOOR_REL: f64 = 1e-12;
 /// - Marquardt, D. W. (1963). "An Algorithm for Least-Squares Estimation of Nonlinear
 ///   Parameters." *SIAM Journal*, 11(2), 431-441.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LevenbergMarquardtSolver {
     /// Convergence tolerance for gradient norm
     pub tolerance: f64,

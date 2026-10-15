@@ -3363,6 +3363,7 @@
       "type": "object"
     },
     "d_cdb8fddc0106047270c4": {
+      "additionalProperties": false,
       "description": "A finite, left-continuous piecewise-constant curve.",
       "properties": {
         "times": {

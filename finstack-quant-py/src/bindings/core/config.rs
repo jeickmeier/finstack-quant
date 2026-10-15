@@ -222,15 +222,13 @@ impl PyToleranceConfig {
             .map_err(|err| serde_json_to_py(err, "invalid ToleranceConfig"))
     }
 
-    /// Deserialize from JSON; epsilons are re-validated.
+    /// Deserialize from JSON; epsilons are validated during deserialization.
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        let parsed: ToleranceConfig = serde_json::from_str(json)
-            .map_err(|err| serde_json_to_py(err, "invalid ToleranceConfig JSON"))?;
-        ToleranceConfig::new(parsed.rate_epsilon, parsed.generic_epsilon)
+        serde_json::from_str(json)
             .map(Self::from_inner)
-            .map_err(core_to_py)
+            .map_err(|err| serde_json_to_py(err, "invalid ToleranceConfig JSON"))
     }
 
     /// Support ``pickle`` via the JSON wire format.

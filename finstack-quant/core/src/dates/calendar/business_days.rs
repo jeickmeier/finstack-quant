@@ -195,6 +195,7 @@ impl<T: HolidayCalendar + ?Sized> HolidayCalendar for &T {
 /// Basic metadata describing a holiday calendar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CalendarMetadata {
     /// Lowercase identifier (stable code).
     pub id: &'static str,
@@ -322,7 +323,7 @@ impl core::fmt::Display for BusinessDayConvention {
 /// `Following`, `P` → `Preceding`, `MP`/`MODPRECEDING` → `ModifiedPreceding`,
 /// `NONE` → `Unadjusted`.
 impl core::str::FromStr for BusinessDayConvention {
-    type Err = String;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.trim().to_ascii_lowercase().as_str() {
@@ -336,11 +337,11 @@ impl core::str::FromStr for BusinessDayConvention {
                 Ok(BusinessDayConvention::ModifiedPreceding)
             }
             "nearest" => Ok(BusinessDayConvention::Nearest),
-            _ => Err(format!(
+            _ => Err(crate::Error::Validation(format!(
                 "Unknown business day convention: '{s}'; expected one of unadjusted, \
                  following, modified_following, preceding, modified_preceding, nearest \
                  (or short codes NONE, F, MF, P, MP)"
-            )),
+            ))),
         }
     }
 }
@@ -617,10 +618,7 @@ fn joint_calendar(id: &str) -> crate::Result<&'static dyn HolidayCalendar> {
         return Ok(*single);
     }
     let key = parts.join("+");
-    let mut interned = JOINT_CALENDARS
-        .get_or_init(Default::default)
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut interned = crate::recover_lock(JOINT_CALENDARS.get_or_init(Default::default).lock());
     if let Some(existing) = interned.get(&key) {
         return Ok(*existing);
     }

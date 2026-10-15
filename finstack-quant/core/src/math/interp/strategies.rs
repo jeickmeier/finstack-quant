@@ -21,7 +21,7 @@ use std::vec::Vec;
 /// Simple linear interpolation between knot points. Fast and straightforward
 /// but may produce negative forward rates (arbitrage) if discount factors
 /// aren't carefully spaced. Prefer LogLinear or MonotoneConvex for yield curves.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
 pub struct LinearStrategy;
 
 impl InterpolationStrategy for LinearStrategy {
@@ -138,7 +138,7 @@ fn segment_slope(knots: &[f64], values: &[f64], left_index: usize, right_index: 
 /// constant between knots except on a segment that starts at `t = 0`.
 /// Guarantees positive forward rates and is commonly used for government
 /// bond curves and simple yield curve construction.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
 pub struct LogLinearStrategy {
     /// Precomputed log(values) for efficient evaluation.
     log_values: Box<[f64]>,
@@ -270,13 +270,6 @@ impl InterpolationStrategy for LogLinearStrategy {
     }
 }
 
-impl LogLinearStrategy {
-    /// Access the log values (for serialization).
-    pub fn log_values(&self) -> &[f64] {
-        &self.log_values
-    }
-}
-
 #[inline]
 fn log_segment_slope(
     log_values: &[f64],
@@ -302,7 +295,7 @@ fn log_segment_slope(
 /// - de Boor, C. *A Practical Guide to Splines*. Canonical reference for the
 ///   underlying natural cubic spline construction. See
 ///   [De Boor Splines](../../../../docs/REFERENCES.md#de-boor-splines).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
 pub struct PiecewiseQuadraticForwardStrategy {
     /// Knot locations (copied for boundary evaluation).
     knots: Box<[f64]>,
@@ -524,7 +517,7 @@ impl PiecewiseQuadraticForwardStrategy {
 /// - Fritsch, F. N., & Carlson, R. E. (1980). "Monotone Piecewise Cubic
 ///   Interpolation." *SIAM Journal on Numerical Analysis*, 17(2), 238-246.
 ///   See [Fritsch-Carlson 1980](../../../../docs/REFERENCES.md#fritsch-carlson-1980).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
 pub struct CubicHermiteStrategy {
     /// First-derivative values at each knot (PCHIP slopes).
     ms: Box<[f64]>,
@@ -665,13 +658,6 @@ impl InterpolationStrategy for CubicHermiteStrategy {
     }
 }
 
-impl CubicHermiteStrategy {
-    /// Access the slopes (for serialization or inspection).
-    pub fn slopes(&self) -> &[f64] {
-        &self.ms
-    }
-}
-
 /// Compute shape-preserving slopes using the Fritsch-Carlson monotone scheme
 /// (a.k.a. PCHIP slopes).
 #[inline]
@@ -767,7 +753,7 @@ pub const DEFAULT_MONOTONE_CONVEX_EPSILON: f64 = 1e-14;
 /// Hagan, P. S., & West, G. (2006). "Interpolation Methods for Curve Construction."
 /// *Applied Mathematical Finance*, 13(2), 89-129. `docs/REFERENCES.md#hagan-west-monotone-convex`
 ///
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
 pub struct MonotoneConvexStrategy {
     /// Discrete forward rates f^d_i for each segment (length n-1).
     fd: Box<[f64]>,
@@ -1116,20 +1102,5 @@ impl MonotoneConvexStrategy {
                 -a * dx - (g1 - a) * dx * (1.0 - u + u * u / 3.0),
             )
         }
-    }
-
-    /// Get the epsilon value used for near-zero detection.
-    pub fn epsilon(&self) -> f64 {
-        self.epsilon
-    }
-
-    /// Access the discrete forward rates (for inspection/debugging).
-    pub fn discrete_forwards(&self) -> &[f64] {
-        &self.fd
-    }
-
-    /// Access the instantaneous forward rates at knots (for inspection/debugging).
-    pub fn instantaneous_forwards(&self) -> &[f64] {
-        &self.f
     }
 }

@@ -146,7 +146,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/cheyette_rough_vol_params.schema.json",
-      "bytes": 3527,
+      "bytes": 3564,
       "kind": "input",
       "path": "schemas/models/1/cheyette_rough_vol_params.schema.json",
       "summary": "Cheyette + rough stochastic volatility model parameters.",
@@ -335,7 +335,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/hull_white1_f_params.schema.json",
-      "bytes": 1342,
+      "bytes": 1379,
       "kind": "input",
       "path": "schemas/models/1/hull_white1_f_params.schema.json",
       "summary": "Validated Hull-White one-factor process parameters.",
@@ -353,7 +353,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/hull_white_params.schema.json",
-      "bytes": 1058,
+      "bytes": 1095,
       "kind": "input",
       "path": "schemas/models/1/hull_white_params.schema.json",
       "summary": "Hull-White parameters with piecewise-constant short-rate volatility.",
@@ -578,7 +578,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/path_simulation_spec.schema.json",
-      "bytes": 42038,
+      "bytes": 42112,
       "kind": "input",
       "path": "schemas/models/1/path_simulation_spec.schema.json",
       "summary": "Complete, serializable description of one path simulation.",
@@ -650,7 +650,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/process_spec.schema.json",
-      "bytes": 31509,
+      "bytes": 31583,
       "kind": "input",
       "path": "schemas/models/1/process_spec.schema.json",
       "summary": "Stochastic process to simulate, with its parameters.",
@@ -722,7 +722,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rough_bergomi_params.schema.json",
-      "bytes": 3161,
+      "bytes": 3198,
       "kind": "input",
       "path": "schemas/models/1/rough_bergomi_params.schema.json",
       "summary": "rBergomi model parameters.",
@@ -740,7 +740,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rough_heston_params.schema.json",
-      "bytes": 2033,
+      "bytes": 2070,
       "kind": "input",
       "path": "schemas/models/1/rough_heston_params.schema.json",
       "summary": "Rough Heston model parameters.",

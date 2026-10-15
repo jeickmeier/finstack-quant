@@ -4016,7 +4016,6 @@ export interface D_65B0652Ed08913529246 {
 export interface D_0B91Bd9Cf7E8361C3A1F {
   times: number[];
   values: number[];
-  [k: string]: unknown;
 }
 /**
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.

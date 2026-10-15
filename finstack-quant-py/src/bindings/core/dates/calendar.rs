@@ -91,7 +91,7 @@ impl PyBusinessDayConvention {
     fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
         name.parse::<BusinessDayConvention>()
             .map(Self::from_inner)
-            .map_err(crate::errors::value_error)
+            .map_err(core_to_py)
     }
 
     /// Support ``pickle`` by reconstructing through ``from_name``.
@@ -117,9 +117,7 @@ pub(crate) fn extract_business_day_convention(
         return Ok(business_day_convention.inner);
     }
     if let Ok(s) = obj.extract::<String>() {
-        return s
-            .parse::<BusinessDayConvention>()
-            .map_err(crate::errors::value_error);
+        return s.parse::<BusinessDayConvention>().map_err(core_to_py);
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
         "expected BusinessDayConvention or str",

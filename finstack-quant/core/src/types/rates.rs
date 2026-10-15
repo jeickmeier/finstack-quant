@@ -517,14 +517,6 @@ impl Bps {
         self.0 < 0
     }
 
-    /// Return the absolute basis-point quote.
-    ///
-    /// Panics when the quote is `i32::MIN`, which has no positive `i32`
-    /// representation; [`Self::checked_abs`] reports that overflow instead.
-    pub fn abs(self) -> Self {
-        bps_from_checked(self.checked_abs())
-    }
-
     /// Return the absolute basis-point quote, rejecting `i32::MIN`.
     ///
     /// # Errors
@@ -735,12 +727,6 @@ mod tests {
     fn bps_checked_abs_rejects_the_unrepresentable_minimum() {
         assert_eq!(Bps::new(-25).checked_abs().unwrap(), Bps::new(25));
         assert!(Bps::new(i32::MIN).checked_abs().is_err());
-    }
-
-    #[test]
-    #[should_panic(expected = "basis-point arithmetic failed")]
-    fn bps_abs_operator_panics_with_the_checked_error() {
-        let _ = Bps::new(i32::MIN).abs();
     }
 
     #[test]

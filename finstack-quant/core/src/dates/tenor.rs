@@ -120,6 +120,20 @@ impl TenorUnit {
     }
 }
 
+impl std::str::FromStr for TenorUnit {
+    type Err = crate::Error;
+
+    fn from_str(s: &str) -> crate::Result<Self> {
+        let mut chars = s.chars();
+        match (chars.next(), chars.next()) {
+            (Some(c), None) => Self::from_char(c),
+            _ => Err(crate::Error::Validation(format!(
+                "expected a single unit character D, W, M or Y, got {s:?}"
+            ))),
+        }
+    }
+}
+
 /// A parsed tenor representing a time period.
 ///
 /// Tenors are commonly used in financial markets to specify maturities,

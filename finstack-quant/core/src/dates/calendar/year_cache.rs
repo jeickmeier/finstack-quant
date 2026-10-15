@@ -6,16 +6,12 @@
 //! range [`BASE_YEAR`, `END_YEAR`].
 
 use std::sync::{OnceLock, RwLock};
-
-fn recover<T>(res: Result<T, std::sync::PoisonError<T>>) -> T {
-    res.unwrap_or_else(std::sync::PoisonError::into_inner)
-}
 use time::{Date, Duration};
 
 use super::algo::{BASE_YEAR, END_YEAR};
 use super::business_days::HolidayCalendar;
 use super::types::Calendar;
-use crate::HashMap;
+use crate::{recover_lock, HashMap};
 
 /// 366-day holiday mask plus inclusive business-day prefix sums for one year.
 #[derive(Clone, Copy)]
@@ -112,10 +108,10 @@ fn year_bits(cal: &Calendar, year: i32) -> YearBits {
         rules_addr: cal.rules.as_ptr() as usize,
         rules_len: cal.rules.len(),
     };
-    if let Some(bits) = recover(cache().read()).get(&key).copied() {
+    if let Some(bits) = recover_lock(cache().read()).get(&key).copied() {
         return bits;
     }
-    let mut cache = recover(cache().write());
+    let mut cache = recover_lock(cache().write());
     if let Some(bits) = cache.get(&key).copied() {
         return bits;
     }

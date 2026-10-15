@@ -18,7 +18,7 @@ static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<RatingScaleRegistry> = EmbeddedJs
 /// Rating level for credit rating scales.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "RatingLevelWire")]
 pub struct RatingLevel {
     /// Rating name, for example `AAA` or `Aaa`.
     pub name: String,
@@ -26,6 +26,23 @@ pub struct RatingLevel {
     pub score: f64,
     /// Minimum score threshold for this rating.
     pub min_score: f64,
+}
+
+#[derive(Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct RatingLevelWire {
+    name: String,
+    score: f64,
+    min_score: f64,
+}
+
+impl TryFrom<RatingLevelWire> for RatingLevel {
+    type Error = Error;
+
+    fn try_from(wire: RatingLevelWire) -> Result<Self> {
+        Self::try_new(wire.name, wire.score, wire.min_score)
+    }
 }
 
 /// Scorecard rating-scale definition: a named, ordered list of rating
@@ -36,7 +53,7 @@ pub struct RatingLevel {
 /// the ordered state set of a credit-migration / transition matrix.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "ScorecardScaleWire")]
 pub struct ScorecardScale {
     /// Scale name, for example `S&P` or `Moody's`.
     pub scale_name: String,
@@ -45,6 +62,33 @@ pub struct ScorecardScale {
     pub description: Option<String>,
     /// Ordered list of rating levels from best to worst.
     pub ratings: Vec<RatingLevel>,
+}
+
+#[derive(Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct ScorecardScaleWire {
+    scale_name: String,
+    #[serde(default)]
+    description: Option<String>,
+    ratings: Vec<RatingLevelWire>,
+}
+
+impl TryFrom<ScorecardScaleWire> for ScorecardScale {
+    type Error = Error;
+
+    fn try_from(wire: ScorecardScaleWire) -> Result<Self> {
+        let ratings = wire
+            .ratings
+            .into_iter()
+            .map(|level| RatingLevel {
+                name: level.name,
+                score: level.score,
+                min_score: level.min_score,
+            })
+            .collect();
+        Self::try_new(wire.scale_name, wire.description, ratings)
+    }
 }
 
 impl RatingLevel {
@@ -84,10 +128,8 @@ impl RatingLevel {
     /// violate the schema, the name is blank, or either score is non-finite or
     /// outside the inclusive 0–100 range.
     pub fn from_json(json: &str) -> Result<Self> {
-        let level: RatingLevel = serde_json::from_str(json)
-            .map_err(|err| Error::Validation(format!("invalid rating level JSON: {err}")))?;
-        validate_rating_level(&level)?;
-        Ok(level)
+        serde_json::from_str(json)
+            .map_err(|err| Error::Validation(format!("invalid rating level JSON: {err}")))
     }
 }
 
@@ -138,10 +180,8 @@ impl ScorecardScale {
     ///
     /// * `json` - JSON text encoding the object; unknown fields follow the type's serde policy
     pub fn from_json(json: &str) -> Result<Self> {
-        let scale: ScorecardScale = serde_json::from_str(json)
-            .map_err(|err| Error::Validation(format!("invalid scorecard scale JSON: {err}")))?;
-        validate_scorecard_scale(&scale, &scale.scale_name)?;
-        Ok(scale)
+        serde_json::from_str(json)
+            .map_err(|err| Error::Validation(format!("invalid scorecard scale JSON: {err}")))
     }
 
     /// Export the rating levels in best-to-worst order as a [`TableEnvelope`](crate::table::TableEnvelope)

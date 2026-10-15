@@ -1922,21 +1922,9 @@ export interface PeriodPlan {
    */
   periods: Period[];
 }
-/**
- * Rating level for credit rating scales.
- */
-export interface RatingLevel {
-  /**
-   * Minimum score threshold for this rating.
-   */
+export interface RatingLevelWire {
   min_score: number;
-  /**
-   * Rating name, for example `AAA` or `Aaa`.
-   */
   name: string;
-  /**
-   * Numeric score on a 0-100 scale.
-   */
   score: number;
 }
 /**
@@ -1972,7 +1960,6 @@ export interface Schedule {
    * other non-fatal issues occurred during generation.
    */
   warnings?: ScheduleWarning[];
-  [k: string]: unknown;
 }
 /**
  * Persisted inputs of a date schedule: range, frequency, stub, adjustment and lags.
@@ -1995,17 +1982,8 @@ export interface ScheduleSpec {
  * Named scorecard rating scale: rating levels ordered best to worst with score thresholds.
  */
 export interface ScorecardScale {
-  /**
-   * Human-readable description.
-   */
   description?: string | null;
-  /**
-   * Ordered list of rating levels from best to worst.
-   */
-  ratings: RatingLevel[];
-  /**
-   * Scale name, for example `S&P` or `Moody's`.
-   */
+  ratings: RatingLevelWire[];
   scale_name: string;
 }
 /**

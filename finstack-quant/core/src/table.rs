@@ -320,7 +320,7 @@ impl std::fmt::Display for TableColumnRole {
 }
 
 impl std::str::FromStr for TableColumnRole {
-    type Err = String;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
@@ -328,10 +328,10 @@ impl std::str::FromStr for TableColumnRole {
             "index" => Ok(Self::Index),
             "measure" => Ok(Self::Measure),
             "attribute" => Ok(Self::Attribute),
-            other => Err(format!(
+            other => Err(crate::Error::Validation(format!(
                 "unknown column role '{other}' \
                  (expected dimension|index|measure|attribute)"
-            )),
+            ))),
         }
     }
 }

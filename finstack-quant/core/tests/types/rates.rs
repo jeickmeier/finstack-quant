@@ -129,15 +129,6 @@ fn bp_predicates() {
 }
 
 #[test]
-fn bp_abs() {
-    let negative = Bps::new(-150);
-    assert_eq!(negative.abs(), Bps::new(150));
-
-    let positive = Bps::new(100);
-    assert_eq!(positive.abs(), Bps::new(100));
-}
-
-#[test]
 fn bp_display_formatting() {
     assert_eq!(format!("{}", Bps::new(250)), "250bp");
     assert_eq!(format!("{}", Bps::new(-50)), "-50bp");
@@ -238,10 +229,6 @@ fn checked_bps_arithmetic_rejects_integer_overflow_and_zero_division() {
     .is_err());
     assert!(catch_unwind(|| {
         let _ = -Bps::new(i32::MIN);
-    })
-    .is_err());
-    assert!(catch_unwind(|| {
-        let _ = Bps::new(i32::MIN).abs();
     })
     .is_err());
     assert!(catch_unwind(|| {

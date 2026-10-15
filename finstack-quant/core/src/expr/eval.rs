@@ -167,21 +167,6 @@ impl Clone for CompiledExpr {
 }
 
 impl CompiledExpr {
-    /// Borrow the immutable expression tree used by this compiled evaluator.
-    ///
-    /// Construct a new evaluator to change the formula. Serialization persists
-    /// this tree and optional result metadata; execution plans are rebuilt from
-    /// the tree when deserializing rather than accepting cached plan overrides.
-    ///
-    /// ```compile_fail
-    /// use finstack_quant_core::expr::{CompiledExpr, Expr};
-    /// let mut compiled = CompiledExpr::new(Expr::literal(1.0));
-    /// compiled.ast = Expr::literal(2.0);
-    /// ```
-    pub fn get_ast(&self) -> &Expr {
-        &self.ast
-    }
-
     /// Construct a new compiled expression from an AST.
     ///
     /// Accepts any [`Expr`], including statements-layer functions (`Ttm`,
@@ -359,10 +344,7 @@ impl CompiledExpr {
             // calls) and release the scratch lock immediately so nested
             // median/rolling ops can re-lock the same scratch without deadlock.
             let (mut arena, mut offsets) = {
-                let mut guard = self
-                    .scratch
-                    .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                let mut guard = crate::recover_lock(self.scratch.lock());
                 (
                     std::mem::take(&mut guard.arena),
                     std::mem::take(&mut guard.offsets),
@@ -408,10 +390,7 @@ impl CompiledExpr {
 
             // Return the buffers to the pool for reuse, even on error.
             {
-                let mut guard = self
-                    .scratch
-                    .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                let mut guard = crate::recover_lock(self.scratch.lock());
                 guard.arena = arena;
                 guard.offsets = offsets;
             }
@@ -702,7 +681,7 @@ impl CompiledExpr {
             Function::RollingMin => Self::eval_rolling_min_into(arg_slices, out)?,
             Function::RollingMax => Self::eval_rolling_max_into(arg_slices, out)?,
             Function::RollingCount => Self::eval_rolling_count_into(arg_slices, out)?,
-            Function::EwmMean => Self::eval_ewm_mean_into(arg_slices, out),
+            Function::EwmMean => Self::eval_ewm_mean_into(arg_slices, out)?,
             Function::Std => Self::eval_population_var_into(arg_slices, out, true),
             Function::Var => Self::eval_population_var_into(arg_slices, out, false),
             Function::Median => self.eval_median_into(arg_slices, out),
@@ -711,9 +690,9 @@ impl CompiledExpr {
             Function::CumMin => Self::eval_cum_min_into(arg_slices, out),
             Function::CumMax => Self::eval_cum_max_into(arg_slices, out),
             Function::Rank => Self::eval_rank_into(arg_slices, out),
-            Function::Quantile => self.eval_quantile_into(arg_slices, out),
-            Function::EwmStd => Self::eval_ewm_variance_into(arg_slices, out, true),
-            Function::EwmVar => Self::eval_ewm_variance_into(arg_slices, out, false),
+            Function::Quantile => self.eval_quantile_into(arg_slices, out)?,
+            Function::EwmStd => Self::eval_ewm_variance_into(arg_slices, out, true)?,
+            Function::EwmVar => Self::eval_ewm_variance_into(arg_slices, out, false)?,
             Function::Abs => Self::eval_unary_into(arg_slices, out, f64::abs),
             Function::Sign => Self::eval_sign_into(arg_slices, out),
             Function::Pow => Self::eval_pow_into(arg_slices, out),

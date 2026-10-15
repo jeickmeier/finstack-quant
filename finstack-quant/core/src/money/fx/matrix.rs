@@ -5,12 +5,10 @@ use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::{HashMap, HashSet};
-
-use super::provider::recover;
+use crate::{recover_lock, HashMap, HashSet};
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    recover(mutex.lock())
+    recover_lock(mutex.lock())
 }
 
 // Non-cryptographic keys (currency pairs, query keys) use the workspace-standard
