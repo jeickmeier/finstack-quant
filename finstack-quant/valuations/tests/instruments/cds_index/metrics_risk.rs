@@ -312,7 +312,7 @@ fn bucketed_cs01_quote_single_curve_uses_each_off_grid_replay_quote_once() {
     let expected_count = hazard
         .hazard_calibration()
         .expect("replayable index hazard")
-        .spread_risk_inputs
+        .spread_risk_inputs()
         .len();
     let market = source.insert(hazard);
     let index = standard_single_curve_index("CDX-QUOTE-OFFGRID", as_of, end, 10_000_000.0);
@@ -391,7 +391,7 @@ fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
     let expected_per_curve = hz1
         .hazard_calibration()
         .expect("replayable constituent hazard")
-        .spread_risk_inputs
+        .spread_risk_inputs()
         .len();
     let market = source.insert(hz1).insert(hz2).insert(flat_hazard_curve(
         "HZ-INDEX",

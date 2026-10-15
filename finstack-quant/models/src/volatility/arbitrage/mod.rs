@@ -259,6 +259,18 @@ pub fn check_surface(
     })
 }
 
+fn surface_from_rows(
+    expiries: &[f64],
+    strikes: &[f64],
+    vols: &[Vec<f64>],
+) -> finstack_quant_core::Result<VolSurface> {
+    VolSurface::builder("surface-grid")
+        .expiries(expiries)
+        .strikes(strikes)
+        .rows(vols)
+        .build()
+}
+
 /// Run a butterfly arbitrage check on volatility rows.
 ///
 /// # Arguments
@@ -281,7 +293,7 @@ pub fn check_butterfly_grid(
     tolerance: f64,
 ) -> finstack_quant_core::Result<Vec<ArbitrageViolation>> {
     validate_tolerance(tolerance)?;
-    let surface = VolSurface::from_rows("surface-grid", expiries, strikes, vols)?;
+    let surface = surface_from_rows(expiries, strikes, vols)?;
     let forwards = expand_forward_prices(expiries.len(), forward_prices)?;
     Ok(ButterflyCheck {
         forwards,
@@ -312,7 +324,7 @@ pub fn check_calendar_spread_grid(
     tolerance: f64,
 ) -> finstack_quant_core::Result<Vec<ArbitrageViolation>> {
     validate_tolerance(tolerance)?;
-    let surface = VolSurface::from_rows("surface-grid", expiries, strikes, vols)?;
+    let surface = surface_from_rows(expiries, strikes, vols)?;
     let forwards = expand_forward_prices(expiries.len(), forward_prices)?;
     Ok(CalendarSpreadCheck {
         forwards,
@@ -351,7 +363,7 @@ pub fn check_local_vol_density_grid(
             expiries.len()
         )));
     }
-    let surface = VolSurface::from_rows("surface-grid", expiries, strikes, vols)?;
+    let surface = surface_from_rows(expiries, strikes, vols)?;
     Ok(local_vol_density_violations(
         &surface,
         &forward_prices,
@@ -383,7 +395,7 @@ pub fn check_surface_grid(
     forward_prices: Vec<f64>,
     tolerance: f64,
 ) -> finstack_quant_core::Result<ArbitrageReport> {
-    let surface = VolSurface::from_rows("surface-grid", expiries, strikes, vols)?;
+    let surface = surface_from_rows(expiries, strikes, vols)?;
     let config = ArbitrageCheckConfig {
         check_butterfly: true,
         check_calendar_spread: true,

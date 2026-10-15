@@ -19,6 +19,7 @@ static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<RatingScaleRegistry> = EmbeddedJs
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RatingLevelWire")]
+#[cfg_attr(feature = "json-schema", schemars(!try_from, deny_unknown_fields))]
 pub struct RatingLevel {
     /// Rating name, for example `AAA` or `Aaa`.
     pub name: String,
@@ -29,7 +30,6 @@ pub struct RatingLevel {
 }
 
 #[derive(Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct RatingLevelWire {
     name: String,
@@ -54,6 +54,7 @@ impl TryFrom<RatingLevelWire> for RatingLevel {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "ScorecardScaleWire")]
+#[cfg_attr(feature = "json-schema", schemars(!try_from, deny_unknown_fields))]
 pub struct ScorecardScale {
     /// Scale name, for example `S&P` or `Moody's`.
     pub scale_name: String,
@@ -65,7 +66,6 @@ pub struct ScorecardScale {
 }
 
 #[derive(Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct ScorecardScaleWire {
     scale_name: String,

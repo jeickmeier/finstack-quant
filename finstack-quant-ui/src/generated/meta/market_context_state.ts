@@ -1964,27 +1964,31 @@ export default [
   {
     "path": "#/$defs/d_a550785704f9d0f9db7a/properties/alpha",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SabrParameterData/properties/alpha",
+    "description": "Initial volatility level, strictly positive.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_a550785704f9d0f9db7a/properties/beta",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SabrParameterData/properties/beta",
+    "description": "CEV exponent in the closed interval `[0, 1]`.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_a550785704f9d0f9db7a/properties/nu",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SabrParameterData/properties/nu",
+    "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_a550785704f9d0f9db7a/properties/rho",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SabrParameterData/properties/rho",
+    "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_a550785704f9d0f9db7a/properties/shift",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SabrParameterData/properties/shift",
-    "default": null,
+    "description": "Optional finite displacement applied to forward and strike.",
     "format": "double"
   },
   {

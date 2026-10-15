@@ -170,16 +170,15 @@ fn recipe_inputs(
             hazard.id()
         ))
     })?;
-    let params = serde_json::from_value(recipe.hazard_params.clone()).map_err(|error| {
+    let params = serde_json::from_value(recipe.hazard_params().clone()).map_err(|error| {
         finstack_quant_core::Error::Validation(format!(
             "hazard curve '{}' contains invalid replay parameters: {error}",
             hazard.id()
         ))
     })?;
-    recipe.validate()?;
     let (calibration_inputs, spread_risk_inputs) =
         crate::targets::hazard::validate_hazard_recipe_bindings(&params, recipe)?;
-    let config = serde_json::from_value(recipe.calibration_config.clone()).map_err(|error| {
+    let config = serde_json::from_value(recipe.calibration_config().clone()).map_err(|error| {
         finstack_quant_core::Error::Validation(format!(
             "hazard curve '{}' contains an invalid replay policy: {error}",
             hazard.id()
@@ -207,7 +206,7 @@ pub(crate) fn hazard_with_deal_quote_override(
                 ),
                 category: "cs01_rebootstrap".to_string(),
             })?;
-    let mut risk_inputs = source_recipe.spread_risk_inputs.clone();
+    let mut risk_inputs = source_recipe.spread_risk_inputs().to_vec();
     let template_input =
         risk_inputs
             .first()
@@ -322,10 +321,10 @@ pub(crate) fn hazard_with_deal_quote_override(
         ))
     })?;
     let derived_recipe = HazardCalibrationRecipe::new(
-        source_recipe.hazard_params.clone(),
-        source_recipe.calibration_inputs.clone(),
+        source_recipe.hazard_params().clone(),
+        source_recipe.calibration_inputs().to_vec(),
         risk_inputs,
-        source_recipe.calibration_config.clone(),
+        source_recipe.calibration_config().clone(),
     )?;
     hazard
         .to_builder_with_id(hazard.id().clone())

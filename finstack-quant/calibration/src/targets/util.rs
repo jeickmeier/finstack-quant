@@ -156,7 +156,6 @@ pub(crate) fn resolve_equity_forward_inputs(
             "multiple dividend schedules match equity '{ticker}'"
         )));
     }
-    schedule.validate()?;
 
     let mut cash_dividends = Vec::new();
     for event in schedule.get_events() {

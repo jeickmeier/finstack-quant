@@ -436,7 +436,10 @@ impl MarketSnapshot {
         }
 
         if flags.contains(MarketRestoreFlags::VOL) {
-            snapshot.surfaces = market.surfaces_snapshot();
+            snapshot.surfaces = market
+                .surfaces_iter()
+                .map(|(k, v)| (k.clone(), Arc::clone(v)))
+                .collect();
             snapshot.vol_cubes = market
                 .vol_cubes_iter()
                 .map(|(k, v)| (k.clone(), Arc::clone(v)))

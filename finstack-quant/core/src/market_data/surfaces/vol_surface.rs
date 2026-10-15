@@ -106,16 +106,16 @@ impl std::fmt::Display for VolQuoteType {
 }
 
 impl std::str::FromStr for VolQuoteType {
-    type Err = String;
+    type Err = crate::Error;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "black_lognormal" => Ok(Self::BlackLognormal),
             "shifted_black_lognormal" => Ok(Self::ShiftedBlackLognormal),
             "normal" => Ok(Self::Normal),
-            _ => Err(format!(
+            _ => Err(Error::Validation(format!(
                 "unknown volatility quote type {value:?}; expected black_lognormal, shifted_black_lognormal or normal"
-            )),
+            ))),
         }
     }
 }
@@ -710,6 +710,17 @@ impl VolSurfaceBuilder {
         self
     }
 
+    /// Append multiple rows of implied volatilities corresponding to the
+    /// previously set strikes, in expiry order.
+    ///
+    /// # Arguments
+    ///
+    /// * `rows` - One volatility row per expiry, each matching the strike count.
+    pub fn rows(mut self, rows: &[Vec<f64>]) -> Self {
+        self.vols.extend_from_slice(rows);
+        self
+    }
+
     /// Finalise the surface and return an immutable [`VolSurface`] instance.
     /// Performs consistency checks on grid dimensions.
     ///
@@ -717,7 +728,7 @@ impl VolSurfaceBuilder {
     ///
     /// Returns a validation error when the number of rows does not match
     /// expiries or a row does not match strikes. It also propagates axis and
-    /// volatility validation failures from [`VolSurface::from_rows_opts`].
+    /// volatility validation failures from [`VolSurface::from_grid_opts`].
     pub fn build(self) -> crate::Result<VolSurface> {
         VolSurface::from_rows_opts(
             self.id.as_str(),
@@ -746,24 +757,6 @@ pub struct VolGridOpts {
     pub quote_type: VolQuoteType,
     /// Interpolation contract (direct vol vs total-variance).
     pub interpolation_mode: VolInterpolationMode,
-}
-
-impl VolGridOpts {
-    /// Shorthand constructor (quote type defaults to Black/lognormal).
-    pub fn new(secondary_axis: VolSurfaceAxis, interpolation_mode: VolInterpolationMode) -> Self {
-        Self {
-            secondary_axis,
-            quote_type: VolQuoteType::default(),
-            interpolation_mode,
-        }
-    }
-
-    /// Set the quoting convention.
-    #[must_use]
-    pub fn with_quote_type(mut self, quote_type: VolQuoteType) -> Self {
-        self.quote_type = quote_type;
-        self
-    }
 }
 
 impl VolSurface {
@@ -843,27 +836,7 @@ impl VolSurface {
         )
     }
 
-    /// Construct from axes, row-major volatility rows, and explicit options.
-    ///
-    /// `vol_rows[expiry_idx][strike_idx]` is validated against `expiries` and
-    /// `strikes`, flattened, and forwarded to [`Self::from_grid_opts`].
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Market-data identifier stored on the surface and used for context lookup.
-    /// * `expiries` - Strictly increasing option expiries in year fractions.
-    /// * `strikes` - Strictly increasing secondary-axis coordinates.
-    /// * `vol_rows` - One row per expiry and one annualized decimal volatility
-    ///   per strike; rows must match the axes exactly.
-    /// * `opts` - Secondary-axis meaning, quote type, and interpolation contract for the grid.
-    /// * `displacements` - One finite additive shift per expiry for shifted Black quotes; must be absent for normal or unshifted Black quotes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the row count does not match `expiries.len()`, any
-    /// row length does not match `strikes.len()`, or any invariant enforced by
-    /// [`Self::from_grid_opts`] fails.
-    pub fn from_rows_opts(
+    fn from_rows_opts(
         id: impl AsRef<str>,
         expiries: &[f64],
         strikes: &[f64],
@@ -897,40 +870,6 @@ impl VolSurface {
             flat.extend_from_slice(row);
         }
         Self::from_grid_opts(id, expiries, strikes, &flat, opts, displacements)
-    }
-
-    /// Construct directly from axes and row-major volatility rows.
-    ///
-    /// `vol_rows[expiry_idx][strike_idx]` is flattened and validated through
-    /// [`Self::from_rows_opts`]. This is the canonical entry point for callers
-    /// whose input is naturally represented as expiry rows.
-    ///
-    /// # Errors
-    /// - Row count does not match `expiries.len()`
-    /// - Any row length does not match `strikes.len()`
-    /// - Any invariant enforced by [`Self::from_grid_opts`] fails
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Market-data identifier used for context lookup.
-    /// * `expiries` - Strictly increasing option expiries in year fractions.
-    /// * `strikes` - Strictly increasing strikes in the underlying's quote units.
-    /// * `vol_rows` - One row per expiry and one annualized decimal volatility
-    ///   per strike; rows must match the axes exactly.
-    pub fn from_rows(
-        id: impl AsRef<str>,
-        expiries: &[f64],
-        strikes: &[f64],
-        vol_rows: &[Vec<f64>],
-    ) -> crate::Result<Self> {
-        Self::from_rows_opts(
-            id,
-            expiries,
-            strikes,
-            vol_rows,
-            VolGridOpts::default(),
-            None,
-        )
     }
 }
 
@@ -990,7 +929,10 @@ mod displacement_tests {
 
     #[test]
     fn shifted_surface_construction_and_serde_require_aligned_displacements() {
-        let opts = VolGridOpts::default().with_quote_type(VolQuoteType::ShiftedBlackLognormal);
+        let opts = VolGridOpts {
+            quote_type: VolQuoteType::ShiftedBlackLognormal,
+            ..VolGridOpts::default()
+        };
         assert!(
             VolSurface::from_grid_opts("BAD", &[1.0, 2.0], &[0.03], &[0.2, 0.2], opts, None)
                 .is_err()

@@ -98,8 +98,11 @@ fn test_normal_vol_surface_uses_underlying_tenor_axis() {
         &[1.0],
         &[5.0, 10.0],
         &[0.01, 0.02],
-        VolGridOpts::new(VolSurfaceAxis::Tenor, VolInterpolationMode::Vol)
-            .with_quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal),
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Tenor,
+            interpolation_mode: VolInterpolationMode::Vol,
+            quote_type: finstack_quant_core::market_data::surfaces::VolQuoteType::Normal,
+        },
         None,
     )
     .unwrap();

@@ -40,7 +40,7 @@ impl CdsTranchePricer {
         index_data: &CreditIndexData,
         maturity: Date,
     ) -> Result<f64> {
-        let eff = self.calculate_effective_structure(tranche, index_data.recovery_rate);
+        let eff = self.calculate_effective_structure(tranche, index_data.recovery_rate());
         let (eff_attach, eff_detach, pool_factor) =
             (eff.eff_attach, eff.eff_detach, eff.pool_factor);
 
@@ -52,10 +52,10 @@ impl CdsTranchePricer {
         // Get correlations for ORIGINAL attachment and detachment points
         // Base correlation is sticky to the original structure
         let corr_attach = index_data
-            .base_correlation_curve
+            .base_correlation_curve()
             .correlation(tranche.attach_pct);
         let corr_detach = index_data
-            .base_correlation_curve
+            .base_correlation_curve()
             .correlation(tranche.detach_pct);
 
         // Apply enhanced correlation boundary handling for numerical stability
@@ -115,7 +115,7 @@ impl CdsTranchePricer {
         tranche: &CdsTranche,
         index_data: &CreditIndexData,
     ) -> Result<ElInvariants> {
-        let eff = self.calculate_effective_structure(tranche, index_data.recovery_rate);
+        let eff = self.calculate_effective_structure(tranche, index_data.recovery_rate());
         if eff.eff_detach <= eff.eff_attach {
             return Ok(ElInvariants {
                 eff_attach: 0.0,
@@ -133,17 +133,17 @@ impl CdsTranchePricer {
         }
         let corr_attach = self.smooth_correlation_boundary(
             index_data
-                .base_correlation_curve
+                .base_correlation_curve()
                 .correlation(tranche.attach_pct),
         );
         let corr_detach = self.smooth_correlation_boundary(
             index_data
-                .base_correlation_curve
+                .base_correlation_curve()
                 .correlation(tranche.detach_pct),
         );
         let orig_width = (tranche.detach_pct - tranche.attach_pct) / 100.0;
         let prior_loss = self.calculate_prior_tranche_loss(tranche);
-        let prior_wd = self.calculate_prior_tranche_writedown(tranche, index_data.recovery_rate);
+        let prior_wd = self.calculate_prior_tranche_writedown(tranche, index_data.recovery_rate());
         Ok(ElInvariants {
             eff_attach: eff.eff_attach,
             eff_detach: eff.eff_detach,
@@ -422,9 +422,9 @@ impl CdsTranchePricer {
             let t = self.years_from_base(index_data, maturity)?;
             self.homogeneous_capped_expectation(
                 cap_pct / 100.0,
-                usize::from(index_data.num_constituents),
+                usize::from(index_data.num_constituents()),
                 self.get_default_probability(index_data, t)?,
-                index_data.recovery_rate,
+                index_data.recovery_rate(),
                 self.smooth_correlation_boundary(correlation),
                 exposure,
             )
@@ -485,9 +485,9 @@ impl CdsTranchePricer {
         self.homogeneous_capped_pair(
             loss_cap_pct / 100.0,
             recovery_cap_pct / 100.0,
-            usize::from(index_data.num_constituents),
+            usize::from(index_data.num_constituents()),
             self.get_default_probability(index_data, t)?,
-            index_data.recovery_rate,
+            index_data.recovery_rate(),
             self.smooth_correlation_boundary(correlation),
         )
     }

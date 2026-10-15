@@ -250,9 +250,6 @@ impl HazardCurveBuilder {
         }
         par_pts.sort_by(|a, b| a.0.total_cmp(&b.0));
         let (p_ten, p_spd): (Vec<f64>, Vec<f64>) = par_pts.into_iter().unzip();
-        if let Some(recipe) = &self.hazard_calibration {
-            recipe.validate()?;
-        }
 
         // Convert hazard rates to survival probabilities for interpolation
         // using the single canonical λ-attribution convention shared with

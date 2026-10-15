@@ -165,15 +165,6 @@ impl VolCube {
         if forwards.iter().any(|f| !f.is_finite()) {
             return Err(InputError::Invalid.into());
         }
-        for params in params {
-            SabrParameterData::new_with_shift(
-                params.alpha,
-                params.beta,
-                params.rho,
-                params.nu,
-                params.shift,
-            )?;
-        }
         Ok(Self {
             id: CurveId::new(id.as_ref()),
             expiries: expiries.to_vec().into_boxed_slice(),

@@ -155,15 +155,15 @@ impl CdsTranchePricer {
         index_data: &CreditIndexData,
         maturity_years: f64,
     ) -> Result<f64> {
-        let survival_prob = index_data.index_credit_curve.sp(maturity_years);
+        let survival_prob = index_data.index_credit_curve().sp(maturity_years);
         Ok((1.0 - survival_prob).clamp(0.0, 1.0))
     }
 
     /// Calculate years from the credit curve base date.
     pub(super) fn years_from_base(&self, index_data: &CreditIndexData, date: Date) -> Result<f64> {
-        let day_count = index_data.index_credit_curve.day_count();
+        let day_count = index_data.index_credit_curve().day_count();
         day_count.year_fraction(
-            index_data.index_credit_curve.base_date(),
+            index_data.index_credit_curve().base_date(),
             date,
             finstack_quant_core::dates::DayCountContext::default(),
         )
@@ -243,23 +243,12 @@ impl CdsTranchePricer {
             finstack_quant_core::market_data::term_structures::BaseCorrelationCurve,
         >,
     ) -> Result<CreditIndexData> {
-        let mut builder = CreditIndexData::builder()
-            .num_constituents(original_index.num_constituents)
+        original_index
+            .to_builder()
             .recovery_rate(recovery_rate)
             .index_credit_curve(index_credit_curve)
-            .base_correlation_curve(base_correlation_curve);
-
-        if let Some(curves) = &original_index.issuer_credit_curves {
-            builder = builder.issuer_curves(curves.clone());
-        }
-        if let Some(rates) = &original_index.issuer_recovery_rates {
-            builder = builder.issuer_recovery_rates(rates.clone());
-        }
-        if let Some(weights) = &original_index.issuer_weights {
-            builder = builder.issuer_weights(weights.clone());
-        }
-
-        builder.build()
+            .base_correlation_curve(base_correlation_curve)
+            .build()
     }
 
     /// Calculate prior realized loss on the tranche as a fraction of original tranche notional.
@@ -545,34 +534,34 @@ impl CdsTranchePricer {
 
         // Central difference: (PV_up - PV_down) / (2 * bump) for O(h²) accuracy
         let bumped_corr_curve_up =
-            self.bump_base_correlation(&original_index_arc.base_correlation_curve, bump_abs)?;
+            self.bump_base_correlation(original_index_arc.base_correlation_curve(), bump_abs)?;
         let bumped_corr_curve_down =
-            self.bump_base_correlation(&original_index_arc.base_correlation_curve, -bump_abs)?;
+            self.bump_base_correlation(original_index_arc.base_correlation_curve(), -bump_abs)?;
 
         let bumped_index_up = self.rebuild_credit_index(
             original_index_arc.as_ref(),
-            original_index_arc.recovery_rate,
-            std::sync::Arc::clone(&original_index_arc.index_credit_curve),
+            original_index_arc.recovery_rate(),
+            std::sync::Arc::clone(original_index_arc.index_credit_curve()),
             std::sync::Arc::new(bumped_corr_curve_up),
         )?;
 
         let bumped_index_down = self.rebuild_credit_index(
             original_index_arc.as_ref(),
-            original_index_arc.recovery_rate,
-            std::sync::Arc::clone(&original_index_arc.index_credit_curve),
+            original_index_arc.recovery_rate(),
+            std::sync::Arc::clone(original_index_arc.index_credit_curve()),
             std::sync::Arc::new(bumped_corr_curve_down),
         )?;
 
         let ctx_up = market
             .clone()
             .insert(std::sync::Arc::clone(
-                &bumped_index_up.base_correlation_curve,
+                bumped_index_up.base_correlation_curve(),
             ))
             .insert_credit_index(&tranche.credit_index_id, bumped_index_up)?;
         let ctx_down = market
             .clone()
             .insert(std::sync::Arc::clone(
-                &bumped_index_down.base_correlation_curve,
+                bumped_index_down.base_correlation_curve(),
             ))
             .insert_credit_index(&tranche.credit_index_id, bumped_index_down)?;
 
@@ -611,9 +600,9 @@ impl CdsTranchePricer {
             return Ok(0.0);
         }
 
-        let num_constituents = index_data.num_constituents as usize;
+        let num_constituents = index_data.num_constituents() as usize;
         let base_weight = 1.0 / (num_constituents as f64);
-        let base_recovery = index_data.recovery_rate;
+        let base_recovery = index_data.recovery_rate();
         let current_loss = tranche.realized_loss;
         let loss_in_tranche_before = (current_loss - attach_frac).clamp(0.0, width);
         let impact_of = |individual_loss: f64| {
@@ -630,8 +619,7 @@ impl CdsTranchePricer {
         // Collect JTD impacts for all names
         let mut impacts: Vec<f64> = Vec::with_capacity(num_constituents);
         if let Some(curves) = index_data
-            .issuer_credit_curves
-            .as_ref()
+            .issuer_credit_curves()
             .filter(|curves| !curves.is_empty())
         {
             let mut sorted_ids: Vec<&str> = curves.keys().map(String::as_str).collect();

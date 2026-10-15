@@ -128,6 +128,17 @@ pub enum InflationLag {
     None,
 }
 
+impl From<u8> for InflationLag {
+    #[inline]
+    fn from(months: u8) -> Self {
+        if months == 0 {
+            Self::None
+        } else {
+            Self::Months(months)
+        }
+    }
+}
+
 impl std::fmt::Display for InflationLag {
     /// Render the lag in the same market-convention form [`FromStr`](std::str::FromStr)
     /// accepts: `"none"`, `"<n>M"` or `"<n>D"`.
@@ -273,13 +284,13 @@ impl std::str::FromStr for InflationLag {
 #[cfg_attr(feature = "json-schema", schemars(try_from = "InflationIndexWire"))]
 pub struct InflationIndex {
     /// Unique identifier for this index (e.g., "US-CPI-U", "UK-RPI")
-    pub id: String,
+    id: String,
     /// Canonical observations and calendar-time interpolation policy.
     series: ScalarTimeSeries,
     /// Lag policy for index application
     lag: InflationLag,
     /// Currency of the index
-    pub currency: Currency,
+    currency: Currency,
     /// Optional monthly seasonality factors (index by month-1)
     seasonality: Option<[f64; 12]>,
     /// Explicit publication dates, keyed by the first day of the reference month.
@@ -327,6 +338,18 @@ impl InflationIndex {
             seasonality: None,
             publication_dates: BTreeMap::new(),
         })
+    }
+
+    /// Unique identifier for this index (e.g., `"US-CPI-U"`, `"UK-RPI"`).
+    #[inline]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// Reporting currency of this inflation index.
+    #[inline]
+    pub const fn currency(&self) -> Currency {
+        self.currency
     }
 
     /// Set the interpolation method between observations.
@@ -413,13 +436,20 @@ impl InflationIndex {
     /// supplied; use `1.0` for a month with no adjustment and ensure they are
     /// economically appropriate for the source series.
     ///
+    /// # Arguments
+    ///
+    /// * `factors` - Twelve monthly multiplicative factors (January through December),
+    ///   each finite and strictly positive.
+    ///
     /// # Errors
     ///
-    /// This method currently returns `Ok` for every `[f64; 12]` input and does
-    /// not independently reject non-finite or negative factors. Callers that
-    /// ingest seasonality externally should validate its data-quality policy
-    /// before construction.
+    /// Returns [`Error::Validation`] if any factor is non-finite or non-positive (`<= 0.0`).
     pub fn with_seasonality(mut self, factors: [f64; 12]) -> Result<Self> {
+        if !factors.iter().all(|f| f.is_finite() && *f > 0.0) {
+            return Err(Error::Validation(
+                "inflation seasonality factors must be finite and strictly positive".into(),
+            ));
+        }
         self.seasonality = Some(factors);
         Ok(self)
     }
@@ -785,8 +815,8 @@ mod tests {
     #[test]
     fn test_inflation_creation() {
         let index = sample_cpi();
-        assert_eq!(index.id, "US-CPI");
-        assert_eq!(index.currency, Currency::USD);
+        assert_eq!(index.id(), "US-CPI");
+        assert_eq!(index.currency(), Currency::USD);
 
         let (start, end) = index
             .date_range()

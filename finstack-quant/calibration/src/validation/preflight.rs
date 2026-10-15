@@ -287,10 +287,10 @@ fn validate_inflation_step(
     // - lag match
     // - base CPI match (including any seasonality applied by the index)
     if let Ok(index) = context.get_inflation_index(p.curve_id.as_str()) {
-        if index.currency != p.currency {
+        if index.currency() != p.currency {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Inflation step currency mismatch: params.currency='{}' but InflationIndex.currency='{}'",
-                p.currency, index.currency
+                p.currency, index.currency()
             )));
         }
 

@@ -651,27 +651,27 @@ impl JsCreditIndexData {
     /// Number of names in the index.
     #[wasm_bindgen(getter, js_name = numConstituents)]
     pub fn num_constituents(&self) -> u16 {
-        self.inner.num_constituents
+        self.inner.num_constituents()
     }
 
     /// Index-level recovery rate on default, as a decimal.
     #[wasm_bindgen(getter, js_name = recoveryRate)]
     pub fn recovery_rate(&self) -> f64 {
-        self.inner.recovery_rate
+        self.inner.recovery_rate()
     }
 
     /// Hazard curve of the index as a whole, as a `HazardCurve`.
     #[wasm_bindgen(getter, js_name = indexCreditCurve)]
     pub fn index_credit_curve(&self) -> JsHazardCurve {
         JsHazardCurve {
-            inner: Arc::clone(&self.inner.index_credit_curve),
+            inner: Arc::clone(self.inner.index_credit_curve()),
         }
     }
 
     /// Base-correlation curve used for tranche pricing, as a `BaseCorrelationCurve`.
     #[wasm_bindgen(getter, js_name = baseCorrelationCurve)]
     pub fn base_correlation_curve(&self) -> JsBaseCorrelationCurve {
-        JsBaseCorrelationCurve::from_inner(Arc::clone(&self.inner.base_correlation_curve))
+        JsBaseCorrelationCurve::from_inner(Arc::clone(self.inner.base_correlation_curve()))
     }
 
     /// Hazard curve of one issuer (Rust `CreditIndexData::get_issuer_curve`).

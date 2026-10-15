@@ -80,8 +80,8 @@ fn production_history_reuses_the_pricing_boundary_recalibration_provider() {
     let hazard = market.get_hazard("ISSUER-A-CDS").expect("hazard");
     let origin = hazard.base_date();
     let recipe = hazard.hazard_calibration().expect("replay recipe");
-    let tenor = recipe.spread_risk_inputs[0].pillar_time;
-    let initial_spread = recipe.spread_risk_inputs[0].quote["spread_bp"]
+    let tenor = recipe.spread_risk_inputs()[0].pillar_time;
+    let initial_spread = recipe.spread_risk_inputs()[0].quote["spread_bp"]
         .as_f64()
         .expect("spread");
     let provider = Arc::new(CachedRecalibrationProvider::new());
@@ -100,7 +100,7 @@ fn production_history_reuses_the_pricing_boundary_recalibration_provider() {
     let shifted_spread = rebuilt
         .hazard_calibration()
         .expect("shifted recipe")
-        .spread_risk_inputs[0]
+        .spread_risk_inputs()[0]
         .quote["spread_bp"]
         .as_f64()
         .expect("shifted spread");

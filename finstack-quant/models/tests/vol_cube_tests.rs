@@ -153,15 +153,8 @@ fn total_variance_materialized_slice_matches_canonical_cube_query() {
 }
 
 #[test]
-fn vol_cube_revalidates_public_sabr_fields() {
-    let invalid = SabrParameterData {
-        alpha: 0.03,
-        beta: 0.5,
-        rho: -0.2,
-        nu: 0.4,
-        shift: Some(f64::NAN),
-    };
-    assert!(VolCube::from_grid("BAD", &[1.0], &[5.0], &[invalid], &[0.03]).is_err());
+fn vol_cube_and_sabr_parameter_data_reject_invalid_inputs() {
+    assert!(SabrParameterData::new_with_shift(0.03, 0.5, -0.2, 0.4, Some(f64::NAN)).is_err());
     assert!(VolCube::from_grid(
         "BAD-EXPIRY",
         &[0.0],
@@ -228,11 +221,11 @@ fn test_vol_cube_vol_at_grid_node() {
     let strike = 0.03;
     let vol = finstack_quant_models::volatility::get_cube_vol(&cube, 1.0, 5.0, strike).unwrap();
     let expected = SabrParameters {
-        alpha: p.alpha,
-        beta: p.beta,
-        nu: p.nu,
-        rho: p.rho,
-        shift: p.shift,
+        alpha: p.alpha(),
+        beta: p.beta(),
+        nu: p.nu(),
+        rho: p.rho(),
+        shift: p.shift(),
     }
     .implied_vol_lognormal(fwd, strike, 1.0)
     .expect("valid checked inputs");

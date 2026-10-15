@@ -169,7 +169,7 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         .expect("calibrated hazard curve must retain replay inputs");
     assert!(
         recipe
-            .calibration_inputs
+            .calibration_inputs()
             .windows(2)
             .all(|pair| pair[0].pillar_time < pair[1].pillar_time),
         "unsorted market inputs must persist in canonical pillar order"
@@ -179,27 +179,35 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         serde_json::from_str(&serialized_recipe).expect("deserialize recipe");
     assert!(
         round_trip
-            .calibration_inputs
+            .calibration_inputs()
             .windows(2)
             .all(|pair| pair[0].pillar_time < pair[1].pillar_time),
         "canonical pillar ordering must survive serde"
     );
     assert_eq!(
-        recipe.calibration_inputs[0].quote["pillar"]["date"],
+        recipe.calibration_inputs()[0].quote["pillar"]["date"],
         serde_json::json!("2026-03-20"),
         "absolute CDS pillars must survive calibration losslessly"
     );
     assert_eq!(
-        recipe.calibration_inputs[0].pillar_date,
+        recipe.calibration_inputs()[0].pillar_date,
         Date::from_calendar_date(2026, Month::March, 20).expect("valid pillar date")
     );
     assert_eq!(
-        recipe.calibration_inputs[0].pillar_time,
-        recipe.spread_risk_inputs[0].pillar_time
+        recipe.calibration_inputs()[0].pillar_time,
+        recipe.spread_risk_inputs()[0].pillar_time
     );
 
-    let mut mismatched_recipe = recipe.clone();
-    mismatched_recipe.spread_risk_inputs[0].pillar_time += 0.25;
+    let mut mismatched_risk = recipe.spread_risk_inputs().to_vec();
+    mismatched_risk[0].pillar_time += 0.25;
+    let mismatched_recipe =
+        finstack_quant_core::market_data::term_structures::HazardCalibrationRecipe::new(
+            recipe.hazard_params().clone(),
+            recipe.calibration_inputs().to_vec(),
+            mismatched_risk,
+            recipe.calibration_config().clone(),
+        )
+        .expect("core accepts convention-dependent bindings");
     let mismatched_curve = curve
         .to_builder_with_id(curve.id().clone())
         .hazard_calibration(mismatched_recipe)
@@ -219,13 +227,19 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         "{mismatch_error}"
     );
 
-    let mut tampered_recipe = recipe.clone();
-    for input in [
-        &mut tampered_recipe.calibration_inputs[0],
-        &mut tampered_recipe.spread_risk_inputs[0],
-    ] {
+    let mut tampered_cal = recipe.calibration_inputs().to_vec();
+    let mut tampered_risk = recipe.spread_risk_inputs().to_vec();
+    for input in [&mut tampered_cal[0], &mut tampered_risk[0]] {
         input.quote["pillar"]["date"] = serde_json::json!("2027-03-20");
     }
+    let tampered_recipe =
+        finstack_quant_core::market_data::term_structures::HazardCalibrationRecipe::new(
+            recipe.hazard_params().clone(),
+            tampered_cal,
+            tampered_risk,
+            recipe.calibration_config().clone(),
+        )
+        .expect("core accepts structurally coherent serialized quote");
     let tampered_curve = curve
         .to_builder_with_id(curve.id().clone())
         .hazard_calibration(tampered_recipe)
@@ -246,10 +260,9 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         "{tamper_error}"
     );
 
-    let mut upfront_recipe = recipe.clone();
+    let mut upfront_risk = recipe.spread_risk_inputs().to_vec();
     let par_quote: CdsQuote =
-        serde_json::from_value(upfront_recipe.spread_risk_inputs[0].quote.clone())
-            .expect("stored par quote");
+        serde_json::from_value(upfront_risk[0].quote.clone()).expect("stored par quote");
     let CdsQuote::CdsParSpread {
         id,
         entity,
@@ -261,7 +274,7 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
     else {
         panic!("spread-risk input must start as par spread");
     };
-    upfront_recipe.spread_risk_inputs[0].quote = serde_json::to_value(CdsQuote::CdsUpfront {
+    upfront_risk[0].quote = serde_json::to_value(CdsQuote::CdsUpfront {
         id,
         entity,
         pillar,
@@ -271,11 +284,14 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         convention,
     })
     .expect("serialize malformed upfront risk quote");
-    let upfront_error = curve
-        .to_builder_with_id(curve.id().clone())
-        .hazard_calibration(upfront_recipe)
-        .build()
-        .expect_err("curve construction must reject upfront spread-risk input");
+    let upfront_error =
+        finstack_quant_core::market_data::term_structures::HazardCalibrationRecipe::new(
+            recipe.hazard_params().clone(),
+            recipe.calibration_inputs().to_vec(),
+            upfront_risk,
+            recipe.calibration_config().clone(),
+        )
+        .expect_err("recipe construction must reject upfront spread-risk input");
     assert!(
         upfront_error.to_string().contains("par-spread"),
         "{upfront_error}"

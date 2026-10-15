@@ -686,8 +686,13 @@ impl PyMarketContext {
                 parts.push(format!("{label}={}", ids_repr(&ids)));
             }
         };
-        let surfaces = self.inner.surfaces_snapshot();
-        push_ids("surfaces", surfaces.keys().map(|id| id.as_str()).collect());
+        push_ids(
+            "surfaces",
+            self.inner
+                .surfaces_iter()
+                .map(|(id, _)| id.as_str())
+                .collect(),
+        );
         push_ids(
             "vol_cubes",
             self.inner

@@ -236,7 +236,7 @@ impl CdsTranchePricer {
             Vec::with_capacity(periods.len() * 2 + usize::from(tranche.upfront.is_some()));
         let mut prev_el_fraction = self.calculate_prior_tranche_loss(tranche);
         let mut prev_wd_fraction =
-            self.calculate_prior_tranche_writedown(tranche, _index_data_arc.recovery_rate);
+            self.calculate_prior_tranche_writedown(tranche, _index_data_arc.recovery_rate());
         for (i, period) in periods.iter().enumerate() {
             let payment_date = period.payment_date;
             let el_fraction = el_curve[i].el_fraction;
@@ -427,13 +427,13 @@ impl CdsTranchePricer {
                     ),
                 })
             })?;
-        if as_of < tranche.maturity && index_data_arc.index_credit_curve.base_date() != as_of {
+        if as_of < tranche.maturity && index_data_arc.index_credit_curve().base_date() != as_of {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CDS tranche '{}' requires credit curve '{}' to be based on valuation date {}; got {}. Rebase the curve or provide a conditionally rebased credit index.",
                 tranche.id,
                 tranche.credit_index_id,
                 as_of,
-                index_data_arc.index_credit_curve.base_date()
+                index_data_arc.index_credit_curve().base_date()
             )));
         }
         let valuation_date = self.calculate_settlement_date(tranche, market_ctx, as_of)?;
@@ -455,7 +455,7 @@ impl CdsTranchePricer {
             el_curve.push(super::config::ElWdPoint {
                 el_fraction: self.calculate_prior_tranche_loss(tranche),
                 wd_fraction: self
-                    .calculate_prior_tranche_writedown(tranche, index_data_arc.recovery_rate),
+                    .calculate_prior_tranche_writedown(tranche, index_data_arc.recovery_rate()),
             });
         }
         el_curve.extend(future_losses);
@@ -547,7 +547,7 @@ impl CdsTranchePricer {
         if !is_finite_positive(dt) {
             return UNIFORM_MIDPOINT;
         }
-        let curve = &index_data.index_credit_curve;
+        let curve = index_data.index_credit_curve();
         let s0 = curve.sp(t_start.max(0.0));
         let s1 = curve.sp(t_end);
         // Need a genuine, ordered survival drop to define a hazard:

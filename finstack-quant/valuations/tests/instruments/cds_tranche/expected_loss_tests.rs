@@ -149,15 +149,15 @@ fn test_hetero_matches_homogeneous_when_issuers_identical() {
     let mut issuer_curves = finstack_quant_core::HashMap::default();
     for i in 0..10 {
         let id = format!("ISSUER-{:03}", i + 1);
-        issuer_curves.insert(id, std::sync::Arc::clone(&index_data.index_credit_curve));
+        issuer_curves.insert(id, std::sync::Arc::clone(index_data.index_credit_curve()));
     }
 
     let hetero_index =
         finstack_quant_core::market_data::term_structures::CreditIndexData::builder()
             .num_constituents(10)
-            .recovery_rate(index_data.recovery_rate)
-            .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
-            .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
+            .recovery_rate(index_data.recovery_rate())
+            .index_credit_curve(std::sync::Arc::clone(index_data.index_credit_curve()))
+            .base_correlation_curve(std::sync::Arc::clone(index_data.base_correlation_curve()))
             .issuer_curves(issuer_curves)
             .build()
             .unwrap();
@@ -169,9 +169,9 @@ fn test_hetero_matches_homogeneous_when_issuers_identical() {
     // Same ten-name pool without issuer curves: the homogeneous path.
     let homo_index = finstack_quant_core::market_data::term_structures::CreditIndexData::builder()
         .num_constituents(10)
-        .recovery_rate(index_data.recovery_rate)
-        .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
-        .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
+        .recovery_rate(index_data.recovery_rate())
+        .index_credit_curve(std::sync::Arc::clone(index_data.index_credit_curve()))
+        .base_correlation_curve(std::sync::Arc::clone(index_data.base_correlation_curve()))
         .build()
         .unwrap();
     let homo_market = base_market

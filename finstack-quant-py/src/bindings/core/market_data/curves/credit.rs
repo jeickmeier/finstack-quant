@@ -354,34 +354,34 @@ impl PyCreditIndexData {
     /// Number of constituents in the credit index.
     #[getter]
     fn num_constituents(&self) -> u16 {
-        self.inner.num_constituents
+        self.inner.num_constituents()
     }
 
     /// Index recovery rate (decimal fraction).
     #[getter]
     fn recovery_rate(&self) -> f64 {
-        self.inner.recovery_rate
+        self.inner.recovery_rate()
     }
 
     /// Hazard curve for the index as a whole.
     #[getter]
     fn index_credit_curve(&self) -> PyHazardCurve {
-        PyHazardCurve::from_inner(Arc::clone(&self.inner.index_credit_curve))
+        PyHazardCurve::from_inner(Arc::clone(self.inner.index_credit_curve()))
     }
 
     /// Base-correlation curve by detachment point.
     #[getter]
     fn base_correlation_curve(&self) -> PyBaseCorrelationCurve {
-        PyBaseCorrelationCurve::from_inner(Arc::clone(&self.inner.base_correlation_curve))
+        PyBaseCorrelationCurve::from_inner(Arc::clone(self.inner.base_correlation_curve()))
     }
 
     fn __repr__(&self) -> String {
         format!(
             "CreditIndexData(num_constituents={}, recovery_rate={}, index_credit_curve='{}', base_correlation_curve='{}')",
-            self.inner.num_constituents,
-            self.inner.recovery_rate,
-            self.inner.index_credit_curve.id().as_str(),
-            self.inner.base_correlation_curve.id().as_str()
+            self.inner.num_constituents(),
+            self.inner.recovery_rate(),
+            self.inner.index_credit_curve().id().as_str(),
+            self.inner.base_correlation_curve().id().as_str()
         )
     }
 }

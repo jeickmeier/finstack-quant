@@ -3781,7 +3781,7 @@ export interface VolCubeConstructor {
    * @param id - Curve identifier.
    * @param expiries - Option expiry axis in years (strictly increasing).
    * @param tenors - Swap tenor axis in years (strictly increasing).
-   * @param paramsFlat - Row-major flat array of SABR parameters: `[alpha0, beta0, rho0, nu0, shift0, alpha1, …]`. Length must equal `expiries.len() * tenors.len() * 5`. Pass `NaN` for the shift element of a node to omit the shift. The `nu` component is nonnegative; zero gives deterministic volatility.
+   * @param paramsFlat - Row-major SABR parameters: either a flat array `[alpha0, beta0, rho0, nu0, shift0, alpha1, …]` of length `expiries.len() * tenors.len() * 5` (pass `NaN` for `shift` to omit it), or an array of `{ alpha, beta, rho, nu, shift? }` objects of length `expiries.len() * tenors.len()`. The `nu` component is nonnegative; zero gives deterministic volatility.
    * @param forwards - Row-major forward rates, one per grid node.
    * @param interpolationMode - Interpolation across the expiry axis: `"vol"` or `"total_variance"`; omitted keeps the Rust `VolCube::from_grid` default (`"vol"`).
    * @throws Error - Throws a JavaScript exception if an axis is empty, non-finite, non-positive, or not strictly increasing; the parameter or forward array has the wrong length or its grid-size product overflows; a forward is non-finite; any SABR node has invalid alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol` nor `total_variance`.
@@ -7269,7 +7269,7 @@ export interface VolSurfaceConstructor {
    * @param id - Surface identifier, the `MarketContext` lookup key.
    * @param expiries - Option expiries in years, strictly increasing.
    * @param strikes - Secondary-axis coordinates (strikes, or swap tenors in years), strictly increasing.
-   * @param vols - Flat row-major grid of decimal volatilities, `expiries.length * strikes.length` entries; row `i` holds the smile at `expiries[i]`. Entries must be finite and non-negative.
+   * @param vols - Decimal volatilities, either as a flat row-major grid of `expiries.length * strikes.length` entries or as `expiries.length` rows of `strikes.length` values. Entries must be finite and non-negative.
    * @param secondaryAxis - What `strikes` holds: `"strike"` or `"tenor"`; omitted uses the Rust default (`"strike"`).
    * @param interpolationMode - `"vol"` or `"total_variance"`; omitted uses the Rust default (`"vol"`).
    * @param quoteType - `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`; omitted uses the Rust default (`"black_lognormal"`).
@@ -7683,7 +7683,7 @@ export interface InflationIndexConstructor {
    * @param observations - Array of `[isoDate, level]` pairs (or its JSON text): unique dates and strictly positive index levels.
    * @param currency - ISO-4217 code of the index's currency.
    * @param interpolation - How the level is read between prints: `"step"` or `"linear"`; omitted uses the Rust default (`"step"`).
-   * @param lag - Observation lag as text: `"3M"`, `"90D"` or `"none"`; omitted keeps the Rust default (`"none"`).
+   * @param lag - Observation lag as text (`"3M"`, `"90D"`, `"none"`) or an integer number of months (`0` for `"none"`, `3` for `"3M"`); omitted keeps the Rust default (`"none"`).
    * @param seasonality - Twelve multiplicative monthly factors, January first; omitted applies no seasonality.
    * @returns The validated `InflationIndex`.
    * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for a malformed date or pair, an empty or duplicated observation set, an unknown currency, interpolation or lag, or a `seasonality` array that does not hold twelve valid factors.

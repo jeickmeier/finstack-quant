@@ -147,7 +147,7 @@ pub(crate) fn apply_time_roll_forward(
         if hazard_rolls.iter().any(|(existing, _)| existing == id) {
             continue;
         }
-        let discount_id = recipe.hazard_params["discount_curve_id"]
+        let discount_id = recipe.hazard_params()["discount_curve_id"]
             .as_str()
             .ok_or_else(|| {
                 Error::Validation(format!(

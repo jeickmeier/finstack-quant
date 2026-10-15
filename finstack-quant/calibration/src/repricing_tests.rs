@@ -1067,8 +1067,11 @@ fn hazard_recipe_upfront_inputs_support_par_space_replay() {
     let recipe = hazard
         .hazard_calibration()
         .expect("upfront calibration must retain replay inputs");
-    assert_eq!(recipe.calibration_inputs[0].quote["type"], "cds_upfront");
-    assert_eq!(recipe.spread_risk_inputs[0].quote["type"], "cds_par_spread");
+    assert_eq!(recipe.calibration_inputs()[0].quote["type"], "cds_upfront");
+    assert_eq!(
+        recipe.spread_risk_inputs()[0].quote["type"],
+        "cds_par_spread"
+    );
     let spread_bumped = bump_hazard_spreads(
         hazard.as_ref(),
         &ctx,

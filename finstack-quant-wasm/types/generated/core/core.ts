@@ -1367,7 +1367,6 @@ export interface HazardCalibrationRecipe {
    * Par-spread-only inputs used for quote-space spread risk.
    */
   spread_risk_inputs: HazardCalibrationInput[];
-  [k: string]: unknown;
 }
 /**
  * One atomic quote binding retained for hazard calibration replay.
@@ -1886,10 +1885,25 @@ export interface VolCube {
  * `finstack-quant-models`.
  */
 export interface SabrParameterData {
+  /**
+   * Initial volatility level, strictly positive.
+   */
   alpha: number;
+  /**
+   * CEV exponent in the closed interval `[0, 1]`.
+   */
   beta: number;
+  /**
+   * Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
+   */
   nu: number;
+  /**
+   * Forward-volatility correlation in the open interval `(-1, 1)`.
+   */
   rho: number;
+  /**
+   * Optional finite displacement applied to forward and strike.
+   */
   shift?: number | null;
 }
 /**
@@ -1922,9 +1936,21 @@ export interface PeriodPlan {
    */
   periods: Period[];
 }
-export interface RatingLevelWire {
+/**
+ * Rating level for credit rating scales.
+ */
+export interface RatingLevel {
+  /**
+   * Minimum score threshold for this rating.
+   */
   min_score: number;
+  /**
+   * Rating name, for example `AAA` or `Aaa`.
+   */
   name: string;
+  /**
+   * Numeric score on a 0-100 scale.
+   */
   score: number;
 }
 /**
@@ -1982,8 +2008,17 @@ export interface ScheduleSpec {
  * Named scorecard rating scale: rating levels ordered best to worst with score thresholds.
  */
 export interface ScorecardScale {
+  /**
+   * Human-readable description.
+   */
   description?: string | null;
-  ratings: RatingLevelWire[];
+  /**
+   * Ordered list of rating levels from best to worst.
+   */
+  ratings: RatingLevel[];
+  /**
+   * Scale name, for example `S&P` or `Moody's`.
+   */
   scale_name: string;
 }
 /**

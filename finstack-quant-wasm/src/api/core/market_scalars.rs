@@ -246,7 +246,8 @@ impl JsInflationIndex {
     /// * `currency` - ISO-4217 code of the index's currency.
     /// * `interpolation` - How the level is read between prints: `"step"` or
     ///   `"linear"`; omitted uses the Rust default (`"step"`).
-    /// * `lag` - Observation lag as text: `"3M"`, `"90D"` or `"none"`;
+    /// * `lag` - Observation lag as text (`"3M"`, `"90D"`, `"none"`) or
+    ///   an integer number of months (`0` for `"none"`, `3` for `"3M"`);
     ///   omitted keeps the Rust default (`"none"`).
     /// * `seasonality` - Twelve multiplicative monthly factors, January
     ///   first; omitted applies no seasonality.
@@ -276,10 +277,20 @@ impl JsInflationIndex {
             .transpose()
             .map_err(to_js_err)?
             .unwrap_or_default();
-        let lag = js_opt_string(lag.as_ref(), "lag")?
-            .map(|label| label.parse::<InflationLag>())
-            .transpose()
-            .map_err(to_js_err)?;
+        let lag = match lag {
+            Some(ref v) if !(v.is_null() || v.is_undefined()) => {
+                if v.as_f64().is_some() {
+                    Some(InflationLag::from(js_uint::<u8>(v, "lag")?))
+                } else {
+                    Some(
+                        js_string(v, "lag")?
+                            .parse::<InflationLag>()
+                            .map_err(to_js_err)?,
+                    )
+                }
+            }
+            _ => None,
+        };
         let seasonality = js_opt_f64_seq(seasonality.as_ref(), "seasonality")?
             .map(|factors| {
                 <[f64; 12]>::try_from(factors).map_err(|got| {
@@ -399,14 +410,14 @@ impl JsInflationIndex {
     /// Index identifier (the `MarketContext` lookup key).
     #[wasm_bindgen(getter, js_name = id)]
     pub fn id(&self) -> String {
-        self.inner.id.clone()
+        self.inner.id().to_owned()
     }
 
     /// Currency of the index.
     #[wasm_bindgen(getter, js_name = currency)]
     pub fn currency(&self) -> JsCurrency {
         JsCurrency {
-            inner: self.inner.currency,
+            inner: self.inner.currency(),
         }
     }
 

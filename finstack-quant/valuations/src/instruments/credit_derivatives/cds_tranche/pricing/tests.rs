@@ -69,8 +69,8 @@ fn sample_market_context() -> MarketContext {
 
     MarketContext::new()
         .insert(discount_curve)
-        .insert(Arc::clone(&index_data.index_credit_curve))
-        .insert(Arc::clone(&index_data.base_correlation_curve))
+        .insert(Arc::clone(index_data.index_credit_curve()))
+        .insert(Arc::clone(index_data.base_correlation_curve()))
         .insert_credit_index("CDX.NA.IG.42", index_data)
         .expect("Credit index dependencies should be registered")
 }
@@ -338,13 +338,13 @@ fn test_hetero_matches_homogeneous_when_issuers_equal() {
     let mut issuer_curves = finstack_quant_core::HashMap::default();
     for i in 0..10 {
         let id = format!("ISSUER-{:03}", i + 1);
-        issuer_curves.insert(id, std::sync::Arc::clone(&index_data.index_credit_curve));
+        issuer_curves.insert(id, std::sync::Arc::clone(index_data.index_credit_curve()));
     }
     let hetero_index = CreditIndexData::builder()
         .num_constituents(10)
-        .recovery_rate(index_data.recovery_rate)
-        .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
-        .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
+        .recovery_rate(index_data.recovery_rate())
+        .index_credit_curve(std::sync::Arc::clone(index_data.index_credit_curve()))
+        .base_correlation_curve(std::sync::Arc::clone(index_data.base_correlation_curve()))
         .issuer_curves(issuer_curves)
         .build()
         .expect("Curve builder should succeed with valid test data");
@@ -355,9 +355,9 @@ fn test_hetero_matches_homogeneous_when_issuers_equal() {
     // Same ten-name pool without issuer curves: the homogeneous path.
     let homo_index = CreditIndexData::builder()
         .num_constituents(10)
-        .recovery_rate(index_data.recovery_rate)
-        .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
-        .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
+        .recovery_rate(index_data.recovery_rate())
+        .index_credit_curve(std::sync::Arc::clone(index_data.index_credit_curve()))
+        .base_correlation_curve(std::sync::Arc::clone(index_data.base_correlation_curve()))
         .build()
         .expect("Curve builder should succeed with valid test data");
     let ctx_homo = ctx_base
@@ -535,11 +535,10 @@ fn homogeneity_detection_uses_consistent_tolerance() {
             .expect("index data");
         let mut market = MarketContext::new()
             .insert(discount_curve.clone())
-            .insert(Arc::clone(&index.index_credit_curve))
-            .insert(Arc::clone(&index.base_correlation_curve));
+            .insert(Arc::clone(index.index_credit_curve()))
+            .insert(Arc::clone(index.base_correlation_curve()));
         for curve in index
-            .issuer_credit_curves
-            .as_ref()
+            .issuer_credit_curves()
             .expect("Issuer curves should exist")
             .values()
         {
@@ -947,7 +946,7 @@ fn test_extreme_correlation_numerical_stability() {
         let extreme_index_data = CreditIndexData::builder()
             .num_constituents(125)
             .recovery_rate(0.40)
-            .index_credit_curve(std::sync::Arc::clone(&index_data_arc.index_credit_curve))
+            .index_credit_curve(std::sync::Arc::clone(index_data_arc.index_credit_curve()))
             .base_correlation_curve(std::sync::Arc::new(extreme_corr_curve))
             .build()
             .expect("BaseCorrelationCurve builder should succeed with valid test data");
@@ -1264,7 +1263,7 @@ fn test_correlation_bump_is_a_pure_parallel_shift() {
     let index_data = market_ctx
         .get_credit_index("CDX.NA.IG.42")
         .expect("Index should exist");
-    let original = &index_data.base_correlation_curve;
+    let original = index_data.base_correlation_curve();
 
     // A large negative bump still parallel-shifts every knot by the same
     // amount; monotonicity is preserved by construction.
@@ -1307,7 +1306,7 @@ fn correlation_bump_up_and_down_are_symmetric() {
     let index_data = market_ctx
         .get_credit_index("CDX.NA.IG.42")
         .expect("Index should exist");
-    let original = &index_data.base_correlation_curve;
+    let original = index_data.base_correlation_curve();
 
     let h = 0.01;
     let up = model.bump_base_correlation(original, h).expect("up bump");
@@ -1604,8 +1603,8 @@ fn arbitrage_market_context() -> MarketContext {
 
     MarketContext::new()
         .insert(discount_curve)
-        .insert(Arc::clone(&index_data.index_credit_curve))
-        .insert(Arc::clone(&index_data.base_correlation_curve))
+        .insert(Arc::clone(index_data.index_credit_curve()))
+        .insert(Arc::clone(index_data.base_correlation_curve()))
         .insert_credit_index("CDX.NA.IG.42", index_data)
         .expect("Credit index dependencies should be registered")
 }
@@ -1729,8 +1728,8 @@ fn realistic_base_correlation_skew_prices_every_tranche() {
         .expect("index data");
     let market_ctx = MarketContext::new()
         .insert(discount_curve)
-        .insert(Arc::clone(&index_data.index_credit_curve))
-        .insert(Arc::clone(&index_data.base_correlation_curve))
+        .insert(Arc::clone(index_data.index_credit_curve()))
+        .insert(Arc::clone(index_data.base_correlation_curve()))
         .insert_credit_index("CDX.NA.IG.42", index_data)
         .expect("Credit index dependencies should be registered");
     let pricer = CdsTranchePricer::new();
@@ -2027,8 +2026,8 @@ fn discounting_is_invariant_under_curve_rebasing() {
     let make_ctx = |base: Date| {
         MarketContext::new()
             .insert(make_disc(base))
-            .insert(Arc::clone(&index_data.index_credit_curve))
-            .insert(Arc::clone(&index_data.base_correlation_curve))
+            .insert(Arc::clone(index_data.index_credit_curve()))
+            .insert(Arc::clone(index_data.base_correlation_curve()))
             .insert_credit_index("CDX.NA.IG.42", index_data.clone())
             .expect("Credit index dependencies should be registered")
     };
@@ -2122,8 +2121,8 @@ fn rising_hazard_lowers_premium_leg_pv() {
             .expect("index data");
         MarketContext::new()
             .insert(discount_curve)
-            .insert(Arc::clone(&index_data.index_credit_curve))
-            .insert(Arc::clone(&index_data.base_correlation_curve))
+            .insert(Arc::clone(index_data.index_credit_curve()))
+            .insert(Arc::clone(index_data.base_correlation_curve()))
             .insert_credit_index("CDX.NA.IG.42", index_data)
             .expect("Credit index dependencies should be registered")
     };
@@ -2178,8 +2177,8 @@ fn recovery_market_context(recovery: f64, hazard_scale: f64) -> MarketContext {
         .expect("index data");
     MarketContext::new()
         .insert(discount_curve)
-        .insert(Arc::clone(&index_data.index_credit_curve))
-        .insert(Arc::clone(&index_data.base_correlation_curve))
+        .insert(Arc::clone(index_data.index_credit_curve()))
+        .insert(Arc::clone(index_data.base_correlation_curve()))
         .insert_credit_index("CDX.NA.IG.42", index_data)
         .expect("Credit index dependencies should be registered")
 }
@@ -2423,7 +2422,7 @@ mod production_credit_audit {
             assert!(
                 (actual - expected).abs() < 2e-10,
                 "N={}, PD={pd}, rho={rho}, cap={cap}: {actual:.15} vs {expected:.15}",
-                index.num_constituents
+                index.num_constituents()
             );
             compared += 1;
         }
@@ -2483,22 +2482,23 @@ fn seasoned_aod_reduces_only_the_remaining_day_of_accrual() {
     use time::macros::date;
     let as_of = date!(2025 - 01 - 01);
     let market = sample_market_context();
-    let mut index = market
+    let index = market
         .get_credit_index("CDX.NA.IG.42")
         .expect("index")
-        .as_ref()
-        .clone();
-    index.index_credit_curve = Arc::new(
-        HazardCurve::builder("CDX.NA.IG.42")
-            .base_date(as_of)
-            .recovery_rate(0.4)
-            .knots([(1.0, 36.5), (10.0, 36.5)])
-            .max_hazard_rate(40.0)
-            .build()
-            .expect("hazard"),
-    );
+        .to_builder()
+        .index_credit_curve(Arc::new(
+            HazardCurve::builder("CDX.NA.IG.42")
+                .base_date(as_of)
+                .recovery_rate(0.4)
+                .knots([(1.0, 36.5), (10.0, 36.5)])
+                .max_hazard_rate(40.0)
+                .build()
+                .expect("hazard"),
+        ))
+        .build()
+        .expect("rebuilt index");
     let market = market
-        .insert(Arc::clone(&index.index_credit_curve))
+        .insert(Arc::clone(index.index_credit_curve()))
         .insert_credit_index("CDX.NA.IG.42", index)
         .expect("index");
     let mut tranche = sample_tranche();

@@ -986,7 +986,7 @@ fn bump_credit_market(
             ))
         })?;
         let params: finstack_quant_calibration::api::schema::HazardCurveParams =
-            serde_json::from_value(recipe.hazard_params.clone()).map_err(|error| {
+            serde_json::from_value(recipe.hazard_params().clone()).map_err(|error| {
                 finstack_quant_core::Error::Validation(format!(
                     "invalid hazard replay parameters: {error}"
                 ))
@@ -1026,7 +1026,7 @@ fn bump_credit_keyrates(
             ))
         })?;
         let params: finstack_quant_calibration::api::schema::HazardCurveParams =
-            serde_json::from_value(recipe.hazard_params.clone()).map_err(|error| {
+            serde_json::from_value(recipe.hazard_params().clone()).map_err(|error| {
                 finstack_quant_core::Error::Validation(format!(
                     "invalid hazard parameters: {error}"
                 ))

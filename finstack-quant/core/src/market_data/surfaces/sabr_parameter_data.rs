@@ -8,22 +8,22 @@
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RawSabrParameterData")]
+#[cfg_attr(feature = "json-schema", schemars(!try_from, deny_unknown_fields))]
 pub struct SabrParameterData {
     /// Initial volatility level, strictly positive.
-    pub alpha: f64,
+    alpha: f64,
     /// CEV exponent in the closed interval `[0, 1]`.
-    pub beta: f64,
+    beta: f64,
     /// Forward-volatility correlation in the open interval `(-1, 1)`.
-    pub rho: f64,
+    rho: f64,
     /// Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
-    pub nu: f64,
+    nu: f64,
     /// Optional finite displacement applied to forward and strike.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub shift: Option<f64>,
+    shift: Option<f64>,
 }
 
 #[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct RawSabrParameterData {
     alpha: f64,
@@ -115,5 +115,35 @@ impl SabrParameterData {
             nu,
             shift,
         })
+    }
+
+    /// Initial volatility level, strictly positive.
+    #[inline]
+    pub const fn alpha(&self) -> f64 {
+        self.alpha
+    }
+
+    /// CEV exponent in the closed interval `[0, 1]`.
+    #[inline]
+    pub const fn beta(&self) -> f64 {
+        self.beta
+    }
+
+    /// Forward-volatility correlation in the open interval `(-1, 1)`.
+    #[inline]
+    pub const fn rho(&self) -> f64 {
+        self.rho
+    }
+
+    /// Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
+    #[inline]
+    pub const fn nu(&self) -> f64 {
+        self.nu
+    }
+
+    /// Optional finite displacement applied to forward and strike.
+    #[inline]
+    pub const fn shift(&self) -> Option<f64> {
+        self.shift
     }
 }

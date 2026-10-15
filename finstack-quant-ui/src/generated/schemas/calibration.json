@@ -3729,23 +3729,27 @@
       "description": "Data-only SABR parameters for one volatility-cube node.\n\nThis type records calibrated market data. SABR evaluation, interpolation,\ncalibration, and convention conversion are owned by\n`finstack-quant-models`.",
       "properties": {
         "alpha": {
+          "description": "Initial volatility level, strictly positive.",
           "format": "double",
           "type": "number"
         },
         "beta": {
+          "description": "CEV exponent in the closed interval `[0, 1]`.",
           "format": "double",
           "type": "number"
         },
         "nu": {
+          "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
           "format": "double",
           "type": "number"
         },
         "rho": {
+          "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
           "format": "double",
           "type": "number"
         },
         "shift": {
-          "default": null,
+          "description": "Optional finite displacement applied to forward and strike.",
           "format": "double",
           "type": [
             "number",
@@ -5921,6 +5925,7 @@
       "type": "object"
     },
     "d_cf02f1e5e1bb843fa7a7": {
+      "additionalProperties": false,
       "description": "Exact valuation-layer inputs required to replay a hazard-curve calibration.\n\nThe core market-data crate stores these payloads without interpreting them;\nthe calibration crate deserializes them back into its canonical\n`HazardCurveParams`, typed CDS quotes, and `CalibrationConfig`. Keeping the\ncomplete serde payloads avoids replacing date pillars with rounded tenors or\nsilently substituting current defaults for the original solver policy.",
       "properties": {
         "calibration_config": {

@@ -1356,7 +1356,6 @@ export interface DA9791Cac4C0854B02Bbe {
    * Par-spread-only inputs used for quote-space spread risk.
    */
   spread_risk_inputs: D_268127561C9D65277399[];
-  [k: string]: unknown;
 }
 /**
  * One atomic quote binding retained for hazard calibration replay.
@@ -2478,9 +2477,24 @@ export interface D_8292Ddf9415F5B0B91Bb {
  * `finstack-quant-models`.
  */
 export interface DA550785704F9D0F9Db7A {
+  /**
+   * Initial volatility level, strictly positive.
+   */
   alpha: number;
+  /**
+   * CEV exponent in the closed interval `[0, 1]`.
+   */
   beta: number;
+  /**
+   * Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
+   */
   nu: number;
+  /**
+   * Forward-volatility correlation in the open interval `(-1, 1)`.
+   */
   rho: number;
+  /**
+   * Optional finite displacement applied to forward and strike.
+   */
   shift?: number | null;
 }

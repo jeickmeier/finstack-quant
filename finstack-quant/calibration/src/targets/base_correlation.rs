@@ -319,10 +319,11 @@ impl BaseCorrelationTarget {
         let index_update = context
             .get_credit_index(params.index_id.as_str())
             .ok()
-            .map(|idx| {
-                let mut updated = idx.as_ref().clone();
-                updated.base_correlation_curve = Arc::new(curve.clone());
-                updated
+            .and_then(|idx| {
+                idx.to_builder()
+                    .base_correlation_curve(Arc::new(curve.clone()))
+                    .build()
+                    .ok()
             });
         Ok((curve, index_update, report))
     }
@@ -436,8 +437,10 @@ impl BootstrapTarget for BaseCorrelationTarget {
             curve,
             |ctx| {
                 if let Ok(idx) = ctx.get_credit_index(index_id) {
-                    let mut updated = idx.as_ref().clone();
-                    updated.base_correlation_curve = Arc::new(curve.clone());
+                    let updated = idx
+                        .to_builder()
+                        .base_correlation_curve(Arc::new(curve.clone()))
+                        .build()?;
                     ctx.insert_credit_index_mut(index_id, updated)?;
                 }
                 Ok(())

@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::types::CurveId;
+use crate::HashMap;
 
 use super::{CurveStorage, MarketContext};
 
@@ -194,6 +195,11 @@ impl MarketContext {
         self.dividends.iter()
     }
 
+    /// Iterate over all volatility surfaces.
+    pub fn surfaces_iter(&self) -> impl Iterator<Item = (&CurveId, &Arc<VolSurface>)> {
+        self.surfaces.iter()
+    }
+
     /// Replace all volatility surfaces (mutable).
     ///
     /// This is intended for snapshot restore workflows.
@@ -201,8 +207,7 @@ impl MarketContext {
     where
         I: IntoIterator<Item = (CurveId, Arc<VolSurface>)>,
     {
-        Arc::make_mut(&mut self.surfaces).clear();
-        Arc::make_mut(&mut self.surfaces).extend(surfaces);
+        self.surfaces = Arc::new(surfaces.into_iter().collect());
         self
     }
 
@@ -250,8 +255,7 @@ impl MarketContext {
     where
         I: IntoIterator<Item = (CurveId, Arc<VolCube>)>,
     {
-        Arc::make_mut(&mut self.vol_cubes).clear();
-        Arc::make_mut(&mut self.vol_cubes).extend(cubes);
+        self.vol_cubes = Arc::new(cubes.into_iter().collect());
         self
     }
 
@@ -262,8 +266,7 @@ impl MarketContext {
     where
         I: IntoIterator<Item = (CurveId, Arc<FxDeltaVolSurface>)>,
     {
-        Arc::make_mut(&mut self.fx_delta_vol_surfaces).clear();
-        Arc::make_mut(&mut self.fx_delta_vol_surfaces).extend(surfaces);
+        self.fx_delta_vol_surfaces = Arc::new(surfaces.into_iter().collect());
         self
     }
 
@@ -288,10 +291,10 @@ impl MarketContext {
     /// semantics: a scalar present in the current market but absent from the
     /// snapshot must not survive the restore.
     pub fn clear_market_scalars_mut(&mut self) -> &mut Self {
-        Arc::make_mut(&mut self.prices).clear();
-        Arc::make_mut(&mut self.series).clear();
-        Arc::make_mut(&mut self.inflation_indices).clear();
-        Arc::make_mut(&mut self.dividends).clear();
+        self.prices = Arc::new(HashMap::default());
+        self.series = Arc::new(HashMap::default());
+        self.inflation_indices = Arc::new(HashMap::default());
+        self.dividends = Arc::new(HashMap::default());
         self
     }
 }

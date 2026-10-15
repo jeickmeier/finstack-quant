@@ -731,13 +731,13 @@ mod production_credit_audit {
         let index = CreditIndexData::builder()
             .num_constituents(2)
             .recovery_rate(0.4)
-            .index_credit_curve(Arc::clone(&original.index_credit_curve))
+            .index_credit_curve(Arc::clone(original.index_credit_curve()))
             .base_correlation_curve(Arc::new(correlation))
             .issuer_curves(issuers)
             .build()
             .expect("index");
         market
-            .insert(Arc::clone(&index.base_correlation_curve))
+            .insert(Arc::clone(index.base_correlation_curve()))
             .insert_credit_index("CDX.NA.IG.42", index)
             .expect("dispersed credit index dependencies should exist")
     }

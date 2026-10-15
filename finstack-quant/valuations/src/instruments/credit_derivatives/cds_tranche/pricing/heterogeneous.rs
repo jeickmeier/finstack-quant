@@ -20,10 +20,10 @@ impl CdsTranchePricer {
         maturity: Date,
         exposure: PoolExposure,
     ) -> Result<f64> {
-        let curves = index_data.issuer_credit_curves.as_ref().ok_or_else(|| {
+        let curves = index_data.issuer_credit_curves().ok_or_else(|| {
             Error::Validation("heterogeneous pricing requires issuer curves".to_owned())
         })?;
-        let count = usize::from(index_data.num_constituents);
+        let count = usize::from(index_data.num_constituents());
         if count == 0 || curves.len() != count {
             return Err(Error::Validation(
                 "heterogeneous pricing requires complete issuer coverage".to_owned(),

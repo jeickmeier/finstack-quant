@@ -34,23 +34,23 @@ use std::sync::Arc;
 #[derive(Clone, Debug)]
 pub struct CreditIndexData {
     /// Number of constituents in the credit index (e.g., 125 for CDX IG)
-    pub num_constituents: u16,
+    pub(crate) num_constituents: u16,
     /// Default recovery rate for the index (typically 40% for senior unsecured)
-    pub recovery_rate: f64,
+    pub(crate) recovery_rate: f64,
     /// Hazard curve for the index as a whole
-    pub index_credit_curve: Arc<HazardCurve>,
+    pub(crate) index_credit_curve: Arc<HazardCurve>,
     /// Base correlation curve mapping detachment points to correlations
-    pub base_correlation_curve: Arc<BaseCorrelationCurve>,
+    pub(crate) base_correlation_curve: Arc<BaseCorrelationCurve>,
     /// Optional complete set of individual hazard curves for every constituent.
     /// Keys are issuer identifiers (e.g., ticker or CUSIP); when provided the
     /// map must contain exactly `num_constituents` distinct issuers.
-    pub issuer_credit_curves: Option<BTreeMap<String, Arc<HazardCurve>>>,
+    pub(crate) issuer_credit_curves: Option<BTreeMap<String, Arc<HazardCurve>>>,
     /// Optional individual recovery rates for each constituent issuer
     /// Key is the issuer identifier (e.g., ticker or CUSIP)
-    pub issuer_recovery_rates: Option<BTreeMap<String, f64>>,
+    pub(crate) issuer_recovery_rates: Option<BTreeMap<String, f64>>,
     /// Optional individual weights for each constituent issuer (must sum to 1.0)
     /// Key is the issuer identifier (e.g., ticker or CUSIP)
-    pub issuer_weights: Option<BTreeMap<String, f64>>,
+    pub(crate) issuer_weights: Option<BTreeMap<String, f64>>,
 }
 
 impl CreditIndexData {
@@ -60,8 +60,64 @@ impl CreditIndexData {
         CreditIndexDataBuilder::default()
     }
 
-    /// Check mutable aggregate fields against the builder's invariants.
-    pub(crate) fn validate(&self) -> Result<()> {
+    /// Create a [`CreditIndexDataBuilder`] pre-populated with this index's fields.
+    #[must_use]
+    pub fn to_builder(&self) -> CreditIndexDataBuilder {
+        CreditIndexDataBuilder {
+            num_constituents: Some(self.num_constituents),
+            recovery_rate: Some(self.recovery_rate),
+            index_credit_curve: Some(Arc::clone(&self.index_credit_curve)),
+            base_correlation_curve: Some(Arc::clone(&self.base_correlation_curve)),
+            issuer_credit_curves: self.issuer_credit_curves.clone(),
+            issuer_recovery_rates: self.issuer_recovery_rates.clone(),
+            issuer_weights: self.issuer_weights.clone(),
+        }
+    }
+
+    /// Number of constituents in the credit index (e.g., 125 for CDX IG).
+    #[inline]
+    pub const fn num_constituents(&self) -> u16 {
+        self.num_constituents
+    }
+
+    /// Default recovery rate for the index (typically 40% for senior unsecured).
+    #[inline]
+    pub const fn recovery_rate(&self) -> f64 {
+        self.recovery_rate
+    }
+
+    /// Hazard curve for the index as a whole.
+    #[inline]
+    pub fn index_credit_curve(&self) -> &Arc<HazardCurve> {
+        &self.index_credit_curve
+    }
+
+    /// Base correlation curve mapping detachment points to correlations.
+    #[inline]
+    pub fn base_correlation_curve(&self) -> &Arc<BaseCorrelationCurve> {
+        &self.base_correlation_curve
+    }
+
+    /// Optional complete set of individual hazard curves for every constituent.
+    #[inline]
+    pub fn issuer_credit_curves(&self) -> Option<&BTreeMap<String, Arc<HazardCurve>>> {
+        self.issuer_credit_curves.as_ref()
+    }
+
+    /// Optional individual recovery rates for each constituent issuer.
+    #[inline]
+    pub fn issuer_recovery_rates(&self) -> Option<&BTreeMap<String, f64>> {
+        self.issuer_recovery_rates.as_ref()
+    }
+
+    /// Optional individual weights for each constituent issuer.
+    #[inline]
+    pub fn issuer_weights(&self) -> Option<&BTreeMap<String, f64>> {
+        self.issuer_weights.as_ref()
+    }
+
+    /// Check aggregate fields against the builder's invariants.
+    fn validate(&self) -> Result<()> {
         super::common::validate_unit_range(self.recovery_rate, "recovery_rate")?;
         if self.num_constituents == 0 {
             return Err(crate::error::InputError::Invalid.into());
@@ -169,7 +225,7 @@ impl CreditIndexData {
 ///     .base_correlation_curve(base_corr)
 ///     .build()
 ///     .expect("CreditIndexData builder should succeed");
-/// assert_eq!(index.num_constituents, 125);
+/// assert_eq!(index.num_constituents(), 125);
 /// ```
 #[derive(Default)]
 pub struct CreditIndexDataBuilder {

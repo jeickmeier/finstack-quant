@@ -451,22 +451,22 @@ fn cube_params(cube: &VolCube, expiry: f64, tenor: f64) -> (SabrParameters, f64,
         if u <= 0.5 { n0 } else { n1 },
     );
     let nearest_params = &cube.params()[nearest];
-    let shifts = [p00.shift, p10.shift, p01.shift, p11.shift];
+    let shifts = [p00.shift(), p10.shift(), p01.shift(), p11.shift()];
     let shift = shifts.iter().any(Option::is_some).then(|| {
         bilinear(
-            p00.shift.unwrap_or(0.0),
-            p10.shift.unwrap_or(0.0),
-            p01.shift.unwrap_or(0.0),
-            p11.shift.unwrap_or(0.0),
+            p00.shift().unwrap_or(0.0),
+            p10.shift().unwrap_or(0.0),
+            p01.shift().unwrap_or(0.0),
+            p11.shift().unwrap_or(0.0),
             t,
             u,
         )
     });
     let params = SabrParameters {
-        alpha: bilinear(p00.alpha, p10.alpha, p01.alpha, p11.alpha, t, u).max(1e-8),
-        beta: nearest_params.beta.clamp(0.0, 1.0),
-        nu: bilinear(p00.nu, p10.nu, p01.nu, p11.nu, t, u),
-        rho: bilinear(p00.rho, p10.rho, p01.rho, p11.rho, t, u).clamp(-0.9999, 0.9999),
+        alpha: bilinear(p00.alpha(), p10.alpha(), p01.alpha(), p11.alpha(), t, u).max(1e-8),
+        beta: nearest_params.beta().clamp(0.0, 1.0),
+        nu: bilinear(p00.nu(), p10.nu(), p01.nu(), p11.nu(), t, u),
+        rho: bilinear(p00.rho(), p10.rho(), p01.rho(), p11.rho(), t, u).clamp(-0.9999, 0.9999),
         shift,
     };
     let forward = bilinear(

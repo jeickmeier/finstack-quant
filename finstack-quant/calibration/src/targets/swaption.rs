@@ -411,13 +411,8 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
                         )?
                     };
 
-                    let core_params = SabrParameterData {
-                        alpha: p.alpha,
-                        beta: p.beta,
-                        rho: p.rho,
-                        nu: p.nu,
-                        shift: p.shift,
-                    };
+                    let core_params =
+                        SabrParameterData::new_with_shift(p.alpha, p.beta, p.rho, p.nu, p.shift)?;
 
                     cube_params.push(core_params);
                     cube_forwards.push(f);
@@ -1349,9 +1344,9 @@ mod tests {
         // For beta=0 (normal SABR), alpha IS the ATM normal vol.
         let calibrated = cube.params_at(0, 0).expect("node (0, 0)");
         assert!(
-            (calibrated.alpha - true_alpha).abs() <= 0.0005,
+            (calibrated.alpha() - true_alpha).abs() <= 0.0005,
             "alpha mismatch: calibrated={} true={}",
-            calibrated.alpha,
+            calibrated.alpha(),
             true_alpha
         );
     }

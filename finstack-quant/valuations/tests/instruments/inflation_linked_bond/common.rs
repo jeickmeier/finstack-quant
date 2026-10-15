@@ -239,7 +239,7 @@ pub fn zero_floor_vol() -> finstack_quant_core::market_data::surfaces::VolSurfac
 // The fixture supplies a separate forecast curve, even where the stored series
 // contains future data. Valuation must never use that data as published history.
 fn index_projection(index: &InflationIndex) -> InflationCurve {
-    let (start, count, initial, growth) = if index.id.as_str() == "UK-RPI" {
+    let (start, count, initial, growth) = if index.id() == "UK-RPI" {
         (d(2019, 7, 1), 664, 280.0, 0.0025)
     } else {
         (d(2019, 10, 1), 664, 250.0, 0.002)
@@ -248,7 +248,7 @@ fn index_projection(index: &InflationIndex) -> InflationCurve {
         .into_iter()
         .map(|(date, value)| ((date - start).whole_days() as f64 / 365.0, value))
         .collect();
-    InflationCurve::builder(index.id.as_str())
+    InflationCurve::builder(index.id())
         .base_date(start)
         .base_cpi(initial)
         .knots(knots)

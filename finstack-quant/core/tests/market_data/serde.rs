@@ -153,8 +153,8 @@ fn inflation_index_roundtrip() {
     let json = serde_json::to_string_pretty(&index).unwrap();
     let deserialized: InflationIndex = serde_json::from_str(&json).unwrap();
 
-    assert_eq!(deserialized.id, index.id);
-    assert_eq!(deserialized.currency, index.currency);
+    assert_eq!(deserialized.id(), index.id());
+    assert_eq!(deserialized.currency(), index.currency());
     assert_eq!(deserialized.interpolation(), index.interpolation());
     assert_eq!(deserialized.lag(), index.lag());
 }

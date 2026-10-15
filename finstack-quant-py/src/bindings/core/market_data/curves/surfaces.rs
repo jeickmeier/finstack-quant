@@ -1,18 +1,17 @@
 //! Volatility surface, cube and FX delta-surface bindings.
 
 use finstack_quant_core::market_data::surfaces::{
-    FxDeltaVolSurface, SabrParameterData, VolCube, VolGridOpts, VolSurface,
+    FxDeltaVolSurface, SabrParameterData, VolCube, VolGridOpts, VolInterpolationMode, VolSurface,
+    VolSurfaceAxis,
 };
+use finstack_quant_core::wire::{serde_label, serde_parse};
 use pyo3::types::PyDict;
 
 use std::sync::Arc;
 
 use pyo3::prelude::*;
 
-use super::helpers::{
-    columns_to_dataframe, impl_arc_serde_pymethods, parse_vol_interpolation_mode,
-    parse_vol_quote_type, parse_vol_surface_axis, vol_interpolation_mode_name,
-};
+use super::helpers::{columns_to_dataframe, impl_arc_serde_pymethods, parse_vol_quote_type};
 use crate::bindings::macros::impl_repr_html_via_dataframe;
 use crate::errors::core_to_py;
 
@@ -126,32 +125,35 @@ impl PyVolSurface {
         quote_type: &str,
         displacements: Option<Vec<f64>>,
     ) -> PyResult<Self> {
-        let axis = parse_vol_surface_axis(secondary_axis)?;
-        let mode = parse_vol_interpolation_mode(interpolation_mode)?;
+        let axis: VolSurfaceAxis = serde_parse(secondary_axis).map_err(core_to_py)?;
+        let mode: VolInterpolationMode = serde_parse(interpolation_mode).map_err(core_to_py)?;
         let quote = parse_vol_quote_type(quote_type)?;
         let grid = extract_vol_grid(vols)?;
-        let opts = VolGridOpts {
-            secondary_axis: axis,
-            interpolation_mode: mode,
-            quote_type: quote,
-        };
         let surface = match grid {
             VolInput::Flat(values) => VolSurface::from_grid_opts(
                 id,
                 &expiries,
                 &strikes,
                 &values,
-                opts,
+                VolGridOpts {
+                    secondary_axis: axis,
+                    interpolation_mode: mode,
+                    quote_type: quote,
+                },
                 displacements.as_deref(),
             ),
-            VolInput::Rows(rows) => VolSurface::from_rows_opts(
-                id,
-                &expiries,
-                &strikes,
-                &rows,
-                opts,
-                displacements.as_deref(),
-            ),
+            VolInput::Rows(rows) => {
+                let mut builder = VolSurface::builder(id)
+                    .expiries(&expiries)
+                    .strikes(&strikes)
+                    .secondary_axis(axis)
+                    .interpolation_mode(mode)
+                    .rows(&rows);
+                if let Some(shifts) = displacements.as_deref() {
+                    builder = builder.displacements(shifts);
+                }
+                builder.quote_type(quote).build()
+            }
         }
         .map_err(core_to_py)?;
 
@@ -287,7 +289,7 @@ impl PyVolSurface {
     /// Interpolation contract between grid points (``"vol"`` or ``"total_variance"``).
     #[getter]
     fn interpolation_mode(&self) -> PyResult<String> {
-        vol_interpolation_mode_name(self.inner.interpolation_mode())
+        serde_label(&self.inner.interpolation_mode()).map_err(core_to_py)
     }
 
     /// Surface grid shape as ``(n_expiries, n_strikes)``.
@@ -548,31 +550,31 @@ impl PySabrParameterData {
     /// Initial volatility level (strictly positive).
     #[getter]
     fn alpha(&self) -> f64 {
-        self.inner.alpha
+        self.inner.alpha()
     }
 
     /// CEV exponent in ``[0, 1]``.
     #[getter]
     fn beta(&self) -> f64 {
-        self.inner.beta
+        self.inner.beta()
     }
 
     /// Forward/volatility correlation in ``(-1, 1)``.
     #[getter]
     fn rho(&self) -> f64 {
-        self.inner.rho
+        self.inner.rho()
     }
 
     /// Volatility of volatility (nonnegative; zero gives deterministic volatility).
     #[getter]
     fn nu(&self) -> f64 {
-        self.inner.nu
+        self.inner.nu()
     }
 
     /// Displacement applied to forward and strike, or ``None``.
     #[getter]
     fn shift(&self) -> Option<f64> {
-        self.inner.shift
+        self.inner.shift()
     }
 
     /// Serialize to canonical JSON (``{"alpha": ..., "beta": ..., "rho": ..., "nu": ..., "shift": ...}``).
@@ -624,11 +626,15 @@ impl PySabrParameterData {
     fn __repr__(&self) -> String {
         let shift = self
             .inner
-            .shift
+            .shift()
             .map_or_else(|| "None".to_string(), |s| s.to_string());
         format!(
             "SabrParameterData(alpha={}, beta={}, rho={}, nu={}, shift={})",
-            self.inner.alpha, self.inner.beta, self.inner.rho, self.inner.nu, shift
+            self.inner.alpha(),
+            self.inner.beta(),
+            self.inner.rho(),
+            self.inner.nu(),
+            shift
         )
     }
 }
@@ -748,8 +754,8 @@ impl PyVolCube {
         forwards_row_major: Vec<f64>,
         interpolation_mode: Option<&str>,
     ) -> PyResult<Self> {
-        let mode = interpolation_mode
-            .map(parse_vol_interpolation_mode)
+        let mode: Option<VolInterpolationMode> = interpolation_mode
+            .map(|m| serde_parse(m).map_err(core_to_py))
             .transpose()?;
 
         let sabr_params: Vec<SabrParameterData> = params_row_major
@@ -845,13 +851,16 @@ impl PyVolCube {
             &[
                 ("expiry", exp_col),
                 ("tenor", ten_col),
-                ("alpha", params.iter().map(|p| p.alpha).collect()),
-                ("beta", params.iter().map(|p| p.beta).collect()),
-                ("rho", params.iter().map(|p| p.rho).collect()),
-                ("nu", params.iter().map(|p| p.nu).collect()),
+                ("alpha", params.iter().map(|p| p.alpha()).collect()),
+                ("beta", params.iter().map(|p| p.beta()).collect()),
+                ("rho", params.iter().map(|p| p.rho()).collect()),
+                ("nu", params.iter().map(|p| p.nu()).collect()),
                 (
                     "shift",
-                    params.iter().map(|p| p.shift.unwrap_or(f64::NAN)).collect(),
+                    params
+                        .iter()
+                        .map(|p| p.shift().unwrap_or(f64::NAN))
+                        .collect(),
                 ),
                 ("forward", self.inner.forwards().to_vec()),
             ],
@@ -902,7 +911,7 @@ impl PyVolCube {
     /// Interpolation contract (``"vol"`` or ``"total_variance"``).
     #[getter]
     fn interpolation_mode(&self) -> PyResult<String> {
-        vol_interpolation_mode_name(self.inner.interpolation_mode())
+        serde_label(&self.inner.interpolation_mode()).map_err(core_to_py)
     }
 
     fn __repr__(&self) -> String {

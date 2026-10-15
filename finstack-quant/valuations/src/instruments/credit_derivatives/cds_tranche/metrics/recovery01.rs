@@ -50,23 +50,7 @@ pub(crate) struct Recovery01Calculator;
 /// pricer's own rebuild logic so that heterogeneous bespoke tranches are
 /// not silently downgraded to the homogeneous binomial path during bumping.
 fn rebuild_with_recovery(original: &CreditIndexData, new_recovery: f64) -> Result<CreditIndexData> {
-    let mut builder = CreditIndexData::builder()
-        .num_constituents(original.num_constituents)
-        .recovery_rate(new_recovery)
-        .index_credit_curve(std::sync::Arc::clone(&original.index_credit_curve))
-        .base_correlation_curve(std::sync::Arc::clone(&original.base_correlation_curve));
-
-    if let Some(curves) = &original.issuer_credit_curves {
-        builder = builder.issuer_curves(curves.clone());
-    }
-    if let Some(rates) = &original.issuer_recovery_rates {
-        builder = builder.issuer_recovery_rates(rates.clone());
-    }
-    if let Some(weights) = &original.issuer_weights {
-        builder = builder.issuer_weights(weights.clone());
-    }
-
-    builder.build()
+    original.to_builder().recovery_rate(new_recovery).build()
 }
 
 /// Build a market with the index recovery bumped and the index hazard curve
@@ -92,11 +76,10 @@ fn recalibrated_market_at_bumped_recovery(
     original_index: &CreditIndexData,
     new_recovery: f64,
 ) -> Result<MarketContext> {
-    let mut bumped_index = rebuild_with_recovery(original_index, new_recovery)?;
     let recalibrated = context
         .rebuild_hazard_curve(
             HazardRecalibrationRequest {
-                hazard: Arc::clone(&original_index.index_credit_curve),
+                hazard: Arc::clone(original_index.index_credit_curve()),
                 source_market: Arc::new(base_market.clone()),
                 target_market: Arc::new(base_market.clone()),
                 discount_curve_id: tranche.discount_curve_id.clone(),
@@ -114,11 +97,15 @@ fn recalibrated_market_at_bumped_recovery(
                 "CDS tranche '{}' Recovery01 failed to re-bootstrap index hazard curve '{}' \
              at recovery {new_recovery}: {error}",
                 tranche.id,
-                original_index.index_credit_curve.id()
+                original_index.index_credit_curve().id()
             ),
             category: "recovery01_rebootstrap".to_string(),
         })?;
-    bumped_index.index_credit_curve = Arc::clone(&recalibrated);
+    let bumped_index = original_index
+        .to_builder()
+        .recovery_rate(new_recovery)
+        .index_credit_curve(Arc::clone(&recalibrated))
+        .build()?;
     base_market
         .clone()
         .insert(recalibrated)
@@ -132,7 +119,7 @@ impl MetricCalculator for Recovery01Calculator {
         let market = context.curves.as_ref();
 
         let original_index = market.get_credit_index(&tranche.credit_index_id)?;
-        let base_recovery = original_index.recovery_rate;
+        let base_recovery = original_index.recovery_rate();
 
         let bumped_recovery_up = (base_recovery + RECOVERY_BUMP).clamp(0.0, 1.0);
         let up_delta = bumped_recovery_up - base_recovery;
@@ -140,7 +127,7 @@ impl MetricCalculator for Recovery01Calculator {
         let down_delta = base_recovery - bumped_recovery_down;
 
         let has_par_quotes = original_index
-            .index_credit_curve
+            .index_credit_curve()
             .hazard_calibration()
             .is_some();
 
@@ -253,17 +240,14 @@ mod tests {
         let original = sample_index(true, false);
         let bumped = rebuild_with_recovery(&original, 0.41).expect("rebuild");
 
-        assert!((bumped.recovery_rate - 0.41).abs() < 1e-12);
+        assert!((bumped.recovery_rate() - 0.41).abs() < 1e-12);
 
         // Per-issuer recovery overrides survive intact (this is the regression).
         assert!(
-            bumped.issuer_recovery_rates.is_some(),
+            bumped.issuer_recovery_rates().is_some(),
             "issuer_recovery_rates dropped"
         );
-        let rates = bumped
-            .issuer_recovery_rates
-            .as_ref()
-            .expect("rates present");
+        let rates = bumped.issuer_recovery_rates().expect("rates present");
         assert!((rates.get("ISS-0").copied().unwrap_or(0.0) - 0.10).abs() < 1e-12);
         assert!((rates.get("ISS-1").copied().unwrap_or(0.0) - 0.50).abs() < 1e-12);
         assert!((rates.get("ISS-2").copied().unwrap_or(0.0) - 0.70).abs() < 1e-12);
@@ -274,11 +258,11 @@ mod tests {
         let original = sample_index(false, true);
         let bumped = rebuild_with_recovery(&original, 0.39).expect("rebuild");
 
-        assert!((bumped.recovery_rate - 0.39).abs() < 1e-12);
+        assert!((bumped.recovery_rate() - 0.39).abs() < 1e-12);
 
         // Per-issuer weights survive intact (the second leg of the regression).
-        assert!(bumped.issuer_weights.is_some(), "issuer_weights dropped");
-        let weights = bumped.issuer_weights.as_ref().expect("weights present");
+        assert!(bumped.issuer_weights().is_some(), "issuer_weights dropped");
+        let weights = bumped.issuer_weights().expect("weights present");
         assert!((weights.get("ISS-0").copied().unwrap_or(0.0) - 0.50).abs() < 1e-12);
         assert!((weights.get("ISS-1").copied().unwrap_or(0.0) - 0.30).abs() < 1e-12);
         assert!((weights.get("ISS-2").copied().unwrap_or(0.0) - 0.20).abs() < 1e-12);
@@ -289,17 +273,17 @@ mod tests {
         let original = sample_index(true, true);
         let bumped = rebuild_with_recovery(&original, 0.42).expect("rebuild");
 
-        assert!((bumped.recovery_rate - 0.42).abs() < 1e-12);
+        assert!((bumped.recovery_rate() - 0.42).abs() < 1e-12);
         assert!(
-            bumped.issuer_credit_curves.is_some(),
+            bumped.issuer_credit_curves().is_some(),
             "issuer_curves dropped"
         );
         assert!(
-            bumped.issuer_recovery_rates.is_some(),
+            bumped.issuer_recovery_rates().is_some(),
             "issuer_recovery_rates dropped"
         );
-        assert!(bumped.issuer_weights.is_some(), "issuer_weights dropped");
-        assert_eq!(bumped.num_constituents, original.num_constituents);
+        assert!(bumped.issuer_weights().is_some(), "issuer_weights dropped");
+        assert_eq!(bumped.num_constituents(), original.num_constituents());
     }
 
     #[test]
@@ -309,9 +293,9 @@ mod tests {
         let original = sample_index(false, false);
         let bumped = rebuild_with_recovery(&original, 0.45).expect("rebuild");
 
-        assert!((bumped.recovery_rate - 0.45).abs() < 1e-12);
-        assert!(bumped.issuer_credit_curves.is_some());
-        assert!(bumped.issuer_recovery_rates.is_none());
-        assert!(bumped.issuer_weights.is_none());
+        assert!((bumped.recovery_rate() - 0.45).abs() < 1e-12);
+        assert!(bumped.issuer_credit_curves().is_some());
+        assert!(bumped.issuer_recovery_rates().is_none());
+        assert!(bumped.issuer_weights().is_none());
     }
 }

@@ -9,7 +9,6 @@ use crate::market_data::term_structures::{
     BaseCorrelationCurve, BasisSpreadCurve, CreditIndexData, DiscountCurve, ForwardCurve,
     HazardCurve, InflationCurve, ParametricCurve, PriceCurve, PriceCurveKind,
 };
-use crate::market_data::traits::Discounting;
 use crate::types::CurveId;
 use crate::HashMap;
 use crate::Result;
@@ -464,7 +463,7 @@ impl MarketContext {
     /// let discount = ctx.get_collateral("USD-CSA").expect("Collateral curve should exist");
     /// assert!(discount.df(0.5) <= 1.0);
     /// ```
-    pub fn get_collateral(&self, csa_code: &str) -> Result<Arc<dyn Discounting + Send + Sync>> {
+    pub fn get_collateral(&self, csa_code: &str) -> Result<Arc<DiscountCurve>> {
         let curve_id = self
             .collateral
             .get(csa_code)
@@ -472,6 +471,5 @@ impl MarketContext {
                 id: format!("collateral:{}", csa_code),
             })?;
         self.get_discount(curve_id.as_str())
-            .map(|arc| arc as Arc<dyn Discounting + Send + Sync>)
     }
 }

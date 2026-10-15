@@ -148,7 +148,12 @@ fn arbitrage_checks_reject_missing_or_invalid_forwards_and_tolerance() {
     let strikes = [90.0, 100.0, 110.0];
     let expiries = [1.0, 2.0];
     let vols = [vec![0.3; 3], vec![0.1; 3]];
-    let surface = VolSurface::from_rows("bad-calendar", &expiries, &strikes, &vols).unwrap();
+    let surface = VolSurface::builder("bad-calendar")
+        .expiries(&expiries)
+        .strikes(&strikes)
+        .rows(&vols)
+        .build()
+        .unwrap();
     assert!(check_surface(&surface, &ArbitrageCheckConfig::default()).is_err());
     for forward in [0.0, -1.0, f64::NAN, f64::INFINITY] {
         assert!(check_surface_grid(&strikes, &expiries, &vols, vec![forward], 1e-10).is_err());

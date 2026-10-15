@@ -3814,27 +3814,31 @@ export default [
   {
     "path": "#/$defs/d_83682026197086424468/properties/alpha",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SabrParameterData/properties/alpha",
+    "description": "Initial volatility level, strictly positive.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_83682026197086424468/properties/beta",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SabrParameterData/properties/beta",
+    "description": "CEV exponent in the closed interval `[0, 1]`.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_83682026197086424468/properties/nu",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SabrParameterData/properties/nu",
+    "description": "Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_83682026197086424468/properties/rho",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SabrParameterData/properties/rho",
+    "description": "Forward-volatility correlation in the open interval `(-1, 1)`.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_83682026197086424468/properties/shift",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SabrParameterData/properties/shift",
-    "default": null,
+    "description": "Optional finite displacement applied to forward and strike.",
     "format": "double"
   },
   {

@@ -196,5 +196,7 @@ def test_fx_forward_trade_date_convention_defaults_in_rust_and_accepts_short_cod
     assert default.maturity == dt.date(2024, 4, 17)
     for name in ["MF", "modified_following"]:
         assert FxForward.from_trade_date(*args, business_day_convention=name).maturity == default.maturity
-    with pytest.raises(ValueError, match="invalid business_day_convention: Unknown business day convention"):
+    with pytest.raises(
+        ValueError, match="invalid business_day_convention: Validation error: Unknown business day convention"
+    ):
         FxForward.from_trade_date(*args, business_day_convention="bogus")

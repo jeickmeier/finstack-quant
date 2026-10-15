@@ -86,8 +86,7 @@ impl MetricCalculator for CdsTrancheBucketedCs01Calculator {
                 series_id,
                 &request,
                 |market| {
-                    let mut bumped = index.as_ref().clone();
-                    replace_hazard(&mut bumped, market.get_hazard(hazard_id.as_str())?);
+                    let bumped = replace_hazard(&index, market.get_hazard(hazard_id.as_str())?)?;
                     let market = market
                         .clone()
                         .insert_credit_index(tranche.credit_index_id.as_str(), bumped)?;

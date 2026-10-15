@@ -1,14 +1,14 @@
 //! Hazard curve bindings.
 
 use finstack_quant_core::market_data::term_structures::HazardCurve;
+use finstack_quant_core::wire::{serde_label, serde_parse};
 
 use std::sync::Arc;
 
 use pyo3::prelude::*;
 
 use super::helpers::{
-    columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods, par_interp_name,
-    parse_par_interp, parse_seniority, TimePoint,
+    columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods, parse_seniority, TimePoint,
 };
 use crate::bindings::core::currency::{extract_currency, PyCurrency};
 use crate::bindings::core::dates::daycount::extract_day_count;
@@ -83,7 +83,7 @@ impl PyHazardCurve {
             builder = builder.par_spreads(points);
         }
         if let Some(par_interp) = options.par_interp {
-            builder = builder.par_interp(parse_par_interp(par_interp)?);
+            builder = builder.par_interp(serde_parse(par_interp).map_err(core_to_py)?);
         }
         if let Some(issuer) = options.issuer {
             builder = builder.issuer(issuer);
@@ -381,7 +381,7 @@ impl PyHazardCurve {
     #[pyo3(signature = (t, method=None))]
     fn cds_quote_bp(&self, t: f64, method: Option<&str>) -> PyResult<f64> {
         let method = match method {
-            Some(label) => parse_par_interp(label)?,
+            Some(label) => serde_parse(label).map_err(core_to_py)?,
             None => self.inner.par_interp(),
         };
         Ok(self.inner.cds_quote_bp(t, method))
@@ -479,7 +479,7 @@ impl PyHazardCurve {
     /// Par-spread readout interpolation label (``"linear"`` or ``"log_linear"``).
     #[getter]
     fn par_interp(&self) -> PyResult<String> {
-        par_interp_name(self.inner.par_interp())
+        serde_label(&self.inner.par_interp()).map_err(core_to_py)
     }
 
     /// Calibration recipe stamped on this curve, as a dict.

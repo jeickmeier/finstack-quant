@@ -93,12 +93,6 @@ impl MarketContext {
             rolled_curves.insert(id.clone(), rolled_storage);
         }
 
-        let mut rolled_credit = HashMap::default();
-        rolled_credit.reserve(self.credit_indices.len());
-        for (id, credit_index) in self.credit_indices.iter() {
-            rolled_credit.insert(id.clone(), Arc::clone(credit_index));
-        }
-
         let mut new_ctx = Self {
             curves: Arc::new(rolled_curves),
             fx: self.fx.clone(),
@@ -106,7 +100,7 @@ impl MarketContext {
             prices: Arc::clone(&self.prices),
             series: Arc::clone(&self.series),
             inflation_indices: Arc::clone(&self.inflation_indices),
-            credit_indices: Arc::new(rolled_credit),
+            credit_indices: Arc::clone(&self.credit_indices),
             dividends: Arc::clone(&self.dividends),
             fx_delta_vol_surfaces: Arc::clone(&self.fx_delta_vol_surfaces),
             vol_cubes: Arc::clone(&self.vol_cubes),

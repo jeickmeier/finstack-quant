@@ -1,9 +1,7 @@
 //! Shared curve binding helpers.
 
-use finstack_quant_core::market_data::surfaces::{
-    VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
-};
-use finstack_quant_core::market_data::term_structures::{ParInterp, PriceCurveKind, Seniority};
+use finstack_quant_core::market_data::surfaces::VolQuoteType;
+use finstack_quant_core::market_data::term_structures::Seniority;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::math::Compounding;
 use pyo3::prelude::*;
@@ -34,27 +32,6 @@ pub(super) fn parse_compounding(s: &str) -> PyResult<Compounding> {
     })
 }
 
-/// Parse a price-curve kind label (Rust `PriceCurveKind::from_str`).
-pub(super) fn parse_price_curve_kind(s: &str) -> PyResult<PriceCurveKind> {
-    s.parse::<PriceCurveKind>()
-        .map_err(crate::errors::core_to_py)
-}
-
-/// Canonical label of a price-curve kind (Rust `PriceCurveKind::as_str`).
-pub(super) fn price_curve_kind_name(kind: PriceCurveKind) -> &'static str {
-    kind.as_str()
-}
-
-/// Parse a [`ParInterp`] from its serde name (`"linear"` or `"log_linear"`).
-pub(super) fn parse_par_interp(s: &str) -> PyResult<ParInterp> {
-    finstack_quant_core::wire::serde_parse(s).map_err(crate::errors::core_to_py)
-}
-
-/// Serde name of a [`ParInterp`].
-pub(super) fn par_interp_name(value: ParInterp) -> PyResult<String> {
-    finstack_quant_core::wire::serde_label(&value).map_err(crate::errors::core_to_py)
-}
-
 /// Parse a [`Seniority`] from its serde name
 /// (`"senior_secured"`, `"senior"`, `"subordinated"`, `"junior"`).
 pub(super) fn parse_seniority(s: &str) -> PyResult<Seniority> {
@@ -65,25 +42,9 @@ pub(super) fn parse_seniority(s: &str) -> PyResult<Seniority> {
     })
 }
 
-/// Parse a [`VolSurfaceAxis`] from its serde name (`"strike"` or `"tenor"`).
-pub(super) fn parse_vol_surface_axis(s: &str) -> PyResult<VolSurfaceAxis> {
-    finstack_quant_core::wire::serde_parse(s).map_err(crate::errors::core_to_py)
-}
-
 /// Parse a [`VolQuoteType`] from a Python string.
 pub(super) fn parse_vol_quote_type(s: &str) -> PyResult<VolQuoteType> {
-    s.parse::<VolQuoteType>()
-        .map_err(crate::errors::value_error)
-}
-
-/// Parse a [`VolInterpolationMode`] from its serde name (`"vol"` or `"total_variance"`).
-pub(super) fn parse_vol_interpolation_mode(s: &str) -> PyResult<VolInterpolationMode> {
-    finstack_quant_core::wire::serde_parse(s).map_err(crate::errors::core_to_py)
-}
-
-/// Serde name of a [`VolInterpolationMode`] (`"vol"` or `"total_variance"`).
-pub(super) fn vol_interpolation_mode_name(mode: VolInterpolationMode) -> PyResult<String> {
-    finstack_quant_core::wire::serde_label(&mode).map_err(crate::errors::core_to_py)
+    s.parse::<VolQuoteType>().map_err(crate::errors::core_to_py)
 }
 
 /// A curve query coordinate: a year fraction or a calendar date.

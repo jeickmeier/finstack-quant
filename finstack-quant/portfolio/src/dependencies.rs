@@ -176,8 +176,8 @@ pub(crate) fn credit_index_keys(
     index_id: &CurveId,
 ) -> finstack_quant_core::Result<Vec<MarketFactorKey>> {
     let index = market.get_credit_index(index_id.as_str())?;
-    let mut hazards = std::collections::BTreeSet::from([index.index_credit_curve.id().clone()]);
-    if let Some(issuers) = &index.issuer_credit_curves {
+    let mut hazards = std::collections::BTreeSet::from([index.index_credit_curve().id().clone()]);
+    if let Some(issuers) = index.issuer_credit_curves() {
         hazards.extend(issuers.values().map(|curve| curve.id().clone()));
     }
     let mut keys: Vec<_> = hazards
@@ -185,7 +185,7 @@ pub(crate) fn credit_index_keys(
         .map(|id| MarketFactorKey::curve(id, RatesCurveKind::Credit))
         .collect();
     keys.push(MarketFactorKey::BaseCorrelation(
-        index.base_correlation_curve.id().clone(),
+        index.base_correlation_curve().id().clone(),
     ));
     Ok(keys)
 }
@@ -524,16 +524,17 @@ pub(crate) mod tests {
             .knots([(1.0, 0.01), (5.0, 0.02)])
             .build()
             .expect("issuer");
-        let mut index = market
+        let index = market
             .get_credit_index("INDEX")
             .expect("index")
-            .as_ref()
-            .clone();
-        index.num_constituents = 1;
-        index.issuer_credit_curves = Some(std::collections::BTreeMap::from_iter([(
-            "issuer".to_string(),
-            Arc::new(issuer.clone()),
-        )]));
+            .to_builder()
+            .num_constituents(1)
+            .issuer_curves(finstack_quant_core::HashMap::from_iter([(
+                "issuer".to_string(),
+                Arc::new(issuer.clone()),
+            )]))
+            .build()
+            .expect("credit index");
         let market = market
             .insert(issuer)
             .insert_credit_index("INDEX", index)

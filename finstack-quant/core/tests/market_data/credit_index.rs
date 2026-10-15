@@ -19,10 +19,10 @@ fn credit_index_builder_validates_inputs() {
         .build()
         .expect("valid credit index");
 
-    assert_eq!(data.num_constituents, 125);
+    assert_eq!(data.num_constituents(), 125);
     assert!(!data.has_issuer_curves());
-    assert!(Arc::ptr_eq(&data.index_credit_curve, &hazard));
-    assert!(Arc::ptr_eq(&data.base_correlation_curve, &base_corr));
+    assert!(Arc::ptr_eq(data.index_credit_curve(), &hazard));
+    assert!(Arc::ptr_eq(data.base_correlation_curve(), &base_corr));
 }
 
 #[test]
@@ -90,7 +90,7 @@ fn test_credit_index_recovery_rate_scenarios() {
             .build()
             .expect("valid recovery rate");
 
-        assert_eq!(data.recovery_rate, rr);
+        assert_eq!(data.recovery_rate(), rr);
     }
 }
 

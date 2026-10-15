@@ -79,8 +79,7 @@ use super::{
 /// Non-optional observability for market context mutations.
 ///
 /// Returned by operations that can invalidate credit indices or change
-/// context state in non-obvious ways. Always populated regardless of
-/// subscriber configuration.
+/// context state in non-obvious ways.
 #[derive(Clone, Debug, Default)]
 pub struct ContextMutationInfo {
     /// Credit indices that were invalidated and removed because their
@@ -277,14 +276,6 @@ impl MarketContext {
         amount.convert_at_rate(target_currency, rate.rate)
     }
 
-    /// Snapshot (clone) all stored volatility surfaces.
-    ///
-    /// This clones the `Arc` handles (cheap) without exposing internal storage.
-    #[inline]
-    pub fn surfaces_snapshot(&self) -> HashMap<CurveId, Arc<VolSurface>> {
-        self.surfaces.as_ref().clone()
-    }
-
     pub(crate) fn rebind_credit_index_data(
         &self,
         data: &CreditIndexData,
@@ -332,6 +323,9 @@ impl MarketContext {
     /// because their required curves are no longer present or changed type.
     /// Callers can inspect this list to detect unexpected state transitions.
     pub(crate) fn rebind_all_credit_indices(&mut self) -> Vec<CurveId> {
+        if self.credit_indices.is_empty() {
+            return Vec::new();
+        }
         let mut rebuilt = HashMap::default();
         rebuilt.reserve(self.credit_indices.len());
         let mut invalidated = Vec::new();

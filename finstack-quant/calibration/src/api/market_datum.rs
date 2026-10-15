@@ -125,7 +125,7 @@ impl MarketDatum {
             MarketDatum::Price(d) => &d.id,
             MarketDatum::DividendSchedule(d) => d.schedule.get_id().as_str(),
             MarketDatum::FixingSeries(s) => s.id().as_str(),
-            MarketDatum::InflationFixings(i) => i.id.as_str(),
+            MarketDatum::InflationFixings(i) => i.id(),
             MarketDatum::CreditIndex(c) => c.id.as_str(),
             MarketDatum::FxVolSurface(s) => s.id().as_str(),
             MarketDatum::VolCube(c) => c.id().as_str(),

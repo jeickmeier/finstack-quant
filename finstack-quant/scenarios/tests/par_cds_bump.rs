@@ -638,9 +638,9 @@ fn solve_to_par_after_roll_requotes_surviving_pillars_at_the_horizon() {
             let horizon = ctx.as_of;
             let curve = market.get_hazard("ISSUER-A-CDS").unwrap();
             let recipe = curve.hazard_calibration().expect("fresh horizon recipe");
-            assert_eq!(recipe.hazard_params["base_date"], horizon.to_string());
+            assert_eq!(recipe.hazard_params()["base_date"], horizon.to_string());
             assert!(recipe
-                .calibration_inputs
+                .calibration_inputs()
                 .iter()
                 .all(|input| input.pillar_date > horizon));
             if bp == 0.0 && discount_bp == 0.0 {
@@ -653,7 +653,7 @@ fn solve_to_par_after_roll_requotes_surviving_pillars_at_the_horizon() {
             }
             horizon_pars.push(
                 recipe
-                    .spread_risk_inputs
+                    .spread_risk_inputs()
                     .iter()
                     .map(|input| input.quote["spread_bp"].as_f64().unwrap())
                     .collect::<Vec<_>>(),
@@ -736,10 +736,10 @@ fn standalone_roll_preserves_calibrated_hazard_for_a_later_zero_spread_shock() {
             .get_hazard("ISSUER-A-CDS")
             .expect("rolled hazard");
         let recipe = rolled.hazard_calibration().expect("usable horizon recipe");
-        assert_eq!(recipe.hazard_params["base_date"], horizon.to_string());
-        assert_eq!(recipe.hazard_params["discount_curve_id"], "USD-OIS");
+        assert_eq!(recipe.hazard_params()["base_date"], horizon.to_string());
+        assert_eq!(recipe.hazard_params()["discount_curve_id"], "USD-OIS");
         assert!(recipe
-            .calibration_inputs
+            .calibration_inputs()
             .iter()
             .all(|input| input.pillar_date > horizon));
         let conditional = original
@@ -824,7 +824,7 @@ fn default_provider_replays_calibrated_hazard_rolls_without_explicit_wiring() {
             .get_hazard("ISSUER-A-CDS")
             .expect("rolled hazard");
         let recipe = rolled.hazard_calibration().expect("usable horizon recipe");
-        assert_eq!(recipe.hazard_params["base_date"], horizon.to_string());
+        assert_eq!(recipe.hazard_params()["base_date"], horizon.to_string());
         let conditional = original
             .roll_forward((horizon - base).whole_days())
             .expect("conditional hazard");

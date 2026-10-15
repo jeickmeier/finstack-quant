@@ -70,7 +70,7 @@ impl MetricCalculator for TailDependenceCalculator {
 
         let index_data = credit_index_for_tail_dependence(tranche, &context.curves)?;
         let correlation = index_data
-            .base_correlation_curve
+            .base_correlation_curve()
             .correlation(tranche.detach_pct);
 
         // Build the copula from the same specification the pricing path uses

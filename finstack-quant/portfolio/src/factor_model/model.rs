@@ -951,8 +951,8 @@ fn bump_credit_spreads(
             "Credit spread factor requires a lossless calibration recipe for '{curve_id}'"
         ))
     })?;
-    let params: HazardCurveParams =
-        serde_json::from_value(recipe.hazard_params.clone()).map_err(|err| {
+    let params: HazardCurveParams = serde_json::from_value(recipe.hazard_params().clone())
+        .map_err(|err| {
             Error::invalid_input(format!(
                 "Invalid credit replay parameters for '{curve_id}': {err}"
             ))

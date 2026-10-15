@@ -27,16 +27,17 @@ pub struct JsVolCube {
 
 #[wasm_bindgen(js_class = VolCube)]
 impl JsVolCube {
-    /// Construct a vol cube from a flat SABR parameter array.
+    /// Construct a vol cube from a flat SABR parameter array or an array of SABR node objects.
     ///
     /// # Arguments
     /// * `id` - Curve identifier.
     /// * `expiries` - Option expiry axis in years (strictly increasing).
     /// * `tenors` - Swap tenor axis in years (strictly increasing).
-    /// * `params_flat` - Row-major flat array of SABR parameters:
-    ///   `[alpha0, beta0, rho0, nu0, shift0, alpha1, …]`.
-    ///   Length must equal `expiries.len() * tenors.len() * 5`.
-    ///   Pass `NaN` for the shift element of a node to omit the shift.
+    /// * `params_flat` - Row-major SABR parameters: either a flat array
+    ///   `[alpha0, beta0, rho0, nu0, shift0, alpha1, …]` of length
+    ///   `expiries.len() * tenors.len() * 5` (pass `NaN` for `shift` to omit it),
+    ///   or an array of `{ alpha, beta, rho, nu, shift? }` objects of length
+    ///   `expiries.len() * tenors.len()`.
     ///   The `nu` component is nonnegative; zero gives deterministic volatility.
     /// * `forwards` - Row-major forward rates, one per grid node.
     /// @param interpolation_mode - Interpolation across the expiry axis: `"vol"` or
@@ -61,39 +62,50 @@ impl JsVolCube {
     ) -> Result<JsVolCube, JsValue> {
         let expiries: &[f64] = &js_f64_seq(&expiries, "expiries")?;
         let tenors: &[f64] = &js_f64_seq(&tenors, "tenors")?;
-        let params_flat: &[f64] = &js_f64_seq(&params_flat, "paramsFlat")?;
         let forwards: &[f64] = &js_f64_seq(&forwards, "forwards")?;
         let id: &str = &js_string(&id, "id")?;
         let interpolation_mode = js_opt_string(interpolation_mode.as_ref(), "interpolationMode")?;
-        let n_nodes = expiries
-            .len()
-            .checked_mul(tenors.len())
-            .ok_or_else(|| to_js_err("VolCube grid dimensions are too large"))?;
-        let n_params = n_nodes
-            .checked_mul(5)
-            .ok_or_else(|| to_js_err("VolCube parameter dimensions are too large"))?;
-        if params_flat.len() != n_params {
-            return Err(to_js_err(format!(
-                "params_flat length {} != {} nodes * 5 params",
-                params_flat.len(),
-                n_nodes
-            )));
-        }
-        let mut sabr_params = Vec::with_capacity(n_nodes);
-        for i in 0..n_nodes {
-            let base = i * 5;
-            let shift = params_flat[base + 4];
-            let shift = if shift.is_nan() { None } else { Some(shift) };
-            let p = SabrParameterData::new_with_shift(
-                params_flat[base],     // alpha
-                params_flat[base + 1], // beta
-                params_flat[base + 2], // rho
-                params_flat[base + 3], // nu
-                shift,
-            )
-            .map_err(to_js_err)?;
-            sabr_params.push(p);
-        }
+        let is_object_nodes = params_flat.dyn_ref::<js_sys::Array>().is_some_and(|arr| {
+            arr.length() > 0 && {
+                let first = arr.get(0);
+                first.is_object() && !first.is_null()
+            }
+        });
+        let sabr_params = if is_object_nodes {
+            from_js_json::<Vec<SabrParameterData>>(&params_flat, "paramsFlat")?
+        } else {
+            let params_flat: &[f64] = &js_f64_seq(&params_flat, "paramsFlat")?;
+            let n_nodes = expiries
+                .len()
+                .checked_mul(tenors.len())
+                .ok_or_else(|| to_js_err("VolCube grid dimensions are too large"))?;
+            let n_params = n_nodes
+                .checked_mul(5)
+                .ok_or_else(|| to_js_err("VolCube parameter dimensions are too large"))?;
+            if params_flat.len() != n_params {
+                return Err(to_js_err(format!(
+                    "params_flat length {} != {} nodes * 5 params",
+                    params_flat.len(),
+                    n_nodes
+                )));
+            }
+            let mut nodes = Vec::with_capacity(n_nodes);
+            for i in 0..n_nodes {
+                let base = i * 5;
+                let shift = params_flat[base + 4];
+                let shift = if shift.is_nan() { None } else { Some(shift) };
+                let p = SabrParameterData::new_with_shift(
+                    params_flat[base],     // alpha
+                    params_flat[base + 1], // beta
+                    params_flat[base + 2], // rho
+                    params_flat[base + 3], // nu
+                    shift,
+                )
+                .map_err(to_js_err)?;
+                nodes.push(p);
+            }
+            nodes
+        };
         let mut cube = RustVolCube::from_grid(id, expiries, tenors, &sabr_params, forwards)
             .map_err(to_js_err)?;
         if let Some(mode) = interpolation_mode.as_deref() {
@@ -396,7 +408,7 @@ impl JsVolSurface {
 #[wasm_bindgen(js_class = VolSurface)]
 impl JsVolSurface {
     /// Construct a surface from a row-major volatility grid (Rust
-    /// `VolSurface::from_grid_opts`).
+    /// `VolSurface::from_grid_opts` or `VolSurface::builder`).
     ///
     /// # Arguments
     ///
@@ -404,9 +416,9 @@ impl JsVolSurface {
     /// * `expiries` - Option expiries in years, strictly increasing.
     /// * `strikes` - Secondary-axis coordinates (strikes, or swap tenors in
     ///   years), strictly increasing.
-    /// * `vols` - Flat row-major grid of decimal volatilities,
-    ///   `expiries.length * strikes.length` entries; row `i` holds the smile
-    ///   at `expiries[i]`. Entries must be finite and non-negative.
+    /// * `vols` - Decimal volatilities, either as a flat row-major grid of
+    ///   `expiries.length * strikes.length` entries or as `expiries.length`
+    ///   rows of `strikes.length` values. Entries must be finite and non-negative.
     /// * `secondary_axis` - What `strikes` holds: `"strike"` or `"tenor"`;
     ///   omitted uses the Rust default (`"strike"`).
     /// * `interpolation_mode` - `"vol"` or `"total_variance"`; omitted uses the
@@ -438,7 +450,6 @@ impl JsVolSurface {
         let id = js_string(&id, "id")?;
         let expiries = js_f64_seq(&expiries, "expiries")?;
         let strikes = js_f64_seq(&strikes, "strikes")?;
-        let vols = js_f64_seq(&vols, "vols")?;
         let mut opts = VolGridOpts::default();
         if let Some(axis) = js_opt_string(secondary_axis.as_ref(), "secondaryAxis")? {
             opts.secondary_axis = serde_parse(&axis).map_err(to_js_err)?;
@@ -447,19 +458,46 @@ impl JsVolSurface {
             opts.interpolation_mode = serde_parse(&mode).map_err(to_js_err)?;
         }
         if let Some(quote) = js_opt_string(quote_type.as_ref(), "quoteType")? {
-            opts.quote_type = quote.parse().map_err(|error: String| to_js_err(error))?;
+            opts.quote_type = quote.parse().map_err(to_js_err)?;
         }
         let displacements = js_opt_f64_seq(displacements.as_ref(), "displacements")?;
-        RustVolSurface::from_grid_opts(
-            id,
-            &expiries,
-            &strikes,
-            &vols,
-            opts,
-            displacements.as_deref(),
-        )
-        .map(|surface| Self::from_inner(Arc::new(surface)))
-        .map_err(to_js_err)
+        let is_rows = vols.dyn_ref::<js_sys::Array>().is_some_and(|arr| {
+            arr.length() > 0 && {
+                let first = arr.get(0);
+                first.is_array() || first.is_instance_of::<js_sys::Float64Array>()
+            }
+        });
+        let surface = if is_rows {
+            let outer = vols
+                .dyn_ref::<js_sys::Array>()
+                .ok_or_else(|| crate::utils::input::invalid_type("vols", "expected an array"))?;
+            let rows: Vec<Vec<f64>> = (0..outer.length())
+                .map(|i| js_f64_seq(&outer.get(i), &format!("vols[{i}]")))
+                .collect::<Result<Vec<_>, _>>()?;
+            let mut builder = RustVolSurface::builder(id)
+                .expiries(&expiries)
+                .strikes(&strikes)
+                .secondary_axis(opts.secondary_axis)
+                .interpolation_mode(opts.interpolation_mode)
+                .rows(&rows);
+            if let Some(shifts) = displacements.as_deref() {
+                builder = builder.displacements(shifts);
+            }
+            builder.quote_type(opts.quote_type).build()
+        } else {
+            let vols = js_f64_seq(&vols, "vols")?;
+            RustVolSurface::from_grid_opts(
+                id,
+                &expiries,
+                &strikes,
+                &vols,
+                opts,
+                displacements.as_deref(),
+            )
+        };
+        surface
+            .map(|surface| Self::from_inner(Arc::new(surface)))
+            .map_err(to_js_err)
     }
 
     /// Deserialize from the canonical JSON wire form shared with Python `VolSurface.to_json`.
@@ -654,7 +692,7 @@ impl JsVolCubeExpirySlice {
         displacements: Option<JsValue>,
     ) -> Result<JsVolCubeExpirySlice, JsValue> {
         let quote_type = js_opt_string(quote_type.as_ref(), "quoteType")?
-            .map(|quote| quote.parse().map_err(|error: String| to_js_err(error)))
+            .map(|quote| quote.parse().map_err(to_js_err))
             .transpose()?
             .unwrap_or_default();
         let displacements = js_opt_f64_seq(displacements.as_ref(), "displacements")?;

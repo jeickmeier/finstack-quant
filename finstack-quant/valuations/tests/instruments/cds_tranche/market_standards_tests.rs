@@ -88,14 +88,15 @@ fn test_standard_portfolio_size() {
         let modified_index =
             finstack_quant_core::market_data::term_structures::CreditIndexData::builder()
                 .num_constituents(size as u16)
-                .recovery_rate(index_data.recovery_rate)
-                .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
-                .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
+                .recovery_rate(index_data.recovery_rate())
+                .index_credit_curve(std::sync::Arc::clone(index_data.index_credit_curve()))
+                .base_correlation_curve(std::sync::Arc::clone(index_data.base_correlation_curve()))
                 .build()
                 .unwrap();
 
         assert_eq!(
-            modified_index.num_constituents, size as u16,
+            modified_index.num_constituents(),
+            size as u16,
             "Should support standard portfolio size"
         );
     }
@@ -110,7 +111,7 @@ fn test_standard_recovery_rate() {
     let index_data = standard_credit_index();
 
     approx_eq(
-        index_data.recovery_rate,
+        index_data.recovery_rate(),
         standard_recovery,
         0.01,
         "Standard corporate recovery rate",

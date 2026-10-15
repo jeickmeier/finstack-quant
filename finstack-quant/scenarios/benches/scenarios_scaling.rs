@@ -124,7 +124,7 @@ fn historical_credit_quote_replay(c: &mut Criterion) {
         vec![RiskFactorShift {
             factor: RiskFactorType::CreditSpread {
                 curve_id: "ISSUER-A-CDS".into(),
-                tenor_years: recipe.spread_risk_inputs[0].pillar_time,
+                tenor_years: recipe.spread_risk_inputs()[0].pillar_time,
             },
             shift: 0.001,
         }],

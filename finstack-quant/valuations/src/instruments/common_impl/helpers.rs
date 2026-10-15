@@ -1430,7 +1430,10 @@ pub(crate) fn realized_inflation_index_value(
         return Err(finstack_quant_core::InputError::NotFound {
             id: format!(
                 "inflation index '{}' fixing coverage for {} (available {} through {})",
-                index.id, effective_date, first, last
+                index.id(),
+                effective_date,
+                first,
+                last
             ),
         }
         .into());

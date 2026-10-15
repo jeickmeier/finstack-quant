@@ -92,20 +92,20 @@ fn restoring_credit_curves_preserves_complete_canonical_index_dependencies() {
         .get_credit_index("INDEX")
         .expect("index survives curve replacement");
     assert!(Arc::ptr_eq(
-        &index.index_credit_curve,
+        index.index_credit_curve(),
         &restored.get_hazard("INDEX-HAZ").expect("restored hazard"),
     ));
     assert!(Arc::ptr_eq(
-        &index.base_correlation_curve,
+        index.base_correlation_curve(),
         &restored
             .get_base_correlation("CORR")
             .expect("restored correlation"),
     ));
     assert!(Arc::ptr_eq(
-        &index.issuer_credit_curves.as_ref().expect("issuer curves")["ISSUER"],
+        &index.issuer_credit_curves().expect("issuer curves")["ISSUER"],
         &restored.get_hazard("ISSUER-HAZ").expect("restored issuer"),
     ));
-    assert!((index.index_credit_curve.sp(5.0) - (-0.1_f64).exp()).abs() < 1e-14);
+    assert!((index.index_credit_curve().sp(5.0) - (-0.1_f64).exp()).abs() < 1e-14);
     let json = serde_json::to_string(&restored).expect("consistent restored snapshot");
     let _: MarketContext = serde_json::from_str(&json).expect("restored market roundtrip");
 

@@ -1,6 +1,6 @@
 //! Price curve bindings.
 
-use finstack_quant_core::market_data::term_structures::PriceCurve;
+use finstack_quant_core::market_data::term_structures::{PriceCurve, PriceCurveKind};
 
 use std::sync::Arc;
 
@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 
 use super::helpers::{
     columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods, parse_extrapolation,
-    parse_interp_style, parse_price_curve_kind, price_curve_kind_name, TimePoint,
+    parse_interp_style, TimePoint,
 };
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
@@ -111,7 +111,7 @@ impl PyPriceCurve {
             .base_date(py_to_date(base_date)?)
             .knots(knots);
         if let Some(kind) = kind {
-            builder = builder.kind(parse_price_curve_kind(kind)?);
+            builder = builder.kind(kind.parse::<PriceCurveKind>().map_err(core_to_py)?);
         }
         if let Some(spot) = spot_price {
             builder = builder.spot_price(spot);
@@ -187,7 +187,7 @@ impl PyPriceCurve {
     /// Curve kind label: ``"price"`` or ``"vol_index"``.
     #[getter]
     fn kind(&self) -> &'static str {
-        price_curve_kind_name(self.inner.kind())
+        self.inner.kind().as_str()
     }
 
     /// Spot price (or vol-index level) at ``t = 0``.
@@ -230,7 +230,7 @@ impl PyPriceCurve {
         format!(
             "PriceCurve(id='{}', kind='{}', base_date='{}', knots={}, spot_price={})",
             self.inner.id().as_str(),
-            price_curve_kind_name(self.inner.kind()),
+            self.inner.kind(),
             self.inner.base_date(),
             self.inner.knots().len(),
             self.inner.spot_price()

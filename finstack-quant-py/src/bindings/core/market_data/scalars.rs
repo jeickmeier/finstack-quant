@@ -341,11 +341,7 @@ impl PyInflationIndex {
         let lag = match lag {
             None => None,
             Some(value) => Some(if let Ok(months) = value.extract::<u8>() {
-                if months == 0 {
-                    InflationLag::None
-                } else {
-                    InflationLag::Months(months)
-                }
+                InflationLag::from(months)
             } else {
                 let label: String = value.extract().map_err(|_| {
                     crate::errors::value_error(
@@ -575,13 +571,13 @@ impl PyInflationIndex {
     /// Inflation-index identifier.
     #[getter]
     fn id(&self) -> &str {
-        &self.inner.id
+        self.inner.id()
     }
 
     /// ISO-4217 currency of this inflation index.
     #[getter]
     fn currency(&self) -> PyCurrency {
-        PyCurrency::from_inner(self.inner.currency)
+        PyCurrency::from_inner(self.inner.currency())
     }
 
     /// Interpolation policy name.
@@ -646,7 +642,7 @@ impl PyInflationIndex {
     fn __repr__(&self) -> String {
         format!(
             "InflationIndex(id={:?}, observations={})",
-            self.inner.id,
+            self.inner.id(),
             self.inner.len()
         )
     }

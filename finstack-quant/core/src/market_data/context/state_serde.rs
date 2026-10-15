@@ -275,7 +275,10 @@ fn validate_restore_references(
         &mut report,
         limits,
         "inflation_indices",
-        state.inflation_indices.iter().map(|entry| entry.id.clone()),
+        state
+            .inflation_indices
+            .iter()
+            .map(|entry| entry.id().to_owned()),
     );
     duplicate_id_diagnostics(
         &mut report,

@@ -38,7 +38,6 @@ use crate::solver::helpers::{bracket_solve_1d, ScanStrategy};
 use crate::CalibrationReport;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
@@ -188,11 +187,11 @@ impl StudentTTarget {
             base_correlation_curve.as_ref(),
             params.correlation,
         )?;
-        let credit_index = context.get_credit_index(&index_id)?.as_ref().clone();
-        let rebound_credit_index = CreditIndexData {
-            base_correlation_curve: std::sync::Arc::new(flat_base_correlation.clone()),
-            ..credit_index
-        };
+        let credit_index = context.get_credit_index(&index_id)?;
+        let rebound_credit_index = credit_index
+            .to_builder()
+            .base_correlation_curve(std::sync::Arc::new(flat_base_correlation.clone()))
+            .build()?;
         // Keep the context-level base correlation curve in sync with the overridden
         // credit-index reference. Insertion resolves the index dependencies from
         // the context, so install the requested flat-correlation override first.
@@ -378,7 +377,7 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::{
-        BaseCorrelationCurve, DiscountCurve, HazardCurve,
+        BaseCorrelationCurve, CreditIndexData, DiscountCurve, HazardCurve,
     };
     use finstack_quant_core::HashMap;
     use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};

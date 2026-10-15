@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 pub(super) fn active_hazards(index: &CreditIndexData) -> Vec<Arc<HazardCurve>> {
-    if let Some(issuers) = index.issuer_credit_curves.as_ref() {
+    if let Some(issuers) = index.issuer_credit_curves() {
         // One quote shock per curve, even if several names share its recipe.
         issuers
             .values()
@@ -23,21 +23,33 @@ pub(super) fn active_hazards(index: &CreditIndexData) -> Vec<Arc<HazardCurve>> {
             .into_values()
             .collect()
     } else {
-        vec![Arc::clone(&index.index_credit_curve)]
+        vec![Arc::clone(index.index_credit_curve())]
     }
 }
 
-pub(super) fn replace_hazard(index: &mut CreditIndexData, hazard: Arc<HazardCurve>) {
-    if index.index_credit_curve.id() == hazard.id() {
-        index.index_credit_curve = Arc::clone(&hazard);
+pub(super) fn replace_hazard(
+    index: &CreditIndexData,
+    hazard: Arc<HazardCurve>,
+) -> Result<CreditIndexData> {
+    let mut builder = index.to_builder();
+    if index.index_credit_curve().id() == hazard.id() {
+        builder = builder.index_credit_curve(Arc::clone(&hazard));
     }
-    if let Some(issuers) = &mut index.issuer_credit_curves {
-        for curve in issuers.values_mut() {
-            if curve.id() == hazard.id() {
-                *curve = Arc::clone(&hazard);
-            }
-        }
+    if let Some(issuers) = index.issuer_credit_curves() {
+        let updated: finstack_quant_core::HashMap<_, _> = issuers
+            .iter()
+            .map(|(issuer, curve)| {
+                let next = if curve.id() == hazard.id() {
+                    Arc::clone(&hazard)
+                } else {
+                    Arc::clone(curve)
+                };
+                (issuer.clone(), next)
+            })
+            .collect();
+        builder = builder.issuer_curves(updated);
     }
+    builder.build()
 }
 
 pub(super) fn parallel_cs01(
@@ -71,7 +83,7 @@ pub(super) fn parallel_cs01(
                 deal_quote_override: None,
                 action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(bp)),
             })?;
-            replace_hazard(&mut bumped_index, Arc::clone(&bumped));
+            bumped_index = replace_hazard(&bumped_index, Arc::clone(&bumped))?;
             bumped_market.insert_mut(bumped);
         }
         revalue(&bumped_market.insert_credit_index(index_id, bumped_index)?)

@@ -27,16 +27,20 @@ pub struct HazardCalibrationInput {
 /// complete serde payloads avoids replacing date pillars with rounded tenors or
 /// silently substituting current defaults for the original solver policy.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    feature = "json-schema",
+    derive(schemars::JsonSchema),
+    schemars(deny_unknown_fields)
+)]
 pub struct HazardCalibrationRecipe {
     /// Exact serialized `HazardCurveParams` used for the original solve.
-    pub hazard_params: serde_json::Value,
+    hazard_params: serde_json::Value,
     /// Original par-spread or upfront inputs used to calibrate the curve.
-    pub calibration_inputs: Vec<HazardCalibrationInput>,
+    calibration_inputs: Vec<HazardCalibrationInput>,
     /// Par-spread-only inputs used for quote-space spread risk.
-    pub spread_risk_inputs: Vec<HazardCalibrationInput>,
+    spread_risk_inputs: Vec<HazardCalibrationInput>,
     /// Exact serialized `CalibrationConfig`, including solver and validation policy.
-    pub calibration_config: serde_json::Value,
+    calibration_config: serde_json::Value,
 }
 
 #[derive(Deserialize)]
@@ -97,14 +101,32 @@ impl HazardCalibrationRecipe {
         Ok(recipe)
     }
 
+    /// Exact serialized `HazardCurveParams` used for the original solve.
+    #[inline]
+    pub fn hazard_params(&self) -> &serde_json::Value {
+        &self.hazard_params
+    }
+
+    /// Original par-spread or upfront inputs used to calibrate the curve.
+    #[inline]
+    pub fn calibration_inputs(&self) -> &[HazardCalibrationInput] {
+        &self.calibration_inputs
+    }
+
+    /// Par-spread-only inputs used for quote-space spread risk.
+    #[inline]
+    pub fn spread_risk_inputs(&self) -> &[HazardCalibrationInput] {
+        &self.spread_risk_inputs
+    }
+
+    /// Exact serialized `CalibrationConfig`, including solver and validation policy.
+    #[inline]
+    pub fn calibration_config(&self) -> &serde_json::Value {
+        &self.calibration_config
+    }
+
     /// Validate structural invariants required for lossless replay.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error for empty inputs, non-finite or unordered
-    /// pillar times, malformed quote bindings, non-par spread-risk quotes, or
-    /// mismatches between calibration and spread-risk input sequences.
-    pub fn validate(&self) -> crate::Result<()> {
+    fn validate(&self) -> crate::Result<()> {
         validate_inputs(&self.calibration_inputs, "calibration", false)?;
         validate_inputs(&self.spread_risk_inputs, "spread-risk", true)?;
         if self.calibration_inputs.len() != self.spread_risk_inputs.len() {

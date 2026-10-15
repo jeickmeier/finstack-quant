@@ -332,7 +332,7 @@ fn deal_quote_cs_gamma_is_centered_on_override_quote_set() {
     let override_tenor = hazard
         .hazard_calibration()
         .expect("replayable hazard curve")
-        .spread_risk_inputs
+        .spread_risk_inputs()
         .iter()
         .find(|input| input.pillar_date == maturity)
         .expect("matched 5Y replay quote")
@@ -438,7 +438,7 @@ fn bucketed_cs01_quote_uses_each_off_grid_replay_pillar_once() {
     let recipe = hazard
         .hazard_calibration()
         .expect("replayable hazard curve");
-    let expected_bucket_count = recipe.spread_risk_inputs.len();
+    let expected_bucket_count = recipe.spread_risk_inputs().len();
     let market = source.insert(hazard);
     let cds = create_test_cds(as_of, maturity);
 

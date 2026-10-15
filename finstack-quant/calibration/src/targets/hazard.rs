@@ -142,8 +142,8 @@ pub(crate) fn validate_hazard_recipe_bindings(
 ) -> Result<(Vec<ReplayQuote>, Vec<ReplayQuote>)> {
     let mut quotes = Vec::new();
     for (input_kind, inputs) in [
-        ("calibration", recipe.calibration_inputs.as_slice()),
-        ("spread-risk", recipe.spread_risk_inputs.as_slice()),
+        ("calibration", recipe.calibration_inputs()),
+        ("spread-risk", recipe.spread_risk_inputs()),
     ] {
         for input in inputs {
             quotes.push((
@@ -559,8 +559,10 @@ impl HazardCurveTarget {
             |ctx| {
                 // Sync the credit index (if any) so the pricer sees the trial curve.
                 if let Ok(idx) = ctx.get_credit_index(curve_id) {
-                    let mut updated = idx.as_ref().clone();
-                    updated.index_credit_curve = std::sync::Arc::new(curve.clone());
+                    let updated = idx
+                        .to_builder()
+                        .index_credit_curve(std::sync::Arc::new(curve.clone()))
+                        .build()?;
                     ctx.insert_credit_index_mut(curve_id, updated)?;
                 }
                 Ok(())

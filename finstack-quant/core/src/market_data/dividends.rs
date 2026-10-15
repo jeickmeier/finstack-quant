@@ -202,8 +202,8 @@ impl DividendSchedule {
         self.currency
     }
 
-    /// Validate schedule content (positive cash amounts, non-negative ratios).
-    pub fn validate(&self) -> Result<()> {
+    /// Validate schedule content (non-negative finite cash amounts, yields, and stock ratios).
+    fn validate(&self) -> Result<()> {
         for ev in &self.events {
             match &ev.kind {
                 DividendKind::Cash(m) => {
@@ -215,8 +215,14 @@ impl DividendSchedule {
                     if !y.is_finite() {
                         return Err(Error::Input(crate::error::InputError::Invalid));
                     }
+                    if *y < 0.0 {
+                        return Err(Error::Input(crate::error::InputError::NegativeValue));
+                    }
                 }
                 DividendKind::Stock { ratio } => {
+                    if !ratio.is_finite() {
+                        return Err(Error::Input(crate::error::InputError::Invalid));
+                    }
                     if *ratio < 0.0 {
                         return Err(Error::Input(crate::error::InputError::NegativeValue));
                     }

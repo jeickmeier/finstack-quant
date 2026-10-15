@@ -438,7 +438,7 @@ impl MarketContext {
         index: impl Into<Arc<InflationIndex>>,
     ) -> &mut Self {
         let index = index.into();
-        let key = CurveId::from(index.id.as_str());
+        let key = CurveId::from(index.id());
         Arc::make_mut(&mut self.inflation_indices).insert(key, index);
         self
     }
@@ -465,7 +465,6 @@ impl MarketContext {
         id: impl AsRef<str>,
         data: CreditIndexData,
     ) -> crate::Result<&mut Self> {
-        data.validate()?;
         let data = self.rebind_credit_index_data(&data)?;
         let key = CurveId::from(id.as_ref());
         Arc::make_mut(&mut self.credit_indices).insert(key, Arc::new(data));

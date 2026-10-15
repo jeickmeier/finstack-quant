@@ -130,7 +130,7 @@ pub(crate) fn extract_credit_keyrates(
                 .iter()
                 .map(|bucket| {
                     let input = recipe_t1
-                        .spread_risk_inputs
+                        .spread_risk_inputs()
                         .get(bucket.quote_index)
                         .ok_or_else(|| {
                             Error::Validation(format!(
@@ -155,7 +155,7 @@ pub(crate) fn extract_credit_keyrates(
                 ))
                     })?;
                     let input = recipe_t0
-                        .spread_risk_inputs
+                        .spread_risk_inputs()
                         .get(bucket.quote_index)
                         .ok_or_else(|| {
                             Error::Validation(format!(
