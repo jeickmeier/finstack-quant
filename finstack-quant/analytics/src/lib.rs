@@ -35,9 +35,8 @@
 //! bindings substitute for omitted arguments.
 //!
 //! Freestanding public exceptions are intentionally narrow:
-//! - [`scalar`] exposes [`sharpe`], [`sortino`], [`volatility`] and
-//!   [`max_drawdown`] over a single return slice for callers that do not
-//!   need a panel.
+//! - [`sharpe`], [`sortino`], [`volatility`], and [`max_drawdown`] operate on
+//!   a single return slice for callers that do not need a panel.
 //! - [`beta`] is kept public for cross-crate regression use.
 //! - [`correlation`] owns shared row-major correlation-matrix validation and
 //!   repair infrastructure used by valuations and factor-model crates.
@@ -94,7 +93,6 @@ pub(crate) mod performance;
 pub mod regression;
 pub(crate) mod returns;
 pub(crate) mod risk_metrics;
-pub mod scalar;
 #[cfg(feature = "json-schema")]
 pub mod schema;
 
@@ -107,8 +105,9 @@ pub use defaults::{
 };
 pub use drawdown::DrawdownEpisode;
 pub use performance::{LookbackReturns, Performance};
-pub use risk_metrics::{CagrDayCount, DatedSeries, RollingMetric};
-pub use scalar::{max_drawdown, sharpe, sortino, volatility};
+pub use risk_metrics::{
+    max_drawdown, sharpe, sortino, volatility, CagrDayCount, DatedSeries, RollingMetric,
+};
 
 #[cfg(test)]
 pub(crate) mod test_support {

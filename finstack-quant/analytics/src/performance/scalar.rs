@@ -109,7 +109,7 @@ impl Performance {
     /// One value per ticker in column order.
     pub fn volatility(&self, annualize: bool) -> Vec<f64> {
         self.map_tickers(|i| {
-            risk_metrics::volatility(self.active_returns(i), annualize, self.ann())
+            risk_metrics::volatility_with_annualize(self.active_returns(i), annualize, self.ann())
         })
     }
 

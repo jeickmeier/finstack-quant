@@ -229,7 +229,7 @@ pub(crate) fn mean_vol_annualized(returns: &[f64], ann_factor: f64) -> (f64, f64
 /// Returns `0.0` for an empty slice. When `annualize` is `true`, returns
 /// [`f64::NAN`] if `ann_factor` is not finite or is `<= 0`.
 #[must_use]
-pub(crate) fn volatility(returns: &[f64], annualize: bool, ann_factor: f64) -> f64 {
+pub(crate) fn volatility_with_annualize(returns: &[f64], annualize: bool, ann_factor: f64) -> f64 {
     if invalid_annualization_factor(annualize, ann_factor) {
         return f64::NAN;
     }
@@ -240,11 +240,30 @@ pub(crate) fn volatility(returns: &[f64], annualize: bool, ann_factor: f64) -> f
         v
     }
 }
-/// Sharpe ratio = annualized excess return / annualized volatility.
+
+/// Annualized sample volatility (n−1 denominator) of one return series.
 ///
-/// The annualized risk-free rate is geometrically decompounded to the
-/// observation frequency before subtraction from the period arithmetic
-/// mean, then the excess is scaled by `ann_factor`:
+/// # Arguments
+///
+/// * `returns` - Per-period simple decimal returns in date order.
+/// * `periods_per_year` - Observations per year; the per-period standard
+///   deviation is scaled by its square root.
+///
+/// # Returns
+///
+/// Annualized volatility as a decimal; `0.0` for an empty slice and `NaN`
+/// when `periods_per_year` is not a positive finite number.
+#[must_use]
+pub fn volatility(returns: &[f64], periods_per_year: f64) -> f64 {
+    volatility_with_annualize(returns, true, periods_per_year)
+}
+
+/// Sharpe ratio of one return series.
+///
+/// Annualized excess arithmetic mean over annualized sample volatility. The
+/// annual `risk_free_rate` is geometrically decompounded to the observation
+/// frequency before subtraction, then scaled by `periods_per_year`, exactly as
+/// [`crate::Performance::sharpe`]:
 ///
 /// ```text
 /// rf_period = (1 + rf_annual)^{1/N} − 1
@@ -254,26 +273,52 @@ pub(crate) fn volatility(returns: &[f64], annualize: bool, ann_factor: f64) -> f
 ///
 /// # Arguments
 ///
-/// * `ann_return`     - Linearly annualized arithmetic mean (`μ × N`).
-/// * `ann_vol`        - Annualized portfolio volatility.
-/// * `risk_free_rate` - Annualized risk-free rate (e.g., `0.02` for 2%).
-/// * `ann_factor`     - Periods per year `N` used to decompound
-///   `risk_free_rate`. Pass `1.0` when `ann_return` and `risk_free_rate`
-///   are already in the same (annual) units.
+/// * `returns` - Per-period simple decimal returns in date order.
+/// * `risk_free_rate` - Annualized risk-free rate as a decimal (`0.02` for 2%).
+/// * `periods_per_year` - Observations per year used to annualize (`252.0`
+///   daily, `52.0` weekly, `12.0` monthly).
 ///
 /// # Returns
 ///
-/// The Sharpe ratio. When `ann_vol` is zero: returns `f64::INFINITY` if
-/// excess return is positive, `f64::NEG_INFINITY` if negative, and `0.0`
-/// if both are zero (matching [`sortino`] convention).
+/// The Sharpe ratio; `±∞` when volatility is zero with a non-zero excess
+/// return, `0.0` when both are zero, and `NaN` when `periods_per_year` is
+/// not a positive finite number, an input is non-finite, or fewer than two
+/// observations are available.
 ///
 /// # References
 ///
 /// - Sharpe (1966): see docs/REFERENCES.md#sharpe1966
 #[must_use]
-pub(crate) fn sharpe(ann_return: f64, ann_vol: f64, risk_free_rate: f64, ann_factor: f64) -> f64 {
-    let excess = crate::returns::annualized_excess_return(ann_return, risk_free_rate, ann_factor);
-    crate::drawdown::ratio_or_sign_infinity(excess, ann_vol)
+pub fn sharpe(returns: &[f64], risk_free_rate: f64, periods_per_year: f64) -> f64 {
+    if returns.len() < 2 {
+        return f64::NAN;
+    }
+    let (ann_return, ann_vol) = mean_vol_annualized(returns, periods_per_year);
+    if !ann_return.is_finite() || !ann_vol.is_finite() {
+        return f64::NAN;
+    }
+    let excess =
+        crate::returns::annualized_excess_return(ann_return, risk_free_rate, periods_per_year);
+    super::ratio_or_sign_infinity(excess, ann_vol)
+}
+
+/// Maximum peak-to-trough drawdown of one return series.
+///
+/// Compounds the returns into a wealth path and reports the deepest
+/// fractional decline from a running peak.
+///
+/// # Arguments
+///
+/// * `returns` - Per-period simple decimal returns in date order.
+///
+/// # Returns
+///
+/// A non-positive fraction (`-0.25` for a 25% loss); `0.0` when the series
+/// never falls below its running peak or is empty. Returns `NaN` if the
+/// return or reconstructed drawdown path contains a non-finite value.
+#[must_use]
+pub fn max_drawdown(returns: &[f64]) -> f64 {
+    crate::drawdown::max_drawdown(&crate::drawdown::to_drawdown_series(returns))
 }
 
 /// Downside deviation: semi-standard deviation below a minimum acceptable return.
@@ -330,14 +375,15 @@ pub(crate) fn downside_deviation(
         dd
     }
 }
-/// Sortino ratio: penalises only downside volatility.
+
+/// Annualized Sortino ratio of one return series.
 ///
 /// Unlike the Sharpe ratio, the Sortino ratio uses the **downside deviation**
-/// (semi-standard deviation of negative returns) as the risk denominator,
-/// leaving upside volatility unrewarded:
+/// (semi-standard deviation of returns below `mar`) as the risk denominator,
+/// leaving upside volatility unpenalized:
 ///
 /// ```text
-/// Sortino = (annualized mean return) / (annualized downside deviation)
+/// Sortino = ((mean(r) − mar) × N) / (DD × √N)
 /// ```
 ///
 /// Downside deviation is computed over the full return series (denominator
@@ -346,28 +392,28 @@ pub(crate) fn downside_deviation(
 ///
 /// # Arguments
 ///
-/// * `returns` - Slice of period simple returns.
-/// * `ann_factor` - Number of periods per year.
-/// * `mar` - Minimum acceptable return per period in decimal form.
+/// * `returns` - Per-period simple decimal returns in date order.
+/// * `mar` - Minimum acceptable return **per period** as a decimal (not
+///   annualized), matching [`crate::Performance::sortino`].
+/// * `periods_per_year` - Observations per year used to annualize.
 ///
 /// # Returns
 ///
-/// The annualized Sortino ratio. Returns `±∞` when the excess mean is nonzero
-/// but there are no returns below `mar` (zero downside risk), `0.0` when both
-/// are zero, and [`f64::NAN`] if fewer than 2 returns are supplied or
-/// `ann_factor` is not finite or is `<= 0`.
+/// The annualized Sortino ratio; `±∞` when there is no downside deviation but
+/// a non-zero excess mean, `0.0` when both are zero, and `NaN` for non-finite
+/// inputs, invalid `periods_per_year`, or fewer than two observations.
 ///
 /// # References
 ///
 /// - Sortino & van der Meer (1991): see docs/REFERENCES.md#sortinoVanDerMeer1991
 #[must_use]
-pub(crate) fn sortino(returns: &[f64], ann_factor: f64, mar: f64) -> f64 {
-    if returns.len() < 2 || invalid_annualization_factor(true, ann_factor) {
+pub fn sortino(returns: &[f64], mar: f64, periods_per_year: f64) -> f64 {
+    if returns.len() < 2 || invalid_annualization_factor(true, periods_per_year) {
         return f64::NAN;
     }
     let excess_mean = mean(returns) - mar;
-    let dd = downside_deviation(returns, mar, false, ann_factor);
-    crate::drawdown::annualized_ratio_or_sign_infinity(excess_mean, dd, ann_factor)
+    let dd = downside_deviation(returns, mar, false, periods_per_year);
+    super::annualized_ratio_or_sign_infinity(excess_mean, dd, periods_per_year)
 }
 /// Geometric mean return per period.
 ///
@@ -624,8 +670,10 @@ mod tests {
         assert!(mean_return(&r, true, 0.0).is_nan());
         assert!(mean_return(&r, true, -1.0).is_nan());
         assert!(mean_return(&r, true, f64::NAN).is_nan());
-        assert!(volatility(&r, true, 0.0).is_nan());
-        assert!(volatility(&r, true, f64::INFINITY).is_nan());
+        assert!(volatility_with_annualize(&r, true, 0.0).is_nan());
+        assert!(volatility_with_annualize(&r, true, f64::INFINITY).is_nan());
+        assert!(volatility(&r, 0.0).is_nan());
+        assert!(volatility(&r, f64::INFINITY).is_nan());
     }
 
     #[test]
@@ -633,6 +681,34 @@ mod tests {
         let r = [0.01_f64, -0.02, 0.03];
         assert!(downside_deviation(&r, 0.0, true, 0.0).is_nan());
         assert!(sortino(&r, 0.0, 0.0).is_nan());
+    }
+
+    #[test]
+    fn free_functions_agree_with_daily_panel() {
+        let returns = [0.01, -0.02, 0.015, 0.003, -0.01, 0.02];
+        let dates: Vec<crate::dates::Date> = (1..=6)
+            .map(|d| crate::dates::Date::from_calendar_date(2025, Month::January, d).unwrap())
+            .collect();
+        let perf = crate::Performance::from_returns(
+            dates,
+            vec![returns.to_vec()],
+            vec!["A".into()],
+            None,
+            crate::dates::PeriodKind::Daily,
+        )
+        .unwrap();
+        assert!((sharpe(&returns, 0.02, 252.0) - perf.sharpe(0.02)[0]).abs() < 1e-12);
+        assert!((sortino(&returns, 0.0, 252.0) - perf.sortino(0.0)[0]).abs() < 1e-12);
+        assert!((volatility(&returns, 252.0) - perf.volatility(true)[0]).abs() < 1e-12);
+        assert!((max_drawdown(&returns) - perf.max_drawdown()[0]).abs() < 1e-12);
+    }
+
+    #[test]
+    fn invalid_periods_per_year_is_nan() {
+        let returns = [0.01, -0.02, 0.015, 0.003, -0.01, 0.02];
+        assert!(sharpe(&returns, 0.0, 0.0).is_nan());
+        assert!(volatility(&returns, f64::NAN).is_nan());
+        assert_eq!(max_drawdown(&[]), 0.0);
     }
 
     #[test]
@@ -684,15 +760,19 @@ mod tests {
 
     #[test]
     fn sharpe_basic() {
-        assert!((sharpe(0.10, 0.15, 0.0, 1.0) - 0.6666).abs() < 0.01);
-        assert_eq!(sharpe(0.10, 0.0, 0.0, 1.0), f64::INFINITY);
-        assert_eq!(sharpe(-0.05, 0.0, 0.0, 1.0), f64::NEG_INFINITY);
-        assert_eq!(sharpe(0.02, 0.0, 0.02, 1.0), 0.0);
+        let d = 0.15 / 2.0_f64.sqrt();
+        let r = [0.10 - d, 0.10 + d];
+        assert!((sharpe(&r, 0.0, 1.0) - 0.6666).abs() < 0.01);
+        assert_eq!(sharpe(&[0.10, 0.10], 0.0, 1.0), f64::INFINITY);
+        assert_eq!(sharpe(&[-0.05, -0.05], 0.0, 1.0), f64::NEG_INFINITY);
+        assert_eq!(sharpe(&[0.02, 0.02], 0.02, 1.0), 0.0);
     }
 
     #[test]
     fn sharpe_with_risk_free_rate() {
-        assert!((sharpe(0.10, 0.15, 0.02, 1.0) - 0.5333).abs() < 0.01);
+        let d = 0.15 / 2.0_f64.sqrt();
+        let r = [0.10 - d, 0.10 + d];
+        assert!((sharpe(&r, 0.02, 1.0) - 0.5333).abs() < 0.01);
     }
 
     #[test]
@@ -702,6 +782,9 @@ mod tests {
         let rf_annual = 0.02;
         let ann_return = mu * ann_factor;
         let ann_vol = 0.15;
+        let period_vol = ann_vol / ann_factor.sqrt();
+        let d = period_vol / 2.0_f64.sqrt();
+        let r = [mu - d, mu + d];
         let rf_period = 1.02_f64.powf(1.0 / ann_factor) - 1.0;
         let expected_excess = (mu - rf_period) * ann_factor;
         let linear_excess = ann_return - rf_annual;
@@ -709,7 +792,7 @@ mod tests {
             (expected_excess - linear_excess).abs() > 1e-6,
             "geometric and linear rf subtraction must differ at daily frequency"
         );
-        let s = sharpe(ann_return, ann_vol, rf_annual, ann_factor);
+        let s = sharpe(&r, rf_annual, ann_factor);
         assert!((s * ann_vol - expected_excess).abs() < 1e-12);
         assert!((s * ann_vol - linear_excess).abs() > 1e-6);
     }
@@ -717,7 +800,7 @@ mod tests {
     #[test]
     fn sortino_positive_returns() {
         let r = [0.01, 0.02, 0.03, -0.005, 0.01];
-        let s = sortino(&r, 1.0, 0.0);
+        let s = sortino(&r, 0.0, 1.0);
         assert!(s > 0.0);
     }
 
@@ -760,7 +843,7 @@ mod tests {
         let r = [0.01, 0.02, 0.03, -0.005, 0.01];
         let m = mean(&r);
         let dd = downside_deviation(&r, 0.0, false, 252.0);
-        let s = sortino(&r, 1.0, 0.0);
+        let s = sortino(&r, 0.0, 1.0);
         assert!((s - m / dd).abs() < 1e-12);
     }
 
@@ -769,7 +852,7 @@ mod tests {
         let r = [0.01, 0.02, 0.03, 0.04];
         let mar = 0.02;
         let expected = (mean(&r) - mar) / downside_deviation(&r, mar, false, 252.0);
-        let actual = sortino(&r, 1.0, mar);
+        let actual = sortino(&r, mar, 1.0);
         assert!((actual - expected).abs() < 1e-12);
     }
 
@@ -1031,8 +1114,9 @@ mod tests {
                 cagr_from_factor(&fixture.returns, 252.0).expect("valid fixture CAGR"),
                 expected.cagr_factor,
             );
-            assert_close(sharpe(0.12, 0.18, 0.02, 1.0), expected.sharpe);
-            assert_close(sortino(&fixture.returns, 252.0, 0.0), expected.sortino);
+            let d = 0.18 / 2.0_f64.sqrt();
+            assert_close(sharpe(&[0.12 - d, 0.12 + d], 0.02, 1.0), expected.sharpe);
+            assert_close(sortino(&fixture.returns, 0.0, 252.0), expected.sortino);
             assert_close(
                 value_at_risk(&fixture.returns, 0.95),
                 expected.value_at_risk,

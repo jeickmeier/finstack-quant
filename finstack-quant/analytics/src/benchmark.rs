@@ -178,7 +178,7 @@ pub(crate) fn information_ratio(returns: &[f64], benchmark: &[f64], ann_factor: 
     }
     let er = os.mean();
     let te = os.std_dev();
-    crate::drawdown::annualized_ratio_or_sign_infinity(er, te, ann_factor)
+    crate::risk_metrics::annualized_ratio_or_sign_infinity(er, te, ann_factor)
 }
 
 /// R-squared: proportion of portfolio variance explained by the benchmark.
@@ -1995,7 +1995,7 @@ mod tests {
 pub(crate) fn treynor(ann_return: f64, risk_free_rate: f64, beta: f64, ann_factor: f64) -> f64 {
     let excess = crate::returns::annualized_excess_return(ann_return, risk_free_rate, ann_factor);
     let denom = if beta.abs() < 1e-10 { 0.0 } else { beta };
-    crate::drawdown::ratio_or_sign_infinity(excess, denom)
+    crate::risk_metrics::ratio_or_sign_infinity(excess, denom)
 }
 
 /// M-squared (Modigliani-Modigliani): risk-adjusted return on the benchmark's scale.
