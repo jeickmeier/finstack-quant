@@ -28,8 +28,8 @@ umbrella crate as `finstack_quant::cashflows`.
 | [`schema`](src/schema.rs) | Published JSON Schema artifacts and `jsonschema` resources |
 
 Crate-root exports also include `CashflowScheduleSource`, `CashflowProvider`,
-`ScheduleBuildOpts`, the `schedule_from_*` adapters, `dated_flows`, the serde
-JSON surface (`CashflowScheduleBuildSpec`, `build_cashflow_schedule_json`,
+`ScheduleBuildOpts`, the `schedule_from_*` adapters, the serde JSON surface
+(`CashflowScheduleBuildSpec`, `build_cashflow_schedule_json`,
 `validate_cashflow_schedule_json`, `dated_flows_json`), and the type aliases
 `DatedFlow = (Date, Money)` and `DatedFlows = Vec<DatedFlow>`.
 

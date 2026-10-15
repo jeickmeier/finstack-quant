@@ -1576,6 +1576,10 @@ class CashFlowSchedule:
         """
         Calendar-year non-principal / principal / PV ladder of this schedule.
 
+        Returns a ``pandas.DataFrame`` view alongside :meth:`to_dataframe`; use
+        :func:`finstack_quant.cashflows.aggregation.calendar_year_ladder` for raw
+        ``(year, non_principal, principal, pv)`` tuples over parallel arrays.
+
         Parameters
         ----------
         pvs : list[float]

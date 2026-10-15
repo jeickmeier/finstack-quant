@@ -618,6 +618,10 @@ impl PyCashFlowSchedule {
 
     /// Calendar-year non-principal / principal / PV ladder as a DataFrame.
     ///
+    /// Returns a ``pandas.DataFrame`` view alongside ``to_dataframe()``; use
+    /// ``finstack_quant.cashflows.aggregation.calendar_year_ladder`` for raw
+    /// ``(year, non_principal, principal, pv)`` tuples over parallel arrays.
+    ///
     /// Parameters
     /// ----------
     /// pvs : list[float]

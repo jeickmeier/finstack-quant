@@ -103,13 +103,12 @@ pub use accrual::{
     accrued_interest_amount, AccrualConfig, AccrualIndex, AccrualMethod, ExCouponRule,
 };
 pub use aggregation::PeriodAggregation;
-pub use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
 pub use json::{
     build_cashflow_schedule_json, dated_flows_json, validate_cashflow_schedule_json,
     CashflowScheduleBuildSpec, CouponLegSpec, DatedFlowJson, PaymentProgramSpec,
 };
 pub use traits::{
-    dated_flows, schedule_from_classified_flows, schedule_from_dated_flows, CashflowProvider,
+    schedule_from_classified_flows, schedule_from_dated_flows, CashflowProvider,
     CashflowScheduleSource, ScheduleBuildOpts,
 };
 

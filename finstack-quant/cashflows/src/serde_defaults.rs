@@ -1,9 +1,7 @@
 //! Shared serde default helpers for cashflow specs.
 //!
-//! These functions are the single source of truth for the optional-field
-//! defaults of [`crate::builder::ScheduleParams`] and
-//! [`crate::builder::FeeSpec::PeriodicBp`]; host bindings call them so a
-//! Python or WASM constructor default can never drift from the wire default.
+//! These functions supply the serde field defaults for
+//! [`crate::builder::ScheduleParams`] and [`crate::builder::FeeSpec::PeriodicBp`].
 
 use finstack_quant_core::dates::{BusinessDayConvention, StubKind};
 

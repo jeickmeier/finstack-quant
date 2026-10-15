@@ -706,7 +706,7 @@ pub fn build_cashflow_schedule_with_market(
 /// @throws If the schedule fails validation (kind `validation`).
 #[wasm_bindgen(js_name = datedFlows)]
 pub fn dated_flows(schedule: &JsCashFlowSchedule) -> Result<JsValue, JsValue> {
-    dated_flows_wire(finstack_quant_cashflows::dated_flows(&schedule.inner).map_err(to_js_err)?)
+    dated_flows_wire(schedule.inner.dated_flows().map_err(to_js_err)?)
 }
 
 /// Build a schedule from dated amounts that all share one cashflow kind.

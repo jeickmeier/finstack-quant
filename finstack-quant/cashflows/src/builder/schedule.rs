@@ -1683,7 +1683,7 @@ mod tests {
                 0.0
             );
             assert_eq!(
-                crate::dated_flows(schedule).expect("settlements"),
+                schedule.dated_flows().expect("settlements"),
                 vec![(maturity, Money::from((106_i64, Currency::USD)))]
             );
         }
@@ -1734,7 +1734,7 @@ mod tests {
                 super::super::AmortizationSpec::None
             ));
             assert_eq!(
-                crate::dated_flows(&normalized).expect("remaining principal"),
+                normalized.dated_flows().expect("remaining principal"),
                 vec![(maturity, Money::from((remaining, Currency::USD)))]
             );
         }
