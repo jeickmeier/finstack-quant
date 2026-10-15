@@ -83,30 +83,24 @@ def test_degenerate_regression_frames_keep_numeric_nan_columns() -> None:
     perf = Performance.from_returns_arrays(
         _daily_dates(4), [[0.01, -0.02, 0.03, 0.04], [0.01] * 4], ["FUND", "BENCH"], "BENCH"
     )
-    for leaf, panel in (
-        (perf.beta()[0].to_dataframe(), perf.to_beta_dataframe()),
-        (perf.greeks()[0].to_dataframe(), perf.to_greeks_dataframe()),
+    for frame in (
+        perf.beta()[0].to_dataframe(),
+        perf.greeks()[0].to_dataframe(),
     ):
         # The estimates are NaN; the sample description is always reported.
         described = {"n_obs", "confidence_level"}
-        for frame in (leaf, panel):
-            estimates = frame.drop(columns=described & set(frame.columns))
-            assert estimates.isna().all().all()
-            assert all(dtype == "float64" for dtype in estimates.dtypes)
-            assert (frame["n_obs"] == 4).all()
-        assert list(panel.index) == ["FUND", "BENCH"]
-        assert panel.index.name == "ticker"
+        estimates = frame.drop(columns=described & set(frame.columns))
+        assert estimates.isna().all().all()
+        assert all(dtype == "float64" for dtype in estimates.dtypes)
+        assert (frame["n_obs"] == 4).all()
 
 
-def test_empty_drawdown_frame_retains_populated_dtypes_and_leaf_shape() -> None:
+def test_drawdown_episode_frame_retains_populated_dtypes() -> None:
     perf = Performance.from_arrays(_daily_dates(4), [[100.0, 90.0, 100.0, 110.0]], ["FUND"])
-    empty = perf.to_drawdown_details_dataframe(0, n=0)
-    populated = perf.to_drawdown_details_dataframe(0)
-    assert empty.empty
-    assert empty.dtypes.to_dict() == populated.dtypes.to_dict()
-    assert empty["duration_days"].dtype == "int64"
-    assert empty["truncated_at_start"].dtype == "bool"
-    pd.testing.assert_frame_equal(populated, perf.drawdown_details(0)[0].to_dataframe())
+    frame = perf.drawdown_details(0)[0].to_dataframe()
+    assert frame["duration_days"].dtype == "int64"
+    assert frame["truncated_at_start"].dtype == "bool"
+    assert frame["max_drawdown"].iloc[0] == pytest.approx(-0.10)
 
 
 def test_lookback_frame_preserves_ticker_and_metric_labels() -> None:
@@ -146,12 +140,19 @@ class TestConstruction:
         assert len(active) == 59
         assert active[0] == date(2024, 1, 2)
 
+    def test_from_prices_series(self) -> None:
+        prices = _prices_panel()["ACME"]
+        perf_named = Performance(prices)
+        assert perf_named.ticker_names == ["ACME"]
+        perf_unnamed = Performance(prices.rename(None))
+        assert perf_unnamed.ticker_names == ["asset"]
+
     def test_from_returns_dataframe(self, perf_returns: Performance) -> None:
         assert perf_returns.ticker_names == ["ACME", "BENCH"]
         assert perf_returns.benchmark_idx == 1
         assert len(perf_returns.dates()) == 60
 
-    def test_ragged_price_dataframe_exports_pad_edges(self) -> None:
+    def test_ragged_price_dataframe_trims_active_spans(self) -> None:
         dates = pd.to_datetime(_daily_dates(6))
         prices = pd.DataFrame(
             {
@@ -163,14 +164,7 @@ class TestConstruction:
 
         perf = Performance(prices, benchmark_ticker="BENCH")
         assert perf.active_dates_for_ticker(1) == [date(2024, 1, 4), date(2024, 1, 5)]
-
-        cumulative = perf.to_cumulative_returns_dataframe()
-        assert list(cumulative.index.date) == _daily_dates(5, start=date(2024, 1, 2))
-        assert pd.isna(cumulative.loc[pd.Timestamp(date(2024, 1, 2)), "PORT"])
-        assert pd.isna(cumulative.loc[pd.Timestamp(date(2024, 1, 3)), "PORT"])
-        assert cumulative.loc[pd.Timestamp(date(2024, 1, 4)), "PORT"] == pytest.approx(0.10)
-        assert cumulative.loc[pd.Timestamp(date(2024, 1, 5)), "PORT"] == pytest.approx(0.21)
-        assert pd.isna(cumulative.loc[pd.Timestamp(date(2024, 1, 6)), "PORT"])
+        assert perf.cumulative_returns()[1] == pytest.approx([0.10, 0.21])
 
     def test_from_arrays(self) -> None:
         dates = _daily_dates(5)
@@ -261,7 +255,6 @@ class TestReturnRiskMetrics:
         perf = Performance.from_returns_arrays(dates, returns, ["A", "B"])
         corr, repaired = perf.correlation_matrix()
         assert repaired is False
-        assert perf.to_correlation_dataframe().attrs["repaired"] is False
         assert len(corr) == 2
         assert len(corr[0]) == 2
         assert corr[0][0] == pytest.approx(1.0)
@@ -294,12 +287,14 @@ class TestReturnRiskMetrics:
             assert list(values.index) == ["ACME", "BENCH"]
             assert not values.isna().any()
 
-    def test_summary_to_dataframe_has_one_row_per_ticker(self, perf_prices: Performance) -> None:
-        summary = perf_prices.to_summary_dataframe()
+    def test_to_dataframe_has_one_row_per_ticker(self, perf_prices: Performance) -> None:
+        summary = perf_prices.to_dataframe()
         assert list(summary.index) == ["ACME", "BENCH"]
         assert "cagr" in summary.columns
         assert "sharpe" in summary.columns
         assert "max_drawdown" in summary.columns
+        custom = perf_prices.to_dataframe(risk_free_rate=0.02, confidence=0.99)
+        assert custom.loc["ACME", "sharpe"] != pytest.approx(summary.loc["ACME", "sharpe"])
 
 
 # Scalar-metric Series contract

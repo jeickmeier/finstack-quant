@@ -86,12 +86,11 @@ def _section_stats(row: Any, total_return: float) -> Section:
 
 
 def _section_drawdown(perf: Any, ticker: int, theme: Theme) -> Section:
-    dd = perf.to_drawdown_series_dataframe()
-    dd_series = [v * 100.0 for v in dd[dd.columns[ticker]].tolist()]
+    dd_series = [v * 100.0 for v in perf.drawdown_series()[ticker]]
     return Section(
         "Drawdown",
         charts.line_chart(
-            fmt._dates_of(dd),
+            perf.active_dates_for_ticker(perf.ticker_names[ticker]),
             dd_series,
             theme=theme,
             area=True,
@@ -126,29 +125,25 @@ def _section_rolling(perf: Any, ticker: int, theme: Theme) -> Section:
 
 
 def _build_heatmap_data(perf: Any, ticker: int) -> tuple[dict[int, list[Any]], dict[int, float]]:
-    monthly = perf.to_periodic_returns_dataframe("monthly")
-    annual = perf.to_periodic_returns_dataframe("annual")
-    m_col = monthly[monthly.columns[ticker]]
-    a_col = annual[annual.columns[ticker]]
-    annual_by_year = {ix.year: v * 100.0 for ix, v in a_col.items()}
+    m_col = perf.periodic_returns("monthly")[ticker]
+    a_col = perf.periodic_returns("annual")[ticker]
+    annual_by_year = {ix.year: v * 100.0 for ix, v in a_col}
     by_year: dict[int, list[Any]] = {}
-    for ix, v in m_col.items():
+    for ix, v in m_col:
         by_year.setdefault(ix.year, [None] * 12)[ix.month - 1] = v * 100.0
     return by_year, annual_by_year
 
 
 def _section_drawdowns(perf: Any, ticker: int) -> Section:
-    det = perf.to_drawdown_details_dataframe(ticker, n=5)
-    dd_rows = []
-    for _, r in det.iterrows():
-        end = r["end"]
-        ongoing = end is None or type(end).__name__ == "NaTType"
-        dd_rows.append({
-            "Peak → Trough": f"{fmt.fmt_date(r['start'])} → {fmt.fmt_date(r['valley'])}",
-            "Depth": r["max_drawdown"] * 100.0,
-            "Length": f"{int(r['duration_days'])} days",
-            "Recovery": "ongoing" if ongoing else fmt.fmt_date(end),
-        })
+    dd_rows = [
+        {
+            "Peak → Trough": f"{fmt.fmt_date(ep.start)} → {fmt.fmt_date(ep.valley)}",
+            "Depth": ep.max_drawdown * 100.0,
+            "Length": f"{int(ep.duration_days)} days",
+            "Recovery": "ongoing" if ep.end is None else fmt.fmt_date(ep.end),
+        }
+        for ep in perf.drawdown_details(perf.ticker_names[ticker], n=5)
+    ]
     return Section(
         "Worst Drawdowns",
         tables.data_table(
@@ -214,13 +209,12 @@ def performance_tearsheet(
     """
     wanted = _resolve_sections(sections, ALL_SECTIONS)
 
-    summary = perf.to_summary_dataframe()
-    cum = perf.to_cumulative_returns_dataframe()
-    col = cum.columns[ticker]
+    summary = perf.to_dataframe()
+    col = perf.ticker_names[ticker]
     row = summary.iloc[ticker]
 
-    cum_series = [v * 100.0 for v in cum[col].tolist()]
-    cum_dates = fmt._dates_of(cum)
+    cum_series = [v * 100.0 for v in perf.cumulative_returns()[ticker]]
+    cum_dates = perf.active_dates_for_ticker(col)
     total_return = cum_series[-1] if cum_series else float("nan")
 
     secs: list[Section] = []

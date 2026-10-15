@@ -9557,7 +9557,7 @@ declare class Performance {
   /**
    * The standard per-ticker summary as a table envelope: one row per ticker
    * with 22 metric columns plus a leading `ticker` dimension column. Same
-   * rows as the Python `Performance.to_summary_dataframe`.
+   * rows as the Python `Performance.to_dataframe`.
    * @returns Column-oriented table envelope of the summary metrics.
    * @param riskFreeRate - Annualized risk-free rate as a decimal (0.02 = 2%); affects only `sharpe`. Defaults to 0.0.
    * @param confidence - Tail confidence as a decimal probability applied to VaR, ES and tail ratio; defaults to 0.95.

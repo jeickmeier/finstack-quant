@@ -12,11 +12,6 @@ use pyo3::types::PyDict;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-#[inline]
-fn slice_to_pyarray<'py>(py: Python<'py>, values: &[f64]) -> Bound<'py, PyArray1<f64>> {
-    PyArray1::from_slice(py, values)
-}
-
 fn serde_from_json<T: DeserializeOwned>(json: &str) -> PyResult<T> {
     serde_json::from_str(json).map_err(display_to_py)
 }
@@ -152,20 +147,23 @@ impl PyPeriodStats {
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let s = &self.inner;
         let data = PyDict::new(py);
-        data.set_item("best", slice_to_pyarray(py, &[s.best]))?;
-        data.set_item("worst", slice_to_pyarray(py, &[s.worst]))?;
+        data.set_item("best", PyArray1::from_slice(py, &[s.best]))?;
+        data.set_item("worst", PyArray1::from_slice(py, &[s.worst]))?;
         data.set_item("consecutive_wins", vec![s.consecutive_wins])?;
         data.set_item("consecutive_losses", vec![s.consecutive_losses])?;
-        data.set_item("win_rate", slice_to_pyarray(py, &[s.win_rate]))?;
-        data.set_item("avg_return", slice_to_pyarray(py, &[s.avg_return]))?;
-        data.set_item("avg_win", slice_to_pyarray(py, &[s.avg_win]))?;
-        data.set_item("avg_loss", slice_to_pyarray(py, &[s.avg_loss]))?;
-        data.set_item("payoff_ratio", slice_to_pyarray(py, &[s.payoff_ratio]))?;
-        data.set_item("profit_factor", slice_to_pyarray(py, &[s.profit_factor]))?;
-        data.set_item("cpc_ratio", slice_to_pyarray(py, &[s.cpc_ratio]))?;
+        data.set_item("win_rate", PyArray1::from_slice(py, &[s.win_rate]))?;
+        data.set_item("avg_return", PyArray1::from_slice(py, &[s.avg_return]))?;
+        data.set_item("avg_win", PyArray1::from_slice(py, &[s.avg_win]))?;
+        data.set_item("avg_loss", PyArray1::from_slice(py, &[s.avg_loss]))?;
+        data.set_item("payoff_ratio", PyArray1::from_slice(py, &[s.payoff_ratio]))?;
+        data.set_item(
+            "profit_factor",
+            PyArray1::from_slice(py, &[s.profit_factor]),
+        )?;
+        data.set_item("cpc_ratio", PyArray1::from_slice(py, &[s.cpc_ratio]))?;
         data.set_item(
             "kelly_criterion",
-            slice_to_pyarray(py, &[s.kelly_criterion]),
+            PyArray1::from_slice(py, &[s.kelly_criterion]),
         )?;
         dict_to_dataframe(py, &data, None)
     }
@@ -295,7 +293,18 @@ impl PyBetaResult {
     /// Undefined estimates from a degenerate regression remain ``NaN``
     /// in numeric ``float64`` columns.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        beta_to_dataframe(py, std::slice::from_ref(&self.inner), None)
+        let r = &self.inner;
+        let data = PyDict::new(py);
+        data.set_item("beta", PyArray1::from_slice(py, &[r.beta]))?;
+        data.set_item("std_err", PyArray1::from_slice(py, &[r.std_err]))?;
+        data.set_item("ci_lower", PyArray1::from_slice(py, &[r.ci_lower]))?;
+        data.set_item("ci_upper", PyArray1::from_slice(py, &[r.ci_upper]))?;
+        data.set_item("n_obs", PyArray1::from_slice(py, &[r.n_obs as i64]))?;
+        data.set_item(
+            "confidence_level",
+            PyArray1::from_slice(py, &[r.confidence_level]),
+        )?;
+        dict_to_dataframe(py, &data, None)
     }
 
     fn __repr__(&self) -> String {
@@ -385,7 +394,17 @@ impl PyGreeksResult {
     /// Undefined estimates from a degenerate fit remain ``NaN`` in numeric
     /// ``float64`` columns.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        greeks_to_dataframe(py, std::slice::from_ref(&self.inner), None)
+        let r = &self.inner;
+        let data = PyDict::new(py);
+        data.set_item("alpha", PyArray1::from_slice(py, &[r.alpha]))?;
+        data.set_item("beta", PyArray1::from_slice(py, &[r.beta]))?;
+        data.set_item("r_squared", PyArray1::from_slice(py, &[r.r_squared]))?;
+        data.set_item(
+            "adjusted_r_squared",
+            PyArray1::from_slice(py, &[r.adjusted_r_squared]),
+        )?;
+        data.set_item("n_obs", PyArray1::from_slice(py, &[r.n_obs as i64]))?;
+        dict_to_dataframe(py, &data, None)
     }
 
     fn __repr__(&self) -> String {
@@ -449,20 +468,20 @@ impl PyRollingGreeks {
     /// Rolling alpha values.
     #[getter]
     fn alphas<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
-        slice_to_pyarray(py, &self.inner.alphas)
+        PyArray1::from_slice(py, &self.inner.alphas)
     }
     /// Rolling beta values.
     #[getter]
     fn betas<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
-        slice_to_pyarray(py, &self.inner.betas)
+        PyArray1::from_slice(py, &self.inner.betas)
     }
 
     /// Convert to a pandas ``DataFrame`` with a ``DatetimeIndex`` and
     /// ``alpha`` / ``beta`` columns.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
-        data.set_item("alpha", slice_to_pyarray(py, &self.inner.alphas))?;
-        data.set_item("beta", slice_to_pyarray(py, &self.inner.betas))?;
+        data.set_item("alpha", PyArray1::from_slice(py, &self.inner.alphas))?;
+        data.set_item("beta", PyArray1::from_slice(py, &self.inner.betas))?;
         let idx = dates_to_datetime_index(py, &self.inner.dates)?;
         dict_to_dataframe(py, &data, Some(idx))
     }
@@ -525,7 +544,7 @@ impl PyMultiFactorResult {
     /// One beta per factor, in factor order.
     #[getter]
     fn betas<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
-        slice_to_pyarray(py, &self.inner.betas)
+        PyArray1::from_slice(py, &self.inner.betas)
     }
     /// Coefficient of determination of the fitted model.
     #[getter]
@@ -601,7 +620,7 @@ impl PyMultiFactorResult {
             .getattr("Series")?
             .call((names,), Some(&kwargs))?;
         data.set_item("factor", factors)?;
-        data.set_item("beta", slice_to_pyarray(py, betas))?;
+        data.set_item("beta", PyArray1::from_slice(py, betas))?;
         data.set_item(
             "alpha",
             PyArray1::from_vec(py, vec![self.inner.alpha; betas.len()]),
@@ -709,10 +728,34 @@ impl PyDrawdownEpisode {
     /// Columns: ``start``, ``valley``, ``end`` (``datetime64``; ``NaT`` while
     /// still in drawdown), ``duration_days``, ``max_drawdown``,
     /// ``near_recovery_threshold``, ``truncated_at_start``. Stack episodes
-    /// with ``pd.concat`` or use
-    /// ``Performance.to_drawdown_details_dataframe`` for the top-N table.
+    /// with ``pd.concat([ep.to_dataframe() for ep in episodes])``.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        drawdowns_to_dataframe(py, std::slice::from_ref(&self.inner))
+        let e = &self.inner;
+        let data = PyDict::new(py);
+        let end = match e.end {
+            Some(date) => date_to_py(py, date)?.into_any(),
+            None => py.None().into_bound(py),
+        };
+        data.set_item("start", dates_to_datetime_index(py, &[e.start])?)?;
+        data.set_item("valley", dates_to_datetime_index(py, &[e.valley])?)?;
+        data.set_item(
+            "end",
+            py.import("pandas")?.call_method1("to_datetime", ([end],))?,
+        )?;
+        data.set_item(
+            "duration_days",
+            PyArray1::from_slice(py, &[e.duration_days]),
+        )?;
+        data.set_item("max_drawdown", PyArray1::from_slice(py, &[e.max_drawdown]))?;
+        data.set_item(
+            "near_recovery_threshold",
+            PyArray1::from_slice(py, &[e.near_recovery_threshold]),
+        )?;
+        data.set_item(
+            "truncated_at_start",
+            PyArray1::from_slice(py, &[e.truncated_at_start]),
+        )?;
+        dict_to_dataframe(py, &data, None)
     }
 
     fn __repr__(&self) -> String {
@@ -769,22 +812,22 @@ impl PyLookbackReturns {
     /// Month-to-date returns per ticker.
     #[getter]
     fn mtd<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
-        slice_to_pyarray(py, &self.inner.mtd)
+        PyArray1::from_slice(py, &self.inner.mtd)
     }
     /// Quarter-to-date returns per ticker.
     #[getter]
     fn qtd<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
-        slice_to_pyarray(py, &self.inner.qtd)
+        PyArray1::from_slice(py, &self.inner.qtd)
     }
     /// Year-to-date returns per ticker.
     #[getter]
     fn ytd<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
-        slice_to_pyarray(py, &self.inner.ytd)
+        PyArray1::from_slice(py, &self.inner.ytd)
     }
     /// Fiscal-year-to-date returns per ticker.
     #[getter]
     fn fytd<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
-        slice_to_pyarray(py, &self.inner.fytd)
+        PyArray1::from_slice(py, &self.inner.fytd)
     }
 
     /// Convert to a pandas ``DataFrame`` indexed by :attr:`ticker_names`.
@@ -792,10 +835,10 @@ impl PyLookbackReturns {
     /// Columns: mtd, qtd, ytd, and fytd.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
-        data.set_item("mtd", slice_to_pyarray(py, &self.inner.mtd))?;
-        data.set_item("qtd", slice_to_pyarray(py, &self.inner.qtd))?;
-        data.set_item("ytd", slice_to_pyarray(py, &self.inner.ytd))?;
-        data.set_item("fytd", slice_to_pyarray(py, &self.inner.fytd))?;
+        data.set_item("mtd", PyArray1::from_slice(py, &self.inner.mtd))?;
+        data.set_item("qtd", PyArray1::from_slice(py, &self.inner.qtd))?;
+        data.set_item("ytd", PyArray1::from_slice(py, &self.inner.ytd))?;
+        data.set_item("fytd", PyArray1::from_slice(py, &self.inner.fytd))?;
         let idx = self
             .inner
             .ticker_names
@@ -860,7 +903,7 @@ impl PyDatedSeries {
     /// Numeric values, one per window.
     #[getter]
     fn values<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
-        slice_to_pyarray(py, &self.inner.values)
+        PyArray1::from_slice(py, &self.inner.values)
     }
     /// Window-end dates aligned 1:1 with [`values`](Self::values).
     #[getter]
@@ -884,7 +927,7 @@ impl PyDatedSeries {
         let data = PyDict::new(py);
         data.set_item(
             self.inner.value_column.as_str(),
-            slice_to_pyarray(py, &self.inner.values),
+            PyArray1::from_slice(py, &self.inner.values),
         )?;
         let idx = dates_to_datetime_index(py, &self.inner.dates)?;
         dict_to_dataframe(py, &data, Some(idx))
@@ -907,127 +950,6 @@ impl PyDatedSeries {
     fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
         dataframe_repr_html(self.to_dataframe(py))
     }
-}
-
-/// Native numeric beta columns, shared by the leaf and panel pandas exits.
-///
-/// # Arguments
-/// * `py` - Interpreter token used to allocate NumPy columns and the pandas frame.
-/// * `rows` - Canonical Rust beta results, in output row order.
-/// * `index` - Optional row labels; omitted labels use pandas' default integer index.
-pub(super) fn beta_to_dataframe<'py>(
-    py: Python<'py>,
-    rows: &[fa::BetaResult],
-    index: Option<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let data = PyDict::new(py);
-    data.set_item(
-        "beta",
-        PyArray1::from_vec(py, rows.iter().map(|r| r.beta).collect()),
-    )?;
-    data.set_item(
-        "std_err",
-        PyArray1::from_vec(py, rows.iter().map(|r| r.std_err).collect()),
-    )?;
-    data.set_item(
-        "ci_lower",
-        PyArray1::from_vec(py, rows.iter().map(|r| r.ci_lower).collect()),
-    )?;
-    data.set_item(
-        "ci_upper",
-        PyArray1::from_vec(py, rows.iter().map(|r| r.ci_upper).collect()),
-    )?;
-    data.set_item(
-        "n_obs",
-        PyArray1::from_vec(py, rows.iter().map(|r| r.n_obs as i64).collect()),
-    )?;
-    data.set_item(
-        "confidence_level",
-        PyArray1::from_vec(py, rows.iter().map(|r| r.confidence_level).collect()),
-    )?;
-    dict_to_dataframe(py, &data, index)
-}
-
-/// Native numeric Greeks columns, shared by the leaf and panel pandas exits.
-///
-/// # Arguments
-/// * `py` - Interpreter token used to allocate NumPy columns and the pandas frame.
-/// * `rows` - Canonical Rust regression results, in output row order.
-/// * `index` - Optional row labels; omitted labels use pandas' default integer index.
-pub(super) fn greeks_to_dataframe<'py>(
-    py: Python<'py>,
-    rows: &[fa::GreeksResult],
-    index: Option<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let data = PyDict::new(py);
-    data.set_item(
-        "alpha",
-        PyArray1::from_vec(py, rows.iter().map(|r| r.alpha).collect()),
-    )?;
-    data.set_item(
-        "beta",
-        PyArray1::from_vec(py, rows.iter().map(|r| r.beta).collect()),
-    )?;
-    data.set_item(
-        "r_squared",
-        PyArray1::from_vec(py, rows.iter().map(|r| r.r_squared).collect()),
-    )?;
-    data.set_item(
-        "adjusted_r_squared",
-        PyArray1::from_vec(py, rows.iter().map(|r| r.adjusted_r_squared).collect()),
-    )?;
-    data.set_item(
-        "n_obs",
-        PyArray1::from_vec(py, rows.iter().map(|r| r.n_obs as i64).collect()),
-    )?;
-    dict_to_dataframe(py, &data, index)
-}
-
-/// Typed episode columns, including stable dtypes when no episode is present.
-///
-/// # Arguments
-/// * `py` - Interpreter token used to allocate date, numeric and boolean columns.
-/// * `episodes` - Canonical Rust episodes, retained in their existing severity order.
-pub(super) fn drawdowns_to_dataframe<'py>(
-    py: Python<'py>,
-    episodes: &[fa::DrawdownEpisode],
-) -> PyResult<Bound<'py, PyAny>> {
-    let data = PyDict::new(py);
-    let starts: Vec<_> = episodes.iter().map(|e| e.start).collect();
-    let valleys: Vec<_> = episodes.iter().map(|e| e.valley).collect();
-    let ends = episodes
-        .iter()
-        .map(|e| match e.end {
-            Some(date) => date_to_py(py, date).map(|value| value.into_any()),
-            None => Ok(py.None().into_bound(py)),
-        })
-        .collect::<PyResult<Vec<_>>>()?;
-    data.set_item("start", dates_to_datetime_index(py, &starts)?)?;
-    data.set_item("valley", dates_to_datetime_index(py, &valleys)?)?;
-    data.set_item(
-        "end",
-        py.import("pandas")?.call_method1("to_datetime", (ends,))?,
-    )?;
-    data.set_item(
-        "duration_days",
-        PyArray1::from_vec(py, episodes.iter().map(|e| e.duration_days).collect()),
-    )?;
-    data.set_item(
-        "max_drawdown",
-        PyArray1::from_vec(py, episodes.iter().map(|e| e.max_drawdown).collect()),
-    )?;
-    data.set_item(
-        "near_recovery_threshold",
-        PyArray1::from_vec(
-            py,
-            episodes.iter().map(|e| e.near_recovery_threshold).collect(),
-        ),
-    )?;
-    data.set_item(
-        "truncated_at_start",
-        PyArray1::from_vec(py, episodes.iter().map(|e| e.truncated_at_start).collect()),
-    )?;
-    dict_to_dataframe(py, &data, None)
 }
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {

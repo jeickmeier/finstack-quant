@@ -1,4 +1,4 @@
-"""Tests for raw and pandas periodic-return exits on ``Performance``."""
+"""Tests for periodic-return exits on ``Performance``."""
 
 from __future__ import annotations
 
@@ -17,10 +17,9 @@ def _two_month_perf() -> Performance:
 
 
 def test_periodic_monthly_shape_and_columns() -> None:
-    df = _two_month_perf().to_periodic_returns_dataframe("monthly")
-    assert isinstance(df, pd.DataFrame)
-    assert list(df.columns) == ["STRAT"]
-    assert len(df) == 2  # Jan + Feb 2021
+    panel = _two_month_perf().periodic_returns("monthly")
+    assert len(panel) == 1
+    assert len(panel[0]) == 2  # Jan + Feb 2021
 
 
 def test_raw_periodic_returns_are_ticker_major_dated_points() -> None:
@@ -42,21 +41,19 @@ def test_raw_periodic_returns_are_ticker_major_dated_points() -> None:
 
 
 def test_periodic_annual_single_year() -> None:
-    df = _two_month_perf().to_periodic_returns_dataframe("annual")
-    assert len(df) == 1  # all observations are in 2021
+    panel = _two_month_perf().periodic_returns("annual")
+    assert len(panel[0]) == 1  # all observations are in 2021
 
 
 def test_periodic_rejects_unknown_frequency() -> None:
     perf = _two_month_perf()
     with pytest.raises(ValueError, match=r"frequency|monthly|annual"):
         perf.periodic_returns("hourly")
-    with pytest.raises(ValueError, match=r"frequency|monthly|annual"):
-        perf.to_periodic_returns_dataframe("hourly")
 
 
 def test_periodic_monthly_reconciles_with_cumulative() -> None:
     perf = _two_month_perf()
     monthly = perf.periodic_returns("monthly")[0]
-    total = perf.to_cumulative_returns_dataframe()["STRAT"].iloc[-1]
+    total = perf.cumulative_returns()[0][-1]
     chained = (1.0 + monthly[0][1]) * (1.0 + monthly[1][1]) - 1.0
     assert abs(chained - total) < 1e-9

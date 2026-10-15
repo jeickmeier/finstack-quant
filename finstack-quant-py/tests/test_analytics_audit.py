@@ -22,7 +22,7 @@ def test_empirical_tail_mass_is_preserved_in_metrics_and_summary() -> None:
     values = [-0.2] + [0.0] * 99
     perf = panel(values)
     assert perf.expected_shortfall(0.95).iloc[0] == pytest.approx(-0.04)
-    assert perf.to_summary_dataframe().loc["A", "expected_shortfall"] == pytest.approx(-0.04)
+    assert perf.to_dataframe().loc["A", "expected_shortfall"] == pytest.approx(-0.04)
     values[1] = 0.25
     assert panel(values).cdar(0.95).iloc[0] == pytest.approx(-0.04)
     assert panel([-0.2, -0.1, 0.1, 0.2]).expected_shortfall(0.625).iloc[0] == pytest.approx(-0.25 / 1.5)

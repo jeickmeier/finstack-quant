@@ -835,7 +835,7 @@ impl JsPerformance {
     /// `downside_deviation`, `omega_ratio`, `gain_to_pain`, `ulcer_index`,
     /// `pain_index`, `recovery_factor`, `tail_ratio`, `r_squared`) plus a
     /// leading `ticker` dimension column. Same rows as the Python
-    /// `Performance.to_summary_dataframe`.
+    /// `Performance.to_dataframe`.
     ///
     /// # Errors
     ///

@@ -166,7 +166,7 @@ Tests live beside the rest of the Python suite in
 module here — `theme`, `format`, `document`, `tables`, `charts`,
 `statements_common`, and the ten tear sheets.
 (`test_reporting_periodic_returns.py` is misnamed: it covers
-`analytics.Performance.to_periodic_returns_dataframe`, not this directory.)
+`analytics.Performance.periodic_returns`, not this directory.)
 
 `tests/data/{performance,attribution,instrument_bond}_tearsheet_golden.html` are
 byte-exact renders from RNG-free, clock-free inputs with a pinned `generated` date.
