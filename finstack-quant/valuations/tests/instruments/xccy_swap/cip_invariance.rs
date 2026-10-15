@@ -140,7 +140,7 @@ fn build_swap(notional_exchange: NotionalExchange, spread_bp: Decimal) -> XccySw
 /// CIP invariance with `as_of` STRICTLY AFTER the curve base date.
 ///
 /// Regression test for the bug where `pv_mtm_reset` used absolute
-/// `df_on_date_curve(t)` instead of
+/// `df_on_date(t)` instead of
 /// `relative_df_discount_curve(curve, as_of, t)` — producing identical results
 /// only when `as_of == curve.base_date` (i.e., the calibration date itself) and
 /// silently biasing every intraday revaluation against the calibrated curves.
@@ -209,7 +209,7 @@ fn cip_invariance_holds_when_as_of_after_curve_base_date() {
         "CIP invariance failed with as_of != curve.base_date: pv_fixed={pv_fixed:.4}, \
          pv_mtm={pv_mtm:.4}, diff={:.4e}, tol={tol:.4e}. This indicates a DF discounting \
          bug — pricing_mtm.rs must use relative_df_discount_curve(curve, as_of, t), not \
-         absolute df_on_date_curve(t).",
+         absolute df_on_date(t).",
         pv_fixed - pv_mtm
     );
 }
@@ -401,8 +401,8 @@ fn mtm_reset_cashflow_schedule_npv_matches_base_value() {
             } else {
                 eur_disc.as_ref()
             };
-            let df = disc.df_on_date_curve(cf.date).expect("payment DF")
-                / disc.df_on_date_curve(as_of).expect("valuation DF");
+            let df = disc.df_on_date(cf.date).expect("payment DF")
+                / disc.df_on_date(as_of).expect("valuation DF");
             let native_pv = cf.amount.amount() * df;
             let usd_pv = if ccy == Currency::USD {
                 native_pv

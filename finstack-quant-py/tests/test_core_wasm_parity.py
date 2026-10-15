@@ -244,7 +244,7 @@ CASES: dict[str, Callable[[], Any]] = {
         stats.sample_variance_or_nan(SERIES),
         stats.sample_std_or_nan(SERIES),
         stats.median_or_nan(SERIES),
-        stats.quantile_linear_or_nan(SERIES, 0.3),
+        stats.quantile(SERIES, 0.3),
         stats.finite_min_or_nan(SERIES),
         stats.finite_max_or_nan(SERIES),
     ],
@@ -314,10 +314,10 @@ CASES: dict[str, Callable[[], Any]] = {
     # --- market data ------------------------------------------------------------------
     "discount_curve": lambda: json.loads(_discount().to_json()),
     "discount_curve_queries": lambda: [
-        _discount().zero_annual(2.0),
+        _discount().zero_rate(2.0, "annual"),
         _discount().zero_rate(2.0, "semi_annual"),
         _discount().zero_rate_on_date("2027-01-02", "quarterly"),
-        _discount().df_on_date_curve("2027-01-02"),
+        _discount().df_on_date("2027-01-02"),
         _discount().df_between_dates("2026-01-02", "2027-01-02"),
         _discount().to_forward_curve("USD-FWD", 0.25).rate(1.0),
         _discount().day_count,

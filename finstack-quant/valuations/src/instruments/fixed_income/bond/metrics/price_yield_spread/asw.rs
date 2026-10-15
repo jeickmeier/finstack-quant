@@ -46,7 +46,7 @@ pub(crate) fn settlement_asw_components(
             "ASW requires positive face and remaining payments after settlement".into(),
         ));
     }
-    let df_settlement = disc.df_on_date_curve(settlement)?;
+    let df_settlement = disc.df_on_date(settlement)?;
     let schedule = bond.full_cashflow_schedule(market)?;
     let ex_coupon = bond.accrual_config().ex_coupon;
     let mut coupon_pv = 0.0;
@@ -58,7 +58,7 @@ pub(crate) fn settlement_asw_components(
                 continue;
             }
         }
-        coupon_pv += flow.amount.amount() * disc.df_on_date_curve(flow.date)?
+        coupon_pv += flow.amount.amount() * disc.df_on_date(flow.date)?
             / df_settlement
             / bond.notional.amount();
     }
@@ -98,7 +98,7 @@ pub(crate) fn settlement_asw_components(
             finstack_quant_core::Error::Validation("ASW has no floating payments".into())
         })?;
         (
-            disc.df_on_date_curve(float_schedule[0])? - disc.df_on_date_curve(end)?,
+            disc.df_on_date(float_schedule[0])? - disc.df_on_date(end)?,
             annuity,
         )
     };
@@ -337,7 +337,7 @@ fn pv_coupon_from_custom_schedule(
         }
         match cf.kind {
             CFKind::Fixed | CFKind::Stub => {
-                let df = disc.df_on_date_curve(cf.date)?;
+                let df = disc.df_on_date(cf.date)?;
                 pv.add(cf.amount.amount() * df);
             }
             _ => {}

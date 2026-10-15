@@ -167,25 +167,8 @@ pub fn sample_std_or_nan(xs: &[f64]) -> f64 {
 ///   into a scratch buffer for partial selection, and an empty slice or
 ///   non-finite value returns `NaN`.
 pub fn median_or_nan(xs: &[f64]) -> f64 {
-    quantile_linear_or_nan(xs, 0.5)
-}
-
-/// Linear-interpolation quantile (R-7 / NumPy / Excel style), returning [`f64::NAN`] for
-/// empty input or when any input value is non-finite (matching the mutating
-/// [`quantile`] variant's NaN policy).
-///
-/// # Arguments
-///
-/// * `xs` - Observations whose order statistic is required. Values must be
-///   finite; the slice is copied into a scratch buffer for partial selection.
-/// * `q` - Quantile probability. Values outside the inclusive `0.0..=1.0`
-///   range are clamped to the nearest endpoint; NaN returns `NaN`.
-pub fn quantile_linear_or_nan(xs: &[f64], q: f64) -> f64 {
-    if q.is_nan() {
-        return f64::NAN;
-    }
     let mut buf = xs.to_vec();
-    quantile(&mut buf, q.clamp(0.0, 1.0))
+    quantile(&mut buf, 0.5)
 }
 
 /// Minimum finite value, ignoring NaN / infinite entries. Returns [`f64::NAN`] if none are finite.
@@ -1507,7 +1490,6 @@ mod tests {
         assert!(super::sample_variance_or_nan(&[42.0]).is_nan());
         assert!(super::sample_std_or_nan(&[42.0]).is_nan());
         assert!(super::median_or_nan(&[]).is_nan());
-        assert!(super::quantile_linear_or_nan(&[], 0.5).is_nan());
     }
 
     #[test]
@@ -1519,23 +1501,9 @@ mod tests {
     }
 
     #[test]
-    fn quantile_linear_nan_probability_preserves_nan() {
-        for values in [&[][..], &[1.0][..], &[1.0, 2.0, 3.0][..]] {
-            assert!(super::quantile_linear_or_nan(values, f64::NAN).is_nan());
-        }
-        let values = [1.0, 2.0, 3.0];
-        for q in [f64::NEG_INFINITY, -1.0, 0.0] {
-            assert_eq!(super::quantile_linear_or_nan(&values, q), 1.0);
-        }
-        for q in [1.0, 2.0, f64::INFINITY] {
-            assert_eq!(super::quantile_linear_or_nan(&values, q), 3.0);
-        }
-    }
-
-    #[test]
-    fn quantile_linear_helper_matches_r7_interpolation() {
-        let values = [1.0, 2.0, 3.0, 4.0];
-        assert!((super::quantile_linear_or_nan(&values, 0.5) - 2.5).abs() < 1e-12);
+    fn quantile_matches_r7_interpolation() {
+        let mut values = [1.0, 2.0, 3.0, 4.0];
+        assert!((super::quantile(&mut values, 0.5) - 2.5).abs() < 1e-12);
     }
 
     // ── RealizedVarMethod FromStr / Display roundtrip ──

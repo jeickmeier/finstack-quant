@@ -415,7 +415,7 @@ impl InflationCurve {
     /// CPI level on a specific calendar date, without indexation lag.
     ///
     /// This is the date-based equivalent of [`cpi`](Self::cpi), consistent with
-    /// `DiscountCurve::df_on_date_curve` and `HazardCurve::sp_on_date`.
+    /// `DiscountCurve::df_on_date` and `HazardCurve::sp_on_date`.
     ///
     /// # Errors
     ///

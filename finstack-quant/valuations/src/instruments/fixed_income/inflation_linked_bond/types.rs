@@ -624,7 +624,7 @@ impl InflationLinkedBond {
     /// * `nominal_bond_yield` — yield of the comparable nominal bond, quoted in
     ///   **effective-annual (annually-compounded)** convention.
     ///   When calling from `BreakevenInflationCalculator`, this comes from
-    ///   `disc_curve.zero_annual(t)`.
+    ///   `disc_curve.zero_rate(t, Compounding::Annual)`.
     ///
     /// This is more accurate than the simplified approximation (`nominal - real`)
     /// at higher inflation levels where the cross-term becomes significant.

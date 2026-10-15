@@ -833,7 +833,7 @@ fn test_expected_loss_conditions_on_as_of() {
     let mut cds = create_test_cds(base, maturity);
     cds.protection_leg.recovery_rate = recovery;
 
-    // Curves can be based at `base` (safer for df_on_date_curve on older dates).
+    // Curves can be based at `base` (safer for df_on_date on older dates).
     let market = MarketContext::new()
         .insert(build_test_discount(0.05, base, "USD_OIS"))
         .insert(build_test_hazard(hazard_rate, recovery, base, "CORP"));

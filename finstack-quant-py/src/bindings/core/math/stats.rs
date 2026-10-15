@@ -152,23 +152,6 @@ fn median_or_nan(py: Python<'_>, data: &Bound<'_, PyAny>) -> PyResult<f64> {
     Ok(py.detach(|| stats::median_or_nan(&data)))
 }
 
-/// Linearly interpolated quantile (R-7); clamps ``q`` to ``[0, 1]`` and returns ``nan`` for NaN ``q`` or empty/non-finite data.
-///
-/// # Arguments
-///
-/// * `data` - One-dimensional numeric observations; caller storage is never reordered.
-/// * `q` - Quantile probability clamped to [0, 1]; NaN returns NaN.
-///
-/// # Errors
-///
-/// Raises `TypeError` when a series is not one-dimensional or contains non-numeric values.
-#[pyfunction]
-#[pyo3(text_signature = "(data, q)")]
-fn quantile_linear_or_nan(py: Python<'_>, data: &Bound<'_, PyAny>, q: f64) -> PyResult<f64> {
-    let data = extract_series(data)?;
-    Ok(py.detach(|| stats::quantile_linear_or_nan(&data, q)))
-}
-
 /// Minimum over finite values, or ``nan`` when there are none.
 ///
 /// # Arguments
@@ -397,7 +380,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(median_or_nan, &m)?)?;
     m.add_function(wrap_pyfunction!(population_variance, &m)?)?;
     m.add_function(wrap_pyfunction!(quantile, &m)?)?;
-    m.add_function(wrap_pyfunction!(quantile_linear_or_nan, &m)?)?;
     m.add_function(wrap_pyfunction!(realized_variance, &m)?)?;
     m.add_function(wrap_pyfunction!(realized_variance_ohlc, &m)?)?;
     m.add_function(wrap_pyfunction!(sample_std_or_nan, &m)?)?;
@@ -419,7 +401,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "median_or_nan",
             "population_variance",
             "quantile",
-            "quantile_linear_or_nan",
             "realized_variance",
             "realized_variance_ohlc",
             "sample_std_or_nan",

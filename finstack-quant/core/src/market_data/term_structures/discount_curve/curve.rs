@@ -248,16 +248,6 @@ impl DiscountCurve {
         -self.df(t).ln() / t
     }
 
-    /// Annually-compounded zero rate (bond equivalent yield convention).
-    ///
-    /// Shorthand for [`zero_rate`](Self::zero_rate) with
-    /// [`Compounding::Annual`]: `r_annual = DF^(-1/t) - 1`.
-    #[inline]
-    #[must_use]
-    pub fn zero_annual(&self, t: f64) -> f64 {
-        self.zero_rate(t, Compounding::Annual)
-    }
-
     /// Continuously-compounded forward rate between `t1` and `t2`.
     ///
     /// The forward rate `f(t1, t2)` satisfies `DF(t2) = DF(t1) · exp(-f · (t2 − t1))`,
@@ -341,13 +331,17 @@ impl DiscountCurve {
 
     /// Fallible: discount factor on a specific date `date` using the curve's day-count.
     ///
+    /// # Arguments
+    ///
+    /// * `date` - Target calendar date converted to a year fraction from [`base_date`](Self::base_date) using [`day_count`](Self::day_count).
+    ///
     /// # Errors
     ///
     /// Propagates a failure while computing the curve day-count fraction from
     /// the base date to `date`.
     #[inline]
     #[must_use = "computed discount factor should not be discarded"]
-    pub fn df_on_date_curve(&self, date: Date) -> crate::Result<f64> {
+    pub fn df_on_date(&self, date: Date) -> crate::Result<f64> {
         let t = self.year_fraction_to(date)?;
         Ok(self.df(t))
     }
@@ -487,7 +481,7 @@ impl DiscountCurve {
     /// assert!((curve.zero_rate(0.25, Compounding::Simple) - 0.0404).abs() < 0.001);
     /// // Periodic(1) is the annual convention
     /// let annual = curve.zero_rate(1.0, Compounding::Periodic(1.try_into().unwrap()));
-    /// assert!((curve.zero_annual(1.0) - annual).abs() < 1e-12);
+    /// assert!((curve.zero_rate(1.0, Compounding::Annual) - annual).abs() < 1e-12);
     /// ```
     #[inline]
     #[must_use]

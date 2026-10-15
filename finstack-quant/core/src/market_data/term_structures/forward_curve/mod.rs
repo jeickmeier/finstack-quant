@@ -71,7 +71,7 @@ use crate::market_data::term_structures::common::{
 };
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::{
-    dates::{Date, DayCount, DayCountContext},
+    dates::{Date, DayCount},
     error::InputError,
     math::integration::simpson_rule,
     math::interp::types::Interp,

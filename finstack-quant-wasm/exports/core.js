@@ -202,7 +202,6 @@ export const core = {
   sampleVarianceOrNan: wasm.sampleVarianceOrNan,
   sampleStdOrNan: wasm.sampleStdOrNan,
   medianOrNan: wasm.medianOrNan,
-  quantileLinearOrNan: wasm.quantileLinearOrNan,
   finiteMinOrNan: wasm.finiteMinOrNan,
   finiteMaxOrNan: wasm.finiteMaxOrNan,
   finiteCount: wasm.finiteCount,

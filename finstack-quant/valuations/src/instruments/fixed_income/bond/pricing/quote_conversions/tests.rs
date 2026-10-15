@@ -151,9 +151,7 @@ fn asset_swap_forward_paths_use_discount_factor_implied_rates() {
             .day_count()
             .year_fraction(dates[0], dates[1], DayCountContext::default())
             .expect("valid accrual fraction");
-        let df = disc
-            .df_on_date_curve(dates[1])
-            .expect("valid discount factor");
+        let df = disc.df_on_date(dates[1]).expect("valid discount factor");
         expected_float_pv += fwd.rate_between(t1, t2).expect("valid term forward") * yf * df;
         integrated_float_pv += fwd.rate_period(t1, t2) * yf * df;
     }
@@ -193,9 +191,7 @@ fn overnight_asset_swap_forward_paths_use_observation_average() {
         .year_fraction(base, schedule[1], DayCountContext::default())
         .expect("valid end time");
     let yf = t2;
-    let df = disc
-        .df_on_date_curve(schedule[1])
-        .expect("valid discount factor");
+    let df = disc.df_on_date(schedule[1]).expect("valid discount factor");
     let expected_float_pv = fwd.rate_period(0.0, t2) * yf * df;
     let term_float_pv = fwd.rate_between(0.0, t2).expect("valid term forward") * yf * df;
 

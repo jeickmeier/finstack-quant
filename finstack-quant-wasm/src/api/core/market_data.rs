@@ -318,19 +318,6 @@ impl JsDiscountCurve {
         serde_json::to_string(&*self.inner).map_err(to_js_err)
     }
 
-    /// Annually compounded zero rate at year fraction `t` (Rust `DiscountCurve::zero_annual`).
-    ///
-    /// # Arguments
-    ///
-    /// * `t` - Time from the curve base date in years.
-    ///
-    /// @returns The zero rate as a decimal; `0` at `t = 0`.
-    /// @throws `TypeError` if `t` is not a number.
-    #[wasm_bindgen(js_name = zeroAnnual)]
-    pub fn zero_annual(&self, t: JsValue) -> Result<f64, JsValue> {
-        Ok(self.inner.zero_annual(js_f64(&t, "t")?))
-    }
-
     /// Zero rate at year fraction `t` under a compounding convention (Rust
     /// `DiscountCurve::zero_rate`).
     ///
@@ -379,7 +366,7 @@ impl JsDiscountCurve {
     }
 
     /// Discount factor to a date, measured with the curve day count (Rust
-    /// `DiscountCurve::df_on_date_curve`).
+    /// `DiscountCurve::df_on_date`).
     ///
     /// # Arguments
     ///
@@ -389,10 +376,10 @@ impl JsDiscountCurve {
     /// @throws `TypeError` if `date` is not a string; `FinstackError` (kind
     /// `validation`) for a malformed date or a year fraction that cannot be
     /// computed.
-    #[wasm_bindgen(js_name = dfOnDateCurve)]
-    pub fn df_on_date_curve(&self, date: JsValue) -> Result<f64, JsValue> {
+    #[wasm_bindgen(js_name = dfOnDate)]
+    pub fn df_on_date(&self, date: JsValue) -> Result<f64, JsValue> {
         let date = parse_iso_date(&js_string(&date, "date")?)?;
-        self.inner.df_on_date_curve(date).map_err(to_js_err)
+        self.inner.df_on_date(date).map_err(to_js_err)
     }
 
     /// Forward discount factor between two dates, `df(toDate) / df(fromDate)`
@@ -1184,11 +1171,11 @@ impl JsForwardCurve {
     /// @returns Projection discount factor.
     /// @throws If `date` is not an ISO date, the year fraction cannot be
     /// computed, or the implied discount factor is invalid.
-    #[wasm_bindgen(js_name = dfOnDateCurve)]
-    pub fn df_on_date_curve(&self, date: JsValue) -> Result<f64, JsValue> {
+    #[wasm_bindgen(js_name = dfOnDate)]
+    pub fn df_on_date(&self, date: JsValue) -> Result<f64, JsValue> {
         let date = js_string(&date, "date")?;
         self.inner
-            .df_on_date_curve(parse_iso_date(&date)?)
+            .df_on_date(parse_iso_date(&date)?)
             .map_err(to_js_err)
     }
 

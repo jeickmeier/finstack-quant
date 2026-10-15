@@ -100,8 +100,8 @@ fn test_cashflow_conservation_of_value() {
     let mut manual_pv: f64 = 0.0;
     for (date, amount) in flows {
         let df = disc
-            .df_on_date_curve(date)
-            .expect("try_df_on_date_curve should succeed");
+            .df_on_date(date)
+            .expect("try_df_on_date should succeed");
         manual_pv += amount.amount() * df;
     }
 

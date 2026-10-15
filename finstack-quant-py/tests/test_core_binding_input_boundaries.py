@@ -120,7 +120,7 @@ def test_statistic_array_inputs_match_list_semantics(function: str, layout: str)
     np.testing.assert_array_equal(source, before)
 
 
-@pytest.mark.parametrize("function", ["quantile", "quantile_linear_or_nan"])
+@pytest.mark.parametrize("function", ["quantile"])
 def test_quantile_array_inputs_preserve_caller_storage(function: str) -> None:
     source = np.array([8.0, 4.0, 2.0, 1.0], dtype=np.float64)[::-1]
     before = source.copy()

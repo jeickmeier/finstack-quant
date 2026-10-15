@@ -91,8 +91,8 @@ fn test_theta_sign_diagnostic() {
 
     let disc = market.get_discount("USD-OIS").unwrap();
     let df_1d = disc.df_between_dates(as_of, rolled_date).unwrap();
-    let df_base_to_rolled = disc.df_on_date_curve(rolled_date).unwrap();
-    let df_base_to_as_of = disc.df_on_date_curve(as_of).unwrap();
+    let df_base_to_rolled = disc.df_on_date(rolled_date).unwrap();
+    let df_base_to_as_of = disc.df_on_date(as_of).unwrap();
     eprintln!("df(as_of -> rolled_date) = {df_1d}");
     eprintln!("df_on_curve(rolled_date) = {df_base_to_rolled}");
     eprintln!("df_on_curve(as_of) = {df_base_to_as_of}");

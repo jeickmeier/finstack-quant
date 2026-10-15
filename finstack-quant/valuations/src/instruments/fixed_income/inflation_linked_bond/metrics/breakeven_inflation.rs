@@ -37,7 +37,7 @@ impl MetricCalculator for BreakevenInflationCalculator {
         // Use annually-compounded (effective-annual) zero rate so that the
         // nominal yield passed to `breakeven_inflation` is on the same basis as
         // the real yield after its Street→Annual conversion inside that method.
-        let nominal_yield = disc_curve.zero_annual(t);
+        let nominal_yield = disc_curve.zero_rate(t, finstack_quant_core::math::Compounding::Annual);
 
         ilb.breakeven_inflation(nominal_yield, context.as_of)
     }

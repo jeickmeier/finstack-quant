@@ -176,7 +176,7 @@ pub fn year_fraction(
 /// Schedule → PV helper that uses the curve's own day count convention.
 ///
 /// This variant ensures consistency between:
-/// - Metric calculations (e.g., par rate using `df_on_date_curve`)
+/// - Metric calculations (e.g., par rate using `df_on_date`)
 /// - NPV calculations
 ///
 /// Routes through `core::cashflow::npv`, which excludes flows on or before

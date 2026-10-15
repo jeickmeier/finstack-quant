@@ -15,7 +15,7 @@ use crate::evaluator::formula::{
 };
 use crate::evaluator::formula_aggregates::evaluate_historical_function;
 use finstack_quant_core::expr::{Expr, ExprNode, Function};
-use finstack_quant_core::math::{kahan_sum, quantile_linear_or_nan, ZERO_TOLERANCE};
+use finstack_quant_core::math::{kahan_sum, quantile, ZERO_TOLERANCE};
 
 /// Evaluate a function call.
 ///
@@ -328,8 +328,8 @@ fn eval_quantile(
 ) -> Result<f64> {
     require_args("quantile", args, 2, node_id)?;
 
-    let quantile = evaluate_formula(&args[1], context, node_id)?;
-    if !(0.0..=1.0).contains(&quantile) {
+    let q = evaluate_formula(&args[1], context, node_id)?;
+    if !(0.0..=1.0).contains(&q) {
         return Err(eval_error(node_id, "quantile must be between 0 and 1"));
     }
 
@@ -341,7 +341,7 @@ fn eval_quantile(
     }
 
     let sorted = collect_expression_values_sorted(&args[0], context, node_id)?;
-    let values: Vec<_> = sorted
+    let mut values: Vec<_> = sorted
         .values()
         .copied()
         .filter(|value| value.is_finite())
@@ -349,7 +349,7 @@ fn eval_quantile(
     if values.is_empty() {
         return Ok(f64::NAN);
     }
-    Ok(quantile_linear_or_nan(&values, quantile))
+    Ok(quantile(&mut values, q))
 }
 
 /// Annualise a flow value (cash flows, income, expenses) by multiplying by

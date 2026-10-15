@@ -539,10 +539,10 @@ mod tests {
         let date = Date::from_calendar_date(2027, Month::July, 2).expect("date");
         let swap_id = InstrumentId::new("TEST-XCCY-SWAP");
 
-        // Reference values computed via df_on_date_curve (each curve uses its own axis).
-        // When `as_of == curve.base_date`, the relative DF equals df_on_date_curve.
-        let p_c = disc_c.df_on_date_curve(date).expect("p_c");
-        let p_r = disc_r.df_on_date_curve(date).expect("p_r");
+        // Reference values computed via df_on_date (each curve uses its own axis).
+        // When `as_of == curve.base_date`, the relative DF equals df_on_date.
+        let p_c = disc_c.df_on_date(date).expect("p_c");
+        let p_r = disc_r.df_on_date(date).expect("p_r");
         let expected = n_c / (spot * p_r / p_c);
 
         let actual =

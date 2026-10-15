@@ -250,5 +250,5 @@ test('tiny annual zero rates avoid subtractive cancellation', () => {
     knots: [0, 1, 1, df],
     interp: 'log_linear',
   });
-  assert.ok(Math.abs(curve.zeroAnnual(1) - (1 - df) / df) < 1e-23);
+  assert.ok(Math.abs(curve.zeroRate(1, 'annual') - (1 - df) / df) < 1e-23);
 });

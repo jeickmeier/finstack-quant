@@ -155,7 +155,7 @@ pub fn fixed_leg_annuity(
             dc_ctx
         };
         let alpha = day_count.year_fraction(prev, d, context)?;
-        let p = disc.df_on_date_curve(d)?;
+        let p = disc.df_on_date(d)?;
         ann += alpha * p;
         prev = d;
     }
@@ -207,10 +207,10 @@ pub fn par_rate_and_annuity_from_discount(
         return Ok((0.0, 0.0));
     }
 
-    let p0 = disc.df_on_date_curve(schedule[0])?;
+    let p0 = disc.df_on_date(schedule[0])?;
     // `schedule.len() >= 2` by the guard above, so `schedule[0]` and `schedule[last]` are safe.
     let pn_date = schedule[schedule.len() - 1];
-    let pn = disc.df_on_date_curve(pn_date)?;
+    let pn = disc.df_on_date(pn_date)?;
     let num = p0 - pn;
     Ok((num / ann, ann))
 }
@@ -286,7 +286,7 @@ pub(crate) fn floating_leg_pv_and_annuity(
     let mut prev = schedule[0];
     for &d in &schedule[1..] {
         let yf = day_count.year_fraction(prev, d, DayCountContext::default())?;
-        let df = disc.df_on_date_curve(d)?;
+        let df = disc.df_on_date(d)?;
         let forward = match seasoned {
             Some((market, as_of)) if prev < as_of => {
                 let fixing_id =
@@ -372,8 +372,7 @@ mod tests {
             let spread_bp = 125.0;
             let accrual = (end - start).whole_days() as f64 / 360.0;
             let growth = if tenor > 1.0 / 52.0 {
-                fwd.df_on_date_curve(start).expect("start DF")
-                    / fwd.df_on_date_curve(end).expect("end DF")
+                fwd.df_on_date(start).expect("start DF") / fwd.df_on_date(end).expect("end DF")
                     - 1.0
             } else {
                 // Exact integral of the linear raw curve on its ACT/365F clock.

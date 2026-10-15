@@ -298,8 +298,7 @@ fn test_day_count_impact() {
     let market = build_standard_market(as_of, 0.05);
 
     let forward = market.get_forward("USD_LIBOR_3M").unwrap();
-    let growth =
-        forward.df_on_date_curve(start).unwrap() / forward.df_on_date_curve(end).unwrap() - 1.0;
+    let growth = forward.df_on_date(start).unwrap() / forward.df_on_date(end).unwrap() - 1.0;
     let day_counts = [DayCount::Act360, DayCount::Act365F];
 
     let mut pvs = Vec::new();

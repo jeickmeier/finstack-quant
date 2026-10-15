@@ -48,14 +48,13 @@ from finstack_quant.core.types import Bps, CreditRating, Rate
 from finstack_quant.models.credit import moodys_warf_factor
 
 
-def test_quantile_nan_probability_preserves_nan_and_endpoint_clamping() -> None:
-    from finstack_quant.core.math.stats import quantile, quantile_linear_or_nan
+def test_quantile_nan_probability_and_out_of_range_returns_nan() -> None:
+    from finstack_quant.core.math.stats import quantile
 
     for values in ([], [1.0], [1.0, 2.0, 3.0]):
-        assert math.isnan(quantile_linear_or_nan(values, math.nan))
         assert math.isnan(quantile(values, math.nan))
-    assert quantile_linear_or_nan([1.0, 2.0, 3.0], -1.0) == 1.0
-    assert quantile_linear_or_nan([1.0, 2.0, 3.0], 2.0) == 3.0
+    assert math.isnan(quantile([1.0, 2.0, 3.0], -1.0))
+    assert math.isnan(quantile([1.0, 2.0, 3.0], 2.0))
 
 
 @pytest.mark.parametrize(

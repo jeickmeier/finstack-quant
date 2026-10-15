@@ -473,27 +473,6 @@ pub fn median_or_nan(data: JsValue) -> Result<f64, JsValue> {
     Ok(stats::median_or_nan(&js_f64_seq(&data, "data")?))
 }
 
-/// Linear-interpolation quantile (R-7, the NumPy and Excel default) with a
-/// NaN sentinel (Rust `stats::quantile_linear_or_nan`).
-///
-/// # Arguments
-///
-/// * `data` - Finite observations; the input is not modified.
-/// * `q` - Quantile probability; values outside `[0, 1]` are clamped to the
-///   nearest endpoint.
-///
-/// @returns The quantile, or `NaN` for an empty series, a non-finite
-/// observation or a NaN `q`.
-/// @throws `TypeError` for a mistyped argument.
-#[wasm_bindgen(js_name = quantileLinearOrNan)]
-pub fn quantile_linear_or_nan(data: JsValue, q: JsValue) -> Result<f64, JsValue> {
-    let q = js_f64(&q, "q")?;
-    Ok(stats::quantile_linear_or_nan(
-        &js_f64_seq(&data, "data")?,
-        q,
-    ))
-}
-
 /// Smallest finite value (Rust `stats::finite_min_or_nan`).
 ///
 /// # Arguments

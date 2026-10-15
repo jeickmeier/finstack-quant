@@ -1202,8 +1202,8 @@ mod tests {
         let start = base_date + time::Duration::days(90);
         let end = base_date + time::Duration::days(180);
         for curve in [&act365f, &act360] {
-            let growth = curve.df_on_date_curve(start).expect("start DF")
-                / curve.df_on_date_curve(end).expect("end DF")
+            let growth = curve.df_on_date(start).expect("start DF")
+                / curve.df_on_date(end).expect("end DF")
                 - 1.0;
             let index_rate = growth / (90.0 / 360.0);
             assert!(
@@ -1310,8 +1310,8 @@ mod tests {
                     .expect("contractual accrual");
                 let index_rate = if contract == "CME:ED" {
                     // Term futures are quoted from full-period projection growth.
-                    (curve.df_on_date_curve(start).expect("start DF")
-                        / curve.df_on_date_curve(end).expect("end DF")
+                    (curve.df_on_date(start).expect("start DF")
+                        / curve.df_on_date(end).expect("end DF")
                         - 1.0)
                         / accrual
                 } else {

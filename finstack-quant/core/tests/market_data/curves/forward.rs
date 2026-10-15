@@ -201,7 +201,7 @@ fn df_rejects_invalid_times_and_accrual_steps() {
 }
 
 #[test]
-fn df_on_date_curve_uses_curve_day_count() {
+fn df_on_date_uses_curve_day_count() {
     let curve = ForwardCurve::builder("USD-SOFR6M", 0.5)
         .base_date(test_date())
         .day_count(DayCount::Act360)
@@ -211,7 +211,7 @@ fn df_on_date_curve_uses_curve_day_count() {
         .unwrap();
     let date = test_date() + time::Duration::days(180);
 
-    let df = curve.df_on_date_curve(date).unwrap();
+    let df = curve.df_on_date(date).unwrap();
     let expected = 1.0 / (1.0 + 0.05 * 0.5);
     assert!((df - expected).abs() < 1e-14);
 }

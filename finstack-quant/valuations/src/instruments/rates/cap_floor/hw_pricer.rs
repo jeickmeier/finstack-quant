@@ -298,9 +298,9 @@ impl CapFloorHullWhitePricer {
                         PricingErrorContext::default(),
                     )
                 })?;
-                let projection_df_as_of = fwd.df_on_date_curve(as_of)?;
-                let pf_start = fwd.df_on_date_curve(period.accrual_start)? / projection_df_as_of;
-                let pf_end = fwd.df_on_date_curve(period.accrual_end)? / projection_df_as_of;
+                let projection_df_as_of = fwd.df_on_date(as_of)?;
+                let pf_start = fwd.df_on_date(period.accrual_start)? / projection_df_as_of;
+                let pf_end = fwd.df_on_date(period.accrual_end)? / projection_df_as_of;
                 let t_end = finstack_quant_core::dates::DayCount::Act365F.year_fraction(
                     as_of,
                     period.accrual_end,
@@ -919,13 +919,13 @@ mod tests {
         let period = caplet.pricing_periods().expect("periods").remove(0);
         let disc = market.get_discount("USD-OIS").expect("discount");
         let fwd = market.get_forward("USD-SOFR-3M").expect("forward");
-        let projection_base_df = fwd.df_on_date_curve(as_of).expect("base projection df");
+        let projection_base_df = fwd.df_on_date(as_of).expect("base projection df");
         let pf_start = fwd
-            .df_on_date_curve(period.accrual_start)
+            .df_on_date(period.accrual_start)
             .expect("start projection df")
             / projection_base_df;
         let pf_end = fwd
-            .df_on_date_curve(period.accrual_end)
+            .df_on_date(period.accrual_end)
             .expect("end projection df")
             / projection_base_df;
         let pd_pay = disc

@@ -857,22 +857,18 @@ mod tests {
             .map(|period| {
                 period.accrual_year_fraction
                     * discount
-                        .df_on_date_curve(period.payment_date)
+                        .df_on_date(period.payment_date)
                         .expect("payment DF")
             })
             .sum();
         let floating_pv: f64 = floating_periods
             .iter()
             .map(|period| {
-                (discount
-                    .df_on_date_curve(period.accrual_start)
-                    .expect("start DF")
-                    / discount
-                        .df_on_date_curve(period.accrual_end)
-                        .expect("end DF")
+                (discount.df_on_date(period.accrual_start).expect("start DF")
+                    / discount.df_on_date(period.accrual_end).expect("end DF")
                     - 1.0)
                     * discount
-                        .df_on_date_curve(period.payment_date)
+                        .df_on_date(period.payment_date)
                         .expect("payment DF")
             })
             .sum();

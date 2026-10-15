@@ -1050,10 +1050,8 @@ mod tests {
                 .day_count
                 .year_fraction(period_start, period_end, ctx_day_count)
                 .expect("yf");
-            let growth = fwd
-                .df_on_date_curve(period_start)
-                .expect("start projection DF")
-                / fwd.df_on_date_curve(period_end).expect("end projection DF")
+            let growth = fwd.df_on_date(period_start).expect("start projection DF")
+                / fwd.df_on_date(period_end).expect("end projection DF")
                 - 1.0;
             let df = relative_df_discount_curve(&disc, as_of, period_end).expect("df");
             expected += 1_000_000.0 * growth * df;

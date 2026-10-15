@@ -866,7 +866,6 @@
       "prevCdsDate",
       "prevCdsSemiannualRoll",
       "quantile",
-      "quantileLinearOrNan",
       "quarter",
       "ratingScalesExtensionKey",
       "realizedVariance",
@@ -1464,13 +1463,12 @@
     "methods": [
       "df",
       "dfBetweenDates",
-      "dfOnDateCurve",
+      "dfOnDate",
       "forward",
       "free",
       "toForwardCurve",
       "toJson",
       "zero",
-      "zeroAnnual",
       "zeroRate",
       "zeroRateOnDate"
     ],
@@ -1518,7 +1516,7 @@
   "core.ForwardCurve": {
     "kind": "class",
     "statics": ["flat", "fromJson"],
-    "methods": ["df", "dfOnDateCurve", "free", "rate", "rateBetween", "ratePeriod", "toJson"],
+    "methods": ["df", "dfOnDate", "free", "rate", "rateBetween", "ratePeriod", "toJson"],
     "getters": [
       "baseDate",
       "dayCount",
@@ -1776,9 +1774,6 @@
     "kind": "function"
   },
   "core.medianOrNan": {
-    "kind": "function"
-  },
-  "core.quantileLinearOrNan": {
     "kind": "function"
   },
   "core.finiteMinOrNan": {

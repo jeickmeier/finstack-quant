@@ -263,7 +263,7 @@ impl PyForwardCurve {
     fn df(&self, t: &Bound<'_, PyAny>) -> PyResult<f64> {
         match extract_time_point(t)? {
             TimePoint::Years(t) => self.inner.df(t).map_err(core_to_py),
-            TimePoint::Date(d) => self.inner.df_on_date_curve(d).map_err(core_to_py),
+            TimePoint::Date(d) => self.inner.df_on_date(d).map_err(core_to_py),
         }
     }
 
@@ -283,10 +283,8 @@ impl PyForwardCurve {
     /// ValueError
     ///     If the year fraction cannot be computed.
     #[pyo3(text_signature = "(self, date)")]
-    fn df_on_date_curve(&self, date: &Bound<'_, PyAny>) -> PyResult<f64> {
-        self.inner
-            .df_on_date_curve(py_to_date(date)?)
-            .map_err(core_to_py)
+    fn df_on_date(&self, date: &Bound<'_, PyAny>) -> PyResult<f64> {
+        self.inner.df_on_date(py_to_date(date)?).map_err(core_to_py)
     }
 
     /// Export knots as a pandas ``DataFrame`` with columns ``t`` (years) and ``forward`` (decimal).

@@ -655,10 +655,8 @@ mod tests {
         let accrual = DayCount::Act360
             .year_fraction(start, end, DayCountContext::default())
             .expect("accrual");
-        let growth = forward
-            .df_on_date_curve(start)
-            .expect("start projection DF")
-            / forward.df_on_date_curve(end).expect("end projection DF")
+        let growth = forward.df_on_date(start).expect("start projection DF")
+            / forward.df_on_date(end).expect("end projection DF")
             - 1.0;
         let expected_cashflow = 100_000_000.0 * growth;
         let curve_accrual = forward

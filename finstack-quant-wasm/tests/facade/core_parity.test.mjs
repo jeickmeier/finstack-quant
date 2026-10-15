@@ -240,7 +240,7 @@ const CASES = {
     core.sampleVarianceOrNan(SERIES),
     core.sampleStdOrNan(SERIES),
     core.medianOrNan(SERIES),
-    core.quantileLinearOrNan(SERIES, 0.3),
+    core.quantile(SERIES, 0.3),
     core.finiteMinOrNan(SERIES),
     core.finiteMaxOrNan(SERIES),
   ],
@@ -310,10 +310,10 @@ const CASES = {
   // --- market data ------------------------------------------------------------------
   discount_curve: () => JSON.parse(discount().toJson()),
   discount_curve_queries: () => [
-    discount().zeroAnnual(2.0),
+    discount().zeroRate(2.0, 'annual'),
     discount().zeroRate(2.0, 'semi_annual'),
     discount().zeroRateOnDate('2027-01-02', 'quarterly'),
-    discount().dfOnDateCurve('2027-01-02'),
+    discount().dfOnDate('2027-01-02'),
     discount().dfBetweenDates('2026-01-02', '2027-01-02'),
     discount().toForwardCurve('USD-FWD', 0.25).rate(1.0),
     discount().dayCount,

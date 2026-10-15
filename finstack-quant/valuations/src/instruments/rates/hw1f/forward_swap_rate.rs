@@ -167,9 +167,7 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
                 accrual,
             )? * accrual
         } else {
-            disc.df_on_date_curve(period.accrual_start)?
-                / disc.df_on_date_curve(period.accrual_end)?
-                - 1.0
+            disc.df_on_date(period.accrual_start)? / disc.df_on_date(period.accrual_end)? - 1.0
         };
         let df = relative_df_discount_curve(disc.as_ref(), inputs.as_of, period.payment_date)?;
         pv_float += coupon * df;
@@ -276,8 +274,7 @@ mod tests {
                         .expect("adjusted payment")
                         .add_business_days(lag, calendar)
                         .expect("lagged payment");
-                    expected += (disc.df_on_date_curve(a).expect("df")
-                        / disc.df_on_date_curve(b).expect("df")
+                    expected += (disc.df_on_date(a).expect("df") / disc.df_on_date(b).expect("df")
                         - 1.0)
                         * relative_df_discount_curve(disc.as_ref(), as_of, payment)
                             .expect("payment df");

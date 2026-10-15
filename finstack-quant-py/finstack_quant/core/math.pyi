@@ -486,38 +486,6 @@ class stats:
         ...
 
     @staticmethod
-    def quantile_linear_or_nan(data: Sequence[float] | npt.NDArray[np.float64], q: float) -> float:
-        """
-        Linearly interpolated quantile (R-7), or ``nan`` when undefined.
-
-        Parameters
-        ----------
-        data : Sequence[float] or numpy.ndarray
-            Finite observations (sorted internally); empty or non-finite data returns ``nan``.
-        q : float
-            Quantile probability, clamped to ``[0, 1]``; NaN returns ``nan``.
-
-        Returns
-        -------
-        float
-            Quantile value, or ``nan`` for empty/non-finite data or a NaN probability.
-
-        Raises
-        ------
-        TypeError
-            If a series is not one-dimensional or contains values that cannot
-            be converted to float.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.math import stats
-        >>> stats.quantile_linear_or_nan([1.0, 2.0, 3.0, 4.0], 0.5)
-        2.5
-
-        """
-        ...
-
-    @staticmethod
     def finite_min_or_nan(data: Sequence[float] | npt.NDArray[np.float64]) -> float:
         """
         Minimum over finite values, or ``nan`` when there are none.

@@ -235,8 +235,7 @@ fn test_vanna_computable() {
             let d1 = ((adjusted / strike).ln() + 0.5 * sigma * sigma * t) / (sigma * t.sqrt());
             norm_cdf(d1)
         };
-        let df = disc.df_on_date_curve(inst.payment_dates[i]).unwrap()
-            / disc.df_on_date_curve(as_of).unwrap();
+        let df = disc.df_on_date(inst.payment_dates[i]).unwrap() / disc.df_on_date(as_of).unwrap();
         expected_vanna += df * inst.accrual_fractions[i] * (delta(vol + h) - delta(vol - h))
             / (2.0 * h)
             * 0.01

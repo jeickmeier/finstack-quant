@@ -40,7 +40,7 @@
 
 use super::eval::CompiledExpr;
 use crate::math::{
-    finite_count, finite_max_or_nan, finite_min_or_nan, quantile_linear_or_nan, NeumaierAccumulator,
+    finite_count, finite_max_or_nan, finite_min_or_nan, quantile, NeumaierAccumulator,
 };
 
 impl CompiledExpr {
@@ -763,11 +763,11 @@ impl CompiledExpr {
             return;
         }
         let q = arg_results[1][0].clamp(0.0, 1.0);
-        let valid_values: Vec<f64> = base.iter().copied().filter(|x| !x.is_nan()).collect();
+        let mut valid_values: Vec<f64> = base.iter().copied().filter(|x| !x.is_nan()).collect();
         let quantile_value = if valid_values.is_empty() {
             f64::NAN
         } else {
-            quantile_linear_or_nan(&valid_values, q)
+            quantile(&mut valid_values, q)
         };
         let n = out.len().min(base.len());
         out[..n].fill(quantile_value);

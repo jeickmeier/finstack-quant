@@ -396,26 +396,6 @@ class DiscountCurve:
         """
         ...
 
-    def zero_annual(self, t: float) -> float:
-        """
-        Annually-compounded zero rate (decimal) at year fraction ``t``.
-
-        Parameters
-        ----------
-        t : float
-            Year fraction from ``base_date``.
-
-        Returns
-        -------
-        float
-            Zero rate as a decimal under annual compounding.
-        Notes
-        -----
-        This method does not raise.
-
-        """
-        ...
-
     def zero_rate(self, t: float, compounding: str = "continuous") -> float:
         """
         Zero rate at year fraction ``t`` under an explicit compounding convention.
@@ -463,7 +443,7 @@ class DiscountCurve:
         """
         ...
 
-    def df_on_date_curve(self, date: DateLike) -> float:
+    def df_on_date(self, date: DateLike) -> float:
         """
         Discount factor on a date using the curve day count.
 
@@ -993,7 +973,7 @@ class ForwardCurve:
         """
         ...
 
-    def df_on_date_curve(self, date: DateLike) -> float:
+    def df_on_date(self, date: DateLike) -> float:
         """
         Discount factor on a date using the curve day count.
 

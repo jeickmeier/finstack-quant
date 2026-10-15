@@ -824,15 +824,13 @@ fn forward_and_df_on_date() {
 
     let base = curve.base_date();
     let date = Date::from_calendar_date(base.year(), Month::December, 31).unwrap();
-    let df_curve = curve
-        .df_on_date_curve(date)
-        .expect("df_on_date_curve should succeed");
+    let df_curve = curve.df_on_date(date).expect("df_on_date should succeed");
     assert!(df_curve.is_finite());
     assert!(df_curve > 0.0);
 }
 
 #[test]
-fn df_on_date_curve_uses_stored_day_count() {
+fn df_on_date_uses_stored_day_count() {
     let base = sample_base_date();
     let target = base + time::Duration::days(182); // ~6 months
 
@@ -853,11 +851,11 @@ fn df_on_date_curve_uses_stored_day_count() {
         .unwrap();
 
     let df_360 = curve_360
-        .df_on_date_curve(target)
-        .expect("df_on_date_curve should succeed");
+        .df_on_date(target)
+        .expect("df_on_date should succeed");
     let df_365 = curve_365
-        .df_on_date_curve(target)
-        .expect("df_on_date_curve should succeed");
+        .df_on_date(target)
+        .expect("df_on_date should succeed");
 
     // Different stored day counts = different time fractions = different DFs
     assert!(
@@ -1728,7 +1726,7 @@ fn tiny_annual_zero_rate_avoids_subtractive_cancellation() {
         .build()
         .unwrap();
     let expected = (1.0 - df) / df;
-    assert!((curve.zero_annual(1.0) - expected).abs() < 1e-23);
+    assert!((curve.zero_rate(1.0, Compounding::Annual) - expected).abs() < 1e-23);
     for convention in [
         Compounding::Annual,
         Compounding::Continuous,

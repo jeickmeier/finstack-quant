@@ -991,7 +991,7 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
                 let fixed_growth = 0.04 * period.accrual_year_fraction;
                 10_000_000.0
                     * (floating_growth - fixed_growth)
-                    * discount.df_on_date_curve(period.payment_date).unwrap()
+                    * discount.df_on_date(period.payment_date).unwrap()
             })
             .sum();
         assert!(

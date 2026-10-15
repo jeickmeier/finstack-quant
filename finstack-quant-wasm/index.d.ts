@@ -3138,14 +3138,6 @@ export interface DiscountCurve extends WasmOwned {
    */
   toJson(): string;
   /**
-   * Annually compounded zero rate at year fraction `t` (Rust `DiscountCurve::zero_annual`).
-   *
-   * @param t - Time from the curve base date in years.
-   * @returns The zero rate as a decimal; `0` at `t = 0`.
-   * @throws `TypeError` if `t` is not a number.
-   */
-  zeroAnnual(t: number): number;
-  /**
    * Zero rate at year fraction `t` under a compounding convention (Rust
    * `DiscountCurve::zero_rate`).
    *
@@ -3167,13 +3159,13 @@ export interface DiscountCurve extends WasmOwned {
   zeroRateOnDate(date: string, compounding?: string | null): number;
   /**
    * Discount factor to a date, measured with the curve day count (Rust
-   * `DiscountCurve::df_on_date_curve`).
+   * `DiscountCurve::df_on_date`).
    *
    * @param date - ISO-8601 target date.
    * @returns The discount factor from the base date to `date`.
    * @throws `TypeError` if `date` is not a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
    */
-  dfOnDateCurve(date: string): number;
+  dfOnDate(date: string): number;
   /**
    * Forward discount factor between two dates, `df(toDate) / df(fromDate)`
    * (Rust `DiscountCurve::df_between_dates`).
@@ -3663,7 +3655,7 @@ export interface ForwardCurve extends WasmOwned {
    * @returns Projection discount factor.
    * @throws If `date` is not an ISO date, the year fraction cannot be computed, or the implied discount factor is invalid.
    */
-  dfOnDateCurve(date: string): number;
+  dfOnDate(date: string): number;
 }
 
 /**
@@ -9034,16 +9026,6 @@ export interface CoreNamespace {
    * @throws `TypeError` if `data` is not an array of numbers.
    */
   medianOrNan(data: NumericArray): number;
-  /**
-   * Linear-interpolation quantile (R-7, the NumPy and Excel default) with a
-   * NaN sentinel (Rust `stats::quantile_linear_or_nan`).
-   *
-   * @param data - Finite observations; the input is not modified.
-   * @param q - Quantile probability; values outside `[0, 1]` are clamped to the nearest endpoint.
-   * @returns The quantile, or `NaN` for an empty series, a non-finite observation or a NaN `q`.
-   * @throws `TypeError` for a mistyped argument.
-   */
-  quantileLinearOrNan(data: NumericArray, q: number): number;
   /**
    * Smallest finite value (Rust `stats::finite_min_or_nan`).
    *

@@ -707,7 +707,7 @@ fn quantlib_parity_fra_day_count_act360_vs_act365() {
     let discount = market
         .get_discount("USD_OIS")
         .unwrap()
-        .df_on_date_curve(start)
+        .df_on_date(start)
         .unwrap();
     for (pv, accrual) in [(pv_360.amount(), tau_360), (pv_365.amount(), tau_365)] {
         let expected = 1_000_000.0 * discount * (0.06 * accrual - growth) / (1.0 + growth);

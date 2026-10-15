@@ -297,7 +297,7 @@ impl PyDiscountCurve {
     fn df(&self, t: &Bound<'_, PyAny>) -> PyResult<f64> {
         match extract_time_point(t)? {
             TimePoint::Years(t) => Ok(self.inner.df(t)),
-            TimePoint::Date(d) => self.inner.df_on_date_curve(d).map_err(core_to_py),
+            TimePoint::Date(d) => self.inner.df_on_date(d).map_err(core_to_py),
         }
     }
 
@@ -326,22 +326,6 @@ impl PyDiscountCurve {
                 .zero_rate_on_date(d, finstack_quant_core::math::Compounding::Continuous)
                 .map_err(core_to_py),
         }
-    }
-
-    /// Annually-compounded zero rate (decimal) at year fraction ``t``.
-    ///
-    /// Parameters
-    /// ----------
-    /// t : float
-    ///     Year fraction from ``base_date``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Zero rate as a decimal under annual compounding.
-    #[pyo3(text_signature = "(self, t)")]
-    fn zero_annual(&self, t: f64) -> f64 {
-        self.inner.zero_annual(t)
     }
 
     /// Zero rate at year fraction ``t`` under an explicit compounding convention.
@@ -409,10 +393,8 @@ impl PyDiscountCurve {
     /// ValueError
     ///     If the year fraction cannot be computed.
     #[pyo3(text_signature = "(self, date)")]
-    fn df_on_date_curve(&self, date: &Bound<'_, PyAny>) -> PyResult<f64> {
-        self.inner
-            .df_on_date_curve(py_to_date(date)?)
-            .map_err(core_to_py)
+    fn df_on_date(&self, date: &Bound<'_, PyAny>) -> PyResult<f64> {
+        self.inner.df_on_date(py_to_date(date)?).map_err(core_to_py)
     }
 
     /// Forward discount factor between two dates: ``DF(0, to) / DF(0, from)``.

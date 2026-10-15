@@ -619,8 +619,8 @@ fn discount_implied_simple_forward(
     }
     let start_date = date_from_forward_time(source, start)?;
     let end_date = date_from_forward_time(source, end)?;
-    let start_df = discount.df_on_date_curve(start_date)?;
-    let end_df = discount.df_on_date_curve(end_date)?;
+    let start_df = discount.df_on_date(start_date)?;
+    let end_df = discount.df_on_date(end_date)?;
     if !(start_df.is_finite() && start_df > 0.0 && end_df.is_finite() && end_df > 0.0) {
         return Err(finstack_quant_core::Error::Validation(format!(
             "cannot derive linked OIS projection over {start_date}..{end_date}: \
@@ -1102,10 +1102,10 @@ mod tests {
             let end_date =
                 shocked_forward.base_date() + Duration::days((end * 360.0).round() as i64);
             let discount_implied = (shocked_discount
-                .df_on_date_curve(start_date)
+                .df_on_date(start_date)
                 .expect("discount factor on reset date")
                 / shocked_discount
-                    .df_on_date_curve(end_date)
+                    .df_on_date(end_date)
                     .expect("discount factor on payment date")
                 - 1.0)
                 / (end - start);
@@ -1186,10 +1186,10 @@ mod tests {
             let end_date =
                 shocked_forward.base_date() + Duration::days((end * 360.0).round() as i64);
             let date_implied = (shocked_discount
-                .df_on_date_curve(start_date)
+                .df_on_date(start_date)
                 .expect("discount factor on reset date")
                 / shocked_discount
-                    .df_on_date_curve(end_date)
+                    .df_on_date(end_date)
                     .expect("discount factor on payment date")
                 - 1.0)
                 / (end - start);
@@ -1717,10 +1717,10 @@ mod tests {
         let end_date =
             shocked_forward.base_date() + Duration::days((first_period[1] * 360.0).round() as i64);
         let discount_implied = (shocked_discount
-            .df_on_date_curve(start_date)
+            .df_on_date(start_date)
             .expect("discount factor on reset date")
             / shocked_discount
-                .df_on_date_curve(end_date)
+                .df_on_date(end_date)
                 .expect("discount factor on payment date")
             - 1.0)
             / (first_period[1] - first_period[0]);

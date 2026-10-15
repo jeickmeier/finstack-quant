@@ -453,18 +453,21 @@ impl ForwardCurve {
 
     /// Implied projection discount factor on a calendar date using the curve's day-count.
     ///
+    /// # Arguments
+    ///
+    /// * `date` - Target calendar date converted to a year fraction from [`base_date`](Self::base_date) using [`day_count`](Self::day_count).
+    ///
     /// # Errors
     ///
     /// Returns an error if year fraction or discount factor calculation fails.
     #[inline]
     #[must_use = "computed discount factor should not be discarded"]
-    pub fn df_on_date_curve(&self, date: Date) -> crate::Result<f64> {
-        let t = if date == self.base {
-            0.0
-        } else {
-            self.day_count
-                .year_fraction(self.base, date, DayCountContext::default())?
-        };
+    pub fn df_on_date(&self, date: Date) -> crate::Result<f64> {
+        let t = crate::market_data::term_structures::common::year_fraction_to(
+            self.base,
+            date,
+            self.day_count,
+        )?;
         self.df(t)
     }
 }

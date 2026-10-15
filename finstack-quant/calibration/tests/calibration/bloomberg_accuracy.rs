@@ -396,9 +396,7 @@ fn test_bloomberg_usd_ois_calibration_accuracy() {
     // Bloomberg DF matching: calibrated curve vs reference discount factors
     let mut mismatches = Vec::new();
     for (maturity, _zero_rate, expected_df) in bloomberg_data {
-        let calibrated_df = curve
-            .df_on_date_curve(maturity)
-            .expect("DF on maturity date");
+        let calibrated_df = curve.df_on_date(maturity).expect("DF on maturity date");
         let t = DayCount::Act365F
             .year_fraction(base_date, maturity, DayCountContext::default())
             .expect("year fraction");

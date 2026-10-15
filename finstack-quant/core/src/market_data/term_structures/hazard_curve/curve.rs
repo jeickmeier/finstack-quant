@@ -228,7 +228,7 @@ impl HazardCurve {
     /// Survival probability on a specific calendar date using the curve's day-count.
     ///
     /// This is the date-based equivalent of [`sp`](Self::sp), consistent with
-    /// `DiscountCurve::df_on_date_curve` and `ForwardCurve::df_on_date_curve`.
+    /// `DiscountCurve::df_on_date` and `ForwardCurve::df_on_date`.
     ///
     /// # Errors
     ///
