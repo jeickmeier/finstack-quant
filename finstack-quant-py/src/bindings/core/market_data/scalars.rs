@@ -12,6 +12,7 @@ use pyo3::types::{PyDict, PyList, PyModule};
 use crate::bindings::core::currency::{extract_currency, PyCurrency};
 use crate::bindings::core::money::{decimal_from_py, is_python_decimal};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::impl_repr_html_via_dataframe;
 use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
 use crate::errors::core_to_py;
 
@@ -263,18 +264,9 @@ impl PyScalarTimeSeries {
             self.inner.len()
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+impl_repr_html_via_dataframe!(PyScalarTimeSeries);
 
 /// Inflation index observations with Rust-owned interpolation and validation.
 #[pyclass(
@@ -607,6 +599,19 @@ impl PyInflationIndex {
         self.inner.value_on(py_to_date(date)?).map_err(core_to_py)
     }
 
+    /// Export as a pandas ``DataFrame`` indexed by observation date.
+    ///
+    /// Columns: ``value``.
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let observations = self.inner.observations();
+        let dates: Vec<time::Date> = observations.iter().map(|(date, _)| *date).collect();
+        let values: Vec<f64> = observations.iter().map(|(_, value)| *value).collect();
+        let data = PyDict::new(py);
+        data.set_item("value", values)?;
+        let index = dates_to_datetime_index(py, &dates)?;
+        dict_to_dataframe(py, &data, Some(index))
+    }
+
     /// Serialize the canonical Rust inflation-index state to JSON.
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(|err| {
@@ -646,6 +651,8 @@ impl PyInflationIndex {
         )
     }
 }
+
+impl_repr_html_via_dataframe!(PyInflationIndex);
 
 pub(super) const EXPORTS: &[&str] = &["InflationIndex", "ScalarTimeSeries"];
 

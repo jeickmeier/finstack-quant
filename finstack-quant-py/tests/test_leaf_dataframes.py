@@ -29,7 +29,7 @@ import pandas as pd
 import pytest
 
 from finstack_quant.analytics import MultiFactorResult, Performance
-from finstack_quant.core.market_data import FxMatrix, ScalarTimeSeries
+from finstack_quant.core.market_data import FxMatrix, InflationIndex, ScalarTimeSeries
 from finstack_quant.models.credit import liability_management, pd as credit_pd, recovery_waterfall
 from finstack_quant.models.factor.credit import (
     CreditCalibrator,
@@ -401,6 +401,22 @@ def test_scalar_time_series_ordering_ignores_the_insertion_order() -> None:
     shuffled = ScalarTimeSeries("SOFR", list(reversed(observations))).to_dataframe()
     pd.testing.assert_frame_equal(chronological, shuffled)
     assert list(chronological["value"]) == pytest.approx([0.03, 0.035, 0.04])
+
+
+def test_inflation_index_to_dataframe_is_date_indexed() -> None:
+    observations = [
+        (datetime.date(2025, 3, 1), 303.0),
+        (datetime.date(2025, 1, 1), 300.0),
+        (datetime.date(2025, 2, 1), 301.5),
+    ]
+    index = InflationIndex("US-CPI", observations, "USD")
+    df = index.to_dataframe()
+    assert isinstance(df, pd.DataFrame)
+    assert list(df.columns) == ["value"]
+    assert isinstance(df.index, pd.DatetimeIndex)
+    assert list(df.index) == [pd.Timestamp(d) for d, _ in sorted(observations)]
+    assert list(df["value"]) == pytest.approx([300.0, 301.5, 303.0])
+    assert index._repr_html_() is not None
 
 
 # models.factor.credit

@@ -112,35 +112,35 @@ impl VolCubeExpirySlice {
     }
 
     /// Identifier carried by the source cube.
-    pub fn get_id(&self) -> &CurveId {
+    pub fn id(&self) -> &CurveId {
         &self.id
     }
     /// Fixed option expiry in years.
-    pub fn get_expiry(&self) -> f64 {
+    pub fn expiry(&self) -> f64 {
         self.expiry
     }
     /// Underlying tenor axis in years.
-    pub fn get_tenors(&self) -> &[f64] {
+    pub fn tenors(&self) -> &[f64] {
         &self.tenors
     }
     /// Strike axis in forward-price or decimal-rate units.
-    pub fn get_strikes(&self) -> &[f64] {
+    pub fn strikes(&self) -> &[f64] {
         &self.strikes
     }
     /// Annualized decimal volatility quotes in tenor-major order.
-    pub fn get_vols(&self) -> &[f64] {
+    pub fn vols(&self) -> &[f64] {
         &self.vols
     }
     /// Units and pricing convention of the stored volatility quotes.
-    pub fn get_quote_type(&self) -> VolQuoteType {
+    pub fn quote_type(&self) -> VolQuoteType {
         self.quote_type
     }
     /// Additive displaced-Black shifts aligned with tenors; absent for other conventions.
-    pub fn get_displacements(&self) -> Option<&[f64]> {
+    pub fn displacements(&self) -> Option<&[f64]> {
         self.displacements.as_deref()
     }
     /// Number of tenor rows and strike columns.
-    pub fn get_grid_shape(&self) -> (usize, usize) {
+    pub fn grid_shape(&self) -> (usize, usize) {
         (self.tenors.len(), self.strikes.len())
     }
 }

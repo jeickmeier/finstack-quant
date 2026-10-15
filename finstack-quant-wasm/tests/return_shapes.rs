@@ -308,10 +308,6 @@ fn bare_string_returns_are_named_or_allowlisted() {
         // ISO-8601 dates of the underlying swap.
         ("Swaption", "getUnderlyingStartDate"),
         ("Swaption", "getUnderlyingMaturity"),
-        // Identifier and quote-convention label of the slice (Rust `get_id` /
-        // `get_quote_type`): the value itself.
-        ("VolCubeExpirySlice", "getId"),
-        ("VolCubeExpirySlice", "getQuoteType"),
     ];
     let dts = index_dts();
     let offenders: Vec<String> = members(&dts)

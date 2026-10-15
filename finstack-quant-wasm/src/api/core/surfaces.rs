@@ -546,13 +546,13 @@ impl JsVolSurface {
         self.inner.quote_type().to_string()
     }
 
-    /// Per-expiry shifted-Black displacements (Rust `VolSurface::get_displacements`).
+    /// Per-expiry shifted-Black displacements (Rust `VolSurface::displacements`).
     ///
     /// @returns One displacement per expiry in strike/rate units, or
     /// `undefined` for unshifted and normal quotes.
-    #[wasm_bindgen(js_name = getDisplacements)]
-    pub fn get_displacements(&self) -> Option<Box<[f64]>> {
-        self.inner.get_displacements().map(Into::into)
+    #[wasm_bindgen(getter, js_name = displacements)]
+    pub fn displacements(&self) -> Option<Box<[f64]>> {
+        self.inner.displacements().map(Into::into)
     }
 
     /// A shifted-Black copy of this surface carrying one displacement per
@@ -612,8 +612,8 @@ impl JsVolSurface {
 ///   [0.02, 0.03, 0.04],
 ///   [0.3, 0.25, 0.27, 0.28, 0.24, 0.26],
 /// );
-/// slice.getGridShape(); // [2, 3]
-/// slice.getQuoteType(); // "black_lognormal"
+/// slice.gridShape; // [2, 3]
+/// slice.quoteType; // "black_lognormal"
 /// ```
 #[wasm_bindgen(js_name = VolCubeExpirySlice)]
 pub struct JsVolCubeExpirySlice {
@@ -703,70 +703,51 @@ impl JsVolCubeExpirySlice {
     }
 
     /// Identifier of the materialized grid.
-    ///
-    /// @returns The identifier text.
-    #[wasm_bindgen(js_name = getId)]
-    pub fn get_id(&self) -> String {
-        self.inner.get_id().as_str().to_string()
+    #[wasm_bindgen(getter, js_name = id)]
+    pub fn id(&self) -> String {
+        self.inner.id().as_str().to_string()
     }
 
-    /// Fixed option expiry of the slice.
-    ///
-    /// @returns The expiry in years.
-    #[wasm_bindgen(js_name = getExpiry)]
-    pub fn get_expiry(&self) -> f64 {
-        self.inner.get_expiry()
+    /// Fixed option expiry of the slice in years.
+    #[wasm_bindgen(getter, js_name = expiry)]
+    pub fn expiry(&self) -> f64 {
+        self.inner.expiry()
     }
 
-    /// Underlying-tenor axis.
-    ///
-    /// @returns Tenors in years, strictly increasing.
-    #[wasm_bindgen(js_name = getTenors)]
-    pub fn get_tenors(&self) -> Box<[f64]> {
-        self.inner.get_tenors().into()
+    /// Underlying-tenor axis in years, strictly increasing.
+    #[wasm_bindgen(getter, js_name = tenors)]
+    pub fn tenors(&self) -> Box<[f64]> {
+        self.inner.tenors().into()
     }
 
-    /// Strike axis.
-    ///
-    /// @returns Strikes in forward-rate units, strictly increasing.
-    #[wasm_bindgen(js_name = getStrikes)]
-    pub fn get_strikes(&self) -> Box<[f64]> {
-        self.inner.get_strikes().into()
+    /// Strike axis in forward-rate units, strictly increasing.
+    #[wasm_bindgen(getter, js_name = strikes)]
+    pub fn strikes(&self) -> Box<[f64]> {
+        self.inner.strikes().into()
     }
 
-    /// Volatility grid in the declared quote convention.
-    ///
-    /// @returns Flat tenor-major grid (`getGridShape()[0]` rows of `getGridShape()[1]`).
-    #[wasm_bindgen(js_name = getVols)]
-    pub fn get_vols(&self) -> Box<[f64]> {
-        self.inner.get_vols().into()
+    /// Flat tenor-major volatility grid in the declared quote convention.
+    #[wasm_bindgen(getter, js_name = vols)]
+    pub fn vols(&self) -> Box<[f64]> {
+        self.inner.vols().into()
     }
 
-    /// Quote convention of the stored volatilities.
-    ///
-    /// @returns `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`.
-    #[wasm_bindgen(js_name = getQuoteType)]
-    pub fn get_quote_type(&self) -> String {
-        self.inner.get_quote_type().to_string()
+    /// Quote convention: `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`.
+    #[wasm_bindgen(getter, js_name = quoteType)]
+    pub fn quote_type(&self) -> String {
+        self.inner.quote_type().to_string()
     }
 
-    /// Per-tenor shifted-Black displacements.
-    ///
-    /// @returns One displacement per tenor in rate units, or `undefined` for
-    /// unshifted and normal quotes.
-    #[wasm_bindgen(js_name = getDisplacements)]
-    pub fn get_displacements(&self) -> Option<Box<[f64]>> {
-        self.inner.get_displacements().map(Into::into)
+    /// Per-tenor shifted-Black displacements in rate units, or `undefined` for unshifted quotes.
+    #[wasm_bindgen(getter, js_name = displacements)]
+    pub fn displacements(&self) -> Option<Box<[f64]>> {
+        self.inner.displacements().map(Into::into)
     }
 
-    /// Grid dimensions.
-    ///
-    /// @returns `[tenorCount, strikeCount]`.
-    /// @throws If a dimension does not fit a 32-bit count (not reachable for
-    /// a grid that fits in memory).
-    #[wasm_bindgen(js_name = getGridShape)]
-    pub fn get_grid_shape(&self) -> Result<Box<[u32]>, JsValue> {
-        let (tenors, strikes) = self.inner.get_grid_shape();
+    /// Grid dimensions as `[tenorCount, strikeCount]`.
+    #[wasm_bindgen(getter, js_name = gridShape)]
+    pub fn grid_shape(&self) -> Result<Box<[u32]>, JsValue> {
+        let (tenors, strikes) = self.inner.grid_shape();
         Ok(Box::new([
             u32::try_from(tenors).map_err(|e| to_js_err(e.to_string()))?,
             u32::try_from(strikes).map_err(|e| to_js_err(e.to_string()))?,

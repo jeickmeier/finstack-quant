@@ -66,9 +66,9 @@ def test_materialize_normal_slices_preserve_their_axes() -> None:
 
     expiry_slice = materialize_cube_expiry_slice_normal(cube, 1.0, strikes)
     assert isinstance(expiry_slice, VolCubeExpirySlice)
-    assert expiry_slice.get_quote_type() == "normal"
-    assert expiry_slice.get_expiry() == 1.0
-    assert expiry_slice.get_tenors() == [2.0, 10.0]
+    assert expiry_slice.quote_type == "normal"
+    assert expiry_slice.expiry == 1.0
+    assert expiry_slice.tenors == [2.0, 10.0]
     assert get_cube_expiry_slice_vol(expiry_slice, 2.0, FORWARD) == pytest.approx(
         get_cube_normal_vol(cube, 1.0, 2.0, FORWARD)
     )

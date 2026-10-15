@@ -6,6 +6,7 @@ use finstack_quant_core::market_data::surfaces::VolCubeExpirySlice;
 use pyo3::prelude::*;
 
 use super::helpers::{columns_to_dataframe, impl_arc_serde_pymethods, parse_vol_quote_type};
+use crate::bindings::macros::impl_repr_html_via_dataframe;
 use crate::errors::core_to_py;
 
 /// Volatility grid at one fixed option expiry, indexed by tenor and strike.
@@ -79,51 +80,59 @@ impl PyVolCubeExpirySlice {
     }
 
     /// Identifier of the materialized grid.
-    fn get_id(&self) -> &str {
-        self.inner.get_id().as_str()
+    #[getter]
+    fn id(&self) -> &str {
+        self.inner.id().as_str()
     }
 
     /// Fixed option expiry in years.
-    fn get_expiry(&self) -> f64 {
-        self.inner.get_expiry()
+    #[getter]
+    fn expiry(&self) -> f64 {
+        self.inner.expiry()
     }
 
     /// Underlying-tenor axis in years.
-    fn get_tenors(&self) -> Vec<f64> {
-        self.inner.get_tenors().to_vec()
+    #[getter]
+    fn tenors(&self) -> Vec<f64> {
+        self.inner.tenors().to_vec()
     }
 
     /// Strike axis in forward-rate units.
-    fn get_strikes(&self) -> Vec<f64> {
-        self.inner.get_strikes().to_vec()
+    #[getter]
+    fn strikes(&self) -> Vec<f64> {
+        self.inner.strikes().to_vec()
     }
 
     /// Flat tenor-major volatility grid in the declared quote convention.
-    fn get_vols(&self) -> Vec<f64> {
-        self.inner.get_vols().to_vec()
+    #[getter]
+    fn vols(&self) -> Vec<f64> {
+        self.inner.vols().to_vec()
     }
 
     /// Quote convention: Black, shifted Black, or normal.
-    fn get_quote_type(&self) -> String {
-        self.inner.get_quote_type().to_string()
+    #[getter]
+    fn quote_type(&self) -> String {
+        self.inner.quote_type().to_string()
     }
 
     /// Per-tenor displacement in rate units, absent for unshifted quotes.
-    fn get_displacements(&self) -> Option<Vec<f64>> {
-        self.inner.get_displacements().map(<[f64]>::to_vec)
+    #[getter]
+    fn displacements(&self) -> Option<Vec<f64>> {
+        self.inner.displacements().map(<[f64]>::to_vec)
     }
 
     /// Grid dimensions as ``(number of tenors, number of strikes)``.
-    fn get_grid_shape(&self) -> (usize, usize) {
-        self.inner.get_grid_shape()
+    #[getter]
+    fn grid_shape(&self) -> (usize, usize) {
+        self.inner.grid_shape()
     }
 
     /// Export ``expiry``, ``tenor``, ``strike``, and ``vol`` columns.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut tenors = Vec::with_capacity(self.inner.get_vols().len());
-        let mut strikes = Vec::with_capacity(self.inner.get_vols().len());
-        for &tenor in self.inner.get_tenors() {
-            for &strike in self.inner.get_strikes() {
+        let mut tenors = Vec::with_capacity(self.inner.vols().len());
+        let mut strikes = Vec::with_capacity(self.inner.vols().len());
+        for &tenor in self.inner.tenors() {
+            for &strike in self.inner.strikes() {
                 tenors.push(tenor);
                 strikes.push(strike);
             }
@@ -131,14 +140,23 @@ impl PyVolCubeExpirySlice {
         columns_to_dataframe(
             py,
             &[
-                (
-                    "expiry",
-                    vec![self.inner.get_expiry(); self.inner.get_vols().len()],
-                ),
+                ("expiry", vec![self.inner.expiry(); self.inner.vols().len()]),
                 ("tenor", tenors),
                 ("strike", strikes),
-                ("vol", self.inner.get_vols().to_vec()),
+                ("vol", self.inner.vols().to_vec()),
             ],
+        )
+    }
+
+    fn __repr__(&self) -> String {
+        let (n_ten, n_strk) = self.inner.grid_shape();
+        format!(
+            "VolCubeExpirySlice(id='{}', expiry={}, grid_shape=({}, {}), quote_type='{}')",
+            self.inner.id().as_str(),
+            self.inner.expiry(),
+            n_ten,
+            n_strk,
+            self.inner.quote_type()
         )
     }
 }
@@ -148,3 +166,4 @@ impl_arc_serde_pymethods!(
     VolCubeExpirySlice,
     "VolCubeExpirySlice"
 );
+impl_repr_html_via_dataframe!(PyVolCubeExpirySlice);

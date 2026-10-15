@@ -265,14 +265,10 @@ impl PyVolSurface {
         self.inner.quote_type().to_string()
     }
 
-    /// Return the per-expiry shifted-Black displacements in rate units.
-    ///
-    /// Returns
-    /// -------
-    /// list[float] | None
-    ///     One displacement per expiry, or ``None`` for unshifted quotes.
-    fn get_displacements(&self) -> Option<Vec<f64>> {
-        self.inner.get_displacements().map(<[f64]>::to_vec)
+    /// Per-expiry shifted-Black displacements in rate units, or ``None`` for unshifted quotes.
+    #[getter]
+    fn displacements(&self) -> Option<Vec<f64>> {
+        self.inner.displacements().map(<[f64]>::to_vec)
     }
 
     /// Return a shifted-Black surface retaining one displacement per expiry.

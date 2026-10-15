@@ -55,14 +55,14 @@ impl VolSource {
         Ok(match self {
             Self::Surface(surface) => grid_convention(
                 surface.quote_type(),
-                surface.get_displacements(),
+                surface.displacements(),
                 surface.expiries(),
                 expiry,
             )?,
             Self::CubeExpirySlice(slice) => grid_convention(
-                slice.get_quote_type(),
-                slice.get_displacements(),
-                slice.get_tenors(),
+                slice.quote_type(),
+                slice.displacements(),
+                slice.tenors(),
                 tenor,
             )?,
             Self::Cube(cube) => {
@@ -104,8 +104,8 @@ impl VolSource {
                 get_surface_vol(surface, expiry, secondary)
             }
             Self::CubeExpirySlice(slice) => {
-                segment(&[slice.get_expiry()], expiry)?;
-                require_black_quotes(slice.get_quote_type())?;
+                segment(&[slice.expiry()], expiry)?;
+                require_black_quotes(slice.quote_type())?;
                 get_cube_expiry_slice_vol(slice, tenor, strike)
             }
             Self::Cube(cube) => {
@@ -161,8 +161,8 @@ impl VolSource {
             }
             Self::Cube(cube) => get_cube_normal_vol(cube, expiry, tenor, strike),
             Self::CubeExpirySlice(slice) => {
-                segment(&[slice.get_expiry()], expiry)?;
-                if slice.get_quote_type() != VolQuoteType::Normal {
+                segment(&[slice.expiry()], expiry)?;
+                if slice.quote_type() != VolQuoteType::Normal {
                     return Err(Error::Validation(
                         "slice does not contain normal volatility quotes".into(),
                     ));
@@ -213,9 +213,9 @@ impl VolSource {
                 strike,
             ),
             Self::CubeExpirySlice(slice) => (
-                slice.get_expiry(),
-                clamp(slice.get_tenors(), tenor),
-                clamp(slice.get_strikes(), strike),
+                slice.expiry(),
+                clamp(slice.tenors(), tenor),
+                clamp(slice.strikes(), strike),
             ),
             Self::FxDelta(_) => (expiry, tenor, strike),
         })
@@ -226,7 +226,7 @@ impl VolSource {
         match self {
             Self::Surface(surface) => surface.id(),
             Self::Cube(cube) => cube.id(),
-            Self::CubeExpirySlice(slice) => slice.get_id(),
+            Self::CubeExpirySlice(slice) => slice.id(),
             Self::FxDelta(surface) => surface.id(),
         }
     }
@@ -787,10 +787,10 @@ pub fn get_cube_expiry_slice_vol(
     tenor: f64,
     strike: f64,
 ) -> Result<f64> {
-    let (t0, t1, t) = segment(slice.get_tenors(), tenor)?;
-    let (s0, s1, u) = segment(slice.get_strikes(), strike)?;
-    let cols = slice.get_strikes().len();
-    let values = slice.get_vols();
+    let (t0, t1, t) = segment(slice.tenors(), tenor)?;
+    let (s0, s1, u) = segment(slice.strikes(), strike)?;
+    let cols = slice.strikes().len();
+    let values = slice.vols();
     Ok(bilinear(
         values[t0 * cols + s0],
         values[t1 * cols + s0],
@@ -820,13 +820,10 @@ pub fn get_cube_expiry_slice_vol_clamped(
     }
     get_cube_expiry_slice_vol(
         slice,
-        tenor.clamp(
-            slice.get_tenors()[0],
-            slice.get_tenors()[slice.get_tenors().len() - 1],
-        ),
+        tenor.clamp(slice.tenors()[0], slice.tenors()[slice.tenors().len() - 1]),
         strike.clamp(
-            slice.get_strikes()[0],
-            slice.get_strikes()[slice.get_strikes().len() - 1],
+            slice.strikes()[0],
+            slice.strikes()[slice.strikes().len() - 1],
         ),
     )
     .unwrap_or(f64::NAN)

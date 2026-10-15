@@ -356,7 +356,7 @@ impl LocalVolSurface {
                 quote_type: surface.quote_type(),
                 interpolation_mode: surface.interpolation_mode(),
             },
-            surface.get_displacements(),
+            surface.displacements(),
         )?;
 
         Self::from_implied_vol(&smoothed_surface, forwards)

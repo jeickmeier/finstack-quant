@@ -3323,7 +3323,8 @@ class VolSurface:
         """
         ...
 
-    def get_displacements(self) -> list[float] | None:
+    @property
+    def displacements(self) -> list[float] | None:
         """Return the shifted-Black displacement attached to each expiry.
 
         Returns
@@ -3407,7 +3408,7 @@ class VolCubeExpirySlice:
     --------
     >>> from finstack_quant.core.market_data import VolCubeExpirySlice
     >>> grid = VolCubeExpirySlice("SLICE", 1.0, [5.0], [0.02, 0.03], [0.2, 0.21])
-    >>> (grid.get_expiry(), grid.get_tenors(), grid.get_grid_shape())
+    >>> (grid.expiry, grid.tenors, grid.grid_shape)
     (1.0, [5.0], (1, 2))
     """
 
@@ -3450,7 +3451,8 @@ class VolCubeExpirySlice:
         """
         ...
 
-    def get_id(self) -> str:
+    @property
+    def id(self) -> str:
         """Identifier of the materialized grid.
 
         Returns
@@ -3464,7 +3466,8 @@ class VolCubeExpirySlice:
         """
         ...
 
-    def get_expiry(self) -> float:
+    @property
+    def expiry(self) -> float:
         """Fixed option expiry in years.
 
         Returns
@@ -3478,7 +3481,8 @@ class VolCubeExpirySlice:
         """
         ...
 
-    def get_tenors(self) -> list[float]:
+    @property
+    def tenors(self) -> list[float]:
         """Underlying-tenor axis in years.
 
         Returns
@@ -3492,7 +3496,8 @@ class VolCubeExpirySlice:
         """
         ...
 
-    def get_strikes(self) -> list[float]:
+    @property
+    def strikes(self) -> list[float]:
         """Strike axis in forward-rate units.
 
         Returns
@@ -3506,7 +3511,8 @@ class VolCubeExpirySlice:
         """
         ...
 
-    def get_vols(self) -> list[float]:
+    @property
+    def vols(self) -> list[float]:
         """Flat tenor-major volatility grid.
 
         Returns
@@ -3520,7 +3526,8 @@ class VolCubeExpirySlice:
         """
         ...
 
-    def get_quote_type(self) -> str:
+    @property
+    def quote_type(self) -> str:
         """Convention used by the stored volatility values.
 
         Returns
@@ -3534,7 +3541,8 @@ class VolCubeExpirySlice:
         """
         ...
 
-    def get_displacements(self) -> list[float] | None:
+    @property
+    def displacements(self) -> list[float] | None:
         """Shifted-Black displacements aligned to the tenor axis.
 
         Returns
@@ -3548,7 +3556,8 @@ class VolCubeExpirySlice:
         """
         ...
 
-    def get_grid_shape(self) -> tuple[int, int]:
+    @property
+    def grid_shape(self) -> tuple[int, int]:
         """Dimensions of the tenor-by-strike grid.
 
         Returns
@@ -3569,7 +3578,7 @@ class VolCubeExpirySlice:
         -------
         pandas.DataFrame
             Columns ``expiry``, ``tenor``, ``strike``, and ``vol`` in tenor-major
-            order. Time coordinates are years and quotes use ``get_quote_type()``.
+            order. Time coordinates are years and quotes use ``quote_type``.
 
         Raises
         ------
@@ -3616,10 +3625,15 @@ class VolCubeExpirySlice:
         --------
         >>> from finstack_quant.core.market_data import VolCubeExpirySlice
         >>> grid = VolCubeExpirySlice("S", 1.0, [5.0], [0.03], [0.2])
-        >>> VolCubeExpirySlice.from_json(grid.to_json()).get_expiry()
+        >>> VolCubeExpirySlice.from_json(grid.to_json()).expiry
         1.0
         """
         ...
+
+    def __eq__(self, other: object) -> bool: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __repr__(self) -> str: ...
+    def _repr_html_(self) -> Optional[str]: ...
 
 class FxDeltaVolSurface:
     """
@@ -5562,6 +5576,23 @@ class InflationIndex:
         """
         ...
 
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        Export as a pandas ``DataFrame`` indexed by observation date.
+
+        Returns
+        -------
+        pd.DataFrame
+            Column ``value`` on a ``DatetimeIndex``; only stored observations
+            appear (nothing is interpolated).
+
+        Raises
+        ------
+        ValueError
+            If the frame cannot be built.
+        """
+        ...
+
     @property
     def id(self) -> str:
         """
@@ -5661,6 +5692,7 @@ class InflationIndex:
     def __len__(self) -> int: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
+    def _repr_html_(self) -> Optional[str]: ...
 
 # Context
 

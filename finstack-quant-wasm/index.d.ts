@@ -7290,11 +7290,10 @@ export interface VolSurface extends WasmOwned {
    */
   readonly gridShape: Uint32Array;
   /**
-   * Per-expiry shifted-Black displacements (Rust `VolSurface::get_displacements`).
-   *
+   * Per-expiry shifted-Black displacements in strike/rate units, or `undefined` for unshifted and normal quotes.
    * @returns One displacement per expiry in strike/rate units, or `undefined` for unshifted and normal quotes.
    */
-  getDisplacements(): Float64Array | undefined;
+  readonly displacements: Float64Array | undefined;
   /**
    * A shifted-Black copy of this surface carrying one displacement per
    * expiry (Rust `VolSurface::with_displacements`).
@@ -7398,8 +7397,8 @@ export interface VolSurfaceConstructor {
  *   [0.02, 0.03, 0.04],
  *   [0.3, 0.25, 0.27, 0.28, 0.24, 0.26],
  * );
- * slice.getGridShape(); // [2, 3]
- * slice.getQuoteType(); // "black_lognormal"
+ * slice.gridShape; // [2, 3]
+ * slice.quoteType; // "black_lognormal"
  * ```
  */
 export interface VolCubeExpirySlice extends WasmOwned {
@@ -7412,53 +7411,36 @@ export interface VolCubeExpirySlice extends WasmOwned {
   toJson(): string;
   /**
    * Identifier of the materialized grid.
-   *
-   * @returns The identifier text.
    */
-  getId(): string;
+  readonly id: string;
   /**
-   * Fixed option expiry of the slice.
-   *
-   * @returns The expiry in years.
+   * Fixed option expiry of the slice in years.
    */
-  getExpiry(): number;
+  readonly expiry: number;
   /**
-   * Underlying-tenor axis.
-   *
-   * @returns Tenors in years, strictly increasing.
+   * Underlying-tenor axis in years, strictly increasing.
    */
-  getTenors(): Float64Array;
+  readonly tenors: Float64Array;
   /**
-   * Get strikes for this `VolCubeExpirySlice`.
-   *
-   * @returns Strikes in forward-rate units, strictly increasing.
+   * Strike axis in forward-rate units, strictly increasing.
    */
-  getStrikes(): Float64Array;
+  readonly strikes: Float64Array;
   /**
-   * Volatility grid in the declared quote convention.
-   *
-   * @returns Flat tenor-major grid (`getGridShape()[0]` rows of `getGridShape()[1]`).
+   * Flat tenor-major volatility grid in the declared quote convention.
    */
-  getVols(): Float64Array;
+  readonly vols: Float64Array;
   /**
-   * Quote convention of the stored volatilities.
-   *
-   * @returns `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`.
+   * Quote convention: `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`.
    */
-  getQuoteType(): string;
+  readonly quoteType: string;
   /**
-   * Per-tenor shifted-Black displacements.
-   *
-   * @returns One displacement per tenor in rate units, or `undefined` for unshifted and normal quotes.
+   * Per-tenor shifted-Black displacements in rate units, or `undefined` for unshifted quotes.
    */
-  getDisplacements(): Float64Array | undefined;
+  readonly displacements: Float64Array | undefined;
   /**
-   * Grid dimensions.
-   *
-   * @returns `[tenorCount, strikeCount]`.
-   * @throws If a dimension does not fit a 32-bit count (not reachable for a grid that fits in memory).
+   * Grid dimensions as `[tenorCount, strikeCount]`.
    */
-  getGridShape(): Uint32Array;
+  readonly gridShape: Uint32Array;
 }
 
 /**
@@ -7479,8 +7461,8 @@ export interface VolCubeExpirySlice extends WasmOwned {
  *   [0.02, 0.03, 0.04],
  *   [0.3, 0.25, 0.27, 0.28, 0.24, 0.26],
  * );
- * slice.getGridShape(); // [2, 3]
- * slice.getQuoteType(); // "black_lognormal"
+ * slice.gridShape; // [2, 3]
+ * slice.quoteType; // "black_lognormal"
  * ```
  */
 export interface VolCubeExpirySliceConstructor {

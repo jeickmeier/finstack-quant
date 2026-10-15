@@ -315,9 +315,9 @@ fn test_vol_cube_materialize_expiry_slice() {
     let surface =
         finstack_quant_models::volatility::materialize_cube_expiry_slice(&cube, 1.0, &strikes)
             .unwrap();
-    assert_eq!(surface.get_expiry(), 1.0);
-    assert_eq!(surface.get_tenors(), &[5.0, 10.0]);
-    assert_eq!(surface.get_strikes(), &strikes[..]);
+    assert_eq!(surface.expiry(), 1.0);
+    assert_eq!(surface.tenors(), &[5.0, 10.0]);
+    assert_eq!(surface.strikes(), &strikes[..]);
 }
 
 #[test]
@@ -353,7 +353,7 @@ fn shifted_materialization_preserves_convention_and_displacement_rows() {
     assert!(surface
         .require_quote_type(VolQuoteType::BlackLognormal)
         .is_err());
-    assert_eq!(surface.get_displacements(), Some(&[0.02, 0.04][..]));
+    assert_eq!(surface.displacements(), Some(&[0.02, 0.04][..]));
     let restored: VolSurface =
         serde_json::from_str(&serde_json::to_string(&surface).unwrap()).unwrap();
     for artifact in [
@@ -364,7 +364,7 @@ fn shifted_materialization_preserves_convention_and_displacement_rows() {
             .unwrap(),
         surface.apply_bucket_bump(None, None, 1.0).unwrap(),
     ] {
-        assert_eq!(artifact.get_displacements(), surface.get_displacements());
+        assert_eq!(artifact.displacements(), surface.displacements());
         let source = VolSource::Surface(Arc::new(artifact));
         assert_eq!(
             source.get_convention(2.0, 5.0).unwrap(),
@@ -669,9 +669,9 @@ fn test_vol_cube_materialize_expiry_slice_normal() {
         &cube, 1.0, &strikes,
     )
     .unwrap();
-    assert_eq!(surface.get_quote_type(), VolQuoteType::Normal);
-    assert_eq!(surface.get_expiry(), 1.0);
-    assert_eq!(surface.get_tenors(), &[5.0, 10.0]);
+    assert_eq!(surface.quote_type(), VolQuoteType::Normal);
+    assert_eq!(surface.expiry(), 1.0);
+    assert_eq!(surface.tenors(), &[5.0, 10.0]);
 }
 
 #[test]

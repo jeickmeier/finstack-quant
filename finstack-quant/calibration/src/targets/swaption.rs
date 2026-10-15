@@ -1457,11 +1457,11 @@ mod tests {
         match shift {
             Some(expected) => {
                 assert_eq!(surface.quote_type(), VolQuoteType::ShiftedBlackLognormal);
-                assert_eq!(surface.get_displacements(), Some(&[expected][..]));
+                assert_eq!(surface.displacements(), Some(&[expected][..]));
             }
             None => {
                 assert_eq!(surface.quote_type(), VolQuoteType::BlackLognormal);
-                assert_eq!(surface.get_displacements(), None);
+                assert_eq!(surface.displacements(), None);
             }
         }
     }

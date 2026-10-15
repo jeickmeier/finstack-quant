@@ -1524,7 +1524,7 @@ def materialize_cube_expiry_slice(cube: VolCube, expiry: float, strikes: list[fl
     >>> from finstack_quant.core.market_data import VolCube
     >>> from finstack_quant.models.volatility import materialize_cube_expiry_slice
     >>> c = VolCube("C", [1.0], [5.0], [{"alpha": 0.03, "beta": 0.5, "rho": -0.2, "nu": 0.4}], [0.03])
-    >>> materialize_cube_expiry_slice(c, 1.0, [0.02, 0.03]).get_grid_shape()
+    >>> materialize_cube_expiry_slice(c, 1.0, [0.02, 0.03]).grid_shape
     (1, 2)
     """
     ...
@@ -1557,7 +1557,7 @@ def materialize_cube_expiry_slice_normal(cube: VolCube, expiry: float, strikes: 
     >>> from finstack_quant.core.market_data import VolCube
     >>> from finstack_quant.models.volatility import materialize_cube_expiry_slice_normal
     >>> c = VolCube("C", [1.0], [5.0], [{"alpha": 0.03, "beta": 0.5, "rho": -0.2, "nu": 0.4}], [0.03])
-    >>> materialize_cube_expiry_slice_normal(c, 1.0, [0.02, 0.03]).get_quote_type()
+    >>> materialize_cube_expiry_slice_normal(c, 1.0, [0.02, 0.03]).quote_type
     'normal'
     """
     ...

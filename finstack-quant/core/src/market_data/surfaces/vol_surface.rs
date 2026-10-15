@@ -283,7 +283,7 @@ impl VolSurface {
 
     /// Per-expiry additive displacements for shifted Black quotes, in the same
     /// units as the forward and strike. Unshifted and normal surfaces return `None`.
-    pub fn get_displacements(&self) -> Option<&[f64]> {
+    pub fn displacements(&self) -> Option<&[f64]> {
         self.displacements.as_deref()
     }
 
@@ -331,7 +331,7 @@ impl VolSurface {
     /// displacement rows. Use [`Self::with_displacements`] to attach those rows.
     pub fn with_quote_type(mut self, quote_type: VolQuoteType) -> crate::Result<Self> {
         if quote_type == VolQuoteType::ShiftedBlackLognormal {
-            validate_displacements(quote_type, self.get_displacements(), self.expiries.len())?;
+            validate_displacements(quote_type, self.displacements(), self.expiries.len())?;
         }
         self.quote_type = quote_type;
         if quote_type != VolQuoteType::ShiftedBlackLognormal {
@@ -989,7 +989,7 @@ mod displacement_tests {
             Some(&[0.02, 0.03]),
         )
         .unwrap();
-        assert_eq!(surface.get_displacements(), Some(&[0.02, 0.03][..]));
+        assert_eq!(surface.displacements(), Some(&[0.02, 0.03][..]));
         let mut raw = serde_json::to_value(surface).unwrap();
         raw["displacements"] = serde_json::Value::Null;
         assert!(serde_json::from_value::<VolSurface>(raw).is_err());

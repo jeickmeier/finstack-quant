@@ -1585,8 +1585,9 @@
   "core.VolSurface": {
     "kind": "class",
     "statics": ["fromJson"],
-    "methods": ["free", "getDisplacements", "toJson", "vol", "withDisplacements"],
+    "methods": ["free", "toJson", "vol", "withDisplacements"],
     "getters": [
+      "displacements",
       "expiries",
       "gridShape",
       "id",
@@ -1606,19 +1607,17 @@
   "core.VolCubeExpirySlice": {
     "kind": "class",
     "statics": ["fromJson"],
-    "methods": [
-      "free",
-      "getDisplacements",
-      "getExpiry",
-      "getGridShape",
-      "getId",
-      "getQuoteType",
-      "getStrikes",
-      "getTenors",
-      "getVols",
-      "toJson"
-    ],
-    "getters": []
+    "methods": ["free", "toJson"],
+    "getters": [
+      "displacements",
+      "expiry",
+      "gridShape",
+      "id",
+      "quoteType",
+      "strikes",
+      "tenors",
+      "vols"
+    ]
   },
   "core.FxDeltaVolSurface": {
     "kind": "class",
