@@ -6,11 +6,13 @@ use super::test_helpers::{
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::bumps::{BumpType, MarketBump};
-use finstack_quant_core::market_data::context::{BumpSpec, CurveStorage, MarketContext};
+use finstack_quant_core::market_data::bumps::{
+    BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
+};
+use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
 use finstack_quant_core::market_data::dividends::DividendSchedule;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationInterpolation, MarketScalar, ScalarTimeSeries, SeriesInterpolation,
+    InflationIndex, MarketScalar, ScalarTimeSeries, SeriesInterpolation,
 };
 use finstack_quant_core::market_data::surfaces::SabrParameterData;
 use finstack_quant_core::market_data::surfaces::{FxDeltaVolSurface, VolCube, VolSurface};
@@ -213,7 +215,7 @@ fn market_context_manages_fx_and_scalars() {
         Currency::USD,
     )
     .unwrap()
-    .with_interpolation(InflationInterpolation::Linear);
+    .with_interpolation(SeriesInterpolation::Linear);
 
     let dividends = DividendSchedule::builder("AAPL-DIVS")
         .cash(
@@ -276,7 +278,7 @@ fn market_context_supports_curve_bumps() {
     let bumped = ctx
         .bump([MarketBump::Curve {
             id: CurveId::new("USD-OIS"),
-            spec: finstack_quant_core::market_data::context::BumpSpec::parallel_bp(50.0),
+            spec: BumpSpec::parallel_bp(50.0),
         }])
         .expect("bump should succeed");
 
@@ -340,8 +342,8 @@ fn market_context_bumps_surfaces_and_scalars() {
             MarketBump::Curve {
                 id: CurveId::from("EQ-SPOT"),
                 spec: BumpSpec {
-                    mode: finstack_quant_core::market_data::context::BumpMode::Multiplicative,
-                    units: finstack_quant_core::market_data::context::BumpUnits::Factor,
+                    mode: BumpMode::Multiplicative,
+                    units: BumpUnits::Factor,
                     value: 1.05,
                     bump_type: BumpType::Parallel,
                 },
@@ -349,8 +351,8 @@ fn market_context_bumps_surfaces_and_scalars() {
             MarketBump::Curve {
                 id: CurveId::from("TS"),
                 spec: BumpSpec {
-                    mode: finstack_quant_core::market_data::context::BumpMode::Additive,
-                    units: finstack_quant_core::market_data::context::BumpUnits::Percent,
+                    mode: BumpMode::Additive,
+                    units: BumpUnits::Percent,
                     value: 10.0,
                     bump_type: BumpType::Parallel,
                 },
@@ -1364,7 +1366,7 @@ fn market_context_insert_and_stats_setters_cover_remaining_paths() {
     let idx = Arc::new(
         InflationIndex::new("US-CPI", vec![(date, 100.0)], Currency::USD)
             .unwrap()
-            .with_interpolation(InflationInterpolation::Linear),
+            .with_interpolation(SeriesInterpolation::Linear),
     );
     ctx = ctx.insert_inflation_index(idx);
 

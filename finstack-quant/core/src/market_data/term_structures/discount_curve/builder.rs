@@ -1,10 +1,10 @@
 //! Fluent discount-curve builder and construction validation.
 
-use super::super::common::{build_interp_input_error, split_points};
+use super::super::common::build_interp;
 use super::validation::{validate_forward_rates, validate_monotonic_df};
 use super::{DiscountCurve, ValidationMode};
 use crate::dates::{Date, DayCount};
-use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
+use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::types::CurveId;
 
 /// Fluent builder for [`DiscountCurve`].
@@ -256,7 +256,7 @@ impl DiscountCurveBuilder {
 
         validate_origin(&self.points)?;
 
-        let (knots, dfs) = split_points(std::mem::take(&mut self.points));
+        let (knots, dfs) = std::mem::take(&mut self.points).into_iter().unzip();
         self.finish(base, knots, dfs)
     }
 
@@ -293,7 +293,7 @@ impl DiscountCurveBuilder {
         validate_origin(&self.points)?;
 
         let (knots_vec, dfs_vec): (Vec<f64>, Vec<f64>) =
-            split_points(std::mem::take(&mut self.points));
+            std::mem::take(&mut self.points).into_iter().unzip();
         crate::math::interp::utils::validate_knots(&knots_vec)?;
 
         if !self.allow_non_monotonic {
@@ -322,12 +322,12 @@ impl DiscountCurveBuilder {
         let knots = knots.into_boxed_slice();
         let dfs = dfs.into_boxed_slice();
 
-        let interp = build_interp_input_error(
+        let interp = build_interp(
             self.style,
             knots.clone(),
             dfs.clone(),
             self.extrapolation,
-            true,
+            ValidationPolicy::AllowNegative,
         )?;
 
         let mut curve = DiscountCurve {

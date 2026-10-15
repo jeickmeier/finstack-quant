@@ -4,7 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationInterpolation, InflationLag,
+    InflationIndex, InflationLag, SeriesInterpolation,
 };
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
 use finstack_quant_core::money::Money;
@@ -126,7 +126,7 @@ pub fn simple_index(
         .collect();
     InflationIndex::new(id, observations, ccy)
         .unwrap()
-        .with_interpolation(InflationInterpolation::Linear)
+        .with_interpolation(SeriesInterpolation::Linear)
         .with_lag(lag)
 }
 

@@ -91,11 +91,7 @@ pub mod scalars;
 pub mod surfaces;
 /// One-dimensional term structures (yield, credit, ...).
 pub mod term_structures;
-/// Traits for market data types (Discounting, Forward, Survival, etc.).
-///
-/// These traits define the interface for curve types used in pricing.
-/// Useful for generic programming and custom curve implementations.
+/// Traits for polymorphic discount curve code (`Discounting`).
 pub mod traits;
 pub use context::MarketContext;
 pub use dividends::{DividendEvent, DividendKind, DividendSchedule, DividendScheduleBuilder};
-pub use term_structures::DiscountCurve;

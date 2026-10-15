@@ -515,7 +515,7 @@ impl PyHazardCurve {
     /// Debt seniority label (``"senior_secured"``, ``"senior"``, ``"subordinated"``, ``"junior"``), or ``None``.
     #[getter]
     fn seniority(&self) -> Option<String> {
-        self.inner.seniority.map(|s| s.to_string())
+        self.inner.seniority().map(|s| s.to_string())
     }
 
     /// Par-spread readout interpolation label (``"linear"`` or ``"log_linear"``).

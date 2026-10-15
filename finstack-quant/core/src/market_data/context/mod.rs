@@ -58,8 +58,6 @@ pub(crate) use curve_storage::for_each_context_curve;
 pub use curve_storage::CurveStorage;
 pub use stats::ContextStats;
 
-pub use super::bumps::{BumpMode, BumpSpec, BumpUnits};
-
 use std::sync::Arc;
 
 use crate::currency::Currency;

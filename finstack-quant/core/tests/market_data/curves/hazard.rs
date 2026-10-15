@@ -153,7 +153,7 @@ fn to_builder_preserves_metadata() {
         .expect("builder should succeed");
 
     assert_eq!(rebuilt.recovery_rate(), curve.recovery_rate());
-    assert_eq!(rebuilt.seniority, Some(Seniority::Senior));
+    assert_eq!(rebuilt.seniority(), Some(Seniority::Senior));
     assert_eq!(
         rebuilt.knot_points().collect::<Vec<_>>(),
         curve.knot_points().collect::<Vec<_>>()

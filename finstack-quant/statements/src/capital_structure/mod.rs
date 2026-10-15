@@ -32,7 +32,7 @@
 //!
 //! ## Example
 //! ```
-//! use finstack_quant_core::market_data::{context::MarketContext, DiscountCurve};
+//! use finstack_quant_core::market_data::{context::MarketContext, term_structures::DiscountCurve};
 //! use finstack_quant_statements::prelude::*;
 //!
 //! use time::macros::date;

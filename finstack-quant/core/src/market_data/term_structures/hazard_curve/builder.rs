@@ -267,6 +267,7 @@ impl HazardCurveBuilder {
             interp_kvec.into_boxed_slice(),
             interp_svec.into_boxed_slice(),
             ExtrapolationPolicy::FlatForward,
+            ValidationPolicy::Strict,
         )?;
 
         Ok(HazardCurve {

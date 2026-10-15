@@ -69,13 +69,13 @@ Full item documentation is in the rustdoc (`cargo doc -p finstack-quant-core
 | `market_data::context::MarketContext` | Immutable container keyed by curve id, with typed getters (`get_discount`, `get_forward`, …) returning `Arc<T>`. Bumping returns a new context. |
 | `market_data::term_structures` | `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `InflationCurve`, `BaseCorrelationCurve`, `BasisSpreadCurve`, `PriceCurve` (signed prices or, via `PriceCurveKind::VolIndex`, non-negative volatility-index levels), `ParametricCurve` (Nelson-Siegel / Svensson), `ForwardVarianceCurve`, `CreditIndexData`, plus builders and rate-calibration helpers. |
 | `market_data::surfaces` | `VolSurface`, `VolCube`, `FxDeltaVolSurface` (validated ATM / risk-reversal / butterfly quotes; conversion lives in `finstack-quant-models::volatility`). |
-| `market_data::scalars` | `MarketScalar`, `ScalarTimeSeries`, `SeriesInterpolation`, plus `InflationIndex` with its `InflationLag`/`InflationInterpolation` conventions. |
+| `market_data::scalars` | `MarketScalar`, `ScalarTimeSeries`, `SeriesInterpolation`, plus `InflationIndex` with its `InflationLag` convention. |
 | `market_data::dividends` | `DividendEvent`, `DividendKind`, `DividendSchedule`. |
 | `market_data::bumps` | `BumpSpec`, `BumpType`, `BumpUnits`, `BumpMode`, `MarketBump`, and the `Bumpable` trait — the scenario/greeks perturbation vocabulary. |
 | `market_data::diff` | Curve and scalar shift measurements between two contexts; volatility-surface evaluation and shift measurement live in models. |
 | `market_data::hierarchy` | Tree of tagged nodes referencing `CurveId`s, for scenario targeting and factor scoping. |
 | `market_data::fixings` | The `FIXING:{forward_curve_id}` lookup convention. |
-| `market_data::traits` | `TermStructure`, `Discounting`, `Forward`, `Survival` — the minimal trait surface for polymorphic curve code; concrete curve types carry the rest. |
+| `market_data::traits` | `Discounting` — the minimal trait surface for polymorphic discount curve code; concrete curve types carry the rest. |
 
 ### Math
 

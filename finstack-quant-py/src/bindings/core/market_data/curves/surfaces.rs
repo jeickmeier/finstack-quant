@@ -135,36 +135,24 @@ impl PyVolSurface {
             interpolation_mode: mode,
             quote_type: quote,
         };
-        let flat_vols = match grid {
-            VolInput::Flat(values) => values,
-            VolInput::Rows(rows) => {
-                if rows.len() != expiries.len() {
-                    return Err(crate::errors::value_error(format!(
-                        "vol_rows has {} rows but expiries has {} entries",
-                        rows.len(),
-                        expiries.len()
-                    )));
-                }
-                for (i, row) in rows.iter().enumerate() {
-                    if row.len() != strikes.len() {
-                        return Err(crate::errors::value_error(format!(
-                            "vol_rows[{i}] has {} entries but strikes has {}",
-                            row.len(),
-                            strikes.len()
-                        )));
-                    }
-                }
-                rows.into_iter().flatten().collect()
-            }
-        };
-        let surface = VolSurface::from_grid_opts(
-            id,
-            &expiries,
-            &strikes,
-            &flat_vols,
-            opts,
-            displacements.as_deref(),
-        )
+        let surface = match grid {
+            VolInput::Flat(values) => VolSurface::from_grid_opts(
+                id,
+                &expiries,
+                &strikes,
+                &values,
+                opts,
+                displacements.as_deref(),
+            ),
+            VolInput::Rows(rows) => VolSurface::from_rows_opts(
+                id,
+                &expiries,
+                &strikes,
+                &rows,
+                opts,
+                displacements.as_deref(),
+            ),
+        }
         .map_err(core_to_py)?;
 
         Ok(Self {

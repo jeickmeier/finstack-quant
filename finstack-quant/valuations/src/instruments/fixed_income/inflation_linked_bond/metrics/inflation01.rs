@@ -220,7 +220,7 @@ mod tests {
         use finstack_quant_core::currency::Currency;
         use finstack_quant_core::dates::DateExt;
         use finstack_quant_core::market_data::scalars::{
-            InflationIndex, InflationInterpolation, InflationLag,
+            InflationIndex, InflationLag, SeriesInterpolation,
         };
 
         let as_of = date!(2024 - 01 - 15);
@@ -240,7 +240,7 @@ mod tests {
             .collect();
         let index = InflationIndex::new("US-CPI", observations, Currency::USD)
             .expect("inflation index")
-            .with_interpolation(InflationInterpolation::Linear)
+            .with_interpolation(SeriesInterpolation::Linear)
             .with_lag(InflationLag::None);
         let market = MarketContext::new()
             .insert(discount)

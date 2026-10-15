@@ -35,9 +35,7 @@ fn dividend_schedule_restoration_uses_validated_builder() {
     assert!(serde_json::from_value::<DividendSchedule>(wire).is_err());
 }
 use finstack_quant_core::market_data::hierarchy::MarketDataHierarchy;
-use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationInterpolation, InflationLag,
-};
+use finstack_quant_core::market_data::scalars::{InflationIndex, InflationLag};
 use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};
 use finstack_quant_core::market_data::surfaces::SabrParameterData;
 use finstack_quant_core::market_data::surfaces::{FxDeltaVolSurface, VolCube, VolSurface};
@@ -149,7 +147,7 @@ fn inflation_index_roundtrip() {
 
     let index = InflationIndex::new("US-CPI", vec![(d1, 300.0), (d2, 301.5)], Currency::USD)
         .unwrap()
-        .with_interpolation(InflationInterpolation::Linear)
+        .with_interpolation(SeriesInterpolation::Linear)
         .with_lag(InflationLag::Months(3));
 
     let json = serde_json::to_string_pretty(&index).unwrap();
@@ -937,7 +935,7 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
     // Inflation index (separate from inflation curve)
     let idx = InflationIndex::new("US-CPI", vec![(d, 300.0)], Currency::USD)
         .unwrap()
-        .with_interpolation(InflationInterpolation::Linear);
+        .with_interpolation(SeriesInterpolation::Linear);
 
     let series = ScalarTimeSeries::new("TS", vec![(d, 1.0)], None)
         .unwrap()

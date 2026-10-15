@@ -423,17 +423,14 @@ fn pik_funded_repayment_validates() {
 }
 #[test]
 fn funding_outflow_has_no_default_recovery_payment() {
-    struct Survival;
-    impl finstack_quant_core::market_data::traits::Survival for Survival {
-        fn id(&self) -> &finstack_quant_core::types::CurveId {
-            static ID: std::sync::LazyLock<finstack_quant_core::types::CurveId> =
-                std::sync::LazyLock::new(|| "test-survival".into());
-            &ID
-        }
-        fn sp(&self, _: f64) -> f64 {
-            0.8
-        }
-    }
+    let hazard =
+        finstack_quant_core::market_data::term_structures::HazardCurve::from_survival_probs(
+            "test-survival",
+            date("2025-01-01"),
+            &[(181.0 / 365.0, 0.8), (1.0, 0.64)],
+            0.4,
+        )
+        .expect("valid hazard curve");
     let mut v = spec("2025-01-01", "2026-01-01");
     v["coupon_program"] = json!([]);
     v["principal_events"] = json!([{"date":"2025-07-01", "payment_date": "2025-07-01","delta":{"amount":"100","currency":"USD"},"kind":"notional"}]);
@@ -446,7 +443,7 @@ fn funding_outflow_has_no_default_recovery_payment() {
     let pvs = cf::aggregation::credit_adjusted_cashflow_pvs(
         s.get_flows(),
         &vec![1.0; s.get_flows().len()],
-        Some(&Survival),
+        Some(&hazard),
         Some(0.4),
         cf::aggregation::DateContext::new(
             date("2025-01-01"),

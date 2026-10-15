@@ -4,7 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationInterpolation, InflationLag,
+    InflationIndex, InflationLag, SeriesInterpolation,
 };
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::InflationCurve;
@@ -117,7 +117,7 @@ pub fn market_context_with_index() -> (MarketContext, InflationIndex) {
     let observations = monthly_observations(d(2019, 10, 1), 664, 250.0, 0.002);
     let index = InflationIndex::new("US-CPI-U", observations, Currency::USD)
         .unwrap()
-        .with_interpolation(InflationInterpolation::Linear);
+        .with_interpolation(SeriesInterpolation::Linear);
 
     let ctx = MarketContext::new()
         .insert_surface(zero_floor_vol())
@@ -199,7 +199,7 @@ pub fn uk_market_context() -> (MarketContext, InflationIndex) {
     let observations = monthly_observations(d(2019, 7, 1), 260, 280.0, 0.0025);
     let index = InflationIndex::new("UK-RPI", observations, Currency::GBP)
         .unwrap()
-        .with_interpolation(InflationInterpolation::Step);
+        .with_interpolation(SeriesInterpolation::Step);
 
     let ctx = MarketContext::new()
         .insert_surface(zero_floor_vol())

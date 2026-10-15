@@ -8,8 +8,7 @@ use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::instruments::fixed_income::mbs_passthrough::pricer::price_mbs;
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
-use finstack_quant_core::market_data::bumps::MarketBump;
-use finstack_quant_core::market_data::context::BumpSpec;
+use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 

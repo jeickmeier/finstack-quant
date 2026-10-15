@@ -236,7 +236,7 @@ pub struct InflationSwapConventions {
     /// Inflation lag (observation lag) in months/period.
     pub inflation_lag: Tenor,
     /// Monthly reference CPI rule: interpolated daily for USD, monthly step for EUR/UK.
-    pub interpolation: finstack_quant_core::market_data::scalars::InflationInterpolation,
+    pub interpolation: finstack_quant_core::market_data::scalars::SeriesInterpolation,
 }
 
 /// Conventions for cross-currency basis swaps.

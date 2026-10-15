@@ -163,7 +163,7 @@ impl MarketContext {
     /// # Examples
     /// ```rust
     /// use finstack_quant_core::market_data::context::MarketContext;
-    /// use finstack_quant_core::market_data::scalars::{InflationIndex, InflationInterpolation};
+    /// use finstack_quant_core::market_data::scalars::{InflationIndex, SeriesInterpolation};
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::dates::Date;
     /// use std::sync::Arc;
@@ -175,7 +175,7 @@ impl MarketContext {
     /// ];
     /// let index = InflationIndex::new("US-CPI", observations, Currency::USD)
     ///     .expect("InflationIndex creation should succeed")
-    ///     .with_interpolation(InflationInterpolation::Linear);
+    ///     .with_interpolation(SeriesInterpolation::Linear);
     /// let ctx = MarketContext::new().insert_inflation_index(index);
     /// assert!(ctx.get_inflation_index("US-CPI").is_ok());
     ///

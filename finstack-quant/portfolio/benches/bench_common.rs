@@ -14,7 +14,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationInterpolation, InflationLag, MarketScalar, ScalarTimeSeries,
+    InflationIndex, InflationLag, MarketScalar, ScalarTimeSeries, SeriesInterpolation,
 };
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{
@@ -267,7 +267,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
     )
     .unwrap()
     .with_lag(InflationLag::None)
-    .with_interpolation(InflationInterpolation::Linear);
+    .with_interpolation(SeriesInterpolation::Linear);
 
     let base_corr = BaseCorrelationCurve::builder("CDX-CORR")
         .knots(corr_knots)
@@ -1025,7 +1025,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .fixed_rate(rust_decimal::Decimal::try_from(0.02).expect("valid literal"))
             .inflation_index_id("USD-CPI".into())
             .lag(InflationLag::Months(3))
-            .interpolation(InflationInterpolation::Step)
+            .interpolation(SeriesInterpolation::Step)
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)

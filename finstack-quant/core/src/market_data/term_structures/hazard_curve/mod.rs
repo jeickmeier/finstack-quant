@@ -71,11 +71,10 @@ use crate::{
     currency::Currency,
     dates::{Date, DayCount, DayCountContext},
     error::InputError,
-    market_data::traits::Survival,
     math::interp::{
         strategies::{LinearStrategy, LogLinearStrategy},
         types::Interp,
-        ExtrapolationPolicy, InterpStyle, InterpolationStrategy,
+        ExtrapolationPolicy, InterpStyle, InterpolationStrategy, ValidationPolicy,
     },
     types::CurveId,
 };
@@ -118,7 +117,7 @@ pub struct HazardCurve {
     /// Optional issuer metadata
     issuer: Option<String>,
     /// Debt seniority
-    pub seniority: Option<Seniority>,
+    seniority: Option<Seniority>,
     /// Currency of protection leg (metadata)
     currency: Option<Currency>,
     /// Day count convention for converting dates→times (metadata)

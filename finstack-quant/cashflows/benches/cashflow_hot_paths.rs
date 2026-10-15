@@ -239,7 +239,6 @@ fn bench_pv_by_period_credit(c: &mut Criterion) {
     let hazard = market.get_hazard("USD-CREDIT").unwrap();
 
     use finstack_quant_cashflows::aggregation::DateContext;
-    use finstack_quant_core::market_data::traits::Survival;
 
     {
         let (years, label) = (5i32, "5y_40cf");
@@ -258,7 +257,7 @@ fn bench_pv_by_period_credit(c: &mut Criterion) {
                         black_box(&periods),
                         black_box(disc.as_ref()),
                         Some(finstack_quant_cashflows::builder::PvCreditAdjustment {
-                            hazard: Some(black_box(hazard.as_ref() as &dyn Survival)),
+                            hazard: Some(black_box(hazard.as_ref())),
                             recovery_rate: None,
                         }),
                         black_box(ctx),
@@ -276,7 +275,7 @@ fn bench_pv_by_period_credit(c: &mut Criterion) {
                         black_box(&periods),
                         black_box(disc.as_ref()),
                         Some(finstack_quant_cashflows::builder::PvCreditAdjustment {
-                            hazard: Some(black_box(hazard.as_ref() as &dyn Survival)),
+                            hazard: Some(black_box(hazard.as_ref())),
                             recovery_rate: Some(0.40),
                         }),
                         black_box(ctx),

@@ -310,6 +310,13 @@ impl HazardCurve {
         self.issuer.as_deref()
     }
 
+    /// Debt seniority metadata associated with this curve.
+    #[inline]
+    #[must_use]
+    pub const fn seniority(&self) -> Option<Seniority> {
+        self.seniority
+    }
+
     /// Opaque FX policy stamp set by the curve constructor; see
     /// [`crate::market_data::term_structures::DiscountCurve::fx_policy`] for the contract.
     #[inline]
@@ -417,28 +424,6 @@ impl HazardCurve {
                 }
             }
         }
-    }
-}
-
-impl Survival for HazardCurve {
-    #[inline]
-    fn id(&self) -> &CurveId {
-        &self.id
-    }
-
-    #[inline]
-    fn sp(&self, t: f64) -> f64 {
-        self.sp(t)
-    }
-
-    #[inline]
-    fn base_date(&self) -> Option<Date> {
-        Some(self.base_date())
-    }
-
-    #[inline]
-    fn day_count(&self) -> DayCount {
-        self.day_count()
     }
 }
 

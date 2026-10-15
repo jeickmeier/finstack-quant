@@ -715,24 +715,15 @@ impl VolSurfaceBuilder {
     ///
     /// # Errors
     ///
-    /// Returns `InputError::DimensionMismatch` when the number of rows does
-    /// not match expiries or a row does not match strikes. It also propagates
-    /// axis and volatility validation failures from [`VolSurface::from_grid_opts`].
+    /// Returns a validation error when the number of rows does not match
+    /// expiries or a row does not match strikes. It also propagates axis and
+    /// volatility validation failures from [`VolSurface::from_rows_opts`].
     pub fn build(self) -> crate::Result<VolSurface> {
-        if self.vols.len() != self.expiries.len() {
-            return Err(InputError::DimensionMismatch.into());
-        }
-        for row in &self.vols {
-            if row.len() != self.strikes.len() {
-                return Err(InputError::DimensionMismatch.into());
-            }
-        }
-        let flat: Vec<f64> = self.vols.into_iter().flatten().collect();
-        VolSurface::from_grid_opts(
+        VolSurface::from_rows_opts(
             self.id.as_str(),
             &self.expiries,
             &self.strikes,
-            &flat,
+            &self.vols,
             VolGridOpts {
                 secondary_axis: self.secondary_axis,
                 quote_type: self.quote_type,
@@ -852,29 +843,33 @@ impl VolSurface {
         )
     }
 
-    /// Construct directly from axes and row-major volatility rows.
+    /// Construct from axes, row-major volatility rows, and explicit options.
     ///
-    /// `vol_rows[expiry_idx][strike_idx]` is flattened and validated through
-    /// [`Self::from_grid_opts`]. This is the canonical entry point for callers
-    /// whose input is naturally represented as expiry rows.
-    ///
-    /// # Errors
-    /// - Row count does not match `expiries.len()`
-    /// - Any row length does not match `strikes.len()`
-    /// - Any invariant enforced by [`Self::from_grid_opts`] fails
+    /// `vol_rows[expiry_idx][strike_idx]` is validated against `expiries` and
+    /// `strikes`, flattened, and forwarded to [`Self::from_grid_opts`].
     ///
     /// # Arguments
     ///
-    /// * `id` - Market-data identifier used for context lookup.
+    /// * `id` - Market-data identifier stored on the surface and used for context lookup.
     /// * `expiries` - Strictly increasing option expiries in year fractions.
-    /// * `strikes` - Strictly increasing strikes in the underlying's quote units.
+    /// * `strikes` - Strictly increasing secondary-axis coordinates.
     /// * `vol_rows` - One row per expiry and one annualized decimal volatility
     ///   per strike; rows must match the axes exactly.
-    pub fn from_rows(
+    /// * `opts` - Secondary-axis meaning, quote type, and interpolation contract for the grid.
+    /// * `displacements` - One finite additive shift per expiry for shifted Black quotes; must be absent for normal or unshifted Black quotes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the row count does not match `expiries.len()`, any
+    /// row length does not match `strikes.len()`, or any invariant enforced by
+    /// [`Self::from_grid_opts`] fails.
+    pub fn from_rows_opts(
         id: impl AsRef<str>,
         expiries: &[f64],
         strikes: &[f64],
         vol_rows: &[Vec<f64>],
+        opts: VolGridOpts,
+        displacements: Option<&[f64]>,
     ) -> crate::Result<Self> {
         if vol_rows.len() != expiries.len() {
             return Err(Error::Validation(format!(
@@ -901,7 +896,41 @@ impl VolSurface {
         for row in vol_rows {
             flat.extend_from_slice(row);
         }
-        Self::from_grid_opts(id, expiries, strikes, &flat, VolGridOpts::default(), None)
+        Self::from_grid_opts(id, expiries, strikes, &flat, opts, displacements)
+    }
+
+    /// Construct directly from axes and row-major volatility rows.
+    ///
+    /// `vol_rows[expiry_idx][strike_idx]` is flattened and validated through
+    /// [`Self::from_rows_opts`]. This is the canonical entry point for callers
+    /// whose input is naturally represented as expiry rows.
+    ///
+    /// # Errors
+    /// - Row count does not match `expiries.len()`
+    /// - Any row length does not match `strikes.len()`
+    /// - Any invariant enforced by [`Self::from_grid_opts`] fails
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Market-data identifier used for context lookup.
+    /// * `expiries` - Strictly increasing option expiries in year fractions.
+    /// * `strikes` - Strictly increasing strikes in the underlying's quote units.
+    /// * `vol_rows` - One row per expiry and one annualized decimal volatility
+    ///   per strike; rows must match the axes exactly.
+    pub fn from_rows(
+        id: impl AsRef<str>,
+        expiries: &[f64],
+        strikes: &[f64],
+        vol_rows: &[Vec<f64>],
+    ) -> crate::Result<Self> {
+        Self::from_rows_opts(
+            id,
+            expiries,
+            strikes,
+            vol_rows,
+            VolGridOpts::default(),
+            None,
+        )
     }
 }
 

@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationInterpolation, InflationLag, ScalarTimeSeries, SeriesInterpolation,
+    InflationIndex, InflationLag, ScalarTimeSeries, SeriesInterpolation,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
@@ -370,7 +370,7 @@ impl PyInflationIndex {
             .collect::<PyResult<Vec<_>>>()?;
         let currency = extract_currency(currency)?;
         let interpolation = interpolation
-            .map(InflationInterpolation::from_str)
+            .map(SeriesInterpolation::from_str)
             .transpose()
             .map_err(core_to_py)?
             .unwrap_or_default();

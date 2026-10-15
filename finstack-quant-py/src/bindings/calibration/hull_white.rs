@@ -8,7 +8,7 @@ use finstack_quant_calibration::hull_white::{
     self as rust_hw, CapFloorCalibrationConfig, CapFloorQuote, HullWhiteCalibrationParams,
     HullWhiteParams, PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionQuote,
 };
-use finstack_quant_core::market_data::DiscountCurve;
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use std::sync::Arc;

@@ -309,7 +309,7 @@ impl DiscountCurve {
         let mut points = Vec::with_capacity(rolled_points.len() + 1);
         points.push((0.0, 1.0));
         points.extend(rolled_points);
-        let (knots, dfs) = super::super::common::split_points(points);
+        let (knots, dfs): (Vec<f64>, Vec<f64>) = points.into_iter().unzip();
         if !self.allow_non_monotonic {
             super::validation::validate_monotonic_df(&knots, &dfs)?;
         }

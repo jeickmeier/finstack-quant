@@ -81,7 +81,7 @@ fn cap_floor_parity_matches_same_forward_swap_across_quote_volatilities() {
 
 #[test]
 fn zero_and_day_lag_caplets_do_not_consume_unpublished_denominators() {
-    use finstack_quant_core::market_data::scalars::{InflationIndex, InflationInterpolation};
+    use finstack_quant_core::market_data::scalars::{InflationIndex, SeriesInterpolation};
     use finstack_quant_core::market_data::surfaces::VolQuoteType;
     use finstack_quant_core::market_data::term_structures::InflationCurve;
     use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationVolatilityExpiry;
@@ -136,7 +136,7 @@ fn zero_and_day_lag_caplets_do_not_consume_unpublished_denominators() {
         cap.start_date = start;
         cap.maturity = end;
         cap.lag = Some(lag);
-        cap.interpolation = Some(InflationInterpolation::Step);
+        cap.interpolation = Some(SeriesInterpolation::Step);
         cap.rate_option_type = RateOptionType::Caplet;
         cap.volatility_expiry = InflationVolatilityExpiry::PublicationDate;
         cap.strike = Decimal::ZERO;
@@ -158,7 +158,7 @@ fn zero_and_day_lag_caplets_do_not_consume_unpublished_denominators() {
 
 #[test]
 fn monthly_publication_controls_availability_and_explicit_quote_clock() {
-    use finstack_quant_core::market_data::scalars::{InflationIndex, InflationInterpolation};
+    use finstack_quant_core::market_data::scalars::{InflationIndex, SeriesInterpolation};
     use finstack_quant_core::market_data::surfaces::VolQuoteType;
     use finstack_quant_core::market_data::term_structures::InflationCurve;
     use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationVolatilityExpiry;
@@ -177,7 +177,7 @@ fn monthly_publication_controls_availability_and_explicit_quote_clock() {
         Currency::USD,
     )
     .unwrap()
-    .with_interpolation(InflationInterpolation::Step)
+    .with_interpolation(SeriesInterpolation::Step)
     .with_publication_dates(vec![(january, release)])
     .unwrap();
     let market = MarketContext::new()
@@ -201,7 +201,7 @@ fn monthly_publication_controls_availability_and_explicit_quote_clock() {
     cap.maturity = date!(2026 - 04 - 01);
     cap.strike = Decimal::try_from(0.02).unwrap();
     cap.rate_option_type = RateOptionType::Caplet;
-    cap.interpolation = Some(InflationInterpolation::Step);
+    cap.interpolation = Some(SeriesInterpolation::Step);
     // Existing reference-date quotes cannot be silently reinterpreted after
     // that reference date has passed while the observation is still unknown.
     assert!(cap

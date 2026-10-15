@@ -72,7 +72,7 @@
 //!   - Fleckenstein, M., Longstaff, F. A., & Lustig, H. (2017). "Deflation Risk."
 //!     *Review of Financial Studies*, 30(8), 2719-2760. `docs/REFERENCES.md#kerkhof-2005`
 
-use super::common::{build_interp, roll_knots, split_points};
+use super::common::{build_interp, roll_knots};
 use crate::dates::DateExt;
 use crate::dates::{Date, DayCount};
 use crate::market_data::bumps::{BumpSpec, BumpType, Bumpable};
@@ -724,7 +724,7 @@ impl InflationCurveBuilder {
                 "CPI knot at t=0 must equal base_cpi".to_string(),
             ));
         }
-        let (mut kvec, mut cvec): (Vec<f64>, Vec<f64>) = split_points(self.points);
+        let (mut kvec, mut cvec): (Vec<f64>, Vec<f64>) = self.points.into_iter().unzip();
         let origin = kvec.partition_point(|&t| t < 0.0);
         if kvec.get(origin).is_none_or(|&t| t != 0.0) {
             kvec.insert(origin, 0.0);
@@ -738,6 +738,7 @@ impl InflationCurveBuilder {
             knots.clone(),
             cpi_levels.clone(),
             self.extrapolation,
+            ValidationPolicy::Strict,
         )?;
         if let Some(state) = self.roll_transform {
             interp = Interp::restore_rolled(

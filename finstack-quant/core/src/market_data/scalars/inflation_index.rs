@@ -42,7 +42,7 @@
 //! # Examples
 //! ```rust
 //! use finstack_quant_core::market_data::scalars::{
-//!     InflationIndex, InflationInterpolation, InflationLag,
+//!     InflationIndex, InflationLag, SeriesInterpolation,
 //! };
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::dates::Date;
@@ -60,7 +60,7 @@
 //! ];
 //! let index = InflationIndex::new("US-CPI", observations, Currency::USD)
 //!     .expect("Index creation should succeed")
-//!     .with_interpolation(InflationInterpolation::Linear)
+//!     .with_interpolation(SeriesInterpolation::Linear)
 //!     .with_lag(InflationLag::Months(3));
 //! let settle = Date::from_calendar_date(2024, Month::June, 30).expect("Valid date");
 //! let base = Date::from_calendar_date(2024, Month::March, 31).expect("Valid date");
@@ -75,13 +75,6 @@ use crate::{Error, Result};
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-
-/// Interpolation method for CPI/RPI values between monthly observations.
-///
-/// Alias for [`SeriesInterpolation`]: [`SeriesInterpolation::Linear`] is the
-/// daily pro-rata convention used by US TIPS and modern UK Index-Linked Gilts,
-/// while [`SeriesInterpolation::Step`] carries the last published level forward.
-pub type InflationInterpolation = SeriesInterpolation;
 
 /// Contractual observation lag for inflation index reference dates.
 ///
@@ -228,7 +221,7 @@ impl std::str::FromStr for InflationLag {
 ///
 /// ```rust
 /// use finstack_quant_core::market_data::scalars::{
-///     InflationIndex, InflationInterpolation, InflationLag,
+///     InflationIndex, SeriesInterpolation, InflationLag,
 /// };
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::Date;
@@ -248,7 +241,7 @@ impl std::str::FromStr for InflationLag {
 ///
 /// let index = InflationIndex::new("US-CPI-U", observations, Currency::USD)
 ///     .expect("Index creation should succeed")
-///     .with_interpolation(InflationInterpolation::Linear)
+///     .with_interpolation(SeriesInterpolation::Linear)
 ///     .with_lag(InflationLag::Months(3)); // TIPS standard
 ///
 /// // Calculate inflation ratio for TIPS coupon indexation
@@ -337,7 +330,7 @@ impl InflationIndex {
     }
 
     /// Set the interpolation method between observations.
-    pub fn with_interpolation(mut self, interpolation: InflationInterpolation) -> Self {
+    pub fn with_interpolation(mut self, interpolation: SeriesInterpolation) -> Self {
         self.series = self.series.with_interpolation(interpolation);
         self
     }
@@ -450,8 +443,8 @@ impl InflationIndex {
     pub fn value_on(&self, date: Date) -> Result<f64> {
         if let InflationLag::Months(months) = self.lag {
             let contract_date = match self.interpolation() {
-                InflationInterpolation::Linear => date,
-                InflationInterpolation::Step => date
+                SeriesInterpolation::Linear => date,
+                SeriesInterpolation::Step => date
                     .replace_day(1)
                     .map_err(|_| crate::InputError::InvalidDateRange)?,
             };
@@ -589,7 +582,7 @@ impl InflationIndex {
     }
 
     /// Expose current interpolation setting for bump/rebuild helpers.
-    pub fn interpolation(&self) -> InflationInterpolation {
+    pub fn interpolation(&self) -> SeriesInterpolation {
         self.series.interpolation()
     }
     /// Expose current lag setting for bump/rebuild helpers.
@@ -642,7 +635,7 @@ struct InflationIndexWire {
     )]
     pub observations: Vec<(Date, f64)>,
     /// Interpolation method
-    pub interpolation: InflationInterpolation,
+    pub interpolation: SeriesInterpolation,
     /// Lag policy
     pub lag: InflationLag,
     /// Optional seasonality factors
@@ -821,7 +814,7 @@ mod tests {
 
     #[test]
     fn test_linear_interpolation() {
-        let index = sample_cpi().with_interpolation(InflationInterpolation::Linear);
+        let index = sample_cpi().with_interpolation(SeriesInterpolation::Linear);
 
         // Exact date
         let value = index
@@ -841,16 +834,16 @@ mod tests {
         let query = make_date(2023, 3, 15);
         let mut index = sample_cpi();
         for interpolation in [
-            InflationInterpolation::Linear,
-            InflationInterpolation::Step,
-            InflationInterpolation::Linear,
+            SeriesInterpolation::Linear,
+            SeriesInterpolation::Step,
+            SeriesInterpolation::Linear,
         ] {
             index = index.with_interpolation(interpolation);
             assert_eq!(index.interpolation(), interpolation);
             let actual = index.value_on(query).expect("covered observation interval");
             match interpolation {
-                InflationInterpolation::Step => assert_eq!(actual, 101.0),
-                InflationInterpolation::Linear => assert!(actual > 101.0 && actual < 102.0),
+                SeriesInterpolation::Step => assert_eq!(actual, 101.0),
+                SeriesInterpolation::Linear => assert!(actual > 101.0 && actual < 102.0),
             }
             let restored: InflationIndex =
                 serde_json::from_str(&serde_json::to_string(&index).expect("serialize index"))
@@ -896,7 +889,7 @@ mod tests {
 
     #[test]
     fn ref_cpi_months_lag_requires_exact_monthly_observations() {
-        for interpolation in [InflationInterpolation::Step, InflationInterpolation::Linear] {
+        for interpolation in [SeriesInterpolation::Step, SeriesInterpolation::Linear] {
             for observations in [
                 vec![
                     (make_date(2025, 1, 1), 300.0),
@@ -974,7 +967,7 @@ mod tests {
             Currency::USD,
         )
         .expect("valid observations")
-        .with_interpolation(InflationInterpolation::Linear)
+        .with_interpolation(SeriesInterpolation::Linear)
         .with_seasonality(seasonality)
         .expect("seasonality should apply");
 

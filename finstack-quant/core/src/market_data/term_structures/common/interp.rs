@@ -5,58 +5,15 @@ use crate::math::interp::types::Interp;
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::Result;
 
-/// Build an `Interp` with unified error mapping (crate::Result) for callers
-/// whose builders return `crate::Result<T>` (Forward/Inflation).
-///
-/// Preserves the original interpolation error context for better diagnostics.
+/// Build an `Interp` with the requested style, extrapolation, and validation policy.
 #[inline]
 pub(crate) fn build_interp(
     style: InterpStyle,
     knots: Box<[f64]>,
     values: Box<[f64]>,
     extrapolation: ExtrapolationPolicy,
+    validation: ValidationPolicy,
 ) -> Result<Interp> {
-    style.build_enum(knots, values, extrapolation, ValidationPolicy::Strict)
-}
-
-/// Build an `Interp` allowing any values (including negative forward rates).
-///
-/// This is used by forward curves where negative rates are allowed
-/// (e.g., EUR, CHF, JPY markets since 2014).
-///
-/// Preserves the original interpolation error context for better diagnostics.
-#[inline]
-pub(crate) fn build_interp_allow_any_values(
-    style: InterpStyle,
-    knots: Box<[f64]>,
-    values: Box<[f64]>,
-    extrapolation: ExtrapolationPolicy,
-) -> Result<Interp> {
-    style.build_enum(
-        knots,
-        values,
-        extrapolation,
-        ValidationPolicy::AllowNegative,
-    )
-}
-
-/// Build an `Interp` mapping errors to `InputError` for discount curve builders.
-#[inline]
-pub(crate) fn build_interp_input_error(
-    style: InterpStyle,
-    knots: Box<[f64]>,
-    values: Box<[f64]>,
-    extrapolation: ExtrapolationPolicy,
-    skip_validation: bool,
-) -> crate::Result<Interp> {
-    // Preserve the original interpolation error (usually an InputError).
-    let validation = if skip_validation {
-        // Allow domain-specific builders (e.g., discount curves) to defer value validation
-        // to downstream helpers while still validating knot shape upstream.
-        ValidationPolicy::AllowNegative
-    } else {
-        ValidationPolicy::Strict
-    };
     style.build_enum(knots, values, extrapolation, validation)
 }
 
@@ -84,10 +41,4 @@ pub(crate) fn year_fraction_to_with_ctx(
     } else {
         Ok(day_count.signed_year_fraction(base, date, ctx)?)
     }
-}
-
-/// Convenience to split points (t, v) into separate vectors.
-#[inline]
-pub(crate) fn split_points(points: Vec<(f64, f64)>) -> (Vec<f64>, Vec<f64>) {
-    points.into_iter().unzip()
 }

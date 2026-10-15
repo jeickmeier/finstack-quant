@@ -526,9 +526,7 @@ fn envelope_for_priced(
     let native_pvs = credit_adjusted_cashflow_pvs(
         schedule.get_flows(),
         &discount_factors,
-        hazard_arc
-            .as_deref()
-            .map(|hazard| hazard as &dyn finstack_quant_core::market_data::traits::Survival),
+        hazard_arc.as_deref(),
         recovery_rate,
         DateContext::new(as_of_date, primary_discount.day_count(), dc_ctx),
     )?;

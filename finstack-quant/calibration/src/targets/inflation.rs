@@ -18,7 +18,7 @@ use crate::build::prepared::PreparedQuote;
 use finstack_quant_core::dates::DateExt;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::{InflationInterpolation, InflationLag};
+use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
 use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
@@ -195,7 +195,7 @@ impl InflationCurveTarget {
                 .replace_day(1)
                 .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?;
             let anchor = first.add_months(-i32::from(months))?;
-            if conventions.interpolation == InflationInterpolation::Linear && maturity.day() > 1 {
+            if conventions.interpolation == SeriesInterpolation::Linear && maturity.day() > 1 {
                 anchor.add_months(1)?
             } else {
                 anchor

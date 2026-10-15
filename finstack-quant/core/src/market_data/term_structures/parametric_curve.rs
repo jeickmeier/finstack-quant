@@ -382,7 +382,43 @@ impl ParametricCurve {
         &self.model
     }
 
+    /// Discount factor at time `t` (years from `base_date`).
+    ///
+    /// Returns `1.0` for `t <= 0.0`.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time in years from the curve's base date.
+    #[must_use]
+    #[inline]
+    pub fn df(&self, t: f64) -> f64 {
+        if t <= 0.0 {
+            return 1.0;
+        }
+        source_discount_factor(&self.model, self.time_offset + t)
+            / source_discount_factor(&self.model, self.time_offset)
+    }
+
+    /// Relative discount factor from `from` to `to`: `df(t_to) / df(t_from)`.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - Start date for the relative discounting interval.
+    /// * `to` - End date for the relative discounting interval.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the day-count year-fraction calculation fails or
+    /// if the resulting discount factors are non-finite or non-positive.
+    pub fn df_between_dates(&self, from: Date, to: Date) -> crate::Result<f64> {
+        <Self as Discounting>::df_between_dates(self, from, to)
+    }
+
     /// Continuously compounded zero rate at time `t`.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time in years from the curve's base date.
     #[must_use]
     #[inline]
     pub fn zero_rate(&self, t: f64) -> f64 {
@@ -498,11 +534,7 @@ impl Discounting for ParametricCurve {
     }
 
     fn df(&self, t: f64) -> f64 {
-        if t <= 0.0 {
-            return 1.0;
-        }
-        source_discount_factor(&self.model, self.time_offset + t)
-            / source_discount_factor(&self.model, self.time_offset)
+        Self::df(self, t)
     }
 }
 

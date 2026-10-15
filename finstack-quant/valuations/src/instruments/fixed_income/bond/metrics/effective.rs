@@ -17,8 +17,7 @@
 
 use crate::instruments::Bond;
 use crate::metrics::{MetricContext, MetricId};
-use finstack_quant_core::market_data::bumps::MarketBump;
-use finstack_quant_core::market_data::context::BumpSpec;
+use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 

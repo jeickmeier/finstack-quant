@@ -18,7 +18,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationInterpolation, InflationLag,
+    InflationIndex, InflationLag, SeriesInterpolation,
 };
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
@@ -453,7 +453,7 @@ fn inflation_preflight_rejects_lag_mismatch_with_index() {
     ];
     let index = InflationIndex::new("USD-CPI", observations, Currency::USD)
         .expect("index")
-        .with_interpolation(InflationInterpolation::Linear)
+        .with_interpolation(SeriesInterpolation::Linear)
         .with_lag(InflationLag::Months(3));
 
     let source_market = MarketContext::new()

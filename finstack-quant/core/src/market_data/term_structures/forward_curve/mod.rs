@@ -67,9 +67,9 @@
 //!   SSRN Working Paper. `docs/REFERENCES.md#ametrano-bianchetti-2013`
 
 use crate::market_data::term_structures::common::{
-    build_interp_allow_any_values, infer_forward_curve_defaults, roll_knots, split_points,
+    build_interp, infer_forward_curve_defaults, roll_knots,
 };
-use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
+use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::{
     dates::{Date, DayCount},
     error::InputError,

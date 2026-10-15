@@ -76,7 +76,7 @@ use crate::dates::{Date, DayCount, DayCountContext};
 /// # See Also
 ///
 /// - [`crate::market_data::term_structures::ForwardCurve`] - Concrete forward rate curve
-/// - [`Survival`] - Trait for hazard/survival curves
+/// - [`crate::market_data::term_structures::HazardCurve`] - Concrete hazard/survival curve
 pub trait Discounting: Send + Sync {
     /// Unique identifier of the curve.
     fn id(&self) -> &crate::types::CurveId;
@@ -214,72 +214,6 @@ pub trait Discounting: Send + Sync {
         let end = t + eps;
         let df_ratio = self.df_between_times(start, end)?;
         Ok(-df_ratio.ln() / (end - start))
-    }
-}
-/// Minimal trait for survival/hazard curve polymorphism where needed.
-///
-/// Most code should call methods directly on `HazardCurve`. This trait enables
-/// polymorphic code that needs to accept different survival curve implementations.
-///
-/// # Required Methods
-///
-/// - [`sp`](Self::sp) - Returns the survival probability at time `t`
-///
-/// # Mathematical Background
-///
-/// The survival probability `S(t)` represents the probability of no default
-/// occurring before time `t`. It relates to the hazard rate `λ(t)` via:
-///
-/// ```text
-/// S(t) = exp(-∫₀ᵗ λ(s) ds)
-/// ```
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::market_data::traits::Survival;
-/// use finstack_quant_core::types::CurveId;
-///
-/// struct FlatHazard {
-///     id: CurveId,
-///     hazard_rate: f64, // Constant hazard rate
-/// }
-///
-/// impl Survival for FlatHazard {
-///     fn id(&self) -> &CurveId { &self.id }
-///     fn sp(&self, t: f64) -> f64 {
-///         (-self.hazard_rate * t).exp()
-///     }
-/// }
-///
-/// let curve = FlatHazard { id: CurveId::from("XYZ-HAZARD"), hazard_rate: 0.02 };
-/// let sp_1y = curve.sp(1.0);
-/// assert!(sp_1y < 1.0 && sp_1y > 0.0); // Survival prob decreases over time
-/// ```
-pub trait Survival: Send + Sync {
-    /// Unique identifier of the curve.
-    fn id(&self) -> &crate::types::CurveId;
-
-    /// Survival probability up to time `t`.
-    ///
-    /// # Arguments
-    ///
-    /// * `t` - Time in years from the curve's base date
-    ///
-    /// # Returns
-    ///
-    /// The probability of survival (no default) from time 0 to time `t`,
-    /// a value in the range `(0, 1]`.
-    fn sp(&self, t: f64) -> f64;
-
-    /// Optional curve base date for date-based conditional survival.
-    fn base_date(&self) -> Option<Date> {
-        None
-    }
-
-    /// Day-count convention used by the curve when a base date is available.
-    fn day_count(&self) -> DayCount {
-        DayCount::Act365F
     }
 }
 #[cfg(test)]

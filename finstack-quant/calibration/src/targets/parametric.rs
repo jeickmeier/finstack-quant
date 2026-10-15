@@ -19,7 +19,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
     NelsonSiegelModel, NsVariant, ParametricCurve,
 };
-use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;

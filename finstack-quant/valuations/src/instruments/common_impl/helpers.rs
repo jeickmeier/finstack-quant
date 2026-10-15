@@ -10,7 +10,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::{
     context::MarketContext,
-    scalars::{InflationIndex, InflationInterpolation, MarketScalar},
+    scalars::{InflationIndex, MarketScalar, SeriesInterpolation},
     surfaces::{VolQuoteType, VolSurfaceAxis},
 };
 use finstack_quant_core::money::Money;
@@ -1419,10 +1419,10 @@ pub(crate) fn realized_inflation_index_value(
         false
     } else {
         match index.interpolation() {
-            InflationInterpolation::Step => {
+            SeriesInterpolation::Step => {
                 (effective_date.year(), effective_date.month()) <= (last.year(), last.month())
             }
-            InflationInterpolation::Linear => effective_date <= last,
+            SeriesInterpolation::Linear => effective_date <= last,
         }
     };
 
@@ -1464,7 +1464,7 @@ pub(crate) fn reference_inflation_value(
     date: Date,
     as_of: Date,
     lag: InflationLag,
-    interpolation: InflationInterpolation,
+    interpolation: SeriesInterpolation,
 ) -> finstack_quant_core::Result<f64> {
     Ok(resolve_reference_inflation(market, index_id, date, as_of, lag, interpolation)?.value)
 }
@@ -1476,7 +1476,7 @@ pub(crate) fn resolve_reference_inflation(
     date: Date,
     as_of: Date,
     lag: InflationLag,
-    interpolation: InflationInterpolation,
+    interpolation: SeriesInterpolation,
 ) -> finstack_quant_core::Result<InflationReferenceValue> {
     let index = market.get_inflation_index(index_id).ok();
     // An explicit monthly publication schedule also establishes reference-month
@@ -1526,7 +1526,7 @@ pub(crate) fn resolve_reference_inflation(
             .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?;
         let anchor0 = first.add_months(-i32::from(months))?;
         let cpi0 = cpi_on(anchor0)?;
-        if interpolation == InflationInterpolation::Step || weight_date.day() == 1 {
+        if interpolation == SeriesInterpolation::Step || weight_date.day() == 1 {
             return Ok(cpi0);
         }
         let cpi1 = cpi_on(anchor0.add_months(1)?)?;
@@ -1569,7 +1569,7 @@ mod realized_inflation_index_tests {
             Currency::USD,
         )
         .expect("index")
-        .with_interpolation(InflationInterpolation::Linear)
+        .with_interpolation(SeriesInterpolation::Linear)
         .with_publication_dates(vec![
             (january, date!(2026 - 02 - 13)),
             (february, date!(2026 - 03 - 13)),
@@ -1599,7 +1599,7 @@ mod realized_inflation_index_tests {
                 exact_date,
                 date!(2026 - 01 - 20),
                 lag,
-                InflationInterpolation::Step,
+                SeriesInterpolation::Step,
             )
             .expect("unpublished January projects for either lag");
             // The default log-linear curve performs a log/exp round trip,
@@ -1614,7 +1614,7 @@ mod realized_inflation_index_tests {
                 interpolation_date,
                 date!(2026 - 02 - 14),
                 lag,
-                InflationInterpolation::Linear,
+                SeriesInterpolation::Linear,
             )
             .expect("published January with projected February");
             assert!((mixed.value - (306.0 + (310.0 - 306.0) * 15.0 / 31.0)).abs() < 1e-12);
@@ -1634,7 +1634,7 @@ mod realized_inflation_index_tests {
             Currency::USD,
         )
         .expect("daily index")
-        .with_interpolation(InflationInterpolation::Linear);
+        .with_interpolation(SeriesInterpolation::Linear);
         let market = MarketContext::new().insert_inflation_index(index);
         for (lag, contract_date) in [
             (InflationLag::None, date!(2026 - 01 - 15)),
@@ -1646,7 +1646,7 @@ mod realized_inflation_index_tests {
                 contract_date,
                 date!(2026 - 01 - 21),
                 lag,
-                InflationInterpolation::Linear,
+                SeriesInterpolation::Linear,
             )
             .expect("existing daily interpolation");
             assert_eq!(result.value, 301.0);
@@ -1685,7 +1685,7 @@ mod realized_inflation_index_tests {
             date!(2026 - 03 - 16),
             date!(2026 - 01 - 20),
             InflationLag::Months(3),
-            InflationInterpolation::Linear,
+            SeriesInterpolation::Linear,
         )
         .expect("one observed and one unpublished anchor");
         assert!((mixed.value - (305.0 + 5.0 * 15.0 / 31.0)).abs() < 1e-12);
@@ -1699,7 +1699,7 @@ mod realized_inflation_index_tests {
                 date!(2026 - 04 - 01),
                 as_of,
                 InflationLag::Months(3),
-                InflationInterpolation::Step,
+                SeriesInterpolation::Step,
             )
             .expect("published anchor");
             assert_eq!(fixed.value, 306.0);
@@ -1717,7 +1717,7 @@ mod realized_inflation_index_tests {
             date!(2026 - 04 - 01),
             release,
             InflationLag::Months(3),
-            InflationInterpolation::Step,
+            SeriesInterpolation::Step,
         )
         .is_err());
 
@@ -1730,7 +1730,7 @@ mod realized_inflation_index_tests {
             date!(2026 - 04 - 01),
             date!(2026 - 01 - 20),
             InflationLag::Months(3),
-            InflationInterpolation::Step,
+            SeriesInterpolation::Step,
         )
         .is_err());
     }
@@ -1807,7 +1807,7 @@ mod realized_inflation_index_tests {
             Currency::USD,
         )
         .expect("valid index")
-        .with_interpolation(InflationInterpolation::Linear);
+        .with_interpolation(SeriesInterpolation::Linear);
         let result = realized_inflation_index_value(
             &index,
             date!(2025 - 01 - 15),

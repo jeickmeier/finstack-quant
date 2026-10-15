@@ -265,7 +265,7 @@ fn hazard_curve_apply_bump_preserves_metadata_and_drops_stale_quotes() {
 
     // Full metadata threaded through the rebuild.
     assert_eq!(bumped.issuer(), Some("ACME Corp"));
-    assert_eq!(bumped.seniority, Some(Seniority::Senior));
+    assert_eq!(bumped.seniority(), Some(Seniority::Senior));
     assert_eq!(bumped.currency(), Some(Currency::USD));
     assert_eq!(bumped.fx_policy(), Some("triangulate_via_usd"));
     assert_eq!(bumped.day_count(), curve.day_count());
@@ -300,7 +300,7 @@ fn hazard_curve_roll_forward_preserves_metadata() {
 
     let rolled = curve.roll_forward(183).unwrap();
     assert_eq!(rolled.issuer(), Some("ACME Corp"));
-    assert_eq!(rolled.seniority, Some(Seniority::Senior));
+    assert_eq!(rolled.seniority(), Some(Seniority::Senior));
     assert_eq!(rolled.currency(), Some(Currency::USD));
     assert_eq!(rolled.fx_policy(), Some("triangulate_via_usd"));
 }

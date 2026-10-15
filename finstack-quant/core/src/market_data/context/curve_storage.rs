@@ -10,7 +10,7 @@ use super::super::term_structures::{
     BaseCorrelationCurve, BasisSpreadCurve, DiscountCurve, ForwardCurve, HazardCurve,
     InflationCurve, ParametricCurve, PriceCurve,
 };
-use super::BumpSpec;
+use crate::market_data::bumps::BumpSpec;
 
 macro_rules! for_each_context_curve {
     ($macro:ident) => {
@@ -53,16 +53,7 @@ macro_rules! impl_simple_rebuildable_with_id {
     };
 }
 
-impl_simple_rebuildable_with_id!(
-    DiscountCurve,
-    ForwardCurve,
-    HazardCurve,
-    InflationCurve,
-    BaseCorrelationCurve,
-    PriceCurve,
-    BasisSpreadCurve,
-    ParametricCurve,
-);
+impl_simple_rebuildable_with_id!(InflationCurve, BaseCorrelationCurve, PriceCurve);
 
 macro_rules! define_curve_storage {
     ($( $variant:ident => {

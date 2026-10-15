@@ -10,7 +10,7 @@
 
 use super::common::*;
 use finstack_quant_core::dates::DateExt;
-use finstack_quant_core::market_data::scalars::{InflationInterpolation, InflationLag};
+use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
 use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
     DeflationProtection, IndexationMethod,
 };
@@ -22,7 +22,7 @@ fn test_index_ratio_basic_linear_interpolation() {
     let (_, index) = market_context_with_index();
 
     // Verify interpolation method matches TIPS requirements
-    assert_eq!(index.interpolation(), InflationInterpolation::Linear);
+    assert_eq!(index.interpolation(), SeriesInterpolation::Linear);
 
     // Act - calculate index ratio for a date with 3-month lag
     let ratio = ilb.index_ratio(d(2025, 4, 1), &index).unwrap();
@@ -51,7 +51,7 @@ fn test_index_ratio_with_3month_lag() {
         finstack_quant_core::currency::Currency::USD,
     )
     .unwrap()
-    .with_interpolation(InflationInterpolation::Linear);
+    .with_interpolation(SeriesInterpolation::Linear);
 
     // Act - valuation date Apr 1, 2025 → reference date Jan 1, 2025 (3-month lag)
     let ratio = ilb.index_ratio(d(2025, 4, 1), &index).unwrap();
@@ -79,7 +79,7 @@ fn test_index_ratio_with_8month_lag_uk() {
         finstack_quant_core::currency::Currency::GBP,
     )
     .unwrap()
-    .with_interpolation(InflationInterpolation::Step);
+    .with_interpolation(SeriesInterpolation::Step);
 
     // Act - valuation date Oct 1, 2025 → reference date Feb 1, 2025 (8-month lag)
     let ratio = ilb.index_ratio(d(2025, 10, 1), &index).unwrap();
@@ -103,7 +103,7 @@ fn cpi_2019_index() -> finstack_quant_core::market_data::scalars::InflationIndex
         finstack_quant_core::currency::Currency::USD,
     )
     .unwrap()
-    .with_interpolation(InflationInterpolation::Linear)
+    .with_interpolation(SeriesInterpolation::Linear)
 }
 
 #[test]
@@ -168,7 +168,7 @@ fn test_index_ratio_no_deflation_protection() {
         finstack_quant_core::currency::Currency::USD,
     )
     .unwrap()
-    .with_interpolation(InflationInterpolation::Linear);
+    .with_interpolation(SeriesInterpolation::Linear);
 
     // Act - calculate ratio when CPI drops below base
     let ratio = ilb.index_ratio(d(2025, 1, 1), &index).unwrap();
@@ -199,7 +199,7 @@ fn test_index_ratio_maturity_only_deflation_protection() {
         finstack_quant_core::currency::Currency::USD,
     )
     .unwrap()
-    .with_interpolation(InflationInterpolation::Linear);
+    .with_interpolation(SeriesInterpolation::Linear);
 
     // index_ratio now returns the RAW ratio (no deflation floor).
     // Deflation protection is applied when building the cashflow schedule.
@@ -237,7 +237,7 @@ fn test_index_ratio_all_payments_deflation_protection() {
         finstack_quant_core::currency::Currency::USD,
     )
     .unwrap()
-    .with_interpolation(InflationInterpolation::Linear);
+    .with_interpolation(SeriesInterpolation::Linear);
 
     // index_ratio now returns the RAW ratio (no deflation floor).
     // Deflation protection is applied when building the cashflow schedule.
@@ -359,7 +359,7 @@ fn test_index_ratio_tips_requires_linear_interpolation() {
         finstack_quant_core::currency::Currency::USD,
     )
     .unwrap()
-    .with_interpolation(InflationInterpolation::Step); // Wrong for TIPS
+    .with_interpolation(SeriesInterpolation::Step); // Wrong for TIPS
 
     // Act & Assert - should fail validation
     let result = ilb.index_ratio(d(2025, 1, 1), &index);
@@ -379,7 +379,7 @@ fn test_index_ratio_uk_requires_step_interpolation() {
         finstack_quant_core::currency::Currency::GBP,
     )
     .unwrap()
-    .with_interpolation(InflationInterpolation::Linear); // Wrong for UK
+    .with_interpolation(SeriesInterpolation::Linear); // Wrong for UK
 
     // Act & Assert - should fail validation
     let result = ilb.index_ratio(d(2025, 1, 1), &index);
@@ -399,7 +399,7 @@ fn test_index_ratio_canadian_requires_linear_interpolation() {
         finstack_quant_core::currency::Currency::CAD,
     )
     .unwrap()
-    .with_interpolation(InflationInterpolation::Step); // Wrong for Canadian
+    .with_interpolation(SeriesInterpolation::Step); // Wrong for Canadian
 
     // Act & Assert - should fail validation
     let result = ilb.index_ratio(d(2025, 1, 1), &index);
@@ -449,7 +449,7 @@ fn test_index_ratio_extreme_inflation() {
         finstack_quant_core::currency::Currency::USD,
     )
     .unwrap()
-    .with_interpolation(InflationInterpolation::Linear);
+    .with_interpolation(SeriesInterpolation::Linear);
 
     // Act
     let ratio = ilb.index_ratio(d(2025, 1, 1), &index).unwrap();
@@ -479,7 +479,7 @@ fn test_index_ratio_time_series() {
         finstack_quant_core::currency::Currency::USD,
     )
     .unwrap()
-    .with_interpolation(InflationInterpolation::Linear);
+    .with_interpolation(SeriesInterpolation::Linear);
 
     // Act - calculate ratios over time
     // April 2025 with 3mo lag → Jan 2025 (i=12)

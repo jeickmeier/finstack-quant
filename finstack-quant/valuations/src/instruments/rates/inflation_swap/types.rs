@@ -12,7 +12,7 @@ use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::{InflationInterpolation, InflationLag};
+use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use rust_decimal::Decimal;
@@ -85,7 +85,7 @@ pub struct InflationSwap {
     pub lag: Option<InflationLag>,
     /// Contractual monthly reference-index interpolation; takes precedence over index metadata;
     /// without either source the default is monthly step interpolation.
-    pub interpolation: Option<InflationInterpolation>,
+    pub interpolation: Option<SeriesInterpolation>,
     /// Explicit Base CPI (reference index level at start with lag applied).
     /// If not provided, it will be looked up/calculated from start date.
     pub base_cpi: Option<f64>,
@@ -659,7 +659,7 @@ pub struct YoYInflationSwap {
     pub lag: Option<InflationLag>,
     /// Contractual monthly reference-index interpolation; takes precedence over index metadata;
     /// without either source the default is monthly step interpolation.
-    pub interpolation: Option<InflationInterpolation>,
+    pub interpolation: Option<SeriesInterpolation>,
     /// Observed contractual reference CPI at start, with lag and interpolation
     /// already applied. If absent, start CPI must resolve from market observations.
     pub base_cpi: Option<f64>,

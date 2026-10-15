@@ -857,7 +857,7 @@ mod tests {
     }
 
     fn flat_discount_market(rate: f64) -> finstack_quant_core::market_data::context::MarketContext {
-        use finstack_quant_core::market_data::DiscountCurve;
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
         let tenors = [0.0_f64, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0];
         let knots: Vec<(f64, f64)> = tenors.iter().map(|&t| (t, (-rate * t).exp())).collect();
         let curve = DiscountCurve::builder("USD-OIS")

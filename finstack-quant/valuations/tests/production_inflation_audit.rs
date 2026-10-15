@@ -4,7 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{calendar_by_id, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationInterpolation, InflationLag,
+    InflationIndex, InflationLag, SeriesInterpolation,
 };
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
 use finstack_quant_core::money::Money;
@@ -101,7 +101,7 @@ fn b17_month_end_cpi_has_the_same_reference_month_in_index_and_hybrid_sources() 
         Currency::USD,
     )
     .expect("published monthly CPI")
-    .with_interpolation(InflationInterpolation::Linear);
+    .with_interpolation(SeriesInterpolation::Linear);
     bond.inflation_index_id = "US-CPI".into();
     let historical = MarketContext::new().insert_inflation_index(index);
     let hybrid = historical.clone().insert(
@@ -283,7 +283,7 @@ fn b17_projected_inflation_uses_contract_month_interpolation_weights() {
                 Currency::USD,
             )
             .expect("history")
-            .with_interpolation(InflationInterpolation::Linear)
+            .with_interpolation(SeriesInterpolation::Linear)
             .with_lag(InflationLag::Months(3)),
         );
     let mut swap = InflationSwap::example().expect("example");

@@ -9,7 +9,7 @@ use finstack_quant_core::{
     dates::{DayCount, StubKind, Tenor, TenorUnit},
     market_data::{
         context::MarketContext,
-        scalars::{InflationIndex, InflationInterpolation, MarketScalar},
+        scalars::{InflationIndex, MarketScalar, SeriesInterpolation},
         term_structures::DiscountCurve,
     },
     money::Money,
@@ -54,7 +54,7 @@ fn cpi_index(latest: f64) -> InflationIndex {
     }
     InflationIndex::new("US-CPI", observations, Currency::USD)
         .unwrap()
-        .with_interpolation(InflationInterpolation::Linear)
+        .with_interpolation(SeriesInterpolation::Linear)
 }
 
 #[test]

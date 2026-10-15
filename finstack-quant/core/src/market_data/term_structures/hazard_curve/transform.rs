@@ -158,6 +158,7 @@ impl HazardCurve {
             interp_knots.into_boxed_slice(),
             interp_sp.into_boxed_slice(),
             ExtrapolationPolicy::FlatForward,
+            ValidationPolicy::Strict,
         )?;
         self.lambdas = lambdas;
         // The stored par-spread quotes were calibrated to the *unbumped*

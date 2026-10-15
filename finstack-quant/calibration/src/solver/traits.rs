@@ -16,7 +16,7 @@ pub(crate) trait BootstrapTarget {
     /// Type of input quote (e.g., [`RateQuote`](crate::quotes::rates::RateQuote)).
     type Quote;
 
-    /// Type of the curve being built (e.g., [`DiscountCurve`](finstack_quant_core::market_data::DiscountCurve)).
+    /// Type of the curve being built (e.g., [`DiscountCurve`](finstack_quant_core::market_data::term_structures::DiscountCurve)).
     type Curve;
 
     /// Get the time (year fraction) for the knot corresponding to this quote.

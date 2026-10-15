@@ -169,7 +169,7 @@ impl ForwardCurveBuilder {
         if self.points.len() < 2 {
             return Err(InputError::TooFewPoints.into());
         }
-        let (kvec, fvec): (Vec<f64>, Vec<f64>) = split_points(self.points);
+        let (kvec, fvec): (Vec<f64>, Vec<f64>) = self.points.into_iter().unzip();
         crate::math::interp::utils::validate_knots(&kvec)?;
         crate::math::interp::utils::validate_finite_series(&fvec)?;
         if let Some(min_fwd) = self.min_forward_rate {
@@ -201,19 +201,21 @@ impl ForwardCurveBuilder {
             .transpose()?;
         let knots = kvec.into_boxed_slice();
         let forwards = fvec.into_boxed_slice();
-        // Use allow_any_values to support negative forward rates
+        // Use AllowNegative to support negative forward rates
         // (common in EUR, CHF, JPY markets since 2014)
         let (source_knots, source_forwards) = if let Some(transform) = &self.transform {
-            let (times, values) = split_points(transform.source_points().to_vec());
+            let (times, values): (Vec<f64>, Vec<f64>) =
+                transform.source_points().iter().copied().unzip();
             (times.into_boxed_slice(), values.into_boxed_slice())
         } else {
             (knots.clone(), forwards.clone())
         };
-        let interp = build_interp_allow_any_values(
+        let interp = build_interp(
             self.style,
             source_knots,
             source_forwards,
             self.extrapolation,
+            ValidationPolicy::AllowNegative,
         )?;
         let mut curve = ForwardCurve {
             id: self.id,

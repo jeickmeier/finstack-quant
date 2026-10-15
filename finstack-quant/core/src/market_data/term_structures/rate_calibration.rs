@@ -4,19 +4,15 @@ use crate::currency::Currency;
 use crate::dates::{Date, DayCount, Tenor};
 use crate::types::{CurveId, IndexId};
 
-mod future_contract_id {
-    /// Marker for [`RateCalibrationFutureContractId`].
-    #[derive(Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-    pub struct RateCalibrationFutureContractTag;
+/// Marker for [`RateCalibrationFutureContractId`].
+#[derive(Debug, Clone, Copy, Default)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct RateCalibrationFutureContractTag;
 
-    /// Serialized identifier for an interest-rate futures convention.
-    ///
-    /// Alias of [`crate::types::Id`].
-    pub type RateCalibrationFutureContractId = crate::types::Id<RateCalibrationFutureContractTag>;
-}
-
-pub use future_contract_id::RateCalibrationFutureContractId;
+/// Serialized identifier for an interest-rate futures convention.
+///
+/// Alias of [`crate::types::Id`].
+pub type RateCalibrationFutureContractId = crate::types::Id<RateCalibrationFutureContractTag>;
 
 /// Numerical method used to calibrate a rate curve.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

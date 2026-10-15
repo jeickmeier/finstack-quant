@@ -161,7 +161,7 @@ pub struct InflationCapFloor {
     pub lag: Option<InflationLag>,
     /// Contractual monthly CPI interpolation; takes precedence over index metadata.
     /// Defaults to monthly step interpolation when neither source supplies it.
-    pub interpolation: Option<finstack_quant_core::market_data::scalars::InflationInterpolation>,
+    pub interpolation: Option<finstack_quant_core::market_data::scalars::SeriesInterpolation>,
     /// Clock used by the volatility surface's annualized quotes. This is
     /// independent of CPI publication policy; changing it requires matching
     /// quotes, not merely relabelling the old surface.

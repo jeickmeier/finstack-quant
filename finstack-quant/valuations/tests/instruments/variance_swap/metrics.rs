@@ -497,8 +497,7 @@ fn test_dv01_matches_bump_and_reprice() {
 
     // Assert - use bump-and-reprice validation
     // Bump the discount curve by 1bp and verify DV01 matches the PV change
-    use finstack_quant_core::market_data::bumps::MarketBump;
-    use finstack_quant_core::market_data::context::BumpSpec;
+    use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 
     let base_pv = swap.value(&ctx, as_of).unwrap().amount();
     let bumped_ctx = ctx

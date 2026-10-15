@@ -69,7 +69,7 @@
 
 use crate::error::InputError;
 use crate::market_data::bumps::{BumpSpec, Bumpable};
-use crate::math::interp::{types::Interp, ExtrapolationPolicy, InterpStyle};
+use crate::math::interp::{types::Interp, ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::types::CurveId;
 use crate::Result;
 
@@ -481,11 +481,12 @@ impl BaseCorrelationCurveBuilder {
 
         let (kvec, cvec): (Vec<f64>, Vec<f64>) = sorted_points.into_iter().unzip();
 
-        let interp = super::common::build_interp_allow_any_values(
+        let interp = super::common::build_interp(
             InterpStyle::Linear,
             kvec.clone().into_boxed_slice(),
             cvec.clone().into_boxed_slice(),
             ExtrapolationPolicy::FlatZero,
+            ValidationPolicy::AllowNegative,
         )?;
 
         let curve = BaseCorrelationCurve {

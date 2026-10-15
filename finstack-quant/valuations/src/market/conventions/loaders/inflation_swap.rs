@@ -14,7 +14,7 @@ struct InflationSwapConventionRecord {
     business_day_convention: BusinessDayConvention,
     day_count: DayCount,
     inflation_lag: String,
-    interpolation: finstack_quant_core::market_data::scalars::InflationInterpolation,
+    interpolation: finstack_quant_core::market_data::scalars::SeriesInterpolation,
 }
 
 impl InflationSwapConventionRecord {

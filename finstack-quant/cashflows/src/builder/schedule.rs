@@ -11,7 +11,7 @@ use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Perio
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
-use finstack_quant_core::market_data::traits::{Discounting, Survival};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use indexmap::IndexMap;
@@ -1247,7 +1247,7 @@ fn apply_flow_to_outstanding(
 #[derive(Clone, Copy)]
 pub struct PvCreditAdjustment<'a> {
     /// Optional hazard curve used to survival-adjust cashflows.
-    pub hazard: Option<&'a dyn Survival>,
+    pub hazard: Option<&'a HazardCurve>,
     /// Optional recovery rate applied to principal-like flows.
     pub recovery_rate: Option<f64>,
 }
@@ -1470,10 +1470,8 @@ impl CreditCurveHandles {
         self.discount.as_ref()
     }
 
-    pub(crate) fn hazard_survival(&self) -> Option<&dyn Survival> {
-        self.hazard
-            .as_ref()
-            .map(|arc| arc.as_ref() as &dyn Survival)
+    pub(crate) fn hazard_survival(&self) -> Option<&HazardCurve> {
+        self.hazard.as_deref()
     }
 
     pub(crate) fn recovery_rate(&self) -> Option<f64> {

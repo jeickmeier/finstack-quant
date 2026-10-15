@@ -232,7 +232,7 @@ fn test_schedule_with_deflation_protection() {
         finstack_quant_core::currency::Currency::USD,
     )
     .unwrap()
-    .with_interpolation(finstack_quant_core::market_data::scalars::InflationInterpolation::Linear);
+    .with_interpolation(finstack_quant_core::market_data::scalars::SeriesInterpolation::Linear);
     ctx = ctx.insert_inflation_index(index);
 
     let as_of = d(2024, 1, 1);

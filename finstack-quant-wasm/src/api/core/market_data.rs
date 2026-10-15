@@ -920,7 +920,7 @@ impl JsHazardCurve {
     /// `"junior"`), or `undefined`.
     #[wasm_bindgen(getter, js_name = seniority)]
     pub fn seniority(&self) -> Option<String> {
-        self.inner.seniority.map(|s| s.to_string())
+        self.inner.seniority().map(|s| s.to_string())
     }
 
     /// Par-spread readout interpolation label (`"linear"` or `"log_linear"`).

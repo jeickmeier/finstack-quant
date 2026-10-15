@@ -10,8 +10,8 @@ use crate::utils::{date_to_iso, parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex as RustInflationIndex, InflationInterpolation, InflationLag,
-    ScalarTimeSeries as RustScalarTimeSeries, SeriesInterpolation,
+    InflationIndex as RustInflationIndex, InflationLag, ScalarTimeSeries as RustScalarTimeSeries,
+    SeriesInterpolation,
 };
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
@@ -272,7 +272,7 @@ impl JsInflationIndex {
             .parse()
             .map_err(to_js_err)?;
         let interpolation = js_opt_string(interpolation.as_ref(), "interpolation")?
-            .map(|name| name.parse::<InflationInterpolation>())
+            .map(|name| name.parse::<SeriesInterpolation>())
             .transpose()
             .map_err(to_js_err)?
             .unwrap_or_default();

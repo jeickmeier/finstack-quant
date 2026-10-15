@@ -9,7 +9,7 @@
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationInterpolation, InflationLag,
+    InflationIndex, InflationLag, SeriesInterpolation,
 };
 use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_core::Result;
@@ -45,7 +45,7 @@ impl InflationLinkedBond {
             // formula: anchor on first-of-month CPI(m−L)/CPI(m−L+1) and weight
             // by (day−1)/D(settlement month). A generic calendar shift +
             // interpolation mis-weights month-end settlements (day clamping).
-            InflationLag::Months(m) if expected_interp == InflationInterpolation::Linear => {
+            InflationLag::Months(m) if expected_interp == SeriesInterpolation::Linear => {
                 inflation_index.ref_cpi_months_lag(date, m.into())?
             }
             InflationLag::Months(m) => inflation_index.ref_cpi_months_lag(
@@ -66,7 +66,7 @@ impl InflationLinkedBond {
     pub(super) fn validate_index_conventions(
         &self,
         inflation_index: &InflationIndex,
-    ) -> Result<InflationInterpolation> {
+    ) -> Result<SeriesInterpolation> {
         if !matches!(inflation_index.lag(), InflationLag::None) {
             return Err(finstack_quant_core::Error::Validation(
                 "InflationIndex must have lag=None when used with InflationLinkedBond \
@@ -95,12 +95,12 @@ impl InflationLinkedBond {
             IndexationMethod::Tips
             | IndexationMethod::Canadian
             | IndexationMethod::French
-            | IndexationMethod::Japanese => InflationInterpolation::Linear,
+            | IndexationMethod::Japanese => SeriesInterpolation::Linear,
             IndexationMethod::Uk => {
                 if is_modern_uk {
-                    InflationInterpolation::Linear
+                    SeriesInterpolation::Linear
                 } else {
-                    InflationInterpolation::Step
+                    SeriesInterpolation::Step
                 }
             }
         };
@@ -223,9 +223,9 @@ impl InflationLinkedBond {
         as_of: Date,
     ) -> Result<crate::instruments::common_impl::helpers::InflationReferenceValue> {
         let interpolation = if self.daily_interpolated_indexation() {
-            InflationInterpolation::Linear
+            SeriesInterpolation::Linear
         } else {
-            InflationInterpolation::Step
+            SeriesInterpolation::Step
         };
         if let Ok(index) = market.get_inflation_index(self.inflation_index_id.as_str()) {
             self.validate_index_conventions(index.as_ref())?;

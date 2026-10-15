@@ -44,9 +44,7 @@ fn adjusted_final_payment_remains_live_after_raw_maturity() {
             Currency::USD,
         )
         .unwrap()
-        .with_interpolation(
-            finstack_quant_core::market_data::scalars::InflationInterpolation::Linear,
-        ),
+        .with_interpolation(finstack_quant_core::market_data::scalars::SeriesInterpolation::Linear),
     );
     for (convention, payment) in [
         (BusinessDayConvention::Following, d(2026, 2, 2)),
@@ -336,7 +334,7 @@ fn test_npv_with_deflation_protection() {
         Currency::USD,
     )
     .unwrap()
-    .with_interpolation(finstack_quant_core::market_data::scalars::InflationInterpolation::Linear);
+    .with_interpolation(finstack_quant_core::market_data::scalars::SeriesInterpolation::Linear);
 
     let ctx = finstack_quant_core::market_data::context::MarketContext::new()
         .insert_surface(zero_floor_vol())

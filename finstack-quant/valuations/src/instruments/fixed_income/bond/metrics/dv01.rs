@@ -7,8 +7,7 @@ use crate::instruments::Bond;
 use crate::instruments::BondRiskBasis;
 use crate::metrics::sensitivities::cs01::sensitivity_central_diff;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
-use finstack_quant_core::market_data::bumps::MarketBump;
-use finstack_quant_core::market_data::context::BumpSpec;
+use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::types::CurveId;
 use std::borrow::Cow;
 

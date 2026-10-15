@@ -2,8 +2,7 @@
 
 use super::*;
 use crate::dates::DateExt;
-use crate::error::InputError;
-use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
+use crate::market_data::bumps::{BumpSpec, BumpType, Bumpable};
 
 impl ForwardCurve {
     /// Create a builder pre-populated with this curve's data but a new ID.
@@ -355,36 +354,6 @@ impl ForwardCurve {
 
 impl Bumpable for ForwardCurve {
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        match spec.bump_type {
-            BumpType::Parallel => {
-                spec.resolve_standard_values_or_error(
-                    "ForwardCurve parallel bump requires",
-                    "Additive/{RateBp,Percent,Fraction} or Multiplicative/Factor",
-                )?;
-                self.bumped_with_id(spec.standard_bump_id(self.id()), &spec)
-            }
-            BumpType::TriangularKeyRate {
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-            } => {
-                if spec.mode == BumpMode::Additive && spec.units == BumpUnits::RateBp {
-                    self.with_triangular_key_rate_bump_neighbors(
-                        prev_bucket,
-                        target_bucket,
-                        next_bucket,
-                        spec.value,
-                    )
-                } else {
-                    Err(InputError::UnsupportedBump {
-                        reason: format!(
-                            "ForwardCurve key-rate bump requires Additive/RateBp, got {:?}/{:?}",
-                            spec.mode, spec.units
-                        ),
-                    }
-                    .into())
-                }
-            }
-        }
+        self.bumped_with_id(spec.standard_bump_id(self.id()), &spec)
     }
 }

@@ -357,7 +357,8 @@ pub fn aggregate_by_period(
     aggregate_by_period_sorted(&sorted, periods).and_then(PeriodAggregation::try_from)
 }
 
-use finstack_quant_core::market_data::traits::{Discounting, Survival};
+use finstack_quant_core::market_data::term_structures::HazardCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 
 /// Currency-checked single-currency aggregation with explicit target currency.
 ///
@@ -691,7 +692,7 @@ fn credit_adjusted_period_pv(cf: &CashFlow, df: f64, sp: f64, base: Date) -> f64
 pub fn credit_adjusted_cashflow_pvs(
     cashflows: &[CashFlow],
     discount_factors: &[f64],
-    hazard: Option<&dyn Survival>,
+    hazard: Option<&HazardCurve>,
     recovery_rate: Option<f64>,
     date_ctx: DateContext<'_>,
 ) -> finstack_quant_core::Result<Vec<f64>> {
@@ -741,7 +742,7 @@ pub fn credit_adjusted_cashflow_pvs(
 
 fn validate_recovery(
     cashflows: &[CashFlow],
-    hazard: Option<&dyn Survival>,
+    hazard: Option<&HazardCurve>,
     recovery_rate: Option<f64>,
 ) -> finstack_quant_core::Result<()> {
     if let Some(rate) = recovery_rate {
@@ -951,7 +952,7 @@ fn default_mass(start_sp: f64, end_sp: f64) -> finstack_quant_core::Result<f64> 
 fn discount_survival(
     d: Date,
     disc: &dyn Discounting,
-    hazard: Option<&dyn Survival>,
+    hazard: Option<&HazardCurve>,
     ctx: &DateContext<'_>,
 ) -> finstack_quant_core::Result<(f64, f64)> {
     let df = disc.df_between_dates(ctx.base, d).map_err(|err| {
@@ -969,40 +970,29 @@ fn discount_survival(
 
 fn survival_on_date(
     d: Date,
-    hazard: Option<&dyn Survival>,
+    hazard: Option<&HazardCurve>,
     ctx: &DateContext<'_>,
 ) -> finstack_quant_core::Result<f64> {
     if d == ctx.base {
         return Ok(1.0);
     }
     let sp = match hazard {
-        Some(h) => match h.base_date() {
-            Some(h_base) => {
-                let h_day_count = h.day_count();
-                let t_d =
-                    h_day_count.signed_year_fraction(h_base, d, DayCountContext::default())?;
-                let t_asof = h_day_count.signed_year_fraction(
-                    h_base,
-                    ctx.base,
-                    DayCountContext::default(),
-                )?;
-                let sp_d = h.sp(t_d);
-                let sp_asof = h.sp(t_asof);
-                if !sp_asof.is_finite() || sp_asof <= 0.0 {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "survival curve returned invalid base survival ({sp_asof}) at {}",
-                        ctx.base
-                    )));
-                }
-                sp_d / sp_asof
+        Some(h) => {
+            let h_base = h.base_date();
+            let h_day_count = h.day_count();
+            let t_d = h_day_count.signed_year_fraction(h_base, d, DayCountContext::default())?;
+            let t_asof =
+                h_day_count.signed_year_fraction(h_base, ctx.base, DayCountContext::default())?;
+            let sp_d = h.sp(t_d);
+            let sp_asof = h.sp(t_asof);
+            if !sp_asof.is_finite() || sp_asof <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "survival curve returned invalid base survival ({sp_asof}) at {}",
+                    ctx.base
+                )));
             }
-            None => {
-                let t_h = ctx
-                    .day_count
-                    .signed_year_fraction(ctx.base, d, ctx.day_count_context)?;
-                h.sp(t_h)
-            }
-        },
+            sp_d / sp_asof
+        }
         None => 1.0,
     };
     if !sp.is_finite() || sp < 0.0 || (d > ctx.base && sp > 1.0) {
@@ -1044,7 +1034,7 @@ pub(crate) fn pv_by_period_credit_adjusted(
     flows: &[CashFlow],
     periods: &[Period],
     disc: &dyn Discounting,
-    hazard: Option<&dyn Survival>,
+    hazard: Option<&HazardCurve>,
     recovery_rate: Option<f64>,
     date_ctx: DateContext<'_>,
 ) -> finstack_quant_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
@@ -1506,17 +1496,15 @@ mod credit_pv_tests {
         }
     }
 
-    struct FlatSurvival;
+    fn flat_survival_at(base: Date, target: Date, sp: f64) -> HazardCurve {
+        let t = DayCount::Act365F
+            .year_fraction(base, target, DayCountContext::default())
+            .expect("valid year fraction");
+        HazardCurve::from_survival_probs("hzd", base, &[(t, sp)], 0.4).expect("valid hazard curve")
+    }
 
-    impl Survival for FlatSurvival {
-        fn id(&self) -> &CurveId {
-            static ID: std::sync::LazyLock<CurveId> = std::sync::LazyLock::new(|| "hzd".into());
-            &ID
-        }
-
-        fn sp(&self, _t: f64) -> f64 {
-            0.95
-        }
+    fn annual_survival(base: Date) -> HazardCurve {
+        HazardCurve::flat("annual-survival", base, -0.8_f64.ln(), 0.4).expect("valid hazard curve")
     }
 
     fn make_period(base: Date, end: Date) -> Period {
@@ -1539,80 +1527,12 @@ mod credit_pv_tests {
         )
     }
 
-    /// Linearly decaying survival without a base date: `sp(t) = 1 − 0.1·t`.
-    struct LinearSurvival;
-
-    impl Survival for LinearSurvival {
-        fn id(&self) -> &CurveId {
-            static ID: std::sync::LazyLock<CurveId> =
-                std::sync::LazyLock::new(|| "hzd-linear".into());
-            &ID
-        }
-
-        fn sp(&self, t: f64) -> f64 {
-            1.0 - 0.1 * t
-        }
-    }
-
-    struct AnnualSurvival;
-
-    impl Survival for AnnualSurvival {
-        fn id(&self) -> &CurveId {
-            static ID: std::sync::LazyLock<CurveId> =
-                std::sync::LazyLock::new(|| "annual-survival".into());
-            &ID
-        }
-
-        fn sp(&self, t: f64) -> f64 {
-            0.8_f64.powf(t)
-        }
-    }
-
-    #[test]
-    fn originless_survival_uses_supplied_day_count_context() {
-        use finstack_quant_core::dates::{calendar_by_id_strict, Tenor};
-        let base = d(2025, 1, 1);
-        let end = d(2025, 7, 1);
-        let flows = [flow(end, 100.0, CFKind::Fixed)];
-        let calendar = calendar_by_id_strict("usny").expect("calendar");
-        let cases = [
-            (
-                DayCount::Bus252,
-                DayCountContext {
-                    calendar: Some(calendar),
-                    bus_basis: Some(252),
-                    ..Default::default()
-                },
-            ),
-            (
-                DayCount::ActActIsma,
-                DayCountContext {
-                    frequency: Some(Tenor::semi_annual()),
-                    coupon_period: Some((base, end)),
-                    ..Default::default()
-                },
-            ),
-        ];
-        for (day_count, context) in cases {
-            let expected_time = day_count.year_fraction(base, end, context).expect("time");
-            let expected_pv = 100.0 * (1.0 - 0.1 * expected_time);
-            let pvs = credit_adjusted_cashflow_pvs(
-                &flows,
-                &[1.0],
-                Some(&LinearSurvival),
-                None,
-                DateContext::new(base, day_count, context),
-            )
-            .expect("caller context must reach originless survival");
-            assert!((pvs[0] - expected_pv).abs() < 1e-12);
-        }
-    }
-
     fn funded_pvs(flows: &[CashFlow], base: Date) -> Vec<f64> {
+        let hazard = annual_survival(base);
         credit_adjusted_cashflow_pvs(
             flows,
             &vec![1.0; flows.len()],
-            Some(&AnnualSurvival),
+            Some(&hazard),
             Some(0.4),
             DateContext::new(base, DayCount::Act365F, DayCountContext::default()),
         )
@@ -1630,11 +1550,12 @@ mod credit_pv_tests {
         let expected = -100.0 * 0.8 + 100.0 * 0.64 + 0.4 * 100.0 * (0.8 - 0.64);
         assert!((pvs.iter().sum::<f64>() - expected).abs() < 1e-10);
         let periods = [make_period(base, d(2027, 1, 2))];
+        let hazard = annual_survival(base);
         let aggregate = pv_by_period_credit_adjusted(
             &flows,
             &periods,
             &FlatDiscount { base },
-            Some(&AnnualSurvival),
+            Some(&hazard),
             Some(0.4),
             DateContext::new(base, DayCount::Act365F, DayCountContext::default()),
         )
@@ -1681,11 +1602,12 @@ mod credit_pv_tests {
         let payment_recovery =
             0.4 * (40.0 * df(2.0) * (0.8 - 0.64) + 60.0 * df(3.0) * (0.8 - 0.512));
         let recovery = payment_recovery;
+        let hazard = annual_survival(base);
         let pv = pv_by_period_credit_adjusted(
             &flows,
             &periods,
             &discount,
-            Some(&AnnualSurvival),
+            Some(&hazard),
             Some(0.4),
             DateContext::new(base, DayCount::Act365F, DayCountContext::default()),
         )
@@ -1827,35 +1749,13 @@ mod credit_pv_tests {
     }
 
     #[test]
-    fn batch_pv_rejects_invalid_survival_probability() {
-        struct InvalidSurvival;
-        impl Survival for InvalidSurvival {
-            fn id(&self) -> &CurveId {
-                AnnualSurvival.id()
-            }
-            fn sp(&self, _: f64) -> f64 {
-                -0.01
-            }
-        }
-        let error = credit_adjusted_cashflow_pvs(
-            &[flow(d(2026, 1, 1), 100.0, CFKind::Notional)],
-            &[1.0],
-            Some(&InvalidSurvival),
-            Some(0.4),
-            DateContext::new(d(2025, 1, 1), DayCount::Act365F, DayCountContext::default()),
-        )
-        .expect_err("invalid survival must fail");
-        assert!(error.to_string().contains("survival probability"));
-    }
-
-    #[test]
     fn credit_adjusted_pv_zeroes_pik_flows() {
         // PIK is a capitalization event, not cash: its value is already carried
         // by the inflated notional redemption. Its PV is zero.
         let base = d(2025, 1, 1);
         let periods = vec![make_period(base, d(2026, 1, 1))];
         let disc = FlatDiscount { base };
-        let hazard = FlatSurvival;
+        let hazard = flat_survival_at(base, d(2025, 6, 1), 0.95);
         let flows = vec![
             flow(d(2025, 6, 1), 50_000.0, CFKind::Fixed),
             flow(d(2025, 6, 1), 40_000.0, CFKind::Pik),
@@ -1887,7 +1787,7 @@ mod credit_pv_tests {
         let base = d(2025, 1, 1);
         let periods = vec![make_period(base, d(2026, 1, 1))];
         let disc = FlatDiscount { base };
-        let hazard = FlatSurvival;
+        let hazard = flat_survival_at(base, d(2025, 6, 1), 0.95);
         let flows = vec![flow(d(2025, 6, 1), 100_000.0, CFKind::RevolvingRepayment)];
 
         let out = pv_by_period_credit_adjusted(
@@ -1916,7 +1816,13 @@ mod credit_pv_tests {
         let base = d(2025, 1, 1);
         let periods = vec![make_period(base, d(2026, 1, 1))];
         let disc = FlatDiscount { base };
-        let hazard = LinearSurvival;
+        let t1 = 151.0 / 365.0; // 2025-01-01 → 2025-06-01
+        let t2 = 334.0 / 365.0; // 2025-01-01 → 2025-12-01
+        let sp1 = 1.0 - 0.1 * t1;
+        let sp2 = 1.0 - 0.1 * t2;
+        let hazard =
+            HazardCurve::from_survival_probs("hzd-linear", base, &[(t1, sp1), (t2, sp2)], 0.4)
+                .expect("valid hazard curve");
         let flows = vec![
             flow(d(2025, 6, 1), -500_000.0, CFKind::Notional),
             flow(d(2025, 12, 1), 500_000.0, CFKind::Amortization),
@@ -1934,10 +1840,6 @@ mod credit_pv_tests {
 
         let pv = out[&PeriodId::quarter(2025, 1).expect("valid period fixture")][&Currency::USD]
             .amount();
-        let t1 = 151.0 / 365.0; // 2025-01-01 → 2025-06-01
-        let t2 = 334.0 / 365.0; // 2025-01-01 → 2025-12-01
-        let sp1 = 1.0 - 0.1 * t1;
-        let sp2 = 1.0 - 0.1 * t2;
         // Draw: survival-weighted cash PV only. Amortization: survival-weighted
         // PV plus recovery only over (draw date, repayment date].
         let expected = -500_000.0 * sp1 + 500_000.0 * sp2 + 0.40 * 500_000.0 * (sp1 - sp2);
@@ -1991,7 +1893,7 @@ mod credit_pv_tests {
         ];
         let periods = vec![make_period(base, d(2026, 1, 1))];
         let disc = FlatDiscount { base };
-        let hazard = FlatSurvival;
+        let hazard = flat_survival_at(base, d(2025, 12, 1), 0.95);
         let ctx = DateContext::new(base, DayCount::Act365F, DayCountContext::default());
 
         let result =
@@ -2031,7 +1933,7 @@ mod credit_pv_tests {
         ];
         let periods = vec![make_period(base, d(2026, 1, 1))];
         let disc = FlatDiscount { base };
-        let hazard = FlatSurvival;
+        let hazard = flat_survival_at(base, d(2025, 12, 1), 0.95);
         let ctx = DateContext::new(base, DayCount::Act365F, DayCountContext::default());
 
         let result =
@@ -2047,7 +1949,7 @@ mod credit_pv_tests {
         let base = d(2025, 1, 1);
         let periods = vec![make_period(base, d(2026, 1, 1))];
         let disc = FlatDiscount { base };
-        let hazard = FlatSurvival;
+        let hazard = flat_survival_at(base, d(2025, 11, 1), 0.95);
         let sorted = vec![
             flow(d(2025, 3, 1), 1_000_000.0, CFKind::Amortization),
             flow(d(2025, 6, 1), 50_000.0, CFKind::Fixed),
@@ -2093,7 +1995,7 @@ mod credit_pv_tests {
             is_actual: false,
         }];
         let disc = FlatDiscount { base };
-        let hazard = FlatSurvival;
+        let hazard = flat_survival_at(base, d(2025, 10, 1), 0.95);
         let flows = vec![
             flow(d(2025, 3, 1), 111.0, CFKind::Fixed),
             flow(d(2025, 10, 1), 1_000.0, CFKind::Fixed),

@@ -736,7 +736,7 @@ mod tests {
 
     #[test]
     fn inflation_print_shift_ignores_lag_interpolation_and_seasonality() {
-        use crate::market_data::scalars::{InflationInterpolation, InflationLag};
+        use crate::market_data::scalars::{InflationLag, SeriesInterpolation};
 
         let observations = vec![
             (time::macros::date!(2025 - 01 - 01), 300.0),
@@ -751,7 +751,7 @@ mod tests {
         seasonality[3] = 1.2;
         seasonality[4] = 0.8;
         for lag in [InflationLag::None, InflationLag::Months(3)] {
-            for interpolation in [InflationInterpolation::Step, InflationInterpolation::Linear] {
+            for interpolation in [SeriesInterpolation::Step, SeriesInterpolation::Linear] {
                 let context = |observations| {
                     let index = InflationIndex::new("CPI", observations, Currency::USD)
                         .expect("index")

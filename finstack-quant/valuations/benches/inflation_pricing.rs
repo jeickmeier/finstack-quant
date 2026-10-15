@@ -9,7 +9,7 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationInterpolation, InflationLag,
+    InflationIndex, InflationLag, SeriesInterpolation,
 };
 use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_core::money::Money;
@@ -82,7 +82,7 @@ fn bench_inflation_index() -> InflationIndex {
         .collect();
     InflationIndex::new("US-CPI-U", observations, Currency::USD)
         .expect("inflation index")
-        .with_interpolation(InflationInterpolation::Linear)
+        .with_interpolation(SeriesInterpolation::Linear)
         .with_lag(InflationLag::Months(3))
 }
 

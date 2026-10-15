@@ -881,7 +881,7 @@ mod tests {
     use crate::cashflow::traits::CashflowProvider;
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::market_data::scalars::{InflationIndex, InflationInterpolation};
+    use finstack_quant_core::market_data::scalars::{InflationIndex, SeriesInterpolation};
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use time::Month;
 
@@ -897,7 +897,7 @@ mod tests {
             Currency::USD,
         )
         .expect("index")
-        .with_interpolation(InflationInterpolation::Linear)
+        .with_interpolation(SeriesInterpolation::Linear)
         .with_publication_dates(vec![(date!(2025 - 03 - 01), date!(2025 - 04 - 15))])
         .expect("publication");
         let curve = InflationCurve::builder("US-CPI")
@@ -1380,7 +1380,7 @@ mod tests {
 
     #[test]
     fn hybrid_ref_cpi_resolves_published_and_projected_anchors_independently() {
-        use finstack_quant_core::market_data::scalars::{InflationIndex, InflationInterpolation};
+        use finstack_quant_core::market_data::scalars::{InflationIndex, SeriesInterpolation};
 
         let mut bond = sample_bond(DeflationProtection::None);
         bond.lag = InflationLag::Months(3);
@@ -1394,7 +1394,7 @@ mod tests {
             Currency::USD,
         )
         .expect("published CPI")
-        .with_interpolation(InflationInterpolation::Linear);
+        .with_interpolation(SeriesInterpolation::Linear);
         let curve = InflationCurve::builder("US-CPI")
             .base_date(d(2025, Month::March, 1))
             .base_cpi(110.0)
@@ -1631,7 +1631,7 @@ mod tests {
             Currency::USD,
         )
         .expect("index builds")
-        .with_interpolation(InflationInterpolation::Linear);
+        .with_interpolation(SeriesInterpolation::Linear);
 
         // Modern (3-month) lag must succeed; we don't care about the exact ratio,
         // just that the validation didn't reject the bond.

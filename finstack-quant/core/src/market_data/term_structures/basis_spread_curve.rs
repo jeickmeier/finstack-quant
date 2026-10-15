@@ -35,7 +35,7 @@
 //! - Fujii, M., Shimada, Y., & Takahashi, A. (2011). "A Note on Construction of
 //!   Multiple Swap Curves with and without Collateral." *FSA Research Review*, 7. `docs/REFERENCES.md#fujii-shimada-takahashi-2010`
 
-use super::common::{build_interp_allow_any_values, roll_knots, split_points, year_fraction_to};
+use super::common::{build_interp, roll_knots, year_fraction_to};
 use crate::dates::DateExt;
 use crate::math::interp::types::InterpRollState;
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
@@ -363,15 +363,16 @@ impl BasisSpreadCurveBuilder {
             return Err(InputError::TooFewPoints.into());
         }
 
-        let (knots_vec, spreads_vec) = split_points(self.points);
+        let (knots_vec, spreads_vec): (Vec<f64>, Vec<f64>) = self.points.into_iter().unzip();
         let knots: Box<[f64]> = knots_vec.into();
         let spreads: Box<[f64]> = spreads_vec.into();
 
-        let mut interp = build_interp_allow_any_values(
+        let mut interp = build_interp(
             self.style,
             knots.clone(),
             spreads.clone(),
             self.extrapolation,
+            ValidationPolicy::AllowNegative,
         )?;
 
         if let Some(state) = self.roll_transform {

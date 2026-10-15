@@ -116,18 +116,4 @@ impl SabrParameterData {
             shift,
         })
     }
-
-    /// Return a copy with an explicit finite displacement.
-    ///
-    /// # Arguments
-    ///
-    /// * `shift` - Finite displacement in the same units as associated
-    ///   forwards and strikes.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::Error::Validation`] when `shift` is not finite.
-    pub fn with_shift(self, shift: f64) -> crate::Result<Self> {
-        Self::new_with_shift(self.alpha, self.beta, self.rho, self.nu, Some(shift))
-    }
 }

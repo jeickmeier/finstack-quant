@@ -12,7 +12,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationInterpolation, InflationLag,
+    InflationIndex, InflationLag, SeriesInterpolation,
 };
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
@@ -70,7 +70,7 @@ fn create_us_cpi_fixings_with_seasonality() -> InflationIndex {
 
     InflationIndex::new("USD-CPI", observations, Currency::USD)
         .expect("index")
-        .with_interpolation(InflationInterpolation::Linear)
+        .with_interpolation(SeriesInterpolation::Linear)
         .with_lag(InflationLag::Months(3))
         .with_seasonality(factors)
         .expect("seasonality")
@@ -254,7 +254,7 @@ fn b17_inflation_calibration_matches_observed_and_explicit_base_cpi() {
     )
     .expect("monthly CPI")
     .with_lag(InflationLag::Months(3))
-    .with_interpolation(InflationInterpolation::Linear);
+    .with_interpolation(SeriesInterpolation::Linear);
     let reference_cpi = 300.0 + 3.0 * 14.0 / 31.0;
     let (explicit, _, _) = calibrated_market(None, reference_cpi);
     let (observed, _, _) = calibrated_market(Some(index), reference_cpi);
@@ -349,7 +349,7 @@ fn delivered_inflation_curve_preserves_lag_and_reprices_without_an_override() {
                 .day_count(DayCount::OneOne)
                 .side(PayReceive::Pay)
                 .base_cpi(100.0)
-                .interpolation(InflationInterpolation::Step)
+                .interpolation(SeriesInterpolation::Step)
                 .calendar_id_opt(Some("gblo".into()))
                 .build()
                 .expect("downstream swap");
