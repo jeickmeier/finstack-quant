@@ -11,7 +11,6 @@
 //! return series; none depends on `Performance`.
 
 mod performance;
-mod performance_io;
 mod regression;
 mod scalar;
 

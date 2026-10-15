@@ -1,113 +1,45 @@
 //! Lookback period selectors: MTD, QTD, YTD, FYTD.
 //!
 //! Crate-internal: callers use these through [`crate::Performance`].
-//! Each function returns a `Range<usize>` into the dates/returns arrays rather
-//! than sliced data, so callers slice their own arrays.
+//! [`select_range`] returns a `Range<usize>` into the sorted dates/returns
+//! arrays for a `[period_start, ref_date]` window.
 
 use crate::dates::{Date, DateExt, FiscalConfig, Month};
 use core::ops::Range;
 
-/// Index of the first date on or after `target` via binary search.
-fn lower_bound(dates: &[Date], target: Date) -> usize {
-    dates.partition_point(|&d| d < target)
-}
-
-/// Shared range builder: `[period_start, ref_date]` inclusive.
-fn select_range(dates: &[Date], period_start: Date, ref_date: Date) -> Range<usize> {
-    let lo = lower_bound(dates, period_start);
+/// Index range `[period_start, ref_date]` inclusive in a sorted date slice.
+pub(crate) fn select_range(dates: &[Date], period_start: Date, ref_date: Date) -> Range<usize> {
+    let lo = dates.partition_point(|&d| d < period_start);
     let hi = dates.partition_point(|&date| date <= ref_date);
     lo..hi
 }
 
-/// Month-to-date index range: from the first calendar day of `ref_date`'s
-/// month through `ref_date` (inclusive).
-///
-/// # Arguments
-///
-/// * `dates`    - Sorted slice of observation dates.
-/// * `ref_date` - Reference date (typically "today").
-///
-/// # Returns
-///
-/// A `Range<usize>` into `dates` covering the MTD window.
-/// The range may be empty if no dates fall within the window.
-pub(crate) fn mtd_select(dates: &[Date], ref_date: Date) -> Range<usize> {
-    let month_start = ref_date.replace_day(1).unwrap_or(ref_date);
-    select_range(dates, month_start, ref_date)
+/// First calendar day of `ref_date`'s month.
+pub(crate) fn mtd_start_date(ref_date: Date) -> Date {
+    ref_date.replace_day(1).unwrap_or(ref_date)
 }
 
-/// Quarter-to-date index range: from the first calendar day of `ref_date`'s
-/// quarter through `ref_date` (inclusive).
-///
-/// Quarter boundaries follow calendar convention: Q1 = Jan–Mar,
-/// Q2 = Apr–Jun, Q3 = Jul–Sep, Q4 = Oct–Dec.
-///
-/// # Arguments
-///
-/// * `dates`    - Sorted slice of observation dates.
-/// * `ref_date` - Reference date (typically "today").
-///
-/// # Returns
-///
-/// A `Range<usize>` into `dates` covering the QTD window.
-pub(crate) fn qtd_select(dates: &[Date], ref_date: Date) -> Range<usize> {
+/// First calendar day of `ref_date`'s calendar quarter (Q1 = Jan, Q2 = Apr, Q3 = Jul, Q4 = Oct).
+pub(crate) fn qtd_start_date(ref_date: Date) -> Date {
     let q = ref_date.quarter();
     let quarter_start_month = (q - 1) * 3 + 1;
     let (year, _month, _day) = ref_date.to_calendar_date();
-    let qtr_start = crate::dates::create_date(
+    crate::dates::create_date(
         year,
         Month::try_from(quarter_start_month).unwrap_or(Month::January),
         1,
     )
-    .unwrap_or(ref_date);
-    select_range(dates, qtr_start, ref_date)
+    .unwrap_or(ref_date)
 }
 
-/// Year-to-date index range: from January 1 of `ref_date`'s calendar year
-/// through `ref_date` (inclusive).
-///
-/// # Arguments
-///
-/// * `dates`    - Sorted slice of observation dates.
-/// * `ref_date` - Reference date (typically "today").
-///
-/// # Returns
-///
-/// A `Range<usize>` into `dates` covering the YTD window.
-pub(crate) fn ytd_select(dates: &[Date], ref_date: Date) -> Range<usize> {
+/// January 1 of `ref_date`'s calendar year.
+pub(crate) fn ytd_start_date(ref_date: Date) -> Date {
     let (year, _month, _day) = ref_date.to_calendar_date();
-    let year_start = crate::dates::create_date(year, Month::January, 1).unwrap_or(ref_date);
-    select_range(dates, year_start, ref_date)
+    crate::dates::create_date(year, Month::January, 1).unwrap_or(ref_date)
 }
 
-/// Fiscal-year-to-date index range: first observation on or after the
-/// fiscal calendar start through `ref_date` (inclusive).
-///
-/// The fiscal year start is determined by [`FiscalConfig`] (start month and
-/// day) with no holiday skip. A January 1 holiday still begins the window
-/// at the first observation `>=` January 1. The first included simple
-/// return still spans the prior close (the return on date `T` is the
-/// move from `T-1` to `T`).
-///
-/// # Arguments
-///
-/// * `dates`         - Sorted slice of observation dates.
-/// * `ref_date`      - Reference date (typically "today").
-/// * `fiscal_config` - Fiscal year configuration (start month, start day).
-///
-/// # Returns
-///
-/// A `Range<usize>` into `dates` covering the FYTD window.
-pub(crate) fn fytd_select(
-    dates: &[Date],
-    ref_date: Date,
-    fiscal_config: FiscalConfig,
-) -> Range<usize> {
-    let fy_start = fiscal_year_start_date(ref_date, fiscal_config);
-    select_range(dates, fy_start, ref_date)
-}
-
-fn fiscal_year_start_date(ref_date: Date, fiscal_config: FiscalConfig) -> Date {
+/// Start date of the fiscal year containing `ref_date` under `fiscal_config`.
+pub(crate) fn fytd_start_date(ref_date: Date, fiscal_config: FiscalConfig) -> Date {
     fiscal_config
         .year_start(ref_date.fiscal_year(fiscal_config))
         .unwrap_or(ref_date)
@@ -129,7 +61,8 @@ mod tests {
     #[test]
     fn ytd_select_basic() {
         let dates = daily_dates(d(2025, 1, 1), 60);
-        let range = ytd_select(&dates, d(2025, 2, 15));
+        let ref_date = d(2025, 2, 15);
+        let range = select_range(&dates, ytd_start_date(ref_date), ref_date);
         assert_eq!(range.start, 0);
         assert!(range.end > 30);
     }
@@ -137,14 +70,16 @@ mod tests {
     #[test]
     fn mtd_select_basic() {
         let dates = daily_dates(d(2025, 1, 1), 60);
-        let range = mtd_select(&dates, d(2025, 2, 15));
+        let ref_date = d(2025, 2, 15);
+        let range = select_range(&dates, mtd_start_date(ref_date), ref_date);
         assert!(range.start > 0);
     }
 
     #[test]
     fn qtd_select_q1() {
         let dates = daily_dates(d(2025, 1, 1), 90);
-        let range = qtd_select(&dates, d(2025, 3, 15));
+        let ref_date = d(2025, 3, 15);
+        let range = select_range(&dates, qtd_start_date(ref_date), ref_date);
         assert_eq!(range.start, 0);
     }
 
@@ -152,31 +87,30 @@ mod tests {
     fn fytd_select_us_federal() {
         let dates = daily_dates(d(2024, 10, 1), 120);
         let config = FiscalConfig::us_federal();
-        let range = fytd_select(&dates, d(2025, 1, 15), config);
+        let ref_date = d(2025, 1, 15);
+        let range = select_range(&dates, fytd_start_date(ref_date, config), ref_date);
         assert_eq!(range.start, 0);
     }
 
     #[test]
     fn fiscal_start_day_exceeding_month_length_clamps_to_month_end() {
-        // "Feb 30" fiscal start means "last day of February" (matching
-        // `DateExt::fiscal_year` overflow semantics). Before the clamp this
-        // silently degenerated to a single-observation FYTD window anchored
-        // at `ref_date`.
         let config = FiscalConfig::new(2, 30).expect("config accepts day 30");
-        let start = fiscal_year_start_date(d(2025, 6, 15), config);
+        let start = fytd_start_date(d(2025, 6, 15), config);
         assert_eq!(start, d(2025, 2, 28));
 
-        // Leap year: clamps to Feb 29.
-        let start_leap = fiscal_year_start_date(d(2024, 6, 15), config);
+        let start_leap = fytd_start_date(d(2024, 6, 15), config);
         assert_eq!(start_leap, d(2024, 2, 29));
     }
 
     #[test]
     fn fytd_select_includes_first_observation_on_or_after_fiscal_start() {
         let dates = daily_dates(d(2024, 12, 30), 10);
-        let range = fytd_select(&dates, d(2025, 1, 6), FiscalConfig::calendar_year());
-        // Jan 1 2025 is a holiday; the window still starts at the first
-        // observation on/after Jan 1, not the Following business day.
+        let ref_date = d(2025, 1, 6);
+        let range = select_range(
+            &dates,
+            fytd_start_date(ref_date, FiscalConfig::calendar_year()),
+            ref_date,
+        );
         assert_eq!(dates[range.start], d(2025, 1, 1));
         assert_ne!(dates[range.start], d(2025, 1, 2));
     }

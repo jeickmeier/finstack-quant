@@ -1,11 +1,13 @@
 //! Per-ticker scalar metrics on [`Performance`] (CAGR, Sharpe, Sortino,
 //! Calmar, drawdown statistics, VaR family, etc.).
 
+use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
+
 use super::Performance;
 use crate::dates::HolidayCalendar;
 use crate::drawdown::{
-    calmar, cdar, martin_ratio, max_drawdown, max_drawdown_duration as dd_max_duration,
-    mean_drawdown, pain_index, pain_ratio, recovery_factor, sterling_ratio, ulcer_index,
+    calmar, martin_ratio, max_drawdown, max_drawdown_duration as dd_max_duration, mean_drawdown,
+    pain_index, pain_ratio, recovery_factor, sterling_ratio, ulcer_index,
 };
 use crate::returns::comp_total;
 use crate::risk_metrics;
@@ -109,7 +111,7 @@ impl Performance {
     /// One value per ticker in column order.
     pub fn volatility(&self, annualize: bool) -> Vec<f64> {
         self.map_tickers(|i| {
-            risk_metrics::volatility(self.active_returns(i), annualize, self.ann())
+            risk_metrics::volatility_with_annualize(self.active_returns(i), annualize, self.ann())
         })
     }
 
@@ -158,13 +160,8 @@ impl Performance {
     /// Returns [`f64::NAN`] when the active window has fewer than 2
     /// observations (downside deviation is not estimable from one point).
     pub fn sortino(&self, mar: f64) -> Vec<f64> {
-        self.map_tickers(|i| {
-            let r = self.active_returns(i);
-            if r.len() < 2 {
-                return f64::NAN;
-            }
-            risk_metrics::sortino(r, true, self.ann(), mar)
-        })
+        let ann = self.ann();
+        self.map_tickers(|i| crate::sortino(self.active_returns(i), mar, ann))
     }
 
     /// Calmar ratio for each ticker.
@@ -317,40 +314,6 @@ impl Performance {
     /// values indicate fatter tails than a normal distribution.
     pub fn kurtosis(&self) -> Vec<f64> {
         self.map_tickers(|i| risk_metrics::kurtosis(self.active_returns(i)))
-    }
-
-    /// Per-ticker `(skewness, kurtosis)` from one moments pass per ticker.
-    ///
-    /// Returns two parallel vectors `(skewness_per_ticker, kurtosis_per_ticker)`
-    /// in column order. Equivalent to calling [`Self::skewness`] and
-    /// [`Self::kurtosis`] but walks each ticker once instead of twice.
-    pub(crate) fn skew_kurt(&self) -> (Vec<f64>, Vec<f64>) {
-        let n = self.ticker_names().len();
-        let mut sk = Vec::with_capacity(n);
-        let mut ku = Vec::with_capacity(n);
-        for i in 0..n {
-            let (s, k) = risk_metrics::skew_kurt(self.active_returns(i));
-            sk.push(s);
-            ku.push(k);
-        }
-        (sk, ku)
-    }
-
-    /// Per-ticker `(value_at_risk, expected_shortfall)` from one tail pass per ticker.
-    ///
-    /// Returns two parallel vectors `(var_per_ticker, es_per_ticker)` in
-    /// column order. Equivalent to calling [`Self::value_at_risk`] and
-    /// [`Self::expected_shortfall`] but shares the partition / allocation.
-    pub(crate) fn value_at_risk_and_es(&self, confidence: f64) -> (Vec<f64>, Vec<f64>) {
-        let n = self.ticker_names().len();
-        let mut vars = Vec::with_capacity(n);
-        let mut ess = Vec::with_capacity(n);
-        for i in 0..n {
-            let (v, e) = risk_metrics::value_at_risk_and_es(self.active_returns(i), confidence);
-            vars.push(v);
-            ess.push(e);
-        }
-        (vars, ess)
     }
 
     /// Geometric mean return for each ticker.
@@ -611,7 +574,14 @@ impl Performance {
     /// strictly inside `(0, 1)`.
     pub fn cdar(&self, confidence: f64) -> crate::Result<Vec<f64>> {
         Self::ensure_confidence(confidence)?;
-        Ok(self.map_tickers(|i| cdar(self.active_drawdown_values(i), confidence)))
+        Ok(self.map_tickers(|i| {
+            let dd = self.active_drawdown_values(i);
+            if dd.is_empty() {
+                0.0
+            } else {
+                risk_metrics::expected_shortfall(dd, confidence)
+            }
+        }))
     }
 
     /// Modified Sharpe ratio for each ticker.
@@ -649,13 +619,99 @@ impl Performance {
             )
         }))
     }
+
+    /// The standard per-ticker summary: one row per ticker, 22 metric columns.
+    ///
+    /// Columns (in order): `ticker`, `cagr`, `mean_return`, `volatility`,
+    /// `sharpe`, `sortino`, `calmar`, `max_drawdown`, `value_at_risk`,
+    /// `expected_shortfall`, `tracking_error`, `information_ratio`,
+    /// `skewness`, `kurtosis`, `geometric_mean`, `downside_deviation`,
+    /// `omega_ratio`, `gain_to_pain`, `ulcer_index`, `pain_index`,
+    /// `recovery_factor`, `tail_ratio`, `r_squared`.
+    ///
+    /// `mean_return` and `volatility` are annualized; `cagr` uses
+    /// [`CagrDayCount::default`]. The MAR-based metrics (`sortino`,
+    /// `downside_deviation`) and the `omega_ratio` threshold are fixed at
+    /// `0.0`; call the individual methods for other thresholds.
+    ///
+    /// # Arguments
+    ///
+    /// * `risk_free_rate` - Annualized risk-free rate in decimal (`0.02` =
+    ///   2%); affects only `sharpe`.
+    /// * `confidence` - Tail confidence in `(0, 1)` (`0.95` = 95%) applied to
+    ///   `value_at_risk`, `expected_shortfall` and `tail_ratio`.
+    ///
+    /// # Errors
+    ///
+    /// Rejects a `confidence` outside `(0, 1)` and propagates [`Self::cagr`]
+    /// and [`Self::calmar`] failures (for example a panel too short to
+    /// annualize).
+    pub fn summary(&self, risk_free_rate: f64, confidence: f64) -> crate::Result<TableEnvelope> {
+        Self::ensure_confidence(confidence)?;
+        let (var, es): (Vec<f64>, Vec<f64>) = self
+            .map_tickers(|i| risk_metrics::value_at_risk_and_es(self.active_returns(i), confidence))
+            .into_iter()
+            .unzip();
+        let (skew, kurt): (Vec<f64>, Vec<f64>) = self
+            .map_tickers(|i| risk_metrics::skew_kurt(self.active_returns(i)))
+            .into_iter()
+            .unzip();
+        let cagrs = self.cagr(CagrDayCount::default(), None)?;
+        let drawdowns = self.max_drawdown();
+        let calmars = cagrs
+            .iter()
+            .zip(&drawdowns)
+            .map(|(&growth, &drawdown)| calmar(growth, drawdown))
+            .collect();
+        let recovery_factors =
+            self.map_tickers(|i| recovery_factor(comp_total(self.active_returns(i)), drawdowns[i]));
+        let metrics: [(&str, Vec<f64>); 22] = [
+            ("cagr", cagrs),
+            ("mean_return", self.mean_return(true)),
+            ("volatility", self.volatility(true)),
+            ("sharpe", self.sharpe(risk_free_rate)),
+            ("sortino", self.sortino(0.0)),
+            ("calmar", calmars),
+            ("max_drawdown", drawdowns),
+            ("value_at_risk", var),
+            ("expected_shortfall", es),
+            ("tracking_error", self.tracking_error()),
+            ("information_ratio", self.information_ratio()),
+            ("skewness", skew),
+            ("kurtosis", kurt),
+            ("geometric_mean", self.geometric_mean()),
+            ("downside_deviation", self.downside_deviation(0.0)),
+            ("omega_ratio", self.omega_ratio(0.0)),
+            ("gain_to_pain", self.gain_to_pain()),
+            ("ulcer_index", self.ulcer_index()),
+            ("pain_index", self.pain_index()),
+            ("recovery_factor", recovery_factors),
+            ("tail_ratio", self.tail_ratio(confidence)?),
+            ("r_squared", self.r_squared()),
+        ];
+        let mut columns = Vec::with_capacity(metrics.len() + 1);
+        columns.push(
+            TableColumn::new(
+                "ticker",
+                TableColumnData::String(self.ticker_names().to_vec()),
+            )
+            .with_role(TableColumnRole::Dimension),
+        );
+        for (name, values) in metrics {
+            columns.push(
+                TableColumn::new(name, TableColumnData::Float64(values))
+                    .with_role(TableColumnRole::Measure),
+            );
+        }
+        TableEnvelope::new(columns)
+    }
 }
 
 #[cfg(test)]
 mod from_returns_cagr_tests {
 
     use crate::dates::{Date, Month, PeriodKind};
-    use crate::risk_metrics::{cagr, CagrDayCount};
+    use crate::risk_metrics::{self, cagr, CagrDayCount};
     use crate::Performance;
 
     fn d(year: i32, month: Month, day: u8) -> Date {
@@ -671,16 +727,20 @@ mod from_returns_cagr_tests {
         ];
         let perf = Performance::from_returns(
             dates,
-            returns,
+            returns.clone(),
             vec!["A".into(), "B".into()],
             None,
             PeriodKind::Daily,
         )
         .expect("daily panel");
-        let (var, es) = perf.value_at_risk_and_es(0.95);
+        let (var, es): (Vec<f64>, Vec<f64>) = returns
+            .iter()
+            .map(|r| risk_metrics::value_at_risk_and_es(r, 0.95))
+            .unzip();
         assert_eq!(var, perf.value_at_risk(0.95).expect("valid confidence"));
         assert_eq!(es, perf.expected_shortfall(0.95).expect("valid confidence"));
-        let (skew, kurt) = perf.skew_kurt();
+        let (skew, kurt): (Vec<f64>, Vec<f64>) =
+            returns.iter().map(|r| risk_metrics::skew_kurt(r)).unzip();
         assert_eq!(skew, perf.skewness());
         assert_eq!(kurt, perf.kurtosis());
     }

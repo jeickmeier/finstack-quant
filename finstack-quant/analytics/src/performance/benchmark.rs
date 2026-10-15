@@ -32,8 +32,7 @@ impl Performance {
     /// is exactly zero.
     pub fn treynor(&self, risk_free_rate: f64) -> Vec<f64> {
         let ann = self.ann();
-        self.map_tickers(|i| {
-            let (r, bench) = self.active_pair_returns(i);
+        self.map_pair_returns(|r, bench| {
             if r.len().min(bench.len()) < 2 {
                 return f64::NAN;
             }
@@ -45,34 +44,26 @@ impl Performance {
 
     /// Empyrical-style annualized geometric up-capture for each ticker versus the active benchmark.
     pub fn up_capture(&self) -> Vec<f64> {
-        self.map_tickers(|i| {
-            let (r, bench) = self.active_pair_returns(i);
-            up_capture(r, bench, self.ann())
-        })
+        let ann = self.ann();
+        self.map_pair_returns(|r, bench| up_capture(r, bench, ann))
     }
 
     /// Empyrical-style annualized geometric down-capture for each ticker versus the active benchmark.
     pub fn down_capture(&self) -> Vec<f64> {
-        self.map_tickers(|i| {
-            let (r, bench) = self.active_pair_returns(i);
-            down_capture(r, bench, self.ann())
-        })
+        let ann = self.ann();
+        self.map_pair_returns(|r, bench| down_capture(r, bench, ann))
     }
 
     /// Empyrical-style annualized geometric capture ratio for each ticker.
     pub fn capture_ratio(&self) -> Vec<f64> {
-        self.map_tickers(|i| {
-            let (r, bench) = self.active_pair_returns(i);
-            capture_ratio(r, bench, self.ann())
-        })
+        let ann = self.ann();
+        self.map_pair_returns(|r, bench| capture_ratio(r, bench, ann))
     }
 
     /// Annualized tracking error for each ticker versus the active benchmark.
     pub fn tracking_error(&self) -> Vec<f64> {
-        self.map_tickers(|i| {
-            let (r, bench) = self.active_pair_returns(i);
-            tracking_error(r, bench, self.ann())
-        })
+        let ann = self.ann();
+        self.map_pair_returns(|r, bench| tracking_error(r, bench, ann))
     }
 
     /// Annualized information ratio for each ticker versus the active benchmark.
@@ -81,12 +72,12 @@ impl Performance {
     /// fewer than 2 observations (tracking error is not estimable from one
     /// point, so the ratio is undefined rather than a plausible `±∞`).
     pub fn information_ratio(&self) -> Vec<f64> {
-        self.map_tickers(|i| {
-            let (r, bench) = self.active_pair_returns(i);
+        let ann = self.ann();
+        self.map_pair_returns(|r, bench| {
             if r.len().min(bench.len()) < 2 {
                 return f64::NAN;
             }
-            information_ratio(r, bench, self.ann())
+            information_ratio(r, bench, ann)
         })
     }
 
@@ -96,10 +87,7 @@ impl Performance {
     /// has fewer than two observations or either overlapping series has zero
     /// variance.
     pub fn r_squared(&self) -> Vec<f64> {
-        self.map_tickers(|i| {
-            let (r, bench) = self.active_pair_returns(i);
-            r_squared(r, bench)
-        })
+        self.map_pair_returns(r_squared)
     }
 
     /// OLS beta estimates for each ticker versus the active benchmark.
@@ -109,10 +97,7 @@ impl Performance {
     /// observations. All result fields are [`f64::NAN`] when the overlap is
     /// shorter or the benchmark variance is zero.
     pub fn beta(&self) -> Vec<BetaResult> {
-        self.map_tickers(|i| {
-            let (r, bench) = self.active_pair_returns(i);
-            beta(r, bench)
-        })
+        self.map_pair_returns(beta)
     }
 
     /// Single-factor greeks for each ticker versus the active benchmark.
@@ -133,10 +118,8 @@ impl Performance {
     /// zero ticker variance, and adjusted R-squared for exactly two
     /// observations.
     pub fn greeks(&self, risk_free_rate: f64) -> Vec<GreeksResult> {
-        self.map_tickers(|i| {
-            let (r, bench) = self.active_pair_returns(i);
-            greeks(r, bench, self.ann(), risk_free_rate)
-        })
+        let ann = self.ann();
+        self.map_pair_returns(|r, bench| greeks(r, bench, ann, risk_free_rate))
     }
 
     /// Rolling greeks (alpha, beta) for a specific ticker vs the benchmark.
@@ -169,10 +152,7 @@ impl Performance {
     /// Fraction of periods where the ticker's return exceeds the benchmark's
     /// return over the active window.
     pub fn batting_average(&self) -> Vec<f64> {
-        self.map_tickers(|i| {
-            let (r, bench) = self.active_pair_returns(i);
-            batting_average(r, bench)
-        })
+        self.map_pair_returns(batting_average)
     }
 
     /// M-squared (Modigliani-Modigliani) for each ticker.
@@ -188,8 +168,7 @@ impl Performance {
     ///   return; the same annual rate is added back as the cash return.
     pub fn m_squared(&self, risk_free_rate: f64) -> Vec<f64> {
         let ann = self.ann();
-        self.map_tickers(|i| {
-            let (r, bench) = self.active_pair_returns(i);
+        self.map_pair_returns(|r, bench| {
             let (ann_ret, ann_vol) = risk_metrics::mean_vol_annualized(r, ann);
             let (_, bench_vol) = risk_metrics::mean_vol_annualized(bench, ann);
             m_squared(ann_ret, ann_vol, bench_vol, risk_free_rate, ann)

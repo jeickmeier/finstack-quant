@@ -106,10 +106,7 @@ impl Performance {
         for (i, row) in matrix.iter_mut().enumerate() {
             row[i] = 1.0;
         }
-        let pairs: Vec<(usize, usize)> = (0..n)
-            .flat_map(|i| (i + 1..n).map(move |j| (i, j)))
-            .collect();
-        for (i, j) in pairs {
+        for (i, j) in (0..n).flat_map(|i| (i + 1..n).map(move |j| (i, j))) {
             let (lhs, rhs) = if complete_case {
                 (
                     self.returns_for_span(i, common),
@@ -132,8 +129,7 @@ impl Performance {
     /// so identical paths remain zero even when absolute wealth would
     /// overflow or round to zero.
     pub fn cumulative_returns_outperformance(&self) -> Vec<Vec<f64>> {
-        self.map_tickers(|i| {
-            let (port, bench) = self.active_pair_returns(i);
+        self.map_pair_returns(|port, bench| {
             let mut relative_log_growth = NeumaierAccumulator::new();
             port.iter()
                 .zip(bench.iter())
@@ -148,8 +144,7 @@ impl Performance {
 
     /// Drawdown difference versus the active benchmark.
     pub fn drawdown_difference(&self) -> Vec<Vec<f64>> {
-        self.map_tickers(|i| {
-            let (port, bench) = self.active_pair_returns(i);
+        self.map_pair_returns(|port, bench| {
             let port_dd = to_drawdown_series(port);
             let bench_dd = to_drawdown_series(bench);
             port_dd
@@ -243,9 +238,13 @@ impl Performance {
         fiscal_config: Option<FiscalConfig>,
     ) -> LookbackReturns {
         let fiscal_config = fiscal_config.unwrap_or_default();
-        let compute = |selector: fn(&[Date], Date) -> core::ops::Range<usize>| -> Vec<f64> {
+        let compute = |period_start: Date| -> Vec<f64> {
             self.map_tickers(|i| {
-                let range = selector(self.active_dates_for_ticker_unchecked(i), ref_date);
+                let range = lookback::select_range(
+                    self.active_dates_for_ticker_unchecked(i),
+                    period_start,
+                    ref_date,
+                );
                 let r = self.active_returns(i);
                 let start = range.start.min(r.len());
                 let end = range.end.min(r.len()).max(start);
@@ -253,21 +252,12 @@ impl Performance {
             })
         };
 
-        let fytd = self.map_tickers(|i| {
-            let dates = self.active_dates_for_ticker_unchecked(i);
-            let range = lookback::fytd_select(dates, ref_date, fiscal_config);
-            let r = self.active_returns(i);
-            let start = range.start.min(r.len());
-            let end = range.end.min(r.len()).max(start);
-            comp_total(&r[start..end])
-        });
-
         LookbackReturns {
             ticker_names: self.ticker_names().to_vec(),
-            mtd: compute(lookback::mtd_select),
-            qtd: compute(lookback::qtd_select),
-            ytd: compute(lookback::ytd_select),
-            fytd,
+            mtd: compute(lookback::mtd_start_date(ref_date)),
+            qtd: compute(lookback::qtd_start_date(ref_date)),
+            ytd: compute(lookback::ytd_start_date(ref_date)),
+            fytd: compute(lookback::fytd_start_date(ref_date, fiscal_config)),
         }
     }
 
@@ -372,18 +362,6 @@ fn flatten_matrix(matrix: &[Vec<f64>]) -> Vec<f64> {
 
 fn finalize_correlation_matrix(matrix: Vec<Vec<f64>>) -> crate::Result<(Vec<Vec<f64>>, bool)> {
     let n = matrix.len();
-    for (i, row) in matrix.iter().enumerate() {
-        for (j, &value) in row.iter().enumerate() {
-            if i != j && !value.is_finite() {
-                return Err(crate::error::InputError::InvalidReturnSeries {
-                    ticker: format!("<{i},{j}>"),
-                    index: 0,
-                    reason: format!("correlation ρ[{i},{j}] is non-finite"),
-                }
-                .into());
-            }
-        }
-    }
     let flat = flatten_matrix(&matrix);
     if validate_correlation_matrix(&flat, n).is_ok() {
         return Ok((matrix, false));
@@ -408,10 +386,15 @@ fn finalize_correlation_matrix(matrix: Vec<Vec<f64>>) -> crate::Result<(Vec<Vec<
 }
 
 #[cfg(test)]
-mod periodic_returns_tests {
+mod tests {
     use super::*;
+    use crate::correlation::validate_correlation_matrix;
     use crate::dates::{Month, PeriodKind};
     use crate::Performance;
+
+    fn jan(day: u8) -> Date {
+        Date::from_calendar_date(2024, Month::January, day).expect("valid date")
+    }
 
     /// Build a single-ticker `Performance` with daily returns spanning
     /// January and February 2021 (2021-01-04 through 2021-02-26).
@@ -439,41 +422,6 @@ mod periodic_returns_tests {
         .unwrap()
     }
 
-    #[test]
-    fn lookback_returns_default_fiscal_year_is_calendar_year() {
-        let perf = sample_two_month_daily_performance();
-        let ref_date = *perf.dates().last().unwrap();
-        let omitted = perf.lookback_returns(ref_date, None);
-        let explicit = perf.lookback_returns(ref_date, Some(FiscalConfig::calendar_year()));
-        assert_eq!(omitted.fytd, explicit.fytd);
-        assert_eq!(omitted.ytd, explicit.fytd);
-    }
-
-    #[test]
-    fn periodic_returns_monthly_has_one_bucket_per_month() {
-        let perf = sample_two_month_daily_performance();
-        let periodic = perf.periodic_returns(PeriodKind::Monthly);
-        assert_eq!(periodic.len(), perf.ticker_names().len());
-        assert_eq!(periodic[0].len(), 2);
-        assert_eq!(periodic[0][0].date.month(), Month::January);
-        assert_eq!(periodic[0][1].date.month(), Month::February);
-        let cum = perf.cumulative_returns();
-        let total = *cum[0].last().unwrap();
-        let chained = (1.0 + periodic[0][0].value) * (1.0 + periodic[0][1].value) - 1.0;
-        assert!((chained - total).abs() < 1e-12);
-    }
-}
-
-#[cfg(test)]
-mod excess_returns_tests {
-    use super::*;
-    use crate::dates::{Month, PeriodKind};
-    use crate::Performance;
-
-    fn jan(day: u8) -> Date {
-        Date::from_calendar_date(2024, Month::January, day).expect("valid date")
-    }
-
     fn rectangular_perf() -> Performance {
         let dates = vec![jan(2), jan(3), jan(4), jan(5)];
         Performance::from_returns(
@@ -499,6 +447,30 @@ mod excess_returns_tests {
             PeriodKind::Daily,
         )
         .expect("ragged panel")
+    }
+
+    #[test]
+    fn lookback_returns_default_fiscal_year_is_calendar_year() {
+        let perf = sample_two_month_daily_performance();
+        let ref_date = *perf.dates().last().unwrap();
+        let omitted = perf.lookback_returns(ref_date, None);
+        let explicit = perf.lookback_returns(ref_date, Some(FiscalConfig::calendar_year()));
+        assert_eq!(omitted.fytd, explicit.fytd);
+        assert_eq!(omitted.ytd, explicit.fytd);
+    }
+
+    #[test]
+    fn periodic_returns_monthly_has_one_bucket_per_month() {
+        let perf = sample_two_month_daily_performance();
+        let periodic = perf.periodic_returns(PeriodKind::Monthly);
+        assert_eq!(periodic.len(), perf.ticker_names().len());
+        assert_eq!(periodic[0].len(), 2);
+        assert_eq!(periodic[0][0].date.month(), Month::January);
+        assert_eq!(periodic[0][1].date.month(), Month::February);
+        let cum = perf.cumulative_returns();
+        let total = *cum[0].last().unwrap();
+        let chained = (1.0 + periodic[0][0].value) * (1.0 + periodic[0][1].value) - 1.0;
+        assert!((chained - total).abs() < 1e-12);
     }
 
     #[test]
@@ -539,18 +511,6 @@ mod excess_returns_tests {
             msg.contains("rf.len()") || msg.contains("active date"),
             "unexpected error: {msg}"
         );
-    }
-}
-
-#[cfg(test)]
-mod correlation_matrix_tests {
-    use super::*;
-    use crate::correlation::validate_correlation_matrix;
-    use crate::dates::{Month, PeriodKind};
-    use crate::Performance;
-
-    fn jan(day: u8) -> Date {
-        Date::from_calendar_date(2024, Month::January, day).expect("valid date")
     }
 
     #[test]

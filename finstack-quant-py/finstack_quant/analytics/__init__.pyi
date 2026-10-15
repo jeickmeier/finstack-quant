@@ -1319,8 +1319,7 @@ class DrawdownEpisode:
             Columns ``start``, ``valley``, ``end`` (``datetime64``; ``NaT``
             while still in drawdown), ``duration_days``, ``max_drawdown``,
             ``near_recovery_threshold``, ``truncated_at_start``. Stack
-            episodes with ``pd.concat`` or use
-            :meth:`Performance.to_drawdown_details_dataframe`.
+            episodes with ``pd.concat([ep.to_dataframe() for ep in episodes])``.
 
         Raises
         ------
@@ -1686,9 +1685,10 @@ class Performance:
     """
     Stateful performance analytics engine over a panel of ticker series.
 
-    Construct from a pandas DataFrame of prices (``Performance(df)``), a
-    DataFrame of returns (``Performance.from_returns(df)``), or from raw
-    arrays via :meth:`from_arrays` / :meth:`from_returns_arrays`.
+    Construct from a pandas DataFrame or Series of prices
+    (``Performance(df)``), a DataFrame or Series of returns
+    (``Performance.from_returns(df)``), or from raw arrays via
+    :meth:`from_arrays` / :meth:`from_returns_arrays`.
 
     Scalar-per-ticker metrics return a ``pandas.Series`` indexed by ticker name
     and named after the metric, so results are selected by label rather than by
@@ -1709,18 +1709,20 @@ class Performance:
 
     def __init__(
         self,
-        prices: pd.DataFrame,
+        prices: pd.DataFrame | pd.Series,
         benchmark_ticker: str | None = None,
         frequency: str | None = None,
     ) -> None:
         """
-        Build from a pandas DataFrame of prices.
+        Build from a pandas DataFrame (or Series) of prices.
 
         Parameters
         ----------
-        prices : pandas.DataFrame
+        prices : pandas.DataFrame or pandas.Series
             Price panel with a date-like index (``datetime.date`` or
-            ``pd.Timestamp``) and one column per ticker.
+            ``pd.Timestamp``) and one column per ticker. A ``Series`` is a
+            single-asset panel whose ticker is the series ``name`` (``"asset"``
+            when unnamed).
         benchmark_ticker : str, optional
             Benchmark column name. Defaults to the first column when ``None``.
         frequency : str, optional
@@ -1734,10 +1736,10 @@ class Performance:
         Raises
         ------
         AnalyticsError
-            If ``prices`` is not a DataFrame, dates are invalid, or the panel is
-            empty.
+            If ``prices`` is invalid or empty, or dates are not strictly
+            ascending.
         TypeError
-            If ``prices`` is not a pandas ``DataFrame`` (use
+            If ``prices`` is not a pandas ``DataFrame`` or ``Series`` (use
             :meth:`from_arrays` for raw lists), or its column labels are not
             all ``str`` (rename with ``df.columns = df.columns.astype(str)``).
 
@@ -3418,30 +3420,9 @@ class Performance:
         (1, datetime.date(2024, 1, 2), 0.0302)
         """
 
-    # -- DataFrame export methods --
+    # -- DataFrame export --
 
-    def to_dataframe(self) -> pd.DataFrame:
-        """
-        The primary pandas view: the summary statistics table.
-
-        One row per ticker, one column per scalar metric. Alias for
-        `to_summary_dataframe` with default arguments, so every result type
-        answers to a plain `to_dataframe()`. The other `*_to_dataframe`
-        methods are the secondary views.
-
-        Returns
-        -------
-        pd.DataFrame
-            Summary statistics, one row per ticker.
-
-        Raises
-        ------
-        ValueError
-            If the result cannot be represented as a pandas object.
-        """
-        ...
-
-    def to_summary_dataframe(
+    def to_dataframe(
         self,
         risk_free_rate: float = 0.0,
         confidence: float = 0.95,
@@ -3482,225 +3463,6 @@ class Performance:
         AnalyticsError
             If ``confidence`` is outside ``(0, 1)`` or a ticker's active range
             has no positive holding period and therefore cannot be annualized.
-        """
-        ...
-
-    def to_returns_dataframe(self) -> pd.DataFrame:
-        """
-        Per-period simple returns for all tickers as a pandas DataFrame.
-
-        Ragged per-ticker series are padded with ``NaN`` onto the active date
-        grid. Prefer this over :meth:`excess_returns` with an all-zero
-        risk-free series or un-compounding
-        :meth:`to_cumulative_returns_dataframe`.
-
-        Returns
-        -------
-        pd.DataFrame
-            Simple returns indexed by date, one column per ticker.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def to_cumulative_returns_dataframe(self) -> pd.DataFrame:
-        """
-        Cumulative returns for all tickers as a pandas DataFrame.
-
-        Returns
-        -------
-        pd.DataFrame
-            Cumulative returns indexed by date, one column per ticker.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def to_periodic_returns_dataframe(self, frequency: str | None = None) -> pd.DataFrame:
-        """
-        Calendar-bucketed compounded returns for all tickers.
-
-        Parameters
-        ----------
-        frequency : str, optional
-            Bucketing frequency: one of ``"daily"``, ``"weekly"``,
-            ``"monthly"``, ``"quarterly"``, ``"semi_annual"``, ``"annual"``
-            or a pandas offset alias (``D``/``B``, ``W``, ``M``/``ME``,
-            ``Q``/``QE``, ``A``/``Y``/``YE``); ``None`` uses the Rust default
-            ``DEFAULT_PERIODIC_FREQUENCY`` (monthly).
-
-        Returns
-        -------
-        pd.DataFrame
-            Compounded period returns indexed by period-end date, one column
-            per ticker. Buckets reconcile with
-            :meth:`to_cumulative_returns_dataframe`. This convenience exit is
-            built from the same canonical result as :meth:`periodic_returns`.
-
-        Raises
-        ------
-        ValueError
-            If ``frequency`` is not a recognized frequency.
-        """
-        ...
-
-    def to_drawdown_series_dataframe(self) -> pd.DataFrame:
-        """
-        Drawdown series for all tickers as a pandas DataFrame.
-
-        Returns
-        -------
-        pd.DataFrame
-            Drawdown series indexed by date, one column per ticker.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def to_correlation_dataframe(self) -> pd.DataFrame:
-        """
-        Correlation matrix as a pandas DataFrame indexed by ticker name.
-
-        Returns
-        -------
-        pd.DataFrame
-            Symmetric correlation matrix with ticker names on both axes;
-            ``df.attrs["repaired"]`` is ``True`` when the estimate was
-            Higham-repaired (see :meth:`correlation_matrix`).
-
-        Raises
-        ------
-        AnalyticsError
-            If a pair is degenerate or Higham repair fails.
-        """
-        ...
-
-    def to_drawdown_details_dataframe(
-        self,
-        ticker_idx: int | str,
-        n: int = 5,
-    ) -> pd.DataFrame:
-        """
-        Top-N drawdown episodes for a ticker as a pandas DataFrame.
-
-        Columns: ``start``, ``valley``, ``end`` (``datetime64``; ``NaT``
-        while still in drawdown), ``duration_days``, ``max_drawdown``,
-        ``near_recovery_threshold``, ``truncated_at_start``.
-
-        Parameters
-        ----------
-        ticker_idx : int or str
-            Zero-based ticker column index, or a ticker name resolved through
-            Rust ``Performance::ticker_index``.
-        n : int, default 5
-            Number of largest drawdown episodes to return.
-
-        Returns
-        -------
-        pd.DataFrame
-            Drawdown episodes, one row per episode, deepest first. Empty
-            frames retain ``int64`` duration and ``bool`` truncation columns.
-
-        Raises
-        ------
-        AnalyticsError
-            If an integer ``ticker_idx`` is outside the loaded ticker columns.
-        KeyError
-            If a string ``ticker_idx`` is not a loaded ticker name.
-        """
-        ...
-
-    def to_beta_dataframe(self) -> pd.DataFrame:
-        """
-        Beta regression statistics for every ticker vs the benchmark.
-
-        Returns
-        -------
-        pd.DataFrame
-            Indexed by ticker with columns ``beta``, ``std_err``,
-            ``ci_lower``, ``ci_upper`` (95% bounds), ``n_obs`` (``int64``
-            observation count) and ``confidence_level`` (decimal level of the
-            bounds). Undefined estimates remain ``NaN`` in numeric ``float64``
-            columns.
-
-        Raises
-        ------
-        ValueError
-            If the result cannot be represented as a pandas object.
-
-        Examples
-        --------
-        >>> from datetime import date
-        >>> from finstack_quant.analytics import Performance
-        >>> perf = Performance.from_returns_arrays(
-        ...     [date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)],
-        ...     [[0.01, 0.02, -0.01, 0.005], [0.02, -0.01, 0.01, 0.0]],
-        ...     ["FUND", "BENCH"],
-        ...     benchmark_ticker="BENCH",
-        ... )
-        >>> list(perf.to_beta_dataframe().columns)
-        ['beta', 'std_err', 'ci_lower', 'ci_upper', 'n_obs', 'confidence_level']
-        """
-        ...
-
-    def to_greeks_dataframe(self, risk_free_rate: float = 0.0) -> pd.DataFrame:
-        """
-        Single-index greeks for every ticker vs the benchmark.
-
-        Parameters
-        ----------
-        risk_free_rate : float, default 0.0
-            Annualized decimal risk-free rate used for Jensen alpha.
-
-        Returns
-        -------
-        pd.DataFrame
-            Indexed by ticker with columns ``alpha`` (annualized Jensen
-            alpha), ``beta``, ``r_squared``, ``adjusted_r_squared`` and
-            ``n_obs`` (``int64`` observation count).
-
-        Raises
-        ------
-        ValueError
-            If the result cannot be represented as a pandas object.
-        """
-        ...
-
-    def to_excess_returns_dataframe(
-        self,
-        rf: pd.Series | Sequence[float],
-        nperiods: float | None = None,
-    ) -> pd.DataFrame:
-        """
-        Excess returns over a risk-free rate, one column per ticker.
-
-        Parameters
-        ----------
-        rf : pandas.Series or numpy.ndarray or sequence of float
-            Annualized decimal risk-free rate, aligned to
-            :meth:`active_dates` (one value per date).
-        nperiods : float, optional
-            ``None`` geometrically decompounds the annual rate using the panel
-            frequency; pass ``1.0`` when ``rf`` is already per-period.
-
-        Returns
-        -------
-        pd.DataFrame
-            Excess simple returns with a ``DatetimeIndex`` and one column per
-            ticker; ragged series are padded with ``NaN``.
-
-        Raises
-        ------
-        AnalyticsError
-            If ``rf`` does not have one value per active date.
-        TypeError
-            If ``rf`` is not a float sequence, NumPy array or Series.
         """
         ...
 

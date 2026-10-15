@@ -11,7 +11,8 @@ use crate::dates::Date;
 use finstack_quant_core::math::neumaier_sum;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 
-use super::return_based::{invalid_annualization_factor, sharpe};
+use super::return_based::invalid_annualization_factor;
+use super::{annualized_ratio_or_sign_infinity, ratio_or_sign_infinity};
 
 /// Number of slide steps before the incremental rolling kernel fully
 /// recomputes its running moments from the current window.
@@ -193,8 +194,8 @@ pub(crate) fn rolling_sharpe(
         let ann_mean = mean * ann_factor;
         let var = (m2 / (w - 1.0)).max(0.0);
         let ann_vol = var.sqrt() * ann_factor.sqrt();
-        out.values
-            .push(sharpe(ann_mean, ann_vol, risk_free_rate, ann_factor));
+        let excess = crate::returns::annualized_excess_return(ann_mean, risk_free_rate, ann_factor);
+        out.values.push(ratio_or_sign_infinity(excess, ann_vol));
         out.dates.push(dates[date_idx]);
         date_idx += 1;
     });
@@ -280,23 +281,71 @@ pub(crate) fn rolling_sortino(
     rolling_sortino_kernel(returns, n, window, mar, |sum, sum_ds| {
         let m = sum / w - mar;
         let dd = (sum_ds / w).sqrt();
-        out.values.push(if !m.is_finite() || !dd.is_finite() {
-            f64::NAN
-        } else if dd == 0.0 {
-            if m > 0.0 {
-                f64::INFINITY
-            } else if m < 0.0 {
-                f64::NEG_INFINITY
-            } else {
-                0.0
-            }
-        } else {
-            (m * ann_factor) / (dd * ann_factor.sqrt())
-        });
+        out.values
+            .push(annualized_ratio_or_sign_infinity(m, dd, ann_factor));
         out.dates.push(dates[date_idx]);
         date_idx += 1;
     });
     out
+}
+
+fn recompute_log_sum(window: &[f64]) -> NeumaierAccumulator {
+    let mut acc = NeumaierAccumulator::new();
+    for &r in window {
+        acc.add(r.ln_1p());
+    }
+    acc
+}
+
+/// Rolling compounded returns over a sliding window.
+///
+/// Computes the total compounded return over each `window`-length sub-slice
+/// of `returns`, right-labelled by the window-end date.
+pub(crate) fn rolling_returns(returns: &[f64], dates: &[Date], window: usize) -> DatedSeries {
+    let n = returns.len().min(dates.len());
+    if n < window || window == 0 {
+        return DatedSeries::empty(RollingMetric::Return);
+    }
+    let count = n - window + 1;
+    let mut values = Vec::with_capacity(count);
+    let mut out_dates = Vec::with_capacity(count);
+
+    let mut log_sum = recompute_log_sum(&returns[..window]);
+    let total = log_sum.total();
+    values.push(if total.is_finite() {
+        total.exp_m1()
+    } else {
+        f64::NAN
+    });
+    out_dates.push(dates[window - 1]);
+
+    let mut steps_since_recompute = 0_usize;
+    for end in (window + 1)..=n {
+        let add = returns[end - 1];
+        let rem = returns[end - 1 - window];
+        log_sum.add(add.ln_1p());
+        log_sum.add(-rem.ln_1p());
+        steps_since_recompute += 1;
+        if !log_sum.total().is_finite()
+            || steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
+        {
+            let start = end - window;
+            log_sum = recompute_log_sum(&returns[start..end]);
+            steps_since_recompute = 0;
+        }
+        let total = log_sum.total();
+        values.push(if total.is_finite() {
+            total.exp_m1()
+        } else {
+            f64::NAN
+        });
+        out_dates.push(dates[end - 1]);
+    }
+    DatedSeries {
+        values,
+        dates: out_dates,
+        value_column: RollingMetric::Return,
+    }
 }
 
 // Each kernel advances a sliding window over `returns[..n]` and calls
@@ -463,7 +512,7 @@ mod tests {
         let returns: Vec<f64> = (0..10).map(|i| (i as f64 - 5.0) * 0.01).collect();
         let dates: Vec<Date> = (0..10).map(|i| jan1(2025) + Duration::days(i)).collect();
         let rv = rolling_volatility(&returns, &dates, 5, 252.0);
-        let first_window = volatility(&returns[0..5], true, 252.0);
+        let first_window = volatility(&returns[0..5], 252.0);
         assert!((rv.values[0] - first_window).abs() < 1e-12);
     }
 
@@ -508,7 +557,7 @@ mod tests {
         let returns: Vec<f64> = (0..10).map(|i| (i as f64 - 5.0) * 0.01).collect();
         let dates: Vec<Date> = (0..10).map(|i| jan1(2025) + Duration::days(i)).collect();
         let rs = rolling_sortino(&returns, &dates, 5, 252.0, 0.0);
-        let first_window = sortino(&returns[0..5], true, 252.0, 0.0);
+        let first_window = sortino(&returns[0..5], 0.0, 252.0);
         assert!((rs.values[0] - first_window).abs() < 1e-12);
     }
 
@@ -522,7 +571,7 @@ mod tests {
         let mar = 0.005;
         let rs = rolling_sortino(&returns, &dates, 5, 252.0, mar);
         for window_start in 0..=returns.len() - 5 {
-            let expected = sortino(&returns[window_start..window_start + 5], true, 252.0, mar);
+            let expected = sortino(&returns[window_start..window_start + 5], mar, 252.0);
             let got = rs.values[window_start];
             assert!(
                 (got - expected).abs() < 1e-10,
@@ -543,7 +592,7 @@ mod tests {
                     .collect();
                 let rolling = rolling_sortino(&returns, &dates, 3, 252.0, 0.0);
                 for (start, window) in returns.windows(3).enumerate() {
-                    let expected = sortino(window, true, 252.0, 0.0);
+                    let expected = sortino(window, 0.0, 252.0);
                     let actual = rolling.values[start];
                     if expected.is_infinite() {
                         assert_eq!(actual, expected);
@@ -567,7 +616,7 @@ mod tests {
             .collect();
         let rolling = rolling_sortino(&returns, &dates, 2, 252.0, 0.0);
         assert!(rolling.values[0].is_nan());
-        assert!(sortino(&returns[..2], true, 252.0, 0.0).is_nan());
+        assert!(sortino(&returns[..2], 0.0, 252.0).is_nan());
         assert_eq!(rolling.values[1], f64::INFINITY);
         assert_eq!(rolling.values[2], 0.0);
     }

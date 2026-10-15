@@ -178,16 +178,7 @@ pub(crate) fn information_ratio(returns: &[f64], benchmark: &[f64], ann_factor: 
     }
     let er = os.mean();
     let te = os.std_dev();
-    if te == 0.0 {
-        return if er > 0.0 {
-            f64::INFINITY
-        } else if er < 0.0 {
-            f64::NEG_INFINITY
-        } else {
-            0.0
-        };
-    }
-    (er * ann_factor) / (te * ann_factor.sqrt())
+    crate::risk_metrics::annualized_ratio_or_sign_infinity(er, te, ann_factor)
 }
 
 /// R-squared: proportion of portfolio variance explained by the benchmark.
@@ -1195,6 +1186,102 @@ pub(crate) fn multi_factor_greeks(
     })
 }
 
+/// Treynor ratio: excess return per unit of systematic risk.
+///
+/// ```text
+/// Treynor = (R_p − R_f) / β
+/// ```
+///
+/// Complements the Sharpe ratio by using beta (systematic risk) rather
+/// than total volatility as the risk denominator.
+///
+/// # Arguments
+///
+/// * `ann_return`     - Linearly annualized arithmetic mean (`μ × N`).
+/// * `risk_free_rate` - Annualized risk-free rate in decimal form.
+/// * `beta`           - Portfolio beta vs benchmark.
+/// * `ann_factor`     - Periods per year `N` used to decompound
+///   `risk_free_rate`. Pass `1.0` when `ann_return` and `risk_free_rate`
+///   are already in the same (annual) units.
+///
+/// # Returns
+///
+/// The Treynor ratio. When `|beta| < 1e-10`: returns `+∞` if the excess
+/// return is positive, `−∞` if negative, and `0.0` only when the excess
+/// return is also zero (matching the [`sharpe`](crate::risk_metrics) /
+/// `information_ratio` zero-denominator convention). A `NaN` beta (e.g.
+/// from a zero-variance benchmark) propagates to a `NaN` ratio.
+/// Non-finite annualized excess return also returns `NaN`, including when
+/// `risk_free_rate` is non-finite, before applying the zero-beta convention.
+///
+/// Excess return uses the same geometric rf decompounding as
+/// [`crate::risk_metrics::sharpe`]:
+///
+/// ```text
+/// excess_ann = (μ − rf_period) × N
+/// ```
+///
+/// # References
+///
+/// - Treynor (1965): see docs/REFERENCES.md#treynor1965
+#[must_use]
+pub(crate) fn treynor(ann_return: f64, risk_free_rate: f64, beta: f64, ann_factor: f64) -> f64 {
+    let excess = crate::returns::annualized_excess_return(ann_return, risk_free_rate, ann_factor);
+    let denom = if beta.abs() < 1e-10 { 0.0 } else { beta };
+    crate::risk_metrics::ratio_or_sign_infinity(excess, denom)
+}
+
+/// M-squared (Modigliani-Modigliani): risk-adjusted return on the benchmark's scale.
+///
+/// Leverages or deleverages the portfolio to match the benchmark's volatility,
+/// then reports the resulting return. The difference `M² − R_bench` is a
+/// direct measure of value added at the same risk level.
+///
+/// ```text
+/// M² = rf_period × N + excess_ann × (σ_bench / σ_portfolio)
+/// excess_ann = (μ − rf_period) × N
+/// ```
+///
+/// # Arguments
+///
+/// * `ann_return`     - Linearly annualized arithmetic mean (`μ × N`).
+/// * `ann_vol`        - Annualized portfolio volatility.
+/// * `bench_vol`      - Annualized benchmark volatility.
+/// * `risk_free_rate` - Annualized risk-free rate in decimal form.
+/// * `ann_factor`     - Periods per year `N` used to decompound
+///   `risk_free_rate`. Pass `1.0` when `ann_return` and `risk_free_rate`
+///   are already in the same (annual) units.
+///
+/// # Returns
+///
+/// The linearly annualized M-squared return. For zero portfolio volatility,
+/// returns the decompounded periodic cash rate multiplied by `ann_factor`.
+///
+/// # References
+///
+/// - Modigliani & Modigliani (1997): see docs/REFERENCES.md#modigliani1997
+#[must_use]
+pub(crate) fn m_squared(
+    ann_return: f64,
+    ann_vol: f64,
+    bench_vol: f64,
+    risk_free_rate: f64,
+    ann_factor: f64,
+) -> f64 {
+    let cash = crate::returns::periodic_risk_free_rate(risk_free_rate, ann_factor) * ann_factor;
+    if !cash.is_finite()
+        || !ann_return.is_finite()
+        || !ann_vol.is_finite()
+        || !bench_vol.is_finite()
+    {
+        return f64::NAN;
+    }
+    if ann_vol.abs() < 1e-10 {
+        return cash;
+    }
+    cash + (ann_return - cash) * (bench_vol / ann_vol)
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -1960,118 +2047,6 @@ mod tests {
     fn batting_average_empty() {
         assert_eq!(batting_average(&[], &[]), 0.0);
     }
-}
-
-/// Treynor ratio: excess return per unit of systematic risk.
-///
-/// ```text
-/// Treynor = (R_p − R_f) / β
-/// ```
-///
-/// Complements the Sharpe ratio by using beta (systematic risk) rather
-/// than total volatility as the risk denominator.
-///
-/// # Arguments
-///
-/// * `ann_return`     - Linearly annualized arithmetic mean (`μ × N`).
-/// * `risk_free_rate` - Annualized risk-free rate in decimal form.
-/// * `beta`           - Portfolio beta vs benchmark.
-/// * `ann_factor`     - Periods per year `N` used to decompound
-///   `risk_free_rate`. Pass `1.0` when `ann_return` and `risk_free_rate`
-///   are already in the same (annual) units.
-///
-/// # Returns
-///
-/// The Treynor ratio. When `|beta| < 1e-10`: returns `+∞` if the excess
-/// return is positive, `−∞` if negative, and `0.0` only when the excess
-/// return is also zero (matching the [`sharpe`](crate::risk_metrics) /
-/// `information_ratio` zero-denominator convention). A `NaN` beta (e.g.
-/// from a zero-variance benchmark) propagates to a `NaN` ratio.
-/// Non-finite annualized excess return also returns `NaN`, including when
-/// `risk_free_rate` is non-finite, before applying the zero-beta convention.
-///
-/// Excess return uses the same geometric rf decompounding as
-/// [`crate::risk_metrics::sharpe`]:
-///
-/// ```text
-/// excess_ann = (μ − rf_period) × N
-/// ```
-///
-/// # References
-///
-/// - Treynor (1965): see docs/REFERENCES.md#treynor1965
-#[must_use]
-pub(crate) fn treynor(ann_return: f64, risk_free_rate: f64, beta: f64, ann_factor: f64) -> f64 {
-    let excess = crate::returns::annualized_excess_return(ann_return, risk_free_rate, ann_factor);
-    if !excess.is_finite() {
-        return f64::NAN;
-    }
-    if beta.abs() < 1e-10 {
-        return if excess > 0.0 {
-            f64::INFINITY
-        } else if excess < 0.0 {
-            f64::NEG_INFINITY
-        } else {
-            0.0
-        };
-    }
-    excess / beta
-}
-
-/// M-squared (Modigliani-Modigliani): risk-adjusted return on the benchmark's scale.
-///
-/// Leverages or deleverages the portfolio to match the benchmark's volatility,
-/// then reports the resulting return. The difference `M² − R_bench` is a
-/// direct measure of value added at the same risk level.
-///
-/// ```text
-/// M² = rf_period × N + excess_ann × (σ_bench / σ_portfolio)
-/// excess_ann = (μ − rf_period) × N
-/// ```
-///
-/// # Arguments
-///
-/// * `ann_return`     - Linearly annualized arithmetic mean (`μ × N`).
-/// * `ann_vol`        - Annualized portfolio volatility.
-/// * `bench_vol`      - Annualized benchmark volatility.
-/// * `risk_free_rate` - Annualized risk-free rate in decimal form.
-/// * `ann_factor`     - Periods per year `N` used to decompound
-///   `risk_free_rate`. Pass `1.0` when `ann_return` and `risk_free_rate`
-///   are already in the same (annual) units.
-///
-/// # Returns
-///
-/// The linearly annualized M-squared return. For zero portfolio volatility,
-/// returns the decompounded periodic cash rate multiplied by `ann_factor`.
-///
-/// # References
-///
-/// - Modigliani & Modigliani (1997): see docs/REFERENCES.md#modigliani1997
-#[must_use]
-pub(crate) fn m_squared(
-    ann_return: f64,
-    ann_vol: f64,
-    bench_vol: f64,
-    risk_free_rate: f64,
-    ann_factor: f64,
-) -> f64 {
-    let cash = crate::returns::periodic_risk_free_rate(risk_free_rate, ann_factor) * ann_factor;
-    if !cash.is_finite()
-        || !ann_return.is_finite()
-        || !ann_vol.is_finite()
-        || !bench_vol.is_finite()
-    {
-        return f64::NAN;
-    }
-    if ann_vol.abs() < 1e-10 {
-        return cash;
-    }
-    cash + (ann_return - cash) * (bench_vol / ann_vol)
-}
-
-#[cfg(test)]
-mod benchmark_ratio_tests {
-    use super::*;
 
     #[test]
     fn treynor_hand_calc() {
@@ -2117,17 +2092,6 @@ mod benchmark_ratio_tests {
         assert!((sharpe_excess - expected).abs() < 1e-12);
         assert!((alpha - sharpe_excess).abs() < 1e-12);
     }
-}
-
-#[cfg(test)]
-mod multi_factor_error_regression_tests {
-    use super::*;
-    use crate::dates::{Month, PeriodKind};
-    use crate::performance::Performance;
-
-    fn jan(day: u8) -> Date {
-        Date::from_calendar_date(2024, Month::January, day).expect("valid date")
-    }
 
     #[test]
     fn standalone_multi_factor_greeks_errors_on_singular_factor_matrix() {
@@ -2142,6 +2106,11 @@ mod multi_factor_error_regression_tests {
 
     #[test]
     fn performance_multi_factor_greeks_errors_on_invalid_factor_input() {
+        use crate::dates::{Month, PeriodKind};
+        use crate::performance::Performance;
+
+        let jan =
+            |day: u8| Date::from_calendar_date(2024, Month::January, day).expect("valid date");
         let dates = vec![jan(1), jan(2), jan(3), jan(4), jan(5), jan(6)];
         let prices = vec![
             vec![100.0, 101.0, 102.0, 103.0, 104.0, 105.0],

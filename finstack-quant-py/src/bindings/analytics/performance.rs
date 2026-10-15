@@ -3,15 +3,10 @@
 use super::types::*;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::pandas_utils::{
-    dates_to_datetime_index, dict_to_dataframe, int_values_to_series, table_to_dataframe,
-    values_to_series,
-};
-use crate::errors::analytics_to_py as core_to_py;
-use crate::errors::display_to_py;
+use crate::bindings::pandas_utils::{int_values_to_series, table_to_dataframe, values_to_series};
+use crate::errors::analytics_to_py;
 use finstack_quant_analytics as fa;
 use finstack_quant_core::dates::{FiscalConfig, HolidayCalendar, PeriodKind};
-use numpy::PyArray1;
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
@@ -19,17 +14,11 @@ use pyo3::types::PyDict;
 
 type PyPeriodicReturnPanel<'py> = Vec<Vec<(Bound<'py, PyAny>, f64)>>;
 
-/// Wrap a `Vec<f64>` as a NumPy `float64` array, taking ownership of the
-/// buffer so no per-element `PyFloat` boxing occurs.
-fn vec_to_pyarray<'py>(py: Python<'py>, values: Vec<f64>) -> Bound<'py, PyArray1<f64>> {
-    PyArray1::from_vec(py, values)
-}
-
 /// Resolve optional fiscal-year-start month/day through the Rust rule
 /// ([`FiscalConfig::from_parts`]): `None` when both are omitted, otherwise the
 /// omitted half is January / the 1st.
 fn make_fiscal_config(month: Option<u8>, day: Option<u8>) -> PyResult<Option<FiscalConfig>> {
-    FiscalConfig::from_parts(month, day).map_err(core_to_py)
+    FiscalConfig::from_parts(month, day).map_err(analytics_to_py)
 }
 
 fn parse_cagr_day_count(day_count: Option<&Bound<'_, PyAny>>) -> PyResult<fa::CagrDayCount> {
@@ -40,7 +29,7 @@ fn parse_cagr_day_count(day_count: Option<&Bound<'_, PyAny>>) -> PyResult<fa::Ca
         return Ok(fa::CagrDayCount::DayCount(day_count.inner));
     }
     if let Ok(label) = value.extract::<String>() {
-        return label.parse::<fa::CagrDayCount>().map_err(core_to_py);
+        return label.parse::<fa::CagrDayCount>().map_err(analytics_to_py);
     }
     Err(PyTypeError::new_err(
         "day_count must be None, 'act365_25', a DayCount name such as 'act_365f', or a DayCount",
@@ -53,7 +42,7 @@ fn resolve_optional_calendar(
     calendar_id
         .map(finstack_quant_core::dates::calendar_by_id_strict)
         .transpose()
-        .map_err(core_to_py)
+        .map_err(analytics_to_py)
 }
 
 /// Parse a frequency token into a [`PeriodKind`].
@@ -66,7 +55,7 @@ fn parse_frequency(frequency: Option<&str>, default: PeriodKind) -> PyResult<Per
     Ok(frequency
         .map(str::parse::<PeriodKind>)
         .transpose()
-        .map_err(core_to_py)?
+        .map_err(analytics_to_py)?
         .unwrap_or(default))
 }
 
@@ -183,90 +172,35 @@ fn series_to_frame<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>
     value.call_method1("to_frame", (label,))
 }
 
-/// Build a `Performance` from pre-extracted arrays.
-fn build_performance(
+type PerformanceBuilder = fn(
+    Vec<time::Date>,
+    Vec<Vec<f64>>,
+    Vec<String>,
+    Option<&str>,
+    PeriodKind,
+) -> finstack_quant_core::Result<fa::Performance>;
+
+/// Build a `Performance` from pre-extracted panel arrays using the given Rust constructor.
+fn build_performance_with(
     py: Python<'_>,
     dates: Vec<time::Date>,
-    prices: Vec<Vec<f64>>,
-    ticker_names: Vec<String>,
-    benchmark_ticker: Option<&str>,
-    frequency: Option<&str>,
-) -> PyResult<PyPerformance> {
-    let period_kind = parse_frequency(frequency, fa::DEFAULT_FREQUENCY)?;
-    let inner = py
-        .detach(|| fa::Performance::new(dates, prices, ticker_names, benchmark_ticker, period_kind))
-        .map_err(core_to_py)?;
-    Ok(PyPerformance { inner })
-}
-
-/// Build a `Performance` from pre-extracted return arrays.
-fn build_returns_performance(
-    py: Python<'_>,
-    dates: Vec<time::Date>,
-    returns: Vec<Vec<f64>>,
-    ticker_names: Vec<String>,
-    benchmark_ticker: Option<&str>,
-    frequency: Option<&str>,
-) -> PyResult<PyPerformance> {
-    let period_kind = parse_frequency(frequency, fa::DEFAULT_FREQUENCY)?;
-    let inner = py
-        .detach(|| {
-            fa::Performance::from_returns(
-                dates,
-                returns,
-                ticker_names,
-                benchmark_ticker,
-                period_kind,
-            )
-        })
-        .map_err(core_to_py)?;
-    Ok(PyPerformance { inner })
-}
-
-fn ticker_index<'py>(py: Python<'py>, ticker_names: &[String]) -> PyResult<Bound<'py, PyAny>> {
-    let index: Vec<&str> = ticker_names.iter().map(String::as_str).collect();
-    Ok(index.into_pyobject(py)?.into_any())
-}
-
-fn panel_to_dataframe<'py>(
-    py: Python<'py>,
-    perf: &fa::Performance,
-    panel: Vec<Vec<f64>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let (dates, columns) = perf.aligned_panel(panel).map_err(core_to_py)?;
-    aligned_columns_to_dataframe(py, perf, &dates, columns)
-}
-
-/// Calendar-bucketed returns on the union of period-end dates, one column per
-/// ticker.
-fn periodic_panel_to_dataframe<'py>(
-    py: Python<'py>,
-    perf: &fa::Performance,
-    frequency: PeriodKind,
-) -> PyResult<Bound<'py, PyAny>> {
-    let (dates, columns) = perf.periodic_returns_aligned(frequency);
-    aligned_columns_to_dataframe(py, perf, &dates, columns)
-}
-
-/// Build a date-indexed frame from Rust-aligned per-ticker columns.
-fn aligned_columns_to_dataframe<'py>(
-    py: Python<'py>,
-    perf: &fa::Performance,
-    dates: &[time::Date],
     columns: Vec<Vec<f64>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let data = PyDict::new(py);
-    for (name, padded) in perf.ticker_names().iter().zip(columns) {
-        data.set_item(name, vec_to_pyarray(py, padded))?;
-    }
-    let idx = dates_to_datetime_index(py, dates)?;
-    dict_to_dataframe(py, &data, Some(idx))
+    ticker_names: Vec<String>,
+    benchmark_ticker: Option<&str>,
+    frequency: Option<&str>,
+    ctor: PerformanceBuilder,
+) -> PyResult<PyPerformance> {
+    let period_kind = parse_frequency(frequency, fa::DEFAULT_FREQUENCY)?;
+    let inner = py
+        .detach(|| ctor(dates, columns, ticker_names, benchmark_ticker, period_kind))
+        .map_err(analytics_to_py)?;
+    Ok(PyPerformance { inner })
 }
 
 /// Stateful performance analytics engine over a panel of ticker price series.
 ///
-/// Accepts a pandas ``DataFrame`` where the index contains dates and each
-/// column is a price series for one ticker.
+/// Accepts a pandas ``DataFrame`` (or ``Series``) where the index contains
+/// dates and each column is a price series for one ticker.
 ///
 /// Scalar-per-ticker metrics return a ``pandas.Series`` indexed by ticker name
 /// and named after the metric, so results are selected by label rather than by
@@ -283,35 +217,28 @@ impl PyPerformance {
     /// (`Performance::ticker_index`); a miss raises ``KeyError``.
     fn resolve_ticker(&self, ticker: &Bound<'_, PyAny>) -> PyResult<usize> {
         if let Ok(name) = ticker.extract::<String>() {
-            return self.inner.ticker_index(&name).map_err(core_to_py);
+            return self.inner.ticker_index(&name).map_err(analytics_to_py);
         }
         ticker.extract::<usize>().map_err(|_| {
             PyTypeError::new_err("ticker_idx must be an int column index or a str ticker name")
         })
     }
-
-    fn lookback_returns_inner(
-        &self,
-        ref_date: time::Date,
-        fiscal_year_start_month: Option<u8>,
-        fiscal_year_start_day: Option<u8>,
-    ) -> PyResult<fa::LookbackReturns> {
-        let fc = make_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
-        Ok(self.inner.lookback_returns(ref_date, fc))
-    }
 }
 
 #[pymethods]
 impl PyPerformance {
-    /// Construct from a pandas DataFrame of prices.
+    /// Construct from a pandas DataFrame (or Series) of prices.
     ///
-    /// The DataFrame index must contain ``datetime.date`` or ``pd.Timestamp``
-    /// values, and each column represents one ticker's price series.
+    /// The index must contain ``datetime.date`` or ``pd.Timestamp`` values,
+    /// and each column represents one ticker's price series. A
+    /// ``pandas.Series`` is treated as a single-asset panel whose ticker is
+    /// the series ``name`` (``"asset"`` when unnamed).
     ///
     /// Parameters
     /// ----------
-    /// prices : pandas.DataFrame
-    ///     Price panel with a date-like index and one ``str`` column per ticker.
+    /// prices : pandas.DataFrame | pandas.Series
+    ///     Price panel with a date-like index and one ``str`` column per
+    ///     ticker, or a single-asset price ``Series``.
     /// benchmark_ticker : str, optional
     ///     Benchmark column name; defaults to the first column.
     /// frequency : str, optional
@@ -325,7 +252,8 @@ impl PyPerformance {
     /// Raises
     /// ------
     /// TypeError
-    ///     If ``prices`` is not a DataFrame or its columns are not ``str``.
+    ///     If ``prices`` is not a DataFrame or Series, or its columns are not
+    ///     ``str``.
     /// AnalyticsError
     ///     If the panel is empty, dates are not strictly ascending, or
     ///     ``frequency`` is unknown.
@@ -337,17 +265,19 @@ impl PyPerformance {
         benchmark_ticker: Option<&str>,
         frequency: Option<&str>,
     ) -> PyResult<Self> {
+        let prices = series_to_frame(&prices)?;
         let panel = extract_dataframe_panel(
             &prices,
-            "Expected a pandas DataFrame; use Performance.from_arrays() for raw lists",
+            "Expected a pandas DataFrame or Series; use Performance.from_arrays() for raw lists",
         )?;
-        build_performance(
+        build_performance_with(
             py,
             panel.dates,
             panel.columns,
             panel.ticker_names,
             benchmark_ticker,
             frequency,
+            fa::Performance::new,
         )
     }
 
@@ -363,13 +293,14 @@ impl PyPerformance {
         frequency: Option<&str>,
     ) -> PyResult<Self> {
         let rust_dates = dates.iter().map(py_to_date).collect::<PyResult<Vec<_>>>()?;
-        build_performance(
+        build_performance_with(
             py,
             rust_dates,
             prices,
             ticker_names,
             benchmark_ticker,
             frequency,
+            fa::Performance::new,
         )
     }
 
@@ -392,13 +323,14 @@ impl PyPerformance {
             &returns,
             "Expected a pandas DataFrame or Series; use Performance.from_returns_arrays() for raw lists",
         )?;
-        build_returns_performance(
+        build_performance_with(
             py,
             panel.dates,
             panel.columns,
             panel.ticker_names,
             benchmark_ticker,
             frequency,
+            fa::Performance::from_returns,
         )
     }
 
@@ -414,13 +346,14 @@ impl PyPerformance {
         frequency: Option<&str>,
     ) -> PyResult<Self> {
         let rust_dates = dates.iter().map(py_to_date).collect::<PyResult<Vec<_>>>()?;
-        build_returns_performance(
+        build_performance_with(
             py,
             rust_dates,
             returns,
             ticker_names,
             benchmark_ticker,
             frequency,
+            fa::Performance::from_returns,
         )
     }
 
@@ -434,7 +367,9 @@ impl PyPerformance {
 
     /// Change the benchmark ticker.
     fn reset_bench_ticker(&mut self, ticker: &str) -> PyResult<()> {
-        self.inner.reset_bench_ticker(ticker).map_err(core_to_py)
+        self.inner
+            .reset_bench_ticker(ticker)
+            .map_err(analytics_to_py)
     }
 
     // -- Getters --
@@ -498,7 +433,7 @@ impl PyPerformance {
         let ticker_idx = self.resolve_ticker(ticker_idx)?;
         self.inner
             .active_dates_for_ticker(ticker_idx)
-            .map_err(core_to_py)?
+            .map_err(analytics_to_py)?
             .iter()
             .map(|&d| date_to_py(py, d))
             .collect()
@@ -526,7 +461,10 @@ impl PyPerformance {
     ) -> PyResult<Bound<'py, PyAny>> {
         let day_count = parse_cagr_day_count(day_count)?;
         let calendar = resolve_optional_calendar(calendar_id)?;
-        let values = self.inner.cagr(day_count, calendar).map_err(core_to_py)?;
+        let values = self
+            .inner
+            .cagr(day_count, calendar)
+            .map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "cagr")
     }
 
@@ -594,7 +532,7 @@ impl PyPerformance {
     ///     With zero drawdown, nonzero CAGR gives signed infinity and zero
     ///     CAGR gives ``0.0``.
     fn calmar<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let values = self.inner.calmar().map_err(core_to_py)?;
+        let values = self.inner.calmar().map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "calmar")
     }
 
@@ -628,7 +566,10 @@ impl PyPerformance {
     ///     Historical value at risk indexed by ticker name.
     #[pyo3(signature = (confidence = fa::DEFAULT_CONFIDENCE))]
     fn value_at_risk<'py>(&self, py: Python<'py>, confidence: f64) -> PyResult<Bound<'py, PyAny>> {
-        let values = self.inner.value_at_risk(confidence).map_err(core_to_py)?;
+        let values = self
+            .inner
+            .value_at_risk(confidence)
+            .map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "value_at_risk")
     }
 
@@ -647,7 +588,7 @@ impl PyPerformance {
         let values = self
             .inner
             .expected_shortfall(confidence)
-            .map_err(core_to_py)?;
+            .map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "expected_shortfall")
     }
 
@@ -830,7 +771,7 @@ impl PyPerformance {
     ///     Ulcer Index, nonzero CAGR gives signed infinity and zero CAGR
     ///     gives ``0.0``.
     fn martin_ratio<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let values = self.inner.martin_ratio().map_err(core_to_py)?;
+        let values = self.inner.martin_ratio().map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "martin_ratio")
     }
 
@@ -866,7 +807,10 @@ impl PyPerformance {
     ///     give ``NaN``, including when the pain index is zero.
     #[pyo3(signature = (risk_free_rate = fa::DEFAULT_RISK_FREE_RATE))]
     fn pain_ratio<'py>(&self, py: Python<'py>, risk_free_rate: f64) -> PyResult<Bound<'py, PyAny>> {
-        let values = self.inner.pain_ratio(risk_free_rate).map_err(core_to_py)?;
+        let values = self
+            .inner
+            .pain_ratio(risk_free_rate)
+            .map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "pain_ratio")
     }
 
@@ -878,7 +822,7 @@ impl PyPerformance {
     ///     Tail ratio indexed by ticker name.
     #[pyo3(signature = (confidence = fa::DEFAULT_CONFIDENCE))]
     fn tail_ratio<'py>(&self, py: Python<'py>, confidence: f64) -> PyResult<Bound<'py, PyAny>> {
-        let values = self.inner.tail_ratio(confidence).map_err(core_to_py)?;
+        let values = self.inner.tail_ratio(confidence).map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "tail_ratio")
     }
 
@@ -923,7 +867,7 @@ impl PyPerformance {
         let values = self
             .inner
             .parametric_var(confidence, horizon_periods)
-            .map_err(core_to_py)?;
+            .map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "parametric_var")
     }
 
@@ -946,7 +890,7 @@ impl PyPerformance {
         let values = self
             .inner
             .cornish_fisher_var(confidence, horizon_periods)
-            .map_err(core_to_py)?;
+            .map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "cornish_fisher_var")
     }
 
@@ -958,7 +902,7 @@ impl PyPerformance {
     ///     Conditional drawdown at risk indexed by ticker name.
     #[pyo3(signature = (confidence = fa::DEFAULT_CONFIDENCE))]
     fn cdar<'py>(&self, py: Python<'py>, confidence: f64) -> PyResult<Bound<'py, PyAny>> {
-        let values = self.inner.cdar(confidence).map_err(core_to_py)?;
+        let values = self.inner.cdar(confidence).map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "cdar")
     }
 
@@ -996,7 +940,7 @@ impl PyPerformance {
         let values = self
             .inner
             .modified_sharpe(risk_free_rate, confidence)
-            .map_err(core_to_py)?;
+            .map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "modified_sharpe")
     }
 
@@ -1017,7 +961,7 @@ impl PyPerformance {
         let values = self
             .inner
             .sterling_ratio(risk_free_rate, n)
-            .map_err(core_to_py)?;
+            .map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "sterling_ratio")
     }
 
@@ -1038,7 +982,7 @@ impl PyPerformance {
         let values = self
             .inner
             .burke_ratio(risk_free_rate, n)
-            .map_err(core_to_py)?;
+            .map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "burke_ratio")
     }
 
@@ -1059,7 +1003,7 @@ impl PyPerformance {
         let ticker_idx = self.resolve_ticker(ticker_idx)?;
         self.inner
             .returns_for_ticker(ticker_idx)
-            .map_err(core_to_py)
+            .map_err(analytics_to_py)
     }
 
     /// Cumulative returns for each ticker.
@@ -1103,8 +1047,7 @@ impl PyPerformance {
     /// Drawdown series for each ticker.
     ///
     /// Despite the ``_series`` suffix (which mirrors the Rust name) this is a
-    /// nested ``list[list[float]]`` panel, not a :class:`pandas.Series`. Use
-    /// :meth:`to_drawdown_series_dataframe` for the tabular view.
+    /// nested ``list[list[float]]`` panel, not a :class:`pandas.Series`.
     fn drawdown_series(&self) -> Vec<Vec<f64>> {
         self.inner.drawdown_series()
     }
@@ -1121,7 +1064,7 @@ impl PyPerformance {
     /// estimate from a repaired one.
     /// Raises when a pair is degenerate or repair fails.
     fn correlation_matrix(&self, py: Python<'_>) -> PyResult<(Vec<Vec<f64>>, bool)> {
-        py.detach(|| self.inner.correlation_matrix().map_err(core_to_py))
+        py.detach(|| self.inner.correlation_matrix().map_err(analytics_to_py))
     }
 
     /// Cumulative returns outperformance vs benchmark.
@@ -1147,7 +1090,9 @@ impl PyPerformance {
         nperiods: Option<f64>,
     ) -> PyResult<Vec<Vec<f64>>> {
         let rf = extract_f64_vec(rf, "rf")?;
-        self.inner.excess_returns(&rf, nperiods).map_err(core_to_py)
+        self.inner
+            .excess_returns(&rf, nperiods)
+            .map_err(analytics_to_py)
     }
 
     // -- Per-ticker indexed methods --
@@ -1186,7 +1131,7 @@ impl PyPerformance {
                 self.inner
                     .rolling_greeks(ticker_idx, window, risk_free_rate)
             })
-            .map_err(core_to_py)?;
+            .map_err(analytics_to_py)?;
         Ok(PyRollingGreeks { inner })
     }
 
@@ -1201,7 +1146,7 @@ impl PyPerformance {
         let ticker_idx = self.resolve_ticker(ticker_idx)?;
         let inner = py
             .detach(|| self.inner.rolling_volatility(ticker_idx, window))
-            .map_err(core_to_py)?;
+            .map_err(analytics_to_py)?;
         Ok(PyDatedSeries { inner })
     }
 
@@ -1217,7 +1162,7 @@ impl PyPerformance {
         let ticker_idx = self.resolve_ticker(ticker_idx)?;
         let inner = py
             .detach(|| self.inner.rolling_sortino(ticker_idx, window, mar))
-            .map_err(core_to_py)?;
+            .map_err(analytics_to_py)?;
         Ok(PyDatedSeries { inner })
     }
 
@@ -1236,7 +1181,7 @@ impl PyPerformance {
                 self.inner
                     .rolling_sharpe(ticker_idx, window, risk_free_rate)
             })
-            .map_err(core_to_py)?;
+            .map_err(analytics_to_py)?;
         Ok(PyDatedSeries { inner })
     }
 
@@ -1251,7 +1196,7 @@ impl PyPerformance {
         Ok(self
             .inner
             .drawdown_details(ticker_idx, n)
-            .map_err(core_to_py)?
+            .map_err(analytics_to_py)?
             .into_iter()
             .map(|e| PyDrawdownEpisode { inner: e })
             .collect())
@@ -1280,10 +1225,11 @@ impl PyPerformance {
     ) -> PyResult<PyMultiFactorResult> {
         let ticker_idx = self.resolve_ticker(ticker_idx)?;
         let refs: Vec<&[f64]> = factor_returns.iter().map(|v| v.as_slice()).collect();
-        let kind = fa::ReturnKind::from_label(return_kind, risk_free_rate).map_err(core_to_py)?;
+        let kind =
+            fa::ReturnKind::from_label(return_kind, risk_free_rate).map_err(analytics_to_py)?;
         py.detach(|| self.inner.multi_factor_greeks(ticker_idx, &refs, kind))
             .map(|r| PyMultiFactorResult { inner: r })
-            .map_err(core_to_py)
+            .map_err(analytics_to_py)
     }
 
     /// Rolling N-period total compounded return for a specific ticker.
@@ -1297,7 +1243,7 @@ impl PyPerformance {
         let ticker_idx = self.resolve_ticker(ticker_idx)?;
         let inner = py
             .detach(|| self.inner.rolling_returns(ticker_idx, window))
-            .map_err(core_to_py)?;
+            .map_err(analytics_to_py)?;
         Ok(PyDatedSeries { inner })
     }
 
@@ -1314,12 +1260,9 @@ impl PyPerformance {
         fiscal_year_start_day: Option<u8>,
     ) -> PyResult<PyLookbackReturns> {
         let d = py_to_date(&ref_date)?;
+        let fc = make_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
         Ok(PyLookbackReturns {
-            inner: self.lookback_returns_inner(
-                d,
-                fiscal_year_start_month,
-                fiscal_year_start_day,
-            )?,
+            inner: self.inner.lookback_returns(d, fc),
         })
     }
 
@@ -1339,28 +1282,16 @@ impl PyPerformance {
             inner: self
                 .inner
                 .period_stats(ticker_idx, pk, fc)
-                .map_err(core_to_py)?,
+                .map_err(analytics_to_py)?,
         })
     }
 
-    // -- DataFrame export methods --
-
-    /// The primary pandas view of this object: the summary statistics table.
-    ///
-    /// One row per ticker, one column per scalar metric. This is an alias for
-    /// :meth:`to_summary_dataframe` with default arguments, provided so every
-    /// result type in the library answers to a plain ``to_dataframe()``. The
-    /// ``*_to_dataframe`` methods on this class are the secondary views
-    /// (returns, drawdowns, correlations, lookbacks); use those when you want
-    /// something other than the summary.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.to_summary_dataframe(py, fa::DEFAULT_RISK_FREE_RATE, fa::DEFAULT_CONFIDENCE)
-    }
+    // -- DataFrame export --
 
     /// Summary statistics for all tickers as a pandas ``DataFrame``.
     ///
-    /// Returns a DataFrame with one row per ticker and columns for each
-    /// scalar metric (CAGR, volatility, Sharpe, max drawdown, etc.).
+    /// Returns a DataFrame indexed by ticker with columns for each scalar
+    /// metric (CAGR, volatility, Sharpe, max drawdown, etc.).
     ///
     /// ``risk_free_rate`` affects only the ``sharpe`` column; the MAR-based
     /// metrics (``sortino``, ``downside_deviation``) and the
@@ -1369,7 +1300,7 @@ impl PyPerformance {
     /// directly for non-zero thresholds. ``confidence`` applies to
     /// ``value_at_risk``, ``expected_shortfall``, and ``tail_ratio``.
     #[pyo3(signature = (risk_free_rate = fa::DEFAULT_RISK_FREE_RATE, confidence = fa::DEFAULT_CONFIDENCE))]
-    fn to_summary_dataframe<'py>(
+    fn to_dataframe<'py>(
         &self,
         py: Python<'py>,
         risk_free_rate: f64,
@@ -1380,165 +1311,14 @@ impl PyPerformance {
         // O(22 * n * m) walk.
         let table = py
             .detach(|| self.inner.summary(risk_free_rate, confidence))
-            .map_err(core_to_py)?;
+            .map_err(analytics_to_py)?;
         table_to_dataframe(py, &table)?.call_method1("set_index", ("ticker",))
-    }
-
-    /// Per-period simple returns for all tickers as a pandas ``DataFrame``.
-    ///
-    /// Returns a DataFrame with a date index and one column per ticker.
-    /// Ragged per-ticker series are padded with ``NaN`` onto the active date
-    /// grid. Prefer this over :meth:`excess_returns` with an all-zero
-    /// risk-free series or un-compounding
-    /// :meth:`to_cumulative_returns_dataframe`.
-    fn to_returns_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        panel_to_dataframe(py, &self.inner, self.inner.returns())
-    }
-
-    /// Cumulative returns for all tickers as a pandas ``DataFrame``.
-    ///
-    /// Returns a DataFrame with a date index and one column per ticker.
-    fn to_cumulative_returns_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        panel_to_dataframe(py, &self.inner, self.inner.cumulative_returns())
-    }
-
-    /// Calendar-bucketed compounded returns as a pandas ``DataFrame``.
-    ///
-    /// ``frequency`` is one of ``"daily"``, ``"weekly"``, ``"monthly"``,
-    /// ``"quarterly"``, ``"semi_annual"``, or ``"annual"`` (pandas offset
-    /// aliases ``D``/``B``, ``W``, ``M``/``ME``, ``Q``/``QE``, ``A``/``Y``/``YE`` are accepted too).
-    /// Returns a DataFrame
-    /// indexed by period-end date with one column per ticker; buckets reconcile
-    /// with :meth:`to_cumulative_returns_dataframe`. This convenience exit is
-    /// built from the same canonical Rust result as :meth:`periodic_returns`.
-    #[pyo3(signature = (frequency = None))]
-    fn to_periodic_returns_dataframe<'py>(
-        &self,
-        py: Python<'py>,
-        frequency: Option<&str>,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        let kind = parse_frequency(frequency, fa::DEFAULT_PERIODIC_FREQUENCY)?;
-        periodic_panel_to_dataframe(py, &self.inner, kind)
-    }
-
-    /// Drawdown series for all tickers as a pandas ``DataFrame``.
-    ///
-    /// Returns a DataFrame with a date index and one column per ticker.
-    fn to_drawdown_series_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        panel_to_dataframe(py, &self.inner, self.inner.drawdown_series())
-    }
-
-    /// Correlation matrix as a pandas ``DataFrame``.
-    ///
-    /// Returns a ticker × ticker matrix with ticker names as index and columns.
-    /// ``df.attrs["repaired"]`` is ``True`` when the estimate was
-    /// Higham-repaired (see :meth:`correlation_matrix`).
-    fn to_correlation_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let names = self.inner.ticker_names();
-        let (matrix, repaired) = self.inner.correlation_matrix().map_err(core_to_py)?;
-
-        let pd = py.import("pandas")?;
-        let kwargs = PyDict::new(py);
-        let idx: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
-        let cols: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
-        kwargs.set_item("index", idx)?;
-        kwargs.set_item("columns", cols)?;
-        let frame = pd.call_method("DataFrame", (matrix,), Some(&kwargs))?;
-        frame.getattr("attrs")?.set_item("repaired", repaired)?;
-        Ok(frame)
-    }
-
-    /// Top-N drawdown episodes for a ticker as a pandas ``DataFrame``.
-    ///
-    /// Columns: start, valley, end (``datetime64``, ``NaT`` while still in
-    /// drawdown), duration_days, max_drawdown, near_recovery_threshold,
-    /// truncated_at_start.
-    #[pyo3(signature = (ticker_idx, n = fa::DEFAULT_DRAWDOWN_COUNT))]
-    fn to_drawdown_details_dataframe<'py>(
-        &self,
-        py: Python<'py>,
-        ticker_idx: &Bound<'_, PyAny>,
-        n: usize,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        let ticker_idx = self.resolve_ticker(ticker_idx)?;
-        let episodes = self
-            .inner
-            .drawdown_details(ticker_idx, n)
-            .map_err(core_to_py)?;
-        drawdowns_to_dataframe(py, &episodes)
-    }
-
-    /// Beta regression statistics for every ticker vs the benchmark as a
-    /// pandas ``DataFrame`` indexed by ticker.
-    ///
-    /// Columns: ``beta``, ``std_err``, ``ci_lower``, ``ci_upper`` (95%
-    /// confidence bounds), ``n_obs`` (``int64`` observation count) and
-    /// ``confidence_level`` (decimal level of the bounds). Undefined
-    /// estimates remain ``NaN`` in numeric ``float64`` columns.
-    fn to_beta_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let frame = beta_to_dataframe(
-            py,
-            &self.inner.beta(),
-            Some(ticker_index(py, self.inner.ticker_names())?),
-        )?;
-        frame.getattr("index")?.setattr("name", "ticker")?;
-        Ok(frame)
-    }
-
-    /// Single-index greeks (annualized Jensen alpha, beta, R², adjusted R²)
-    /// for every ticker vs the benchmark as a pandas ``DataFrame`` indexed by
-    /// ticker, plus the ``n_obs`` (``int64``) observation count of each fit.
-    ///
-    /// Parameters
-    /// ----------
-    /// risk_free_rate : float, default 0.0
-    ///     Annualized decimal risk-free rate used for Jensen alpha.
-    #[pyo3(signature = (risk_free_rate = fa::DEFAULT_RISK_FREE_RATE))]
-    fn to_greeks_dataframe<'py>(
-        &self,
-        py: Python<'py>,
-        risk_free_rate: f64,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        let frame = greeks_to_dataframe(
-            py,
-            &self.inner.greeks(risk_free_rate),
-            Some(ticker_index(py, self.inner.ticker_names())?),
-        )?;
-        frame.getattr("index")?.setattr("name", "ticker")?;
-        Ok(frame)
-    }
-
-    /// Excess returns over a risk-free rate as a pandas ``DataFrame`` with a
-    /// date index and one column per ticker.
-    ///
-    /// Parameters
-    /// ----------
-    /// rf : pandas.Series | numpy.ndarray | sequence of float
-    ///     Annualized decimal risk-free rate, aligned to
-    ///     :meth:`active_dates` (one value per date).
-    /// nperiods : float, optional
-    ///     ``None`` geometrically decompounds the annual rate using the
-    ///     panel frequency; pass ``1.0`` when ``rf`` is already per-period.
-    ///
-    /// Raises
-    /// ------
-    /// AnalyticsError
-    ///     If ``rf`` does not have one value per active date.
-    #[pyo3(signature = (rf, nperiods = None))]
-    fn to_excess_returns_dataframe<'py>(
-        &self,
-        py: Python<'py>,
-        rf: &Bound<'py, PyAny>,
-        nperiods: Option<f64>,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        let excess = self.excess_returns(rf, nperiods)?;
-        panel_to_dataframe(py, &self.inner, excess)
     }
 
     /// Serialize authoritative engine inputs (dates, returns, spans, benchmark,
     /// frequency, active window) to compact JSON.
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serde_to_json(&self.inner)
     }
 
     /// Rebuild an engine from :meth:`to_json` output.
@@ -1557,8 +1337,7 @@ impl PyPerformance {
     /// Support ``pickle`` (and therefore ``copy.deepcopy``, ``joblib``,
     /// ``multiprocessing``) via the :meth:`to_json` / :meth:`from_json` pair.
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
+        pickle_reduce_json::<Self>(py, self.to_json()?)
     }
 
     /// Identify this value in notebooks and logs.

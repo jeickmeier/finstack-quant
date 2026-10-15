@@ -29,12 +29,6 @@ pub(crate) fn pairwise_returns(prices: &[f64]) -> Vec<f64> {
         return Vec::new();
     }
     let mut out = Vec::with_capacity(prices.len() - 1);
-    push_pairwise_returns(prices, &mut out);
-    out
-}
-
-#[inline]
-fn push_pairwise_returns(prices: &[f64], out: &mut Vec<f64>) {
     for w in prices.windows(2) {
         let p0 = w[0];
         let p1 = w[1];
@@ -49,6 +43,7 @@ fn push_pairwise_returns(prices: &[f64], out: &mut Vec<f64>) {
             }
         }
     }
+    out
 }
 
 /// Geometric decompounding of an annualized risk-free rate to one period.

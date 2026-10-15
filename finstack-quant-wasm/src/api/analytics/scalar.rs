@@ -1,5 +1,5 @@
 //! WASM bindings for the freestanding scalar metrics
-//! (`finstack_quant_analytics::scalar`).
+//! (`finstack_quant_analytics::{sharpe, sortino, volatility, max_drawdown}`).
 //!
 //! Sharpe, Sortino, annualized volatility and maximum drawdown over one
 //! simple-return series, without constructing a `Performance` panel. Inputs

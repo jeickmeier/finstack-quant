@@ -16,7 +16,6 @@ mod benchmark;
 mod rolling;
 mod scalar;
 mod serialization;
-mod table;
 
 /// Central performance analytics engine.
 ///
@@ -383,10 +382,14 @@ impl Performance {
         )
     }
 
-    fn active_pair_dates(&self, ticker_idx: usize) -> &[Date] {
-        let span = self.active_pair_span(ticker_idx);
+    fn dates_for_span(&self, span: TickerSpan) -> &[Date] {
         let dates = self.dates();
-        &dates[span.start.min(dates.len())..span.end.min(dates.len())]
+        let end = span.end.min(dates.len());
+        &dates[span.start.min(end)..end]
+    }
+
+    fn active_pair_dates(&self, ticker_idx: usize) -> &[Date] {
+        self.dates_for_span(self.active_pair_span(ticker_idx))
     }
 
     fn active_holding_period_for_ticker(&self, ticker_idx: usize) -> Option<(Date, Date)> {
@@ -756,16 +759,8 @@ impl Performance {
         Ok(())
     }
 
-    fn active_range(&self) -> core::ops::Range<usize> {
-        self.start_idx..self.end_idx
-    }
-
-    fn full_range_len(&self) -> usize {
-        self.dates().len()
-    }
-
     fn using_full_range(&self) -> bool {
-        self.start_idx == 0 && self.end_idx >= self.full_range_len()
+        self.start_idx == 0 && self.end_idx >= self.dates().len()
     }
 
     fn refresh_active_drawdown_cache(&mut self) {
@@ -902,10 +897,7 @@ impl Performance {
 
     /// Date slice corresponding to the currently active analysis window.
     pub fn active_dates(&self) -> &[Date] {
-        let range = self.active_range();
-        let dates = self.dates();
-        let end = range.end.min(dates.len());
-        &dates[range.start.min(end)..end]
+        self.dates_for_span(self.global_active_span())
     }
 
     /// Date slice corresponding to a ticker's currently active return series.
@@ -927,9 +919,7 @@ impl Performance {
     }
 
     fn active_dates_for_ticker_unchecked(&self, ticker_idx: usize) -> &[Date] {
-        let span = self.active_span_for_ticker(ticker_idx);
-        let dates = self.dates();
-        &dates[span.start.min(dates.len())..span.end.min(dates.len())]
+        self.dates_for_span(self.active_span_for_ticker(ticker_idx))
     }
 
     fn active_drawdown_values(&self, ticker_idx: usize) -> &[f64] {
@@ -962,6 +952,18 @@ impl Performance {
         F: FnMut(usize) -> T,
     {
         (0..self.ticker_names.len()).map(f).collect()
+    }
+
+    /// Map a closure over each ticker's overlapping `(portfolio, benchmark)` return slices.
+    #[inline]
+    fn map_pair_returns<T, F>(&self, mut f: F) -> Vec<T>
+    where
+        F: FnMut(&[f64], &[f64]) -> T,
+    {
+        self.map_tickers(|i| {
+            let (r, bench) = self.active_pair_returns(i);
+            f(r, bench)
+        })
     }
 
     /// Full return-aligned date vector (independent of any active window).
