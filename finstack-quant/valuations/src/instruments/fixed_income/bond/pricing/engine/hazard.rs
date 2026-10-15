@@ -41,7 +41,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
 use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::is_cash_settlement_kind;
 use crate::instruments::common_impl::pricing::rates_credit::{
     build_daily_bond_rates_credit_targets, continuous_frp_weight,
 };
@@ -157,7 +156,7 @@ impl HazardBondEngine {
         let Some(final_payment_date) = schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.date > as_of && is_cash_settlement_kind(flow.kind))
+            .filter(|flow| flow.date > as_of && flow.kind.is_cash_settlement())
             .map(|flow| flow.date)
             .max()
         else {

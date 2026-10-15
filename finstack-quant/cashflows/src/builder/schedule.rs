@@ -4,7 +4,7 @@
 //! deriving schedule metadata. Downstream pricing/risk code consumes this shape.
 
 use crate::builder::Notional;
-use crate::primitives::{is_cash_settlement_kind, CFKind, CashFlow};
+use crate::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::cashflow::Discountable;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Period};
@@ -302,7 +302,7 @@ impl Discountable for CashFlowSchedule {
         let flows = self
             .flows
             .iter()
-            .filter(|flow| is_cash_settlement_kind(flow.kind))
+            .filter(|flow| flow.kind.is_cash_settlement())
             .map(|flow| (flow.date, flow.amount))
             .collect::<Vec<_>>();
 

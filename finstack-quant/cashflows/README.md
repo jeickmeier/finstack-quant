@@ -23,7 +23,7 @@ umbrella crate as `finstack_quant::cashflows`.
 | [`builder`](src/builder/mod.rs) | `CashFlowSchedule`, `CashFlowBuilder`, and every spec type (`ScheduleParams`, coupon/fee/amortization/credit specs) |
 | [`accrual`](src/accrual.rs) | `accrued_interest_amount`, `AccrualIndex`, `AccrualConfig`, `AccrualMethod`, `ExCouponRule` |
 | [`aggregation`](src/aggregation.rs) | Period bucketing, currency-checked totals, credit-adjusted PV, calendar-year ladders |
-| [`primitives`](src/lib.rs) | `CashFlow` / `CFKind` re-exported from core, plus `is_cash_settlement_kind` |
+| [`primitives`](src/lib.rs) | `CashFlow`, `CFKind`, and `CashFlowAccrual` re-exported from core |
 | [`traits`](src/traits.rs) | `CashflowScheduleSource`, `CashflowProvider`, `ScheduleBuildOpts`, and the `schedule_from_*` adapters |
 | [`json`](src/json.rs) | Serde-first construction: `CashflowScheduleBuildSpec`, `build_cashflow_schedule_json`, `validate_cashflow_schedule*`, `dated_flows_json` |
 | [`schema`](src/schema.rs) | Published JSON Schema artifacts and `jsonschema` resources |
@@ -154,7 +154,7 @@ Discount curves use their own date basis for relative discounting.
 - Coupon rates are `rust_decimal::Decimal` decimals: `dec!(0.05)` is 5%. Fields
   named with a `_bp` suffix are basis points.
 - `CFKind` is `#[non_exhaustive]`; downstream `match` needs a catch-all arm.
-- `is_cash_settlement_kind` is the guard for "is this dated cash": `Pik` is a
+- `CFKind::is_cash_settlement` is the guard for "is this dated cash": `Pik` is a
   capitalization event and `DefaultedNotional` is a write-down, so both return
   `false` and are excluded from `dated_flows_json`.
 - Prepayment/default rate conversions (`cpr_to_smm`, `smm_to_cpr`,

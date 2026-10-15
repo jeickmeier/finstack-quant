@@ -1,8 +1,6 @@
 //! Python bindings for `finstack_quant_cashflows::primitives`.
 
-use finstack_quant_cashflows::primitives::{
-    is_cash_settlement_kind, CFKind, CashFlow, CashFlowAccrual,
-};
+use finstack_quant_cashflows::primitives::{CFKind, CashFlow, CashFlowAccrual};
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
@@ -127,6 +125,11 @@ impl PyCFKind {
     /// Whether this kind changes principal balance (notional, PIK, amortization, …).
     fn is_principal_like(&self) -> bool {
         self.inner.is_principal_like()
+    }
+
+    /// Whether this kind represents a cash settlement (all kinds except PIK and DefaultedNotional).
+    fn is_cash_settlement(&self) -> bool {
+        self.inner.is_cash_settlement()
     }
 
     /// Hash consistent with equality on the underlying kind.
@@ -499,21 +502,6 @@ impl PyCashFlow {
 
 wire_methods!(PyCashFlow, CashFlow, "CashFlow");
 
-/// Whether a classified flow represents a cash settlement.
-///
-/// ``PIK`` is a capitalization event and ``DefaultedNotional`` is a write-down;
-/// both return ``False``. All settlement kinds return ``True``.
-///
-/// Parameters
-/// ----------
-/// kind : CFKind or str
-///     Classified cashflow kind to test.
-#[pyfunction(name = "is_cash_settlement_kind")]
-#[pyo3(text_signature = "(kind)")]
-fn py_is_cash_settlement_kind(kind: &Bound<'_, PyAny>) -> PyResult<bool> {
-    Ok(is_cash_settlement_kind(extract_cf_kind(kind)?))
-}
-
 /// Register the `finstack_quant.cashflows.primitives` submodule.
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let module = crate::bindings::module_utils::new_submodule(parent, "primitives")?;
@@ -524,17 +512,8 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     module.add_class::<PyCFKind>()?;
     module.add_class::<PyCashFlow>()?;
     module.add_class::<PyCashFlowAccrual>()?;
-    module.add_function(wrap_pyfunction!(py_is_cash_settlement_kind, &module)?)?;
 
-    let all = PyList::new(
-        py,
-        [
-            "CFKind",
-            "CashFlow",
-            "CashFlowAccrual",
-            "is_cash_settlement_kind",
-        ],
-    )?;
+    let all = PyList::new(py, ["CFKind", "CashFlow", "CashFlowAccrual"])?;
     module.setattr("__all__", all)?;
 
     crate::bindings::module_utils::attach_submodule(

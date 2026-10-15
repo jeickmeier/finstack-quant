@@ -20,7 +20,7 @@ fn build(v: Value) -> CashFlowSchedule {
         .build(None)
         .expect("valid economics")
 }
-fn date(s: &str) -> cf::Date {
+fn date(s: &str) -> finstack_quant_core::dates::Date {
     serde_json::from_value::<cf::CashflowScheduleBuildSpec>(spec(s, "2030-01-01"))
         .expect("date")
         .issue_date

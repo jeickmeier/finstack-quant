@@ -419,6 +419,7 @@
       "cashFlowGetBalanceDate",
       "cashFlowValidate",
       "cdrToMdr",
+      "cfKindIsCashSettlement",
       "cfKindIsInterestLike",
       "cfKindIsPrincipalLike",
       "cfKindParse",
@@ -445,7 +446,6 @@
       "floatingRateSpecSofr",
       "floatingRateSpecSonia",
       "floatingRateSpecValidate",
-      "isCashSettlementKind",
       "materializeFixings",
       "mdrToCdr",
       "mergeCashflowSchedules",
@@ -564,6 +564,9 @@
   "cashflows.cdrToMdr": {
     "kind": "function"
   },
+  "cashflows.cfKindIsCashSettlement": {
+    "kind": "function"
+  },
   "cashflows.cfKindIsInterestLike": {
     "kind": "function"
   },
@@ -640,9 +643,6 @@
     "kind": "function"
   },
   "cashflows.floatingRateSpecValidate": {
-    "kind": "function"
-  },
-  "cashflows.isCashSettlementKind": {
     "kind": "function"
   },
   "cashflows.materializeFixings": {

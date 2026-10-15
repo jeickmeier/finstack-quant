@@ -14976,7 +14976,7 @@ export interface CashflowsNamespace {
    * @returns `true` when flows of this kind are paid or received in cash.
    * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
    */
-  isCashSettlementKind(kind: generated.cashflows.CFKind): boolean;
+  cfKindIsCashSettlement(kind: generated.cashflows.CFKind): boolean;
 
   /**
    * Date on which a cashflow changes the outstanding balance.

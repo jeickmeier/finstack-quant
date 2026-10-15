@@ -177,7 +177,7 @@ impl Instrument for StructuredCredit {
             context.cashflows = Some(
                 flows
                     .iter()
-                    .filter(|flow| crate::cashflow::primitives::is_cash_settlement_kind(flow.kind))
+                    .filter(|flow| flow.kind.is_cash_settlement())
                     .map(|flow| (flow.date, flow.amount))
                     .collect(),
             );

@@ -928,7 +928,7 @@ impl ReplayTemplate {
                     let has_later_reference_cash = schedule
                         .get_flows()
                         .iter()
-                        .any(|flow| flow.date > date && is_cash_settlement_kind(flow.kind));
+                        .any(|flow| flow.date > date && flow.kind.is_cash_settlement());
                     let make_whole = if call.make_whole.is_none() {
                         None
                     } else if date == bond.maturity && !has_later_reference_cash {
@@ -1075,7 +1075,7 @@ impl ReplayTemplate {
             {
                 static_redemption_pik += static_balance_delta(flow, false).unwrap_or(0.0);
             }
-            if flow.date >= as_of && is_cash_settlement_kind(flow.kind) && !terminal_redemption {
+            if flow.date >= as_of && flow.kind.is_cash_settlement() && !terminal_redemption {
                 let entitlement_key = (flow.date, flow.amount.amount().to_bits());
                 let entitled = entitled_counts
                     .get_mut(&entitlement_key)

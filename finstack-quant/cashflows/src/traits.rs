@@ -8,7 +8,7 @@
 
 use crate::builder::schedule::{CashFlowMeta, CashFlowSchedule};
 use crate::builder::Notional;
-use crate::primitives::{is_cash_settlement_kind, CFKind, CashFlow};
+use crate::primitives::{CFKind, CashFlow};
 pub use crate::DatedFlows;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -199,7 +199,7 @@ fn settlement_rows(schedule: &CashFlowSchedule) -> DatedFlows {
     schedule
         .get_flows()
         .iter()
-        .filter(|flow| is_cash_settlement_kind(flow.kind))
+        .filter(|flow| flow.kind.is_cash_settlement())
         .filter(|flow| flow.amount.amount() != 0.0 || flow.principal_delta.is_none())
         .map(|flow| (flow.date, flow.amount))
         .collect()

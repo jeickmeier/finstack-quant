@@ -127,9 +127,7 @@ impl ConvertibleBondValuator {
         let mut coupon_map: HashMap<usize, f64> = HashMap::default();
         let mut principal_map: HashMap<usize, f64> = HashMap::default();
         for cf in cashflow_schedule.get_flows() {
-            if cf.date <= base_date
-                || !finstack_quant_cashflows::primitives::is_cash_settlement_kind(cf.kind)
-            {
+            if cf.date <= base_date || !cf.kind.is_cash_settlement() {
                 continue;
             }
             let step = map_date_to_step(
@@ -175,7 +173,7 @@ impl ConvertibleBondValuator {
             .iter()
             .filter(|cf| {
                 cf.kind.is_principal_like()
-                    && finstack_quant_cashflows::primitives::is_cash_settlement_kind(cf.kind)
+                    && cf.kind.is_cash_settlement()
                     && cf.amount.amount() > 0.0
                     && cf.get_balance_date() >= bond.maturity
             })

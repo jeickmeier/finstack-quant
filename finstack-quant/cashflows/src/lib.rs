@@ -76,23 +76,9 @@
 //! - Day-count and schedule conventions: `docs/REFERENCES.md#isda-2006-definitions`
 //! - Bond-market accrued-interest conventions: `docs/REFERENCES.md#icma-rule-book`
 
-/// Cash-flow primitives (`CashFlow`, `CFKind`).
+/// Cash-flow primitives (`CashFlow`, `CFKind`, `CashFlowAccrual`).
 pub mod primitives {
     pub use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
-
-    /// Returns whether a classified flow represents a cash settlement.
-    ///
-    /// PIK is a capitalization event and `DefaultedNotional` is a write-down;
-    /// neither should be emitted by APIs whose contract is dated cash.
-    ///
-    /// # Arguments
-    ///
-    /// * `kind` - Classified cashflow kind to test; `PIK` and
-    ///   `DefaultedNotional` return `false`, while all settlement kinds return
-    ///   `true`.
-    pub fn is_cash_settlement_kind(kind: CFKind) -> bool {
-        !matches!(kind, CFKind::Pik | CFKind::DefaultedNotional)
-    }
 }
 
 /// Currency-preserving aggregation utilities for cashflows.
@@ -119,7 +105,7 @@ pub use accrual::{
     accrued_interest_amount, AccrualConfig, AccrualIndex, AccrualMethod, ExCouponRule,
 };
 pub use aggregation::PeriodAggregation;
-pub use builder::CashFlowBuilder;
+pub use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
 pub use json::{
     build_cashflow_schedule_json, dated_flows_json, validate_cashflow_schedule_json,
     CashflowScheduleBuildSpec, CouponLegSpec, DatedFlowJson, PaymentProgramSpec,
@@ -129,8 +115,7 @@ pub use traits::{
     CashflowScheduleSource, ScheduleBuildOpts,
 };
 
-pub use finstack_quant_core::dates::Date;
-pub use finstack_quant_core::money::Money;
+use finstack_quant_core::{dates::Date, money::Money};
 
 /// Single dated amount in a specific currency.
 pub type DatedFlow = (Date, Money);

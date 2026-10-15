@@ -6,7 +6,6 @@
 //! settlement-date base PV. Uses the same IRR engine and day-count as the loan
 //! for consistency.
 
-use crate::cashflow::primitives::is_cash_settlement_kind;
 use crate::instruments::TermLoan;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::money::Money;
@@ -38,7 +37,7 @@ impl MetricCalculator for YtmCalculator {
         let holder_flows: Vec<(finstack_quant_core::dates::Date, Money)> = schedule
             .get_flows()
             .iter()
-            .filter(|cf| is_cash_settlement_kind(cf.kind))
+            .filter(|cf| cf.kind.is_cash_settlement())
             .map(|cf| (cf.date, cf.amount))
             .collect();
 

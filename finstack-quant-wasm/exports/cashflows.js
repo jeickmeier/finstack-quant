@@ -39,6 +39,7 @@ export const cashflows = {
   cashFlowGetBalanceDate: wasm.cashFlowGetBalanceDate,
   cashFlowValidate: wasm.cashFlowValidate,
   cdrToMdr: wasm.cdrToMdr,
+  cfKindIsCashSettlement: wasm.cfKindIsCashSettlement,
   cfKindIsInterestLike: wasm.cfKindIsInterestLike,
   cfKindIsPrincipalLike: wasm.cfKindIsPrincipalLike,
   cfKindParse: wasm.cfKindParse,
@@ -65,7 +66,6 @@ export const cashflows = {
   floatingRateSpecSofr: wasm.floatingRateSpecSofr,
   floatingRateSpecSonia: wasm.floatingRateSpecSonia,
   floatingRateSpecValidate: wasm.floatingRateSpecValidate,
-  isCashSettlementKind: wasm.isCashSettlementKind,
   materializeFixings: (market, schedules, oldDate, newDate) =>
     wasm.materializeFixings(market, scheduleJsonList(schedules), oldDate, newDate),
   mdrToCdr: wasm.mdrToCdr,

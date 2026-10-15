@@ -28,7 +28,6 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Period, Period
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 
-use crate::primitives::is_cash_settlement_kind;
 use indexmap::IndexMap;
 
 /// Per-period, per-currency totals produced by [`aggregate_by_period`] and
@@ -441,7 +440,7 @@ pub(crate) fn pv_by_period_cashflows_sorted_checked(
     validate_periods(periods)?;
     sum_by_period(sorted, periods, |_, flow| {
         let (df, _) = discount_survival(flow.date, disc, None, &date_ctx)?;
-        let pv = if !is_cash_settlement_kind(flow.kind) || flow.date <= date_ctx.base {
+        let pv = if !flow.kind.is_cash_settlement() || flow.date <= date_ctx.base {
             0.0
         } else {
             flow.amount.amount() * df
@@ -627,7 +626,7 @@ pub(crate) fn calendar_year_ladder_rows(
 
 /// Survival-weighted settlement PV, excluding any estimated principal recovery.
 fn credit_adjusted_period_pv(cf: &CashFlow, df: f64, sp: f64, base: Date) -> f64 {
-    if !is_cash_settlement_kind(cf.kind) || cf.date <= base {
+    if !cf.kind.is_cash_settlement() || cf.date <= base {
         return 0.0;
     }
 

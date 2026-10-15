@@ -18,7 +18,7 @@ use crate::cashflow::builder::{
     FloatingCouponReplayState, FloatingRateObservation, OvernightObservationSchedule,
     OvernightRateConstraints,
 };
-use crate::cashflow::primitives::{is_cash_settlement_kind, CFKind, CashFlow};
+use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::instruments::common_impl::helpers::resolve_mc_paths;
 use crate::instruments::common_impl::pricing::floating_reset_descriptors::params_from_spec;
 use crate::instruments::common_impl::pricing::rates_credit::continuous_frp_weight;

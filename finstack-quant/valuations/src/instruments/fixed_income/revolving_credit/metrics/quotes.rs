@@ -22,7 +22,6 @@ use finstack_quant_core::Result;
 use rust_decimal::prelude::ToPrimitive;
 
 use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::is_cash_settlement_kind;
 use crate::cashflow::traits::CashflowScheduleSource;
 use crate::instruments::fixed_income::loan_quotes::{
     all_in_rate_from_schedule, pv_with_discount_margin, solve_discount_margin,
@@ -109,7 +108,7 @@ fn holder_flows(schedule: &CashFlowSchedule, settlement: Date) -> Vec<(Date, f64
     schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.date > settlement && is_cash_settlement_kind(cf.kind))
+        .filter(|cf| cf.date > settlement && cf.kind.is_cash_settlement())
         .map(|cf| (cf.date, cf.amount.amount()))
         .collect()
 }
