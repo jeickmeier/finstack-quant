@@ -27,7 +27,7 @@ class TestRateFamily:
             Rate("five")
 
     def test_cross_conversions(self) -> None:
-        assert Rate(0.05).as_basis_points == Bps(500)
+        assert Bps(Rate(0.05).as_bp) == Bps(500)
         assert Rate(0.05).as_percent == 5.0
         assert Bps(250).as_rate == Rate(0.025)
         assert Bps(250).as_percent == 2.5
@@ -126,8 +126,8 @@ class TestMoney:
         assert round(Money("2.345", "USD")) == Money("2.34", "USD")
         assert round(Money("2.355", "USD"), 2) == Money("2.36", "USD")
 
-    def test_from_tuple_and_config(self) -> None:
-        assert Money.from_tuple((Decimal("1.25"), "EUR")).amount_decimal == Decimal("1.25")
+    def test_decimal_and_config(self) -> None:
+        assert Money(Decimal("1.25"), "EUR").amount_decimal == Decimal("1.25")
         cfg = FinstackConfig(rounding_mode="floor")
         cfg.set_ingest_scale("USD", 1)
         assert Money(1.29, "USD", config=cfg) == Money("1.2", "USD")

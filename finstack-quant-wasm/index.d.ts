@@ -2094,12 +2094,6 @@ export interface Money extends WasmOwned {
    * @throws If serialization fails (should not happen for valid `Money`).
    */
   toJson(): string;
-  /**
-   * The amount and currency code as an `[amount, currencyCode]` pair.
-   *
-   * @returns A two-element array: the amount in major units as a `number` (the `f64` view of the exact decimal) and the ISO-4217 code.
-   */
-  toTuple(): [number, string];
 }
 
 /**
@@ -2187,14 +2181,6 @@ export interface MoneyConstructor {
    * @throws If the amount cannot be constructed (not expected for zero).
    */
   zero(currency: Currency): Money;
-  /**
-   * Construct from an `[amount, currencyCode]` pair, the inverse of `toTuple`.
-   *
-   * @param tup - Two-element array: the amount in major units (a finite `number`) and the ISO-4217 alphabetic currency code (a string).
-   * @returns The constructed `Money`.
-   * @throws `TypeError` (kind `invalid_type`) if `tup` is not a two-element array of a number and a string; `FinstackError` (kind `validation`) for a non-finite amount or an unknown currency code.
-   */
-  fromTuple(tup: readonly [number, string]): Money;
 }
 
 /**
@@ -2247,10 +2233,6 @@ export interface Rate extends WasmOwned {
    * @returns Rate in fractional bp.
    */
   readonly asBpF64: number;
-  /**
-   * The rate as `Bps`, rounded to the nearest whole basis point.
-   */
-  readonly asBasisPoints: Bps;
   /**
    * Absolute value (Rust `Rate::abs`).
    *
@@ -2807,16 +2789,17 @@ export interface DayCountContextConstructor {
  * A financial tenor such as `3M`, `1Y`, or `2W`.
  *
  * Tenors carry a numeric count and a unit (days, weeks, months, years).
- * Parse from strings (`new Tenor(s)` or `Tenor.parse(s)`) or use the
- * named-period factories (`Tenor.daily`, `Tenor.weekly`, `Tenor.biweekly`,
- * `Tenor.monthly`, `Tenor.bimonthly`, `Tenor.quarterly`, `Tenor.semiAnnual`,
- * `Tenor.annual`), `Tenor.fromPaymentsPerYear` or `Tenor.fromYears`.
+ * Construct from a count and `TenorUnit` (`new Tenor(count, unit)`), parse
+ * from strings (`Tenor.parse(s)`), or use the named-period factories
+ * (`Tenor.daily`, `Tenor.weekly`, `Tenor.biweekly`, `Tenor.monthly`,
+ * `Tenor.bimonthly`, `Tenor.quarterly`, `Tenor.semiAnnual`, `Tenor.annual`),
+ * `Tenor.fromPaymentsPerYear` or `Tenor.fromYears`.
  *
  * @example
  * ```javascript
  * import init, { core } from "finstack-quant-wasm";
  * await init();
- * const t = new core.Tenor("3M");
+ * const t = new core.Tenor(3, core.TenorUnit.months());
  * t.toString();        // "3M"
  * t.toYears();   // 0.25
  *
@@ -2898,16 +2881,17 @@ export interface Tenor extends WasmOwned {
  * A financial tenor such as `3M`, `1Y`, or `2W`.
  *
  * Tenors carry a numeric count and a unit (days, weeks, months, years).
- * Parse from strings (`new Tenor(s)` or `Tenor.parse(s)`) or use the
- * named-period factories (`Tenor.daily`, `Tenor.weekly`, `Tenor.biweekly`,
- * `Tenor.monthly`, `Tenor.bimonthly`, `Tenor.quarterly`, `Tenor.semiAnnual`,
- * `Tenor.annual`), `Tenor.fromPaymentsPerYear` or `Tenor.fromYears`.
+ * Construct from a count and `TenorUnit` (`new Tenor(count, unit)`), parse
+ * from strings (`Tenor.parse(s)`), or use the named-period factories
+ * (`Tenor.daily`, `Tenor.weekly`, `Tenor.biweekly`, `Tenor.monthly`,
+ * `Tenor.bimonthly`, `Tenor.quarterly`, `Tenor.semiAnnual`, `Tenor.annual`),
+ * `Tenor.fromPaymentsPerYear` or `Tenor.fromYears`.
  *
  * @example
  * ```javascript
  * import init, { core } from "finstack-quant-wasm";
  * await init();
- * const t = new core.Tenor("3M");
+ * const t = new core.Tenor(3, core.TenorUnit.months());
  * t.toString();        // "3M"
  * t.toYears();   // 0.25
  *
@@ -2917,15 +2901,16 @@ export interface Tenor extends WasmOwned {
  */
 export interface TenorConstructor {
   /**
-   * Parse a tenor string.
+   * Construct a tenor from a unit count and unit (Rust `Tenor::new`).
    *
-   * @param s - Tenor string. Accepted forms include `"3M"`, `"1Y"`, `"2W"`, `"7D"`, `"6M"`, `"10Y"`. Whitespace is permitted.
-   * @returns The parsed `Tenor`.
-   * @throws If `s` cannot be parsed (unknown unit, missing count).
+   * @param count - Positive integer count within the unit's 200-year ceiling.
+   * @param unit - Calendar unit (`TenorUnit`).
+   * @returns The constructed `Tenor`.
+   * @throws `TypeError` (kind `invalid_type`) if `count` is not a non-negative integer; `FinstackError` (kind `validation`) if `count` is zero or exceeds the supported range for `unit`.
    */
-  new (s: string): Tenor;
+  new (count: number, unit: TenorUnit): Tenor;
   /**
-   * Parse a tenor string (Rust `Tenor::parse`; same as `new Tenor(s)`).
+   * Parse a tenor string (Rust `Tenor::parse`).
    *
    * @param s - Tenor text such as `"3M"`, `"1Y"`, `"2W"` or `"7D"`.
    * @returns The parsed `Tenor`.
@@ -4952,10 +4937,6 @@ export interface PeriodId extends WasmOwned {
    */
   readonly isFiscal: boolean;
   /**
-   * Number of periods per year at this identifier's frequency.
-   */
-  readonly periodsPerYear: number;
-  /**
    * Step forward to the next period (Rust `PeriodId::next`).
    *
    * @returns The following `PeriodId`, rolling the year where needed.
@@ -5950,14 +5931,6 @@ export interface FinstackConfig extends WasmOwned {
    * @returns Extension keys in sorted order.
    */
   extensionKeys(): string[];
-  /**
-   * JSON text of one extension section.
-   *
-   * @param key - Extension key to read.
-   * @returns Compact JSON text of the section, or `undefined` if none is stored under `key`.
-   * @throws `TypeError` if `key` is not a string.
-   */
-  getExtensionJson(key: string): string | undefined;
   /**
    * One extension section as a plain value.
    *

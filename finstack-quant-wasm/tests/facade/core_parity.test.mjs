@@ -300,7 +300,7 @@ const CASES = {
   rate_zero: () => [core.Rate.zero().asDecimal, core.Bps.zero().asBp],
   money: () => [
     JSON.parse(core.Money.zero(core.Currency.usd()).toJson()),
-    core.Money.fromTuple([12.5, 'EUR']).toTuple(),
+    [money(12.5, 'EUR').amount, money(12.5, 'EUR').currency.code],
   ],
   currency: () => [
     core.Currency.fromNumeric(840).code,
@@ -421,9 +421,11 @@ const CASES = {
     index_lag: market().getInflationIndex('US-CPI-U').lag,
     credit_index: market().getCreditIndex('CDX-IG-43').numConstituents,
     fx_rate: market().fxRequired().rate('EUR', 'USD', '2025-01-02').rate,
-    converted: market()
-      .convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02')
-      .toTuple(),
+    converted: [
+      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').amount,
+      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').currency
+        .code,
+    ],
     rolled_base_date: market().rollForward(30).getDiscount('USD-OIS').baseDate,
     round_trip: core.MarketContext.fromJson(market().toJson()).toJson() === market().toJson(),
   }),
@@ -536,7 +538,6 @@ test('arguments of the wrong type are TypeErrors', () => {
   assert.throws(() => core.daysSinceEpoch(20089), kind('invalid_type'));
   assert.throws(() => new core.MarketContext().insert({}), kind('invalid_type'));
   assert.throws(() => new core.MarketContext().insertPrice('X', '1'), kind('invalid_type'));
-  assert.throws(() => core.Money.fromTuple([1.0]), kind('invalid_type'));
   assert.throws(() => new core.FinstackConfig(3), kind('invalid_type'));
 });
 
@@ -696,7 +697,6 @@ test('FinstackConfig extensions hold JSON values, not JSON text', () => {
   assert.deepEqual(cfg.tolerances, { rate_epsilon: 1e-9, generic_epsilon: 1e-10 });
   cfg.setExtension('core.example.v1', '{"not":"parsed"}');
   assert.equal(cfg.getExtension('core.example.v1'), '{"not":"parsed"}');
-  assert.equal(cfg.getExtensionJson('core.example.v1'), '"{\\"not\\":\\"parsed\\"}"');
   assert.equal(cfg.getExtension('core.other.v1'), undefined);
   assert.equal(cfg.removeExtension('core.example.v1'), true);
   assert.equal(cfg.removeExtension('core.example.v1'), false);

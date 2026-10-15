@@ -1402,12 +1402,7 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
     for (name, getters) in [
         (
             "Rate ",
-            &[
-                "asDecimal: number",
-                "asPercent: number",
-                "asBp: number",
-                "asBasisPoints: Bps",
-            ][..],
+            &["asDecimal: number", "asPercent: number", "asBp: number"][..],
         ),
         (
             "Bps ",

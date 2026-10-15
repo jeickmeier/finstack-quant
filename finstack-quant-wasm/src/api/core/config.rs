@@ -359,24 +359,6 @@ impl JsFinstackConfig {
         self.inner.extensions.keys().map(str::to_string).collect()
     }
 
-    /// JSON text of one extension section.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - Extension key to read.
-    ///
-    /// @returns Compact JSON text of the section, or `undefined` if none is
-    /// stored under `key`.
-    /// @throws `TypeError` if `key` is not a string.
-    #[wasm_bindgen(js_name = getExtensionJson)]
-    pub fn get_extension_json(&self, key: JsValue) -> Result<Option<String>, JsValue> {
-        self.inner
-            .extensions
-            .get(&js_string(&key, "key")?)
-            .map(|value| serde_json::to_string(value).map_err(to_js_err))
-            .transpose()
-    }
-
     /// One extension section as a plain value.
     ///
     /// # Arguments

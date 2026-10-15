@@ -142,12 +142,6 @@ impl PyRate {
         self.inner.as_bp_f64()
     }
 
-    /// Rate as a ``Bps`` value (rounded to the nearest whole basis point).
-    #[getter]
-    fn as_basis_points(&self) -> PyBps {
-        PyBps::from_inner(Bps::from(self.inner))
-    }
-
     /// Absolute value.
     #[pyo3(text_signature = "(self)")]
     fn abs(&self) -> Self {

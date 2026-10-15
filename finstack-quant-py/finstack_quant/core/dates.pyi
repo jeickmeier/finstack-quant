@@ -1950,22 +1950,6 @@ class PeriodId:
         """
         ...
 
-    @property
-    def periods_per_year(self) -> int:
-        """
-        Number of periods per year for this kind.
-
-        Returns
-        -------
-        int
-            Number of periods per year for this kind.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
     def next(self) -> PeriodId:
         """
         Next period in sequence.

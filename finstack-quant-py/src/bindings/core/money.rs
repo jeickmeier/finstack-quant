@@ -11,7 +11,7 @@ use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
-use pyo3::types::{PyFloat, PyInt, PyList, PyString, PyTuple, PyType};
+use pyo3::types::{PyFloat, PyInt, PyList, PyString, PyType};
 use pyo3::IntoPyObjectExt;
 
 use crate::bindings::core::config::{extract_rounding_mode, PyFinstackConfig};
@@ -380,24 +380,6 @@ impl PyMoney {
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// ``(amount, currency_code)`` tuple.
-    #[allow(clippy::wrong_self_convention)]
-    fn to_tuple(&self) -> (f64, String) {
-        (self.inner.amount(), self.inner.currency().to_string())
-    }
-
-    /// Build from ``(amount, currency)``; ``amount`` may be ``float``, ``int``,
-    /// ``Decimal`` or ``str`` and ``currency`` a ``Currency`` or ISO code.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, tup)")]
-    fn from_tuple(_cls: &Bound<'_, PyType>, tup: &Bound<'_, PyTuple>) -> PyResult<Self> {
-        if tup.len() != 2 {
-            return Err(value_error("expected a (amount, currency) tuple"));
-        }
-        let ccy = extract_currency(&tup.get_item(1)?)?;
-        money_from_amount(&tup.get_item(0)?, ccy).map(Self::from_inner)
     }
 
     /// Convert using an already-resolved positive FX rate.

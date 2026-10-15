@@ -265,22 +265,6 @@ class Rate:
         """
         ...
 
-    @property
-    def as_basis_points(self) -> Bps:
-        """
-        Rate as a ``Bps`` value, rounded to the nearest whole basis point.
-
-        Returns
-        -------
-        Bps
-            Whole-basis-point quote.
-
-        Notes
-        -----
-        This accessor does not raise; sub-bp precision is rounded away.
-        """
-        ...
-
     def abs(self) -> Rate:
         """
         Magnitude of the rate, discarding its sign (decimal units preserved).

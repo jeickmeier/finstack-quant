@@ -56,7 +56,7 @@ test('Rate and Bps: parse, getters, conversions and JSON', () => {
   assert.equal(bps.asBp, 125);
   assert.equal(bps.asRate.asDecimal, 0.0125);
   assert.equal(bps.asPercent, 1.25);
-  assert.equal(new core.Rate(0.05).asBasisPoints.asBp, 500);
+  assert.equal(new core.Bps(new core.Rate(0.05).asBp).asBp, 500);
   assert.equal(new core.Rate(0.05).asPercent, 5);
   assert.equal(new core.Rate(-0.01).abs().asDecimal, 0.01);
   assert.equal(new core.Rate(0).isZero(), true);
@@ -95,7 +95,7 @@ test('Tenor members pass through the Rust Tenor', () => {
   assert.equal(core.Tenor.bimonthly().months, 2);
   assert.equal(core.Tenor.fromPaymentsPerYear(4).toString(), '3M');
   assert.equal(core.Tenor.fromYears(0.5, core.DayCount.act365f()).toString(), '6M');
-  const oneMonth = new core.Tenor('1M');
+  const oneMonth = new core.Tenor(1, core.TenorUnit.months());
   // Month-end clamp; no calendar means no roll.
   assert.deepEqual(
     [...core.dateFromEpochDays(oneMonth.addToDate(core.createDate(2025, 1, 31)))],
@@ -107,7 +107,7 @@ test('Tenor members pass through the Rust Tenor', () => {
     [2025, 6, 30]
   );
   assert.equal(
-    new core.Tenor('6M').toYearsWithContext(core.createDate(2025, 1, 15), core.DayCount.act360()),
+    core.Tenor.parse('6M').toYearsWithContext(core.createDate(2025, 1, 15), core.DayCount.act360()),
     0.5027777777777778
   );
   assert.throws(

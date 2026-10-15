@@ -61,7 +61,7 @@ def test_config_extension_insertion_validates_key() -> None:
 def test_extension_values_remain_native_json_values(value: object) -> None:
     config = FinstackConfig()
     config.set_extension("example.settings.v1", value)
-    assert json.loads(config.get_extension_json("example.settings.v1")) == value
+    assert config.get_extension("example.settings.v1") == value
 
 
 def test_currency_equality_is_typed_and_hash_consistent() -> None:

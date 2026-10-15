@@ -1,5 +1,6 @@
 //! WASM bindings for date utilities from [`finstack_quant_core::dates`].
 
+use crate::api::core::imm::JsTenorUnit;
 use crate::utils::input::{
     from_js_json, invalid_type, js_epoch_days, js_f64, js_int, js_opt_bool, js_opt_string,
     js_opt_uint, js_string, js_uint,
@@ -496,16 +497,17 @@ impl JsDayCount {
 /// A financial tenor such as `3M`, `1Y`, or `2W`.
 ///
 /// Tenors carry a numeric count and a unit (days, weeks, months, years).
-/// Parse from strings (`new Tenor(s)` or `Tenor.parse(s)`) or use the
-/// named-period factories (`Tenor.daily`, `Tenor.weekly`, `Tenor.biweekly`,
-/// `Tenor.monthly`, `Tenor.bimonthly`, `Tenor.quarterly`, `Tenor.semiAnnual`,
-/// `Tenor.annual`), `Tenor.fromPaymentsPerYear` or `Tenor.fromYears`.
+/// Construct from a count and `TenorUnit` (`new Tenor(count, unit)`), parse
+/// from strings (`Tenor.parse(s)`), or use the named-period factories
+/// (`Tenor.daily`, `Tenor.weekly`, `Tenor.biweekly`, `Tenor.monthly`,
+/// `Tenor.bimonthly`, `Tenor.quarterly`, `Tenor.semiAnnual`, `Tenor.annual`),
+/// `Tenor.fromPaymentsPerYear` or `Tenor.fromYears`.
 ///
 /// @example
 /// ```javascript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// const t = new core.Tenor("3M");
+/// const t = new core.Tenor(3, core.TenorUnit.months());
 /// t.toString();        // "3M"
 /// t.toYears();   // 0.25
 ///
@@ -519,21 +521,26 @@ pub struct JsTenor {
 
 #[wasm_bindgen(js_class = Tenor)]
 impl JsTenor {
-    /// Parse a tenor string.
+    /// Construct a tenor from a unit count and unit (Rust `Tenor::new`).
     ///
-    /// @param s - Tenor string. Accepted forms include `"3M"`, `"1Y"`,
-    /// `"2W"`, `"7D"`, `"6M"`, `"10Y"`. Whitespace is permitted.
-    /// @returns The parsed `Tenor`.
-    /// @throws If `s` cannot be parsed (unknown unit, missing count).
+    /// # Arguments
+    ///
+    /// * `count` - Positive integer count within the unit's 200-year ceiling.
+    /// * `unit` - Calendar unit (`TenorUnit`).
+    ///
+    /// @returns The constructed `Tenor`.
+    /// @throws `TypeError` (kind `invalid_type`) if `count` is not a
+    /// non-negative integer; `FinstackError` (kind `validation`) if `count` is
+    /// zero or exceeds the supported range for `unit`.
     #[wasm_bindgen(constructor)]
-    pub fn new(s: JsValue) -> Result<JsTenor, JsValue> {
-        let s: &str = &js_string(&s, "s")?;
-        RustTenor::parse(s)
+    pub fn new(count: JsValue, unit: &JsTenorUnit) -> Result<JsTenor, JsValue> {
+        let count: u32 = js_uint(&count, "count")?;
+        RustTenor::new(count, unit.inner)
             .map(|inner| JsTenor { inner })
             .map_err(to_js_err)
     }
 
-    /// Parse a tenor string (Rust `Tenor::parse`; same as `new Tenor(s)`).
+    /// Parse a tenor string (Rust `Tenor::parse`).
     ///
     /// # Arguments
     ///
@@ -543,7 +550,10 @@ impl JsTenor {
     /// @throws If `s` is not a string or cannot be parsed.
     #[wasm_bindgen(js_name = parse)]
     pub fn parse(s: JsValue) -> Result<JsTenor, JsValue> {
-        Self::new(s)
+        let s: &str = &js_string(&s, "s")?;
+        RustTenor::parse(s)
+            .map(|inner| JsTenor { inner })
+            .map_err(to_js_err)
     }
 
     /// Tenor for a year fraction under a day count (Rust `Tenor::from_years`):

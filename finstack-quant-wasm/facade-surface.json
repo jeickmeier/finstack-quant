@@ -1057,7 +1057,7 @@
   },
   "core.Money": {
     "kind": "class",
-    "statics": ["fromDecimalStr", "fromJson", "fromTuple", "zero"],
+    "statics": ["fromDecimalStr", "fromJson", "zero"],
     "methods": [
       "checkedAdd",
       "checkedDivF64",
@@ -1068,8 +1068,7 @@
       "formatWith",
       "free",
       "toJson",
-      "toString",
-      "toTuple"
+      "toString"
     ],
     "getters": ["amount", "amountDecimal", "currency"]
   },
@@ -1077,7 +1076,7 @@
     "kind": "class",
     "statics": ["fromBp", "fromJson", "fromPercent", "parse", "zero"],
     "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
-    "getters": ["asBasisPoints", "asBp", "asBpF64", "asDecimal", "asPercent"]
+    "getters": ["asBp", "asBpF64", "asDecimal", "asPercent"]
   },
   "core.Bps": {
     "kind": "class",
@@ -1167,7 +1166,6 @@
       "extensionKeys",
       "free",
       "getExtension",
-      "getExtensionJson",
       "ingestScale",
       "ingestScaleOverrides",
       "outputScale",
@@ -1352,7 +1350,7 @@
     "kind": "class",
     "statics": ["annual", "day", "half", "month", "parse", "quarter", "week"],
     "methods": ["free", "next", "nextFiscal", "prev", "prevFiscal", "toString"],
-    "getters": ["code", "index", "isFiscal", "kind", "periodsPerYear", "year"]
+    "getters": ["code", "index", "isFiscal", "kind", "year"]
   },
   "core.FiscalConfig": {
     "kind": "class",

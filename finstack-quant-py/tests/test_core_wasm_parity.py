@@ -304,7 +304,7 @@ CASES: dict[str, Callable[[], Any]] = {
     "rate_zero": lambda: [types.Rate.ZERO.as_decimal, types.Bps.ZERO.as_bp],
     "money": lambda: [
         json.loads(Money.zero("USD").to_json()),
-        list(Money.from_tuple((12.5, "EUR")).to_tuple()),
+        [Money(12.5, "EUR").amount, Money(12.5, "EUR").currency.code],
     ],
     "currency": lambda: [
         currency.Currency.from_numeric(840).code,
@@ -421,7 +421,10 @@ CASES: dict[str, Callable[[], Any]] = {
         "index_lag": _market().get_inflation_index("US-CPI-U").lag,
         "credit_index": _market().get_credit_index("CDX-IG-43").num_constituents,
         "fx_rate": _market().fx_required().rate("EUR", "USD", "2025-01-02").rate,
-        "converted": list(_market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").to_tuple()),
+        "converted": [
+            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").amount,
+            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").currency.code,
+        ],
         "rolled_base_date": _iso(_market().roll_forward(30).get_discount("USD-OIS").base_date),
         "round_trip": json.loads(MarketContext.from_json(_market().to_json()).to_json())
         == json.loads(_market().to_json()),

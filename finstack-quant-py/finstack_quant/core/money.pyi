@@ -368,22 +368,6 @@ class Money:
         """
         ...
 
-    def to_tuple(self) -> tuple[float, str]:
-        """
-        Return ``(amount, currency_code)`` tuple.
-
-        Returns
-        -------
-        tuple[float, str]
-            Binary-float amount, which may lose Decimal precision, and the
-            ISO-4217 alphabetic currency code.
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
-        """
-        ...
-
     def convert_at_rate(self, target: Union[Currency, str], rate: float) -> Money:
         """
         Convert with an already-resolved positive FX rate.
@@ -412,39 +396,6 @@ class Money:
             If *target* is not a recognized currency or, for a different
             currency, *rate* is non-finite or not strictly positive or the
             converted amount exceeds Decimal's representable range.
-
-        """
-        ...
-
-    @classmethod
-    def from_tuple(cls, tup: tuple[Union[float, int, Decimal, str], Union[Currency, str]]) -> Money:
-        """
-        Build from an ``(amount, currency)`` tuple.
-
-        Parameters
-        ----------
-        tup : tuple
-            A two-element tuple of ``(amount, currency)``; ``amount`` accepts
-            the same types as the constructor (``float``, ``int``,
-            ``Decimal``, ``str``) and ``currency`` a ``Currency`` or ISO code.
-
-        Returns
-        -------
-        Money
-            Money built through the same ingest path as the constructor
-            (``Decimal``/``str`` exact, numbers via binary float).
-
-        Raises
-        ------
-        ValueError
-            If the tuple does not have two elements, the currency is invalid
-            or the amount is non-finite / unparsable.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.money import Money
-        >>> Money.from_tuple((25.0, "EUR")).currency.code
-        'EUR'
 
         """
         ...

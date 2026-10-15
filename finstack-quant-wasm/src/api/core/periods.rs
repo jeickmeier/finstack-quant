@@ -322,12 +322,6 @@ impl JsPeriodId {
         self.inner.is_fiscal()
     }
 
-    /// Number of periods per year at this identifier's frequency.
-    #[wasm_bindgen(getter, js_name = periodsPerYear)]
-    pub fn periods_per_year(&self) -> u16 {
-        self.inner.kind().periods_per_year()
-    }
-
     /// Step forward to the next period (Rust `PeriodId::next`).
     ///
     /// @returns The following `PeriodId`, rolling the year where needed.

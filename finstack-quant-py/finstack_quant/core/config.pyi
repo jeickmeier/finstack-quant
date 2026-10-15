@@ -344,8 +344,8 @@ class FinstackConfig:
     >>> config.set_extension("example.settings.v1", {"enabled": True})
     >>> (config.output_scale("USD"), config.ingest_scale("JPY"), config.extension_keys())
     (2, 6, ['example.settings.v1'])
-    >>> (config.get_extension("example.settings.v1"), config.get_extension_json("example.settings.v1"))
-    ({'enabled': True}, '{"enabled":true}')
+    >>> config.get_extension("example.settings.v1")
+    {'enabled': True}
     >>> (config.remove_extension("example.settings.v1"), config.get_extension("example.settings.v1"))
     (True, None)
     >>> FinstackConfig.from_json(config.to_json()).output_scale("USD")
@@ -585,27 +585,6 @@ class FinstackConfig:
         Notes
         -----
         This method does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def get_extension_json(self, key: str) -> Optional[str]:
-        """
-        Return one extension as a JSON string, or ``None`` if absent.
-
-        Parameters
-        ----------
-        key:
-            Namespaced extension key whose serialized payload is requested.
-
-        Returns
-        -------
-        str or None
-            JSON string, or ``None``.
-
-        Raises
-        ------
-        ValueError
-            If a stored extension exists but cannot be serialized to JSON.
         """
         ...
 

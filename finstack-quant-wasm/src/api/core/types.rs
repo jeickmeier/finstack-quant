@@ -162,14 +162,6 @@ impl JsRate {
             .map_err(to_js_err)
     }
 
-    /// The rate as `Bps`, rounded to the nearest whole basis point.
-    #[wasm_bindgen(getter, js_name = asBasisPoints)]
-    pub fn as_basis_points(&self) -> JsBps {
-        JsBps {
-            inner: RustBps::from(self.inner),
-        }
-    }
-
     /// Absolute value (Rust `Rate::abs`).
     ///
     /// @returns A new `Rate` with the sign removed.

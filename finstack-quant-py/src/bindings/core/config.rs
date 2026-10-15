@@ -410,19 +410,6 @@ impl PyFinstackConfig {
         self.inner.extensions.keys().map(str::to_string).collect()
     }
 
-    /// Return one extension as a JSON string, or `None` if absent.
-    #[pyo3(text_signature = "(self, key)")]
-    fn get_extension_json(&self, key: &str) -> PyResult<Option<String>> {
-        self.inner
-            .extensions
-            .get(key)
-            .map(|value| {
-                serde_json::to_string(value)
-                    .map_err(|err| serde_json_to_py(err, "invalid extension JSON"))
-            })
-            .transpose()
-    }
-
     /// Return one extension as native Python data, or `None` if absent.
     #[pyo3(text_signature = "(self, key)")]
     fn get_extension<'py>(
@@ -430,9 +417,11 @@ impl PyFinstackConfig {
         py: Python<'py>,
         key: &str,
     ) -> PyResult<Option<Bound<'py, PyAny>>> {
-        let Some(json) = self.get_extension_json(key)? else {
+        let Some(value) = self.inner.extensions.get(key) else {
             return Ok(None);
         };
+        let json = serde_json::to_string(value)
+            .map_err(|err| serde_json_to_py(err, "invalid extension JSON"))?;
         let json_mod = py.import("json")?;
         json_mod.call_method1("loads", (json,)).map(Some)
     }

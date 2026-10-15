@@ -335,50 +335,6 @@ impl JsMoney {
             .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
-
-    /// Construct from an `[amount, currencyCode]` pair, the inverse of `toTuple`.
-    ///
-    /// # Arguments
-    ///
-    /// * `tup` - Two-element array: the amount in major units (a finite
-    ///   `number`) and the ISO-4217 alphabetic currency code (a string).
-    ///
-    /// @returns The constructed `Money`.
-    /// @throws `TypeError` (kind `invalid_type`) if `tup` is not a two-element
-    /// array of a number and a string; `FinstackError` (kind `validation`) for
-    /// a non-finite amount or an unknown currency code.
-    #[wasm_bindgen(js_name = fromTuple)]
-    pub fn from_tuple(tup: JsValue) -> Result<JsMoney, JsValue> {
-        if !js_sys::Array::is_array(&tup) {
-            return Err(invalid_type("tup", "expected an [amount, currency] array"));
-        }
-        let pair = js_sys::Array::from(&tup);
-        if pair.length() != 2 {
-            return Err(invalid_type(
-                "tup",
-                &format!("expected 2 elements, got {}", pair.length()),
-            ));
-        }
-        let amount = js_f64(&pair.get(0), "tup[0]")?;
-        let currency = js_string(&pair.get(1), "tup[1]")?
-            .parse()
-            .map_err(to_js_err)?;
-        RustMoney::new(amount, currency)
-            .map(|inner| JsMoney { inner })
-            .map_err(to_js_err)
-    }
-
-    /// The amount and currency code as an `[amount, currencyCode]` pair.
-    ///
-    /// @returns A two-element array: the amount in major units as a `number`
-    /// (the `f64` view of the exact decimal) and the ISO-4217 code.
-    #[wasm_bindgen(js_name = toTuple)]
-    pub fn to_tuple(&self) -> js_sys::Array {
-        js_sys::Array::of2(
-            &JsValue::from_f64(self.inner.amount()),
-            &JsValue::from(self.inner.currency().as_ref()),
-        )
-    }
 }
 
 #[cfg(test)]
