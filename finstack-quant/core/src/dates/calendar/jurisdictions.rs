@@ -65,12 +65,13 @@ pub(super) fn hong_kong<A: Array<Item = Date>>(year: i32, out: &mut SmallVec<A>)
     {
         dates.push(sunday_substitute(date));
     }
-    let easter = algo::easter_monday(year);
-    dates.extend([
-        easter - Duration::days(3),
-        easter - Duration::days(2),
-        easter,
-    ]);
+    if let Some(easter) = algo::easter_monday(year) {
+        dates.extend([
+            easter - Duration::days(3),
+            easter - Duration::days(2),
+            easter,
+        ]);
+    }
     if let Some(autumn) = algo::mid_autumn_date(year) {
         let after = autumn + Duration::days(1);
         dates.push(

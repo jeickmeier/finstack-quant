@@ -737,9 +737,9 @@ impl Rule {
                 .map(|base| shift_to_weekday(base, *weekday, *dir) == date)
                 .unwrap_or(false),
             Rule::EasterOffset(offset) => {
-                let easter_mon = algo::easter_monday(date.year());
-                let target = easter_mon + Duration::days(*offset as i64);
-                target == date
+                algo::easter_monday(date.year()).and_then(|easter_mon| {
+                    easter_mon.checked_add(Duration::days(i64::from(*offset)))
+                }) == Some(date)
             }
             Rule::Span { start, len, offset } => {
                 // Pre-compute start dates for this and previous year, then range-check.
@@ -847,8 +847,11 @@ impl Rule {
                 }
             }
             Rule::EasterOffset(offset) => {
-                let em = algo::easter_monday(year);
-                out.push(em + Duration::days(*offset as i64));
+                if let Some(target) = algo::easter_monday(year)
+                    .and_then(|em| em.checked_add(Duration::days(i64::from(*offset))))
+                {
+                    out.push(target);
+                }
             }
             Rule::Span { start, len, offset } => {
                 let mut tmp = smallvec::SmallVec::<[Date; 64]>::new();

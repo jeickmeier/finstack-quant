@@ -49,13 +49,13 @@ pub(crate) const END_YEAR: i32 = 2150;
 ///
 /// # Returns
 ///
-/// The `Date` of Easter Monday (the day after Easter Sunday) for the given year.
+/// The `Date` of Easter Monday (the day after Easter Sunday) for the given
+/// year, or `None` when the year is outside the proleptic Gregorian range the
+/// `time` crate represents or the algorithm's integer arithmetic does not
+/// yield a calendar date (which happens for negative years).
 ///
-/// # Panics
-///
-/// Never panics for valid Gregorian years within the `time` crate's supported range.
-/// The algorithm guarantees Easter falls between March 22 and April 25 (Sunday),
-/// so Easter Monday falls between March 23 and April 26.
+/// For every supported positive year Easter falls between March 22 and
+/// April 25 (Sunday), so Easter Monday falls between March 23 and April 26.
 ///
 /// # References
 ///
@@ -63,8 +63,7 @@ pub(crate) const END_YEAR: i32 = 2150;
 /// - Butcher, S. (1876). "Ecclesiastical Calendar." In *The Calculation of Easter*. `docs/REFERENCES.md#meeus-1991`
 /// - Algorithm widely known as "Anonymous Gregorian Algorithm" or "Meeus/Jones/Butcher" `docs/REFERENCES.md#meeus-1991`
 #[inline]
-#[allow(clippy::unreachable)] // The Gregorian Easter algorithm yields a valid March/April date.
-pub(crate) fn easter_monday(year: i32) -> Date {
+pub(crate) fn easter_monday(year: i32) -> Option<Date> {
     // Anonymous Gregorian algorithm
     let a = year % 19;
     let b = year / 100;
@@ -85,11 +84,8 @@ pub(crate) fn easter_monday(year: i32) -> Date {
     } else {
         Month::April
     };
-    // Easter algorithm always produces valid March 22-April 25 dates.
-    let easter_sunday = Date::from_calendar_date(year, month, day as u8).unwrap_or_else(|_| {
-        unreachable!("Anonymous Gregorian algorithm produces valid March/April dates")
-    });
-    easter_sunday + Duration::days(1) // Easter Monday = Sunday + 1
+    let easter_sunday = Date::from_calendar_date(year, month, u8::try_from(day).ok()?).ok()?;
+    easter_sunday.checked_add(Duration::days(1)) // Easter Monday = Sunday + 1
 }
 
 // Chinese New Year (generated lookup, 1970-2150)
@@ -181,8 +177,11 @@ pub(crate) fn mid_autumn_date(year: i32) -> Option<Date> {
 /// Returns `None` when the requested occurrence does not exist in the month
 /// (e.g. a 5th Monday in a month with only four Mondays), rather than spilling
 /// into the adjacent month.
+///
+/// Also `None` when the month lies outside the date range the `time` crate
+/// represents, so a rule evaluated at the edge of that range is simply not a
+/// holiday rather than a panic.
 #[inline]
-#[allow(clippy::unreachable)] // Gregorian month boundaries used below are valid by construction.
 pub(crate) fn nth_weekday_of_month(
     year: i32,
     month: Month,
@@ -190,31 +189,28 @@ pub(crate) fn nth_weekday_of_month(
     n: i8,
 ) -> Option<Date> {
     let result = if n > 0 {
-        let first = Date::from_calendar_date(year, month, 1)
-            .unwrap_or_else(|_| unreachable!("first day of month is a valid Gregorian date"));
+        let first = Date::from_calendar_date(year, month, 1).ok()?;
         // Days to step forward from the 1st to reach `weekday`, in 0..=6.
         let offset =
             (7 + weekday.number_days_from_monday() - first.weekday().number_days_from_monday()) % 7;
-        first + Duration::days(i64::from(offset)) + Duration::weeks((n as i64) - 1)
+        first
+            .checked_add(Duration::days(i64::from(offset)))?
+            .checked_add(Duration::weeks(i64::from(n) - 1))?
     } else {
         let (ny, nm) = if month == Month::December {
-            (year + 1, Month::January)
+            (year.checked_add(1)?, Month::January)
         } else {
-            (
-                year,
-                Month::try_from(month as u8 + 1).unwrap_or_else(|_| {
-                    unreachable!("successor month exists for non-December months")
-                }),
-            )
+            (year, month.next())
         };
-        let last = Date::from_calendar_date(ny, nm, 1).unwrap_or_else(|_| {
-            unreachable!("first day of successor month is a valid Gregorian date")
-        }) - Duration::days(1);
+        let last = Date::from_calendar_date(ny, nm, 1)
+            .ok()?
+            .checked_sub(Duration::days(1))?;
         // Days to step backward from the last day to reach `weekday`, in 0..=6.
         let offset =
             (7 + last.weekday().number_days_from_monday() - weekday.number_days_from_monday()) % 7;
-        let pos = (-n) as i64; // 1=last, 2=second-last
-        last - Duration::days(i64::from(offset)) - Duration::weeks(pos - 1)
+        let pos = i64::from(-n); // 1=last, 2=second-last
+        last.checked_sub(Duration::days(i64::from(offset)))?
+            .checked_sub(Duration::weeks(pos - 1))?
     };
     (result.year() == year && result.month() == month).then_some(result)
 }
@@ -288,5 +284,36 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn easter_monday_is_none_instead_of_panicking_outside_the_algorithm_range() {
+        // Negative years feed negative remainders into the Gregorian
+        // arithmetic; some of them name no calendar date and must come back as
+        // `None`, never a panic.
+        let negative: Vec<Option<Date>> = (-400..=0).map(easter_monday).collect();
+        assert!(negative.iter().any(Option::is_none));
+        assert!((1583..=Date::MAX.year()).all(|year| easter_monday(year).is_some()));
+        assert!(easter_monday(i32::MIN).is_none());
+        assert!(easter_monday(i32::MAX).is_none());
+    }
+
+    #[test]
+    fn nth_weekday_is_none_at_the_date_range_edge() {
+        let last_year = Date::MAX.year();
+        // The last Monday of the final December needs the successor month.
+        assert_eq!(
+            nth_weekday_of_month(last_year, Month::December, Weekday::Monday, -1),
+            None
+        );
+        assert!(nth_weekday_of_month(last_year, Month::November, Weekday::Monday, -1).is_some());
+        assert_eq!(
+            nth_weekday_of_month(i32::MAX, Month::December, Weekday::Friday, 1),
+            None
+        );
+        assert_eq!(
+            nth_weekday_of_month(i32::MIN, Month::January, Weekday::Friday, -1),
+            None
+        );
     }
 }
