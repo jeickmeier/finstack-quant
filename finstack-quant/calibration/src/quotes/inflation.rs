@@ -109,11 +109,7 @@ impl InflationQuote {
         }
     }
 
-    /// Get maturity date for this quote if applicable.
-    ///
-    /// # Returns
-    ///
-    /// `Some(maturity_date)` for all inflation quote variants, or `None` if not applicable.
+    /// Swap maturity date of the quote.
     ///
     /// # Examples
     ///
@@ -131,22 +127,42 @@ impl InflationQuote {
     ///     convention: InflationSwapConventionId::new("USD-CPI"),
     /// };
     ///
-    /// assert_eq!(quote.maturity_date(), Some(Date::from_calendar_date(2029, time::Month::June, 20).unwrap()));
+    /// assert_eq!(quote.maturity(), Date::from_calendar_date(2029, time::Month::June, 20).unwrap());
     /// ```
-    pub fn maturity_date(&self) -> Option<Date> {
+    pub fn maturity(&self) -> Date {
         match self {
             InflationQuote::InflationSwap { maturity, .. }
-            | InflationQuote::YoYInflationSwap { maturity, .. } => Some(*maturity),
+            | InflationQuote::YoYInflationSwap { maturity, .. } => *maturity,
+        }
+    }
+
+    /// Quoted fixed inflation swap rate as a decimal (e.g., `0.025` for 2.5%).
+    pub fn rate(&self) -> f64 {
+        match self {
+            InflationQuote::InflationSwap { rate, .. }
+            | InflationQuote::YoYInflationSwap { rate, .. } => *rate,
+        }
+    }
+
+    /// Inflation index identifier referenced by the quote.
+    pub fn index(&self) -> &str {
+        match self {
+            InflationQuote::InflationSwap { index, .. }
+            | InflationQuote::YoYInflationSwap { index, .. } => index,
+        }
+    }
+
+    /// Inflation swap convention identifier carried by the quote.
+    pub fn convention(&self) -> &InflationSwapConventionId {
+        match self {
+            InflationQuote::InflationSwap { convention, .. }
+            | InflationQuote::YoYInflationSwap { convention, .. } => convention,
         }
     }
 
     /// Validate that the quoted inflation rate is finite.
     pub fn validate(&self) -> Result<()> {
-        match self {
-            Self::InflationSwap { rate, .. } | Self::YoYInflationSwap { rate, .. } => {
-                validate::finite(*rate, "rate")
-            }
-        }
+        validate::finite(self.rate(), "rate")
     }
 }
 

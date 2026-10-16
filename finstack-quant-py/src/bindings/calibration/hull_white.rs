@@ -5,10 +5,11 @@ use crate::bindings::core::market_data::curves::PyDiscountCurve;
 use crate::bindings::macros::wire_methods;
 use crate::errors::{core_to_py, value_error};
 use finstack_quant_calibration::hull_white::{
-    self as rust_hw, CapFloorCalibrationConfig, CapFloorQuote, HullWhiteCalibrationParams,
-    HullWhiteParams, PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionQuote,
+    self as rust_hw, CapFloorCalibrationConfig, CapFloorQuote, PiecewiseSigmaCalibrationConfig,
+    SwaptionQuote,
 };
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_models::rates::hull_white::{HullWhiteCalibrationParams, HullWhiteParams};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use std::sync::Arc;
@@ -31,14 +32,6 @@ type PiecewiseConfigReduce<'py> = (Bound<'py, PyAny>, (f64, f64, f64, f64, Strin
 
 /// Docstring for the `finstack_quant.calibration.hull_white` namespace.
 const MODULE_DOC: &str = "Direct Hull-White one-factor calibrators (swaptions, caps/floors, piecewise sigma).\n\nThese take a calibrated DiscountCurve and year-fraction quotes; the plan-level\nequivalents are the `hull_white` / `cap_floor_hull_white` calibration steps.\n\nExamples\n--------\n>>> from finstack_quant.calibration.hull_white import SwaptionQuote\n>>> SwaptionQuote(1.0, 5.0, 0.0065, True).expiry\n1.0\n";
-
-fn parse_frequency(value: &str) -> PyResult<SwapFrequency> {
-    value.parse().map_err(core_to_py)
-}
-
-fn frequency_name(value: SwapFrequency) -> String {
-    value.to_string()
-}
 
 /// At-the-money swaption volatility quote in year fractions.
 ///
@@ -82,7 +75,7 @@ impl PySwaptionQuote {
     #[new]
     #[pyo3(text_signature = "(expiry, tenor, volatility, is_normal_vol)")]
     fn new(expiry: f64, tenor: f64, volatility: f64, is_normal_vol: bool) -> PyResult<Self> {
-        SwaptionQuote::try_new(expiry, tenor, volatility, is_normal_vol)
+        SwaptionQuote::new(expiry, tenor, volatility, is_normal_vol)
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
@@ -179,7 +172,7 @@ impl PyCapFloorQuote {
         is_cap: bool,
         is_normal_vol: bool,
     ) -> PyResult<Self> {
-        CapFloorQuote::try_new(maturity, strike, volatility, is_cap, is_normal_vol)
+        CapFloorQuote::new(maturity, strike, volatility, is_cap, is_normal_vol)
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
@@ -415,7 +408,7 @@ impl PyCapFloorCalibrationConfig {
         Ok(Self {
             inner: CapFloorCalibrationConfig {
                 fit_tolerance,
-                frequency: parse_frequency(frequency)?,
+                frequency: frequency.parse().map_err(core_to_py)?,
                 fixed_kappa,
                 initial_guess: initial_guess.map(|p| p.inner),
             },
@@ -431,7 +424,7 @@ impl PyCapFloorCalibrationConfig {
     /// Caplet payment frequency name.
     #[getter]
     fn frequency(&self) -> String {
-        frequency_name(self.inner.frequency)
+        self.inner.frequency.to_string()
     }
 
     /// Fixed mean reversion, when set.
@@ -536,7 +529,7 @@ impl PyPiecewiseSigmaCalibrationConfig {
                 fixed_kappa,
                 sigma_min,
                 sigma_max,
-                frequency: parse_frequency(frequency)?,
+                frequency: frequency.parse().map_err(core_to_py)?,
             },
         })
     }
@@ -568,7 +561,7 @@ impl PyPiecewiseSigmaCalibrationConfig {
     /// Caplet payment frequency name.
     #[getter]
     fn frequency(&self) -> String {
-        frequency_name(self.inner.frequency)
+        self.inner.frequency.to_string()
     }
 
     /// Pickle support through the constructor arguments.
@@ -598,14 +591,6 @@ fn curve_of(curve: &Bound<'_, PyAny>, label: &str) -> PyResult<Arc<DiscountCurve
         .cast::<PyDiscountCurve>()
         .map(|c| Arc::clone(&c.borrow().inner))
         .map_err(|_| value_error(format!("{label} must be a core.market_data.DiscountCurve")))
-}
-
-fn swaption_quotes(quotes: Vec<PyRef<'_, PySwaptionQuote>>) -> Vec<SwaptionQuote> {
-    quotes.into_iter().map(|q| q.inner).collect()
-}
-
-fn cap_floor_quotes(quotes: Vec<PyRef<'_, PyCapFloorQuote>>) -> Vec<CapFloorQuote> {
-    quotes.into_iter().map(|q| q.inner).collect()
 }
 
 /// Fit scalar Hull-White (kappa, sigma) to at-the-money swaption quotes.
@@ -651,8 +636,8 @@ fn calibrate_hull_white_to_swaptions(
     initial_guess: Option<PyRef<'_, PyHullWhiteCalibrationParams>>,
 ) -> PyResult<(PyHullWhiteCalibrationParams, PyCalibrationReport)> {
     let curve = curve_of(discount, "discount")?;
-    let quotes = swaption_quotes(quotes);
-    let frequency = parse_frequency(frequency)?;
+    let quotes: Vec<SwaptionQuote> = quotes.into_iter().map(|q| q.inner).collect();
+    let frequency = frequency.parse().map_err(core_to_py)?;
     let initial_guess = initial_guess.map(|p| p.inner);
     let (params, report) = py
         .detach(move || {
@@ -716,7 +701,7 @@ fn calibrate_hull_white_to_cap_floors(
         Some(curve) if !curve.is_none() => Some(curve_of(curve, "forward")?),
         _ => None,
     };
-    let quotes = cap_floor_quotes(quotes);
+    let quotes: Vec<CapFloorQuote> = quotes.into_iter().map(|q| q.inner).collect();
     let config = config.inner;
     let (params, report) = py
         .detach(move || {
@@ -783,7 +768,7 @@ fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
         Some(curve) if !curve.is_none() => Some(curve_of(curve, "forward")?),
         _ => None,
     };
-    let quotes = cap_floor_quotes(quotes);
+    let quotes: Vec<CapFloorQuote> = quotes.into_iter().map(|q| q.inner).collect();
     let config = config.inner;
     let (params, report) = py
         .detach(move || {

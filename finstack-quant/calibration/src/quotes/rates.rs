@@ -105,7 +105,7 @@ pub enum RateQuote {
         /// `forward = (100 - price) / 100 − convexity_adjustment`.
         /// A positive adjustment lowers the futures-implied rate toward the true
         /// forward. The wire field is required; the host authoring
-        /// constructors ([`RateQuote::from_wire_fields`]) fill an omitted value
+        /// constructor ([`RateQuote::futures`]) fills an omitted value
         /// with [`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`].
         convexity_adjustment: f64,
     },
@@ -241,8 +241,17 @@ impl RateQuote {
     /// Validate that every quoted rate or futures price field is finite.
     pub fn validate(&self) -> Result<()> {
         match self {
-            Self::Deposit { rate, .. } | Self::Fra { rate, .. } | Self::Swap { rate, .. } => {
-                validate::finite(*rate, "rate")
+            Self::Deposit { rate, .. } | Self::Fra { rate, .. } => validate::finite(*rate, "rate"),
+            Self::Swap {
+                rate,
+                spread_decimal,
+                ..
+            } => {
+                validate::finite(*rate, "rate")?;
+                if let Some(spread) = spread_decimal {
+                    validate::finite(*spread, "spread_decimal")?;
+                }
+                Ok(())
             }
             Self::Futures {
                 price,

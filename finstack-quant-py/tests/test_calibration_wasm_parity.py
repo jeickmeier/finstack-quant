@@ -111,9 +111,9 @@ def test_quote_constructors_match_the_shared_golden(name: str) -> None:
 def test_quote_constructors_reject_invalid_inputs() -> None:
     with pytest.raises(ValueError, match="invalid pillar"):
         RateQuote.deposit("D", "USD-SOFR-OIS", "soon", 0.05)
-    with pytest.raises(ValueError, match="invalid VolQuote"):
+    with pytest.raises(ValueError, match="Unknown option type"):
         VolQuote.option_vol("O", "AAPL", "2027-05-08", 155.0, 0.28, "straddle")
-    with pytest.raises(ValueError, match="invalid CdsQuote"):
+    with pytest.raises(ValueError, match="Unknown CDS doc clause"):
         CdsQuote.par_spread("C", "ACME", "USD", "not_a_clause", "5Y", 80.0, 0.4)
 
 

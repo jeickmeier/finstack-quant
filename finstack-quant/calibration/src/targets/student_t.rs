@@ -33,7 +33,7 @@ use crate::api::schema::StudentTParams;
 use crate::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOverrides};
 use crate::build::BuildCtx;
 use crate::config::CalibrationConfig;
-use crate::quotes::market_quote::MarketQuote;
+use crate::quotes::MarketQuote;
 use crate::solver::helpers::{bracket_solve_1d, ScanStrategy};
 use crate::CalibrationReport;
 use finstack_quant_core::dates::Date;

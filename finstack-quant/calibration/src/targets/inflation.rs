@@ -1,11 +1,11 @@
 //! Calibration target construction and shared input validation.
 //!
 use crate::api::schema::InflationCurveParams;
+use crate::build::prepared::PreparedQuote;
 use crate::config::{CalibrationConfig, CalibrationMethod};
 use crate::constants::WEIGHT_MIN_FLOOR;
-use crate::prepared::CalibrationQuote;
 use crate::quotes::inflation::InflationQuote;
-use crate::quotes::market_quote::{ExtractQuotes, MarketQuote};
+use crate::quotes::{ExtractQuotes, MarketQuote};
 use crate::solver::bootstrap::SequentialBootstrapper;
 use crate::solver::global::GlobalFitOptimizer;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
@@ -14,7 +14,6 @@ use crate::targets::util::{
 };
 use crate::CalibrationReport;
 
-use crate::build::prepared::PreparedQuote;
 use finstack_quant_core::dates::DateExt;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -83,33 +82,18 @@ impl InflationCurveTarget {
     pub(crate) fn prepare_quotes(
         &self,
         quotes: Vec<InflationQuote>,
-    ) -> Result<Vec<CalibrationQuote>> {
+    ) -> Result<Vec<PreparedQuote<InflationQuote>>> {
         quotes.into_iter().map(|q| self.prepare_single(q)).collect()
     }
 
-    fn prepare_single(&self, raw: InflationQuote) -> Result<CalibrationQuote> {
-        let (maturity, rate, index_name, frequency, convention_id) = match &raw {
-            InflationQuote::InflationSwap {
-                maturity,
-                rate,
-                index,
-                convention,
-                ..
-            } => (*maturity, *rate, index.as_str(), None, convention),
-            InflationQuote::YoYInflationSwap {
-                maturity,
-                rate,
-                index,
-                frequency,
-                convention,
-                ..
-            } => (
-                *maturity,
-                *rate,
-                index.as_str(),
-                Some(*frequency),
-                convention,
-            ),
+    fn prepare_single(&self, raw: InflationQuote) -> Result<PreparedQuote<InflationQuote>> {
+        let maturity = raw.maturity();
+        let rate = raw.rate();
+        let index_name = raw.index();
+        let convention_id = raw.convention();
+        let frequency = match &raw {
+            InflationQuote::InflationSwap { .. } => None,
+            InflationQuote::YoYInflationSwap { frequency, .. } => Some(*frequency),
         };
 
         // Load conventions
@@ -209,8 +193,12 @@ impl InflationCurveTarget {
             DayCountContext::default(),
         )?;
 
-        let pq = PreparedQuote::new(Arc::new(raw), swap, maturity, pillar_time);
-        Ok(CalibrationQuote::Inflation(pq))
+        Ok(PreparedQuote::new(
+            Arc::new(raw),
+            swap,
+            maturity,
+            pillar_time,
+        ))
     }
 
     /// Parse a lag that can also be represented by the delivered curve.
@@ -397,19 +385,19 @@ impl InflationCurveTarget {
 }
 
 impl BootstrapTarget for InflationCurveTarget {
-    type Quote = CalibrationQuote;
+    type Quote = PreparedQuote<InflationQuote>;
     type Curve = InflationCurve;
 
     fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
-        Some(quote.quote_value())
+        Some(quote.quote.rate())
     }
 
     fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
-        quote.quote_id().to_string()
+        quote.quote.id().as_str().to_string()
     }
 
     fn quote_time(&self, quote: &Self::Quote) -> Result<f64> {
-        Ok(quote.pillar_time())
+        Ok(quote.pillar_time)
     }
 
     fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
@@ -435,21 +423,14 @@ impl BootstrapTarget for InflationCurveTarget {
         let base_date = self.params.base_date;
         // Context needs the curve being calibrated + discount curve
         self.scratch.with_curve(curve, |ctx| {
-            let pv = quote.calibration_value_raw(ctx, base_date)?;
+            let pv = quote.instrument.value_raw(ctx, base_date)?;
             Ok(pv / self.params.notional)
         })
     }
 
     fn initial_guess(&self, quote: &Self::Quote, _previous_knots: &[(f64, f64)]) -> Result<f64> {
         let t = self.quote_time(quote)?;
-        // We know it's Inflation variant
-        let rate = match quote {
-            CalibrationQuote::Inflation(pq) => match pq.quote.as_ref() {
-                InflationQuote::InflationSwap { rate, .. }
-                | InflationQuote::YoYInflationSwap { rate, .. } => *rate,
-            },
-            _ => 0.02, // Fallback if mismatched type (shouldn't happen)
-        };
+        let rate = quote.quote.rate();
         let base_cpi = self.effective_base_cpi()?;
         Ok(base_cpi * (1.0 + rate).powf(t))
     }
@@ -460,7 +441,7 @@ impl BootstrapTarget for InflationCurveTarget {
 }
 
 impl GlobalSolveTarget for InflationCurveTarget {
-    type Quote = CalibrationQuote;
+    type Quote = PreparedQuote<InflationQuote>;
     type Curve = InflationCurve;
 
     fn build_time_grid_and_guesses(
@@ -477,14 +458,7 @@ impl GlobalSolveTarget for InflationCurveTarget {
                 continue;
             }
 
-            // Extract inflation rate from quote for initial guess
-            let rate = match quote {
-                CalibrationQuote::Inflation(pq) => match pq.quote.as_ref() {
-                    InflationQuote::InflationSwap { rate, .. }
-                    | InflationQuote::YoYInflationSwap { rate, .. } => *rate,
-                },
-                _ => 0.02, // Fallback
-            };
+            let rate = quote.quote.rate();
 
             // Initial guess: CPI = base_cpi * (1 + rate)^t
             let cpi_guess = base_cpi * (1.0 + rate).powf(t);
@@ -535,7 +509,7 @@ impl GlobalSolveTarget for InflationCurveTarget {
 
         self.scratch.with_curve(curve, |ctx| {
             for (i, quote) in quotes.iter().enumerate() {
-                let pv = quote.calibration_value_raw(ctx, self.params.base_date)?;
+                let pv = quote.instrument.value_raw(ctx, self.params.base_date)?;
                 residuals[i] = pv / self.params.notional;
             }
             Ok(())
@@ -543,12 +517,11 @@ impl GlobalSolveTarget for InflationCurveTarget {
     }
 
     fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
-        Some(quote.quote_value())
+        Some(quote.quote.rate())
     }
 
     fn residual_key(&self, quote: &Self::Quote, idx: usize) -> String {
-        let q = quote.get_instrument();
-        format!("{}-{:03}", q.id(), idx)
+        format!("{}-{:03}", quote.instrument.id(), idx)
     }
 
     fn residual_weights(&self, quotes: &[Self::Quote], weights_out: &mut [f64]) -> Result<()> {

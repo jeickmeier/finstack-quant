@@ -16,7 +16,7 @@ use crate::api::schema::CalibrationStep;
 use crate::api::schema::{CalibrationResult, CalibrationResultEnvelope};
 use crate::api::validate::DependencyNode;
 use crate::config::CalibrationConfig;
-use crate::quotes::market_quote::MarketQuote;
+use crate::quotes::MarketQuote;
 use crate::step_runtime;
 use crate::step_runtime::StepOutcome;
 use crate::validation::preflight_step;
@@ -94,6 +94,21 @@ pub struct ExecutionErrorDetails {
     pub diagnostics: Vec<StrictLoadDiagnostic>,
 }
 
+impl ExecutionErrorDetails {
+    /// Serialize the stable error payload as compact wire JSON.
+    #[must_use]
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap_or_else(|error| {
+            serde_json::json!({
+                "stage": "target",
+                "category": "json_serialize",
+                "cause": error.to_string(),
+            })
+            .to_string()
+        })
+    }
+}
+
 /// Engine error retaining a single structured contract across all stages.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -121,23 +136,12 @@ pub enum ExecuteError {
 
 impl ExecuteError {
     /// Wrap a structured envelope failure at its execution stage.
-    ///
-    /// # Arguments
-    ///
-    /// * `stage` - Pipeline stage that rejected the request or fit.
-    /// * `error` - Structured envelope validation or solver-acceptance cause.
-    pub fn envelope(stage: ExecutionStage, error: EnvelopeError) -> Self {
+    pub(crate) fn envelope(stage: ExecutionStage, error: EnvelopeError) -> Self {
         Self::Envelope { stage, error }
     }
 
     /// Wrap a core error with stage and optional step context.
-    ///
-    /// # Arguments
-    ///
-    /// * `stage` - Pipeline stage where the underlying operation failed.
-    /// * `step_id` - Failing calibration step, or `None` for plan-wide stages.
-    /// * `source` - Underlying core error.
-    pub fn other(
+    pub(crate) fn other(
         stage: ExecutionStage,
         step_id: Option<String>,
         source: finstack_quant_core::Error,
@@ -202,14 +206,7 @@ impl ExecuteError {
 
     /// Serialize the stable error payload as compact wire JSON.
     pub fn to_json(&self) -> String {
-        serde_json::to_string(&self.details()).unwrap_or_else(|error| {
-            serde_json::json!({
-                "stage": "target",
-                "category": "json_serialize",
-                "cause": error.to_string(),
-            })
-            .to_string()
-        })
+        self.details().to_json()
     }
 }
 

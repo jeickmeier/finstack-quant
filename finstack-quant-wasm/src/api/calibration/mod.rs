@@ -28,17 +28,6 @@
 //!   their shared argument marshalling).
 //! - `hull_white`: direct Hull-White one-factor calibrators on curve handles.
 //! - `result`: free-function twins of the Python `CalibrationResult` methods.
-//!
-//! # Native (non-wasm32) builds
-//!
-//! `JsValue` is opaque on native targets: every non-`const` constructor
-//! (`JsValue::from_str`, `js_sys::Error::new`, ...) is a `wasm-bindgen` stub
-//! that aborts the process. So the `#[wasm_bindgen]` wrappers below are kept
-//! *thin* and the diagnostic-bearing logic lives in `*_inner` helpers that
-//! return the structured `EnvelopeError` / `ExecuteError` directly. Native
-//! tests exercise those helpers and assert on the real diagnostic — the
-//! `JsValue` boundary (where the structured error would otherwise collapse to
-//! an opaque value) is crossed only at the `#[wasm_bindgen]` edge.
 
 // `EnvelopeError` / `ExecuteError` are intentionally large structured errors
 // (rich diagnostic payloads); boxing them would change their public API.
@@ -58,20 +47,9 @@ use crate::utils::input::{js_string, json_text};
 use crate::utils::structured_js_error;
 use crate::utils::to_js_value;
 use finstack_quant_calibration::api::engine::{self, ExecuteError};
-use finstack_quant_calibration::api::schema::{CalibrationEnvelope, CalibrationResultEnvelope};
+use finstack_quant_calibration::api::schema::CalibrationResultEnvelope;
 use finstack_quant_calibration::api::validate;
 use wasm_bindgen::prelude::*;
-
-/// Native-testable core of [`validate_calibration_json`].
-///
-/// Parses the envelope and returns its canonical (pretty-printed) form. A parse
-/// failure surfaces a structured
-/// [`EnvelopeError`](finstack_quant_calibration::api::errors::EnvelopeError)
-/// preserving the full parse diagnostic. The Rust calibration API owns the
-/// canonical serialization path, keeping the WASM layer to error mapping only.
-fn validate_calibration_json_inner(json: &str) -> Result<String, ExecuteError> {
-    validate::validate_calibration_json(json).map_err(ExecuteError::from)
-}
 
 /// Validate a calibration plan JSON and return the canonical (pretty-printed) form.
 /// @param json - `CalibrationEnvelope` as a plain object or its JSON string.
@@ -85,15 +63,7 @@ fn validate_calibration_json_inner(json: &str) -> Result<String, ExecuteError> {
 #[wasm_bindgen(js_name = validateCalibrationJson)]
 pub fn validate_calibration_json(json: JsValue) -> Result<String, JsValue> {
     let json: &str = &json_text(&json, "json")?;
-    validate_calibration_json_inner(json).map_err(execute_error_to_js)
-}
-
-/// Native-testable core of [`validate_calibration`]: strict load, then
-/// fail-fast static validation, returning the typed envelope.
-fn validate_calibration_inner(json: &str) -> Result<CalibrationEnvelope, ExecuteError> {
-    let envelope = validate::parse_envelope(json)?;
-    validate::validate_fail_fast(&envelope)?;
-    Ok(envelope)
+    validate::validate_calibration_json(json).map_err(|err| execute_error_to_js(err.into()))
 }
 
 /// Validate a calibration envelope and return it as a plain `CalibrationEnvelope` object.
@@ -112,17 +82,10 @@ fn validate_calibration_inner(json: &str) -> Result<CalibrationEnvelope, Execute
 #[wasm_bindgen(js_name = validateCalibration)]
 pub fn validate_calibration(envelope: JsValue) -> Result<JsValue, JsValue> {
     let envelope: &str = &json_text(&envelope, "envelope")?;
-    let envelope = validate_calibration_inner(envelope).map_err(execute_error_to_js)?;
-    to_js_value(&envelope)
-}
-
-/// Native-testable core of [`calibrate`].
-///
-/// Returns the `CalibrationResultEnvelope`, or an [`ExecuteError`] (which
-/// carries the structured `EnvelopeError` payload when the failure is
-/// envelope-related).
-fn calibrate_inner(envelope_json: &str) -> Result<CalibrationResultEnvelope, ExecuteError> {
-    engine::calibrate_from_json(envelope_json)
+    let parsed =
+        validate::parse_envelope(envelope).map_err(|err| execute_error_to_js(err.into()))?;
+    validate::validate_fail_fast(&parsed).map_err(|err| execute_error_to_js(err.into()))?;
+    to_js_value(&parsed)
 }
 
 /// Execute a calibration plan and return the full result envelope.
@@ -144,13 +107,8 @@ fn calibrate_inner(envelope_json: &str) -> Result<CalibrationResultEnvelope, Exe
 #[wasm_bindgen(js_name = calibrate)]
 pub fn calibrate(envelope_json: JsValue) -> Result<JsValue, JsValue> {
     let envelope_json: &str = &json_text(&envelope_json, "envelopeJson")?;
-    let result = calibrate_inner(envelope_json).map_err(execute_error_to_js)?;
+    let result = engine::calibrate_from_json(envelope_json).map_err(execute_error_to_js)?;
     to_js_value(&result)
-}
-
-/// Native-testable core of [`calibration_envelope_content_hash`].
-fn calibration_envelope_content_hash_inner(json: &str) -> Result<String, ExecuteError> {
-    Ok(validate::parse_envelope(json)?.content_hash()?)
 }
 
 /// Strict-load a calibration result envelope (default load limits).
@@ -165,11 +123,6 @@ fn load_result(json: &str) -> Result<CalibrationResultEnvelope, ExecuteError> {
             finstack_quant_calibration::api::errors::EnvelopeError::strict_load(&error),
         )
     })
-}
-
-/// Native-testable core of [`calibration_result_content_hash`].
-fn calibration_result_content_hash_inner(json: &str) -> Result<String, ExecuteError> {
-    Ok(load_result(json)?.content_hash()?)
 }
 
 /// Canonical content hash of a calibration envelope.
@@ -189,7 +142,11 @@ fn calibration_result_content_hash_inner(json: &str) -> Result<String, ExecuteEr
 #[wasm_bindgen(js_name = calibrationEnvelopeContentHash)]
 pub fn calibration_envelope_content_hash(envelope_json: JsValue) -> Result<String, JsValue> {
     let envelope_json: &str = &json_text(&envelope_json, "envelopeJson")?;
-    calibration_envelope_content_hash_inner(envelope_json).map_err(execute_error_to_js)
+    let envelope =
+        validate::parse_envelope(envelope_json).map_err(|err| execute_error_to_js(err.into()))?;
+    envelope
+        .content_hash()
+        .map_err(|err| execute_error_to_js(err.into()))
 }
 
 /// Canonical content hash of a calibration result envelope.
@@ -208,7 +165,10 @@ pub fn calibration_envelope_content_hash(envelope_json: JsValue) -> Result<Strin
 #[wasm_bindgen(js_name = calibrationResultContentHash)]
 pub fn calibration_result_content_hash(result_json: JsValue) -> Result<String, JsValue> {
     let result_json: &str = &json_text(&result_json, "resultJson")?;
-    calibration_result_content_hash_inner(result_json).map_err(execute_error_to_js)
+    let result = load_result(result_json).map_err(execute_error_to_js)?;
+    result
+        .content_hash()
+        .map_err(|err| execute_error_to_js(err.into()))
 }
 
 /// Pre-flight envelope validation without invoking the solver.
@@ -282,37 +242,38 @@ pub fn calibrate_bermudan_lmm_base_vol(
 }
 
 /// Map every execution stage to the same structured JavaScript error contract:
-/// a `CalibrationEnvelopeError` carrying the Rust-owned host payload.
+/// a `CalibrationEnvelopeError` carrying the structured Rust error payload.
 fn execute_error_to_js(err: ExecuteError) -> JsValue {
-    let host = err.host_error();
+    let details = err.details();
     #[cfg(target_arch = "wasm32")]
     {
+        let details_json = details.to_json();
         let error = structured_js_error(
             "CalibrationEnvelopeError",
-            &host.message,
-            Some(&host.kind),
-            Some(&host.details),
+            &details.cause,
+            Some(&details.category),
+            Some(&details_json),
         );
-        let solver_diagnostics = match host.solver_diagnostics.as_ref() {
+        let solver_diagnostics = match details.solver_diagnostics.as_ref() {
             Some(diagnostics) => match to_js_value(diagnostics) {
                 Ok(value) => value,
                 Err(serialization_error) => return serialization_error,
             },
             None => JsValue::UNDEFINED,
         };
-        let diagnostics = match to_js_value(&host.diagnostics) {
+        let diagnostics = match to_js_value(&details.diagnostics) {
             Ok(value) => value,
             Err(serialization_error) => return serialization_error,
         };
-        let step_id = host
+        let step_id = details
             .step_id
             .as_deref()
             .map_or(JsValue::UNDEFINED, JsValue::from);
         for (name, value) in [
-            ("stage", JsValue::from(host.stage.as_str())),
+            ("stage", JsValue::from(details.stage.as_str())),
             ("step_id", step_id),
             ("solver_diagnostics", solver_diagnostics),
-            ("details", JsValue::from(&host.details)),
+            ("details", JsValue::from(&details_json)),
             ("diagnostics", diagnostics),
         ] {
             let _ = js_sys::Reflect::set(&error, &JsValue::from(name), &value);
@@ -321,7 +282,7 @@ fn execute_error_to_js(err: ExecuteError) -> JsValue {
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
-        let _ = host;
+        let _ = details;
         JsValue::UNDEFINED
     }
 }
@@ -329,7 +290,9 @@ fn execute_error_to_js(err: ExecuteError) -> JsValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_calibration::api::schema::{CalibrationPlan, CalibrationSchema};
+    use finstack_quant_calibration::api::schema::{
+        CalibrationEnvelope, CalibrationPlan, CalibrationSchema,
+    };
 
     fn empty_envelope_json() -> String {
         let plan = CalibrationPlan {
@@ -341,7 +304,7 @@ mod tests {
         };
         let envelope = CalibrationEnvelope {
             schema_url: None,
-            schema: finstack_quant_calibration::api::schema::CalibrationSchema::CURRENT,
+            schema: CalibrationSchema::CURRENT,
             plan,
             market_data: Vec::new(),
             prior_market: Vec::new(),
@@ -352,7 +315,7 @@ mod tests {
     #[test]
     fn validate_calibration_json_accepts_empty_plan() {
         let json = empty_envelope_json();
-        let canonical = validate_calibration_json_inner(&json).expect("validate");
+        let canonical = validate::validate_calibration_json(&json).expect("validate");
         assert!(!canonical.is_empty());
     }
 
@@ -371,9 +334,12 @@ mod tests {
         let json = value.to_string();
 
         for error in [
-            validate_calibration_json_inner(&json)
-                .expect_err("validation must reject undefined quote sets"),
-            calibrate_inner(&json).expect_err("execution must reject undefined quote sets"),
+            ExecuteError::from(
+                validate::validate_calibration_json(&json)
+                    .expect_err("validation must reject undefined quote sets"),
+            ),
+            engine::calibrate_from_json(&json)
+                .expect_err("execution must reject undefined quote sets"),
         ] {
             let details = error.details();
             assert_eq!(details.stage.as_str(), "ingestion");
@@ -384,20 +350,19 @@ mod tests {
 
     #[test]
     fn calibrate_empty_plan_succeeds() {
-        // Drives the native-testable core: the `#[wasm_bindgen]` wrapper only
-        // adds the `JsValue` conversion, which aborts on non-wasm32 targets.
         let json = empty_envelope_json();
-        let result = calibrate_inner(&json).expect("execute");
+        let result = engine::calibrate_from_json(&json).expect("execute");
         let parsed = serde_json::to_value(&result).expect("json");
         assert!(parsed.is_object());
         assert!(parsed.get("result").is_some());
     }
 
     #[test]
-    fn validate_calibration_inner_returns_the_typed_envelope() {
-        let envelope = validate_calibration_inner(&empty_envelope_json()).expect("validate");
+    fn validate_calibration_returns_the_typed_envelope() {
+        let envelope = validate::parse_envelope(&empty_envelope_json()).expect("parse");
+        validate::validate_fail_fast(&envelope).expect("validate");
         assert_eq!(envelope.plan.id, "empty");
-        assert!(validate_calibration_inner("{ not json").is_err());
+        assert!(validate::parse_envelope("{ not json").is_err());
     }
 
     #[test]
@@ -418,9 +383,11 @@ mod tests {
     }
 
     #[test]
-    fn validate_calibration_json_inner_preserves_parse_diagnostic() {
-        let error = validate_calibration_json_inner("{ not valid json")
-            .expect_err("malformed JSON must error");
+    fn validate_calibration_json_preserves_parse_diagnostic() {
+        let error = ExecuteError::from(
+            validate::validate_calibration_json("{ not valid json")
+                .expect_err("malformed JSON must error"),
+        );
         let details = error.details();
         assert_eq!(details.stage.as_str(), "ingestion");
         assert_eq!(details.category, "strict_load");
@@ -429,16 +396,9 @@ mod tests {
     }
 
     #[test]
-    fn validate_calibration_json_inner_never_returns_empty_object_fallback() {
-        // A successfully validated envelope must round-trip to a non-trivial
-        // canonical JSON — never the literal `"{}"` that the old silent
-        // `unwrap_or_else` fallback would have produced on a (hypothetical)
-        // re-serialization failure. This guards the regression: the success
-        // path returns the real canonical form, and the error path (covered
-        // by `validate_calibration_json_inner_preserves_parse_diagnostic`)
-        // returns a structured error rather than a fake `"{}"` success.
+    fn validate_calibration_json_never_returns_empty_object_fallback() {
         let json = empty_envelope_json();
-        let canonical = validate_calibration_json_inner(&json).expect("validate");
+        let canonical = validate::validate_calibration_json(&json).expect("validate");
         assert_ne!(
             canonical, "{}",
             "canonical envelope JSON must not collapse to an empty object"
@@ -460,17 +420,20 @@ mod tests {
         )
         .expect("envelope");
         assert_eq!(
-            calibration_envelope_content_hash_inner(&json).expect("hash"),
+            validate::parse_envelope(&json)
+                .expect("parse")
+                .content_hash()
+                .expect("hash"),
             envelope.content_hash().expect("typed hash"),
         );
-        assert!(calibration_envelope_content_hash_inner("{ not json").is_err());
-        assert!(calibration_result_content_hash_inner("{ not json").is_err());
+        assert!(validate::parse_envelope("{ not json").is_err());
+        assert!(load_result("{ not json").is_err());
     }
 
     #[test]
-    fn calibrate_inner_preserves_malformed_envelope_diagnostic() {
-        let error =
-            calibrate_inner("{ this is not valid json").expect_err("malformed envelope must error");
+    fn calibrate_preserves_malformed_envelope_diagnostic() {
+        let error = engine::calibrate_from_json("{ this is not valid json")
+            .expect_err("malformed envelope must error");
         let details = error.details();
         let json = error.to_json();
         assert_eq!(details.stage.as_str(), "ingestion");

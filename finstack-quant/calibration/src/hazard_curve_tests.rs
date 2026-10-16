@@ -8,7 +8,7 @@ use crate::build::cds::build_cds_instrument;
 use crate::build::BuildCtx;
 use crate::quotes::cds::CdsQuote;
 use crate::quotes::ids::{Pillar, QuoteId};
-use crate::quotes::market_quote::MarketQuote;
+use crate::quotes::MarketQuote;
 use crate::recalibration::bump_hazard_spreads;
 use crate::{CalibrationConfig, CalibrationMethod, ResidualWeightingScheme};
 use finstack_quant_core::currency::Currency;

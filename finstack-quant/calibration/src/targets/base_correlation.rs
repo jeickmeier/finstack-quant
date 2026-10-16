@@ -6,9 +6,8 @@ use crate::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOve
 use crate::build::context::BuildCtx;
 use crate::build::prepared::PreparedQuote;
 use crate::config::CalibrationConfig;
-use crate::prepared::{CalibrationQuote, CdsTrancheCalibrationQuote};
 use crate::quotes::cds_tranche::CdsTrancheQuote;
-use crate::quotes::market_quote::{ExtractQuotes, MarketQuote};
+use crate::quotes::{ExtractQuotes, MarketQuote};
 use crate::solver::bootstrap::SequentialBootstrapper;
 use crate::solver::traits::BootstrapTarget;
 use crate::targets::util::ContextScratch;
@@ -22,6 +21,13 @@ use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer;
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
 use std::sync::Arc;
+
+/// Prepared CDS tranche quote paired with its normalized detachment percentage.
+#[derive(Debug, Clone)]
+pub(crate) struct CdsTrancheCalibrationQuote {
+    pub(crate) prepared: PreparedQuote<CdsTrancheQuote>,
+    pub(crate) detachment_pct: f64,
+}
 
 /// Validate that all detachment points in params are valid.
 fn validate_detachment_points(points: &[f64]) -> Result<()> {
@@ -196,7 +202,7 @@ impl BaseCorrelationTarget {
         build_ctx: &BuildCtx,
         overrides: &CdsTrancheBuildOverrides,
         time_day_count: DayCount,
-    ) -> Result<CalibrationQuote> {
+    ) -> Result<CdsTrancheCalibrationQuote> {
         // Retain the contractual upfront so pricing discounts it to settlement
         // using the same cashflow rules as the instrument exposed to callers.
         let instrument =
@@ -220,13 +226,16 @@ impl BaseCorrelationTarget {
         );
 
         let detachment_pct = normalize_pct(quote.detachment);
-        Ok(CalibrationQuote::CdsTranche(CdsTrancheCalibrationQuote {
+        Ok(CdsTrancheCalibrationQuote {
             prepared: prepared_quote,
             detachment_pct,
-        }))
+        })
     }
 
-    fn prepare_quotes(&self, quotes: Vec<CdsTrancheQuote>) -> Result<Vec<CalibrationQuote>> {
+    fn prepare_quotes(
+        &self,
+        quotes: Vec<CdsTrancheQuote>,
+    ) -> Result<Vec<CdsTrancheCalibrationQuote>> {
         if !self.params.detachment_points.is_empty() {
             validate_detachment_points(&self.params.detachment_points)?;
         }
@@ -330,15 +339,15 @@ impl BaseCorrelationTarget {
 }
 
 impl BootstrapTarget for BaseCorrelationTarget {
-    type Quote = CalibrationQuote;
+    type Quote = CdsTrancheCalibrationQuote;
     type Curve = BaseCorrelationCurve;
 
     fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
-        Some(quote.quote_value())
+        Some(quote.prepared.quote.upfront_pct)
     }
 
     fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
-        quote.quote_id().to_string()
+        quote.prepared.quote.id.as_str().to_string()
     }
 
     /// Base-correlation calibration opts into best-effort knots: the objective
@@ -350,12 +359,7 @@ impl BootstrapTarget for BaseCorrelationTarget {
     }
 
     fn quote_time(&self, quote: &Self::Quote) -> Result<f64> {
-        match quote {
-            CalibrationQuote::CdsTranche(pq) => Ok(pq.detachment_pct),
-            _ => Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::Invalid,
-            )),
-        }
+        Ok(quote.detachment_pct)
     }
 
     fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
@@ -414,14 +418,7 @@ impl BootstrapTarget for BaseCorrelationTarget {
     }
 
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
-        let pq = match quote {
-            CalibrationQuote::CdsTranche(pq) => &pq.prepared,
-            _ => {
-                return Err(finstack_quant_core::Error::Input(
-                    finstack_quant_core::InputError::Invalid,
-                ))
-            }
-        };
+        let pq = &quote.prepared;
 
         let tranche = pq
             .instrument

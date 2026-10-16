@@ -135,7 +135,7 @@
               "type": "null"
             }
           ],
-          "description": "Units of [`Self::residuals`], [`Self::max_residual`] and [`Self::rmse`].\n\nSet by every calibrator in this crate and mirrored as the\n`residual_units` entry of [`Self::metadata`]. `None` only on reports\nbuilt directly through [`Self::new`] or\n[`Self::for_type_with_tolerance`] without a solver, and on JSON\nwritten before this field existed."
+          "description": "Units of [`Self::residuals`], [`Self::max_residual`] and [`Self::rmse`].\n\nSet by every calibrator in this crate and mirrored as the\n`residual_units` entry of [`Self::metadata`]. `None` only on reports\nbuilt directly through [`Self::new`] or\n`Self::for_type_with_tolerance` without a solver, and on JSON\nwritten before this field existed."
         },
         "residuals": {
           "additionalProperties": {
@@ -194,14 +194,14 @@
               "type": "null"
             }
           ],
-          "description": "Numerical procedure that produced this report.\n\nSet by every calibrator in this crate. `None` only on reports built\ndirectly through [`Self::new`] or [`Self::for_type_with_tolerance`]\nwithout a solver, and on JSON written before this field existed."
+          "description": "Numerical procedure that produced this report.\n\nSet by every calibrator in this crate. `None` only on reports built\ndirectly through [`Self::new`] or `Self::for_type_with_tolerance`\nwithout a solver, and on JSON written before this field existed."
         },
         "success": {
           "description": "User-facing success flag. True only if both fitting and validation passed.",
           "type": "boolean"
         },
         "success_tolerance": {
-          "description": "Configured tolerance used to determine [`Self::success`] from residuals.\n\nSet by [`Self::for_type_with_tolerance`]; `None` for reports built via [`Self::new`]\ndirectly (no tolerance gate applied). This is the typed source of truth for the\nsuccess-gate tolerance; it is distinct from `solver_config.tolerance()`, which controls\nwhen the numerical root-finder stops.",
+          "description": "Configured tolerance used to determine [`Self::success`] from residuals.\n\nSet by `Self::for_type_with_tolerance`; `None` for reports built via [`Self::new`]\ndirectly (no tolerance gate applied). This is the typed source of truth for the\nsuccess-gate tolerance; it is distinct from `solver_config.tolerance()`, which controls\nwhen the numerical root-finder stops.",
           "format": "double",
           "type": [
             "number",

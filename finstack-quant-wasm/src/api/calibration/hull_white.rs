@@ -16,9 +16,10 @@ use crate::api::core::market_data::JsDiscountCurve;
 use crate::utils::input::{from_js_json, js_f64, js_opt_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_calibration::hull_white::{
-    self as rust_hw, CapFloorCalibrationConfig, CapFloorQuote, HullWhiteCalibrationParams,
-    HullWhiteParams, PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionQuote,
+    self as rust_hw, CapFloorCalibrationConfig, CapFloorQuote, PiecewiseSigmaCalibrationConfig,
+    SwapFrequency, SwaptionQuote,
 };
+use finstack_quant_models::rates::hull_white::{HullWhiteCalibrationParams, HullWhiteParams};
 use wasm_bindgen::prelude::*;
 
 /// An omitted frequency is the Rust default (`SwapFrequency::default()`).

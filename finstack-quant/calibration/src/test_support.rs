@@ -5,7 +5,7 @@ use crate::api::market_datum::{
 };
 use crate::api::prior_market::PriorMarketObject;
 use crate::quotes::ids::QuoteId;
-use crate::quotes::market_quote::MarketQuote;
+use crate::quotes::MarketQuote;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::{CurveState, MarketContext, MarketContextState};
 use finstack_quant_core::Result;

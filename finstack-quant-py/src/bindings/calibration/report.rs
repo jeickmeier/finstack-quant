@@ -461,12 +461,6 @@ impl PyCalibrationValidationReport {
     pub(crate) fn from_inner(inner: CalibrationValidationReport) -> Self {
         Self { inner }
     }
-
-    pub(crate) fn to_json_pretty(&self, py: Python<'_>) -> PyResult<String> {
-        self.inner
-            .to_json_pretty()
-            .map_err(|e| super::envelope_error_to_py(py, e))
-    }
 }
 
 #[pymethods]

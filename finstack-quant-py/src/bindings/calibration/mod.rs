@@ -15,13 +15,10 @@ mod schema;
 mod validation;
 
 pub(crate) use config::{PyCalibrationConfig, PyRateBounds, PySolverConfig, PyValidationConfig};
-pub(crate) use envelope::{
-    PyCalibrationEnvelope, PyCalibrationPlan, PyCalibrationStep, PyCdsQuote, PyRateQuote,
-    PyVolQuote,
-};
+pub(crate) use envelope::{PyCalibrationEnvelope, PyCalibrationPlan, PyCalibrationStep};
 pub(crate) use quotes::{
-    PyCdsTrancheQuote, PyCollateralEntry, PyDividendScheduleDatum, PyFxSpotDatum, PyInflationQuote,
-    PyPriceDatum, PyXccyQuote,
+    PyCdsQuote, PyCdsTrancheQuote, PyCollateralEntry, PyDividendScheduleDatum, PyFxSpotDatum,
+    PyInflationQuote, PyPriceDatum, PyRateQuote, PyVolQuote, PyXccyQuote,
 };
 pub(crate) use report::{
     PyCalibrationDiagnostics, PyCalibrationReport, PyCalibrationValidationReport, PyQuoteQuality,
@@ -48,22 +45,23 @@ create_exception!(
      `message`, `code`, `expected_version`, ...) attributes for programmatic handling."
 );
 
-/// Attach the Rust-owned host-error payload to `CalibrationEnvelopeError`.
+/// Attach the structured Rust execution-error payload to `CalibrationEnvelopeError`.
 pub(crate) fn execute_error_to_py(py: Python<'_>, err: ExecuteError) -> PyErr {
-    let host = err.host_error();
-    let exc = CalibrationEnvelopeError::new_err(host.message.clone());
+    let details = err.details();
+    let details_json = details.to_json();
+    let exc = CalibrationEnvelopeError::new_err(details.cause.clone());
     let value = exc.value(py);
-    let diagnostics = match strict_load_diagnostics_to_py(py, &host.diagnostics) {
+    let diagnostics = match strict_load_diagnostics_to_py(py, &details.diagnostics) {
         Ok(list) => list,
         Err(convert_err) => {
             return PyRuntimeError::new_err(format!(
                 "failed to convert calibration diagnostics ({}): underlying calibration error: {}",
                 convert_err.value(py),
-                host.message
+                details.cause
             ))
         }
     };
-    let solver_diagnostics = match host
+    let solver_diagnostics = match details
         .solver_diagnostics
         .as_ref()
         .map(|diagnostics| crate::bindings::pandas_utils::serde_to_py(py, diagnostics))
@@ -74,15 +72,15 @@ pub(crate) fn execute_error_to_py(py: Python<'_>, err: ExecuteError) -> PyErr {
             return PyRuntimeError::new_err(format!(
                 "failed to convert calibration solver diagnostics ({}): underlying calibration error: {}",
                 convert_err.value(py),
-                host.message
+                details.cause
             ))
         }
     };
     let attrs: [(&str, PyResult<()>); 6] = [
-        ("kind", value.setattr("kind", host.kind)),
-        ("stage", value.setattr("stage", host.stage.as_str())),
-        ("details", value.setattr("details", host.details)),
-        ("step_id", value.setattr("step_id", host.step_id)),
+        ("kind", value.setattr("kind", details.category)),
+        ("stage", value.setattr("stage", details.stage.as_str())),
+        ("details", value.setattr("details", details_json)),
+        ("step_id", value.setattr("step_id", details.step_id)),
         (
             "solver_diagnostics",
             value.setattr("solver_diagnostics", solver_diagnostics),
@@ -95,7 +93,7 @@ pub(crate) fn execute_error_to_py(py: Python<'_>, err: ExecuteError) -> PyErr {
                 "failed to attach '{name}' attribute to CalibrationEnvelopeError \
                  ({}): underlying calibration error: {}",
                 setattr_err.value(py),
-                host.message
+                details.cause
             ));
         }
     }
@@ -174,8 +172,8 @@ pub(crate) fn extract_envelope(
 #[pyfunction]
 #[pyo3(text_signature = "(envelope)")]
 fn validate_calibration_json(py: Python<'_>, envelope: &Bound<'_, PyAny>) -> PyResult<String> {
-    let envelope = validate_calibration(py, envelope)?.inner;
-    envelope
+    validate_calibration(py, envelope)?
+        .inner
         .to_json_pretty()
         .map_err(|error| envelope_error_to_py(py, error))
 }
@@ -255,7 +253,10 @@ fn dry_run(py: Python<'_>, envelope: &Bound<'_, PyAny>) -> PyResult<PyCalibratio
 #[pyfunction]
 #[pyo3(text_signature = "(envelope)")]
 fn dry_run_json(py: Python<'_>, envelope: &Bound<'_, PyAny>) -> PyResult<String> {
-    dry_run(py, envelope)?.to_json_pretty(py)
+    dry_run(py, envelope)?
+        .inner
+        .to_json_pretty()
+        .map_err(|error| envelope_error_to_py(py, error))
 }
 
 /// Execute a calibration plan and return the full result.

@@ -448,10 +448,8 @@ impl PyCalibrationConfig {
 
     /// Post-solve validation mode (``"warn"`` or ``"error"``).
     #[getter]
-    fn validation_mode(&self) -> PyResult<String> {
-        let value = serde_json::to_value(&self.inner.validation_mode)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize validation_mode"))?;
-        Ok(value.as_str().unwrap_or_default().to_string())
+    fn validation_mode(&self) -> String {
+        self.inner.validation_mode.as_str().to_string()
     }
 
     /// Admissible-rate bounds.

@@ -7,8 +7,8 @@ use crate::config::RatesStepConventions;
 use crate::quotes::ids::Pillar;
 #[cfg(test)]
 use crate::quotes::ids::QuoteId;
-use crate::quotes::market_quote::MarketQuote;
 use crate::quotes::rates::RateQuote;
+use crate::quotes::MarketQuote;
 use crate::step_runtime;
 use crate::targets::discount::DiscountCurveTarget;
 use crate::targets::rate_recipe::{ois_compounding_from_recipe, rate_quotes_from_recipe};
@@ -331,7 +331,7 @@ fn discount_replay_conventions(
 /// * `target_context` - Dependency market to use after the quote shock, including
 ///   the bumped linked discount curve when both curves change.
 /// * `bump` - Parallel or tenor-specific quote shock in basis points.
-pub fn bump_forward_curve_from_rate_calibration(
+pub(crate) fn bump_forward_curve_from_rate_calibration(
     curve: &ForwardCurve,
     calibration: &RateCalibrationRecipe,
     source_context: &MarketContext,

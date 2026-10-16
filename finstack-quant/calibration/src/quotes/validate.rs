@@ -23,6 +23,17 @@ pub(crate) fn positive(value: f64, field: &str) -> Result<()> {
     Ok(())
 }
 
+/// Reject non-finite or negative values.
+pub(crate) fn non_negative(value: f64, field: &str) -> Result<()> {
+    finite(value, field)?;
+    if value < 0.0 {
+        return Err(Error::Validation(format!(
+            "{field} must be non-negative; got {value}"
+        )));
+    }
+    Ok(())
+}
+
 /// Reject values outside the closed unit interval.
 pub(crate) fn unit_interval(value: f64, field: &str) -> Result<()> {
     finite(value, field)?;

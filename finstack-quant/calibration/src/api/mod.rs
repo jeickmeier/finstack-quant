@@ -12,7 +12,6 @@ pub mod authoring;
 pub(crate) mod context_builder;
 pub mod engine;
 pub mod errors;
-pub mod host_error;
 pub mod market_datum;
 pub mod prior_market;
 pub mod schema;

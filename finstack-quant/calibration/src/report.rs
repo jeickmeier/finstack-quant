@@ -217,7 +217,7 @@ impl CalibrationDiagnostics {
     ///
     /// This is a lightweight computation that does not require the Jacobian.
     /// The condition number and the Jacobian are left as `None`.
-    pub fn from_residuals(residuals: &[f64]) -> Self {
+    pub(crate) fn from_residuals(residuals: &[f64]) -> Self {
         let n = residuals.len();
         let max_residual = residuals.iter().map(|r| r.abs()).fold(0.0_f64, f64::max);
         let rms_residual = if n > 0 {
@@ -434,7 +434,7 @@ pub struct CalibrationReport {
 
     /// Configured tolerance used to determine [`Self::success`] from residuals.
     ///
-    /// Set by [`Self::for_type_with_tolerance`]; `None` for reports built via [`Self::new`]
+    /// Set by `Self::for_type_with_tolerance`; `None` for reports built via [`Self::new`]
     /// directly (no tolerance gate applied). This is the typed source of truth for the
     /// success-gate tolerance; it is distinct from `solver_config.tolerance()`, which controls
     /// when the numerical root-finder stops.
@@ -444,7 +444,7 @@ pub struct CalibrationReport {
     /// Numerical procedure that produced this report.
     ///
     /// Set by every calibrator in this crate. `None` only on reports built
-    /// directly through [`Self::new`] or [`Self::for_type_with_tolerance`]
+    /// directly through [`Self::new`] or `Self::for_type_with_tolerance`
     /// without a solver, and on JSON written before this field existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solver_method: Option<SolverMethod>,
@@ -454,7 +454,7 @@ pub struct CalibrationReport {
     /// Set by every calibrator in this crate and mirrored as the
     /// `residual_units` entry of [`Self::metadata`]. `None` only on reports
     /// built directly through [`Self::new`] or
-    /// [`Self::for_type_with_tolerance`] without a solver, and on JSON
+    /// `Self::for_type_with_tolerance` without a solver, and on JSON
     /// written before this field existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub residual_units: Option<ResidualUnits>,
@@ -550,21 +550,8 @@ impl CalibrationReport {
     }
 
     /// Mark this report as a plan-level aggregation over `step_reports`.
-    ///
-    /// The residual map of a plan report is expressed as
-    /// `|residual| / step_tolerance`, so the max/RMSE computed by
-    /// [`Self::new`] are ratios. This method moves them to
-    /// [`Self::max_residual_ratio`] / [`Self::rmse_ratio`] and recomputes
-    /// [`Self::max_residual`] / [`Self::rmse`] from the raw per-step
-    /// reports: the maximum step `max_residual` and the residual-count
-    /// weighted RMSE of the step RMSEs.
-    ///
-    /// # Arguments
-    ///
-    /// * `step_reports` - Per-step reports (raw residual units) whose raw
-    ///   statistics replace the ratio statistics on this report.
     #[must_use]
-    pub fn with_plan_aggregation(
+    pub(crate) fn with_plan_aggregation(
         mut self,
         step_reports: &BTreeMap<String, CalibrationReport>,
     ) -> Self {
@@ -590,76 +577,58 @@ impl CalibrationReport {
 
     /// Attach an explanation trace to this report.
     #[must_use]
-    pub fn with_explanation(mut self, trace: ExplanationTrace) -> Self {
+    pub(crate) fn with_explanation(mut self, trace: ExplanationTrace) -> Self {
         self.explanation = Some(trace);
         self
     }
 
     /// Attach model/methodology version to this report.
-    ///
-    /// Used for audit trails and regulatory compliance. Examples:
-    /// - "ISDA Standard Model v1.8.2" for CDS hazard curve calibration
-    /// - "Multi-curve OIS discounting" for discount curve calibration
     #[must_use]
-    pub fn with_model_version(mut self, version: impl Into<String>) -> Self {
+    pub(crate) fn with_model_version(mut self, version: impl Into<String>) -> Self {
         self.model_version = Some(version.into());
         self
     }
 
     /// Attach calibration diagnostics to this report.
     #[must_use]
-    pub fn with_diagnostics(mut self, diagnostics: CalibrationDiagnostics) -> Self {
+    pub(crate) fn with_diagnostics(mut self, diagnostics: CalibrationDiagnostics) -> Self {
         self.diagnostics = Some(diagnostics);
         self
     }
 
     /// Add metadata key-value pair to the report (builder pattern).
     #[must_use]
-    pub fn with_metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+    pub(crate) fn with_metadata(
+        mut self,
+        key: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
         self.metadata.insert(key.into(), value.into());
         self
     }
 
     /// Update metadata key-value pair on an existing report.
-    pub fn update_metadata(&mut self, key: impl Into<String>, value: impl Into<String>) {
+    pub(crate) fn update_metadata(&mut self, key: impl Into<String>, value: impl Into<String>) {
         self.metadata.insert(key.into(), value.into());
     }
 
     /// Attach the smile parameters fitted per quoted expiry.
-    ///
-    /// # Arguments
-    ///
-    /// * `fitted_slices` - One entry per quoted expiry, in increasing expiry
-    ///   order; stored in [`Self::fitted_slices`].
     #[must_use]
-    pub fn with_fitted_slices(mut self, fitted_slices: Vec<FittedSlice>) -> Self {
+    pub(crate) fn with_fitted_slices(mut self, fitted_slices: Vec<FittedSlice>) -> Self {
         self.fitted_slices = fitted_slices;
         self
     }
 
     /// Record the numerical procedure that produced this report.
-    ///
-    /// # Arguments
-    ///
-    /// * `method` - Solver procedure stored in [`Self::solver_method`].
     #[must_use]
-    pub fn with_solver_method(mut self, method: SolverMethod) -> Self {
+    pub(crate) fn with_solver_method(mut self, method: SolverMethod) -> Self {
         self.solver_method = Some(method);
         self
     }
 
     /// Record the units of this report's residuals.
-    ///
-    /// Sets [`Self::residual_units`] and mirrors the wire name into the
-    /// `residual_units` metadata entry so the typed field and the metadata
-    /// cannot disagree.
-    ///
-    /// # Arguments
-    ///
-    /// * `units` - Units of [`Self::residuals`], [`Self::max_residual`] and
-    ///   [`Self::rmse`].
     #[must_use]
-    pub fn with_residual_units(mut self, units: ResidualUnits) -> Self {
+    pub(crate) fn with_residual_units(mut self, units: ResidualUnits) -> Self {
         self.residual_units = Some(units);
         self.metadata
             .insert("residual_units".to_string(), units.as_str().to_string());
@@ -668,14 +637,14 @@ impl CalibrationReport {
 
     /// Attach the typed success-gate tolerance used to determine [`Self::success`].
     #[must_use]
-    pub fn with_success_tolerance(mut self, tolerance: f64) -> Self {
+    pub(crate) fn with_success_tolerance(mut self, tolerance: f64) -> Self {
         self.success_tolerance = Some(tolerance);
         self
     }
 
     /// Attach validation outcome. If validation fails, the report is marked unsuccessful.
     #[must_use]
-    pub fn with_validation_result(mut self, passed: bool, error: Option<String>) -> Self {
+    pub(crate) fn with_validation_result(mut self, passed: bool, error: Option<String>) -> Self {
         self.validation_passed = passed;
         self.validation_error = error;
 
@@ -702,34 +671,8 @@ impl CalibrationReport {
 
     /// Explicitly mark the report as having encountered penalty residuals during
     /// the solve (provenance-based penalty detection).
-    ///
-    /// The magnitude-based threshold in `compute_residual_diagnostics` cannot
-    /// detect small penalty values produced by `fill_penalty` in the optimizer
-    /// when bound violations are tiny (e.g., `PENALTY * d/(1+d) ≪ RESIDUAL_PENALTY_ABS_MIN`).
-    /// Callers that KNOW bound violations occurred during solving (e.g., because their
-    /// `clamp_to_bounds` count was non-zero) MUST call `with_has_penalty_residuals(true)` so
-    /// the report is correctly flagged.
-    ///
-    /// When `has_penalty` is `true`:
-    /// - `success` is set to `false`.
-    /// - `convergence_reason` is updated to mention "penalty residuals encountered".
-    ///
-    /// When `has_penalty` is `false`, this is a no-op (does not reset a previously
-    /// detected penalty).
-    ///
-    /// # Example
-    /// ```
-    /// use finstack_quant_calibration::CalibrationReport;
-    /// use std::collections::BTreeMap;
-    ///
-    /// # let residuals = BTreeMap::new();
-    /// # let n_clamped = 1usize;
-    /// // If the solver clamped any params to bounds, flag the report.
-    /// let report = CalibrationReport::for_type_with_tolerance("global_fit", residuals, 10, 1e-6)
-    ///     .with_has_penalty_residuals(n_clamped > 0);
-    /// ```
     #[must_use]
-    pub fn with_has_penalty_residuals(mut self, has_penalty: bool) -> Self {
+    pub(crate) fn with_has_penalty_residuals(mut self, has_penalty: bool) -> Self {
         if !has_penalty {
             return self;
         }
@@ -751,7 +694,7 @@ impl CalibrationReport {
     }
 
     /// Update solver configuration on an existing report.
-    pub fn update_solver_config(&mut self, config: SolverConfig) {
+    pub(crate) fn update_solver_config(&mut self, config: SolverConfig) {
         self.solver_config = config;
         self.metadata.insert(
             "solver_tolerance".to_string(),
@@ -764,43 +707,7 @@ impl CalibrationReport {
     }
 
     /// Create a calibration report for a specific calibration type with tolerance checking.
-    ///
-    /// This method properly determines success/failure based on:
-    /// - Whether any residuals contain PENALTY values (indicating hard failures)
-    /// - Whether max_residual exceeds the configured tolerance
-    ///
-    /// # Arguments
-    /// * `calibration_type` - Type identifier for the calibration (e.g., "yield_curve")
-    /// * `residuals` - Map of instrument labels to their calibration residuals
-    /// * `iterations` - Number of solver iterations performed
-    /// * `tolerance` - Configured tolerance threshold for success determination
-    ///
-    /// # Example
-    /// ```
-    /// use finstack_quant_calibration::CalibrationReport;
-    /// use std::collections::BTreeMap;
-    ///
-    /// # fn main() -> finstack_quant_core::Result<()> {
-    /// let residuals = BTreeMap::from([("DEP-1D".to_string(), 1e-6)]);
-    /// let iterations = 5;
-    /// let tolerance = 1e-4;
-    ///
-    /// let report = CalibrationReport::for_type_with_tolerance(
-    ///     "yield_curve",
-    ///     residuals,
-    ///     iterations,
-    ///     tolerance,
-    /// );
-    /// if !report.success {
-    ///     return Err(finstack_quant_core::Error::Calibration {
-    ///         message: report.convergence_reason.clone(),
-    ///         category: "calibration".to_string(),
-    ///     });
-    /// }
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn for_type_with_tolerance(
+    pub(crate) fn for_type_with_tolerance(
         calibration_type: impl Into<String>,
         residuals: BTreeMap<String, f64>,
         iterations: usize,

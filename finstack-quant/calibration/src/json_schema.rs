@@ -9,9 +9,7 @@ fn calibration_examples() -> finstack_quant_core::Result<Vec<Value>> {
 }
 
 fn market_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    example(&crate::quotes::market_quote::MarketQuote::Rates(
-        rate_quote_example()?,
-    ))
+    example(&crate::quotes::MarketQuote::Rates(rate_quote_example()?))
 }
 
 fn calibration_envelope_example() -> crate::api::schema::CalibrationEnvelope {
@@ -55,14 +53,14 @@ fn step_params_examples() -> finstack_quant_core::Result<Vec<Value>> {
 
 /// A 5Y-into-5Y ATM swaption at 88 bp normal volatility.
 fn hull_white_swaption_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    example(&crate::hull_white::SwaptionQuote::try_new(
+    example(&crate::hull_white::SwaptionQuote::new(
         5.0, 5.0, 0.0088, true,
     )?)
 }
 
 /// A 5Y cap struck at 3% and quoted at 88 bp normal volatility.
 fn hull_white_cap_floor_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    example(&crate::hull_white::CapFloorQuote::try_new(
+    example(&crate::hull_white::CapFloorQuote::new(
         5.0, 0.03, 0.0088, true, true,
     )?)
 }
@@ -206,7 +204,7 @@ fn build_artifacts() -> Vec<SchemaArtifact> {
         .with_kind(SchemaKind::Output)
         .with_summary("Dry-run findings for a calibration envelope; nothing is solved.")
         .with_examples(calibration_validation_report_examples),
-        SchemaArtifact::new::<crate::quotes::market_quote::MarketQuote>(
+        SchemaArtifact::new::<crate::quotes::MarketQuote>(
             "schemas/market/1/market_quote.schema.json",
             "https://finstack_quant.dev/schemas/market/1/market_quote.schema.json",
             "Market Quote",

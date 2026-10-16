@@ -158,12 +158,20 @@ pub enum ValidationMode {
     Error,
 }
 
+impl ValidationMode {
+    /// Canonical lowercase wire label (`"warn"` or `"error"`).
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Warn => "warn",
+            Self::Error => "error",
+        }
+    }
+}
+
 impl std::fmt::Display for ValidationMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Warn => write!(f, "warn"),
-            Self::Error => write!(f, "error"),
-        }
+        f.write_str(self.as_str())
     }
 }
 

@@ -66,24 +66,22 @@ mod quotes;
 mod swaption;
 mod targets;
 
-pub use cap_floor::{
+pub use cap_floor::PiecewiseSigmaCalibrationConfig;
+pub(crate) use cap_floor::{
     bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
-    calibrate_hull_white_to_cap_floors_with_fn, PiecewiseSigmaCalibrationConfig,
+    calibrate_hull_white_to_cap_floors_with_fn,
 };
-pub use cap_schedule::{CapFloorSchedule, CapletSchedule};
+pub(crate) use cap_schedule::{CapFloorSchedule, CapletSchedule};
 pub use curves::{
     bootstrap_hull_white_sigma_schedule_to_cap_floors, calibrate_hull_white_to_cap_floors,
     calibrate_hull_white_to_swaptions,
 };
-pub use finstack_quant_models::rates::hull_white::{
-    capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key, hw1f_scalar_keys,
-    HullWhiteCalibrationParams, HullWhiteParams,
+use finstack_quant_models::rates::hull_white::{HullWhiteCalibrationParams, HullWhiteParams};
+pub use quotes::{CapFloorCalibrationConfig, CapFloorQuote, SwapFrequency, SwaptionQuote};
+pub(crate) use quotes::{SwaptionFloatingPeriod, SwaptionSchedule};
+pub(crate) use swaption::{
+    calibrate_hull_white_to_swaptions_with_fn, contractual_swap_annuity_and_forward,
 };
-pub use quotes::{
-    CapFloorCalibrationConfig, CapFloorQuote, SwapFrequency, SwaptionFloatingPeriod, SwaptionQuote,
-    SwaptionSchedule,
-};
-pub use swaption::calibrate_hull_white_to_swaptions_with_fn;
 
 #[cfg(test)]
 pub(crate) use contractual_swaption::price as contractual_swaption_price;

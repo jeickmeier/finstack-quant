@@ -4,15 +4,16 @@
 //! `VolQuote.option_vol(...)` and `RateBounds.for_currency(...)` as static
 //! methods on typed wrappers. WASM calibration inputs are plain objects, so
 //! each constructor is a free function returning the serde wire object of the
-//! Rust type. Both hosts marshal their arguments into wire fields and call the
-//! same Rust constructors (`RateQuote::from_wire_fields`,
-//! `CdsQuote::from_wire_fields`, `VolQuote::from_wire_fields`), which own the
-//! defaults, the strict deserialization and the quote validation.
+//! Rust type. Both hosts convert their arguments and call the same typed Rust
+//! constructors (`RateQuote::deposit`, `CdsQuote::par_spread`,
+//! `VolQuote::option_vol`, ...), which own the defaults and quote validation.
 
-use super::fields::Fields;
-use crate::utils::input::js_string;
-use crate::utils::{to_js_err, to_js_value};
+use crate::utils::input::{
+    from_js_json, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_string,
+};
+use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_calibration::quotes::cds::CdsQuote;
+use finstack_quant_calibration::quotes::ids::Pillar;
 use finstack_quant_calibration::quotes::inflation::InflationQuote;
 use finstack_quant_calibration::quotes::rates::RateQuote;
 use finstack_quant_calibration::quotes::vol::VolQuote;
@@ -20,25 +21,20 @@ use finstack_quant_calibration::RateBounds;
 use finstack_quant_core::currency::Currency;
 use wasm_bindgen::prelude::*;
 
-fn rate_quote(kind: &str, fields: Fields) -> Result<JsValue, JsValue> {
-    to_js_value(&RateQuote::from_wire_fields(kind, fields.0).map_err(to_js_err)?)
+fn js_pillar(value: &JsValue, label: &str) -> Result<Pillar, JsValue> {
+    match value.as_string() {
+        Some(text) => text.parse::<Pillar>().map_err(to_js_err),
+        None => from_js_json(value, label),
+    }
 }
 
-fn cds_quote(kind: &str, fields: Fields) -> Result<JsValue, JsValue> {
-    to_js_value(&CdsQuote::from_wire_fields(kind, fields.0).map_err(to_js_err)?)
-}
-
-fn vol_quote(kind: &str, fields: Fields) -> Result<JsValue, JsValue> {
-    to_js_value(&VolQuote::from_wire_fields(kind, fields.0).map_err(to_js_err)?)
-}
-
-fn inflation_quote(kind: &str, fields: Fields) -> Result<JsValue, JsValue> {
-    to_js_value(&InflationQuote::from_wire_fields(kind, fields.0).map_err(to_js_err)?)
+fn js_date(value: &JsValue, label: &str) -> Result<time::Date, JsValue> {
+    parse_iso_date(&js_string(value, label)?)
 }
 
 /// Build a money-market deposit rate quote.
 ///
-/// Free-function twin of Python `RateQuote.deposit` (Rust `RateQuote::from_wire_fields`).
+/// Free-function twin of Python `RateQuote.deposit` (Rust `RateQuote::deposit`).
 /// @param id - Unique quote identifier (the residual key in calibration reports).
 /// @param index - Rate index identifier (for example `"USD-SOFR-OIS"`).
 /// @param pillar - Maturity pillar: tenor string (`"3M"`, `"5Y"`), ISO-8601 date string, or a `{"tenor": {...}}` / `{"date": "..."}` object.
@@ -56,17 +52,19 @@ pub fn rate_quote_deposit(
     pillar: JsValue,
     rate: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let fields = Fields::new()
-        .string("id", &id, "id")?
-        .string("index", &index, "index")?
-        .pillar("pillar", &pillar, "pillar")?
-        .number("rate", &rate, "rate")?;
-    rate_quote("deposit", fields)
+    let quote = RateQuote::deposit(
+        js_string(&id, "id")?,
+        js_string(&index, "index")?,
+        js_pillar(&pillar, "pillar")?,
+        js_f64(&rate, "rate")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&quote)
 }
 
 /// Build a forward-rate-agreement quote.
 ///
-/// Free-function twin of Python `RateQuote.fra` (Rust `RateQuote::from_wire_fields`).
+/// Free-function twin of Python `RateQuote.fra` (Rust `RateQuote::fra`).
 /// @param id - Unique quote identifier (the residual key in calibration reports).
 /// @param index - Rate index identifier of the underlying floating rate.
 /// @param start - Accrual start pillar: tenor string, ISO-8601 date string, or pillar object.
@@ -86,18 +84,20 @@ pub fn rate_quote_fra(
     end: JsValue,
     rate: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let fields = Fields::new()
-        .string("id", &id, "id")?
-        .string("index", &index, "index")?
-        .pillar("start", &start, "start")?
-        .pillar("end", &end, "end")?
-        .number("rate", &rate, "rate")?;
-    rate_quote("fra", fields)
+    let quote = RateQuote::fra(
+        js_string(&id, "id")?,
+        js_string(&index, "index")?,
+        js_pillar(&start, "start")?,
+        js_pillar(&end, "end")?,
+        js_f64(&rate, "rate")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&quote)
 }
 
 /// Build an interest-rate futures price quote.
 ///
-/// Free-function twin of Python `RateQuote.futures` (Rust `RateQuote::from_wire_fields`).
+/// Free-function twin of Python `RateQuote.futures` (Rust `RateQuote::futures`).
 /// @param id - Unique quote identifier (the residual key in calibration reports).
 /// @param contract - Futures contract identifier (for example `"CME:SR3"`).
 /// @param expiry - ISO-8601 last trading date of the contract.
@@ -117,22 +117,20 @@ pub fn rate_quote_futures(
     price: JsValue,
     convexity_adjustment: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let fields = Fields::new()
-        .string("id", &id, "id")?
-        .string("contract", &contract, "contract")?
-        .date("expiry", &expiry, "expiry")?
-        .number("price", &price, "price")?
-        .opt_number(
-            "convexity_adjustment",
-            convexity_adjustment.as_ref(),
-            "convexityAdjustment",
-        )?;
-    rate_quote("futures", fields)
+    let quote = RateQuote::futures(
+        js_string(&id, "id")?,
+        js_string(&contract, "contract")?.as_str(),
+        js_date(&expiry, "expiry")?,
+        js_f64(&price, "price")?,
+        js_opt_f64(convexity_adjustment.as_ref(), "convexityAdjustment")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&quote)
 }
 
 /// Build a par swap rate quote.
 ///
-/// Free-function twin of Python `RateQuote.swap` (Rust `RateQuote::from_wire_fields`).
+/// Free-function twin of Python `RateQuote.swap` (Rust `RateQuote::swap`).
 /// @param id - Unique quote identifier (the residual key in calibration reports).
 /// @param index - Floating-leg index identifier (for example `"USD-SOFR-OIS"`).
 /// @param pillar - Swap maturity pillar: tenor string (`"5Y"`), ISO-8601 date string, or pillar object.
@@ -152,18 +150,20 @@ pub fn rate_quote_swap(
     rate: JsValue,
     spread_decimal: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let fields = Fields::new()
-        .string("id", &id, "id")?
-        .string("index", &index, "index")?
-        .pillar("pillar", &pillar, "pillar")?
-        .number("rate", &rate, "rate")?
-        .opt_number("spread_decimal", spread_decimal.as_ref(), "spreadDecimal")?;
-    rate_quote("swap", fields)
+    let quote = RateQuote::swap(
+        js_string(&id, "id")?,
+        js_string(&index, "index")?,
+        js_pillar(&pillar, "pillar")?,
+        js_f64(&rate, "rate")?,
+        js_opt_f64(spread_decimal.as_ref(), "spreadDecimal")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&quote)
 }
 
 /// Build a running par-spread CDS quote.
 ///
-/// Free-function twin of Python `CdsQuote.par_spread` (Rust `CdsQuote::from_wire_fields`).
+/// Free-function twin of Python `CdsQuote.par_spread` (Rust `CdsQuote::par_spread`).
 /// @param id - Unique quote identifier.
 /// @param entity - Reference entity name.
 /// @param currency - ISO-4217 contract currency of the CDS convention.
@@ -187,19 +187,22 @@ pub fn cds_quote_par_spread(
     spread_bp: JsValue,
     recovery_rate: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let fields = Fields::new()
-        .string("id", &id, "id")?
-        .string("entity", &entity, "entity")?
-        .cds_convention(&currency, &doc_clause)?
-        .pillar("pillar", &pillar, "pillar")?
-        .number("spread_bp", &spread_bp, "spreadBp")?
-        .number("recovery_rate", &recovery_rate, "recoveryRate")?;
-    cds_quote("cds_par_spread", fields)
+    let quote = CdsQuote::par_spread(
+        js_string(&id, "id")?,
+        js_string(&entity, "entity")?,
+        &js_string(&currency, "currency")?,
+        &js_string(&doc_clause, "docClause")?,
+        js_pillar(&pillar, "pillar")?,
+        js_f64(&spread_bp, "spreadBp")?,
+        js_f64(&recovery_rate, "recoveryRate")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&quote)
 }
 
 /// Build an upfront-plus-running-coupon CDS quote.
 ///
-/// Free-function twin of Python `CdsQuote.upfront` (Rust `CdsQuote::from_wire_fields`).
+/// Free-function twin of Python `CdsQuote.upfront` (Rust `CdsQuote::upfront`).
 /// @param id - Unique quote identifier.
 /// @param entity - Reference entity name.
 /// @param currency - ISO-4217 contract currency of the CDS convention.
@@ -226,20 +229,23 @@ pub fn cds_quote_upfront(
     upfront_pct: JsValue,
     recovery_rate: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let fields = Fields::new()
-        .string("id", &id, "id")?
-        .string("entity", &entity, "entity")?
-        .cds_convention(&currency, &doc_clause)?
-        .pillar("pillar", &pillar, "pillar")?
-        .number("coupon_bp", &coupon_bp, "couponBp")?
-        .number("upfront_pct", &upfront_pct, "upfrontPct")?
-        .number("recovery_rate", &recovery_rate, "recoveryRate")?;
-    cds_quote("cds_upfront", fields)
+    let quote = CdsQuote::upfront(
+        js_string(&id, "id")?,
+        js_string(&entity, "entity")?,
+        &js_string(&currency, "currency")?,
+        &js_string(&doc_clause, "docClause")?,
+        js_pillar(&pillar, "pillar")?,
+        js_f64(&coupon_bp, "couponBp")?,
+        js_f64(&upfront_pct, "upfrontPct")?,
+        js_f64(&recovery_rate, "recoveryRate")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&quote)
 }
 
 /// Build a listed equity or FX option implied-volatility quote.
 ///
-/// Free-function twin of Python `VolQuote.option_vol` (Rust `VolQuote::from_wire_fields`).
+/// Free-function twin of Python `VolQuote.option_vol` (Rust `VolQuote::option_vol`).
 /// @param id - Unique quote identifier.
 /// @param underlying - Underlying identifier (ticker) the surface is keyed by.
 /// @param expiry - ISO-8601 option expiry date.
@@ -261,19 +267,22 @@ pub fn vol_quote_option_vol(
     vol: JsValue,
     option_type: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let fields = Fields::new()
-        .string("id", &id, "id")?
-        .string("underlying", &underlying, "underlying")?
-        .date("expiry", &expiry, "expiry")?
-        .number("strike", &strike, "strike")?
-        .number("vol", &vol, "vol")?
-        .opt_string("option_type", option_type.as_ref(), "optionType")?;
-    vol_quote("option_vol", fields)
+    let option_type = js_opt_string(option_type.as_ref(), "optionType")?;
+    let quote = VolQuote::option_vol(
+        js_string(&id, "id")?,
+        js_string(&underlying, "underlying")?,
+        js_date(&expiry, "expiry")?,
+        js_f64(&strike, "strike")?,
+        js_f64(&vol, "vol")?,
+        option_type.as_deref(),
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&quote)
 }
 
 /// Build a swaption volatility quote.
 ///
-/// Free-function twin of Python `VolQuote.swaption_vol` (Rust `VolQuote::from_wire_fields`).
+/// Free-function twin of Python `VolQuote.swaption_vol` (Rust `VolQuote::swaption_vol`).
 /// @param id - Unique quote identifier.
 /// @param expiry - ISO-8601 option expiry date.
 /// @param maturity - ISO-8601 maturity date of the underlying swap.
@@ -297,20 +306,23 @@ pub fn vol_quote_swaption_vol(
     quote_type: JsValue,
     convention: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let fields = Fields::new()
-        .string("id", &id, "id")?
-        .date("expiry", &expiry, "expiry")?
-        .date("maturity", &maturity, "maturity")?
-        .number("strike", &strike, "strike")?
-        .number("vol", &vol, "vol")?
-        .string("quote_type", &quote_type, "quoteType")?
-        .opt_string("convention", convention.as_ref(), "convention")?;
-    vol_quote("swaption_vol", fields)
+    let convention = js_opt_string(convention.as_ref(), "convention")?;
+    let quote = VolQuote::swaption_vol(
+        js_string(&id, "id")?,
+        js_date(&expiry, "expiry")?,
+        js_date(&maturity, "maturity")?,
+        js_f64(&strike, "strike")?,
+        js_f64(&vol, "vol")?,
+        &js_string(&quote_type, "quoteType")?,
+        convention.as_deref(),
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&quote)
 }
 
 /// Build a cap or floor volatility quote.
 ///
-/// Free-function twin of Python `VolQuote.cap_floor_vol` (Rust `VolQuote::from_wire_fields`).
+/// Free-function twin of Python `VolQuote.cap_floor_vol` (Rust `VolQuote::cap_floor_vol`).
 /// @param id - Unique quote identifier.
 /// @param expiry - ISO-8601 cap/floor maturity date.
 /// @param strike - Strike rate as a decimal.
@@ -332,14 +344,16 @@ pub fn vol_quote_cap_floor_vol(
     quote_type: JsValue,
     is_cap: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let fields = Fields::new()
-        .string("id", &id, "id")?
-        .date("expiry", &expiry, "expiry")?
-        .number("strike", &strike, "strike")?
-        .number("vol", &vol, "vol")?
-        .string("quote_type", &quote_type, "quoteType")?
-        .opt_bool("is_cap", is_cap.as_ref(), "isCap")?;
-    vol_quote("cap_floor_vol", fields)
+    let quote = VolQuote::cap_floor_vol(
+        js_string(&id, "id")?,
+        js_date(&expiry, "expiry")?,
+        js_f64(&strike, "strike")?,
+        js_f64(&vol, "vol")?,
+        &js_string(&quote_type, "quoteType")?,
+        js_opt_bool(is_cap.as_ref(), "isCap")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&quote)
 }
 
 /// Currency-appropriate default zero-rate bounds for curve calibration.
@@ -378,7 +392,7 @@ pub fn rate_bounds_emerging_markets() -> Result<JsValue, JsValue> {
 
 /// Build a zero-coupon inflation swap quote.
 ///
-/// Free-function twin of Python `InflationQuote.inflation_swap` (Rust `InflationQuote::from_wire_fields`).
+/// Free-function twin of Python `InflationQuote.inflation_swap` (Rust `InflationQuote::inflation_swap`).
 /// @param id - Unique quote identifier.
 /// @param maturity - ISO-8601 swap maturity date.
 /// @param rate - Fixed zero-coupon swap rate as a decimal (`0.025` is 2.5%).
@@ -398,18 +412,20 @@ pub fn inflation_quote_inflation_swap(
     index: JsValue,
     convention: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let fields = Fields::new()
-        .string("id", &id, "id")?
-        .date("maturity", &maturity, "maturity")?
-        .number("rate", &rate, "rate")?
-        .string("index", &index, "index")?
-        .string("convention", &convention, "convention")?;
-    inflation_quote("inflation_swap", fields)
+    let quote = InflationQuote::inflation_swap(
+        js_string(&id, "id")?,
+        js_date(&maturity, "maturity")?,
+        js_f64(&rate, "rate")?,
+        js_string(&index, "index")?,
+        js_string(&convention, "convention")?.as_str(),
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&quote)
 }
 
 /// Build a year-on-year inflation swap quote.
 ///
-/// Free-function twin of Python `InflationQuote.yoy_inflation_swap` (Rust `InflationQuote::from_wire_fields`).
+/// Free-function twin of Python `InflationQuote.yoy_inflation_swap` (Rust `InflationQuote::yoy_inflation_swap`).
 /// @param id - Unique quote identifier.
 /// @param maturity - ISO-8601 swap maturity date.
 /// @param rate - Fixed year-on-year swap rate as a decimal.
@@ -431,12 +447,14 @@ pub fn inflation_quote_yoy_inflation_swap(
     frequency: JsValue,
     convention: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let fields = Fields::new()
-        .string("id", &id, "id")?
-        .date("maturity", &maturity, "maturity")?
-        .number("rate", &rate, "rate")?
-        .string("index", &index, "index")?
-        .string("frequency", &frequency, "frequency")?
-        .string("convention", &convention, "convention")?;
-    inflation_quote("yoy_inflation_swap", fields)
+    let quote = InflationQuote::yoy_inflation_swap(
+        js_string(&id, "id")?,
+        js_date(&maturity, "maturity")?,
+        js_f64(&rate, "rate")?,
+        js_string(&index, "index")?,
+        &js_string(&frequency, "frequency")?,
+        js_string(&convention, "convention")?.as_str(),
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&quote)
 }

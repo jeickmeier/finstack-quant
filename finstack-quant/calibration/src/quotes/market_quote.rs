@@ -21,7 +21,7 @@ use finstack_quant_core::{Error, Result};
 ///
 /// Creating a rates quote:
 /// ```rust
-/// use finstack_quant_calibration::quotes::market_quote::MarketQuote;
+/// use finstack_quant_calibration::quotes::MarketQuote;
 /// use finstack_quant_calibration::quotes::rates::RateQuote;
 /// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
 /// use finstack_quant_core::types::IndexId;

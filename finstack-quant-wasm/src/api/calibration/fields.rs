@@ -1,8 +1,6 @@
-//! Wire-field marshalling shared by the quote and step constructor twins.
+//! Wire-field marshalling for the step constructor twins.
 
-use crate::utils::input::{
-    from_js_json, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_string, js_uint,
-};
+use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, js_uint};
 use crate::utils::{date_to_iso, parse_iso_date};
 use serde_json::{Map, Value};
 use wasm_bindgen::prelude::*;
@@ -65,66 +63,6 @@ impl Fields {
     ) -> Result<Self, JsValue> {
         self.0
             .insert(key.to_string(), Value::from(js_f64(value, label)?));
-        Ok(self)
-    }
-
-    pub(super) fn opt_number(
-        mut self,
-        key: &str,
-        value: Option<&JsValue>,
-        label: &str,
-    ) -> Result<Self, JsValue> {
-        if let Some(number) = js_opt_f64(value, label)? {
-            self.0.insert(key.to_string(), Value::from(number));
-        }
-        Ok(self)
-    }
-
-    pub(super) fn opt_bool(
-        mut self,
-        key: &str,
-        value: Option<&JsValue>,
-        label: &str,
-    ) -> Result<Self, JsValue> {
-        if let Some(flag) = js_opt_bool(value, label)? {
-            self.0.insert(key.to_string(), Value::Bool(flag));
-        }
-        Ok(self)
-    }
-
-    /// A pillar: a tenor / ISO-date string (parsed by Rust) or a
-    /// `{"tenor": ...}` / `{"date": ...}` object.
-    pub(super) fn pillar(
-        mut self,
-        key: &str,
-        value: &JsValue,
-        label: &str,
-    ) -> Result<Self, JsValue> {
-        let pillar = match value.as_string() {
-            Some(text) => Value::String(text),
-            None => from_js_json(value, label)?,
-        };
-        self.0.insert(key.to_string(), pillar);
-        Ok(self)
-    }
-
-    /// The nested CDS convention key `{currency, doc_clause}`.
-    pub(super) fn cds_convention(
-        mut self,
-        currency: &JsValue,
-        doc_clause: &JsValue,
-    ) -> Result<Self, JsValue> {
-        let mut convention = Map::new();
-        convention.insert(
-            "currency".to_string(),
-            Value::String(js_string(currency, "currency")?),
-        );
-        convention.insert(
-            "doc_clause".to_string(),
-            Value::String(js_string(doc_clause, "docClause")?),
-        );
-        self.0
-            .insert("convention".to_string(), Value::Object(convention));
         Ok(self)
     }
 

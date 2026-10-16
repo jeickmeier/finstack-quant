@@ -92,6 +92,50 @@ pub(super) fn require_quote_vega(
 pub(super) const HW_NUM_RESTARTS: usize = 5;
 /// Halton perturbation scale (50%) applied to each parameter on restart.
 pub(super) const HW_PERTURB_SCALE: f64 = 0.5;
+
+/// Run the shared 2-parameter (κ, σ) multi-start Levenberg-Marquardt solve.
+pub(super) fn solve_hw1f_two_param<T>(
+    target: &T,
+    quotes: &[T::Quote],
+    fit_tolerance: f64,
+) -> finstack_quant_core::Result<(T::Curve, CalibrationReport)>
+where
+    T: GlobalSolveTarget + Sync,
+    T::Quote: Sync,
+{
+    let mut config = CalibrationConfig::default();
+    config.solver = config.solver.with_tolerance(1e-12).with_max_iterations(300);
+
+    let multi_start = MultiStartConfig {
+        num_restarts: HW_NUM_RESTARTS,
+        perturbation_scale: HW_PERTURB_SCALE,
+    };
+
+    GlobalFitOptimizer::optimize_with_multi_start(
+        target,
+        quotes,
+        &config,
+        fit_tolerance,
+        Some(&multi_start),
+        false,
+    )
+}
+
+/// Format the display label for a cap/floor quote (`"{maturity}Y_{cap|floor}_{strike:.6}"`).
+pub(super) fn cap_floor_quote_label(quote: &CapFloorQuote) -> String {
+    format!(
+        "{}Y_{}_{:.6}",
+        quote.maturity,
+        if quote.is_cap { "cap" } else { "floor" },
+        quote.strike
+    )
+}
+
+/// Format the indexed residual key for a cap/floor quote (`"{idx}:{label}"`).
+pub(super) fn cap_floor_quote_key(idx: usize, quote: &CapFloorQuote) -> String {
+    format!("{idx}:{}", cap_floor_quote_label(quote))
+}
+
 /// Validate a required quote-space acceptance tolerance.
 pub(super) fn validate_fit_tolerance(tolerance: f64) -> finstack_quant_core::Result<()> {
     if !tolerance.is_finite() || tolerance <= 0.0 {
@@ -137,6 +181,17 @@ pub(super) fn quote_fit_report(
     fit
 }
 
+/// Payoff representation for one pre-computed swaption quote.
+pub(super) enum SwaptionPayoff {
+    /// Contractual fixed and floating coupon schedules.
+    Contractual(SwaptionSchedule),
+    /// Synthetic equal-period fixed cashflows starting at `swap_start_time`.
+    Synthetic {
+        swap_start_time: f64,
+        cashflows: Vec<(f64, f64)>,
+    },
+}
+
 /// Pre-computed market data for one swaption quote, captured once before
 /// LM iteration. Contractual cashflows are prepared once and shared by all
 /// independent optimizer restarts.
@@ -145,9 +200,7 @@ pub(super) struct PreparedSwaption {
     pub(super) annuity: f64,
     pub(super) fwd_swap_rate: f64,
     pub(super) vega: f64,
-    pub(super) swap_start_time: f64,
-    pub(super) cashflows: Vec<(f64, f64)>,
-    pub(super) schedule: Option<SwaptionSchedule>,
+    pub(super) payoff: SwaptionPayoff,
 }
 
 impl PreparedSwaption {
@@ -157,19 +210,51 @@ impl PreparedSwaption {
         df: &(dyn Fn(f64) -> f64 + Sync),
         expiry: f64,
     ) -> finstack_quant_core::Result<f64> {
-        if let Some(schedule) = &self.schedule {
-            super::contractual_swaption::price(params, df, expiry, self.fwd_swap_rate, schedule)
-        } else {
-            Ok(hw1f_swaption_price_prepared(
+        match &self.payoff {
+            SwaptionPayoff::Contractual(schedule) => {
+                super::contractual_swaption::price(params, df, expiry, self.fwd_swap_rate, schedule)
+            }
+            SwaptionPayoff::Synthetic {
+                swap_start_time,
+                cashflows,
+            } => Ok(hw1f_swaption_price_prepared(
                 params.kappa,
                 params.sigma,
                 df,
                 expiry,
-                self.swap_start_time,
-                &self.cashflows,
-            ))
+                *swap_start_time,
+                cashflows,
+            )),
         }
     }
+}
+
+/// Shared 2-parameter `(ln κ, ln σ)` grid, parameter decoding, and box bounds
+/// used by both swaption and cap/floor HW1F Levenberg-Marquardt targets.
+fn hw1f_two_param_grid_and_guesses<Q: Clone>(
+    initial_x0: [f64; 2],
+    quotes: &[Q],
+) -> finstack_quant_core::Result<(Vec<f64>, Vec<f64>, Vec<Q>)> {
+    // HW1F has 2 scalar parameters (lnκ, lnσ); we use a dummy 2-point
+    // time grid to satisfy the framework's knot-oriented API. Values
+    // must be strictly positive to clear `validate_global_inputs`,
+    // so we use `[1.0, 2.0]`.
+    Ok((vec![1.0, 2.0], initial_x0.to_vec(), quotes.to_vec()))
+}
+
+fn hw1f_params_from_log(params: &[f64]) -> finstack_quant_core::Result<HullWhiteCalibrationParams> {
+    Ok(HullWhiteCalibrationParams {
+        kappa: params[0].exp(),
+        sigma: params[1].exp(),
+    })
+}
+
+fn hw1f_log_lower_bounds() -> Option<Vec<f64>> {
+    Some(vec![KAPPA_MIN.ln(), SIGMA_MIN.ln()])
+}
+
+fn hw1f_log_upper_bounds() -> Option<Vec<f64>> {
+    Some(vec![KAPPA_MAX.ln(), SIGMA_MAX.ln()])
 }
 
 /// `GlobalSolveTarget` impl carrying everything HW1F swaption calibration
@@ -190,12 +275,7 @@ impl<'a> GlobalSolveTarget for HullWhiteSwaptionTarget<'a> {
         &self,
         quotes: &[Self::Quote],
     ) -> finstack_quant_core::Result<(Vec<f64>, Vec<f64>, Vec<Self::Quote>)> {
-        // HW1F has 2 scalar parameters (lnκ, lnσ); we use a dummy 2-point
-        // time grid to satisfy the framework's knot-oriented API. Values
-        // must be strictly positive to clear `validate_global_inputs`,
-        // so we use `[1.0, 2.0]`. The target ignores `times` entirely
-        // in `build_curve_from_params`.
-        Ok((vec![1.0, 2.0], self.initial_x0.to_vec(), quotes.to_vec()))
+        hw1f_two_param_grid_and_guesses(self.initial_x0, quotes)
     }
 
     fn build_curve_from_params(
@@ -203,19 +283,9 @@ impl<'a> GlobalSolveTarget for HullWhiteSwaptionTarget<'a> {
         _times: &[f64],
         params: &[f64],
     ) -> finstack_quant_core::Result<Self::Curve> {
-        // Used by `build_curve_final_from_params` (default delegation).
-        // For solver iterations we override to skip validation; here we
-        // accept anything finite-positive and leave the κ-bounds check
-        // to the wrapper post-solve so a transient out-of-bounds final
-        // step does not mask a successful calibration.
-        let kappa = params[0].exp();
-        let sigma = params[1].exp();
-        Ok(HullWhiteCalibrationParams { kappa, sigma })
+        hw1f_params_from_log(params)
     }
 
-    // The solver residual is the vega-scaled price error, a first-order
-    // quoted-volatility error; the published report replaces it with the
-    // exact implied-volatility error (see `quote_fit_report`).
     fn residual_units(&self) -> crate::report::ResidualUnits {
         crate::report::ResidualUnits::QuotedVolatility
     }
@@ -230,12 +300,6 @@ impl<'a> GlobalSolveTarget for HullWhiteSwaptionTarget<'a> {
             let pre = &self.prepared[idx];
             let model_price = pre.model_price(*curve, self.df, q.expiry)?;
             if !model_price.is_finite() {
-                // Signal infeasibility to the LM solver instead of injecting a
-                // magic sentinel as a real residual: a hard-coded literal here
-                // would flow into the Gauss-Newton step as `literal / vega` and
-                // can dominate or poison the objective. Returning `Err` lets the
-                // global solver substitute a properly bounded penalty pattern
-                // (see `solver::global::fill_penalty`).
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "Hull-White swaption model produced a non-finite price \
                      ({model_price:?}) for quote {}Yx{}Y (κ={:.6e}, σ={:.6e}); \
@@ -248,20 +312,6 @@ impl<'a> GlobalSolveTarget for HullWhiteSwaptionTarget<'a> {
             // approximation `σ_model − σ_market`, so all quotes enter the
             // objective on a common implied-vol scale (Gilli–Maringer–
             // Schumann §13.4).
-            //
-            // APPROXIMATION REGIME (W-38): this linearisation is accurate
-            // only NEAR the solution, where `price_model ≈ price_mkt` and
-            // the vega evaluated at the *market* quote is a good proxy for
-            // the local price/vol slope. Far from the solution — during LM
-            // exploration or multi-start restarts — the true price/vol
-            // map is nonlinear and the fixed market vega mis-scales the
-            // residual, so the LM objective is a distorted (but still
-            // descent-compatible) surface rather than a true vol-error
-            // objective. Andersen–Piterbarg (*Interest Rate Modeling*,
-            // Vol. III) instead iterate implied-vol residuals directly.
-            // The vega-scaled form is retained here because it avoids a
-            // per-iteration implied-vol inversion and converges to the
-            // same minimiser once the iterates enter the valid regime.
             residuals[idx] = (model_price - pre.market_price) / pre.vega;
         }
         Ok(())
@@ -271,19 +321,12 @@ impl<'a> GlobalSolveTarget for HullWhiteSwaptionTarget<'a> {
         format!("{idx}:{}Yx{}Y", quote.expiry, quote.tenor)
     }
 
-    /// Log-space lower bounds `[ln(KAPPA_MIN), ln(SIGMA_MIN)]`.
-    ///
-    /// Enforced during the solve so κ cannot approach 0⁺ — at which point
-    /// `B(t,T) = (1 − e^{−κτ})/κ` and the integrated-variance factor blow up.
-    /// Previously `KAPPA_MAX` was only checked post-solve and there was no
-    /// lower κ bound active during iteration.
     fn lower_bounds(&self) -> Option<Vec<f64>> {
-        Some(vec![KAPPA_MIN.ln(), SIGMA_MIN.ln()])
+        hw1f_log_lower_bounds()
     }
 
-    /// Log-space upper bounds `[ln(KAPPA_MAX), ln(SIGMA_MAX)]`.
     fn upper_bounds(&self) -> Option<Vec<f64>> {
-        Some(vec![KAPPA_MAX.ln(), SIGMA_MAX.ln()])
+        hw1f_log_upper_bounds()
     }
 }
 
@@ -313,7 +356,7 @@ impl<'a> GlobalSolveTarget for HullWhiteCapFloorTarget<'a> {
         &self,
         quotes: &[Self::Quote],
     ) -> finstack_quant_core::Result<(Vec<f64>, Vec<f64>, Vec<Self::Quote>)> {
-        Ok((vec![1.0, 2.0], self.initial_x0.to_vec(), quotes.to_vec()))
+        hw1f_two_param_grid_and_guesses(self.initial_x0, quotes)
     }
 
     fn build_curve_from_params(
@@ -321,14 +364,9 @@ impl<'a> GlobalSolveTarget for HullWhiteCapFloorTarget<'a> {
         _times: &[f64],
         params: &[f64],
     ) -> finstack_quant_core::Result<Self::Curve> {
-        let kappa = params[0].exp();
-        let sigma = params[1].exp();
-        Ok(HullWhiteCalibrationParams { kappa, sigma })
+        hw1f_params_from_log(params)
     }
 
-    // The solver residual is the vega-scaled price error, a first-order
-    // quoted-volatility error; the published report replaces it with the
-    // exact implied-volatility error (see `quote_fit_report`).
     fn residual_units(&self) -> crate::report::ResidualUnits {
         crate::report::ResidualUnits::QuotedVolatility
     }
@@ -351,12 +389,6 @@ impl<'a> GlobalSolveTarget for HullWhiteCapFloorTarget<'a> {
                 quote.is_cap,
             )?;
             if !model_price.is_finite() {
-                // Signal infeasibility to the LM solver instead of injecting a
-                // magic sentinel as a real residual: a hard-coded literal here
-                // would flow into the Gauss-Newton step as `literal / vega` and
-                // can dominate or poison the objective. Returning `Err` lets the
-                // global solver substitute a properly bounded penalty pattern
-                // (see `solver::global::fill_penalty`).
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "Hull-White {} model produced a non-finite price \
                      ({model_price:?}) for quote {}Y strike {:.6} \
@@ -374,24 +406,14 @@ impl<'a> GlobalSolveTarget for HullWhiteCapFloorTarget<'a> {
     }
 
     fn residual_key(&self, quote: &Self::Quote, idx: usize) -> String {
-        format!(
-            "{idx}:{}Y_{}_{:.6}",
-            quote.maturity,
-            if quote.is_cap { "cap" } else { "floor" },
-            quote.strike
-        )
+        cap_floor_quote_key(idx, quote)
     }
 
-    /// Log-space lower bounds `[ln(KAPPA_MIN), ln(SIGMA_MIN)]`.
-    ///
-    /// Enforced during the solve so κ cannot approach 0⁺ — at which point
-    /// `B(t,T) = (1 − e^{−κτ})/κ` and the integrated-variance factor blow up.
     fn lower_bounds(&self) -> Option<Vec<f64>> {
-        Some(vec![KAPPA_MIN.ln(), SIGMA_MIN.ln()])
+        hw1f_log_lower_bounds()
     }
 
-    /// Log-space upper bounds `[ln(KAPPA_MAX), ln(SIGMA_MAX)]`.
     fn upper_bounds(&self) -> Option<Vec<f64>> {
-        Some(vec![KAPPA_MAX.ln(), SIGMA_MAX.ln()])
+        hw1f_log_upper_bounds()
     }
 }

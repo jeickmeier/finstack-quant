@@ -110,16 +110,30 @@ use rust_decimal::Decimal;
 ///
 /// - [`RateQuote`] for supported quote types
 /// - [`BuildCtx`] for build context configuration
-pub fn build_rate_instrument(quote: &RateQuote, ctx: &BuildCtx) -> Result<Box<dyn Instrument>> {
+#[cfg(test)]
+pub(crate) fn build_rate_instrument(
+    quote: &RateQuote,
+    ctx: &BuildCtx,
+) -> Result<Box<dyn Instrument>> {
+    build_rate_instrument_with_dates(quote, ctx, false).map(|(instrument, _)| instrument)
+}
+
+/// Build an interest-rate instrument together with its resolved calibration dates in a single pass.
+pub(crate) fn build_rate_instrument_with_dates(
+    quote: &RateQuote,
+    ctx: &BuildCtx,
+    swap_use_payment_delay: bool,
+) -> Result<(Box<dyn Instrument>, RateResolvedDates)> {
     tracing::debug!(quote_id = %quote.id(), "building rate instrument");
     let registry = ConventionRegistry::try_global()?;
-
-    match quote {
-        RateQuote::Deposit { .. } => build_deposit(quote, ctx, registry),
-        RateQuote::Fra { .. } => build_fra(quote, ctx, registry),
-        RateQuote::Futures { .. } => build_future(quote, ctx, registry),
-        RateQuote::Swap { .. } => build_swap(quote, ctx, registry),
-    }
+    let dates = resolve_rate_quote_dates(quote, ctx, registry, swap_use_payment_delay)?;
+    let instrument = match quote {
+        RateQuote::Deposit { .. } => build_deposit(quote, ctx, registry, dates)?,
+        RateQuote::Fra { .. } => build_fra(quote, ctx, registry, dates)?,
+        RateQuote::Futures { .. } => build_future(quote, ctx, registry, dates)?,
+        RateQuote::Swap { .. } => build_swap(quote, ctx, registry, dates)?,
+    };
+    Ok((instrument, dates))
 }
 
 /// Resolved date set for an interest-rate market quote.
@@ -174,13 +188,25 @@ impl RateResolvedDates {
     }
 }
 
+fn resolve_pillar_date(
+    pillar: &Pillar,
+    base_date: Date,
+    cal: &dyn finstack_quant_core::dates::HolidayCalendar,
+    business_day_convention: BusinessDayConvention,
+) -> Result<Date> {
+    match pillar {
+        Pillar::Tenor(t) => t.add_to_date(base_date, Some(cal), business_day_convention),
+        Pillar::Date(d) => adjust(*d, business_day_convention, cal),
+    }
+}
+
 /// Resolve rate quote dates without requiring callers to inspect the boxed instrument.
-pub(crate) fn resolve_rate_quote_dates(
+fn resolve_rate_quote_dates(
     quote: &RateQuote,
     ctx: &BuildCtx,
+    registry: &ConventionRegistry,
     swap_use_payment_delay: bool,
 ) -> Result<RateResolvedDates> {
-    let registry = ConventionRegistry::try_global()?;
     match quote {
         RateQuote::Deposit { index, pillar, .. } => {
             let conv = registry.require_rate_index(index)?;
@@ -191,12 +217,7 @@ pub(crate) fn resolve_rate_quote_dates(
                 conv.market_business_day_convention,
             )?;
             let cal = calendar_by_id_strict(&conv.market_calendar_id)?;
-            let end = match pillar {
-                Pillar::Tenor(t) => {
-                    t.add_to_date(spot, Some(cal), conv.market_business_day_convention)?
-                }
-                Pillar::Date(d) => adjust(*d, conv.market_business_day_convention, cal)?,
-            };
+            let end = resolve_pillar_date(pillar, spot, cal, conv.market_business_day_convention)?;
             Ok(RateResolvedDates::Deposit { start: spot, end })
         }
         RateQuote::Fra {
@@ -213,18 +234,10 @@ pub(crate) fn resolve_rate_quote_dates(
                 conv.market_business_day_convention,
             )?;
             let cal = calendar_by_id_strict(&conv.market_calendar_id)?;
-            let start = match start_pillar {
-                Pillar::Tenor(t) => {
-                    t.add_to_date(spot, Some(cal), conv.market_business_day_convention)?
-                }
-                Pillar::Date(d) => adjust(*d, conv.market_business_day_convention, cal)?,
-            };
-            let end = match end_pillar {
-                Pillar::Tenor(t) => {
-                    t.add_to_date(spot, Some(cal), conv.market_business_day_convention)?
-                }
-                Pillar::Date(d) => adjust(*d, conv.market_business_day_convention, cal)?,
-            };
+            let start =
+                resolve_pillar_date(start_pillar, spot, cal, conv.market_business_day_convention)?;
+            let end =
+                resolve_pillar_date(end_pillar, spot, cal, conv.market_business_day_convention)?;
             let fixing = resolve_fixing_date(start, conv)?;
             Ok(RateResolvedDates::Fra { fixing, start, end })
         }
@@ -315,12 +328,8 @@ pub(crate) fn resolve_rate_quote_dates(
                 conv.market_business_day_convention,
             )?;
             let cal = calendar_by_id_strict(&conv.market_calendar_id)?;
-            let maturity = match pillar {
-                Pillar::Tenor(t) => {
-                    t.add_to_date(start, Some(cal), conv.market_business_day_convention)?
-                }
-                Pillar::Date(d) => adjust(*d, conv.market_business_day_convention, cal)?,
-            };
+            let maturity =
+                resolve_pillar_date(pillar, start, cal, conv.market_business_day_convention)?;
             let pillar_date = if swap_use_payment_delay {
                 finstack_quant_valuations::instruments::pricing::swap_legs::add_payment_delay(
                     maturity,
@@ -343,6 +352,7 @@ fn build_deposit(
     quote: &RateQuote,
     ctx: &BuildCtx,
     registry: &ConventionRegistry,
+    dates: RateResolvedDates,
 ) -> Result<Box<dyn Instrument>> {
     let RateQuote::Deposit {
         id, index, rate, ..
@@ -354,8 +364,7 @@ fn build_deposit(
     };
 
     let conv = registry.require_rate_index(index)?;
-    let RateResolvedDates::Deposit { start, end } = resolve_rate_quote_dates(quote, ctx, false)?
-    else {
+    let RateResolvedDates::Deposit { start, end } = dates else {
         return Err(Error::Validation(
             "resolved non-deposit dates for deposit quote".to_string(),
         ));
@@ -383,6 +392,7 @@ fn build_fra(
     quote: &RateQuote,
     ctx: &BuildCtx,
     registry: &ConventionRegistry,
+    dates: RateResolvedDates,
 ) -> Result<Box<dyn Instrument>> {
     let RateQuote::Fra {
         id, index, rate, ..
@@ -398,7 +408,7 @@ fn build_fra(
         fixing,
         start: start_date,
         end: end_date,
-    } = resolve_rate_quote_dates(quote, ctx, false)?
+    } = dates
     else {
         return Err(Error::Validation(
             "resolved non-FRA dates for FRA quote".to_string(),
@@ -429,6 +439,7 @@ fn build_future(
     quote: &RateQuote,
     ctx: &BuildCtx,
     registry: &ConventionRegistry,
+    dates: RateResolvedDates,
 ) -> Result<Box<dyn Instrument>> {
     let RateQuote::Futures {
         id,
@@ -450,7 +461,7 @@ fn build_future(
         period_start,
         period_end,
         fixing,
-    } = resolve_rate_quote_dates(quote, ctx, false)?
+    } = dates
     else {
         return Err(Error::Validation(
             "resolved non-future dates for futures quote".to_string(),
@@ -502,6 +513,7 @@ fn build_swap(
     quote: &RateQuote,
     ctx: &BuildCtx,
     registry: &ConventionRegistry,
+    dates: RateResolvedDates,
 ) -> Result<Box<dyn Instrument>> {
     let RateQuote::Swap {
         id,
@@ -519,7 +531,7 @@ fn build_swap(
     let conv = registry.require_rate_index(index)?;
     let RateResolvedDates::Swap {
         start, maturity, ..
-    } = resolve_rate_quote_dates(quote, ctx, false)?
+    } = dates
     else {
         return Err(Error::Validation(
             "resolved non-swap dates for swap quote".to_string(),

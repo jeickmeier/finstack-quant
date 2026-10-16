@@ -3,8 +3,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use finstack_quant_calibration::api::schema::{ForwardCurveParams, StepParams};
 use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-use finstack_quant_calibration::quotes::market_quote::MarketQuote;
 use finstack_quant_calibration::quotes::rates::RateQuote;
+use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_calibration::CalibrationMethod;
 use finstack_quant_core::currency::Currency;

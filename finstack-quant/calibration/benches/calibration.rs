@@ -12,8 +12,8 @@ use finstack_quant_calibration::api::{
     },
 };
 use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-use finstack_quant_calibration::quotes::market_quote::MarketQuote;
 use finstack_quant_calibration::quotes::rates::RateQuote;
+use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::recalibration::{bump_hazard_spreads, CachedRecalibrationProvider};
 use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_calibration::CalibrationMethod;

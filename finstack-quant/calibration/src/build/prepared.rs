@@ -1,14 +1,16 @@
 //! Prepared quote envelopes for calibration pipelines.
 
 use crate::build::cds::{build_cds_instrument, resolve_cds_quote_dates};
-use crate::build::rates::{build_rate_instrument, resolve_rate_quote_dates};
+use crate::build::rates::build_rate_instrument_with_dates;
 use crate::build::xccy::build_xccy_instrument;
 use crate::build::BuildCtx;
 use crate::quotes::cds::CdsQuote;
 use crate::quotes::rates::RateQuote;
 use crate::quotes::xccy::XccyQuote;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
+use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::Instrument;
 use std::fmt;
 use std::sync::Arc;
@@ -88,6 +90,24 @@ impl<Q> PreparedQuote<Q> {
     }
 }
 
+impl PreparedQuote<RateQuote> {
+    /// Compute the unrounded present value for solver residual evaluation.
+    ///
+    /// Deposit quotes bypass `Decimal`/`Money` rounding via [`Deposit::npv_raw`].
+    pub(crate) fn calibration_value_raw(
+        &self,
+        context: &MarketContext,
+        as_of: Date,
+    ) -> Result<f64> {
+        if matches!(self.quote.as_ref(), RateQuote::Deposit { .. }) {
+            if let Some(deposit) = self.instrument.as_any().downcast_ref::<Deposit>() {
+                return deposit.npv_raw(context, as_of);
+            }
+        }
+        self.instrument.value_raw(context, as_of)
+    }
+}
+
 /// Prepare a rate quote into an instrument + pillar time.
 pub(crate) fn prepare_rate_quote(
     quote: RateQuote,
@@ -96,9 +116,9 @@ pub(crate) fn prepare_rate_quote(
     base_date: Date,
     swap_use_payment_delay: bool,
 ) -> Result<PreparedQuote<RateQuote>> {
-    let maturity_date =
-        resolve_rate_quote_dates(&quote, build_ctx, swap_use_payment_delay)?.pillar_date();
-    let instrument = build_rate_instrument(&quote, build_ctx)?;
+    let (instrument, resolved_dates) =
+        build_rate_instrument_with_dates(&quote, build_ctx, swap_use_payment_delay)?;
+    let maturity_date = resolved_dates.pillar_date();
     let instrument: Arc<dyn Instrument> = instrument.into();
 
     let pillar_time =

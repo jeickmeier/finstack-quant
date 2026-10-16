@@ -97,7 +97,7 @@ export type MarketDatum =
            * `forward = (100 - price) / 100 − convexity_adjustment`.
            * A positive adjustment lowers the futures-implied rate toward the true
            * forward. The wire field is required; the host authoring
-           * constructors ([`RateQuote::from_wire_fields`]) fill an omitted value
+           * constructor ([`RateQuote::futures`]) fills an omitted value
            * with [`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`].
            */
           convexity_adjustment: number;
@@ -3185,7 +3185,7 @@ export type MarketQuote =
            * `forward = (100 - price) / 100 − convexity_adjustment`.
            * A positive adjustment lowers the futures-implied rate toward the true
            * forward. The wire field is required; the host authoring
-           * constructors ([`RateQuote::from_wire_fields`]) fill an omitted value
+           * constructor ([`RateQuote::futures`]) fills an omitted value
            * with [`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`].
            */
           convexity_adjustment: number;
@@ -3584,7 +3584,7 @@ export type RateQuote =
        * `forward = (100 - price) / 100 − convexity_adjustment`.
        * A positive adjustment lowers the futures-implied rate toward the true
        * forward. The wire field is required; the host authoring
-       * constructors ([`RateQuote::from_wire_fields`]) fill an omitted value
+       * constructor ([`RateQuote::futures`]) fills an omitted value
        * with [`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`].
        */
       convexity_adjustment: number;

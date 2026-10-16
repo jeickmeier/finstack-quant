@@ -1,11 +1,12 @@
 //! Forward curve calibration target.
 
 use crate::api::schema::ForwardCurveParams;
+use crate::build::prepared::PreparedQuote;
 use crate::config::CalibrationConfig;
 use crate::config::CalibrationMethod;
-use crate::quotes::market_quote::ExtractQuotes;
-use crate::quotes::market_quote::MarketQuote;
 use crate::quotes::rates::RateQuote;
+use crate::quotes::ExtractQuotes;
+use crate::quotes::MarketQuote;
 use crate::solver::global::GlobalFitOptimizer;
 use crate::solver::traits::GlobalSolveTarget;
 use crate::targets::rate_recipe::recipe_ois_compounding;
@@ -184,17 +185,7 @@ impl ForwardCurveTarget {
 
     /// Return the reset-date parameter time for quotes whose modeled rate is
     /// derived from projection discount factors over a future accrual period.
-    fn parameter_time(&self, quote: &crate::prepared::CalibrationQuote) -> Result<f64> {
-        let pq = match quote {
-            crate::prepared::CalibrationQuote::Rates(pq) => pq,
-            other => {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Forward curve calibration accepts Rates quotes only; got {:?}",
-                    std::mem::discriminant(other)
-                )));
-            }
-        };
-
+    fn parameter_time(&self, pq: &PreparedQuote<RateQuote>) -> Result<f64> {
         let intervals = self.reset_intervals(pq)?;
         let parameter_date = match pq.quote.as_ref() {
             RateQuote::Swap { .. } => intervals.last().map(|(start, _)| *start),
@@ -219,24 +210,12 @@ impl ForwardCurveTarget {
     }
 
     /// Quote-derived initial rate for the simultaneous solver.
-    fn initial_guess(&self, quote: &crate::prepared::CalibrationQuote) -> Result<f64> {
-        let pq = match quote {
-            crate::prepared::CalibrationQuote::Rates(pq) => pq,
-            other => {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Forward curve calibration accepts Rates quotes only; got {:?}",
-                    std::mem::discriminant(other)
-                )));
-            }
-        };
-        Ok(pq.quote.implied_rate())
+    fn initial_guess(&self, pq: &PreparedQuote<RateQuote>) -> f64 {
+        pq.quote.implied_rate()
     }
 
     /// Resolve all contractual projection intervals represented by a prepared quote.
-    fn reset_intervals(
-        &self,
-        pq: &crate::build::prepared::PreparedQuote<RateQuote>,
-    ) -> Result<Vec<(Date, Date)>> {
+    fn reset_intervals(&self, pq: &PreparedQuote<RateQuote>) -> Result<Vec<(Date, Date)>> {
         match pq.quote.as_ref() {
             RateQuote::Deposit { .. } => {
                 let deposit = pq
@@ -325,18 +304,9 @@ impl ForwardCurveTarget {
     }
 
     /// Build and validate the dense contractual reset boundary grid.
-    fn projection_grid(&self, quotes: &[crate::prepared::CalibrationQuote]) -> Result<Vec<f64>> {
+    fn projection_grid(&self, quotes: &[PreparedQuote<RateQuote>]) -> Result<Vec<f64>> {
         let mut grid = vec![0.0];
-        for quote in quotes {
-            let pq = match quote {
-                crate::prepared::CalibrationQuote::Rates(pq) => pq,
-                other => {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Forward curve calibration accepts Rates quotes only; got {:?}",
-                        std::mem::discriminant(other)
-                    )));
-                }
-            };
+        for pq in quotes {
             for (start, end) in self.reset_intervals(pq)? {
                 let start_time = self.params.time_day_count.year_fraction(
                     self.params.base_date,
@@ -407,7 +377,7 @@ impl ForwardCurveTarget {
 }
 
 impl GlobalSolveTarget for ForwardCurveTarget {
-    type Quote = crate::prepared::CalibrationQuote;
+    type Quote = PreparedQuote<RateQuote>;
     type Curve = ForwardCurve;
 
     fn build_time_grid_and_guesses(
@@ -417,17 +387,8 @@ impl GlobalSolveTarget for ForwardCurveTarget {
         let projection_grid = self.projection_grid(quotes)?;
         let mut entries = Vec::with_capacity(quotes.len());
         let mut deposits = Vec::new();
-        for quote in quotes {
-            let pq = match quote {
-                crate::prepared::CalibrationQuote::Rates(pq) => pq,
-                other => {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Forward curve calibration accepts Rates quotes only; got {:?}",
-                        std::mem::discriminant(other)
-                    )));
-                }
-            };
-            let initial = self.initial_guess(quote)?;
+        for pq in quotes {
+            let initial = self.initial_guess(pq);
             if matches!(pq.quote.as_ref(), RateQuote::Deposit { .. }) {
                 let (start, end) = self.reset_intervals(pq)?.first().copied().ok_or_else(|| {
                     finstack_quant_core::Error::Calibration {
@@ -448,9 +409,9 @@ impl GlobalSolveTarget for ForwardCurveTarget {
                     end,
                     DayCountContext::default(),
                 )?;
-                deposits.push((start_time, end_time, initial, quote.clone()));
+                deposits.push((start_time, end_time, initial, pq.clone()));
             } else {
-                let parameter_time = self.parameter_time(quote)?;
+                let parameter_time = self.parameter_time(pq)?;
                 let fallback_time = if matches!(pq.quote.as_ref(), RateQuote::Swap { .. }) {
                     let maturity = self
                         .reset_intervals(pq)?
@@ -471,7 +432,7 @@ impl GlobalSolveTarget for ForwardCurveTarget {
                 } else {
                     None
                 };
-                entries.push((parameter_time, fallback_time, initial, quote.clone()));
+                entries.push((parameter_time, fallback_time, initial, pq.clone()));
             }
         }
         deposits.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.total_cmp(&b.1)));
@@ -601,16 +562,7 @@ impl GlobalSolveTarget for ForwardCurveTarget {
             });
         }
         self.scratch.with_curve(curve, |ctx| {
-            for (residual, quote) in residuals.iter_mut().zip(quotes) {
-                let pq = match quote {
-                    crate::prepared::CalibrationQuote::Rates(pq) => pq,
-                    other => {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "Forward curve calibration accepts Rates quotes only; got {:?}",
-                            std::mem::discriminant(other)
-                        )));
-                    }
-                };
+            for (residual, pq) in residuals.iter_mut().zip(quotes) {
                 if !self.params.residual_notional.is_finite() || self.params.residual_notional <= 0.0 {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "Invalid residual_notional {}: expected finite positive value",
@@ -671,27 +623,16 @@ impl GlobalSolveTarget for ForwardCurveTarget {
     }
 
     fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
-        Some(quote.quote_value())
+        Some(quote.quote.value())
     }
 
-    fn residual_key(&self, quote: &Self::Quote, idx: usize) -> String {
-        match quote {
-            crate::prepared::CalibrationQuote::Rates(pq) => pq.quote.id().as_str().to_string(),
-            _ => format!("FORWARD-{idx:06}"),
-        }
+    fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
+        quote.quote.id().as_str().to_string()
     }
 
     fn residual_weights(&self, quotes: &[Self::Quote], weights_out: &mut [f64]) -> Result<()> {
         for (quote, weight) in quotes.iter().zip(weights_out.iter_mut()) {
-            let time = match quote {
-                crate::prepared::CalibrationQuote::Rates(pq) => pq.pillar_time.max(1e-6),
-                other => {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Forward curve calibration accepts Rates quotes only; got {:?}",
-                        std::mem::discriminant(other)
-                    )));
-                }
-            };
+            let time = quote.pillar_time.max(1e-6);
             *weight = pv01_residual_weight(
                 quote,
                 time,
@@ -723,10 +664,9 @@ mod tests {
     use super::*;
     use crate::build::prepared::PreparedQuote;
     use crate::constants::WEIGHT_MIN_FLOOR;
-    use crate::prepared::CalibrationQuote;
     use crate::quotes::ids::{Pillar, QuoteId};
-    use crate::quotes::market_quote::MarketQuote;
     use crate::quotes::rates::RateQuote;
+    use crate::quotes::MarketQuote;
     use crate::solver::traits::GlobalSolveTarget;
     use crate::targets::util::quote_annuity_proxy;
     use crate::{RateBounds, ResidualWeightingScheme};
@@ -822,7 +762,7 @@ mod tests {
             .map(|(pillar_time, quote_rate)| {
                 let start_date = base_date + time::Duration::days((pillar_time * 360.0) as i64);
                 let maturity = start_date + time::Duration::days(90);
-                CalibrationQuote::Rates(PreparedQuote::new(
+                PreparedQuote::new(
                     Arc::new(RateQuote::Deposit {
                         id: QuoteId::new(format!("DEP-{pillar_time}")),
                         index: finstack_quant_core::types::IndexId::new("USD-SOFR-3M"),
@@ -849,7 +789,7 @@ mod tests {
                     }),
                     maturity,
                     pillar_time,
-                ))
+                )
             })
             .collect::<Vec<_>>();
 
@@ -870,7 +810,7 @@ mod tests {
         let expected: Vec<f64> = quotes
             .iter()
             .map(|quote| {
-                let time = quote.pillar_time().max(1e-6);
+                let time = quote.pillar_time.max(1e-6);
                 let annuity = quote_annuity_proxy(quote, time);
                 let weight = (1.0 / (annuity * annuity)) * time;
                 if weight.is_finite() {
@@ -928,7 +868,7 @@ mod tests {
             .into_iter()
             .map(|(days, rate)| {
                 let maturity = base_date + time::Duration::days(days);
-                CalibrationQuote::Rates(PreparedQuote::new(
+                PreparedQuote::new(
                     Arc::new(RateQuote::Deposit {
                         id: QuoteId::new(format!("DEP-{days}D")),
                         index: finstack_quant_core::types::IndexId::new("USD-SOFR-3M"),
@@ -954,7 +894,7 @@ mod tests {
                     }),
                     maturity,
                     days as f64 / 360.0,
-                ))
+                )
             })
             .collect::<Vec<_>>();
 
@@ -997,7 +937,7 @@ mod tests {
             .into_iter()
             .map(|(days, rate)| {
                 let maturity = base_date + time::Duration::days(days);
-                CalibrationQuote::Rates(PreparedQuote::new(
+                PreparedQuote::new(
                     Arc::new(RateQuote::Deposit {
                         id: QuoteId::new(format!("DEP-{days}D")),
                         index: finstack_quant_core::types::IndexId::new("USD-SOFR-3M"),
@@ -1024,7 +964,7 @@ mod tests {
                     maturity,
                     // Pillar time on the curve's Act/365F axis.
                     days as f64 / 365.0,
-                ))
+                )
             })
             .collect::<Vec<_>>();
 
@@ -1132,7 +1072,7 @@ mod tests {
             base_context: MarketContext::new(),
         });
 
-        let quote = CalibrationQuote::Rates(PreparedQuote::new(
+        let quote = PreparedQuote::new(
             Arc::new(RateQuote::Futures {
                 id: QuoteId::new("SR3"),
                 contract: IrFutureContractId::new("CME:SR3"),
@@ -1143,9 +1083,9 @@ mod tests {
             Arc::new(DummyInstrument),
             base_date,
             1.0,
-        ));
+        );
 
-        let guess = target.initial_guess(&quote).expect("initial guess");
+        let guess = target.initial_guess(&quote);
         assert!((guess - 0.014).abs() < 1e-12, "expected 1.40%, got {guess}");
     }
 
@@ -1295,9 +1235,7 @@ mod tests {
                     None,
                 )
                 .expect("prepared future");
-                let CalibrationQuote::Rates(prepared) = &prepared.quotes[0] else {
-                    unreachable!("rate quote");
-                };
+                let prepared = &prepared.quotes[0];
                 let future = prepared
                     .instrument
                     .as_any()

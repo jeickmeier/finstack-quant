@@ -8,10 +8,10 @@
 use crate::quotes::cds::CdsQuote;
 use crate::quotes::cds_tranche::CdsTrancheQuote;
 use crate::quotes::inflation::InflationQuote;
-use crate::quotes::market_quote::MarketQuote;
 use crate::quotes::rates::RateQuote;
 use crate::quotes::vol::VolQuote;
 use crate::quotes::xccy::XccyQuote;
+use crate::quotes::MarketQuote;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::CreditIndexState;
 use finstack_quant_core::market_data::dividends::DividendSchedule;

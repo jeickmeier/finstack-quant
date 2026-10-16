@@ -11,7 +11,7 @@
 use crate::api::schema::{CalibrationStep, StepParams};
 use crate::config::CalibrationConfig;
 use crate::quotes::cds_tranche::CdsTrancheQuote;
-use crate::quotes::market_quote::{ExtractQuotes, MarketQuote};
+use crate::quotes::{ExtractQuotes, MarketQuote};
 use crate::targets::util::curve_day_count_from_quotes;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;

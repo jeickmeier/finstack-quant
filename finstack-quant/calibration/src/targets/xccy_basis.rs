@@ -24,11 +24,12 @@
 //! a foreign discount curve.
 
 use crate::api::schema::XccyBasisParams;
+use crate::build::prepared::PreparedQuote;
 use crate::config::CalibrationConfig;
-use crate::prepared::CalibrationQuote;
-use crate::quotes::market_quote::ExtractQuotes;
-use crate::quotes::market_quote::MarketQuote;
+use crate::quotes::rates::RateQuote;
 use crate::quotes::xccy::XccyQuote;
+use crate::quotes::ExtractQuotes;
+use crate::quotes::MarketQuote;
 use crate::solver::bootstrap::SequentialBootstrapper;
 use crate::solver::traits::BootstrapTarget;
 use crate::targets::util::{
@@ -38,7 +39,7 @@ use crate::CalibrationReport;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
-    BasisSpreadCurve, DiscountCurve, DiscountCurveBuilder, ValidationMode,
+    BasisSpreadCurve, DiscountCurve, DiscountCurveBuilder, ValidationMode as CurveValidationMode,
 };
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
@@ -47,6 +48,51 @@ use std::sync::Arc;
 
 /// Instrument notional and residual normalization divisor.
 const XCCY_RESIDUAL_NOTIONAL: f64 = 1_000_000.0;
+
+/// Prepared quote for cross-currency basis bootstrapping, which mixes
+/// short-end foreign [`RateQuote`] anchors with long-end [`XccyQuote`] swaps.
+#[derive(Debug, Clone)]
+pub(crate) enum XccyCalibrationQuote {
+    Rates(PreparedQuote<RateQuote>),
+    XccyBasis(PreparedQuote<XccyQuote>),
+}
+
+impl XccyCalibrationQuote {
+    fn quote_id(&self) -> &str {
+        match self {
+            Self::Rates(pq) => pq.quote.id().as_str(),
+            Self::XccyBasis(pq) => pq.quote.id.as_str(),
+        }
+    }
+
+    fn quote_value(&self) -> f64 {
+        match self {
+            Self::Rates(pq) => pq.quote.value(),
+            Self::XccyBasis(pq) => pq.quote.basis_spread_bp * 1e-4,
+        }
+    }
+
+    fn pillar_time(&self) -> f64 {
+        match self {
+            Self::Rates(pq) => pq.pillar_time,
+            Self::XccyBasis(pq) => pq.pillar_time,
+        }
+    }
+
+    fn pillar_date(&self) -> Date {
+        match self {
+            Self::Rates(pq) => pq.pillar_date,
+            Self::XccyBasis(pq) => pq.pillar_date,
+        }
+    }
+
+    fn calibration_value_raw(&self, context: &MarketContext, as_of: Date) -> Result<f64> {
+        match self {
+            Self::Rates(pq) => pq.calibration_value_raw(context, as_of),
+            Self::XccyBasis(pq) => pq.instrument.value_raw(context, as_of),
+        }
+    }
+}
 
 /// Parameters for constructing an [`XccyBasisTarget`].
 #[derive(Clone)]
@@ -131,7 +177,7 @@ impl XccyBasisTarget {
             .curve_day_count
             .unwrap_or(finstack_quant_core::dates::DayCount::Act365F);
 
-        let mut prepared_quotes: Vec<CalibrationQuote> =
+        let mut prepared_quotes: Vec<XccyCalibrationQuote> =
             Vec::with_capacity(rates_quotes.len() + xccy_quotes.len());
 
         if has_rates {
@@ -146,7 +192,7 @@ impl XccyBasisTarget {
                 XCCY_RESIDUAL_NOTIONAL,
                 None,
             )?;
-            prepared_quotes.extend(prepared.quotes);
+            prepared_quotes.extend(prepared.quotes.into_iter().map(XccyCalibrationQuote::Rates));
         }
 
         if has_xccy {
@@ -174,7 +220,7 @@ impl XccyBasisTarget {
                     curve_day_count,
                     schema_params.base_date,
                 )?;
-                prepared_quotes.push(CalibrationQuote::XccyBasis(prepared));
+                prepared_quotes.push(XccyCalibrationQuote::XccyBasis(prepared));
             }
         }
 
@@ -207,13 +253,7 @@ impl XccyBasisTarget {
             spread_knots.push((0.0, 0.0));
             for quote in &prepared_quotes {
                 let t = quote.pillar_time();
-                let pillar_date = match quote {
-                    CalibrationQuote::Rates(prepared) => prepared.pillar_date,
-                    CalibrationQuote::XccyBasis(prepared) => prepared.pillar_date,
-                    _ => {
-                        return Err(finstack_quant_core::InputError::Invalid.into());
-                    }
-                };
+                let pillar_date = quote.pillar_date();
                 let df_foreign = curve.df_between_dates(schema_params.base_date, pillar_date)?;
                 let df_domestic =
                     domestic_discount.df_between_dates(schema_params.base_date, pillar_date)?;
@@ -260,7 +300,7 @@ impl XccyBasisTarget {
 }
 
 impl BootstrapTarget for XccyBasisTarget {
-    type Quote = CalibrationQuote;
+    type Quote = XccyCalibrationQuote;
     type Curve = DiscountCurve;
 
     fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
@@ -281,7 +321,7 @@ impl BootstrapTarget for XccyBasisTarget {
 
     fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
         self.curve_builder(knots)
-            .validation(ValidationMode::Raw {
+            .validation(CurveValidationMode::Raw {
                 allow_non_monotonic: true,
                 forward_floor: None,
             })

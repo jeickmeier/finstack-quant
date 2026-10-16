@@ -44,8 +44,7 @@ fn with_model_curves<T>(
 
 /// Calibrate scalar Hull-White `(κ, σ)` to ATM swaption quotes on a discount curve.
 ///
-/// Curve-input form of [`calibrate_hull_white_to_swaptions_with_fn`] with the
-/// synthetic constant-period fixed-leg schedule (no contractual schedules).
+/// Uses a synthetic constant-period fixed-leg schedule implied by `frequency`.
 /// The curve is mapped from its day count to ACT/365F model years, normalized
 /// at its base date.
 ///
@@ -94,11 +93,9 @@ pub fn calibrate_hull_white_to_swaptions(
 
 /// Calibrate scalar Hull-White `(κ, σ)` to cap/floor quotes on market curves.
 ///
-/// Curve-input form of [`calibrate_hull_white_to_cap_floors_with_fn`] with
-/// the synthetic caplet schedule implied by `config.frequency` (no
-/// contractual schedules). Both curves are normalized at
-/// `discount.base_date()` and mapped from their own day counts to ACT/365F
-/// model years.
+/// Uses the synthetic caplet schedule implied by `config.frequency`. Both
+/// curves are normalized at `discount.base_date()` and mapped from their own
+/// day counts to ACT/365F model years.
 ///
 /// # Arguments
 ///
@@ -134,10 +131,8 @@ pub fn calibrate_hull_white_to_cap_floors(
 
 /// Bootstrap a piecewise-constant Hull-White sigma schedule to cap/floor quotes on market curves.
 ///
-/// Curve-input form of [`bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn`]
-/// with the synthetic caplet schedule implied by `config.frequency` (no
-/// contractual schedules). Both curves use ACT/365F model time normalized at
-/// `discount.base_date()`.
+/// Uses the synthetic caplet schedule implied by `config.frequency`. Both
+/// curves use ACT/365F model time normalized at `discount.base_date()`.
 ///
 /// # Arguments
 ///
@@ -202,7 +197,7 @@ mod tests {
         [(1.0, 0.0070), (2.0, 0.0075), (5.0, 0.0080)]
             .iter()
             .map(|&(maturity, vol)| {
-                CapFloorQuote::try_new(maturity, 0.03, vol, true, true).expect("quote")
+                CapFloorQuote::new(maturity, 0.03, vol, true, true).expect("quote")
             })
             .collect()
     }
@@ -269,7 +264,7 @@ mod tests {
             .interp(InterpStyle::LogLinear)
             .build()
             .expect("valid curve");
-        let quotes = [CapFloorQuote::try_new(5.0, 0.04, 0.009, true, true).expect("valid quote")];
+        let quotes = [CapFloorQuote::new(5.0, 0.04, 0.009, true, true).expect("valid quote")];
         let config = CapFloorCalibrationConfig {
             fit_tolerance: 1e-5,
             frequency: SwapFrequency::Quarterly,
@@ -296,7 +291,7 @@ mod tests {
     #[test]
     fn swaption_curve_form_requires_two_quotes() {
         let curve = flat_curve("USD-OIS", 0.03);
-        let quote = [SwaptionQuote::try_new(1.0, 5.0, 0.0065, true).expect("quote")];
+        let quote = [SwaptionQuote::new(1.0, 5.0, 0.0065, true).expect("quote")];
         let error = calibrate_hull_white_to_swaptions(
             &curve,
             &quote,

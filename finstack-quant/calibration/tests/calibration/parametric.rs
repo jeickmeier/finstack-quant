@@ -6,8 +6,8 @@ use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, ParametricCurveParams, StepParams,
 };
 use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-use finstack_quant_calibration::quotes::market_quote::MarketQuote;
 use finstack_quant_calibration::quotes::rates::RateQuote;
+use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::{CalibrationConfig, DiscountCurveSolveConfig};
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::term_structures::NsVariant;
