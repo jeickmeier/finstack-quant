@@ -362,31 +362,22 @@ impl FxTouchOption {
             return Ok(Some(0.0));
         }
 
-        // Central-difference spot bump. Each scenario is a *fresh* `FxMatrix`
-        // wrapping the same provider `Arc`. This is safe: `FxMatrix::set_quote`
-        // writes a matrix-local explicit quote (its own LRU), and `FxMatrix`
-        // never mutates the underlying provider — the explicit quote shadows
-        // the provider on lookup. The base market's matrix is therefore
-        // unaffected by the bumps. (Bumping must NOT go through
-        // `SimpleFxProvider::set_quote`, which would mutate shared state.)
-        let up_fx = {
-            let fx_up = finstack_quant_core::money::fx::FxMatrix::new(fx_matrix.provider());
-            fx_up.set_quote(
-                self.base_currency,
-                self.quote_currency,
-                current_spot * (1.0 + bumps.spot_bump_decimal),
-            )?;
-            market.clone().insert_fx(fx_up)
-        };
-        let dn_fx = {
-            let fx_dn = finstack_quant_core::money::fx::FxMatrix::new(fx_matrix.provider());
-            fx_dn.set_quote(
-                self.base_currency,
-                self.quote_currency,
-                current_spot * (1.0 - bumps.spot_bump_decimal),
-            )?;
-            market.clone().insert_fx(fx_dn)
-        };
+        // Central-difference spot bump through the matrix's own relative bump,
+        // which keeps its `FxConfig` (pivot, triangulation) and pinned quotes
+        // and never mutates the shared provider, so the base market is
+        // unaffected.
+        let up_fx = market.clone().insert_fx(fx_matrix.with_bumped_rate(
+            self.base_currency,
+            self.quote_currency,
+            bumps.spot_bump_decimal,
+            as_of,
+        )?);
+        let dn_fx = market.clone().insert_fx(fx_matrix.with_bumped_rate(
+            self.base_currency,
+            self.quote_currency,
+            -bumps.spot_bump_decimal,
+            as_of,
+        )?);
 
         let pv_up = self.value(&up_fx, as_of)?.amount();
         let pv_dn = self.value(&dn_fx, as_of)?.amount();
@@ -425,26 +416,19 @@ impl FxTouchOption {
             return Ok(Some(0.0));
         }
 
-        // See `option_delta` for why reusing the provider `Arc` is safe:
-        // `FxMatrix::set_quote` is matrix-local and never mutates the provider.
-        let up_fx = {
-            let fx_up = finstack_quant_core::money::fx::FxMatrix::new(fx_matrix.provider());
-            fx_up.set_quote(
-                self.base_currency,
-                self.quote_currency,
-                current_spot * (1.0 + bumps.spot_bump_decimal),
-            )?;
-            market.clone().insert_fx(fx_up)
-        };
-        let dn_fx = {
-            let fx_dn = finstack_quant_core::money::fx::FxMatrix::new(fx_matrix.provider());
-            fx_dn.set_quote(
-                self.base_currency,
-                self.quote_currency,
-                current_spot * (1.0 - bumps.spot_bump_decimal),
-            )?;
-            market.clone().insert_fx(fx_dn)
-        };
+        // See `option_delta`: the relative bump leaves the base market untouched.
+        let up_fx = market.clone().insert_fx(fx_matrix.with_bumped_rate(
+            self.base_currency,
+            self.quote_currency,
+            bumps.spot_bump_decimal,
+            as_of,
+        )?);
+        let dn_fx = market.clone().insert_fx(fx_matrix.with_bumped_rate(
+            self.base_currency,
+            self.quote_currency,
+            -bumps.spot_bump_decimal,
+            as_of,
+        )?);
 
         let pv_up = self.value(&up_fx, as_of)?.amount();
         let pv_dn = self.value(&dn_fx, as_of)?.amount();
