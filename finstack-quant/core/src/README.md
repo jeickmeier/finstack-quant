@@ -67,8 +67,8 @@ and `mise run core-check-data` to check without writing. `gen-write` and
 
 [gen_lunar_festivals.py](../build/gen_lunar_festivals.py) separately refreshes
 Dragon Boat and Mid-Autumn dates and their Rust tables using `lunar_python`.
-[holiday_generated.rs](generated/holiday_generated.rs) contains the maintained
-calendar coverage limits. Generated data changes require an explicit review of
+`BASE_YEAR`/`END_YEAR` in [algo.rs](dates/calendar/algo.rs) are the
+maintained calendar coverage limits, which both generators read. Generated data changes require an explicit review of
 the inputs; a refactor must not silently change holiday or currency values.
 
 ## Validation

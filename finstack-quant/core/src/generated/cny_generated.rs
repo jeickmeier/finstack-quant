@@ -190,9 +190,3 @@ static CNY_DATES_MAP: phf::Map<i32, (u8, u8)> = phf::phf_map! {
 pub(crate) fn cny_date_for_year(year: i32) -> Option<(u8, u8)> {
     CNY_DATES_MAP.get(&year).copied()
 }
-
-/// Check if a date is Chinese New Year.
-#[inline]
-pub(crate) fn is_cny_date(year: i32, month: u8, day: u8) -> bool {
-    CNY_DATES_MAP.get(&year).is_some_and(|&(m, d)| m == month && d == day)
-}

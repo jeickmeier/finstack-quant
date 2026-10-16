@@ -149,9 +149,14 @@ fn twentieth(month: Month, year: i32) -> crate::Result<Date> {
 /// # Errors
 /// Returns `Error::Validation` when `year` is outside the supported date range.
 pub fn third_wednesday(month: Month, year: i32) -> crate::Result<Date> {
+    third_weekday(month, year, Weekday::Wednesday)
+}
+
+/// Third `weekday` of `month` in `year`, validating the year range.
+fn third_weekday(month: Month, year: i32, weekday: Weekday) -> crate::Result<Date> {
     Date::from_calendar_date(year, month, 1)
         .map_err(|error| crate::Error::Validation(error.to_string()))?;
-    nth_weekday_of_month(year, month, Weekday::Wednesday, 3).ok_or_else(|| {
+    nth_weekday_of_month(year, month, weekday, 3).ok_or_else(|| {
         crate::Error::Validation(format!("year {year} is outside the supported date range"))
     })
 }
@@ -381,11 +386,7 @@ pub fn imm_option_expiry(month: Month, year: i32) -> crate::Result<Date> {
 /// # Errors
 /// Returns `Error::Validation` when `year` is outside the supported date range.
 pub fn third_friday(month: Month, year: i32) -> crate::Result<Date> {
-    Date::from_calendar_date(year, month, 1)
-        .map_err(|error| crate::Error::Validation(error.to_string()))?;
-    nth_weekday_of_month(year, month, Weekday::Friday, 3).ok_or_else(|| {
-        crate::Error::Validation(format!("year {year} is outside the supported date range"))
-    })
+    third_weekday(month, year, Weekday::Friday)
 }
 
 /// Return the **next IMM option expiry date** (Friday before third Wednesday of
@@ -459,13 +460,12 @@ impl SifmaSettlementClass {
     ///
     /// # Arguments
     ///
-    /// * `agency` - Agency program label. Values containing `GNMA` or `GN` are
-    ///   treated as Ginnie Mae for the 30-year Class C convention.
+    /// * `agency` - Agency program label. Values containing `GN` (so also
+    ///   `GNMA`) are treated as Ginnie Mae for the 30-year Class C convention.
     /// * `term_years` - Original mortgage term in whole years. Fifteen-year
     ///   pools map to Class B and conventional 30-year pools map to Class A.
     pub fn from_agency_term(agency: &str, term_years: u32) -> Self {
-        let agency_upper = agency.to_uppercase();
-        let is_gnma = agency_upper.contains("GNMA") || agency_upper.contains("GN");
+        let is_gnma = agency.to_uppercase().contains("GN");
         match (is_gnma, term_years) {
             (true, 30) => Self::C,
             (_, 15) => Self::B,
@@ -513,20 +513,14 @@ pub fn estimated_sifma_settlement_date_for_class(
     year: i32,
     class: SifmaSettlementClass,
 ) -> crate::Result<Date> {
-    let calendar = super::calendar_by_id("sifma");
+    let calendar = super::calendar_by_id_strict("sifma")?;
     let target = estimated_sifma_business_day_index(class);
     let mut date = Date::from_calendar_date(year, month, 1)
         .map_err(|error| crate::Error::Validation(error.to_string()))?;
     let mut seen = 0;
 
     while date.month() == month {
-        let is_business_day = calendar
-            .map(|cal| cal.is_business_day(date))
-            .unwrap_or(!matches!(
-                date.weekday(),
-                Weekday::Saturday | Weekday::Sunday
-            ));
-        if is_business_day {
+        if calendar.is_business_day(date) {
             seen += 1;
             if seen == target {
                 return Ok(date);

@@ -136,21 +136,7 @@ pub(super) fn build_periods_with_calendar(
 
 const MAX_PERIODS: usize = 100_000;
 
-pub(super) fn days_in_year(year: i32) -> u16 {
-    if time::util::is_leap_year(year) {
-        366
-    } else {
-        365
-    }
-}
-
-pub(super) fn iso_weeks_in_year(year: i32) -> u8 {
-    if Date::from_iso_week_date(year, 53, time::Weekday::Monday).is_ok() {
-        53
-    } else {
-        52
-    }
-}
+pub(super) use time::util::{days_in_year, weeks_in_year as iso_weeks_in_year};
 
 fn daily_bounds(year: i32, ordinal: u16) -> crate::Result<(Date, Date)> {
     let start = Date::from_ordinal_date(year, ordinal).map_err(|_| {

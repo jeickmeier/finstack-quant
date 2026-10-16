@@ -21,8 +21,13 @@
 
 use time::{Date, Duration, Month, Weekday};
 
-// Year-range constants shared by the calendar cache and rule validation.
-include!("../../generated/holiday_generated.rs");
+/// Inclusive first year of the holiday cache and the lunar/equinox tables.
+///
+/// `build/generate_reference_data.py` and `build/gen_lunar_festivals.py` read
+/// this pair from this file.
+pub(crate) const BASE_YEAR: i32 = 1970;
+/// Inclusive last year of the holiday cache and the lunar/equinox tables.
+pub(crate) const END_YEAR: i32 = 2150;
 
 // Easter
 
@@ -57,14 +62,6 @@ include!("../../generated/holiday_generated.rs");
 /// - Meeus, J. (1991). *Astronomical Algorithms*. Willmann-Bell. Chapter 8. `docs/REFERENCES.md#meeus-1991`
 /// - Butcher, S. (1876). "Ecclesiastical Calendar." In *The Calculation of Easter*. `docs/REFERENCES.md#meeus-1991`
 /// - Algorithm widely known as "Anonymous Gregorian Algorithm" or "Meeus/Jones/Butcher" `docs/REFERENCES.md#meeus-1991`
-///
-/// # Examples
-///
-/// ```rust,compile_fail
-/// // This helper is internal (pub(crate)); it is not part of the public API.
-/// use finstack_quant_core::dates::calendar::algo::easter_monday;
-/// let _ = easter_monday(2025);
-/// ```
 #[inline]
 #[allow(clippy::unreachable)] // The Gregorian Easter algorithm yields a valid March/April date.
 pub(crate) fn easter_monday(year: i32) -> Date {
@@ -97,42 +94,8 @@ pub(crate) fn easter_monday(year: i32) -> Date {
 
 // Chinese New Year (generated lookup, 1970-2150)
 
-// The generated table provides `cny_date_for_year` and `is_cny_date` helpers.
+// The generated table provides `cny_date_for_year`.
 include!("../../generated/cny_generated.rs");
-
-/// Tests whether a given date is Chinese New Year (Spring Festival).
-///
-/// Chinese New Year is celebrated on the second new moon after winter solstice,
-/// typically falling between January 21 and February 20 in the Gregorian calendar.
-///
-/// This function uses a pre-computed lookup table generated from astronomical
-/// calculations for years 1970-2150.
-///
-/// # Arguments
-///
-/// * `date` - The date to check
-///
-/// # Returns
-///
-/// `true` if `date` is Chinese New Year, `false` otherwise. Returns `false`
-/// for years outside the supported range (1970-2150).
-///
-/// # Examples
-///
-/// ```rust,compile_fail
-/// // This helper is internal (pub(crate)); it is not part of the public API.
-/// use finstack_quant_core::dates::calendar::algo::is_cny;
-/// let _ = is_cny(time::macros::date!(2025 - 01 - 29));
-/// ```
-///
-/// # References
-///
-/// - Dates computed from Chinese lunar calendar astronomical algorithms
-/// - Generated table covers 1970-2150 (standard financial system date range)
-#[inline]
-pub(crate) fn is_cny(date: Date) -> bool {
-    is_cny_date(date.year(), date.month() as u8, date.day())
-}
 
 /// Returns the Chinese New Year date for a given year, if available.
 ///
@@ -150,30 +113,21 @@ pub(crate) fn is_cny(date: Date) -> bool {
 /// `Some(Date)` with the Chinese New Year date for the given year, or `None`
 /// if the year is outside the supported range.
 ///
-/// # Examples
-///
-/// ```rust,compile_fail
-/// // This helper is internal (pub(crate)); it is not part of the public API.
-/// use finstack_quant_core::dates::calendar::algo::cny_date;
-/// let _ = cny_date(2025);
-/// ```
-///
 /// # References
 ///
 /// - Dates computed from Chinese lunar calendar astronomical algorithms
 /// - Generated table covers 1970-2150 (standard financial system date range)
 #[inline]
 pub(crate) fn cny_date(year: i32) -> Option<Date> {
-    cny_date_for_year(year)
-        .and_then(|(m, d)| Date::from_calendar_date(year, Month::try_from(m).ok()?, d).ok())
+    festival_date(year, cny_date_for_year(year))
 }
 
 // Dragon Boat / Mid-Autumn (generated lookup, 1970-2150)
 
-// The generated table provides `dragon_boat_date_for_year`, `is_dragon_boat_date`,
-// `mid_autumn_date_for_year`, and `is_mid_autumn_date` helpers.
+// The generated table provides one `*_date_for_year` helper per festival.
 include!("../../generated/festivals_generated.rs");
 
+/// Gregorian date of a tabulated `(month, day)` in `year`, if tabulated.
 fn festival_date(year: i32, month_day: Option<(u8, u8)>) -> Option<Date> {
     month_day.and_then(|(m, d)| Date::from_calendar_date(year, Month::try_from(m).ok()?, d).ok())
 }
@@ -207,18 +161,8 @@ pub(crate) fn autumnal_equinox_jp_date(year: i32) -> Option<Date> {
 ///
 /// Celebrated on the 5th day of the 5th Chinese lunar month (typically late May
 /// to mid June). Uses a pre-computed lookup table for years 1970-2150.
-#[inline]
 pub(crate) fn dragon_boat_date(year: i32) -> Option<Date> {
-    dragon_boat_date_for_year(year)
-        .and_then(|(m, d)| Date::from_calendar_date(year, Month::try_from(m).ok()?, d).ok())
-}
-
-/// Tests whether a given date is the Dragon Boat Festival.
-///
-/// Returns `false` for years outside the supported range (1970-2150).
-#[inline]
-pub(crate) fn is_dragon_boat(date: Date) -> bool {
-    is_dragon_boat_date(date.year(), date.month() as u8, date.day())
+    festival_date(year, dragon_boat_date_for_year(year))
 }
 
 /// Returns the Mid-Autumn Festival (中秋节) date for a given year, if available.
@@ -226,18 +170,8 @@ pub(crate) fn is_dragon_boat(date: Date) -> bool {
 /// Celebrated on the 15th day of the 8th Chinese lunar month (typically mid
 /// September to early October). Uses a pre-computed lookup table for years
 /// 1970-2150.
-#[inline]
 pub(crate) fn mid_autumn_date(year: i32) -> Option<Date> {
-    mid_autumn_date_for_year(year)
-        .and_then(|(m, d)| Date::from_calendar_date(year, Month::try_from(m).ok()?, d).ok())
-}
-
-/// Tests whether a given date is the Mid-Autumn Festival.
-///
-/// Returns `false` for years outside the supported range (1970-2150).
-#[inline]
-pub(crate) fn is_mid_autumn(date: Date) -> bool {
-    is_mid_autumn_date(date.year(), date.month() as u8, date.day())
+    festival_date(year, mid_autumn_date_for_year(year))
 }
 
 // Nth weekday of month

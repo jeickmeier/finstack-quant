@@ -192,12 +192,6 @@ pub(crate) fn dragon_boat_date_for_year(year: i32) -> Option<(u8, u8)> {
     DRAGON_BOAT_DATES_MAP.get(&year).copied()
 }
 
-/// Check whether a date is the Dragon Boat Festival.
-#[inline]
-pub(crate) fn is_dragon_boat_date(year: i32, month: u8, day: u8) -> bool {
-    DRAGON_BOAT_DATES_MAP.get(&year).is_some_and(|&(m, d)| m == month && d == day)
-}
-
 /// Mid-Autumn Festival dates as (month, day), indexed by Gregorian year.
 static MID_AUTUMN_DATES_MAP: phf::Map<i32, (u8, u8)> = phf::phf_map! {
     1970i32 => (9, 15),
@@ -387,12 +381,6 @@ static MID_AUTUMN_DATES_MAP: phf::Map<i32, (u8, u8)> = phf::phf_map! {
 #[inline]
 pub(crate) fn mid_autumn_date_for_year(year: i32) -> Option<(u8, u8)> {
     MID_AUTUMN_DATES_MAP.get(&year).copied()
-}
-
-/// Check whether a date is the Mid-Autumn Festival.
-#[inline]
-pub(crate) fn is_mid_autumn_date(year: i32, month: u8, day: u8) -> bool {
-    MID_AUTUMN_DATES_MAP.get(&year).is_some_and(|&(m, d)| m == month && d == day)
 }
 
 /// Buddha's Birthday dates as (month, day), indexed by Gregorian year.

@@ -759,9 +759,9 @@ impl Rule {
                 }
                 false
             }
-            Rule::ChineseNewYear => algo::is_cny(date),
-            Rule::DragonBoat => algo::is_dragon_boat(date),
-            Rule::MidAutumn => algo::is_mid_autumn(date),
+            Rule::ChineseNewYear => algo::cny_date(date.year()) == Some(date),
+            Rule::DragonBoat => algo::dragon_boat_date(date.year()) == Some(date),
+            Rule::MidAutumn => algo::mid_autumn_date(date.year()) == Some(date),
             Rule::QingMing => algo::qing_ming_date(date.year()) == Some(date),
             Rule::BuddhasBirthday => algo::buddhas_birthday_date(date.year()) == Some(date),
             Rule::VernalEquinoxJP => {

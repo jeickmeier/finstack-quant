@@ -231,14 +231,8 @@ impl Tenor {
             TenorUnit::Days | TenorUnit::Months => true,
         };
         if count == 0 || count > max_count || !conversion_ok {
-            let suffix = match unit {
-                TenorUnit::Days => "D",
-                TenorUnit::Weeks => "W",
-                TenorUnit::Months => "M",
-                TenorUnit::Years => "Y",
-            };
             return Err(InputError::InvalidTenor {
-                tenor: format!("{count}{suffix}"),
+                tenor: format!("{count}{}", unit.designator()),
                 reason: if count == 0 {
                     "count must be positive".to_string()
                 } else {
@@ -411,27 +405,12 @@ impl Tenor {
             .into());
         }
 
-        // Unit should be exactly one character
-        if unit_str.len() != 1 {
-            return Err(InputError::InvalidTenor {
+        let unit = unit_str
+            .parse::<TenorUnit>()
+            .map_err(|err| InputError::InvalidTenor {
                 tenor: s.to_string(),
-                reason: format!(
-                    "invalid unit '{}'; expected single character D, W, M, or Y",
-                    unit_str
-                ),
-            }
-            .into());
-        }
-
-        // Length was checked to be 1 above, so first char exists
-        let Some(unit_char) = unit_str.chars().next() else {
-            return Err(InputError::InvalidTenor {
-                tenor: s.to_string(),
-                reason: "unit string unexpectedly empty".to_string(),
-            }
-            .into());
-        };
-        let unit = TenorUnit::from_char(unit_char)?;
+                reason: err.to_string(),
+            })?;
         Self::new(count, unit)
     }
 

@@ -139,7 +139,7 @@ pub(super) fn year_fraction_act_act_isda(start: Date, end: Date) -> crate::Resul
     }
 
     if start.year() == end.year() {
-        let denom = days_in_year(start.year()) as f64;
+        let denom = f64::from(time::util::days_in_year(start.year()));
         let days = (end - start).whole_days() as f64;
         return Ok(days / denom);
     }
@@ -147,7 +147,7 @@ pub(super) fn year_fraction_act_act_isda(start: Date, end: Date) -> crate::Resul
     // Days from start to 31-Dec of start year (inclusive of start, exclusive of next year 1-Jan).
     let start_year_end = crate::dates::create_date(start.year() + 1, Month::January, 1)?;
     let days_start_year = (start_year_end - start).whole_days() as f64;
-    let mut frac = days_start_year / days_in_year(start.year()) as f64;
+    let mut frac = days_start_year / f64::from(time::util::days_in_year(start.year()));
 
     // Preserve per-year addition: bulk addition differs by one ULP for some
     // seeds because IEEE addition is not associative.
@@ -158,7 +158,7 @@ pub(super) fn year_fraction_act_act_isda(start: Date, end: Date) -> crate::Resul
     // Days from 1-Jan of end year to end date
     let start_of_end_year = crate::dates::create_date(end.year(), Month::January, 1)?;
     let days_end_year = (end - start_of_end_year).whole_days() as f64;
-    frac += days_end_year / days_in_year(end.year()) as f64;
+    frac += days_end_year / f64::from(time::util::days_in_year(end.year()));
 
     Ok(frac)
 }
@@ -218,15 +218,6 @@ pub(super) fn year_fraction_act_act_isma_with_ctx(
         }
     }
     Err(InputError::MissingCouponPeriodForActActIsma.into())
-}
-
-#[inline]
-const fn days_in_year(year: i32) -> i32 {
-    if time::util::is_leap_year(year) {
-        366
-    } else {
-        365
-    }
 }
 
 /// ACT/ACT AFB (Association Française des Banques / Actual/Actual Euro).

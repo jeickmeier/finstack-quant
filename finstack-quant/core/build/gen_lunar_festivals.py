@@ -36,11 +36,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import sys
 
-from generate_reference_data import render_festivals
+from generate_reference_data import cache_year_range, render_festivals
 from lunar_python import Lunar, Solar
 
-BASE_YEAR = 1970
-END_YEAR = 2150
+BASE_YEAR, END_YEAR = cache_year_range()
 
 # (lunar_month, lunar_day) for each festival.
 DRAGON_BOAT = (5, 5)
