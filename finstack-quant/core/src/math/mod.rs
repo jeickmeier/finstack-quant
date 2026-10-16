@@ -141,10 +141,7 @@ pub mod summation;
 pub mod time_grid;
 
 pub use compounding::Compounding;
-pub use distributions::{
-    binomial_pmf_all, binomial_pmf_all_into, binomial_probability, chi_squared_quantile,
-    log_factorial,
-};
+pub use distributions::{binomial_pmf_all, binomial_pmf_all_into, chi_squared_quantile};
 pub use integration::{
     gauss_legendre_grid, gauss_legendre_integrate, gauss_legendre_integrate_adaptive,
     gauss_legendre_integrate_composite, GaussHermiteQuadrature,

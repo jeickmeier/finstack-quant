@@ -12,7 +12,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::{BaseCorrelationCurve, HazardCurve};
-use finstack_quant_core::math::{binomial_probability, log_factorial, standard_normal_inv_cdf};
+use finstack_quant_core::math::standard_normal_inv_cdf;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::correlation::copula::CopulaSpec;
 use std::sync::Arc;
@@ -221,32 +221,6 @@ fn test_conditional_default_probability() {
     // Test with positive market factor (should decrease default prob)
     let cond_prob_pos = model.conditional_default_probability(default_threshold, correlation, 1.0);
     assert!(cond_prob_pos < 0.05);
-}
-
-#[test]
-fn test_binomial_probability() {
-    // Test known values
-    assert!((binomial_probability(10, 5, 0.5) - 0.24609375).abs() < 1e-6);
-    assert!((binomial_probability(5, 0, 0.1) - 0.59049).abs() < 1e-6);
-
-    // Test edge cases
-    assert_eq!(binomial_probability(10, 0, 0.0), 1.0);
-    assert_eq!(binomial_probability(10, 10, 1.0), 1.0);
-    assert_eq!(binomial_probability(10, 5, 0.0), 0.0);
-}
-
-#[test]
-fn test_log_factorial() {
-    // Test small values (exact calculation)
-    assert!((log_factorial(1) - 0.0).abs() < 1e-12);
-    assert!(
-        (log_factorial(5) - (2.0_f64.ln() + 3.0_f64.ln() + 4.0_f64.ln() + 5.0_f64.ln())).abs()
-            < 1e-12
-    );
-
-    // Test that Stirling's approximation is reasonable for large n
-    let log_100_factorial = log_factorial(100);
-    assert!(log_100_factorial > 360.0 && log_100_factorial < 370.0); // Should be around 363.7
 }
 
 #[test]

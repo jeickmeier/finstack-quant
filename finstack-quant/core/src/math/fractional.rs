@@ -87,11 +87,6 @@ impl HurstExponent {
         self.h
     }
 
-    /// The fractional index α = H + 0.5 used in Volterra-type representations.
-    pub fn alpha(&self) -> f64 {
-        self.h + 0.5
-    }
-
     /// Returns `true` when the exponent describes a rough process (H < 0.5).
     pub fn is_rough(&self) -> bool {
         self.h < 0.5
@@ -162,7 +157,6 @@ mod tests {
     fn hurst_valid() {
         let h = HurstExponent::new(0.1).unwrap();
         assert!((h.value() - 0.1).abs() < TOL);
-        assert!((h.alpha() - 0.6).abs() < TOL);
         assert!(h.is_rough());
     }
 

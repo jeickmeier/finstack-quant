@@ -68,7 +68,7 @@ use thiserror::Error;
 /// of the square root of the largest input diagonal magnitude. Substitution uses
 /// the largest factor diagonal magnitude. Both criteria are invariant to a
 /// uniform rescaling of the system. The correlation-specific path
-/// (`cholesky_correlation`) uses [`PIVOT_TOLERANCE_RELATIVE`] instead.
+/// (`cholesky_correlation`) uses the relative pivot tolerance instead.
 pub const SINGULAR_THRESHOLD: f64 = 1e-10;
 
 /// Default tolerance for diagonal elements in correlation matrices.
@@ -95,7 +95,7 @@ pub const SYMMETRY_TOLERANCE: f64 = 1e-10;
 /// valid input that a strict bound would reject. The slack is therefore kept at
 /// rounding scale — wide enough for last-bit error, far too narrow to admit a
 /// value that is actually out of range.
-pub const CORRELATION_BOUND_SLACK: f64 = 1e-12;
+const CORRELATION_BOUND_SLACK: f64 = 1e-12;
 
 /// Relative pivot tolerance for [`cholesky_correlation`].
 ///
@@ -103,7 +103,7 @@ pub const CORRELATION_BOUND_SLACK: f64 = 1e-12;
 /// `PIVOT_TOLERANCE_RELATIVE * max_diagonal`. This makes the threshold
 /// scale-invariant and appropriate for both normalised correlation matrices
 /// (diagonal ≈ 1) and general covariance matrices with large entries.
-pub const PIVOT_TOLERANCE_RELATIVE: f64 = 1e-10;
+const PIVOT_TOLERANCE_RELATIVE: f64 = 1e-10;
 
 /// Number of entries in an `n × n` row-major matrix, or `None` when `n * n`
 /// overflows `usize` (from `n = 65536` on 32-bit targets such as wasm32).

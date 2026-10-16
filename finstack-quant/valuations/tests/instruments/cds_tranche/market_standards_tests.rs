@@ -9,7 +9,7 @@
 
 use super::helpers::*;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::math::{binomial_probability, log_factorial};
+use finstack_quant_core::math::binomial_pmf_all;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
@@ -189,6 +189,11 @@ fn test_base_correlation_approach() {
 
 // ==================== Binomial Probability Tests ====================
 
+/// `P(X = k)` for `X ~ Binomial(n, p)`, read off the full PMF.
+fn binomial_probability(n: usize, k: usize, p: f64) -> f64 {
+    binomial_pmf_all(n, p).expect("valid probability")[k]
+}
+
 #[test]
 fn test_binomial_probability_known_values() {
     // Market Standard: Binomial distribution is foundation of loss distribution
@@ -222,26 +227,6 @@ fn test_binomial_probability_edge_cases() {
     // Edge case: p=1 should give probability 1 for k=n, 0 otherwise
     assert_eq!(binomial_probability(10, 10, 1.0), 1.0);
     assert_eq!(binomial_probability(10, 5, 1.0), 0.0);
-}
-
-#[test]
-fn test_log_factorial_accuracy() {
-    // Test small values (exact calculation)
-    approx_eq(log_factorial(1), 0.0, 1e-12, "log(1!)");
-    approx_eq(
-        log_factorial(5),
-        2.0_f64.ln() + 3.0_f64.ln() + 4.0_f64.ln() + 5.0_f64.ln(),
-        1e-12,
-        "log(5!)",
-    );
-
-    // Test Stirling's approximation for large n
-    let log_100_factorial = log_factorial(100);
-    assert!(
-        (360.0..370.0).contains(&log_100_factorial),
-        "log(100!) should be ~363.7, got {}",
-        log_100_factorial
-    );
 }
 
 // ==================== Day Count Convention Tests ====================

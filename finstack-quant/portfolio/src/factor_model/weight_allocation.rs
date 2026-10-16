@@ -1,7 +1,7 @@
 //! Lightweight strategy-level allocation schemes.
 
 use crate::error::{Error, Result};
-use finstack_quant_core::math::summation::NeumaierAccumulator;
+use finstack_quant_core::math::summation::{neumaier_sum, NeumaierAccumulator};
 use serde::{Deserialize, Serialize};
 
 const WEIGHT_TOLERANCE: f64 = 1e-9;
@@ -239,8 +239,8 @@ impl WeightAllocationSpec {
             scheme: self.scheme,
             allocations,
             diagnostics: AllocationDiagnostics {
-                weights_sum: neumaier_total(weights.iter().copied()),
-                leverage: neumaier_total(weights.iter().map(|weight| weight.abs())),
+                weights_sum: neumaier_sum(weights.iter().copied()),
+                leverage: neumaier_sum(weights.iter().map(|weight| weight.abs())),
             },
         })
     }
@@ -330,7 +330,7 @@ fn inverse_volatility_weights(
         inverse_vols.push(1.0 / volatility);
     }
 
-    let denominator = neumaier_total(inverse_vols.iter().copied());
+    let denominator = neumaier_sum(inverse_vols.iter().copied());
     if denominator <= WEIGHT_TOLERANCE {
         return Err(Error::validation(
             "allocation inverse volatility denominator is zero",
@@ -367,7 +367,7 @@ fn sample_volatility(strategy: &StrategyAllocationInput) -> Result<f64> {
             strategy.id
         )));
     }
-    let mean = neumaier_total(strategy.returns.iter().copied()) / strategy.returns.len() as f64;
+    let mean = neumaier_sum(strategy.returns.iter().copied()) / strategy.returns.len() as f64;
     let variance = strategy
         .returns
         .iter()
@@ -544,7 +544,7 @@ fn risk_contribution_fractions(weights: &[f64], covariance: &[f64]) -> Result<Ve
 fn rounded_capitals(total_capital: f64, weights: &[f64], decimal_places: u32) -> Result<Vec<f64>> {
     let scale = 10_f64.powi(decimal_places as i32);
     let target_units = (total_capital.abs() * scale).round();
-    let weights_sum = neumaier_total(weights.iter().copied());
+    let weights_sum = neumaier_sum(weights.iter().copied());
     if !target_units.is_finite()
         || !weights_sum.is_finite()
         || weights_sum <= 0.0
@@ -566,7 +566,7 @@ fn rounded_capitals(total_capital: f64, weights: &[f64], decimal_places: u32) ->
         units.push(whole_units);
         remainders.push((idx, exact_units - whole_units));
     }
-    let residual = (target_units - neumaier_total(units.iter().copied())).round();
+    let residual = (target_units - neumaier_sum(units.iter().copied())).round();
     let fractional_count = remainders
         .iter()
         .filter(|(_, fraction)| *fraction > 0.0)
@@ -607,7 +607,7 @@ fn rounded_capitals(total_capital: f64, weights: &[f64], decimal_places: u32) ->
 }
 
 fn validate_weights_sum_to_one(weights: &[f64], label: &str) -> Result<()> {
-    let sum = neumaier_total(weights.iter().copied());
+    let sum = neumaier_sum(weights.iter().copied());
     if (sum - 1.0).abs() > WEIGHT_TOLERANCE {
         return Err(Error::validation(format!(
             "allocation {label} must sum to 1.0 (got {sum})"
@@ -617,7 +617,7 @@ fn validate_weights_sum_to_one(weights: &[f64], label: &str) -> Result<()> {
 }
 
 fn normalize_weights(weights: &mut [f64]) -> Result<()> {
-    let sum = neumaier_total(weights.iter().copied());
+    let sum = neumaier_sum(weights.iter().copied());
     if sum <= WEIGHT_TOLERANCE {
         return Err(Error::validation("allocation weights sum must be positive"));
     }
@@ -625,17 +625,6 @@ fn normalize_weights(weights: &mut [f64]) -> Result<()> {
         *weight /= sum;
     }
     Ok(())
-}
-
-fn neumaier_total<I>(values: I) -> f64
-where
-    I: IntoIterator<Item = f64>,
-{
-    let mut acc = NeumaierAccumulator::new();
-    for value in values {
-        acc.add(value);
-    }
-    acc.total()
 }
 
 #[cfg(test)]

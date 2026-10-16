@@ -720,7 +720,7 @@ fn compute_monotone_slopes(xs: &[f64], ys: &[f64]) -> Box<[f64]> {
 }
 
 /// Default epsilon for near-zero slope detection in MonotoneConvex.
-pub const DEFAULT_MONOTONE_CONVEX_EPSILON: f64 = 1e-14;
+const DEFAULT_MONOTONE_CONVEX_EPSILON: f64 = 1e-14;
 
 /// Strategy for monotone-convex discount-factor interpolation (Hagan & West, 2006).
 ///
@@ -763,8 +763,6 @@ pub struct MonotoneConvexStrategy {
     dt: Box<[f64]>,
     /// Cumulative log discount factors at each knot: -ln(DF[i]).
     log_df: Box<[f64]>,
-    /// Numerical tolerance for near-zero detection.
-    epsilon: f64,
 }
 
 impl InterpolationStrategy for MonotoneConvexStrategy {
@@ -778,7 +776,7 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
         // curves (EUR/CHF/JPY).
         validate_positive_series(values)?;
         validate_knot_spacing(knots, MIN_RELATIVE_KNOT_GAP)?;
-        Self::build_hagan_west(knots, values, DEFAULT_MONOTONE_CONVEX_EPSILON)
+        Self::build_hagan_west(knots, values)
     }
 
     fn interp(
@@ -882,56 +880,13 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
 }
 
 impl MonotoneConvexStrategy {
-    /// Construct with custom epsilon for near-zero slope detection.
-    ///
-    /// Implements Hagan-West monotone-convex interpolation of strictly
-    /// positive discount factors. Increasing discount factors (and therefore
-    /// negative forward rates) are allowed; monotonicity amelioration is only
-    /// applied when all inferred discrete forwards are non-negative. `epsilon`
-    /// controls near-zero slope handling and must lie in `(0, 1e-6]`.
-    ///
-    /// # Arguments
-    ///
-    /// * `knots` - Finite, strictly increasing year fractions with at least two
-    ///   entries and the same length as `values`.
-    /// * `values` - Positive, finite discount factors at the corresponding knots;
-    ///   increasing values are accepted for negative-rate curves.
-    /// * `epsilon` - Absolute tolerance in decimal forward-rate units for treating
-    ///   both endpoint deviations as nearly flat; must be finite and in `(0, 1e-6]`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `epsilon` is outside that range, consecutive knots
-    /// are too closely spaced for stable slope calculations, or any supplied
-    /// value is non-finite or not strictly positive.
-    ///
-    pub fn with_epsilon(knots: &[f64], values: &[f64], epsilon: f64) -> crate::Result<Self> {
-        use crate::error::InputError;
-
-        if !epsilon.is_finite() || epsilon <= 0.0 || epsilon > 1e-6 {
-            return Err(InputError::Invalid.into());
-        }
-        if knots.len() != values.len() {
-            return Err(InputError::DimensionMismatch.into());
-        }
-        super::utils::validate_knots(knots)?;
-
-        // Same knot-spacing validation as the other strategy constructors.
-        validate_knot_spacing(knots, MIN_RELATIVE_KNOT_GAP)?;
-        // DF values must be strictly positive and finite; increasing DFs
-        // (negative forward rates) are accepted.
-        validate_positive_series(values)?;
-
-        Self::build_hagan_west(knots, values, epsilon)
-    }
-
     /// Build the Hagan-West monotone convex coefficients.
     ///
     /// This implements the algorithm from Hagan & West (2006):
     /// 1. Compute discrete forward rates from discount factors
     /// 2. Estimate instantaneous forward rates at knots
     /// 3. Apply monotonicity constraints
-    fn build_hagan_west(knots: &[f64], dfs: &[f64], epsilon: f64) -> crate::Result<Self> {
+    fn build_hagan_west(knots: &[f64], dfs: &[f64]) -> crate::Result<Self> {
         let n = knots.len();
         debug_assert!(n >= 2);
 
@@ -988,7 +943,6 @@ impl MonotoneConvexStrategy {
             f: f.into_boxed_slice(),
             dt: dt.into_boxed_slice(),
             log_df: log_df.into_boxed_slice(),
-            epsilon,
         })
     }
 
@@ -1027,7 +981,8 @@ impl MonotoneConvexStrategy {
         let g_left = self.f[i] - fd_i;
         let g_right = self.f[i + 1] - fd_i;
 
-        let (g_x, g_integral) = Self::forward_adjustment(x, g_left, g_right, self.epsilon);
+        let (g_x, g_integral) =
+            Self::forward_adjustment(x, g_left, g_right, DEFAULT_MONOTONE_CONVEX_EPSILON);
         let forward = fd_i + g_x;
 
         // DF: integral of f from t_i to t, then DF(t) = exp(-(log_df[i] + integral)).

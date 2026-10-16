@@ -148,12 +148,6 @@ impl Compounding {
         }
     }
 
-    /// Returns true if this is a periodic compounding convention (including Annual).
-    #[must_use]
-    pub fn is_periodic(&self) -> bool {
-        matches!(self, Compounding::Annual | Compounding::Periodic(_))
-    }
-
     /// Convert an interest rate to a discount factor for time `t` (in years).
     ///
     /// Uses the compounding convention of `self`:
@@ -437,14 +431,6 @@ mod tests {
         assert_eq!(Compounding::QUARTERLY.periods_per_year(), Some(4));
         assert_eq!(Compounding::MONTHLY.periods_per_year(), Some(12));
         assert_eq!(Compounding::Simple.periods_per_year(), None);
-    }
-
-    #[test]
-    fn test_is_periodic() {
-        assert!(!Compounding::Continuous.is_periodic());
-        assert!(Compounding::Annual.is_periodic());
-        assert!(Compounding::SEMI_ANNUAL.is_periodic());
-        assert!(!Compounding::Simple.is_periodic());
     }
 
     #[test]

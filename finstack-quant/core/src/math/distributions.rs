@@ -30,14 +30,14 @@
 //!
 //! # Examples
 //!
-//! ## Binomial probability calculation
+//! ## Binomial probability mass function
 //!
 //! ```
-//! use finstack_quant_core::math::distributions::binomial_probability;
+//! use finstack_quant_core::math::distributions::binomial_pmf_all;
 //!
-//! // Calculate P(X = 5) where X ~ Binomial(10, 0.5)
-//! let prob = binomial_probability(10, 5, 0.5);
-//! assert!((prob - 0.24609375).abs() < 1e-6);
+//! // P(X = k) for every k where X ~ Binomial(10, 0.5)
+//! let pmf = binomial_pmf_all(10, 0.5).expect("valid probability");
+//! assert!((pmf[5] - 0.24609375).abs() < 1e-6);
 //! ```
 //!
 //! ## Beta sampling for recovery-rate uncertainty
@@ -82,78 +82,12 @@
 
 use super::random::RandomNumberGenerator;
 
-/// Calculate binomial probability P(X = k) where X ~ Binomial(n, p).
-///
-/// Computes the probability mass function for the binomial distribution using
-/// the battle-tested `statrs` crate implementation. The binomial distribution
-/// models the number of successes in n independent Bernoulli trials.
-///
-/// # Mathematical Definition
-///
-/// ```text
-/// P(X = k) = C(n,k) * p^k * (1-p)^(n-k)
-///
-/// where C(n,k) = n! / (k! * (n-k)!)
-/// ```
-///
-/// # Arguments
-///
-/// * `n` - Number of independent trials (≥ 0)
-/// * `k` - Number of successes (0 ≤ k ≤ n)
-/// * `p` - Probability of success on each trial (0 ≤ p ≤ 1)
-///
-/// # Returns
-///
-/// Probability P(X = k) ∈ [0, 1]
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::math::distributions::binomial_probability;
-///
-/// // Fair coin: P(5 heads in 10 flips)
-/// let prob = binomial_probability(10, 5, 0.5);
-/// assert!((prob - 0.24609375).abs() < 1e-6);
-///
-/// // Credit portfolio: P(5 defaults in 100 names with 5% PD)
-/// let default_prob = binomial_probability(100, 5, 0.05);
-/// ```
-///
-/// # Implementation
-///
-/// This is a thin wrapper around `statrs::distribution::Binomial::pmf`, which
-/// provides numerically stable computation with proper edge case handling.
-///
-/// # References
-///
-/// - Johnson, N. L., Kotz, S., & Kemp, A. W. (1993). *Univariate Discrete Distributions*
-///   (2nd ed.). Wiley. Chapter 3. `docs/REFERENCES.md#press-numerical-recipes`
-pub fn binomial_probability(n: usize, k: usize, p: f64) -> f64 {
-    use statrs::distribution::{Binomial, Discrete};
-
-    if k > n {
-        return 0.0;
-    }
-    if p <= 0.0 {
-        return if k == 0 { 1.0 } else { 0.0 };
-    }
-    if p >= 1.0 {
-        return if k == n { 1.0 } else { 0.0 };
-    }
-
-    // statrs::distribution::Binomial::new(p, n) where p is success probability and n is trials
-    match Binomial::new(p, n as u64) {
-        Ok(binom) => binom.pmf(k as u64),
-        Err(_) => 0.0,
-    }
-}
-
 /// Compute the full binomial PMF `P(K = k)` for every `k` in `0..=n` in one pass.
 ///
 /// Returns a vector `pmf` of length `n + 1` where `pmf[k]` is the probability of
 /// exactly `k` successes in `n` independent trials each with success probability
-/// `p`. This is mathematically equivalent to calling [`binomial_probability`] for
-/// every `k`, but evaluates the whole distribution in `O(n)` arithmetic via the
+/// `p`. This is mathematically equivalent to evaluating the binomial PMF for
+/// every `k`, but computes the whole distribution in `O(n)` arithmetic via the
 /// forward recurrence
 ///
 /// ```text
@@ -169,19 +103,17 @@ pub fn binomial_probability(n: usize, k: usize, p: f64) -> f64 {
 ///
 /// * `n` - Number of trials.
 /// * `p` - Success probability. Values `<= 0` and `>= 1` collapse to the
-///   degenerate distributions (all mass on `k = 0` and `k = n` respectively),
-///   matching [`binomial_probability`].
+///   degenerate distributions (all mass on `k = 0` and `k = n` respectively).
 ///
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::math::{binomial_pmf_all, binomial_probability};
+/// use finstack_quant_core::math::binomial_pmf_all;
 ///
-/// let pmf = binomial_pmf_all(10, 0.3)?;
+/// let pmf = binomial_pmf_all(10, 0.5)?;
 /// assert_eq!(pmf.len(), 11);
-/// for k in 0..=10 {
-///     assert!((pmf[k] - binomial_probability(10, k, 0.3)).abs() < 1e-12);
-/// }
+/// assert!((pmf[5] - 0.24609375).abs() < 1e-12);
+/// assert!((pmf.iter().sum::<f64>() - 1.0).abs() < 1e-12);
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 ///
@@ -252,31 +184,6 @@ pub fn binomial_pmf_all_into(out: &mut Vec<f64>, n: usize, p: f64) -> crate::Res
         }
     }
     Ok(())
-}
-
-/// Calculate log factorial ln(n!).
-///
-/// Delegates to [`statrs::function::factorial::ln_factorial`], which uses a
-/// precomputed lookup table for small `n` and `ln_gamma(n + 1)` for larger `n`.
-///
-/// # Arguments
-///
-/// * `n` - Non-negative integer
-///
-/// # Returns
-///
-/// ln(n!)
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::math::distributions::log_factorial;
-///
-/// assert_eq!(log_factorial(0), 0.0); // 0! = 1, ln(1) = 0
-/// assert!((log_factorial(5) - (2.0_f64.ln() + 3.0_f64.ln() + 4.0_f64.ln() + 5.0_f64.ln())).abs() < 1e-10);
-/// ```
-pub fn log_factorial(n: usize) -> f64 {
-    statrs::function::factorial::ln_factorial(n as u64)
 }
 
 /// Sample from Beta(α, β) distribution using the gamma ratio method.
@@ -382,8 +289,8 @@ pub fn sample_beta(
     }
 
     // Use gamma ratio method: X/(X+Y) ~ Beta(α, β) where X ~ Gamma(α), Y ~ Gamma(β)
-    let x = sample_gamma_unchecked(rng, alpha)?;
-    let y = sample_gamma_unchecked(rng, beta)?;
+    let x = sample_gamma(rng, alpha)?;
+    let y = sample_gamma(rng, beta)?;
 
     // Guard against division by zero or near-zero denominator.
     // Both gamma samples can underflow to 0 for very small shape parameters.
@@ -422,24 +329,11 @@ pub fn sample_beta(
 /// Uses Marsaglia & Tsang's rejection method for shape ≥ 1, with Ahrens-Dieter
 /// transformation for shape < 1.
 ///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::math::distributions::sample_gamma;
-/// use finstack_quant_core::math::random::Pcg64Rng;
-/// use finstack_quant_core::math::RandomNumberGenerator;
-///
-/// let mut rng = Pcg64Rng::new(42);
-/// let sample = sample_gamma(&mut rng as &mut dyn RandomNumberGenerator, 2.0)?;
-/// assert!(sample >= 0.0);
-/// # Ok::<(), finstack_quant_core::Error>(())
-/// ```
-///
 /// # References
 ///
 /// - Marsaglia, G., & Tsang, W. W. (2000). "A Simple Method for Generating Gamma
 ///   Variables." *ACM Transactions on Mathematical Software*, 26(3), 363-372. `docs/REFERENCES.md#press-numerical-recipes`
-pub fn sample_gamma(rng: &mut dyn RandomNumberGenerator, shape: f64) -> crate::Result<f64> {
+fn sample_gamma(rng: &mut dyn RandomNumberGenerator, shape: f64) -> crate::Result<f64> {
     if !shape.is_finite() || shape <= 0.0 {
         return Err(crate::Error::Validation(format!(
             "Gamma shape parameter must be positive, got: {}",
@@ -447,15 +341,10 @@ pub fn sample_gamma(rng: &mut dyn RandomNumberGenerator, shape: f64) -> crate::R
         )));
     }
 
-    sample_gamma_unchecked(rng, shape)
+    sample_gamma_with_max_attempts(rng, shape, GAMMA_MAX_REJECTION_ATTEMPTS)
 }
 
 const GAMMA_MAX_REJECTION_ATTEMPTS: usize = 100_000;
-
-/// Internal unchecked gamma sampling (assumes shape > 0).
-fn sample_gamma_unchecked(rng: &mut dyn RandomNumberGenerator, shape: f64) -> crate::Result<f64> {
-    sample_gamma_with_max_attempts(rng, shape, GAMMA_MAX_REJECTION_ATTEMPTS)
-}
 
 fn sample_gamma_with_max_attempts(
     rng: &mut dyn RandomNumberGenerator,
@@ -676,10 +565,6 @@ mod tests {
         fn normal(&mut self, _mean: f64, _std_dev: f64) -> f64 {
             -10.0
         }
-
-        fn bernoulli(&mut self, _p: f64) -> bool {
-            false
-        }
     }
 
     #[test]
@@ -688,32 +573,6 @@ mod tests {
         let error = sample_gamma_with_max_attempts(&mut rng, 1.0, 3)
             .expect_err("deterministic rejection must terminate");
         assert!(error.to_string().contains("attempt"));
-    }
-
-    #[test]
-    fn test_binomial_probability() {
-        // Test known values
-        assert!((binomial_probability(10, 5, 0.5) - 0.24609375).abs() < 1e-6);
-        assert!((binomial_probability(5, 0, 0.1) - 0.59049).abs() < 1e-6);
-
-        // Test edge cases
-        assert_eq!(binomial_probability(10, 0, 0.0), 1.0);
-        assert_eq!(binomial_probability(10, 10, 1.0), 1.0);
-        assert_eq!(binomial_probability(10, 5, 0.0), 0.0);
-    }
-
-    #[test]
-    fn test_log_factorial() {
-        // Test small values (exact calculation)
-        assert!((log_factorial(1) - 0.0).abs() < 1e-12);
-        assert!(
-            (log_factorial(5) - (2.0_f64.ln() + 3.0_f64.ln() + 4.0_f64.ln() + 5.0_f64.ln())).abs()
-                < 1e-12
-        );
-
-        // Test large values (Stirling approximation)
-        let log_100_factorial = log_factorial(100);
-        assert!(log_100_factorial > 360.0 && log_100_factorial < 365.0);
     }
 
     #[test]
@@ -926,16 +785,18 @@ mod tests {
     // Log-Normal Distribution Tests
 
     #[test]
-    fn binomial_pmf_all_matches_binomial_probability() {
+    fn binomial_pmf_all_matches_statrs() {
+        use statrs::distribution::{Binomial, Discrete};
+
         for &(n, p) in &[(10usize, 0.3f64), (50, 0.05), (126, 0.5), (20, 0.9)] {
+            let reference = Binomial::new(p, n as u64).expect("valid binomial");
             let pmf = binomial_pmf_all(n, p).expect("valid probability should produce a PMF");
             assert_eq!(pmf.len(), n + 1);
             for (k, &prob) in pmf.iter().enumerate() {
+                let expected = reference.pmf(k as u64);
                 assert!(
-                    (prob - binomial_probability(n, k, p)).abs() < 1e-10,
-                    "n={n}, k={k}, p={p}: recurrence {} vs statrs {}",
-                    prob,
-                    binomial_probability(n, k, p)
+                    (prob - expected).abs() < 1e-10,
+                    "n={n}, k={k}, p={p}: recurrence {prob} vs statrs {expected}"
                 );
             }
             let total: f64 = pmf.iter().sum();

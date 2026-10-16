@@ -23,7 +23,7 @@
 //! // Generate samples
 //! let uniform = rng.uniform();       // U(0, 1)
 //! let normal = rng.normal(0.0, 1.0); // N(0, 1)
-//! let event = rng.bernoulli(0.05);   // 5% probability
+//! let event = rng.uniform() < 0.05;   // 5% probability
 //! ```
 //!
 //! # Statistical properties
@@ -70,22 +70,8 @@ pub trait RandomNumberGenerator: Send + Sync {
     /// Generate uniform random number in [0, 1)
     fn uniform(&mut self) -> f64;
 
-    /// Generate a random 64-bit value.
-    ///
-    /// Implementations with native integer output should override this method.
-    /// The default combines two uniforms so existing RNG implementations remain
-    /// source-compatible.
-    fn next_u64(&mut self) -> u64 {
-        let hi = (self.uniform() * (u32::MAX as f64 + 1.0)) as u64;
-        let lo = (self.uniform() * (u32::MAX as f64 + 1.0)) as u64;
-        (hi << 32) | lo
-    }
-
     /// Generate normal random number with specified mean and standard deviation
     fn normal(&mut self, mean: f64, std_dev: f64) -> f64;
-
-    /// Generate Bernoulli random boolean with probability p
-    fn bernoulli(&mut self, p: f64) -> bool;
 }
 
 // PCG64 RNG: Pcg64Rng
@@ -134,7 +120,7 @@ use rand_pcg::Pcg64;
 /// let z = rng.normal(0.0, 1.0);
 ///
 /// // Bernoulli for binary events
-/// let default_occurred = rng.bernoulli(0.02); // 2% default probability
+/// let default_occurred = rng.uniform() < 0.02; // 2% default probability
 /// ```
 ///
 /// # Parallel Streams
@@ -260,15 +246,18 @@ impl Pcg64Rng {
     }
 }
 
+impl Pcg64Rng {
+    /// Next raw 64-bit output of the underlying PCG64 stream.
+    #[inline]
+    pub fn next_u64(&mut self) -> u64 {
+        self.inner.next_u64()
+    }
+}
+
 impl RandomNumberGenerator for Pcg64Rng {
     #[inline]
     fn uniform(&mut self) -> f64 {
         self.inner.random()
-    }
-
-    #[inline]
-    fn next_u64(&mut self) -> u64 {
-        self.inner.next_u64()
     }
 
     fn normal(&mut self, mean: f64, std_dev: f64) -> f64 {
@@ -283,15 +272,6 @@ impl RandomNumberGenerator for Pcg64Rng {
         let (z0, z1) = box_muller_transform(u1, u2);
         self.cached_normal = Some(z1);
         mean + std_dev * z0
-    }
-
-    #[inline]
-    fn bernoulli(&mut self, p: f64) -> bool {
-        debug_assert!(
-            (0.0..=1.0).contains(&p),
-            "bernoulli probability must be in [0, 1], got {p}"
-        );
-        self.uniform() < p
     }
 }
 
@@ -561,38 +541,6 @@ mod tests {
             (variance - 1.0).abs() < 0.1,
             "Sample variance {} too far from 1",
             variance
-        );
-    }
-
-    #[test]
-    fn test_pcg64_rng_bernoulli() {
-        let mut rng = Pcg64Rng::new(42);
-
-        // Test extreme probabilities
-        for _ in 0..10 {
-            assert!(!rng.bernoulli(0.0));
-            assert!(rng.bernoulli(1.0));
-        }
-
-        // Reset RNG for frequency test
-        let mut rng = Pcg64Rng::new(42);
-        let mut successes = 0;
-        let n = 10_000;
-
-        for _ in 0..n {
-            if rng.bernoulli(0.3) {
-                successes += 1;
-            }
-        }
-
-        // Should be roughly 30% successes (3000 ± 3σ where σ ≈ 45.8)
-        let expected = 0.3 * n as f64;
-        let std_dev = (0.3 * 0.7 * n as f64).sqrt();
-        assert!(
-            (successes as f64 - expected).abs() < 4.0 * std_dev,
-            "Bernoulli frequency {} too far from expected {}",
-            successes,
-            expected
         );
     }
 

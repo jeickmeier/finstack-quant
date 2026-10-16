@@ -125,13 +125,15 @@ impl BrownianBridge {
         Self::build_bridge_recursive(mid, right, order, multipliers);
     }
 
-    /// Get construction order.
-    pub fn order(&self) -> &[usize] {
+    /// Construction order, exposed to the unit tests that pin the bridge layout.
+    #[cfg(test)]
+    fn order(&self) -> &[usize] {
         &self.construction_order
     }
 
-    /// Get standard deviation multipliers.
-    pub fn multipliers(&self) -> &[f64] {
+    /// Standard deviation multipliers, exposed to the unit tests.
+    #[cfg(test)]
+    fn multipliers(&self) -> &[f64] {
         &self.std_multipliers
     }
 

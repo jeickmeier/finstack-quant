@@ -47,7 +47,7 @@ pub(crate) mod utils;
 pub use generic::Interpolator;
 pub use strategies::{
     CubicHermiteStrategy, LinearStrategy, LogLinearStrategy, MonotoneConvexStrategy,
-    PiecewiseQuadraticForwardStrategy, DEFAULT_MONOTONE_CONVEX_EPSILON,
+    PiecewiseQuadraticForwardStrategy,
 };
 pub use traits::InterpolationStrategy;
 pub use types::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};

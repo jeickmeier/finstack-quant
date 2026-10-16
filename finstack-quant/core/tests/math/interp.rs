@@ -224,45 +224,6 @@ fn piecewise_quadratic_forward_matches_natural_cubic_and_is_continuous() {
     assert!(approx_eq(forward_left, forward_right, 1e-8));
 }
 
-mod monotone_convex_strategy {
-    use super::*;
-
-    #[test]
-    fn with_epsilon_accepts_reasonable_epsilon() {
-        let knots = standard_knots();
-        let dfs = standard_dfs();
-
-        let strategy =
-            MonotoneConvexStrategy::with_epsilon(&knots, &dfs, 1e-12).expect("valid epsilon");
-
-        assert!(strategy.interp(1.5, &knots, &dfs, ExtrapolationPolicy::FlatZero) > 0.0);
-    }
-
-    #[test]
-    fn with_epsilon_rejects_invalid_epsilon() {
-        let knots = standard_knots();
-        let dfs = standard_dfs();
-
-        assert!(MonotoneConvexStrategy::with_epsilon(&knots, &dfs, 0.0).is_err());
-        assert!(MonotoneConvexStrategy::with_epsilon(&knots, &dfs, -1.0e-12).is_err());
-        assert!(MonotoneConvexStrategy::with_epsilon(&knots, &dfs, 1.0e-5).is_err());
-        assert!(MonotoneConvexStrategy::with_epsilon(&knots, &dfs, f64::NAN).is_err());
-        assert!(MonotoneConvexStrategy::with_epsilon(&knots, &dfs, f64::INFINITY).is_err());
-    }
-
-    #[test]
-    fn with_epsilon_rejects_invalid_input_shapes() {
-        for (knots, values) in [
-            (vec![], vec![]),
-            (vec![0.0], vec![1.0]),
-            (vec![0.0, 1.0], vec![1.0]),
-            (vec![0.0, f64::NAN], vec![1.0, 0.9]),
-        ] {
-            assert!(MonotoneConvexStrategy::with_epsilon(&knots, &values, 1e-14).is_err());
-        }
-    }
-}
-
 // Extrapolation Policy Tests
 
 macro_rules! extrapolation_tests {

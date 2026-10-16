@@ -11,7 +11,7 @@
 
 use std::collections::HashSet;
 
-use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator};
 use finstack_quant_core::validation::validate_f64_non_negative;
 use finstack_quant_core::{Error, Result};
 
@@ -242,7 +242,7 @@ pub fn allocate_recovery(
         total_distributed = sum_recoveries(&allocations);
     }
     let undistributed_estate = (estate_value - total_distributed).max(0.0);
-    let conserved = compensated_sum([total_distributed, undistributed_estate]);
+    let conserved = neumaier_sum([total_distributed, undistributed_estate]);
     if (conserved - estate_value).abs() > comparison_tolerance(conserved, estate_value) {
         return Err(validation_error(format!(
             "recovery conservation failed: distributed ({total_distributed}) plus undistributed \
@@ -299,7 +299,7 @@ fn finalize_allocation(allocation: &mut RecoveryAllocation) {
 }
 
 fn sum_recoveries(allocations: &[RecoveryAllocation]) -> f64 {
-    compensated_sum(
+    neumaier_sum(
         allocations
             .iter()
             .map(|allocation| allocation.total_recovery),
@@ -320,17 +320,6 @@ fn reduce_last_recovery(allocations: &mut [RecoveryAllocation], mut excess: f64)
             break;
         }
     }
-}
-
-fn compensated_sum<I>(values: I) -> f64
-where
-    I: IntoIterator<Item = f64>,
-{
-    let mut sum = NeumaierAccumulator::new();
-    for value in values {
-        sum.add(value);
-    }
-    sum.total()
 }
 
 fn comparison_tolerance(left: f64, right: f64) -> f64 {
