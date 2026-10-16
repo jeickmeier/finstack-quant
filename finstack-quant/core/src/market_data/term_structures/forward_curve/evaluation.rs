@@ -2,7 +2,7 @@
 
 use super::{ForwardCurve, InputError};
 use crate::market_data::bumps::BumpType;
-use crate::market_data::term_structures::common::PiecewiseLinearAdjustment;
+use crate::market_data::term_structures::common::{PiecewiseLinearAdjustment, RateShock};
 use crate::math::interp::types::Interp;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -61,7 +61,7 @@ impl CurveTransform {
             self.adjustment.scale(value)?;
         } else {
             self.adjustment
-                .add_forward_rate_bump(self.offset, value, shape)?;
+                .add_bump(self.offset, value, shape, RateShock::ForwardRate)?;
         }
         self.validate()
     }

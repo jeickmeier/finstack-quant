@@ -70,7 +70,7 @@ impl MarketContext {
         vol_surface_id: &str,
         spec: BumpSpec,
     ) -> Result<ContextScratchBump> {
-        spec.validate_finite()?;
+        spec.validate()?;
         let key = CurveId::from(vol_surface_id);
         let previous = self.surfaces.get(vol_surface_id).cloned().ok_or_else(|| {
             crate::error::InputError::NotFound {
@@ -125,7 +125,7 @@ impl MarketContext {
         curve_id: &CurveId,
         spec: BumpSpec,
     ) -> Result<ContextScratchBump> {
-        spec.validate_finite()?;
+        spec.validate()?;
         let previous = self.curves.get(curve_id.as_str()).cloned().ok_or_else(|| {
             crate::error::InputError::NotFound {
                 id: curve_id.to_string(),
@@ -222,7 +222,7 @@ impl MarketContext {
             processed_bumps += 1;
             match bump {
                 MarketBump::Curve { id, spec } => {
-                    spec.validate_finite()?;
+                    spec.validate()?;
                     needs_credit_rebind |= ctx.apply_curve_bump(id, spec)?;
                 }
                 MarketBump::FxPct {

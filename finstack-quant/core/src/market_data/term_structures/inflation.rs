@@ -766,7 +766,7 @@ impl InflationCurveBuilder {
 
 impl Bumpable for InflationCurve {
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        spec.validate_finite()?;
+        spec.validate()?;
 
         let (shift, is_multiplicative) = spec.resolve_standard_values_or_error(
             "InflationCurve",
@@ -774,18 +774,6 @@ impl Bumpable for InflationCurve {
         )?;
 
         let bumped_id = spec.standard_bump_id(self.id());
-        if let BumpType::TriangularKeyRate {
-            prev_bucket,
-            target_bucket,
-            next_bucket,
-        } = spec.bump_type
-        {
-            crate::market_data::term_structures::common::validate_triangular_bucket_grid(
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-            )?;
-        }
         let weight = |t: f64| match spec.bump_type {
             BumpType::Parallel => 1.0,
             BumpType::TriangularKeyRate {

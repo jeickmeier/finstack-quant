@@ -176,7 +176,7 @@ impl ForwardCurve {
 
     /// Apply a continuous rate shock while preserving the source interpolator.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
-        spec.validate_finite()?;
+        spec.validate()?;
         let (val, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
             crate::error::InputError::UnsupportedBump {
                 reason: format!(
@@ -186,23 +186,11 @@ impl ForwardCurve {
             }
         })?;
 
-        if let BumpType::TriangularKeyRate {
-            prev_bucket,
-            target_bucket,
-            next_bucket,
-        } = spec.bump_type
-        {
-            crate::market_data::term_structures::common::validate_triangular_bucket_grid(
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-            )?;
-            if is_multiplicative {
-                return Err(crate::error::InputError::UnsupportedBump {
-                    reason: "ForwardCurve key-rate shocks require additive rate units".into(),
-                }
-                .into());
+        if is_multiplicative && matches!(spec.bump_type, BumpType::TriangularKeyRate { .. }) {
+            return Err(crate::error::InputError::UnsupportedBump {
+                reason: "ForwardCurve key-rate shocks require additive rate units".into(),
             }
+            .into());
         }
         if (!is_multiplicative && val == 0.0) || (is_multiplicative && val.total_cmp(&1.0).is_eq())
         {

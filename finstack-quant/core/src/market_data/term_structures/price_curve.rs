@@ -574,7 +574,11 @@ impl PriceCurve {
         next_bucket: Option<f64>,
         bump: f64,
     ) -> crate::Result<Self> {
-        super::common::validate_triangular_bucket_grid(prev_bucket, target_bucket, next_bucket)?;
+        crate::market_data::bumps::validate_triangular_bucket_grid(
+            prev_bucket,
+            target_bucket,
+            next_bucket,
+        )?;
         if !bump.is_finite() {
             return Err(InputError::Invalid.into());
         }
@@ -875,7 +879,7 @@ impl PriceCurveBuilder {
 /// triangular weight; the spot level remains unchanged.
 impl Bumpable for PriceCurve {
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        spec.validate_finite()?;
+        spec.validate()?;
         match spec.bump_type {
             BumpType::Parallel => {
                 match (spec.mode, spec.units) {
@@ -913,9 +917,6 @@ impl Bumpable for PriceCurve {
                         )
                     }
                     (BumpMode::Additive, BumpUnits::Percent) => {
-                        super::common::validate_triangular_bucket_grid(
-                            prev_bucket, target_bucket, next_bucket,
-                        )?;
                         let percentage = spec.value / 100.0;
                         // Spot is not bumped in a key-rate shock; neither are
                         // rolled source pillars at or before the current origin.

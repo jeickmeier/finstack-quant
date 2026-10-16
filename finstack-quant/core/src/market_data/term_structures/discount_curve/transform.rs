@@ -41,18 +41,6 @@ impl DiscountCurve {
             }
             .into());
         }
-        if let BumpType::TriangularKeyRate {
-            prev_bucket,
-            target_bucket,
-            next_bucket,
-        } = spec.bump_type
-        {
-            super::super::common::validate_triangular_bucket_grid(
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-            )?;
-        }
         if val == 0.0 {
             return Ok(());
         }

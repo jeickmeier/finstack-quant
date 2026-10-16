@@ -1,6 +1,6 @@
 //! Exact, non-recursive evaluation of rolled and continuously shocked curves.
 
-use super::super::common::PiecewiseLinearAdjustment;
+use super::super::common::{PiecewiseLinearAdjustment, RateShock};
 use super::DiscountCurve;
 use crate::market_data::bumps::BumpType;
 use crate::math::interp::types::Interp;
@@ -50,7 +50,8 @@ impl CurveTransform {
     }
 
     pub(super) fn bump(&mut self, rate: f64, shape: BumpType) -> crate::Result<()> {
-        self.adjustment.add_zero_rate_bump(self.offset, rate, shape)
+        self.adjustment
+            .add_bump(self.offset, rate, shape, RateShock::ZeroRate)
     }
 
     pub(super) fn roll(&mut self, interp: &Interp, years: f64) -> crate::Result<()> {

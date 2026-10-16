@@ -72,21 +72,14 @@ impl HazardCurve {
     /// triangular weight, so the bucket shifts sum to the parallel shift at
     /// every knot.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
-        spec.validate_finite()?;
+        spec.validate()?;
         let bucket = match spec.bump_type {
             BumpType::Parallel => None,
             BumpType::TriangularKeyRate {
                 prev_bucket,
                 target_bucket,
                 next_bucket,
-            } => {
-                crate::market_data::term_structures::common::validate_triangular_bucket_grid(
-                    prev_bucket,
-                    target_bucket,
-                    next_bucket,
-                )?;
-                Some((prev_bucket, target_bucket, next_bucket))
-            }
+            } => Some((prev_bucket, target_bucket, next_bucket)),
         };
 
         // Recovery must be within [0, 1) for the par spread ⇢ hazard

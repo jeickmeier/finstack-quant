@@ -28,6 +28,16 @@ struct Segment {
     slope: f64,
 }
 
+/// How a bump shape `w(t)` enters the adjustment.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum RateShock {
+    /// The derivative of `-rate * t * w(t)`, whose integral is the
+    /// continuously compounded log-discount shock.
+    ZeroRate,
+    /// The continuous rate shock `rate * w(t)` itself.
+    ForwardRate,
+}
+
 impl PiecewiseLinearAdjustment {
     fn coefficients(&self, x: f64) -> (f64, f64) {
         let index = self.segments.partition_point(|segment| segment.start <= x);
@@ -91,23 +101,28 @@ impl PiecewiseLinearAdjustment {
         self.validate()
     }
 
-    /// Add the derivative of -rate*t*w(t), whose integral is the continuously
-    /// compounded log-discount shock. Coordinates are relative to `offset`.
-    pub(crate) fn add_zero_rate_bump(
+    /// Add `rate` times the bump shape `w(t)` as a `shock`, in coordinates
+    /// relative to `offset`.
+    pub(crate) fn add_bump(
         &mut self,
         offset: f64,
         rate: f64,
         shape: BumpType,
+        shock: RateShock,
     ) -> crate::Result<()> {
+        // Function value where the shape is flat at one.
+        let flat = match shock {
+            RateShock::ZeroRate => -rate,
+            RateShock::ForwardRate => rate,
+        };
         let BumpType::TriangularKeyRate {
             prev_bucket: prev,
             target_bucket: target,
             next_bucket: next,
         } = shape
         else {
-            return self.add_constant(-rate);
+            return self.add_constant(flat);
         };
-        super::validate_triangular_bucket_grid(prev, target, next)?;
         let coefficients = |x: f64| {
             let t = x - offset;
             if let Some(p) = prev {
@@ -115,75 +130,41 @@ impl PiecewiseLinearAdjustment {
                     return (0.0, 0.0);
                 }
                 if x < offset + target {
-                    let coefficient = -rate / (target - p);
-                    return (coefficient * (2.0 * t - p), 2.0 * coefficient);
+                    return match shock {
+                        RateShock::ZeroRate => {
+                            let coefficient = -rate / (target - p);
+                            (coefficient * (2.0 * t - p), 2.0 * coefficient)
+                        }
+                        RateShock::ForwardRate => {
+                            let slope = rate / (target - p);
+                            (slope * (t - p), slope)
+                        }
+                    };
                 }
             } else if x < offset + target {
-                return (-rate, 0.0);
+                return (flat, 0.0);
             }
             if let Some(n) = next {
                 if x < offset + n {
-                    let coefficient = rate / (n - target);
-                    (coefficient * (2.0 * t - n), 2.0 * coefficient)
+                    match shock {
+                        RateShock::ZeroRate => {
+                            let coefficient = rate / (n - target);
+                            (coefficient * (2.0 * t - n), 2.0 * coefficient)
+                        }
+                        RateShock::ForwardRate => {
+                            let slope = -rate / (n - target);
+                            (-slope * (n - t), slope)
+                        }
+                    }
                 } else {
                     (0.0, 0.0)
                 }
             } else {
-                (-rate, 0.0)
+                (flat, 0.0)
             }
         };
         self.merge(
-            if prev.is_none() { -rate } else { 0.0 },
-            prev.into_iter()
-                .chain([target])
-                .chain(next)
-                .map(|t| offset + t),
-            coefficients,
-        )
-    }
-
-    /// Add a continuous rate shock rate*w(t), including flat wing buckets.
-    pub(crate) fn add_forward_rate_bump(
-        &mut self,
-        offset: f64,
-        rate: f64,
-        shape: BumpType,
-    ) -> crate::Result<()> {
-        let BumpType::TriangularKeyRate {
-            prev_bucket: prev,
-            target_bucket: target,
-            next_bucket: next,
-        } = shape
-        else {
-            return self.add_constant(rate);
-        };
-        super::validate_triangular_bucket_grid(prev, target, next)?;
-        let coefficients = |x: f64| {
-            let t = x - offset;
-            if let Some(p) = prev {
-                if x < offset + p {
-                    return (0.0, 0.0);
-                }
-                if x < offset + target {
-                    let slope = rate / (target - p);
-                    return (slope * (t - p), slope);
-                }
-            } else if x < offset + target {
-                return (rate, 0.0);
-            }
-            if let Some(n) = next {
-                if x < offset + n {
-                    let slope = -rate / (n - target);
-                    (-slope * (n - t), slope)
-                } else {
-                    (0.0, 0.0)
-                }
-            } else {
-                (rate, 0.0)
-            }
-        };
-        self.merge(
-            if prev.is_none() { rate } else { 0.0 },
+            if prev.is_none() { flat } else { 0.0 },
             prev.into_iter()
                 .chain([target])
                 .chain(next)

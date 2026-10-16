@@ -138,32 +138,31 @@ impl BumpSpec {
     /// Call this at public mutation boundaries before cloning or mutating market
     /// data so failed bumps cannot contaminate reusable scratch state.
     ///
-    /// For a triangular key-rate bump, this includes the target bucket and any
-    /// supplied neighbouring bucket coordinates. It deliberately does not
+    /// For a triangular key-rate bump, this also checks the bucket grid, so
+    /// curve bump paths need no second grid check. It deliberately does not
     /// validate unit/mode compatibility; use a product-specific resolver after
     /// this structural check.
     ///
     /// # Errors
     ///
-    /// Returns an error if the bump magnitude, target bucket, or a supplied
-    /// neighbouring bucket is NaN or infinite.
-    pub fn validate_finite(&self) -> crate::Result<()> {
-        let buckets_are_finite = match self.bump_type {
-            BumpType::Parallel => true,
-            BumpType::TriangularKeyRate {
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-            } => {
-                prev_bucket.is_none_or(f64::is_finite)
-                    && target_bucket.is_finite()
-                    && next_bucket.is_none_or(f64::is_finite)
-            }
-        };
-        if !self.value.is_finite() || !buckets_are_finite {
+    /// Returns [`Error::Validation`](crate::Error::Validation) if the bump
+    /// magnitude is NaN or infinite, and
+    /// [`InputError::Invalid`](crate::error::InputError::Invalid) if a
+    /// key-rate bucket is non-finite or the buckets do not satisfy
+    /// `prev_bucket < target_bucket < next_bucket`.
+    pub fn validate(&self) -> crate::Result<()> {
+        if !self.value.is_finite() {
             return Err(crate::Error::Validation(
-                "BumpSpec values and bucket coordinates must be finite".to_string(),
+                "BumpSpec value must be finite".to_string(),
             ));
+        }
+        if let BumpType::TriangularKeyRate {
+            prev_bucket,
+            target_bucket,
+            next_bucket,
+        } = self.bump_type
+        {
+            validate_triangular_bucket_grid(prev_bucket, target_bucket, next_bucket)?;
         }
         Ok(())
     }
@@ -326,7 +325,7 @@ impl BumpSpec {
     /// a triangular key-rate bump rather than [`BumpType::Parallel`]. The
     /// `context` string is included in the unsupported-bump diagnostic.
     pub(crate) fn validate_parallel(&self, context: &str) -> crate::Result<()> {
-        self.validate_finite()?;
+        self.validate()?;
         if !matches!(self.bump_type, BumpType::Parallel) {
             return Err(crate::error::InputError::UnsupportedBump {
                 reason: format!("{} only supports Parallel bumps", context),
@@ -360,7 +359,7 @@ impl BumpSpec {
         context: &str,
         supported: &str,
     ) -> crate::Result<(f64, bool)> {
-        self.validate_finite()?;
+        self.validate()?;
         self.resolve_standard_values().ok_or_else(|| {
             crate::error::InputError::UnsupportedBump {
                 reason: format!(
@@ -495,6 +494,38 @@ pub trait Bumpable: Sized + Send + Sync {
     /// Returns [`InputError::UnsupportedBump`](crate::error::InputError::UnsupportedBump)
     /// if the bump operation is not supported for this type.
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self>;
+}
+
+/// Validate a triangular key-rate bucket grid before applying it.
+///
+/// Every finite bound must satisfy `prev < target < next`, and any provided
+/// bound must be finite: a non-finite neighbour (e.g. `Some(f64::INFINITY)`
+/// as a "no right neighbour" sentinel) would make `triangular_weight`
+/// compute `∞/∞ = NaN` for knots beyond `target` and corrupt the curve.
+/// Wing buckets must be expressed with `None`, not infinite sentinels.
+///
+/// Called from [`BumpSpec::validate`] and from the raw-bucket
+/// `PriceCurve::with_triangular_key_rate_bump_neighbors`, so every bump path
+/// rejects the same malformed grids.
+pub(crate) fn validate_triangular_bucket_grid(
+    prev: Option<f64>,
+    target: f64,
+    next: Option<f64>,
+) -> crate::Result<()> {
+    if !target.is_finite() {
+        return Err(crate::error::InputError::Invalid.into());
+    }
+    if let Some(p) = prev {
+        if !p.is_finite() || p >= target {
+            return Err(crate::error::InputError::Invalid.into());
+        }
+    }
+    if let Some(n) = next {
+        if !n.is_finite() || target >= n {
+            return Err(crate::error::InputError::Invalid.into());
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

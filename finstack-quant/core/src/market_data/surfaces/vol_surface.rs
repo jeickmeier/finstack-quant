@@ -513,7 +513,7 @@ impl Bumpable for VolSurface {
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
         use crate::error::InputError;
 
-        spec.validate_finite()?;
+        spec.validate()?;
         if !matches!(spec.bump_type, BumpType::Parallel) {
             return Err(InputError::UnsupportedBump {
                 reason: "VolSurface only supports Parallel bumps, not key-rate bumps".to_string(),
