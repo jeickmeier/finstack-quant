@@ -20,7 +20,7 @@ use pyo3::types::{PyModule, PyType};
     hash,
     skip_from_py_object
 )]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PyTenorUnit {
     /// Inner unit variant.
     pub(crate) inner: TenorUnit,
@@ -141,7 +141,7 @@ fn extract_tenor_unit(obj: &Bound<'_, PyAny>) -> PyResult<TenorUnit> {
     hash,
     skip_from_py_object
 )]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PyTenor {
     /// Inner Rust tenor.
     pub(crate) inner: Tenor,
@@ -310,7 +310,6 @@ impl PyTenor {
     }
 
     /// Approximate tenor length in years (1D = 1/365, 1W = 7/365, 1M = 1/12, no calendar).
-    #[allow(clippy::wrong_self_convention)]
     fn to_years(&self) -> f64 {
         self.inner.to_years()
     }
@@ -321,7 +320,6 @@ impl PyTenor {
     }
 
     /// Approximate tenor length in calendar days.
-    #[allow(clippy::wrong_self_convention)]
     fn to_days_approx(&self) -> i64 {
         self.inner.to_days_approx()
     }
@@ -406,7 +404,6 @@ impl PyTenor {
     /// ValueError
     ///     If ``day_count`` or the convention is unrecognized, or the
     ///     day-count needs context (e.g. ``BUS_252`` without a calendar).
-    #[allow(clippy::wrong_self_convention)]
     #[pyo3(
         signature = (as_of, *, day_count, calendar=None, business_day_convention=None),
         text_signature = "(self, as_of, *, day_count, calendar=None, business_day_convention='modified_following')"

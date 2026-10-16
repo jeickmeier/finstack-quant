@@ -31,7 +31,7 @@ use pyo3::types::{PyList, PyModule, PyString, PyType};
     hash,
     skip_from_py_object
 )]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PyRoundingMode {
     /// Underlying Rust rounding mode.
     pub(crate) inner: RoundingMode,
@@ -114,7 +114,6 @@ impl PyRoundingMode {
     }
 
     /// Serialize to JSON (the quoted lowercase name).
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner)
             .map_err(|err| serde_json_to_py(err, "invalid RoundingMode"))
@@ -163,7 +162,7 @@ impl PyRoundingMode {
     eq,
     skip_from_py_object
 )]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PyToleranceConfig {
     /// Underlying Rust tolerance configuration.
     pub(crate) inner: ToleranceConfig,
@@ -216,7 +215,6 @@ impl PyToleranceConfig {
     }
 
     /// Serialize to JSON.
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner)
             .map_err(|err| serde_json_to_py(err, "invalid ToleranceConfig"))

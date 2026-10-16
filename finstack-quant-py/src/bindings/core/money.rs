@@ -63,7 +63,7 @@ fn decimal_type<'py>(py: Python<'py>) -> PyResult<&'py Bound<'py, PyType>> {
     frozen,
     from_py_object
 )]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PyMoney {
     /// Inner currency-tagged amount.
     pub(crate) inner: Money,
@@ -359,7 +359,6 @@ impl PyMoney {
     }
 
     /// Serialize to JSON.
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
@@ -474,7 +473,7 @@ impl PyMoney {
         }
         let scalar: f64 = other.extract()?;
         if scalar == 0.0 {
-            Ok(*self)
+            Ok(self.clone())
         } else {
             Err(PyTypeError::new_err(
                 "unsupported right operand for Money addition (expected Money or 0)",

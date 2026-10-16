@@ -34,7 +34,7 @@ use pyo3::types::{PyIterator, PyList, PyModule, PyType};
     hash,
     skip_from_py_object
 )]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct PyUnknownScalePolicy {
     /// Underlying Rust policy variant.
     pub(crate) inner: UnknownScalePolicy,
@@ -96,7 +96,6 @@ impl PyUnknownScalePolicy {
     }
 
     /// Serialize to a JSON string.
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner)
             .map_err(|err| serde_json_to_py(err, "invalid UnknownScalePolicy"))

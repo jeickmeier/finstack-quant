@@ -3,7 +3,7 @@
 //! `VolCubeExpirySlice` and `FxDeltaVolSurface`.
 
 use crate::utils::input::{
-    from_js_json, js_f64, js_f64_seq, js_opt_f64_seq, js_opt_string, js_string, js_uint, json_text,
+    from_js_json, js_f64, js_f64_seq, js_opt_f64_seq, js_opt_string, js_string, js_uint,
 };
 use crate::utils::to_js_err;
 use finstack_quant_core::market_data::surfaces::{
@@ -129,8 +129,7 @@ impl JsVolCube {
     /// @throws Error - Throws when JSON is malformed, fields are unknown, or native axis, parameter, or forward validation fails.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsVolCube, JsValue> {
-        let json: &str = &json_text(&json, "json")?;
-        let inner = serde_json::from_str::<RustVolCube>(json).map_err(to_js_err)?;
+        let inner = from_js_json::<RustVolCube>(&json, "json")?;
         Ok(Self {
             inner: Arc::new(inner),
         })
@@ -310,8 +309,7 @@ impl JsFxDeltaVolSurface {
     /// @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsFxDeltaVolSurface, JsValue> {
-        let json: &str = &json_text(&json, "json")?;
-        let inner = serde_json::from_str::<RustFxDeltaVolSurface>(json).map_err(to_js_err)?;
+        let inner = from_js_json::<RustFxDeltaVolSurface>(&json, "json")?;
         Ok(Self {
             inner: Arc::new(inner),
         })

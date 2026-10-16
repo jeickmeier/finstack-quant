@@ -499,7 +499,7 @@ impl_repr_html_via_dataframe!(PyFxDeltaVolSurface);
     eq,
     skip_from_py_object
 )]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct PySabrParameterData {
     /// Inner Rust parameter node.
     pub(crate) inner: SabrParameterData,
@@ -588,7 +588,6 @@ impl PySabrParameterData {
     /// ValueError
     ///     If serialization fails.
     // PyO3 `#[pymethods]` cannot take `self` by value.
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(|e| {
             crate::errors::value_error(format!("failed to serialize SabrParameterData: {e}"))

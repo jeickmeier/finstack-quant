@@ -18,7 +18,7 @@ use strum::IntoEnumIterator;
     frozen,
     from_py_object
 )]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PyCurrency {
     /// Inner ISO-4217 currency value.
     pub(crate) inner: Currency,
@@ -99,7 +99,6 @@ impl PyCurrency {
     }
 
     /// Serialize this currency to a JSON string.
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }

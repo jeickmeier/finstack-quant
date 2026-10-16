@@ -53,7 +53,7 @@ fn from_json_impl<T: serde::de::DeserializeOwned>(json: &str, what: &str) -> PyR
     hash,
     skip_from_py_object
 )]
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct PyRate {
     /// Underlying Rust rate.
     pub(crate) inner: Rate,
@@ -221,7 +221,6 @@ impl PyRate {
     }
 
     /// Serialize to JSON (the bare decimal number, e.g. ``0.05``).
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         to_json_impl(&self.inner, "invalid Rate")
     }
@@ -246,7 +245,7 @@ fn extract_rate_or_basis_points(obj: &Bound<'_, PyAny>) -> PyResult<Rate> {
         return Ok(rate.inner);
     }
     if let Ok(bps) = obj.extract::<PyRef<'_, PyBps>>() {
-        return Ok(Rate::from(bps.inner));
+        return Ok(bps.inner.as_rate());
     }
     Err(PyTypeError::new_err("expected Rate or Bps"))
 }
@@ -281,7 +280,7 @@ fn extract_rate_or_basis_points(obj: &Bound<'_, PyAny>) -> PyResult<Rate> {
     hash,
     skip_from_py_object
 )]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct PyBps {
     /// Underlying Rust basis-point value.
     pub(crate) inner: Bps,
@@ -430,7 +429,6 @@ impl PyBps {
     }
 
     /// Serialize to JSON (the bare integer basis-point quote, e.g. ``250``).
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         to_json_impl(&self.inner, "invalid Bps")
     }
@@ -481,7 +479,7 @@ impl PyBps {
     frozen,
     skip_from_py_object
 )]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct PyCreditRating {
     /// Underlying Rust credit rating.
     pub(crate) inner: CreditRating,
@@ -650,7 +648,6 @@ impl PyCreditRating {
     /// Moody's-style label (``"Baa1"`` for BBB+).
     #[pyo3(text_signature = "(self)")]
     // PyO3 `#[pymethods]` cannot take `self` by value.
-    #[allow(clippy::wrong_self_convention)]
     fn to_moodys_string(&self) -> &'static str {
         self.inner.to_moodys_string()
     }
@@ -699,7 +696,6 @@ impl PyCreditRating {
     }
 
     /// Serialize to JSON (the quoted S&P/Fitch label, e.g. ``"BBB+"``).
-    #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
         to_json_impl(&self.inner, "invalid CreditRating")
     }
