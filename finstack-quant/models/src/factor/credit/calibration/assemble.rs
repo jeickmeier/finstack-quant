@@ -174,7 +174,8 @@ pub(crate) fn assemble_factor_model_config(
                     |e| validation_err(format!("Ridge: nearest_correlation failed: {e}")),
                 )?
             };
-            let corr_data = unflatten_square(&rho_flat, n);
+            let corr_data =
+                unflatten_square(&rho_flat, n).map_err(|e| validation_err(e.to_string()))?;
             let corr =
                 FactorCorrelationMatrix::new(factor_id_order.to_vec(), corr_data).map_err(|e| {
                     validation_err(format!(
@@ -202,7 +203,8 @@ pub(crate) fn assemble_factor_model_config(
                     },
                 )?
             };
-            let corr_data = unflatten_square(&rho_repaired, n);
+            let corr_data =
+                unflatten_square(&rho_repaired, n).map_err(|e| validation_err(e.to_string()))?;
             let corr =
                 FactorCorrelationMatrix::new(factor_id_order.to_vec(), corr_data).map_err(|e| {
                     validation_err(format!(

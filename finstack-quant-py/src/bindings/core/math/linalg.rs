@@ -90,7 +90,7 @@ fn cholesky_decomposition(py: Python<'_>, matrix: &Bound<'_, PyAny>) -> PyResult
     let result = py
         .detach(|| linalg::cholesky_decomposition(&flat, n))
         .map_err(cholesky_err)?;
-    Ok(linalg::unflatten_square(&result, n))
+    linalg::unflatten_square(&result, n).map_err(cholesky_err)
 }
 
 /// Solve a symmetric positive-definite linear system A x = b given the Cholesky
@@ -160,7 +160,8 @@ fn symmetric_eigen(
     let (values, vectors) = py
         .detach(|| linalg::symmetric_eigen(&flat, n))
         .map_err(cholesky_err)?;
-    Ok((values, linalg::unflatten_square(&vectors, n)))
+    let vectors = linalg::unflatten_square(&vectors, n).map_err(cholesky_err)?;
+    Ok((values, vectors))
 }
 
 /// Ledoit-Wolf (2004) shrinkage of a sample covariance matrix toward a scaled
@@ -201,10 +202,8 @@ fn ledoit_wolf_shrinkage(
     let result = py
         .detach(|| linalg::ledoit_wolf_shrinkage(&flat, t, n))
         .map_err(core_to_py)?;
-    Ok((
-        linalg::unflatten_square(&result.covariance, n),
-        result.shrinkage,
-    ))
+    let covariance = linalg::unflatten_square(&result.covariance, n).map_err(cholesky_err)?;
+    Ok((covariance, result.shrinkage))
 }
 
 /// Build the `finstack_quant.core.math.linalg` submodule.

@@ -116,6 +116,26 @@ pub(crate) fn square_len(n: usize) -> Option<usize> {
     n.checked_mul(n)
 }
 
+/// Reject a buffer that is not an `n × n` matrix of finite entries.
+fn check_square_finite(matrix: &[f64], n: usize) -> std::result::Result<(), CholeskyError> {
+    if square_len(n) != Some(matrix.len()) {
+        return Err(CholeskyError::DimensionMismatch {
+            expected: n,
+            actual: matrix.len(),
+        });
+    }
+    for (index, &value) in matrix.iter().enumerate() {
+        if !value.is_finite() {
+            return Err(CholeskyError::NonFiniteInput {
+                value,
+                row: index / n,
+                col: index % n,
+            });
+        }
+    }
+    Ok(())
+}
+
 /// `n * n` for an error message, or a note that it overflows.
 fn square_len_label(n: usize) -> String {
     square_len(n).map_or_else(
@@ -518,26 +538,12 @@ pub fn cholesky_correlation(
     matrix: &[f64],
     n: usize,
 ) -> std::result::Result<CorrelationFactor, CholeskyError> {
-    if square_len(n) != Some(matrix.len()) {
-        return Err(CholeskyError::DimensionMismatch {
-            expected: n,
-            actual: matrix.len(),
-        });
-    }
-    if n == 0 {
-        return Ok(CorrelationFactor::from_parts(vec![], 0, 0));
-    }
-
     // Reject non-finite inputs up front: NaN otherwise propagates through the
     // pivot selection (`total_cmp` orders NaN above all numbers) and would be
     // absorbed into an Ok(NaN factor).
-    for row in 0..n {
-        for col in 0..n {
-            let value = matrix[row * n + col];
-            if !value.is_finite() {
-                return Err(CholeskyError::NonFiniteInput { value, row, col });
-            }
-        }
+    check_square_finite(matrix, n)?;
+    if n == 0 {
+        return Ok(CorrelationFactor::from_parts(vec![], 0, 0));
     }
 
     // Maximum diagonal value — used to set relative tolerance.
@@ -710,23 +716,9 @@ pub fn symmetric_eigen(
     matrix: &[f64],
     n: usize,
 ) -> std::result::Result<(Vec<f64>, Vec<f64>), CholeskyError> {
-    if square_len(n) != Some(matrix.len()) {
-        return Err(CholeskyError::DimensionMismatch {
-            expected: n,
-            actual: matrix.len(),
-        });
-    }
+    check_square_finite(matrix, n)?;
     if n == 0 {
         return Ok((Vec::new(), Vec::new()));
-    }
-    for (index, &value) in matrix.iter().enumerate() {
-        if !value.is_finite() {
-            return Err(CholeskyError::NonFiniteInput {
-                value,
-                row: index / n,
-                col: index % n,
-            });
-        }
     }
 
     let a = nalgebra::DMatrix::from_fn(n, n, |i, j| matrix[i * n + j]);
@@ -745,48 +737,39 @@ pub fn symmetric_eigen(
 
 /// Reshape a row-major flat buffer of length `n * n` into `n` nested rows.
 ///
-/// Returns an empty vector when `n == 0` or `flat.len() != n * n`.
-///
 /// # Arguments
 ///
 /// * `flat` - Row-major square matrix storage; `flat.len()` must equal `n * n`.
-/// * `n` - Matrix dimension (rows == columns).
+/// * `n` - Matrix dimension (rows == columns); `0` yields no rows.
+///
+/// # Errors
+///
+/// Returns [`CholeskyError::DimensionMismatch`] when `flat.len() != n * n`
+/// (including when `n * n` overflows `usize`).
 ///
 /// # Examples
 ///
 /// ```
 /// use finstack_quant_core::math::linalg::unflatten_square;
-/// assert_eq!(unflatten_square(&[1.0, 2.0, 3.0, 4.0], 2), vec![vec![1.0, 2.0], vec![3.0, 4.0]]);
+/// let rows = unflatten_square(&[1.0, 2.0, 3.0, 4.0], 2)?;
+/// assert_eq!(rows, vec![vec![1.0, 2.0], vec![3.0, 4.0]]);
+/// assert!(unflatten_square(&[1.0, 2.0, 3.0], 2).is_err());
+/// # Ok::<(), finstack_quant_core::math::linalg::CholeskyError>(())
 /// ```
-#[must_use]
-pub fn unflatten_square(flat: &[f64], n: usize) -> Vec<Vec<f64>> {
-    if n == 0 || square_len(n) != Some(flat.len()) {
-        return Vec::new();
+pub fn unflatten_square(
+    flat: &[f64],
+    n: usize,
+) -> std::result::Result<Vec<Vec<f64>>, CholeskyError> {
+    if square_len(n) != Some(flat.len()) {
+        return Err(CholeskyError::DimensionMismatch {
+            expected: n,
+            actual: flat.len(),
+        });
     }
-    flat.chunks_exact(n).map(<[f64]>::to_vec).collect()
-}
-
-/// Transpose a flat row-major `rows × cols` matrix into `cols × rows`.
-///
-/// Returns an empty vector when `rows * cols` overflows or does not equal `data.len()`.
-///
-/// # Arguments
-///
-/// * `data` - Row-major buffer with `rows * cols` entries.
-/// * `rows` - Number of rows in `data`.
-/// * `cols` - Number of columns in `data`.
-#[must_use]
-pub fn transpose_row_major(data: &[f64], rows: usize, cols: usize) -> Vec<f64> {
-    if rows.checked_mul(cols) != Some(data.len()) {
-        return Vec::new();
+    if n == 0 {
+        return Ok(Vec::new());
     }
-    let mut out = Vec::with_capacity(data.len());
-    for c in 0..cols {
-        for r in 0..rows {
-            out.push(data[r * cols + c]);
-        }
-    }
-    out
+    Ok(flat.chunks_exact(n).map(<[f64]>::to_vec).collect())
 }
 
 /// Cholesky decomposition of a correlation/covariance matrix.
@@ -855,21 +838,12 @@ pub fn cholesky_decomposition_into(
     n: usize,
     l: &mut [f64],
 ) -> std::result::Result<(), CholeskyError> {
-    let len = square_len(n);
-    if len != Some(matrix.len()) || len != Some(l.len()) {
+    check_square_finite(matrix, n)?;
+    if l.len() != matrix.len() {
         return Err(CholeskyError::DimensionMismatch {
             expected: n,
-            actual: matrix.len(),
+            actual: l.len(),
         });
-    }
-    for (index, &value) in matrix.iter().enumerate() {
-        if !value.is_finite() {
-            return Err(CholeskyError::NonFiniteInput {
-                value,
-                row: index / n,
-                col: index % n,
-            });
-        }
     }
 
     let matrix_scale = (0..n)
@@ -2094,7 +2068,8 @@ mod tests {
         match cholesky_decomposition_into(&a, 2, &mut out) {
             Err(CholeskyError::DimensionMismatch { expected, actual }) => {
                 assert_eq!(expected, 2);
-                assert_eq!(actual, 4);
+                // The offending buffer is the output, not the matrix.
+                assert_eq!(actual, 3);
             }
             other => panic!("expected DimensionMismatch, got {other:?}"),
         }

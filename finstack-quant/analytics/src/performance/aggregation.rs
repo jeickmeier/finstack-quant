@@ -382,7 +382,14 @@ fn finalize_correlation_matrix(matrix: Vec<Vec<f64>>) -> crate::Result<(Vec<Vec<
         }
         .into());
     }
-    Ok((unflatten_square(&repaired, n), true))
+    let repaired = unflatten_square(&repaired, n).map_err(|err| {
+        crate::error::InputError::InvalidReturnSeries {
+            ticker: "<correlation>".into(),
+            index: 0,
+            reason: err.to_string(),
+        }
+    })?;
+    Ok((repaired, true))
 }
 
 #[cfg(test)]

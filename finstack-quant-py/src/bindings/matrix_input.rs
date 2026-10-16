@@ -43,14 +43,23 @@ impl PositionPnlMatrix {
                 self.data
             }
             PositionPnlOrder::PositionMajor => {
-                finstack_quant_core::math::linalg::transpose_row_major(
-                    &self.data,
-                    n_positions,
-                    self.n_scenarios,
-                )
+                transpose_row_major(&self.data, n_positions, self.n_scenarios)
             }
         }
     }
+}
+
+/// Transpose a flat row-major `rows × cols` buffer into `cols × rows`.
+///
+/// `data.len()` is `rows * cols` by construction (the NumPy array's shape).
+fn transpose_row_major(data: &[f64], rows: usize, cols: usize) -> Vec<f64> {
+    let mut out = Vec::with_capacity(data.len());
+    for c in 0..cols {
+        for r in 0..rows {
+            out.push(data[r * cols + c]);
+        }
+    }
+    out
 }
 
 /// Copy a NumPy matrix into logical C/row-major order.
