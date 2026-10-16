@@ -259,8 +259,7 @@ impl HazardCurveBuilder {
         // Build interpolator over survival probabilities. The default
         // LogLinear style implies a piecewise-constant hazard rate.
         // Extrapolate with FlatForward (constant hazard rate at tail).
-        let interp = crate::market_data::term_structures::common::build_interp(
-            InterpStyle::LogLinear,
+        let interp = InterpStyle::LogLinear.build_enum(
             interp_kvec.into_boxed_slice(),
             interp_svec.into_boxed_slice(),
             ExtrapolationPolicy::FlatForward,

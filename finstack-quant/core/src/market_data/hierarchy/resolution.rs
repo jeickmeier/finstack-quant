@@ -83,11 +83,6 @@ impl TagFilter {
     pub fn matches(&self, tags: &IndexMap<String, String>) -> bool {
         self.predicates.iter().all(|p| p.matches(tags))
     }
-
-    /// An empty filter matches everything.
-    pub fn is_empty(&self) -> bool {
-        self.predicates.is_empty()
-    }
 }
 
 /// A target specifying a hierarchy path with optional tag filtering.

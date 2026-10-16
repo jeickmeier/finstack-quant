@@ -639,7 +639,10 @@ impl DiscountCurve {
             .rate_calibration_opt(self.rate_calibration.clone())
             .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days)
             .fx_policy_opt(self.fx_policy.clone())
-            .apply_non_monotonic_settings(self.allow_non_monotonic, self.min_forward_rate)
+            .validation(ValidationMode::Raw {
+                allow_non_monotonic: self.allow_non_monotonic,
+                forward_floor: self.min_forward_rate,
+            })
     }
 
     /// Create a forward curve from this discount curve.

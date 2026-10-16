@@ -4,14 +4,12 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::diff::{
-    measure_discount_curve_shift, measure_fx_shift, measure_hazard_curve_shift,
-    measure_inflation_curve_shift, measure_scalar_absolute_shift, measure_scalar_shift,
-    TenorSamplingMethod, STANDARD_TENORS,
+    measure_discount_curve_shift, measure_fx_shift, measure_inflation_curve_shift,
+    measure_scalar_absolute_shift, measure_scalar_shift, TenorSamplingMethod, STANDARD_TENORS,
 };
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::{
@@ -51,10 +49,6 @@ fn sample_fx_matrix() -> FxMatrix {
 }
 
 fn market_with_discount(curve: DiscountCurve) -> MarketContext {
-    MarketContext::new().insert(curve)
-}
-
-fn market_with_hazard(curve: HazardCurve) -> MarketContext {
     MarketContext::new().insert(curve)
 }
 
@@ -248,107 +242,6 @@ fn test_discount_curve_custom_sampling() {
 }
 
 // Hazard Curve Shift Tests
-
-#[test]
-fn test_hazard_curve_parallel_shift() {
-    let base_date = sample_date();
-
-    let curve_t0 = HazardCurve::builder("CORP-01")
-        .base_date(base_date)
-        .recovery_rate(0.4)
-        .knots(vec![(1.0, 0.01), (5.0, 0.02), (10.0, 0.025)])
-        .build()
-        .expect("Should build curve");
-
-    // +25bp shift
-    let curve_t1 = HazardCurve::builder("CORP-01")
-        .base_date(base_date)
-        .recovery_rate(0.4)
-        .knots(vec![(1.0, 0.0125), (5.0, 0.0225), (10.0, 0.0275)])
-        .build()
-        .expect("Should build curve");
-
-    let market_t0 = market_with_hazard(curve_t0);
-    let market_t1 = market_with_hazard(curve_t1);
-
-    let shift = measure_hazard_curve_shift(
-        "CORP-01",
-        &market_t0,
-        &market_t1,
-        TenorSamplingMethod::Standard,
-    )
-    .expect("Should measure shift");
-
-    assert!((shift - 25.0).abs() < 1.0, "Expected ~25bp, got {}", shift);
-}
-
-#[test]
-fn test_hazard_curve_widening() {
-    let base_date = sample_date();
-
-    let curve_t0 = HazardCurve::builder("CORP-01")
-        .base_date(base_date)
-        .recovery_rate(0.4)
-        .knots(vec![(1.0, 0.010), (5.0, 0.012), (10.0, 0.015)])
-        .build()
-        .expect("Should build curve");
-
-    // Widening: longer spreads move more
-    let curve_t1 = HazardCurve::builder("CORP-01")
-        .base_date(base_date)
-        .recovery_rate(0.4)
-        .knots(vec![(1.0, 0.0110), (5.0, 0.0145), (10.0, 0.0250)])
-        .build()
-        .expect("Should build curve");
-
-    let market_t0 = market_with_hazard(curve_t0);
-    let market_t1 = market_with_hazard(curve_t1);
-
-    let shift = measure_hazard_curve_shift(
-        "CORP-01",
-        &market_t0,
-        &market_t1,
-        TenorSamplingMethod::Standard,
-    )
-    .expect("Should measure shift");
-
-    assert!(shift > 0.0, "Should detect positive widening");
-}
-
-#[test]
-fn test_hazard_curve_missing_error() {
-    let market_t0 = MarketContext::new();
-    let market_t1 = MarketContext::new();
-
-    let result = measure_hazard_curve_shift(
-        "MISSING",
-        &market_t0,
-        &market_t1,
-        TenorSamplingMethod::Standard,
-    );
-
-    assert!(result.is_err(), "Should error on missing curve");
-}
-
-#[test]
-fn test_hazard_curve_dynamic_sampling() {
-    let base_date = sample_date();
-
-    let curve = HazardCurve::builder("CORP-01")
-        .base_date(base_date)
-        .recovery_rate(0.4)
-        .knots(vec![(2.0, 0.01), (4.0, 0.015), (8.0, 0.02)])
-        .build()
-        .expect("Should build curve");
-
-    let market = market_with_hazard(curve);
-
-    let shift =
-        measure_hazard_curve_shift("CORP-01", &market, &market, TenorSamplingMethod::Dynamic)
-            .expect("Should measure with dynamic sampling");
-
-    assert_eq!(shift, 0.0, "Same market should produce zero shift");
-}
 
 // Inflation Curve Shift Tests
 
@@ -773,32 +666,6 @@ fn test_discount_shift_negative_shift() {
         "Should detect negative shift of ~-50bp, got {}",
         shift
     );
-}
-
-#[test]
-fn test_hazard_curve_zero_shift_consistency() {
-    let base_date = sample_date();
-
-    let curve = HazardCurve::builder("CORP-01")
-        .base_date(base_date)
-        .recovery_rate(0.4)
-        .knots(vec![(1.0, 0.01), (5.0, 0.02), (10.0, 0.03)])
-        .build()
-        .expect("Should build curve");
-
-    let market = market_with_hazard(curve);
-
-    // All sampling methods should yield same result for identical curves
-    let shift_std =
-        measure_hazard_curve_shift("CORP-01", &market, &market, TenorSamplingMethod::Standard)
-            .expect("Should measure");
-
-    let shift_dyn =
-        measure_hazard_curve_shift("CORP-01", &market, &market, TenorSamplingMethod::Dynamic)
-            .expect("Should measure");
-
-    assert_eq!(shift_std, 0.0);
-    assert_eq!(shift_dyn, 0.0);
 }
 
 #[test]

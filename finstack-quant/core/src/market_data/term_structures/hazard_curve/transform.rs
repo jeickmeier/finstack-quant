@@ -85,8 +85,6 @@ impl HazardCurve {
     /// triangular weight, so the bucket shifts sum to the parallel shift at
     /// every knot.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
-        use BumpType;
-
         spec.validate_finite()?;
         let bucket = match spec.bump_type {
             BumpType::Parallel => None,
@@ -153,8 +151,7 @@ impl HazardCurve {
             *lambda = shifted;
         }
         let (interp_knots, interp_sp) = survival_pillars(&self.knots, &lambdas);
-        let interp = crate::market_data::term_structures::common::build_interp(
-            InterpStyle::LogLinear,
+        let interp = InterpStyle::LogLinear.build_enum(
             interp_knots.into_boxed_slice(),
             interp_sp.into_boxed_slice(),
             ExtrapolationPolicy::FlatForward,

@@ -91,21 +91,6 @@ impl TryFrom<RawForwardVarianceCurve> for ForwardVarianceCurve {
     }
 }
 
-impl Default for ForwardVarianceCurve {
-    /// Returns a flat curve at ξ₀ = 0.04 (≡ 20% flat vol).
-    ///
-    /// Intended as an infallible placeholder for `#[serde(default)]` when a
-    /// caller-controlled constructor will overwrite the field anyway. Not a
-    /// substitute for market-data-derived curves.
-    fn default() -> Self {
-        Self {
-            interpolation: Interpolation::Linear,
-            times: vec![0.0],
-            values: vec![0.04],
-        }
-    }
-}
-
 impl ForwardVarianceCurve {
     /// Creates a flat forward variance curve (constant ξ₀(t) = v0).
     ///

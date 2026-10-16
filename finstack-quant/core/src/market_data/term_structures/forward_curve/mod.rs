@@ -66,9 +66,7 @@
 //!   Know About Multiple Interest Rate Curve Bootstrapping but Were Afraid to Ask."
 //!   SSRN Working Paper. `docs/REFERENCES.md#ametrano-bianchetti-2013`
 
-use crate::market_data::term_structures::common::{
-    build_interp, infer_forward_curve_defaults, roll_knots,
-};
+use crate::market_data::term_structures::common::{infer_forward_curve_defaults, roll_knots};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::{
     dates::{Date, DayCount},

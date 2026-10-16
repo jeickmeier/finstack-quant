@@ -1,21 +1,7 @@
 //! Shared defaults and calculations used by term-structure implementations.
 //!
 use crate::dates::{Date, DayCount, DayCountContext};
-use crate::math::interp::types::Interp;
-use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::Result;
-
-/// Build an `Interp` with the requested style, extrapolation, and validation policy.
-#[inline]
-pub(crate) fn build_interp(
-    style: InterpStyle,
-    knots: Box<[f64]>,
-    values: Box<[f64]>,
-    extrapolation: ExtrapolationPolicy,
-    validation: ValidationPolicy,
-) -> Result<Interp> {
-    style.build_enum(knots, values, extrapolation, validation)
-}
 
 /// Compute year fraction from a base date to a target date using the given day-count.
 ///

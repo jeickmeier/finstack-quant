@@ -481,8 +481,7 @@ impl BaseCorrelationCurveBuilder {
 
         let (kvec, cvec): (Vec<f64>, Vec<f64>) = sorted_points.into_iter().unzip();
 
-        let interp = super::common::build_interp(
-            InterpStyle::Linear,
+        let interp = InterpStyle::Linear.build_enum(
             kvec.clone().into_boxed_slice(),
             cvec.clone().into_boxed_slice(),
             ExtrapolationPolicy::FlatZero,

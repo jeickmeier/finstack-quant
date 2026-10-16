@@ -176,8 +176,6 @@ impl ForwardCurve {
 
     /// Apply a continuous rate shock while preserving the source interpolator.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
-        use BumpType;
-
         spec.validate_finite()?;
         let (val, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
             crate::error::InputError::UnsupportedBump {

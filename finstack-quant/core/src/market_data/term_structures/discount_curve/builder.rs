@@ -1,6 +1,5 @@
 //! Fluent discount-curve builder and construction validation.
 
-use super::super::common::build_interp;
 use super::validation::{validate_forward_rates, validate_monotonic_df};
 use super::{DiscountCurve, ValidationMode};
 use crate::dates::{Date, DayCount};
@@ -216,16 +215,6 @@ impl DiscountCurveBuilder {
         self
     }
 
-    pub(super) fn apply_non_monotonic_settings(
-        mut self,
-        allow_non_monotonic: bool,
-        min_forward_rate: Option<f64>,
-    ) -> Self {
-        self.allow_non_monotonic = allow_non_monotonic;
-        self.min_forward_rate = min_forward_rate;
-        self
-    }
-
     /// Build the curve with minimal validation for solver use.
     ///
     /// This method skips monotonicity validation and forward rate checks, providing
@@ -322,8 +311,7 @@ impl DiscountCurveBuilder {
         let knots = knots.into_boxed_slice();
         let dfs = dfs.into_boxed_slice();
 
-        let interp = build_interp(
-            self.style,
+        let interp = self.style.build_enum(
             knots.clone(),
             dfs.clone(),
             self.extrapolation,

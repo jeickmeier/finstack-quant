@@ -83,9 +83,8 @@
 //! - CBOE (2019). "VIX White Paper." CBOE Global Markets. `docs/REFERENCES.md#cboe-vix-white-paper`
 
 use super::common::{
-    build_interp, bump_knots_parallel, bump_knots_percentage, bump_knots_triangular,
-    infer_spot_from_knots, roll_knots, triangular_weight, validate_non_negative_knots,
-    year_fraction_to,
+    bump_knots_parallel, bump_knots_percentage, bump_knots_triangular, infer_spot_from_knots,
+    roll_knots, triangular_weight, validate_non_negative_knots, year_fraction_to,
 };
 use crate::dates::DateExt;
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
@@ -830,8 +829,7 @@ impl PriceCurveBuilder {
         let knots = kvec.into_boxed_slice();
         let prices = pvec.into_boxed_slice();
 
-        let mut interp = build_interp(
-            self.style,
+        let mut interp = self.style.build_enum(
             knots.clone(),
             prices.clone(),
             self.extrapolation,

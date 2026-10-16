@@ -187,48 +187,9 @@ pub fn measure_discount_curve_shift(
     measure_average_shift(tenors, 10_000.0, |t| curve_t0.zero(t), |t| curve_t1.zero(t))
 }
 
-/// Measure average parallel spread shift in hazard curve (basis points).
-///
-/// # Arguments
-///
-/// * `curve_id` - Identifier of the hazard curve to retrieve from both market
-///   contexts. The same ID must resolve in each context.
-/// * `market_t0` - Baseline market context representing the earlier state.
-/// * `market_t1` - Comparison market context representing the later state.
-/// * `method` - Tenor-sampling policy used to average hazard-rate differences.
-///   `Dynamic` samples the baseline hazard curve's knots.
-///
-/// # Errors
-///
-/// Returns an error if `curve_id` is absent from either market context, the
-/// selected grid is empty or non-finite, or a curve cannot provide a finite
-/// sample value on that grid.
-pub fn measure_hazard_curve_shift(
-    curve_id: impl AsRef<str>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    method: TenorSamplingMethod,
-) -> Result<f64> {
-    let curve_t0 = market_t0.get_hazard(&curve_id)?;
-    let curve_t1 = market_t1.get_hazard(&curve_id)?;
-
-    let t0_knots: Vec<f64> = curve_t0.knot_points().map(|(t, _)| t).collect();
-    let tenors = match method {
-        TenorSamplingMethod::Dynamic => t0_knots.as_slice(),
-        _ => method.tenors(None),
-    };
-
-    measure_average_shift(
-        tenors,
-        10_000.0,
-        |t| curve_t0.hazard_rate(t),
-        |t| curve_t1.hazard_rate(t),
-    )
-}
-
 /// Measure the average **par CDS spread** shift on a hazard curve (basis points).
 ///
-/// This is the par-spread analogue of [`measure_hazard_curve_shift`]: it samples
+/// Where a raw hazard-rate shift would sample `hazard_rate`, this samples
 /// the par CDS spread (via `HazardCurve::cds_quote_bp`) rather than the raw
 /// hazard rate. Credit sensitivities (`Cs01`, `BucketedCs01`) are defined per bp
 /// of **par-spread** move, so attribution must pair them with this — pairing a
@@ -883,66 +844,6 @@ mod tests {
         let source_shift =
             measure_inflation_source_shift("US-CPI", &market_t0, &market_t1).expect("hybrid shift");
         assert!(source_shift.abs() < 1e-12);
-    }
-
-    #[test]
-    fn test_par_spread_shift_is_hazard_shift_scaled_by_lgd() {
-        let base_date = sample_date();
-        let curve_t0 = HazardCurve::builder("CORP-01")
-            .base_date(base_date)
-            .recovery_rate(0.4)
-            .knots(vec![(1.0, 0.01), (5.0, 0.02), (10.0, 0.025)])
-            .build()
-            .expect("hazard curve t0 should build");
-        let curve_t1 = HazardCurve::builder("CORP-01")
-            .base_date(base_date)
-            .recovery_rate(0.4)
-            .knots(vec![(1.0, 0.0125), (5.0, 0.0225), (10.0, 0.0275)])
-            .build()
-            .expect("hazard curve t1 should build");
-        let market_t0 = MarketContext::new().insert(curve_t0);
-        let market_t1 = MarketContext::new().insert(curve_t1);
-
-        let hazard_shift = measure_hazard_curve_shift(
-            "CORP-01",
-            &market_t0,
-            &market_t1,
-            TenorSamplingMethod::Standard,
-        )
-        .expect("hazard shift");
-        let par_shift = measure_par_spread_shift(
-            "CORP-01",
-            &market_t0,
-            &market_t1,
-            TenorSamplingMethod::Standard,
-        )
-        .expect("par-spread shift");
-
-        // With no stored par quotes, `cds_quote_bp` falls back to λ·(1−R)·1e4,
-        // so the par-spread move is the hazard-rate move scaled by LGD = 1−R.
-        assert!(
-            (hazard_shift - 25.0).abs() < 1.0,
-            "hazard shift ~25bp, got {hazard_shift}"
-        );
-        assert!(
-            (par_shift - 15.0).abs() < 1.0,
-            "par-spread shift ~15bp (25 × 0.6), got {par_shift}"
-        );
-
-        let per_tenor = measure_per_tenor_par_spread_shift(
-            "CORP-01",
-            &market_t0,
-            &market_t1,
-            &[1.0, 5.0, 10.0],
-        )
-        .expect("per-tenor par-spread shift");
-        assert_eq!(per_tenor.len(), 3, "one entry per requested tenor");
-        for s in per_tenor {
-            assert!(
-                (s - 15.0).abs() < 1.0,
-                "per-tenor par-spread move ~15bp, got {s}"
-            );
-        }
     }
 
     #[test]

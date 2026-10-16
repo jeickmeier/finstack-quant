@@ -119,28 +119,19 @@ impl HierarchyNode {
     }
 
     /// Set a tag on this node.
-    pub fn set_tag(&mut self, key: impl Into<String>, value: impl Into<String>) {
+    pub(crate) fn set_tag(&mut self, key: impl Into<String>, value: impl Into<String>) {
         self.tags.insert(key.into(), value.into());
     }
 
-    /// Add a child node. Returns a mutable reference to the child.
-    ///
-    /// If a child with the same name already exists, the existing node is
-    /// returned unchanged and `child` is discarded.
-    pub fn add_child(&mut self, child: HierarchyNode) -> &mut HierarchyNode {
-        let name = child.name.clone();
-        self.children.entry(name).or_insert(child)
-    }
-
     /// Get or create a child node by name.
-    pub fn get_or_create_child(&mut self, name: &str) -> &mut HierarchyNode {
+    pub(crate) fn get_or_create_child(&mut self, name: &str) -> &mut HierarchyNode {
         self.children
             .entry(name.to_string())
             .or_insert_with(|| HierarchyNode::new(name))
     }
 
     /// Add a curve ID to this node's leaf set.
-    pub fn add_curve_id(&mut self, id: impl Into<CurveId>) {
+    pub(crate) fn add_curve_id(&mut self, id: impl Into<CurveId>) {
         self.curve_ids.push(id.into());
     }
 }
@@ -210,7 +201,7 @@ impl MarketDataHierarchy {
     }
 
     /// Mutable lookup by path.
-    pub fn get_node_mut(&mut self, path: &[String]) -> Option<&mut HierarchyNode> {
+    pub(crate) fn get_node_mut(&mut self, path: &[String]) -> Option<&mut HierarchyNode> {
         let mut path_iter = path.iter();
         let root_name = path_iter.next()?;
         let mut current = self.roots.get_mut(root_name.as_str())?;

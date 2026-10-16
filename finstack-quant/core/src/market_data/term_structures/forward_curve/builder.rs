@@ -210,8 +210,7 @@ impl ForwardCurveBuilder {
         } else {
             (knots.clone(), forwards.clone())
         };
-        let interp = build_interp(
-            self.style,
+        let interp = self.style.build_enum(
             source_knots,
             source_forwards,
             self.extrapolation,
