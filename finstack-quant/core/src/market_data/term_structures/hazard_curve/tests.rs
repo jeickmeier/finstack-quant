@@ -60,6 +60,28 @@ fn hazard_recipe_invalidation_covers_synthetic_transformations() {
 }
 
 #[test]
+fn survival_at_dates_is_one_on_or_before_the_base_date() {
+    let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let curve = HazardCurve::builder("HZ")
+        .base_date(base)
+        .knots([(1.0, 0.02), (5.0, 0.03)])
+        .recovery_rate(0.4)
+        .build()
+        .expect("valid hazard curve");
+    let dates = [
+        base - time::Duration::days(400),
+        base,
+        base + time::Duration::days(365),
+    ];
+    let survival = curve
+        .survival_at_dates(&dates)
+        .expect("signed year fractions");
+    assert_eq!(survival[0], 1.0);
+    assert_eq!(survival[1], 1.0);
+    assert!(survival[2] < 1.0);
+}
+
+#[test]
 fn survival_interpolation_preserves_hazard_consistency() {
     let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let builder = || {

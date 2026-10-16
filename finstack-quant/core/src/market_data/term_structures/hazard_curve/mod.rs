@@ -69,7 +69,7 @@
 
 use crate::{
     currency::Currency,
-    dates::{Date, DayCount, DayCountContext},
+    dates::{Date, DayCount},
     error::InputError,
     math::interp::{
         strategies::{LinearStrategy, LogLinearStrategy},

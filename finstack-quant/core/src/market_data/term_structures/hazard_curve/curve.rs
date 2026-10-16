@@ -268,17 +268,10 @@ impl HazardCurve {
     /// a year fraction for any supplied date. No partial vector is returned.
     #[must_use = "computed survival probabilities should not be discarded"]
     pub fn survival_at_dates(&self, dates: &[Date]) -> crate::Result<Vec<f64>> {
-        let base = self.base_date();
-        let day_count = self.day_count();
-        let mut survival = Vec::with_capacity(dates.len());
-
-        for &date in dates {
-            let t = day_count.year_fraction(base, date, DayCountContext::default())?;
-            let sp = self.sp(t).clamp(0.0, 1.0);
-            survival.push(sp);
-        }
-
-        Ok(survival)
+        dates
+            .iter()
+            .map(|&date| Ok(self.sp(self.year_fraction_to(date)?).clamp(0.0, 1.0)))
+            .collect()
     }
 
     /// Unique identifier used to register and resolve this hazard curve.

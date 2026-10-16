@@ -1391,7 +1391,7 @@ class HazardCurve:
         Parameters
         ----------
         dates : Sequence[datetime.date or str]
-            Target dates on or after ``base_date``.
+            Target dates; a date on or before ``base_date`` gives ``1.0``.
 
         Returns
         -------

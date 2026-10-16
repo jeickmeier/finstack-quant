@@ -780,7 +780,7 @@ impl JsHazardCurve {
     ///
     /// # Arguments
     ///
-    /// * `dates` - ISO-8601 target dates on or after `baseDate`.
+    /// * `dates` - ISO-8601 target dates; a date on or before `baseDate` yields `1`.
     ///
     /// @returns One survival probability per input date, in order.
     /// @throws If a date is not an ISO date or a year fraction cannot be computed.

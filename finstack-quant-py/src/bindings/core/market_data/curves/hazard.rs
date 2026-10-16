@@ -318,7 +318,7 @@ impl PyHazardCurve {
     /// Parameters
     /// ----------
     /// dates : list[datetime.date | str]
-    ///     Target dates on or after ``base_date``.
+    ///     Target dates; a date on or before ``base_date`` gives ``1.0``.
     ///
     /// Returns
     /// -------
