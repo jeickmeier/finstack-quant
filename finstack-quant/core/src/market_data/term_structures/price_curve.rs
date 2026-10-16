@@ -922,16 +922,30 @@ impl Bumpable for PriceCurve {
                             prev_bucket, target_bucket, next_bucket,
                         )?;
                         let percentage = spec.value / 100.0;
-                        let points = self.knots.iter().zip(self.prices.iter()).map(|(&time, &price)| {
-                            let weight = super::common::triangular_weight(
-                                time, prev_bucket, target_bucket, next_bucket,
-                            );
-                            (time, if time == 0.0 { self.spot_price } else { price * (1.0 + percentage * weight) })
-                        });
-                        self.metadata_builder(spec.standard_bump_id(self.id()))
-                            .spot_price(self.spot_price)
-                            .knots(points)
-                            .build()
+                        // Spot is not bumped in a key-rate shock; neither are
+                        // rolled source pillars at or before the current origin.
+                        let shock = |time: f64, price: f64| {
+                            if time <= 0.0 {
+                                price
+                            } else {
+                                let weight = triangular_weight(
+                                    time, prev_bucket, target_bucket, next_bucket,
+                                );
+                                price * (1.0 + percentage * weight)
+                            }
+                        };
+                        let points: Vec<(f64, f64)> = self
+                            .knots
+                            .iter()
+                            .zip(self.prices.iter())
+                            .map(|(&time, &price)| (time, shock(time, price)))
+                            .collect();
+                        self.rebuild_shocked(
+                            spec.standard_bump_id(self.id()),
+                            self.spot_price,
+                            points,
+                            shock,
+                        )
                     }
                     _ => {
                         Err(InputError::UnsupportedBump {
@@ -1257,6 +1271,63 @@ mod tests {
             .expect("key-rate shock on a rolled curve");
         assert!((key_rate.spot_price() - rolled.spot_price()).abs() < 1e-12);
         assert!(key_rate.price(rolled.knots()[1]) > rolled.price(rolled.knots()[1]));
+    }
+
+    #[test]
+    fn percent_key_rate_bump_keeps_roll_state_and_matches_fraction_path() {
+        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+        let rolled = PriceCurve::builder("PRICE-ROLL-PCT")
+            .base_date(base)
+            .spot_price(100.0)
+            .knots([(0.0, 100.0), (1.0, 110.0), (2.0, 130.0), (3.0, 160.0)])
+            .interp(InterpStyle::CubicHermite)
+            .build()
+            .unwrap()
+            .roll_forward(182)
+            .unwrap();
+        assert!(rolled.interp.roll_state().is_some());
+
+        // Bucket the pre-roll 2y pillar (now at knots()[2]) between its neighbours,
+        // so a +10% shock there equals an absolute +13.0 shock on every pillar.
+        let knots = rolled.knots();
+        let (prev, target, next) = (Some(knots[1]), knots[2], Some(knots[3]));
+        let percent = rolled
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Percent,
+                value: 10.0,
+                bump_type: BumpType::TriangularKeyRate {
+                    prev_bucket: prev,
+                    target_bucket: target,
+                    next_bucket: next,
+                },
+            })
+            .expect("percent key-rate shock on a rolled curve");
+        let fraction = rolled
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Fraction,
+                value: 13.0,
+                bump_type: BumpType::TriangularKeyRate {
+                    prev_bucket: prev,
+                    target_bucket: target,
+                    next_bucket: next,
+                },
+            })
+            .expect("fraction key-rate shock on a rolled curve");
+
+        assert!(percent.interp.roll_state().is_some());
+        assert_eq!(percent.knots(), rolled.knots());
+        assert!((percent.price(target) - 143.0).abs() < 1e-12);
+        assert!((percent.spot_price() - rolled.spot_price()).abs() < 1e-12);
+        for time in [0.1, 0.25, knots[1], 0.75, target, 1.9, knots[3], 2.4] {
+            assert!(
+                (percent.price(time) - fraction.price(time)).abs() < 1e-12,
+                "t={time}: percent {} vs fraction {}",
+                percent.price(time),
+                fraction.price(time)
+            );
+        }
     }
 
     #[test]
