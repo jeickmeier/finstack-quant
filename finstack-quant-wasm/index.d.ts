@@ -8922,7 +8922,7 @@ export interface CoreNamespace {
    * Median with a NaN sentinel (Rust `stats::median_or_nan`).
    *
    * @param data - Observations whose median is required; the input is not modified.
-   * @returns The median, or `NaN` for an empty series.
+   * @returns The median, or `NaN` for an empty series or when any observation is non-finite.
    * @throws `TypeError` if `data` is not an array of numbers.
    */
   medianOrNan(data: NumericArray): number;

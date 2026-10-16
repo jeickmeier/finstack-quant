@@ -3,10 +3,9 @@
 #![cfg(target_arch = "wasm32")]
 
 use finstack_quant_wasm::api::core::dates::{create_date, JsDayCount, JsDayCountContext};
-use finstack_quant_wasm::api::core::market_data::*;
-use finstack_quant_wasm::api::core::market_data::{
-    JsDiscountCurve, JsForwardCurve, JsFxConversionPolicy, JsFxMatrix,
-};
+use finstack_quant_wasm::api::core::market_data::{JsDiscountCurve, JsForwardCurve};
+use finstack_quant_wasm::api::core::market_fx::*;
+use finstack_quant_wasm::api::core::market_fx::{JsFxConversionPolicy, JsFxMatrix};
 use finstack_quant_wasm::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube};
 use finstack_quant_wasm::api::models::volatility::{
     get_cube_normal_vol, get_cube_normal_vol_clamped, get_fx_delta_pillar_vols, get_fx_delta_vol,
