@@ -209,7 +209,7 @@ pub(crate) fn resolve_sigma(
         iv
     } else {
         let t = option.time_to_expiry(as_of)?;
-        let strike = option.strike.native_surface_coordinate()?;
+        let strike = option.strike.native_surface_coordinate();
         let surface = curves.get_surface(option.vol_surface_id.as_str())?;
         if surface.secondary_axis() != VolSurfaceAxis::Strike {
             return Err(finstack_quant_core::Error::Validation(format!(

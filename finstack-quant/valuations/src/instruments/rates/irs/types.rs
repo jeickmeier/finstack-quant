@@ -14,7 +14,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::Decimal;
 
-use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::pricing::overnight_conventions;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
@@ -486,7 +485,7 @@ impl InterestRateSwap {
         })?;
 
         // Validate fixed rate is within reasonable bounds
-        let rate_f64 = decimal_to_f64(self.fixed_leg.rate, "fixed rate")?;
+        let rate_f64 = self.fixed_leg.rate.as_f64();
         validation::validate_rate_magnitude(
             rate_f64,
             MAX_RATE_MAGNITUDE,

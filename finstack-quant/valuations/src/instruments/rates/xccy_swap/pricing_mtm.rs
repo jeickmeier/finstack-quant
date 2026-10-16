@@ -19,7 +19,6 @@
 //! Canonical citation: `docs/REFERENCES.md`
 //! (`#andersen-piterbarg-xccy-mtm-reset`).
 
-use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::rates::xccy_swap::types::{
     initial_principal_sign, ResettingSide, XccySwap,
@@ -260,10 +259,7 @@ fn project_mtm_cashflows(
         None,
     ));
 
-    let spread_c = decimal_to_f64(
-        constant_leg.leg.spread_bp,
-        "XccySwap constant leg spread_bp",
-    )? / 10_000.0;
+    let spread_c = constant_leg.leg.spread_bp.as_f64() / 10_000.0;
     for period in &constant_periods {
         if period.payment_date <= as_of {
             continue;
@@ -290,10 +286,7 @@ fn project_mtm_cashflows(
         ));
     }
 
-    let spread_decimal = decimal_to_f64(
-        resetting_leg.leg.spread_bp,
-        "XccySwap resetting leg spread_bp",
-    )? / 10_000.0;
+    let spread_decimal = resetting_leg.leg.spread_bp.as_f64() / 10_000.0;
 
     let mut n_r_prev = n_r_initial;
     for (j, period) in resetting_periods.iter().enumerate() {

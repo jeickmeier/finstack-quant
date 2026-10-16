@@ -30,13 +30,11 @@ fn observations_to_dataframe<'py>(
 
 /// Extract an `f64` observation from a `float`, `int` or `decimal.Decimal`.
 ///
-/// A `Decimal` converts to `f64` through
-/// `finstack_quant_core::decimal::decimal_to_f64`; finiteness is checked by the
-/// Rust constructor that receives the value.
+/// A `Decimal` converts to `f64` with `Decimal::as_f64`; finiteness is
+/// checked by the Rust constructor that receives the value.
 pub(crate) fn extract_f64(value: &Bound<'_, PyAny>, field: &str) -> PyResult<f64> {
     if is_python_decimal(value)? {
-        return finstack_quant_core::decimal::decimal_to_f64(decimal_from_py(value)?)
-            .map_err(core_to_py);
+        return Ok(decimal_from_py(value)?.as_f64());
     }
     value.extract::<f64>().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(

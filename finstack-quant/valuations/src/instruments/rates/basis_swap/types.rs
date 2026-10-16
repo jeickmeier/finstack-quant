@@ -26,7 +26,6 @@ use finstack_quant_core::{
     dates::Date, market_data::context::MarketContext, money::Money, types::InstrumentId, Result,
 };
 
-use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::validation;
 use finstack_quant_cashflows::builder::{
@@ -387,7 +386,7 @@ impl BasisSwap {
             ));
         }
 
-        let spread_bp = decimal_to_f64(leg.spread_bp, "BasisSwap leg spread_bp")?;
+        let spread_bp = leg.spread_bp.as_f64();
         validation::validate_rate_magnitude(
             spread_bp,
             5000.0,
@@ -727,7 +726,7 @@ impl BasisSwap {
             leg.forward_curve_id.as_str(),
         )
         .ok();
-        let spread_bp = decimal_to_f64(leg.spread_bp, "BasisSwap overnight spread_bp")?;
+        let spread_bp = leg.spread_bp.as_f64();
         let mut flows = Vec::with_capacity(periods.len());
         let mut projected_fixings = Vec::new();
         for period in periods {

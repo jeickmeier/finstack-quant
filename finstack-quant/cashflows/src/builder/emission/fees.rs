@@ -10,7 +10,7 @@ use rust_decimal::Decimal;
 
 use super::super::compiler::PeriodicFee;
 use super::super::specs::{FeeAccrualBasis, FeeBase};
-use super::{decimal_to_f64, f64_to_decimal};
+use super::f64_to_decimal;
 
 /// Conversion factor from basis points to rate (1 bp = 0.0001).
 const BP_TO_RATE: Decimal = Decimal::from_parts(1, 0, 0, false, 4);
@@ -118,9 +118,9 @@ pub(in crate::builder) fn emit_fees_on(
 
                 let yf_dec = f64_to_decimal(yf)?;
                 let fee_amt_dec = checked_fee_amount(base_amt, pf.bp, yf_dec)?;
-                let fee_amt = decimal_to_f64(fee_amt_dec)?;
+                let fee_amt = fee_amt_dec.as_f64();
 
-                let rate = decimal_to_f64(pf.bp)? * 1e-4;
+                let rate = pf.bp.as_f64() * 1e-4;
 
                 if fee_amt != 0.0 {
                     new_flows.push(

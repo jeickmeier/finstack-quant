@@ -27,7 +27,6 @@ use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::Result;
 use rust_decimal::prelude::ToPrimitive;
-use rust_decimal::Decimal;
 
 /// Parameters for floating rate projection.
 #[derive(Debug, Clone)]
@@ -171,23 +170,6 @@ impl FloatingRateParams {
     }
 }
 
-/// Convert an optional [`Decimal`] constraint (floor/cap in bp) to `f64`.
-///
-/// Returns `Ok(None)` when the input is `None`. A `Decimal` that fails
-/// conversion to `f64` (pathologically out of range) is a hard error: a
-/// silently dropped floor/cap would change coupon economics without notice.
-fn optional_decimal_to_f64(value: Option<Decimal>, label: &str) -> Result<Option<f64>> {
-    value
-        .map(|d| {
-            d.to_f64().ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "{label} value {d} cannot be represented as f64"
-                ))
-            })
-        })
-        .transpose()
-}
-
 impl TryFrom<&crate::builder::specs::FloatingRateSpec> for FloatingRateParams {
     type Error = finstack_quant_core::Error;
 
@@ -218,10 +200,10 @@ impl TryFrom<&crate::builder::specs::FloatingRateSpec> for FloatingRateParams {
             spread_bp,
             gearing,
             gearing_includes_spread: spec.gearing_includes_spread,
-            index_floor_bp: optional_decimal_to_f64(spec.index_floor_bp, "index_floor_bp")?,
-            index_cap_bp: optional_decimal_to_f64(spec.index_cap_bp, "index_cap_bp")?,
-            all_in_floor_bp: optional_decimal_to_f64(spec.all_in_floor_bp, "all_in_floor_bp")?,
-            all_in_cap_bp: optional_decimal_to_f64(spec.all_in_cap_bp, "all_in_cap_bp")?,
+            index_floor_bp: spec.index_floor_bp.map(|d| d.as_f64()),
+            index_cap_bp: spec.index_cap_bp.map(|d| d.as_f64()),
+            all_in_floor_bp: spec.all_in_floor_bp.map(|d| d.as_f64()),
+            all_in_cap_bp: spec.all_in_cap_bp.map(|d| d.as_f64()),
         };
         params.validate()?;
         Ok(params)

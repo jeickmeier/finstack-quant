@@ -1,6 +1,5 @@
 //! Zero-coupon Inflation Swap types and pricing implementation.
 
-use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::legs::PayReceive;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
@@ -169,7 +168,7 @@ impl InflationSwap {
                 finstack_quant_core::InputError::NonPositiveValue,
             )?;
         }
-        let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
+        let fixed_rate = self.fixed_rate.as_f64();
         validation::require_with(fixed_rate > -1.0, || {
             format!(
                 "InflationSwap fixed_rate ({fixed_rate}) must be greater than -1.0 for geometric compounding"
@@ -284,7 +283,7 @@ impl InflationSwap {
         // Use instrument day count for accrual period
         let tau_accrual = self.fixed_accrual()?;
 
-        let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
+        let fixed_rate = self.fixed_rate.as_f64();
         let fixed_payment = self
             .notional
             .checked_mul_f64((1.0 + fixed_rate).powf(tau_accrual) - 1.0)?;
@@ -347,7 +346,7 @@ impl InflationSwap {
 
     fn fixed_leg_amount(&self) -> finstack_quant_core::Result<Money> {
         let tau_accrual = self.fixed_accrual()?;
-        let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
+        let fixed_rate = self.fixed_rate.as_f64();
         self.notional
             .checked_mul_f64((1.0 + fixed_rate).powf(tau_accrual) - 1.0)
     }
@@ -443,7 +442,7 @@ impl InflationSwap {
         )?;
 
         let tau_accrual = self.fixed_accrual()?;
-        let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
+        let fixed_rate = self.fixed_rate.as_f64();
         let fixed_pv = self.notional.amount() * ((1.0 + fixed_rate).powf(tau_accrual) - 1.0) * df;
 
         let index_ratio = self.projected_index_ratio(market, as_of)?;
@@ -551,7 +550,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
         };
         let ccy = self.notional.currency();
         let accrual_factor = self.fixed_accrual()?;
-        let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
+        let fixed_rate = self.fixed_rate.as_f64();
         let inflation_rate = (accrual_factor > 0.0)
             .then_some(inflation_amount.amount() / self.notional.amount() / accrual_factor);
         let fixed_flow = CashFlow::new(
@@ -858,7 +857,7 @@ impl YoYInflationSwap {
             let cpi_end = self.cpi_value(market, as_of, end)?;
 
             let inflation_leg = self.notional.amount() * (cpi_end / cpi_start - 1.0);
-            let fixed_rate = decimal_to_f64(self.fixed_rate, "YoYInflationSwap fixed_rate")?;
+            let fixed_rate = self.fixed_rate.as_f64();
             let fixed_leg = self.notional.amount() * fixed_rate * accrual;
 
             let net = match self.side {
@@ -946,7 +945,7 @@ impl YoYInflationSwap {
         as_of: Date,
     ) -> finstack_quant_core::Result<Vec<CashFlow>> {
         let mut flows = Vec::new();
-        let fixed_rate = decimal_to_f64(self.fixed_rate, "YoYInflationSwap fixed_rate")?;
+        let fixed_rate = self.fixed_rate.as_f64();
 
         for (start, end, pay) in self.schedule()? {
             if pay < as_of {

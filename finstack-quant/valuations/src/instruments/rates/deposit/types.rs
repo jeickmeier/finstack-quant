@@ -22,7 +22,6 @@ use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use rust_decimal::Decimal;
 use time::macros::date;
 
-use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
@@ -288,7 +287,7 @@ impl Deposit {
 
         // Warn about extreme rates (don't fail, as they may be intentional)
         if let Some(r) = self.fixed_rate {
-            let r_f64 = decimal_to_f64(r, "Deposit fixed_rate")?;
+            let r_f64 = r.as_f64();
             if validation::rate_outside_range(r_f64, MIN_REASONABLE_RATE, MAX_REASONABLE_RATE) {
                 tracing::warn!(
                     deposit_id = %self.id,
@@ -396,7 +395,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
                 id: "deposit fixed_rate".to_string(),
             })
         })?;
-        let r = decimal_to_f64(r, "Deposit fixed_rate")?;
+        let r = r.as_f64();
         let redemption = self.notional.checked_mul_f64(1.0 + r * yf)?;
         let interest = redemption.checked_sub(self.notional)?;
         let flows = vec![

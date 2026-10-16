@@ -443,7 +443,7 @@ impl TarnPricer {
         };
 
         let payoff = TarnPayoff::new(
-            finstack_quant_core::decimal::decimal_to_f64(inst.fixed_rate)?,
+            inst.fixed_rate.as_f64(),
             inst.coupon_floor,
             inst.target_coupon,
             inst.notional.amount(),
@@ -481,7 +481,7 @@ fn deterministic_estimate(
     config: &RateExoticMcConfig,
 ) -> finstack_quant_core::Result<MoneyEstimate> {
     let mut payoff = TarnPayoff::new(
-        finstack_quant_core::decimal::decimal_to_f64(inst.fixed_rate)?,
+        inst.fixed_rate.as_f64(),
         inst.coupon_floor,
         inst.target_coupon,
         inst.notional.amount(),
@@ -711,8 +711,7 @@ mod tests {
                 .expect("projection time");
             let floating_rate = projection.rate(projection_time);
 
-            let fixed_rate =
-                finstack_quant_core::decimal::decimal_to_f64(tarn.fixed_rate).expect("fixed_rate");
+            let fixed_rate = tarn.fixed_rate.as_f64();
             let coupon = (fixed_rate - floating_rate).max(tarn.coupon_floor) * accrual;
             let actual = tracker.add_coupon(coupon);
             pv += actual * tarn.notional.amount() * p_end;

@@ -262,7 +262,7 @@ impl CmsSwap {
     ///
     /// Returns an error when `cms_spread_bp` cannot be represented as `f64`.
     pub(crate) fn cms_spread_rate(&self) -> finstack_quant_core::Result<f64> {
-        Ok(finstack_quant_core::decimal::decimal_to_f64(self.cms_spread_bp)? / 10_000.0)
+        Ok(self.cms_spread_bp.as_f64() / 10_000.0)
     }
 
     /// Validate CMS and funding leg schedule vectors.
@@ -591,12 +591,7 @@ impl CmsSwap {
                 continue;
             }
             let (rate, index_rate, kind, reset_date) = match &self.funding_leg {
-                FundingLeg::Fixed { rate, .. } => (
-                    finstack_quant_core::decimal::decimal_to_f64(*rate)?,
-                    None,
-                    CFKind::Fixed,
-                    None,
-                ),
+                FundingLeg::Fixed { rate, .. } => (rate.as_f64(), None, CFKind::Fixed, None),
                 FundingLeg::Floating {
                     spread_bp,
                     forward_curve_id,
@@ -622,8 +617,7 @@ impl CmsSwap {
                         )?
                     };
                     (
-                        index_rate
-                            + finstack_quant_core::decimal::decimal_to_f64(*spread_bp)? / 10_000.0,
+                        index_rate + spread_bp.as_f64() / 10_000.0,
                         Some(index_rate),
                         CFKind::FloatReset,
                         Some(period.reset_date),

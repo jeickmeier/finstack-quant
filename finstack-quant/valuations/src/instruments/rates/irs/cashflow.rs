@@ -25,7 +25,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use rust_decimal::Decimal;
 
-use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::rates::irs::{FloatingLegCompounding, InterestRateSwap, PayReceive};
 use finstack_quant_cashflows::builder::{
     build_periods, merge_cashflow_schedules, BuildPeriodsParams, CashFlowSchedule,
@@ -223,7 +222,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         let compound_factor = projection.compound_factor;
         let accrual_year_fraction = projection.accrual_year_fraction;
 
-        let spread_bp = decimal_to_f64(float.spread_bp, "float leg spread_bp")?;
+        let spread_bp = float.spread_bp.as_f64();
         let coupon_amount =
             crate::instruments::common_impl::pricing::overnight::overnight_coupon_amount(
                 irs.notional.amount(),
@@ -301,7 +300,7 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
         roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     })?;
     let period_count = periods.len();
-    let rate = decimal_to_f64(fixed.rate, "fixed leg rate")?;
+    let rate = fixed.rate.as_f64();
     let flows = periods
         .into_iter()
         .enumerate()

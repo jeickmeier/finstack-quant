@@ -12,7 +12,6 @@
 //!   legs (`compounding` other than Simple) use the shared daily compounded
 //!   projector. Historical fixings are required once the fixing date is past.
 
-use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::legs::FloatLegSpec;
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::impl_instrument_base;
@@ -716,7 +715,7 @@ impl XccySwap {
             leg.leg.forward_curve_id.as_str(),
         );
         let fixings = market.get_series(&fixing_series_id).ok();
-        let spread = decimal_to_f64(leg.leg.spread_bp, "XccySwap leg spread_bp")? / 10_000.0;
+        let spread = leg.leg.spread_bp.as_f64() / 10_000.0;
 
         let mut flows = Vec::with_capacity(periods.len());
         let mut projected_fixings = Vec::new();
@@ -920,7 +919,7 @@ impl XccySwap {
                 );
             }
 
-            let spread = decimal_to_f64(leg.leg.spread_bp, "XccySwap leg spread_bp")? / 10_000.0;
+            let spread = leg.leg.spread_bp.as_f64() / 10_000.0;
             let coupon = leg.side.sign() * projected.unsigned_coupon(leg.notional.amount(), spread);
 
             // Use relative date-based discounting for numerical stability.

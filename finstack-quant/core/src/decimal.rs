@@ -7,7 +7,6 @@
 //! `Decimal::from_f64_retain(...)` or the `dec!` macro.
 
 use crate::{Error, InputError, NonFiniteKind, Result};
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
 /// Parse exact fixed-point or scientific decimal text without rounding.
@@ -118,26 +117,6 @@ pub fn f64_to_decimal(value: f64) -> Result<Decimal> {
     Decimal::try_from(value).map_err(|_| Error::from(InputError::ConversionOverflow))
 }
 
-/// Convert a [`Decimal`] to `f64`, returning an error if conversion fails.
-///
-/// While `Decimal` values are always finite, conversion to `f64` can fail for
-/// very large magnitudes that exceed `f64`'s representable range
-/// (~1.8 × 10^308).
-///
-/// # Arguments
-///
-/// * `value` - Decimal quantity to convert to the nearest representable `f64`.
-///
-/// # Errors
-///
-/// Returns [`InputError::ConversionOverflow`] when the value cannot be
-/// represented as `f64`.
-pub fn decimal_to_f64(value: Decimal) -> Result<f64> {
-    value
-        .to_f64()
-        .ok_or_else(|| Error::from(InputError::ConversionOverflow))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,13 +160,6 @@ mod tests {
             f64_to_decimal(1e100),
             Err(Error::Input(InputError::ConversionOverflow))
         ));
-    }
-
-    #[test]
-    fn decimal_to_f64_roundtrips_typical_values() {
-        let d = f64_to_decimal(0.0525).expect("convert");
-        let f = decimal_to_f64(d).expect("convert back");
-        assert!((f - 0.0525).abs() < 1e-12);
     }
 
     #[test]

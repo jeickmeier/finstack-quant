@@ -4,7 +4,7 @@ use crate::builder::orchestrator::{AmortizationSetup, PreparedAmortization};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::decimal::{decimal_to_f64, f64_to_decimal};
+use finstack_quant_core::decimal::f64_to_decimal;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 
@@ -27,7 +27,7 @@ fn emit_principal_repayment(
     new_flows.push(CashFlow::new(
         d,
         None,
-        Money::new(decimal_to_f64(pay)?, ccy)?,
+        Money::new(pay.as_f64(), ccy)?,
         CFKind::Amortization,
         0.0,
         None,

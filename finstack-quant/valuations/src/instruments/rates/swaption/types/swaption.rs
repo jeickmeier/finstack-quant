@@ -819,7 +819,6 @@ impl Swaption {
         as_of: Date,
         fixed_annuity: f64,
     ) -> Result<f64> {
-        use crate::instruments::common_impl::numeric::decimal_to_f64;
         use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 
         let float = &self.underlying_float_leg;
@@ -840,7 +839,7 @@ impl Swaption {
             adjust_accrual_dates: false,
             roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         })?;
-        let spread = decimal_to_f64(float.spread_bp, "swaption underlier spread_bp")? / 10_000.0;
+        let spread = float.spread_bp.as_f64() / 10_000.0;
         let (float_pv, _) = single_curve_float_leg_pv(disc, as_of, &periods, spread)?;
         Ok(float_pv / fixed_annuity)
     }

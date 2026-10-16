@@ -956,7 +956,7 @@ impl finstack_quant_covenants::InstrumentMutator for TermLoan {
             RateSpec::Fixed { rate } => {
                 let stepped = finstack_quant_core::decimal::f64_to_decimal(*rate)?
                     + bp_increase / Decimal::from(10_000);
-                *rate = finstack_quant_core::decimal::decimal_to_f64(stepped)?;
+                *rate = stepped.as_f64();
             }
             RateSpec::Floating(spec) => {
                 spec.spread_bp += bp_increase;

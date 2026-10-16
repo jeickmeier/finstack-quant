@@ -10,7 +10,7 @@ pub(crate) mod coupons;
 mod fees;
 mod helpers;
 
-use finstack_quant_core::decimal::{decimal_to_f64, f64_to_decimal};
+use finstack_quant_core::decimal::f64_to_decimal;
 
 pub(crate) use coupons::{
     emit_fixed_coupons_on, emit_float_coupons_on, FloatEmissionOutput, ResolvedFloatMarket,

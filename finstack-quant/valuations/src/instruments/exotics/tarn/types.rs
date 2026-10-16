@@ -125,7 +125,7 @@ impl Tarn {
             "TARN start_date followed by payment_dates",
         )?;
 
-        finstack_quant_core::decimal::decimal_to_f64(self.fixed_rate)?;
+        self.fixed_rate.as_f64();
 
         validation::require_with(
             self.target_coupon >= 0.0 && self.target_coupon.is_finite(),

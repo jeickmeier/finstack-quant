@@ -143,12 +143,8 @@ pub struct CmsSpreadOption {
 
 impl CmsSpreadOption {
     /// Strike as an `f64` decimal rate for the pricing kernels.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when `strike` cannot be represented as `f64`.
-    pub(crate) fn strike_rate(&self) -> finstack_quant_core::Result<f64> {
-        finstack_quant_core::decimal::decimal_to_f64(self.strike)
+    pub(crate) fn strike_rate(&self) -> f64 {
+        self.strike.as_f64()
     }
 
     /// Validate the CMS spread option parameters.
@@ -169,8 +165,6 @@ impl CmsSpreadOption {
                 )
             },
         )?;
-
-        self.strike_rate()?;
 
         validation::require_with(self.payment_date >= self.expiry, || {
             format!(
@@ -259,14 +253,14 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSpreadOption {
             crate::instruments::common_impl::dependencies::VolatilityDependency::new(
                 self.long_vol_surface_id.clone(),
                 None,
-                Some(self.strike_rate()?),
+                Some(self.strike_rate()),
             ),
         );
         deps.add_volatility_dependency(
             crate::instruments::common_impl::dependencies::VolatilityDependency::new(
                 self.short_vol_surface_id.clone(),
                 None,
-                Some(self.strike_rate()?),
+                Some(self.strike_rate()),
             ),
         );
         let long_tenor_years = self.long_cms_tenor.months().map(f64::from).ok_or_else(|| {

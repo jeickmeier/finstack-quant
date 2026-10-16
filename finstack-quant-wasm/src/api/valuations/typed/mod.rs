@@ -93,9 +93,7 @@ pub(super) mod get {
 
     /// A `Decimal` as a JavaScript number.
     pub(crate) fn dec(value: &Decimal) -> Js {
-        finstack_quant_core::decimal::decimal_to_f64(*value)
-            .map(JsValue::from_f64)
-            .map_err(to_js_err)
+        Ok(JsValue::from_f64(value.as_f64()))
     }
 
     /// A `(payment date, amount)` pair as `[isoDate, Money]`, or `null`.

@@ -1,6 +1,5 @@
 //! Pricing and metric helpers for interest-rate instruments.
 //!
-use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::rates::basis_swap::types::BasisSwap;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::{Error, Result};
@@ -173,10 +172,7 @@ impl MetricCalculator for IncrementalParSpreadCalculator {
         let swap = context.instrument_as::<BasisSwap>()?;
 
         // Current spread in bp (convert Decimal to f64 at arithmetic boundary)
-        let current_spread_bp = decimal_to_f64(
-            swap.primary_leg.spread_bp,
-            "BasisSwap primary_leg spread_bp",
-        )?;
+        let current_spread_bp = swap.primary_leg.spread_bp.as_f64();
 
         // Incremental = absolute par spread - current spread
         Ok(absolute_par_spread_bp - current_spread_bp)

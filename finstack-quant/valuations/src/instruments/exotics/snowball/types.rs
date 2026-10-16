@@ -152,7 +152,7 @@ impl Snowball {
             "Snowball start_date followed by payment_dates",
         )?;
 
-        finstack_quant_core::decimal::decimal_to_f64(self.fixed_rate)?;
+        self.fixed_rate.as_f64();
 
         validation::require_with(self.gearing > 0.0 && self.gearing.is_finite(), || {
             format!(

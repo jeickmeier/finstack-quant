@@ -34,7 +34,6 @@
 //! forward-spread model volatilities in both cases — a clean-price strike
 //! axis does not change the model's state variable.
 
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
 /// Typed CDS-option strike: forward-spread or clean-price convention.
@@ -50,10 +49,10 @@ use rust_decimal::Decimal;
 ///
 /// let spread = CdsOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp
 /// assert!(spread.spread_decimal().is_some());
-/// assert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);
+/// assert_eq!(spread.native_surface_coordinate(), 0.0325);
 ///
 /// let price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0
-/// assert_eq!(price.native_surface_coordinate().unwrap(), 107.0);
+/// assert_eq!(price.native_surface_coordinate(), 107.0);
 /// assert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -130,11 +129,10 @@ impl CdsOptionStrike {
     ///
     /// # Errors
     ///
-    /// Returns a validation error when the strike is a clean-price strike
-    /// or the decimal cannot be represented as `f64`.
+    /// Returns a validation error when the strike is a clean-price strike.
     pub fn spread_f64(&self) -> finstack_quant_core::Result<f64> {
         match self {
-            Self::Spread(s) => decimal_to_f64(*s, "strike spread"),
+            Self::Spread(s) => Ok(s.as_f64()),
             Self::CleanPricePct(p) => Err(finstack_quant_core::Error::Validation(format!(
                 "expected a spread strike but got clean-price strike {p}; \
                  clean-price strikes have no spread representation"
@@ -151,38 +149,26 @@ impl CdsOptionStrike {
     ///
     /// # Errors
     ///
-    /// Returns a validation error when the strike is a spread strike or
-    /// the decimal cannot be represented as `f64`.
+    /// Returns a validation error when the strike is a spread strike.
     pub fn clean_price_fraction(&self) -> finstack_quant_core::Result<f64> {
         match self {
             Self::Spread(s) => Err(finstack_quant_core::Error::Validation(format!(
                 "expected a clean-price strike but got spread strike {s}; \
                  spread strikes have no clean-price representation"
             ))),
-            Self::CleanPricePct(p) => Ok(decimal_to_f64(*p, "strike clean price")? / 100.0),
+            Self::CleanPricePct(p) => Ok(p.as_f64() / 100.0),
         }
     }
 
     /// Native volatility-surface strike coordinate: the decimal spread for
     /// spread strikes (`0.0325`) and the percentage clean price for
     /// clean-price strikes (`107.0`).
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error when the decimal cannot be represented
-    /// as `f64`.
-    pub fn native_surface_coordinate(&self) -> finstack_quant_core::Result<f64> {
+    pub fn native_surface_coordinate(&self) -> f64 {
         match self {
-            Self::Spread(s) => decimal_to_f64(*s, "strike spread"),
-            Self::CleanPricePct(p) => decimal_to_f64(*p, "strike clean price"),
+            Self::Spread(s) => s.as_f64(),
+            Self::CleanPricePct(p) => p.as_f64(),
         }
     }
-}
-
-fn decimal_to_f64(value: Decimal, label: &str) -> finstack_quant_core::Result<f64> {
-    value.to_f64().ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!("cannot represent {label} {value} as f64"))
-    })
 }
 
 #[cfg(test)]
@@ -225,10 +211,10 @@ mod tests {
     #[test]
     fn native_surface_coordinates_use_displayed_units() {
         let spread = CdsOptionStrike::Spread(Decimal::new(325, 4));
-        assert!((spread.native_surface_coordinate().unwrap() - 0.0325).abs() < 1e-15);
+        assert!((spread.native_surface_coordinate() - 0.0325).abs() < 1e-15);
 
         let price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1));
-        assert!((price.native_surface_coordinate().unwrap() - 107.0).abs() < 1e-12);
+        assert!((price.native_surface_coordinate() - 107.0).abs() < 1e-12);
     }
 
     #[test]

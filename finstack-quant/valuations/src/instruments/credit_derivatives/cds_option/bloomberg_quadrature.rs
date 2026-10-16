@@ -64,7 +64,6 @@ use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
 /// `1/√(2π)` — the standard normal density's normalising constant.
@@ -380,10 +379,10 @@ impl ForwardCdsContext {
         let mut forward_par_spread =
             forward_protection_pv / (risky_annuity_at_value_dt * cds.notional.amount());
 
-        let coupon = decimal_to_f64(option.effective_coupon_bp()? / Decimal::new(10_000, 0))?;
+        let coupon = (option.effective_coupon_bp()? / Decimal::new(10_000, 0)).as_f64();
         let strike = match &option.strike {
             super::strike::CdsOptionStrike::Spread(spread) => QuadratureStrike::Spread {
-                strike: decimal_to_f64(*spread)?,
+                strike: spread.as_f64(),
             },
             price @ super::strike::CdsOptionStrike::CleanPricePct(_) => {
                 let strike_index_factor = option.strike_index_factor.ok_or_else(|| {
@@ -781,14 +780,6 @@ pub fn quadrature_payoff(
         (ctx.scale * ctx.exercise_survival_multiplier() * expected_payoff + default_payment)
             * ctx.df_to_settlement,
     )
-}
-
-fn decimal_to_f64(value: Decimal) -> Result<f64> {
-    value.to_f64().ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!(
-            "Bloomberg CDSO quadrature: cannot represent {value} as f64"
-        ))
-    })
 }
 
 /// Bloomberg CDSO standard-normal quadrature half-width.

@@ -1,7 +1,6 @@
 //! Core types for Repurchase Agreement (Repo) instruments.
 
 use crate::contract_specs::embedded_registry;
-use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::dates::{adjust, BusinessDayConvention, Date, DateExt, DayCount};
@@ -460,7 +459,7 @@ impl Repo {
     ///
     /// Returns an error if `repo_rate` cannot be represented as `f64`.
     pub fn effective_rate(&self) -> Result<f64> {
-        let base_rate = decimal_to_f64(self.repo_rate, "Repo repo_rate")?;
+        let base_rate = self.repo_rate.as_f64();
         Ok(match &self.collateral.collateral_type {
             CollateralType::General => base_rate,
             CollateralType::Special {

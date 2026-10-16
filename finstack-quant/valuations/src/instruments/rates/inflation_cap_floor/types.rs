@@ -38,7 +38,6 @@
 //! determine when those values are known. The selected volatility-expiry convention
 //! determines the ACT/365F clock on which annualized option volatility is quoted.
 
-use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
@@ -219,8 +218,8 @@ impl InflationCapFloor {
         Ok(())
     }
 
-    pub(crate) fn strike_f64(&self) -> finstack_quant_core::Result<f64> {
-        decimal_to_f64(self.strike, "InflationCapFloor strike")
+    pub(crate) fn strike_f64(&self) -> f64 {
+        self.strike.as_f64()
     }
 
     /// Minimum reasonable CPI value for developed market indices.
@@ -397,7 +396,7 @@ impl InflationCapFloor {
                 ))
             }
         };
-        let strike = self.strike_f64()?;
+        let strike = self.strike_f64();
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
 
         let mut total_pv = 0.0_f64;
@@ -540,7 +539,7 @@ impl crate::instruments::common_impl::traits::Instrument for InflationCapFloor {
             crate::instruments::common_impl::dependencies::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 None,
-                Some(self.strike_f64()?),
+                Some(self.strike_f64()),
             ),
         );
         Ok(deps)

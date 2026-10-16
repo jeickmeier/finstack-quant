@@ -469,7 +469,7 @@ impl SnowballHw1fMcPricer {
         let spec = SnowballCouponSpec {
             variant: inst.variant,
             initial_coupon: inst.initial_coupon,
-            fixed_rate: finstack_quant_core::decimal::decimal_to_f64(inst.fixed_rate)?,
+            fixed_rate: inst.fixed_rate.as_f64(),
             gearing: inst.gearing,
             coupon_floor: inst.coupon_floor,
             coupon_cap: inst.coupon_cap,

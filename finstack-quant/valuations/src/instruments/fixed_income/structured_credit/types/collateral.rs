@@ -20,8 +20,6 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::{HashSet, Result};
-use rust_decimal::prelude::ToPrimitive;
-use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use super::enums::AssetType;
@@ -490,18 +488,10 @@ fn require_currency(actual: Currency, expected: Currency, id: &InstrumentId) -> 
     Ok(())
 }
 
-fn decimal_to_f64(value: Decimal, what: &str) -> Result<f64> {
-    value.to_f64().ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!(
-            "{what} {value} cannot be represented as f64"
-        ))
-    })
-}
-
 /// `(rate, spread_bp, forward_curve_id)` for a floating-rate spec: the row's coupon
 /// is the spread until the index is projected by the engine.
 fn floating_economics(spec: &FloatingRateSpec) -> Result<(f64, Option<f64>, Option<String>)> {
-    let spread_bp = decimal_to_f64(spec.spread_bp, "floating spread")?;
+    let spread_bp = spec.spread_bp.as_f64();
     Ok((
         spread_bp / 10_000.0,
         Some(spread_bp),
@@ -512,13 +502,9 @@ fn floating_economics(spec: &FloatingRateSpec) -> Result<(f64, Option<f64>, Opti
 /// `(rate, spread_bp, forward_curve_id)` for a bond cashflow specification.
 fn bond_economics(spec: &CashflowSpec) -> Result<(f64, Option<f64>, Option<String>)> {
     match spec {
-        CashflowSpec::Fixed(fixed) => Ok((decimal_to_f64(fixed.rate, "bond coupon")?, None, None)),
+        CashflowSpec::Fixed(fixed) => Ok((fixed.rate.as_f64(), None, None)),
         CashflowSpec::Floating(floating) => floating_economics(&floating.rate_spec),
-        CashflowSpec::StepUp(step_up) => Ok((
-            decimal_to_f64(step_up.initial_rate, "step-up initial coupon")?,
-            None,
-            None,
-        )),
+        CashflowSpec::StepUp(step_up) => Ok((step_up.initial_rate.as_f64(), None, None)),
         CashflowSpec::Amortizing { base, .. } => bond_economics(base),
     }
 }

@@ -8,7 +8,7 @@ use super::schedule::{finalize_flows, CashFlowSchedule};
 use crate::builder::{AmortizationSpec, Notional, PrincipalExchange};
 use crate::primitives::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::decimal::{decimal_to_f64, f64_to_decimal};
+use finstack_quant_core::decimal::f64_to_decimal;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
@@ -871,8 +871,8 @@ impl CompiledCashFlowPlan {
                 };
                 let relative_residual = abs_outstanding / abs_initial;
                 if relative_residual > threshold {
-                    let final_outstanding = decimal_to_f64(state.outstanding)?;
-                    let relative_residual_f64 = decimal_to_f64(relative_residual)?;
+                    let final_outstanding = state.outstanding.as_f64();
+                    let relative_residual_f64 = relative_residual.as_f64();
                     tracing::warn!(
                         initial = initial_amount,
                         final_outstanding,

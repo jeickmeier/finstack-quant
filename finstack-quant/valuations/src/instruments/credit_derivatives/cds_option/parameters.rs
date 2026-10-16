@@ -3,7 +3,6 @@
 //! Validated at the point of construction so the resulting `CdsOption` is
 //! guaranteed to satisfy the Bloomberg CDSO model's preconditions.
 
-use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::credit_derivatives::cds_option::strike::CdsOptionStrike;
 use crate::instruments::credit_derivatives::cds_option::ProtectionStartConvention;
@@ -25,7 +24,7 @@ pub(crate) fn validate_common_terms(
 ) -> finstack_quant_core::Result<()> {
     match strike {
         CdsOptionStrike::Spread(spread) => {
-            let strike_f64 = decimal_to_f64(*spread, "strike")?;
+            let strike_f64 = spread.as_f64();
             if strike_f64 <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "strike must be positive, got {}",
@@ -40,7 +39,7 @@ pub(crate) fn validate_common_terms(
             }
         }
         CdsOptionStrike::CleanPricePct(price_pct) => {
-            let price_f64 = decimal_to_f64(*price_pct, "strike clean price")?;
+            let price_f64 = price_pct.as_f64();
             if price_f64 <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "clean-price strike must be positive percentage points, got {}",

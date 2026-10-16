@@ -73,11 +73,8 @@ pub(super) fn build_overnight_coupon(
 
     let constraints = OvernightRateConstraints {
         application: spec.rate_spec.overnight_index_constraints,
-        index_floor_bp: decimal_option_to_f64(
-            spec.rate_spec.index_floor_bp,
-            "overnight index floor",
-        )?,
-        index_cap_bp: decimal_option_to_f64(spec.rate_spec.index_cap_bp, "overnight index cap")?,
+        index_floor_bp: spec.rate_spec.index_floor_bp.map(|d| d.as_f64()),
+        index_cap_bp: spec.rate_spec.index_cap_bp.map(|d| d.as_f64()),
     };
     let forward_curve_id = spec.rate_spec.forward_curve_id.as_str();
     let fixing_id = fixing_series_id(forward_curve_id);
@@ -204,21 +201,6 @@ pub(super) fn build_overnight_coupon(
             constraints,
         },
     ))
-}
-
-pub(super) fn decimal_option_to_f64(
-    value: Option<rust_decimal::Decimal>,
-    label: &str,
-) -> Result<Option<f64>> {
-    value
-        .map(|value| {
-            value.to_f64().ok_or_else(|| {
-                Error::Validation(format!(
-                    "bond hazard LSMC {label} cannot be represented as f64"
-                ))
-            })
-        })
-        .transpose()
 }
 
 pub(super) fn fallback_index_rate(fallback: &FloatingRateFallback, error: Error) -> Result<f64> {

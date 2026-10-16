@@ -129,7 +129,7 @@ impl CompiledCashFlowPlan {
             && self.principal_exchange == PrincipalExchange::InitialAndFinal
             && state.outstanding > Decimal::ZERO
         {
-            let outstanding_f64 = finstack_quant_core::decimal::decimal_to_f64(state.outstanding)?;
+            let outstanding_f64 = state.outstanding.as_f64();
             state.flows.push(
                 CashFlow::new(
                     self.redemption_date,

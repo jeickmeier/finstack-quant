@@ -1,5 +1,4 @@
 //! Contractual exercise cashflows shared by European and Bermudan HW trees.
-use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::{FixedLegSpec, FloatLegSpec, OptionType};
 use crate::instruments::rates::swaption::CashSettlementMethod;
 use crate::instruments::SettlementType;
@@ -74,7 +73,7 @@ impl HwSwaptionCashflows {
             adjust_accrual_dates: false,
             roll_rule: RollRule::None,
         };
-        let spread = decimal_to_f64(float.spread_bp, "Hull-White floating spread_bp")? / 10_000.0;
+        let spread = float.spread_bp.as_f64() / 10_000.0;
         let float = build_periods(float_params)?
             .iter()
             .filter(|p| p.accrual_end > exercise && p.payment_date > exercise)

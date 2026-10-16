@@ -122,7 +122,7 @@ impl CmsSpreadOptionPricer {
             cms_spread_payoff(
                 long_leg.forward_rate,
                 short_leg.forward_rate,
-                inst.strike_rate()?,
+                inst.strike_rate(),
                 inst.option_type,
             )
         } else {
@@ -237,7 +237,7 @@ impl CmsSpreadOptionPricer {
         let short_stddev = short_leg.atm_volatility * short_leg.time_to_expiry.sqrt();
         let conditional_stddev = short_stddev * (1.0 - rho * rho).sqrt();
 
-        let strike = inst.strike_rate()?;
+        let strike = inst.strike_rate();
         let expected = quadrature.integrate(|z_long| {
             let long_rate = quantile_from_gaussian(long_leg, z_long);
             let short_conditional_mean = short_leg.adjusted_forward_rate
@@ -616,8 +616,7 @@ mod tests {
                         .expect("discount")
                         .df_between_dates(as_of, inst.payment_date)
                         .expect("df");
-                    let expected =
-                        inst.notional.amount() * df * (mean - inst.strike_rate().expect("strike"));
+                    let expected = inst.notional.amount() * df * (mean - inst.strike_rate());
                     assert!(
                         (call.value.amount() - put.value.amount() - expected).abs() < 1.0e-6,
                         "order {order}, correlation {correlation}, strike {strike}"

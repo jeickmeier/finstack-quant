@@ -14,7 +14,6 @@ use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use std::collections::BTreeMap;
 
@@ -82,7 +81,7 @@ pub(crate) fn generate_cashflows(
             if let Some(oid) = &ddtl.oid_policy {
                 match oid {
                     super::spec::OidPolicy::WithheldBp(bp) => {
-                        let pct = bp_to_f64(*bp)? * 1e-4;
+                        let pct = bp.as_f64() * 1e-4;
                         cash_inflow =
                             Money::new(ev.amount.amount() * (1.0 - pct), ev.amount.currency())?;
                     }
@@ -92,7 +91,7 @@ pub(crate) fn generate_cashflows(
                             .checked_sub(Money::new(m.amount() * draw_share, m.currency())?)?;
                     }
                     super::spec::OidPolicy::SeparateBp(bp) => {
-                        let pct = bp_to_f64(*bp)? * 1e-4;
+                        let pct = bp.as_f64() * 1e-4;
                         let fee_amt = Money::new(ev.amount.amount() * pct, ev.amount.currency())?;
                         if fee_amt.amount() > 0.0 {
                             fees.push(FeeSpec::Fixed {
@@ -462,13 +461,6 @@ pub(crate) fn generate_cashflows(
     Ok(schedule)
 }
 
-/// Contractual basis points as `f64` for the fee and OID arithmetic.
-fn bp_to_f64(bp: Decimal) -> finstack_quant_core::Result<f64> {
-    bp.to_f64().ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!("{bp} bp is not representable as f64"))
-    })
-}
-
 fn effective_draw_stop(loan: &TermLoan) -> Option<Date> {
     loan.covenants
         .as_ref()
@@ -540,7 +532,7 @@ fn build_commitment_fee_flows(
         last
     };
 
-    let fee_rate = bp_to_f64(ddtl.commitment_fee_bp)? * 1e-4;
+    let fee_rate = ddtl.commitment_fee_bp.as_f64() * 1e-4;
     let mut by_payment_date = std::collections::BTreeMap::<Date, f64>::new();
     let mut prev = dates[0];
     for &d in dates.iter().skip(1) {

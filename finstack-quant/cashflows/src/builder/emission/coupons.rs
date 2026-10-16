@@ -25,8 +25,8 @@ use crate::builder::{
 };
 
 use super::super::compiler::{FixedSchedule, FloatSchedule};
+use super::f64_to_decimal;
 use super::helpers::{add_pik_flow_if_nonzero, compute_reset_date};
-use super::{decimal_to_f64, f64_to_decimal};
 
 /// Append pre-computed inflation-linked coupon cashflows.
 ///
@@ -311,16 +311,16 @@ pub(crate) fn emit_fixed_coupons_on(
                             "fixed coupon amount exceeds Decimal range".into(),
                         )
                     })?;
-                let coupon_total = decimal_to_f64(coupon_total_dec)?;
+                let coupon_total = coupon_total_dec.as_f64();
 
                 let (cash_fraction, pik_fraction) = spec.coupon_type.split_parts()?;
-                let cash_fraction_f64 = decimal_to_f64(cash_fraction)?;
-                let pik_fraction_f64 = decimal_to_f64(pik_fraction)?;
+                let cash_fraction_f64 = cash_fraction.as_f64();
+                let pik_fraction_f64 = pik_fraction.as_f64();
 
                 let cash_amt = coupon_total * cash_fraction_f64;
                 let pik_amt = coupon_total * pik_fraction_f64;
 
-                let rate_f64 = decimal_to_f64(spec.rate)?;
+                let rate_f64 = spec.rate.as_f64();
                 let accrual = CashFlowAccrual {
                     coupon_period,
                     end_is_termination_date: is_termination_date,
@@ -761,7 +761,7 @@ pub(crate) fn emit_float_coupons_on(
                 }
             };
             let (cash_fraction, pik_fraction) = spec.coupon_type.split_parts()?;
-            let cash_fraction = decimal_to_f64(cash_fraction)?;
+            let cash_fraction = cash_fraction.as_f64();
             let compiled = CompiledFloatingCoupon::compile(
                 FloatingCouponPeriod {
                     accrual_start: period.accrual_start,
@@ -782,7 +782,7 @@ pub(crate) fn emit_float_coupons_on(
                 },
                 FloatingCouponEconomics {
                     cash_fraction,
-                    pik_fraction: decimal_to_f64(pik_fraction)?,
+                    pik_fraction: pik_fraction.as_f64(),
                     rate_params: settlement_params,
                 },
                 observation,
@@ -792,7 +792,7 @@ pub(crate) fn emit_float_coupons_on(
                 .zip(indices)
                 .map(|(segment, (index_rate, projected_index_rate))| {
                     compiled.settle_index_rate_for_accrual(
-                        decimal_to_f64(segment.notional)?,
+                        segment.notional.as_f64(),
                         index_rate,
                         projected_index_rate,
                         segment.year_fraction,

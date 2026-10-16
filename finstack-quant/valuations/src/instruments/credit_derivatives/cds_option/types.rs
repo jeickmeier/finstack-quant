@@ -713,7 +713,7 @@ impl crate::instruments::common_impl::traits::Instrument for CdsOption {
         deps.add_volatility_dependency(VolatilityDependency::new(
             self.vol_surface_id.clone(),
             None,
-            Some(self.strike.native_surface_coordinate()?),
+            Some(self.strike.native_surface_coordinate()),
         ));
         Ok(deps)
     }
