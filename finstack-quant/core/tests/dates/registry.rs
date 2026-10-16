@@ -2,7 +2,8 @@
 
 use finstack_quant_core::dates::calendar::{GBLO, NYSE, TARGET2};
 use finstack_quant_core::dates::{
-    available_calendars, calendar_by_id, calendars_by_ids, CompositeCalendar, Date, HolidayCalendar,
+    available_calendars, calendar_by_id, calendar_by_id_strict, CompositeCalendar, Date,
+    HolidayCalendar,
 };
 use finstack_quant_core::types::CalendarId;
 use time::Month;
@@ -44,7 +45,10 @@ fn strict_many_resolution_preserves_order_and_builds_composite() {
         CalendarId::from(TARGET2.id),
         CalendarId::from(NYSE.id),
     ];
-    let calendars = calendars_by_ids(&ids).expect("known calendars resolve");
+    let calendars: Vec<&dyn HolidayCalendar> = ids
+        .iter()
+        .map(|id| calendar_by_id_strict(id.as_str()).expect("known calendars resolve"))
+        .collect();
     assert_eq!(calendars.len(), 3);
     assert_eq!(calendars[0].metadata().expect("metadata").id, "gblo");
     assert_eq!(calendars[1].metadata().expect("metadata").id, "target2");
@@ -62,7 +66,10 @@ fn strict_many_resolution_rejects_unknown_ids() {
         CalendarId::from("unknown_calendar"),
         CalendarId::from(GBLO.id),
     ];
-    let error = calendars_by_ids(&ids)
+    let error = ids
+        .iter()
+        .map(|id| calendar_by_id_strict(id.as_str()))
+        .collect::<Result<Vec<_>, _>>()
         .err()
         .expect("unknown calendar must fail the whole resolution");
     assert!(error.to_string().contains("unknown_calendar"));

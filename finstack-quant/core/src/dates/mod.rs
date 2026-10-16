@@ -51,19 +51,6 @@
 /// and credit derivative markets.
 pub const CALENDAR_DAYS_PER_YEAR: f64 = 365.0;
 
-/// Average calendar days per year including leap-year adjustment (365.25).
-///
-/// Used in models that need an average year length over long horizons where
-/// leap years materially affect the calculation (e.g., multi-year structured
-/// credit cashflow projections, amortisation schedules).
-///
-/// # Convention
-///
-/// ACT/365.25 — divides by 365.25, the mean Gregorian calendar year length.
-/// This is less common than [`CALENDAR_DAYS_PER_YEAR`] (ACT/365 Fixed) and
-/// should only be used when the model explicitly calls for it.
-pub const AVERAGE_DAYS_PER_YEAR: f64 = 365.25;
-
 pub use time::{Date, Duration, Month, OffsetDateTime, PrimitiveDateTime};
 
 mod date_extensions;
@@ -79,8 +66,8 @@ pub use daycount::{
 
 pub use calendar::business_days::{
     add_joint_business_days, adjust, adjust_joint_calendar, available_calendars,
-    calendar_by_id_strict, calendars_by_ids, canonical_calendar_id, resolve_calendar,
-    BusinessDayConvention, CalendarMetadata, HolidayCalendar, ResolvedCalendarPair,
+    calendar_by_id_strict, canonical_calendar_id, resolve_calendar, BusinessDayConvention,
+    CalendarMetadata, HolidayCalendar, ResolvedCalendarPair,
 };
 pub use calendar::calendars_generated::registry::calendar_by_id;
 pub use calendar::WEEKENDS_ONLY;

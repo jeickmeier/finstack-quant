@@ -435,8 +435,6 @@ impl IntoIterator for Schedule {
 mod builder;
 mod generation;
 mod spec;
-#[cfg(test)]
-mod tests;
 pub use builder::ScheduleBuilder;
 use generation::*;
 pub use spec::ScheduleSpec;

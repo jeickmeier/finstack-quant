@@ -7,8 +7,9 @@
 //!
 //! # Performance
 //!
-//! Allocation-free design using borrowed slice of trait objects. Zero runtime
-//! overhead beyond calling each subcalendar's `is_holiday` method.
+//! Borrowed slice of trait objects: the holiday checks allocate nothing (only
+//! `calendar_id()` builds its joined id) and add no overhead beyond calling
+//! each subcalendar's `is_holiday` method.
 //!
 //! # Examples
 //! ```

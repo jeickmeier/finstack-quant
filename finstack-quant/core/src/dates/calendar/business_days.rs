@@ -631,25 +631,6 @@ fn joint_calendar(id: &str) -> crate::Result<&'static dyn HolidayCalendar> {
     Ok(composite)
 }
 
-/// Resolve typed calendar identifiers strictly and preserve their input order.
-///
-/// # Errors
-///
-/// Returns an error naming the first unknown identifier. Unlike the removed
-/// registry helper, unknown identifiers are never silently dropped.
-///
-/// # Arguments
-///
-/// * `ids` - Typed calendar IDs to resolve in order. Each ID must name a
-///   built-in calendar; the output preserves this input order.
-pub fn calendars_by_ids(
-    ids: &[crate::types::CalendarId],
-) -> crate::Result<Vec<&'static dyn HolidayCalendar>> {
-    ids.iter()
-        .map(|id| calendar_by_id_strict(id.as_str()))
-        .collect()
-}
-
 /// Resolve a calendar ID to a calendar reference.
 ///
 /// # Errors

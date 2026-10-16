@@ -915,6 +915,3 @@ impl Rule {
         }
     }
 }
-
-// Blanket impl for slices of holiday calendars (composite-union semantics)
-// (removed: use CompositeCalendar for composition)

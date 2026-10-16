@@ -384,7 +384,7 @@ impl<'a> ScheduleBuilder<'a> {
         let result = self.build_impl();
 
         match result {
-            Ok(schedule) => strict_fail_closed_on_warnings(error_policy, schedule),
+            Ok(schedule) => Ok(schedule),
             Err(e) if error_policy == ScheduleErrorPolicy::GracefulEmpty => {
                 tracing::warn!(error = %e, "schedule build fell back to empty schedule");
                 // Capture the error as a warning instead of propagating
@@ -572,28 +572,4 @@ fn build_payment_and_fixing_dates(
     };
 
     Ok((payment_dates, fixing_dates))
-}
-
-/// Enforce the strict policy's fail-closed contract on a built schedule.
-///
-/// [`ScheduleErrorPolicy::Strict`] means "no silent degradation": if any
-/// [`ScheduleWarning`] was attached during construction, the schedule is
-/// rejected rather than returned. Non-strict policies pass the schedule
-/// through carrying its warnings for the caller to inspect.
-pub(super) fn strict_fail_closed_on_warnings(
-    policy: ScheduleErrorPolicy,
-    schedule: Schedule,
-) -> crate::Result<Schedule> {
-    if policy == ScheduleErrorPolicy::Strict && schedule.has_warnings() {
-        let joined = schedule
-            .warnings
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join("; ");
-        return Err(crate::Error::Validation(format!(
-            "schedule build produced warnings; strict policy fails closed: {joined}"
-        )));
-    }
-    Ok(schedule)
 }

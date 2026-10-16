@@ -45,27 +45,6 @@ fn validate_coupon_period(start: Date, end: Date) -> crate::Result<()> {
     Ok(())
 }
 
-impl<'a> DayCountContext<'a> {
-    /// Return a copy with validated coupon boundaries for ACT/ACT ICMA or ACT/365L.
-    ///
-    /// # Arguments
-    ///
-    /// * `start` - Inclusive start: the unadjusted regular reference start for
-    ///   ICMA, or the actual contractual coupon start for ACT/365L.
-    /// * `end` - Exclusive end: the unadjusted regular reference end for ICMA,
-    ///   or the actual contractual coupon end for ACT/365L. Must be after
-    ///   `start`; ICMA reference endpoints must share one nominal month grid.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Error::Validation` unless `start < end`.
-    pub fn with_coupon_period(mut self, start: Date, end: Date) -> crate::Result<Self> {
-        validate_coupon_period(start, end)?;
-        self.coupon_period = Some((start, end));
-        Ok(self)
-    }
-}
-
 impl<'a> std::fmt::Debug for DayCountContext<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DayCountContext")

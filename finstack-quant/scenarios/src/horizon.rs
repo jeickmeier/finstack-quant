@@ -65,7 +65,7 @@ use finstack_quant_attribution::{
     ExecutionPolicy,
 };
 use finstack_quant_core::config::FinstackConfig;
-use finstack_quant_core::dates::{calendars_by_ids, Date, HolidayCalendar};
+use finstack_quant_core::dates::{calendar_by_id_strict, Date, HolidayCalendar};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CalendarId;
@@ -240,8 +240,7 @@ impl HorizonAnalysis {
         let Some(id) = self.calendar_id.as_ref() else {
             return Ok(None);
         };
-        let resolved = calendars_by_ids(std::slice::from_ref(id))?;
-        Ok(resolved.into_iter().next())
+        Ok(Some(calendar_by_id_strict(id.as_str())?))
     }
 }
 

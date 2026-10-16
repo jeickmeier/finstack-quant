@@ -5,12 +5,6 @@
 
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
 
-/// Average days per year for structured credit day count calculations (ACT/365.25).
-///
-/// Re-exported from `finstack_quant_core::dates::AVERAGE_DAYS_PER_YEAR`.
-/// Uses 365.25 to account for leap years over multi-year amortisation horizons.
-pub use finstack_quant_core::dates::AVERAGE_DAYS_PER_YEAR;
-
 /// Number of calendar months in one year (12).
 pub const MONTHS_PER_YEAR: i32 = 12;
 
