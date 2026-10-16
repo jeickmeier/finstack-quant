@@ -7,7 +7,7 @@
 #![allow(clippy::wrong_self_convention)]
 
 use crate::dates::calendar::business_days::{
-    seek_business_day, BusinessDayConvention, MAX_BUSINESS_DAY_SEARCH_DAYS,
+    adjustment_failed, seek_business_day, BusinessDayConvention, MAX_BUSINESS_DAY_SEARCH_DAYS,
 };
 use crate::dates::periods::FiscalConfig;
 use time::{Date, Duration, Month};
@@ -292,13 +292,8 @@ impl DateExt for Date {
             } else {
                 BusinessDayConvention::Preceding
             };
-            current = seek_business_day(start, step, MAX_BUSINESS_DAY_SEARCH_DAYS, cal).ok_or({
-                crate::Error::Input(crate::error::InputError::AdjustmentFailed {
-                    date: self,
-                    convention: conv,
-                    max_days: MAX_BUSINESS_DAY_SEARCH_DAYS,
-                })
-            })?;
+            current = seek_business_day(start, step, MAX_BUSINESS_DAY_SEARCH_DAYS, cal)
+                .ok_or_else(|| adjustment_failed(self, conv))?;
         }
         Ok(current)
     }
