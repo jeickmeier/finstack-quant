@@ -73,6 +73,9 @@ impl TryFrom<ScheduleSpecWire> for ScheduleSpec {
     type Error = String;
 
     fn try_from(wire: ScheduleSpecWire) -> Result<Self, Self::Error> {
+        if wire.start > wire.end {
+            return Err("schedule start must be on or before end".to_string());
+        }
         if wire.imm_mode && wire.cds_imm_mode {
             return Err("standard IMM and CDS IMM modes are mutually exclusive".to_string());
         }

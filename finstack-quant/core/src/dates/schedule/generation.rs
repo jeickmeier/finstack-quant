@@ -195,35 +195,21 @@ impl BuilderInternal {
     // contractual and are emitted verbatim (QuantLib-style); snapping them
     // (the previous behavior) silently moved the effective date and maturity.
 
+    /// Forward roll grid from `start` that must land exactly on `end`.
+    ///
+    /// Alignment is against the actual roll grid, including EOM; a
+    /// contractual maturity between grid points needs an explicit stub.
     pub(super) fn gen_regular(self) -> crate::Result<Vec<Date>> {
-        let mut buf: Buffer = Buffer::new();
-        buf.push(self.start);
-        let mut i = 1;
-        loop {
-            // Alignment is against the actual roll grid, including EOM.
-            // A contractual maturity between grid points needs an explicit stub.
-            let Some(raw) = self.nth_tenor(self.start, i)? else {
-                return Err(crate::error::InputError::NonIntegerScheduleTenor.into());
-            };
-            let snapped = maybe_eom(self.eom, raw);
-            if snapped == self.end {
-                push_if_new(&mut buf, self.end);
-                check_anchor_count(buf.len())?;
-                break;
-            }
-            if snapped > self.end {
-                return Err(crate::error::InputError::NonIntegerScheduleTenor.into());
-            }
-            if snapped < self.end {
-                push_if_new(&mut buf, snapped);
-                check_anchor_count(buf.len())?;
-            }
-            i = next_roll_index(i)?;
-        }
-        Ok(buf.into_vec())
+        self.gen_forward(true)
     }
 
     pub(super) fn gen_short_back(self) -> crate::Result<Vec<Date>> {
+        self.gen_forward(false)
+    }
+
+    /// Forward roll grid from `start`, closed by `end`; with `aligned`, a
+    /// grid that overshoots or runs out before `end` is an error.
+    fn gen_forward(self, aligned: bool) -> crate::Result<Vec<Date>> {
         let mut buf: Buffer = Buffer::new();
         buf.push(self.start);
         let mut i = 1;
@@ -233,7 +219,10 @@ impl BuilderInternal {
                 .map(|raw| maybe_eom(self.eom, raw))
             {
                 Some(dt) if dt < self.end => dt,
-                _ => {
+                last => {
+                    if aligned && last != Some(self.end) {
+                        return Err(crate::error::InputError::NonIntegerScheduleTenor.into());
+                    }
                     push_if_new(&mut buf, self.end);
                     check_anchor_count(buf.len())?;
                     break;
@@ -300,9 +289,8 @@ impl BuilderInternal {
         }
         let mut buf: Buffer = Buffer::new();
         buf.push(self.start);
-        for (idx, &a) in anchors.iter().enumerate().rev() {
-            // anchors[0] is the user-provided end date: never snap it.
-            let dt = if idx == 0 { a } else { maybe_eom(self.eom, a) };
+        // anchors[0] is the user-provided end date; the rest are already snapped.
+        for (idx, &dt) in anchors.iter().enumerate().rev() {
             if dt > self.start && (idx == 0 || dt < self.end) {
                 push_if_new(&mut buf, dt);
             }
@@ -338,9 +326,8 @@ impl BuilderInternal {
                 check_anchor_count(buf.len())?;
                 break;
             }
-            let dt = maybe_eom(self.eom, next);
-            if dt < self.end {
-                push_if_new(&mut buf, dt);
+            if next < self.end {
+                push_if_new(&mut buf, next);
                 check_anchor_count(buf.len())?;
             }
             i = next_roll_index(i)?;
