@@ -31,11 +31,16 @@ impl HazardCurve {
         Ok(curve)
     }
 
-    /// Create a builder with this curve's parameters, using a new ID.
+    /// Create a builder with this curve's parameters, including its par
+    /// spreads and calibration provenance, using a new ID.
+    ///
+    /// Bumps and rolls deliberately do not carry the provenance: a shocked
+    /// or rolled curve no longer reproduces from the stored recipe.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> HazardCurveBuilder {
         self.metadata_builder(new_id)
             .knots(self.knot_points())
             .par_spreads(self.par_spread_points())
+            .hazard_calibration_opt(self.hazard_calibration.clone())
     }
 
     /// Builder pre-populated with this curve's full metadata but **no** knots

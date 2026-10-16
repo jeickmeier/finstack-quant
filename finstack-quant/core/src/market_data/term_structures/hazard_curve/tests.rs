@@ -50,7 +50,7 @@ fn hazard_recipe_invalidation_covers_synthetic_transformations() {
         .to_builder_with_id("REBUILT")
         .build()
         .expect("generic rebuild");
-    assert!(rebuilt.hazard_calibration().is_none());
+    assert_eq!(rebuilt.hazard_calibration(), source.hazard_calibration());
 
     let mut in_place = source;
     in_place
