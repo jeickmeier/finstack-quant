@@ -165,13 +165,13 @@ pub struct LmSolution {
 ///
 /// Lambda values below this threshold are clamped to prevent numerical instability
 /// from overly aggressive Gauss-Newton steps.
-pub const LAMBDA_MIN: f64 = 1e-15;
+const LAMBDA_MIN: f64 = 1e-15;
 
 /// Maximum bound for damping parameter λ.
 ///
 /// Lambda values above this threshold are clamped to prevent the solver from
 /// becoming effectively stuck in pure gradient descent mode.
-pub const LAMBDA_MAX: f64 = 1e15;
+const LAMBDA_MAX: f64 = 1e15;
 
 /// Relative floor applied to the `JᵀJ` diagonal in Marquardt damping.
 ///
@@ -180,7 +180,7 @@ pub const LAMBDA_MAX: f64 = 1e15;
 /// (numerically) zero curvature still receives a small positive damping and
 /// cannot make the damped normal-equations matrix singular or produce an
 /// unbounded step.
-pub const MARQUARDT_DIAG_FLOOR_REL: f64 = 1e-12;
+const MARQUARDT_DIAG_FLOOR_REL: f64 = 1e-12;
 
 /// Levenberg-Marquardt solver for non-linear least squares.
 ///
@@ -202,7 +202,7 @@ pub const MARQUARDT_DIAG_FLOOR_REL: f64 = 1e-12;
 /// ```
 ///
 /// The damping uses Marquardt's diagonal scaling `λ·diag(JᵀJ)` (with a small
-/// relative floor, see [`MARQUARDT_DIAG_FLOOR_REL`]) rather than the unscaled
+/// relative floor, see `MARQUARDT_DIAG_FLOOR_REL`) rather than the unscaled
 /// Levenberg `+λI`, so steps are invariant to per-parameter rescaling.
 ///
 /// - **λ → 0**: Gauss-Newton (fast near solution)
@@ -210,7 +210,7 @@ pub const MARQUARDT_DIAG_FLOOR_REL: f64 = 1e-12;
 ///
 /// # Damping Parameter Bounds
 ///
-/// The damping parameter λ is bounded to [`LAMBDA_MIN`] and [`LAMBDA_MAX`] to ensure
+/// The damping parameter λ is bounded to `LAMBDA_MIN` and `LAMBDA_MAX` to ensure
 /// numerical stability. Each time λ is clamped the solver counts it in
 /// [`LmStats::lambda_bound_hits`]; a high count may indicate an ill-conditioned problem.
 ///
@@ -328,7 +328,7 @@ impl LevenbergMarquardtSolver {
     /// Uses Marquardt's diagonal scaling (Marquardt 1963) rather than the
     /// unscaled Levenberg `+λI`, making the step invariant to per-parameter
     /// rescaling. Diagonal entries are floored at
-    /// [`MARQUARDT_DIAG_FLOOR_REL`]` × max_i(JᵀJ_ii)` so zero-curvature
+    /// `MARQUARDT_DIAG_FLOOR_REL`` × max_i(JᵀJ_ii)` so zero-curvature
     /// components cannot stall the factorisation or produce unbounded steps.
     fn solve_normal_equations_into(
         &self,
@@ -408,18 +408,16 @@ impl LevenbergMarquardtSolver {
         Ok(())
     }
 
-    fn solve_lm_core_with_stats<Res, Jac, Check>(
+    fn solve_lm_core_with_stats<Res, Jac>(
         &self,
         mut params: Vec<f64>,
         residuals_func: &Res,
         mut jacobian_func: Jac,
-        convergence_check: Check,
         n_residuals: usize,
     ) -> Result<LmSolution>
     where
         Res: Fn(&[f64], &mut [f64]),
         Jac: FnMut(&[f64], &[f64], &mut usize, &mut [f64]),
-        Check: Fn(&[f64], &[f64], &[f64]) -> Option<LmTerminationReason>,
     {
         if params.is_empty() || n_residuals == 0 {
             return Err(InputError::Invalid.into());
@@ -459,7 +457,7 @@ impl LevenbergMarquardtSolver {
             jacobian_evals += 1;
             jacobian_func(&params, &resid_vec, &mut residual_evals, &mut jacobian);
 
-            if let Some(reason) = convergence_check(&params, &resid_vec, &jacobian[..]) {
+            if let Some(reason) = self.check_residual_norm(&resid_vec) {
                 tracing::debug!(iterations, resid_norm, ?reason, "lm: converged");
                 return Ok(LmSolution {
                     params,
@@ -604,13 +602,7 @@ impl LevenbergMarquardtSolver {
             out.copy_from_slice(&jac_scratch.jacobian);
         };
 
-        self.solve_lm_core_with_stats(
-            initial.to_vec(),
-            &residuals,
-            jacobian_func,
-            |_p, r, _jac| self.check_residual_norm(r),
-            n_residuals,
-        )
+        self.solve_lm_core_with_stats(initial.to_vec(), &residuals, jacobian_func, n_residuals)
     }
 
     /// Solve system with analytical Jacobian and stats.
@@ -660,13 +652,7 @@ impl LevenbergMarquardtSolver {
             out.copy_from_slice(&jac_scratch.jacobian);
         };
 
-        self.solve_lm_core_with_stats(
-            initial.to_vec(),
-            &residuals,
-            jacobian_func,
-            |_p, r, _jac| self.check_residual_norm(r),
-            n_residuals,
-        )
+        self.solve_lm_core_with_stats(initial.to_vec(), &residuals, jacobian_func, n_residuals)
     }
 }
 

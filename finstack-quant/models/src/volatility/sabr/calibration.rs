@@ -356,18 +356,10 @@ fn deterministic_sabr_starts(alpha: f64) -> Vec<[f64; 3]> {
     starts
 }
 
-fn sabr_termination_is_acceptable(
-    reason: &LmTerminationReason,
-    final_residual_norm: f64,
-    residual_tolerance: f64,
-) -> bool {
-    match reason {
-        LmTerminationReason::ConvergedResidualNorm
-        | LmTerminationReason::StepTooSmall
-        | LmTerminationReason::MaxIterations => {
-            final_residual_norm.is_finite() && final_residual_norm <= residual_tolerance
-        }
-    }
+/// A start is acceptable on its final residual alone; the LM termination
+/// reason (converged, step too small, max iterations) does not change that.
+fn sabr_termination_is_acceptable(final_residual_norm: f64, residual_tolerance: f64) -> bool {
+    final_residual_norm.is_finite() && final_residual_norm <= residual_tolerance
 }
 
 #[derive(Default)]
@@ -458,13 +450,7 @@ where
         };
         total_iterations += solution.stats.iterations;
         let score = solution.stats.final_residual_norm;
-        if !score.is_finite()
-            || !sabr_termination_is_acceptable(
-                &solution.stats.termination_reason,
-                score,
-                residual_tolerance,
-            )
-        {
+        if !sabr_termination_is_acceptable(score, residual_tolerance) {
             rejected.record_rejected(&solution);
             continue;
         }
@@ -1123,47 +1109,11 @@ mod acceptance_tests {
     use finstack_quant_core::math::solver_multi::{LmStats, LmTerminationReason};
 
     #[test]
-    fn sabr_step_too_small_requires_residual_tolerance() {
+    fn sabr_acceptance_requires_finite_residual_within_tolerance() {
         let tolerance = 1.0e-4;
-        assert!(!sabr_termination_is_acceptable(
-            &LmTerminationReason::StepTooSmall,
-            1.0e-3,
-            tolerance,
-        ));
-        assert!(sabr_termination_is_acceptable(
-            &LmTerminationReason::StepTooSmall,
-            1.0e-5,
-            tolerance,
-        ));
-    }
-
-    #[test]
-    fn sabr_max_iterations_requires_residual_tolerance_for_both_paths() {
-        let tolerance = 1.0e-4;
-        assert!(!sabr_termination_is_acceptable(
-            &LmTerminationReason::MaxIterations,
-            1.0e-3,
-            tolerance,
-        ));
-        assert!(sabr_termination_is_acceptable(
-            &LmTerminationReason::MaxIterations,
-            1.0e-5,
-            tolerance,
-        ));
-    }
-
-    #[test]
-    fn sabr_genuine_convergence_reasons_remain_acceptable() {
-        assert!(!sabr_termination_is_acceptable(
-            &LmTerminationReason::ConvergedResidualNorm,
-            1.0,
-            1.0e-4,
-        ));
-        assert!(sabr_termination_is_acceptable(
-            &LmTerminationReason::ConvergedResidualNorm,
-            1.0e-6,
-            1.0e-4,
-        ));
+        assert!(!sabr_termination_is_acceptable(1.0e-3, tolerance));
+        assert!(!sabr_termination_is_acceptable(f64::NAN, tolerance));
+        assert!(sabr_termination_is_acceptable(1.0e-5, tolerance));
     }
 
     #[test]

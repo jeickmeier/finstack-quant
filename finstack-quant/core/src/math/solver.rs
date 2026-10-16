@@ -186,9 +186,9 @@ impl BrentSolver {
     ///
     /// The search is bounded by `bracket_min` and `bracket_max` to prevent
     /// overflow and to constrain the search to a reasonable domain.
-    fn find_bracket<Func>(&self, f: &Func, initial_guess: f64) -> Result<[(f64, f64); 2]>
+    fn find_bracket<Func>(&self, f: &mut Func, initial_guess: f64) -> Result<[(f64, f64); 2]>
     where
-        Func: Fn(f64) -> f64,
+        Func: FnMut(f64) -> f64,
     {
         use crate::error::InputError;
 
@@ -339,11 +339,11 @@ impl BrentSolver {
     /// - Maximum iterations are exceeded without convergence
     /// - The function returns non-finite values (NaN, infinity)
     /// - No bracketing interval is found within the bracket bounds
-    pub fn solve<Func>(&self, f: Func, initial_guess: f64) -> Result<f64>
+    pub fn solve<Func>(&self, mut f: Func, initial_guess: f64) -> Result<f64>
     where
-        Func: Fn(f64) -> f64,
+        Func: FnMut(f64) -> f64,
     {
-        let bracket = self.find_bracket(&f, initial_guess)?;
+        let bracket = self.find_bracket(&mut f, initial_guess)?;
         self.brent_method(f, bracket)
     }
 }
