@@ -5,7 +5,7 @@
 //! exact-triangular hot path and the pivoted dense path separately.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_core::math::cholesky_correlation;
+use finstack_quant_core::math::linalg::cholesky_correlation;
 use finstack_quant_core::math::linalg::CorrelationFactor;
 use std::hint::black_box;
 

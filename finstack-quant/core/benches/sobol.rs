@@ -7,7 +7,7 @@
 //! the two is worth optimizing.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_core::math::SobolRng;
+use finstack_quant_core::math::random::SobolRng;
 use std::hint::black_box;
 
 /// Points per iteration for each dimensionality (fixed total work).

@@ -1,10 +1,13 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
 use finstack_quant_core::math::{
-    erf, gauss_legendre_integrate, gauss_legendre_integrate_adaptive,
     gauss_legendre_integrate_composite,
-    integration::{adaptive_simpson, simpson_rule},
-    norm_cdf, GaussHermiteQuadrature,
+    integration::{
+        adaptive_simpson, gauss_legendre_integrate, gauss_legendre_integrate_adaptive, simpson_rule,
+    },
+    norm_cdf,
+    special_functions::erf,
+    GaussHermiteQuadrature,
 };
 use std::f64::consts::PI;
 

@@ -141,33 +141,22 @@ pub mod summation;
 pub mod time_grid;
 
 pub use compounding::Compounding;
-pub use distributions::{binomial_pmf_all, binomial_pmf_all_into, chi_squared_quantile};
+pub use distributions::{binomial_pmf_all, binomial_pmf_all_into};
 pub use integration::{
-    gauss_legendre_grid, gauss_legendre_integrate, gauss_legendre_integrate_adaptive,
-    gauss_legendre_integrate_composite, GaussHermiteQuadrature,
+    gauss_legendre_grid, gauss_legendre_integrate_composite, GaussHermiteQuadrature,
 };
-pub use interp::{
-    CubicHermiteStrategy, ExtrapolationPolicy, Interpolator, LinearStrategy, LogLinearStrategy,
-    MonotoneConvexStrategy, PiecewiseQuadraticForwardStrategy,
-};
-pub use linalg::{
-    apply_lower_triangular, cholesky_correlation, cholesky_decomposition, symmetric_eigen,
-    validate_correlation_matrix, CholeskyError, CorrelationError, CorrelationFactor,
-};
-pub use probability::{correlation_bounds, joint_probabilities, CorrelatedBernoulli};
-pub use random::{
-    box_muller_transform, Pcg64Rng, RandomNumberGenerator, SobolRng, MAX_SOBOL_DIMENSION,
-};
+pub use interp::{ExtrapolationPolicy, LogLinearStrategy, MonotoneConvexStrategy};
+pub use random::RandomNumberGenerator;
 pub use solver::BrentSolver;
-pub use solver_multi::{AnalyticalDerivatives, LevenbergMarquardtSolver};
+pub use solver_multi::LevenbergMarquardtSolver;
 pub use special_functions::{
-    erf, ln_gamma, log_norm_cdf, norm_cdf, norm_pdf, standard_normal_inv_cdf, student_t_cdf,
+    ln_gamma, log_norm_cdf, norm_cdf, norm_pdf, standard_normal_inv_cdf, student_t_cdf,
     student_t_inv_cdf,
 };
 pub use stats::{
     correlation, covariance, finite_count, finite_max_or_nan, finite_min_or_nan,
-    longest_positive_run, mean, mean_or_nan, mean_var, median_or_nan, population_variance,
-    quantile, sample_std_or_nan, sample_variance_or_nan, variance, OnlineCovariance, OnlineStats,
+    longest_positive_run, mean, mean_or_nan, median_or_nan, quantile, sample_std_or_nan,
+    sample_variance_or_nan, variance,
 };
 pub use summation::{kahan_sum, neumaier_sum, NeumaierAccumulator};
-pub use time_grid::{map_date_to_step, map_exercise_dates_to_steps, TimeGrid, TimeGridError};
+pub use time_grid::{map_date_to_step, map_exercise_dates_to_steps};

@@ -1,9 +1,10 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
+use finstack_quant_core::math::stats::mean_var;
 use finstack_quant_core::math::stats::{
     log_returns, realized_variance, realized_variance_ohlc, RealizedVarMethod,
 };
-use finstack_quant_core::math::{correlation, covariance, mean, mean_var, variance};
+use finstack_quant_core::math::{correlation, covariance, mean, variance};
 
 #[test]
 fn mean_and_variance_basic() {

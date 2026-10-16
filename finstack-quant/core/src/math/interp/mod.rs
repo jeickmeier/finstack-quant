@@ -51,5 +51,4 @@ pub use strategies::{
 };
 pub use traits::InterpolationStrategy;
 pub use types::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
-/// Validate knot ordering and finiteness (internal helper used by curve builders).
-pub use utils::{interp_knots_flat, validate_knots};
+pub use utils::interp_knots_flat;
