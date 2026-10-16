@@ -3,8 +3,7 @@
 use crate::error::{Error, Result};
 use crate::types::{NodeId, NodeSpec, NodeType};
 use finstack_quant_core::contract::{
-    deserialize_json_value, parse_json_value, ContractDescriptor, ContractError, LoadLimits,
-    ValidationReport,
+    ContractDescriptor, ContractError, LoadLimits, ValidationReport,
 };
 use finstack_quant_core::dates::Period;
 use finstack_quant_core::wire::SchemaVersion;
@@ -315,13 +314,7 @@ impl FinancialModelSpec {
         bytes: &[u8],
         limits: &LoadLimits,
     ) -> std::result::Result<(Self, ValidationReport), ContractError> {
-        let value = parse_json_value(bytes, limits)?;
-        let version = match value.get("schema_version") {
-            Some(version) => Some(deserialize_json_value::<u32>(version.clone(), limits)?),
-            None => None,
-        };
-        FINANCIAL_MODEL_CONTRACT.resolve_strict(version, "/schema_version", limits)?;
-        let mut model: Self = deserialize_json_value(value, limits)?;
+        let mut model: Self = FINANCIAL_MODEL_CONTRACT.decode_versioned(bytes, limits)?;
         model
             .validate_semantics()
             .map_err(|error| FINANCIAL_MODEL_CONTRACT.semantic_error(error, limits))?;

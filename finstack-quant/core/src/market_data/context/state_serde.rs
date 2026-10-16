@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::contract::{
-    deserialize_json_value, parse_json_value, ContractDescriptor, ContractError, Diagnostic,
-    LoadLimits, LoadPhase, Severity, ValidationReport,
+    ContractDescriptor, ContractError, Diagnostic, LoadLimits, LoadPhase, Severity,
+    ValidationReport,
 };
 use crate::types::CurveId;
 use crate::wire::SchemaVersion;
@@ -686,27 +686,8 @@ impl MarketContext {
         bytes: &[u8],
         limits: &LoadLimits,
     ) -> Result<(Self, ValidationReport), ContractError> {
-        let value = parse_json_value(bytes, limits)?;
-        let version = match value.get("schema_version") {
-            Some(version) => Some(
-                deserialize_json_value::<u32>(version.clone(), limits).map_err(
-                    |error| match error {
-                        ContractError::Report(mut report) => {
-                            for diagnostic in &mut report.diagnostics {
-                                if diagnostic.pointer.is_none() {
-                                    diagnostic.pointer = Some("/schema_version".to_string());
-                                }
-                            }
-                            ContractError::Report(report)
-                        }
-                        other => other,
-                    },
-                )?,
-            ),
-            None => None,
-        };
-        MARKET_CONTEXT_STATE_CONTRACT.resolve_strict(version, "/schema_version", limits)?;
-        let state: MarketContextState = deserialize_json_value(value, limits)?;
+        let state: MarketContextState =
+            MARKET_CONTEXT_STATE_CONTRACT.decode_versioned(bytes, limits)?;
         restore_market_context(state, limits)
     }
 }

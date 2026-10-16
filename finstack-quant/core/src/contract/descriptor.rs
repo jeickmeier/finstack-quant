@@ -181,6 +181,54 @@ impl ContractDescriptor {
         deserialize_json_value(value, limits)
     }
 
+    /// Decode a persisted document whose root `schema_version` key carries
+    /// this contract's numeric version.
+    ///
+    /// The bytes are parsed under `limits`, the root `/schema_version`
+    /// integer is checked with [`Self::resolve_strict`], and the whole
+    /// document is then deserialized into `T`. Domain validation of `T` is
+    /// left to the caller; report its failure with [`Self::semantic_error`].
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - Complete UTF-8 JSON document carrying a root
+    ///   `schema_version` integer.
+    /// * `limits` - Resource policy bounding input size, JSON depth, and
+    ///   retained diagnostics.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContractError::LimitExceeded`] for byte or depth overflows,
+    /// and [`ContractError::Report`] for malformed JSON, a non-integer version
+    /// (pointed at `/schema_version`), a missing or unsupported version, or a
+    /// document that does not match `T`.
+    pub fn decode_versioned<T>(&self, bytes: &[u8], limits: &LoadLimits) -> Result<T, ContractError>
+    where
+        T: DeserializeOwned,
+    {
+        let value = parse_json_value(bytes, limits)?;
+        let version = match value.get("schema_version") {
+            Some(version) => Some(
+                deserialize_json_value::<u32>(version.clone(), limits).map_err(
+                    |error| match error {
+                        ContractError::Report(mut report) => {
+                            for diagnostic in &mut report.diagnostics {
+                                if diagnostic.pointer.is_none() {
+                                    diagnostic.pointer = Some("/schema_version".to_string());
+                                }
+                            }
+                            ContractError::Report(report)
+                        }
+                        other => other,
+                    },
+                )?,
+            ),
+            None => None,
+        };
+        self.resolve_strict(version, "/schema_version", limits)?;
+        deserialize_json_value(value, limits)
+    }
+
     /// Report a failed domain validation of a decoded artifact.
     ///
     /// # Arguments
