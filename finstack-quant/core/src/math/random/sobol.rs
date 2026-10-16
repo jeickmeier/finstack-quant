@@ -107,8 +107,8 @@ pub struct SobolRng {
     index: u64,
     /// Dimension
     dimension: usize,
-    /// Base scrambling seed for each dimension
-    scramble_seeds: Vec<u32>,
+    /// Whether Owen scrambling is applied (a zero `scramble_seed` disables it).
+    scrambled: bool,
     /// Scramble matrices for proper Owen scrambling (32 values per dimension)
     /// Each row contains hash seeds for recursive bit permutation
     scramble_matrices: Vec<[u32; 32]>,
@@ -146,22 +146,15 @@ impl SobolRng {
         let direction_numbers = initialize_direction_numbers(dimension);
 
         // Generate scrambling seeds and matrices for proper Owen scrambling
-        let mut scramble_seeds = Vec::with_capacity(dimension);
         let mut scramble_matrices = Vec::with_capacity(dimension);
 
         for i in 0..dimension {
-            let base_seed = if scramble_seed == 0 {
-                0
-            } else {
-                // Create dimension-specific seed using a mixing function
-                hash_combine(scramble_seed, i as u64)
-            };
-            scramble_seeds.push(base_seed);
-
             // Initialize scramble matrix for this dimension
             // Each row provides hash seeds for the recursive bit scrambling
             let mut matrix = [0u32; 32];
             if scramble_seed != 0 {
+                // Create dimension-specific seed using a mixing function
+                let base_seed = hash_combine(scramble_seed, i as u64);
                 for (bit, entry) in matrix.iter_mut().enumerate() {
                     // Generate deterministic but uncorrelated seeds for each bit level
                     *entry = hash_combine(base_seed as u64, bit as u64);
@@ -173,7 +166,7 @@ impl SobolRng {
         Ok(Self {
             index: 0,
             dimension,
-            scramble_seeds,
+            scrambled: scramble_seed != 0,
             scramble_matrices,
             direction_numbers,
             // At index 0 every dimension's value is 0.
@@ -295,7 +288,7 @@ impl SobolRng {
 
     /// Apply Owen scrambling and return the scrambled integer in [0, 2^32).
     fn owen_scramble_int(&self, value: u32, d: usize) -> u32 {
-        if self.scramble_seeds[d] == 0 {
+        if !self.scrambled {
             return value;
         }
 
@@ -407,24 +400,15 @@ impl SobolRng {
     ///
     /// * `out` - Caller-owned output buffer populated without allocating a replacement.
     pub fn fill_std_normals(&mut self, out: &mut [f64]) {
-        // Pre-fill with raw u32 Sobol integers (we need integer k before
-        // converting to uniform) — but fill_u01 already converts. Instead
-        // we re-implement a grid-centred mapping inline.
         debug_assert!(
             out.len().is_multiple_of(self.dimension),
             "fill_std_normals: buffer length {} is not a multiple of dimension {}",
             out.len(),
             self.dimension
         );
-        // Scale factor: 1 / 2^32
-        const INV_2_32: f64 = 1.0 / 4_294_967_296.0_f64;
         for chunk in out.chunks_mut(self.dimension) {
             for (d, slot) in chunk.iter_mut().enumerate().take(self.dimension) {
-                let raw = self.state[d];
-                let scrambled = self.owen_scramble_int(raw, d);
-                // Map integer k in [0, 2^32) to (k + 0.5) / 2^32 in (0, 1)
-                let u = (scrambled as f64 + 0.5) * INV_2_32;
-                *slot = inverse_normal_cdf(u);
+                *slot = inverse_normal_cdf(self.owen_scramble(self.state[d], d));
             }
             self.advance();
         }

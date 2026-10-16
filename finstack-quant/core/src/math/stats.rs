@@ -75,11 +75,7 @@ pub fn variance(xs: &[f64]) -> f64 {
     if xs.len() < 2 {
         return 0.0;
     }
-    let mut s = OnlineStats::new();
-    for &x in xs {
-        s.update(x);
-    }
-    s.variance()
+    online_stats(xs).variance()
 }
 
 /// Population variance (n denominator) using a single-pass Welford algorithm.
@@ -96,11 +92,7 @@ pub fn population_variance(xs: &[f64]) -> f64 {
     if xs.is_empty() {
         return 0.0;
     }
-    let mut s = OnlineStats::new();
-    for &x in xs {
-        s.update(x);
-    }
-    s.population_variance()
+    online_stats(xs).population_variance()
 }
 
 /// Return (mean, variance) pair in a single Welford pass.
@@ -113,11 +105,26 @@ pub fn mean_var(xs: &[f64]) -> (f64, f64) {
     if xs.is_empty() {
         return (0.0, 0.0);
     }
+    let s = online_stats(xs);
+    (s.mean(), s.variance())
+}
+
+/// Welford fold of `xs`.
+fn online_stats(xs: &[f64]) -> OnlineStats {
     let mut s = OnlineStats::new();
     for &x in xs {
         s.update(x);
     }
-    (s.mean(), s.variance())
+    s
+}
+
+/// Welford fold of the pairs `(x[i], y[i])`; the slices must have equal length.
+fn online_covariance(x: &[f64], y: &[f64]) -> OnlineCovariance {
+    let mut oc = OnlineCovariance::new();
+    for (&a, &b) in x.iter().zip(y) {
+        oc.update(a, b);
+    }
+    oc
 }
 
 /// Arithmetic mean, returning [`f64::NAN`] for empty input.
@@ -213,23 +220,6 @@ pub fn finite_count(xs: &[f64]) -> usize {
     xs.iter().copied().filter(|x| x.is_finite()).count()
 }
 
-/// Count maximum consecutive runs where `predicate` holds.
-fn count_consecutive<F: Fn(f64) -> bool>(values: &[f64], predicate: F) -> usize {
-    let mut max_streak = 0usize;
-    let mut current = 0usize;
-    for &v in values {
-        if predicate(v) {
-            current += 1;
-            if current > max_streak {
-                max_streak = current;
-            }
-        } else {
-            current = 0;
-        }
-    }
-    max_streak
-}
-
 /// Count the longest unbroken run of strictly positive values.
 ///
 /// Canonical definition of a "winning streak" shared across Rust and host
@@ -256,7 +246,17 @@ fn count_consecutive<F: Fn(f64) -> bool>(values: &[f64], predicate: F) -> usize 
 /// assert_eq!(longest_positive_run(&[]), 0);
 /// ```
 pub fn longest_positive_run(values: &[f64]) -> usize {
-    count_consecutive(values, |v| v > 0.0)
+    let mut max_streak = 0usize;
+    let mut current = 0usize;
+    for &v in values {
+        if v > 0.0 {
+            current += 1;
+            max_streak = max_streak.max(current);
+        } else {
+            current = 0;
+        }
+    }
+    max_streak
 }
 
 /// Sample covariance (unbiased, n-1 denominator) between two equal-length slices.
@@ -279,11 +279,7 @@ pub fn covariance(x: &[f64], y: &[f64]) -> f64 {
     if x.len() < 2 {
         return 0.0;
     }
-    let mut oc = OnlineCovariance::new();
-    for i in 0..x.len() {
-        oc.update(x[i], y[i]);
-    }
-    oc.covariance()
+    online_covariance(x, y).covariance()
 }
 
 /// Pearson correlation in a single Welford pass via `OnlineCovariance`.
@@ -299,15 +295,10 @@ pub fn correlation(x: &[f64], y: &[f64]) -> f64 {
     if x.len() != y.len() {
         return f64::NAN;
     }
-    let n = x.len();
-    if n < 2 {
+    if x.len() < 2 {
         return 0.0;
     }
-    let mut oc = OnlineCovariance::new();
-    for i in 0..n {
-        oc.update(x[i], y[i]);
-    }
-    oc.correlation()
+    online_covariance(x, y).correlation()
 }
 
 /// Methods for calculating realized variance from price series.
@@ -749,26 +740,8 @@ pub fn realized_variance_ohlc(
             let m = n - 1;
             let k = YANG_ZHANG_K_NUMERATOR
                 / (YANG_ZHANG_K_DENOMINATOR_BASE + (m + 1) as f64 / (m - 1) as f64);
-            let mean_overnight =
-                overnight_returns.iter().sum::<f64>() / overnight_returns.len() as f64;
-            let mean_open_close =
-                open_close_returns.iter().sum::<f64>() / open_close_returns.len() as f64;
-            let var_overnight = overnight_returns
-                .iter()
-                .map(|r| {
-                    let d = r - mean_overnight;
-                    d * d
-                })
-                .sum::<f64>()
-                / (overnight_returns.len() - 1) as f64;
-            let var_open_close = open_close_returns
-                .iter()
-                .map(|r| {
-                    let d = r - mean_open_close;
-                    d * d
-                })
-                .sum::<f64>()
-                / (open_close_returns.len() - 1) as f64;
+            let var_overnight = two_pass_sample_variance(&overnight_returns);
+            let var_open_close = two_pass_sample_variance(&open_close_returns);
             // RS component averages over the same m = n−1 periods that
             // contribute overnight and open-close returns (Yang & Zhang 2000,
             // Eq. (4)); dividing by the bar count n would bias it down by
@@ -784,6 +757,20 @@ pub fn realized_variance_ohlc(
         )));
     }
     Ok(result.max(0.0))
+}
+
+/// Two-pass sample variance with plain summation, as in Yang & Zhang (2000).
+///
+/// `xs` must hold at least two values.
+fn two_pass_sample_variance(xs: &[f64]) -> f64 {
+    let mean = xs.iter().sum::<f64>() / xs.len() as f64;
+    xs.iter()
+        .map(|r| {
+            let d = r - mean;
+            d * d
+        })
+        .sum::<f64>()
+        / (xs.len() - 1) as f64
 }
 
 /// Online statistics accumulator using Welford's algorithm.
@@ -1683,42 +1670,37 @@ mod tests {
 
     #[test]
     fn consecutive_empty_input() {
-        assert_eq!(super::count_consecutive(&[], |v| v > 0.0), 0);
+        assert_eq!(super::longest_positive_run(&[]), 0);
     }
 
     #[test]
     fn consecutive_all_positive() {
         let data = [0.01, 0.02, 0.03];
-        assert_eq!(super::count_consecutive(&data, |v| v > 0.0), 3);
+        assert_eq!(super::longest_positive_run(&data), 3);
     }
 
     #[test]
     fn consecutive_streak_at_end() {
         let data = [-0.01, 0.02, 0.03, 0.04];
-        assert_eq!(super::count_consecutive(&data, |v| v > 0.0), 3);
+        assert_eq!(super::longest_positive_run(&data), 3);
     }
 
     #[test]
     fn consecutive_no_match() {
         let data = [-0.01, -0.02, -0.03];
-        assert_eq!(super::count_consecutive(&data, |v| v > 0.0), 0);
+        assert_eq!(super::longest_positive_run(&data), 0);
     }
 
     #[test]
     fn consecutive_alternating() {
         let data = [0.01, -0.01, 0.01, -0.01];
-        assert_eq!(super::count_consecutive(&data, |v| v > 0.0), 1);
+        assert_eq!(super::longest_positive_run(&data), 1);
     }
 
     #[test]
-    fn longest_positive_run_matches_generic_predicate() {
+    fn longest_positive_run_picks_the_longest_streak() {
         let data = [-0.01, 0.02, 0.03, 0.04, -0.02, 0.05];
         assert_eq!(super::longest_positive_run(&data), 3);
-        assert_eq!(
-            super::longest_positive_run(&data),
-            super::count_consecutive(&data, |v| v > 0.0)
-        );
-        assert_eq!(super::longest_positive_run(&[]), 0);
         assert_eq!(super::longest_positive_run(&[-0.1, -0.2]), 0);
     }
 }
