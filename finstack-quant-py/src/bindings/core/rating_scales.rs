@@ -19,7 +19,7 @@ use pyo3::types::{PyIterator, PyList, PyModule, PyType};
 ///
 /// Enum-style class: ``ERROR`` rejects unknown names, ``FALLBACK_TO_DEFAULT``
 /// resolves them to the registry's default scale, and ``WARN_AND_FALLBACK``
-/// does the same while leaving warning emission to the caller.
+/// does the same and logs a warning.
 ///
 /// Examples
 /// --------
@@ -59,7 +59,7 @@ impl PyUnknownScalePolicy {
     const FALLBACK_TO_DEFAULT: PyUnknownScalePolicy = PyUnknownScalePolicy {
         inner: UnknownScalePolicy::FallbackToDefault,
     };
-    /// Fall back to the default scale and let callers emit a warning.
+    /// Fall back to the default scale and log a warning.
     #[classattr]
     const WARN_AND_FALLBACK: PyUnknownScalePolicy = PyUnknownScalePolicy {
         inner: UnknownScalePolicy::WarnAndFallback,

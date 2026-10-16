@@ -220,7 +220,8 @@ pub enum UnknownScalePolicy {
     Error,
     /// Use the configured default scale for unknown scale names.
     FallbackToDefault,
-    /// Use the configured default scale for unknown scale names and let callers warn.
+    /// Use the configured default scale for unknown scale names and emit a
+    /// `tracing` warning naming the unknown scale.
     WarnAndFallback,
 }
 
@@ -229,8 +230,8 @@ impl UnknownScalePolicy {
     ///
     /// The policy governs [`RatingScaleRegistry::rating_scale`]: `Error`
     /// rejects an unknown name, while the two fallback variants return the
-    /// registry's configured default scale. `WarnAndFallback` leaves emission
-    /// of a warning to the caller that owns logging policy.
+    /// registry's configured default scale, `WarnAndFallback` with a `tracing`
+    /// warning.
     ///
     /// # Errors
     ///
@@ -326,7 +327,13 @@ impl RatingScaleRegistry {
             Some(id) => id,
             None => match self.scorecard_policy.unknown_scale_policy {
                 UnknownScalePolicy::Error => return Err(not_found(name)),
-                UnknownScalePolicy::FallbackToDefault | UnknownScalePolicy::WarnAndFallback => {
+                UnknownScalePolicy::FallbackToDefault => self.default_scale_id(),
+                UnknownScalePolicy::WarnAndFallback => {
+                    tracing::warn!(
+                        scale = name,
+                        default_scale = self.default_scale_id(),
+                        "unknown scorecard rating scale; falling back to the default scale"
+                    );
                     self.default_scale_id()
                 }
             },
