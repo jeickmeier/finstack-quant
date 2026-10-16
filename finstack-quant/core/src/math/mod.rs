@@ -31,7 +31,8 @@
 //! ## Basic statistics
 //!
 //! ```rust
-//! use finstack_quant_core::math::{mean, variance, population_variance};
+//! use finstack_quant_core::math::stats::population_variance;
+//! use finstack_quant_core::math::{mean, variance};
 //!
 //! let data = [1.0, 2.0, 3.0, 4.0];
 //! assert_eq!(mean(&data), 2.5);

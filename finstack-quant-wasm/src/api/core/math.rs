@@ -235,10 +235,9 @@ fn realized_var_method(
 /// @returns R-7 interpolated quantile, or NaN when `data` is empty or non-finite.
 #[wasm_bindgen(js_name = quantile)]
 pub fn quantile(data: JsValue, q: JsValue) -> Result<f64, JsValue> {
-    let data: &[f64] = &js_f64_seq(&data, "data")?;
+    let mut data = js_f64_seq(&data, "data")?;
     let q = js_f64(&q, "q")?;
-    let mut v = data.to_vec();
-    Ok(stats::quantile(&mut v, q))
+    Ok(stats::quantile(&mut data, q))
 }
 
 /// Standard normal CDF Φ(x).
@@ -466,7 +465,8 @@ pub fn sample_std_or_nan(data: JsValue) -> Result<f64, JsValue> {
 ///
 /// * `data` - Observations whose median is required; the input is not modified.
 ///
-/// @returns The median, or `NaN` for an empty series.
+/// @returns The median, or `NaN` for an empty series or when any observation is
+/// non-finite.
 /// @throws `TypeError` if `data` is not an array of numbers.
 #[wasm_bindgen(js_name = medianOrNan)]
 pub fn median_or_nan(data: JsValue) -> Result<f64, JsValue> {

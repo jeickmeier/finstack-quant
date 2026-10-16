@@ -3,7 +3,7 @@
 //! Tests performance of:
 //! - Curve-based NPV with Money-typed cashflows (single and batch)
 //! - Scalar NPV with flat discount rates
-//! - Discountable trait dispatch
+//! - `Discounting` trait dispatch
 //! - Neumaier compensated summation at scale
 
 #[path = "support/bench_utils.rs"]

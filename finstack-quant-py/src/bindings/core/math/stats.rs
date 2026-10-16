@@ -136,7 +136,8 @@ fn sample_std_or_nan(py: Python<'_>, data: &Bound<'_, PyAny>) -> PyResult<f64> {
     Ok(py.detach(|| stats::sample_std_or_nan(&data)))
 }
 
-/// Median (mean of the two middle values for even counts), or ``nan`` for empty input.
+/// Median (mean of the two middle values for even counts), or ``nan`` for empty input
+/// or when any observation is non-finite.
 ///
 /// # Arguments
 ///

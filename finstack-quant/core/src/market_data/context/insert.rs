@@ -207,8 +207,8 @@ impl MarketContext {
     ///
     /// # Errors
     ///
-    /// Returns an error if the aggregate's constituent, recovery, or issuer
-    /// invariants are invalid, or a referenced curve is absent or has the wrong type.
+    /// Returns an error if a referenced curve is absent or has the wrong type
+    /// (the aggregate's own invariants were checked by its builder).
     ///
     /// # Examples
     /// ```rust
@@ -457,9 +457,8 @@ impl MarketContext {
     ///
     /// # Errors
     ///
-    /// Returns an error when constituent count, recovery, or issuer coverage
-    /// violates the builder's invariants, or a required curve is absent or has
-    /// the wrong type.
+    /// Returns an error when a required curve is absent or has the wrong type;
+    /// the aggregate's own invariants were checked by its builder.
     pub fn insert_credit_index_mut(
         &mut self,
         id: impl AsRef<str>,

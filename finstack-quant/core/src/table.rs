@@ -313,29 +313,6 @@ impl TableColumnRole {
     }
 }
 
-impl std::fmt::Display for TableColumnRole {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl std::str::FromStr for TableColumnRole {
-    type Err = crate::Error;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "dimension" => Ok(Self::Dimension),
-            "index" => Ok(Self::Index),
-            "measure" => Ok(Self::Measure),
-            "attribute" => Ok(Self::Attribute),
-            other => Err(crate::Error::Validation(format!(
-                "unknown column role '{other}' \
-                 (expected dimension|index|measure|attribute)"
-            ))),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -434,11 +411,6 @@ mod tests {
         ] {
             let json = serde_json::to_string(&role).expect("serializes");
             assert_eq!(json, format!("\"{}\"", role.as_str()));
-            assert_eq!(
-                role.as_str().parse::<TableColumnRole>().expect("parses"),
-                role
-            );
         }
-        assert!("bogus".parse::<TableColumnRole>().is_err());
     }
 }

@@ -26,7 +26,7 @@ Targets are registered in `Cargo.toml`. Each is `harness = false` (Criterion own
 | `rolling` | `CompiledExpr::eval` for `RollingMean`, `RollingStd`, and `RollingMedian` over a 500-row column with a 10-row window. This exercises the expression engine, not a standalone rolling API. |
 | `solver_operations` | Newton with finite differences vs an analytic derivative; Brent; IRR and XIRR (including day-count variants); `LevenbergMarquardtSolver` on a global-fit problem. |
 | `rate_conversions` | Simple / periodic / continuous compounding conversions, round trips, a fixed 100-rate batch conversion, market-convention scenarios, and negative rates. |
-| `cashflow_operations` | Curve-based `npv` with `Money` flows on flat and shaped curves, scalar `npv_amounts`, `Discountable` trait dispatch, and bond/swap flow profiles. Each group runs one fixed flow count; no group sweeps size. |
+| `cashflow_operations` | Curve-based `npv` with `Money` flows on flat and shaped curves, scalar `npv_amounts`, `Discounting` trait dispatch, and bond/swap flow profiles. Each group runs one fixed flow count; no group sweeps size. |
 | `schedule_generation` | `ScheduleBuilder` across frequencies, stub conventions, tenors, and EOM handling; IMM and CDS-IMM generation; business-day adjustment; schedule iteration. |
 | `expr_eval` | Steady-state `CompiledExpr::eval` cost over a multi-node DAG with many rows — the pooled-arena, node-id-indexed path that statements hits once per period. |
 | `context_bump` | `MarketContext::bump` cost as a function of context size — the finite-difference greeks hot path, using copy-on-write contexts for factor shocks. |

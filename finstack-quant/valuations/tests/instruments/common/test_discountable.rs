@@ -1,4 +1,4 @@
-//! Tests for Discountable trait and NPV calculations.
+//! Tests for the `Discounting` trait and NPV calculations.
 
 use finstack_quant_cashflows::builder::{
     CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,

@@ -27,7 +27,7 @@
 //!
 //! ## Forward Curve
 //!
-//! [`DiscountCurve::forward`] returns the **continuously compounded** interval
+//! [`DiscountCurve::forward`](crate::market_data::term_structures::DiscountCurve::forward) returns the **continuously compounded** interval
 //! forward:
 //! ```text
 //! f(t₁, t₂) = -ln(DF(t₂) / DF(t₁)) / (t₂ - t₁)

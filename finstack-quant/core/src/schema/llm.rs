@@ -37,17 +37,9 @@ pub(super) const NON_PORTABLE_KEYWORDS: &[&str] = &[
 
 /// Which projection passes to apply.
 ///
-/// Every pass defaults on; turn one off to isolate its effect when measuring.
+/// Every projection pass always runs; the two budgets below are the only knobs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct LlmProfile {
-    /// Pull externally referenced documents into `$defs` so nothing is fetched.
-    pub inline_references: bool,
-    /// Rewrite all-string-`const` unions as a flat `enum`.
-    pub flatten_const_unions: bool,
-    /// Strip Rust API prose from `description` text.
-    pub trim_descriptions: bool,
-    /// Close objects, require every declared property, and drop non-portable keywords.
-    pub strict_shape: bool,
     /// Largest referenced document to inline, in compact bytes.
     ///
     /// Inlining is what makes a schema self-contained, but a reference to a
@@ -95,10 +87,6 @@ pub(crate) const DEFAULT_MAX_DESCRIPTION_CHARS: usize = 240;
 impl Default for LlmProfile {
     fn default() -> Self {
         Self {
-            inline_references: true,
-            flatten_const_unions: true,
-            trim_descriptions: true,
-            strict_shape: true,
             max_inline_bytes: DEFAULT_MAX_INLINE_BYTES,
             max_description_chars: DEFAULT_MAX_DESCRIPTION_CHARS,
         }
@@ -144,22 +132,14 @@ pub fn project_llm(
     }
     let mut projected = schema.clone();
 
-    if profile.inline_references {
-        inline_external_references(&mut projected, resolve, profile.max_inline_bytes);
-    }
+    inline_external_references(&mut projected, resolve, profile.max_inline_bytes);
     if profile.max_inline_bytes > 0 {
         substitute_oversized_local_definitions(&mut projected, profile.max_inline_bytes);
         prune_unreachable_defs(&mut projected);
     }
-    if profile.flatten_const_unions {
-        flatten_const_unions(&mut projected);
-    }
-    if profile.trim_descriptions {
-        trim_descriptions(&mut projected, profile.max_description_chars);
-    }
-    if profile.strict_shape {
-        apply_strict_shape(&mut projected);
-    }
+    flatten_const_unions(&mut projected);
+    trim_descriptions(&mut projected, profile.max_description_chars);
+    apply_strict_shape(&mut projected);
 
     Ok(projected)
 }
@@ -355,7 +335,7 @@ pub(super) fn inline_external_references(
 /// the budget never applies and one contract carries all seventy branches:
 /// measured at 302 definitions and 393 KB for `basket`. Standing the oversized
 /// definition down to a handle makes its dependents unreachable, which
-/// [`prune_unreachable_definitions`] then removes.
+/// [`prune_unreachable_defs`] then removes.
 pub(super) fn substitute_oversized_local_definitions(schema: &mut Value, max_inline_bytes: usize) {
     let Some(defs) = schema.get("$defs").and_then(Value::as_object) else {
         return;

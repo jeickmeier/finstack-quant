@@ -12,10 +12,10 @@
 use serde_json::Value;
 use std::sync::OnceLock;
 
-#[cfg(test)]
-const JSON_SCHEMA_DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
 #[cfg(feature = "jsonschema-validate")]
-const COMMON_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/common/1/";
+use finstack_quant_core::schema::COMMON_SCHEMA_BASE;
+#[cfg(test)]
+use finstack_quant_core::schema::JSON_SCHEMA_DIALECT;
 
 #[cfg(feature = "json-schema")]
 const PRICING_OVERRIDE_SCHEMA_DEFINITIONS:

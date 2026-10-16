@@ -85,7 +85,7 @@ pub(crate) fn seek_business_day<C: HolidayCalendar + ?Sized>(
 /// 1. Return `true` from [`is_holiday`](Self::is_holiday) for market-specific
 ///    non-working days (exchanges closed, bank holidays)
 /// 2. Implement [`is_business_day`](Self::is_business_day) as "not a weekend
-///    under the market's [`WeekendRule`](super::WeekendRule) and not a holiday"
+///    under the market's [`WeekendRule`](crate::dates::WeekendRule) and not a holiday"
 ///
 /// # Examples
 ///
@@ -125,7 +125,7 @@ pub trait HolidayCalendar: Send + Sync {
     /// calendar (i.e. not weekend and not holiday).
     ///
     /// Each calendar applies its own weekend rule here (see
-    /// [`WeekendRule`](super::WeekendRule)); it is independent of how the
+    /// [`WeekendRule`](crate::dates::WeekendRule)); it is independent of how the
     /// calendar labels weekends in [`Self::is_holiday`].
     ///
     /// # Arguments

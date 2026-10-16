@@ -3,7 +3,7 @@
 Shared fixtures, tolerance constants, and parity helpers for the `instruments`
 integration test binary, plus tests for the cross-instrument machinery that has
 no single owning instrument directory (the pricer registry, market conventions,
-the `Discountable` contract, the two-factor rates-credit lattice).
+the `Discounting` contract, the two-factor rates-credit lattice).
 
 This directory is not a standalone test target. It is pulled into
 [`tests/instruments.rs`](../../instruments.rs) as `mod common` via
@@ -19,7 +19,7 @@ submodule reaches it as `crate::common::...`.
 | `parity.rs` | `ParityConfig` / `compare_values` / `assert_parity!` for documented reference comparisons |
 | `parameters/test_conventions.rs` | `BondConvention` lookup and `FromStr` behavior |
 | `pricer/registry.rs` | `InstrumentType`, `ModelKey`, `PricerKey`, `PricingError`, and `PricerRegistry` lookup/batch coverage |
-| `test_discountable.rs` | `finstack_quant_core::cashflow::Discountable` NPV contract against a mock flat curve |
+| `test_discountable.rs` | `finstack_quant_core::market_data::traits::Discounting` NPV contract against a mock flat curve |
 | `test_rates_credit_tree.rs` | Two-factor rates+credit binomial tree: closed-form parity, correlation monotonicity, curve-reproducing calibration |
 | `test_callable_credit_baseline.rs` | Pinned PV/OAS baselines for callable bond and callable term loan on the rates-credit lattice |
 | `test_callable_floating_resets.rs` | Node-dependent floating resets on the same lattice; FRN-invariance identity |

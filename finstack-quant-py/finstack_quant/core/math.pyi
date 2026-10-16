@@ -458,7 +458,8 @@ class stats:
     @staticmethod
     def median_or_nan(data: Sequence[float] | npt.NDArray[np.float64]) -> float:
         """
-        Median (mean of the two middle values for even counts), or ``nan`` for empty input.
+        Median (mean of the two middle values for even counts), or ``nan`` for empty
+        input or when any observation is non-finite.
 
         Parameters
         ----------

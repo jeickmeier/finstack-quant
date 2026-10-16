@@ -345,7 +345,7 @@ impl MarketContext {
     /// #     .with_interpolation(SeriesInterpolation::Linear);
     /// # let ctx = MarketContext::new().insert_inflation_index(index);
     /// let idx = ctx.get_inflation_index("US-CPI").expect("Inflation index should exist");
-    /// assert_eq!(idx.id, "US-CPI");
+    /// assert_eq!(idx.id(), "US-CPI");
     /// ```
     pub fn get_inflation_index(&self, id: impl AsRef<str>) -> Result<Arc<InflationIndex>> {
         self.get_cloned(&self.inflation_indices, id.as_ref())
@@ -417,7 +417,7 @@ impl MarketContext {
     /// # let ctx = MarketContext::new().insert(hazard).insert(base_corr)
     /// #     .insert_credit_index("CDX-IG", data).expect("index dependencies are present");
     /// let idx = ctx.get_credit_index("CDX-IG").expect("Credit index should exist");
-    /// assert_eq!(idx.num_constituents, 125);
+    /// assert_eq!(idx.num_constituents(), 125);
     /// ```
     pub fn get_credit_index(&self, id: impl AsRef<str>) -> Result<Arc<CreditIndexData>> {
         self.get_cloned(&self.credit_indices, id.as_ref())
@@ -436,7 +436,7 @@ impl MarketContext {
     ///
     /// This performs the indirection from a CSA or collateral agreement code to
     /// the discount curve configured for that collateral set. The returned trait
-    /// object exposes the generic [`Discounting`] interface rather than the
+    /// object exposes the generic [`Discounting`](crate::market_data::traits::Discounting) interface rather than the
     /// concrete [`DiscountCurve`] type.
     ///
     /// # Errors

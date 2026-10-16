@@ -1,3 +1,11 @@
+//! A fork of `serde_json::value::Serializer` (serde_json 1.x) that rejects
+//! non-finite floats instead of serializing them as `null`.
+//!
+//! The upstream value serializer cannot be reused because its `null` output
+//! for NaN and infinities is indistinguishable from a genuine `None`, so
+//! canonical hashing could not detect the corruption afterwards. Keep this
+//! module in step with the upstream serializer when serde_json is upgraded.
+
 use serde::ser::{
     self, Impossible, SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant,
     SerializeTuple, SerializeTupleStruct, SerializeTupleVariant,
