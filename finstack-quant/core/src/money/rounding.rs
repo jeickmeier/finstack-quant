@@ -8,8 +8,8 @@
 //! are not part of the public API. For rounding examples, see `Money` documentation.
 
 use crate::config::RoundingMode;
+use crate::decimal::f64_to_decimal;
 use crate::error::{Error, InputError};
-use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 
 /// Internal numeric representation for `Money` amounts.
@@ -52,17 +52,7 @@ pub(crate) fn repr_sub(a: AmountRepr, b: AmountRepr) -> Result<AmountRepr, Error
 /// Fallible multiplication by an `f64` scalar (no silent substitution).
 #[inline]
 pub(crate) fn repr_mul_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Error> {
-    if !rhs.is_finite() {
-        return Err(InputError::NonFiniteValue {
-            kind: crate::error::NonFiniteKind::classify(rhs),
-        }
-        .into());
-    }
-    // Shortest round-trip conversion per the 2026-06-09 core quant review
-    // (user decision): avoids embedding IEEE noise digits in the Decimal.
-    let Some(rhs_decimal) = Decimal::from_f64(rhs) else {
-        return Err(InputError::ConversionOverflow.into());
-    };
+    let rhs_decimal = f64_to_decimal(rhs)?;
     // Checked Decimal multiply: a finite, representable scalar can still drive
     // the product past Decimal's range (~7.9e28). Surface that as an error so
     // `checked_mul_f64` is genuinely panic-free, rather than relying on the
@@ -74,26 +64,15 @@ pub(crate) fn repr_mul_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Error>
 /// Fallible division by an `f64` scalar (no silent substitution).
 #[inline]
 pub(crate) fn repr_div_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Error> {
-    if !rhs.is_finite() {
-        return Err(InputError::NonFiniteValue {
-            kind: crate::error::NonFiniteKind::classify(rhs),
-        }
-        .into());
-    }
-    // Exact-zero check on f64 is intentional and well-defined: division by
-    // any non-zero divisor (however small) is representable as a Decimal,
-    // but division by exact 0.0 (positive or negative) is not. The
-    // surrounding `is_finite` guard already rejects NaN / ±Inf.
+    // `f64_to_decimal` rejects NaN / ±Inf first, so the exact-zero check below
+    // only ever sees finite input. Division by any non-zero divisor (however
+    // small) is representable as a Decimal; division by exact 0.0 is not.
+    let rhs_decimal = f64_to_decimal(rhs)?;
     #[allow(clippy::float_cmp)]
     let is_zero = rhs == 0.0;
     if is_zero {
         return Err(Error::Validation("division by zero".into()));
     }
-    // Shortest round-trip conversion per the 2026-06-09 core quant review
-    // (user decision): avoids embedding IEEE noise digits in the Decimal.
-    let Some(rhs_decimal) = Decimal::from_f64(rhs) else {
-        return Err(InputError::ConversionOverflow.into());
-    };
     // Checked Decimal divide: dividing by a tiny scalar can overflow Decimal's
     // range. Surface as an error so `checked_div_f64` never panics.
     a.checked_div(rhs_decimal)
@@ -103,18 +82,7 @@ pub(crate) fn repr_div_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Error>
 /// Fallible rounding of an `f64` into a Decimal (no silent substitution).
 #[inline]
 pub(crate) fn try_round_f64(x: f64, dp: i32, mode: RoundingMode) -> Result<Decimal, Error> {
-    if !x.is_finite() {
-        return Err(InputError::NonFiniteValue {
-            kind: crate::error::NonFiniteKind::classify(x),
-        }
-        .into());
-    }
-    // Shortest round-trip conversion per the 2026-06-09 core quant review
-    // (user decision): avoids embedding IEEE noise digits in the Decimal.
-    let Some(decimal) = Decimal::from_f64(x) else {
-        return Err(InputError::ConversionOverflow.into());
-    };
-    Ok(round_decimal(decimal, dp, mode))
+    Ok(round_decimal(f64_to_decimal(x)?, dp, mode))
 }
 
 #[cfg(test)]

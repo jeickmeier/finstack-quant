@@ -24,7 +24,8 @@
 use crate::config::{FinstackConfig, RoundingMode};
 use crate::currency::Currency;
 use crate::dates::Date;
-use crate::error::{Error, InputError, NonFiniteKind};
+use crate::decimal::f64_to_decimal;
+use crate::error::{Error, InputError};
 use core::fmt;
 
 use super::rounding::{
@@ -364,24 +365,16 @@ impl Money {
         currency: Currency,
         cfg: Option<&FinstackConfig>,
     ) -> Result<Self, Error> {
-        if !amount.is_finite() {
-            return Err(Error::Input(InputError::NonFiniteValue {
-                kind: NonFiniteKind::classify(amount),
-            }));
-        }
         // IEEE negative zero would become the Decimal "-0", which serializes
         // as "-0" and re-parses as "0"; normalize so wire round trips are
-        // identities.
+        // identities. `f64_to_decimal` rejects NaN / ±Inf and out-of-range
+        // magnitudes, and uses the shortest round-trip conversion so `0.1_f64`
+        // ingests as `0.1`, not the 28-digit IEEE expansion.
         let amount = if amount == 0.0 { 0.0 } else { amount };
         let rounded = if let Some(cfg) = cfg {
             try_round_f64(amount, cfg.ingest_scale(currency) as i32, cfg.rounding.mode)?
         } else {
-            // Shortest round-trip conversion (`Decimal::from_f64`): `0.1_f64`
-            // ingests as `0.1`, not the 28-digit IEEE expansion that
-            // `from_f64_retain` would embed. `from_f64` can also fail when a
-            // finite f64 lies outside Decimal's representable range.
-            <AmountRepr as rust_decimal::prelude::FromPrimitive>::from_f64(amount)
-                .ok_or(InputError::ConversionOverflow)?
+            f64_to_decimal(amount)?
         };
         Ok(Self {
             amount: rounded,

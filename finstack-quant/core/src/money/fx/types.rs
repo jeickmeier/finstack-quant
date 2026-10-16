@@ -23,25 +23,18 @@ pub enum FxConversionPolicy {
 }
 
 impl std::fmt::Display for FxConversionPolicy {
+    /// Writes the serde label (`cashflow_date`, `period_end` or `period_average`).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::CashflowDate => write!(f, "cashflow_date"),
-            Self::PeriodEnd => write!(f, "period_end"),
-            Self::PeriodAverage => write!(f, "period_average"),
-        }
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
 }
 
 impl std::str::FromStr for FxConversionPolicy {
     type Err = crate::error::Error;
 
+    /// Parses the serde label; the error names the accepted labels.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "cashflow_date" => Ok(Self::CashflowDate),
-            "period_end" => Ok(Self::PeriodEnd),
-            "period_average" => Ok(Self::PeriodAverage),
-            _ => Err(crate::error::InputError::Invalid.into()),
-        }
+        crate::wire::serde_parse(s)
     }
 }
 
@@ -281,5 +274,26 @@ impl Serialize for FxMatrixState {
         state.serialize_field("provider_pinned_quotes", &self.provider_pinned_quotes)?;
         state.serialize_field("pinned_quotes", &self.pinned_quotes)?;
         state.end()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FxConversionPolicy;
+
+    #[test]
+    fn fx_conversion_policy_display_and_fromstr_use_the_serde_labels() {
+        for (policy, label) in [
+            (FxConversionPolicy::CashflowDate, "cashflow_date"),
+            (FxConversionPolicy::PeriodEnd, "period_end"),
+            (FxConversionPolicy::PeriodAverage, "period_average"),
+        ] {
+            assert_eq!(policy.to_string(), label);
+            assert_eq!(label.parse::<FxConversionPolicy>().expect(label), policy);
+        }
+        let err = "spot"
+            .parse::<FxConversionPolicy>()
+            .expect_err("unknown label");
+        assert!(err.to_string().contains("cashflow_date"), "{err}");
     }
 }

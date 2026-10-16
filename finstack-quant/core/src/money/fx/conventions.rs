@@ -36,7 +36,8 @@ use crate::Result;
 /// means USD is the base (USDJPY, USDCAD). Non-USD crosses inherit the USD
 /// quotation of the market CCY1 versus USD (EURGBP is Direct because EURUSD
 /// is Direct).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum FxQuoteConvention {
     /// USD is the quote currency (units of USD per one unit of CCY1).
@@ -46,23 +47,18 @@ pub enum FxQuoteConvention {
 }
 
 impl std::fmt::Display for FxQuoteConvention {
+    /// Writes the serde label (`direct` or `indirect`).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Direct => write!(f, "direct"),
-            Self::Indirect => write!(f, "indirect"),
-        }
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
 }
 
 impl std::str::FromStr for FxQuoteConvention {
     type Err = crate::error::Error;
 
+    /// Parses the serde label; the error names the accepted labels.
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "direct" => Ok(Self::Direct),
-            "indirect" => Ok(Self::Indirect),
-            _ => Err(crate::error::InputError::Invalid.into()),
-        }
+        crate::wire::serde_parse(s)
     }
 }
 
