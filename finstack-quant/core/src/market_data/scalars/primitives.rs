@@ -387,18 +387,23 @@ impl ScalarTimeSeries {
             Ok(idx) => Ok(value_vec[idx]),
             Err(idx) => {
                 if idx == 0 {
-                    Err(crate::Error::Input(InputError::NotFound {
-                        id: format!(
-                            "series '{}': no observation on or before {}",
-                            self.id.as_str(),
-                            from_days(query_day),
-                        ),
-                    }))
+                    Err(self.no_prior_observation(query_day))
                 } else {
                     Ok(value_vec[idx - 1]) // Last observation carried forward
                 }
             }
         }
+    }
+
+    /// Error for a lookup before the first observation of the series.
+    fn no_prior_observation(&self, query_day: i32) -> crate::Error {
+        crate::Error::Input(InputError::NotFound {
+            id: format!(
+                "series '{}': no observation on or before {}",
+                self.id.as_str(),
+                from_days(query_day),
+            ),
+        })
     }
 
     /// Linear-interpolation lookup for one query day.
@@ -412,13 +417,7 @@ impl ScalarTimeSeries {
             Ok(idx) => Ok(value_vec[idx]),
             Err(idx) => {
                 if idx == 0 {
-                    Err(crate::Error::Input(InputError::NotFound {
-                        id: format!(
-                            "series '{}': no observation on or before {}",
-                            self.id.as_str(),
-                            from_days(query_day),
-                        ),
-                    }))
+                    Err(self.no_prior_observation(query_day))
                 } else if idx >= date_vec.len() {
                     // Use last value for dates after series
                     Ok(*value_vec.last().ok_or(InputError::TooFewPoints)?)

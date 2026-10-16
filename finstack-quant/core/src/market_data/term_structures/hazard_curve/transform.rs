@@ -24,24 +24,11 @@ impl HazardCurve {
             recovery_rate,
             "recovery_rate",
         )?;
-        Ok(HazardCurve {
-            id: self.id.clone(),
-            base: self.base,
-            knots: self.knots.clone(),
-            lambdas: self.lambdas.clone(),
-            recovery_rate,
-            issuer: self.issuer.clone(),
-            seniority: self.seniority,
-            currency: self.currency,
-            day_count: self.day_count,
-            par_tenors: self.par_tenors.clone(),
-            par_spreads_bp: self.par_spreads_bp.clone(),
-            par_interp: self.par_interp,
-
-            hazard_calibration: None,
-            interp: self.interp.clone(),
-            fx_policy: self.fx_policy.clone(),
-        })
+        let mut curve = self.clone();
+        curve.recovery_rate = recovery_rate;
+        // The calibration provenance described the original recovery assumption.
+        curve.hazard_calibration = None;
+        Ok(curve)
     }
 
     /// Create a builder with this curve's parameters, using a new ID.

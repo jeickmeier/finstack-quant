@@ -426,17 +426,7 @@ impl VolSurface {
                 "absolute volatility point bump must be finite, got {bump_abs}"
             )));
         }
-        let (Some(&exp_min), Some(&exp_max)) = (self.expiries.first(), self.expiries.last()) else {
-            return Err(crate::error::InputError::TooFewPoints.into());
-        };
-        let (Some(&str_min), Some(&str_max)) = (self.strikes.first(), self.strikes.last()) else {
-            return Err(crate::error::InputError::TooFewPoints.into());
-        };
-        let expiry_idx =
-            find_closest_grid_index(self.expiries.as_ref(), expiry.clamp(exp_min, exp_max));
-        let strike_idx =
-            find_closest_grid_index(self.strikes.as_ref(), strike.clamp(str_min, str_max));
-        let idx = expiry_idx * self.strikes.len() + strike_idx;
+        let idx = self.nearest_grid_index(expiry, strike)?;
         let original = self.vols[idx];
         let bumped = original + bump_abs;
         if !bumped.is_finite() {
@@ -460,21 +450,25 @@ impl VolSurface {
         {
             return Err(InputError::Invalid.into());
         }
-        let clamped_expiry = match (self.expiries.first(), self.expiries.last()) {
-            (Some(&min), Some(&max)) => expiry.clamp(min, max),
-            _ => return Err(InputError::TooFewPoints.into()),
-        };
-        let clamped_strike = match (self.strikes.first(), self.strikes.last()) {
-            (Some(&min), Some(&max)) => strike.clamp(min, max),
-            _ => return Err(InputError::TooFewPoints.into()),
-        };
-
-        let expiry_idx = find_closest_grid_index(self.expiries.as_ref(), clamped_expiry);
-        let strike_idx = find_closest_grid_index(self.strikes.as_ref(), clamped_strike);
-
-        let n_strikes = self.strikes.len();
-        self.vols[expiry_idx * n_strikes + strike_idx] = original_vol;
+        let idx = self.nearest_grid_index(expiry, strike)?;
+        self.vols[idx] = original_vol;
         Ok(())
+    }
+
+    /// Flat index of the grid node nearest to `(expiry, strike)`, with both
+    /// coordinates clamped to the grid range.
+    fn nearest_grid_index(&self, expiry: f64, strike: f64) -> crate::Result<usize> {
+        let (Some(&exp_min), Some(&exp_max)) = (self.expiries.first(), self.expiries.last()) else {
+            return Err(InputError::TooFewPoints.into());
+        };
+        let (Some(&str_min), Some(&str_max)) = (self.strikes.first(), self.strikes.last()) else {
+            return Err(InputError::TooFewPoints.into());
+        };
+        let expiry_idx =
+            find_closest_grid_index(self.expiries.as_ref(), expiry.clamp(exp_min, exp_max));
+        let strike_idx =
+            find_closest_grid_index(self.strikes.as_ref(), strike.clamp(str_min, str_max));
+        Ok(expiry_idx * self.strikes.len() + strike_idx)
     }
 
     /// Return a new volatility surface scaled uniformly by `scale`.
@@ -500,16 +494,7 @@ impl VolSurface {
         }
         // Fast path: return an identical copy when scale == 1.0
         if scale.total_cmp(&1.0).is_eq() {
-            return Ok(Self {
-                id: self.id.clone(),
-                expiries: self.expiries.clone(),
-                strikes: self.strikes.clone(),
-                secondary_axis: self.secondary_axis,
-                quote_type: self.quote_type,
-                interpolation_mode: self.interpolation_mode,
-                displacements: self.displacements.clone(),
-                vols: self.vols.clone(),
-            });
+            return Ok(self.clone());
         }
 
         // Scale all vols
@@ -518,16 +503,9 @@ impl VolSurface {
             return Err(InputError::Invalid.into());
         }
 
-        Ok(Self {
-            id: self.id.clone(),
-            expiries: self.expiries.clone(),
-            strikes: self.strikes.clone(),
-            secondary_axis: self.secondary_axis,
-            quote_type: self.quote_type,
-            interpolation_mode: self.interpolation_mode,
-            displacements: self.displacements.clone(),
-            vols: scaled_vols,
-        })
+        let mut scaled = self.clone();
+        scaled.vols = scaled_vols;
+        Ok(scaled)
     }
 }
 
@@ -560,16 +538,9 @@ impl Bumpable for VolSurface {
             return Err(InputError::Invalid.into());
         }
 
-        Ok(Self {
-            id: self.id.clone(),
-            expiries: self.expiries.clone(),
-            strikes: self.strikes.clone(),
-            secondary_axis: self.secondary_axis,
-            quote_type: self.quote_type,
-            interpolation_mode: self.interpolation_mode,
-            displacements: self.displacements.clone(),
-            vols: bumped_vols,
-        })
+        let mut bumped = self.clone();
+        bumped.vols = bumped_vols;
+        Ok(bumped)
     }
 }
 

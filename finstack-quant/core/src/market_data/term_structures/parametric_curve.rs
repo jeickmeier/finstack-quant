@@ -510,13 +510,10 @@ impl ParametricCurve {
         if !normalization.is_finite() || normalization <= 0.0 {
             return Err(crate::error::InputError::NonPositiveValue.into());
         }
-        Ok(Self {
-            id: self.id.clone(),
-            base_date,
-            day_count: self.day_count,
-            model: self.model.clone(),
-            time_offset,
-        })
+        let mut rolled = self.clone();
+        rolled.base_date = base_date;
+        rolled.time_offset = time_offset;
+        Ok(rolled)
     }
 }
 
