@@ -4418,7 +4418,7 @@
       "type": "object"
     },
     "CdsOptionStrike": {
-      "description": "Typed CDS-option strike: forward-spread or clean-price convention.\n\nWire format: externally tagged JSON — `{\"spread\": \"0.0325\"}` or\n`{\"clean_price_pct\": \"107.0\"}` — with no bare-decimal fallback.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;\nuse rust_decimal::Decimal;\n\nlet spread = CdsOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp\nassert!(spread.spread_decimal().is_some());\nassert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);\n\nlet price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0\nassert_eq!(price.native_surface_coordinate().unwrap(), 107.0);\nassert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);\n```",
+      "description": "Typed CDS-option strike: forward-spread or clean-price convention.\n\nWire format: externally tagged JSON — `{\"spread\": \"0.0325\"}` or\n`{\"clean_price_pct\": \"107.0\"}` — with no bare-decimal fallback.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;\nuse rust_decimal::Decimal;\n\nlet spread = CdsOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp\nassert!(spread.spread_decimal().is_some());\nassert_eq!(spread.native_surface_coordinate(), 0.0325);\n\nlet price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0\nassert_eq!(price.native_surface_coordinate(), 107.0);\nassert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);\n```",
       "oneOf": [
         {
           "additionalProperties": false,

@@ -13885,10 +13885,10 @@ export type CdsConvention = "isda_na" | "isda_eu" | "isda_as" | "custom";
  *
  * let spread = CdsOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp
  * assert!(spread.spread_decimal().is_some());
- * assert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);
+ * assert_eq!(spread.native_surface_coordinate(), 0.0325);
  *
  * let price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0
- * assert_eq!(price.native_surface_coordinate().unwrap(), 107.0);
+ * assert_eq!(price.native_surface_coordinate(), 107.0);
  * assert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);
  * ```
  *
