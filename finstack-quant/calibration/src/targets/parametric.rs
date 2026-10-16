@@ -302,7 +302,7 @@ impl GlobalSolveTarget for ParametricCurveTarget {
                 forward_floor: None,
             },
         )
-        .build_for_solver()?;
+        .build()?;
 
         self.scratch.with_curve(&disc_curve, |ctx| {
             for (i, q) in quotes.iter().enumerate() {

@@ -606,20 +606,14 @@ impl BootstrapTarget for DiscountCurveTarget {
         // an infeasible (arbitrage) shape and then fail only at the end.
         let allow_non_monotonic = self.allow_non_monotonic();
 
-        if !allow_non_monotonic {
-            // Hard guard: even if the underlying curve builder's `build_for_solver()` is lenient,
-            // we must not allow the solver to explore arbitrage shapes when the final curve
-            // forbids them.
-            if knots.windows(2).any(|w| w[1].1 > w[0].1) {
-                return Err(finstack_quant_core::Error::Calibration {
-                    message: "Discount factors must be non-increasing".to_string(),
-                    category: "curve_build".to_string(),
-                });
-            }
-        }
-
+        // The solver curve respects the final curve's monotonic policy but not
+        // its forward floor, which only the final build enforces.
         self.curve_builder(&self.params.discount_curve_id, knots, allow_non_monotonic)
-            .build_for_solver()
+            .validation(ValidationMode::Raw {
+                allow_non_monotonic,
+                forward_floor: None,
+            })
+            .build()
             .map_err(|e| finstack_quant_core::Error::Calibration {
                 message: format!("Failed to build temp curve: {}", e),
                 category: "bootstrapping".to_string(),

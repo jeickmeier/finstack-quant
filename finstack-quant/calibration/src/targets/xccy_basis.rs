@@ -285,7 +285,7 @@ impl BootstrapTarget for XccyBasisTarget {
                 allow_non_monotonic: true,
                 forward_floor: None,
             })
-            .build_for_solver()
+            .build()
     }
 
     fn residual_units(&self) -> crate::report::ResidualUnits {

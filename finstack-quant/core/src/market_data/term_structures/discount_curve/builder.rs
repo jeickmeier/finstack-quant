@@ -215,40 +215,6 @@ impl DiscountCurveBuilder {
         self
     }
 
-    /// Build the curve with minimal validation for solver use.
-    ///
-    /// This method skips monotonicity validation and forward rate checks, providing
-    /// faster curve construction for iterative solving where the curve is temporary.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure:
-    /// - At least 2 knot points are provided
-    /// - All discount factors are positive
-    /// - Knots are sorted in ascending order
-    ///
-    /// This is an internal optimization for calibration solvers.
-    /// For general use, prefer [`Self::build`] which includes full validation.
-    #[doc(hidden)]
-    pub fn build_for_solver(mut self) -> crate::Result<DiscountCurve> {
-        let base = self.base.ok_or(crate::error::InputError::Invalid)?;
-        if self.points.first().is_some_and(|&(time, _)| time > 0.0) {
-            self.points.insert(0, (0.0, 1.0));
-        }
-        if self.points.len() < 2 {
-            return Err(crate::error::InputError::TooFewPoints.into());
-        }
-
-        if self.points.iter().any(|&(_, df)| df <= 0.0) {
-            return Err(crate::error::InputError::NonPositiveValue.into());
-        }
-
-        validate_origin(&self.points)?;
-
-        let (knots, dfs) = std::mem::take(&mut self.points).into_iter().unzip();
-        self.finish(base, knots, dfs)
-    }
-
     /// Validate input and create the [`DiscountCurve`].
     ///
     /// If the first knot time is `> 0.0`, automatically prepends `(0.0, 1.0)` to

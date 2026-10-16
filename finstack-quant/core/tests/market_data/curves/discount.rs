@@ -1631,29 +1631,24 @@ mod continuous_transform_regressions {
     }
 
     #[test]
-    fn discount_origin_is_validated_by_builder_solver_and_serde() {
+    fn discount_origin_is_validated_by_builder_and_serde() {
         for points in [[(0.0, 0.9), (1.0, 0.8)], [(-1.0, 1.1), (1.0, 0.9)]] {
             assert!(DiscountCurve::builder("INVALID")
                 .base_date(sample_base_date())
                 .knots(points)
                 .build()
                 .is_err());
-            assert!(DiscountCurve::builder("INVALID")
-                .base_date(sample_base_date())
-                .knots(points)
-                .build_for_solver()
-                .is_err());
         }
         let source = shaped(InterpStyle::LogLinear);
         let mut json = serde_json::to_value(&source).expect("serialize");
         json["knot_points"][0][1] = serde_json::json!(0.9);
         assert!(serde_json::from_value::<DiscountCurve>(json).is_err());
-        let solver = DiscountCurve::builder("SOLVER")
+        let anchored = DiscountCurve::builder("ANCHORED")
             .base_date(sample_base_date())
             .knots([(1.0, 0.95), (2.0, 0.90)])
-            .build_for_solver()
+            .build()
             .expect("automatic anchor");
-        assert_eq!(solver.df(0.0), 1.0);
+        assert_eq!(anchored.df(0.0), 1.0);
     }
 
     #[test]
