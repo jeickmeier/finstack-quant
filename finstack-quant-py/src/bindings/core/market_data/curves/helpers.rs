@@ -25,21 +25,13 @@ pub(super) fn parse_extrapolation(s: &str) -> PyResult<ExtrapolationPolicy> {
 /// Parse a [`Compounding`] convention from its label
 /// (`"continuous"`, `"simple"`, `"annual"`, `"semi_annual"`, `"quarterly"`, `"monthly"`).
 pub(super) fn parse_compounding(s: &str) -> PyResult<Compounding> {
-    s.parse::<Compounding>().map_err(|_| {
-        crate::errors::value_error(format!(
-            "Invalid compounding {s:?}: expected one of continuous, simple, annual, semi_annual, quarterly, monthly"
-        ))
-    })
+    s.parse::<Compounding>().map_err(crate::errors::core_to_py)
 }
 
 /// Parse a [`Seniority`] from its serde name
 /// (`"senior_secured"`, `"senior"`, `"subordinated"`, `"junior"`).
 pub(super) fn parse_seniority(s: &str) -> PyResult<Seniority> {
-    s.parse::<Seniority>().map_err(|_| {
-        crate::errors::value_error(format!(
-            "Invalid seniority {s:?}: expected one of senior_secured, senior, subordinated, junior"
-        ))
-    })
+    s.parse::<Seniority>().map_err(crate::errors::core_to_py)
 }
 
 /// Parse a [`VolQuoteType`] from a Python string.

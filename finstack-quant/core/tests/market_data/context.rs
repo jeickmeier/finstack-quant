@@ -261,7 +261,11 @@ fn market_context_manages_fx_and_scalars() {
     assert!(ctx.get_dividend_schedule("AAPL-DIVS").is_ok());
     assert!(ctx.get_credit_index("CDX").is_ok());
 
-    let ids: Vec<_> = ctx.curve_ids().map(|c| c.as_str().to_string()).collect();
+    let ids: Vec<_> = ctx
+        .curve_ids()
+        .iter()
+        .map(|c| c.as_str().to_string())
+        .collect();
     assert!(ids.contains(&"USD-OIS".to_string()));
 }
 

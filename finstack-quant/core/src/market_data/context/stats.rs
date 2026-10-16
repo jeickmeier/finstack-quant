@@ -27,9 +27,11 @@ impl MarketContext {
         self.curves.get(id.as_ref())
     }
 
-    /// Get all curve IDs
-    pub fn curve_ids(&self) -> impl Iterator<Item = &CurveId> {
-        self.curves.keys()
+    /// Identifiers of every stored term-structure curve, sorted.
+    pub fn curve_ids(&self) -> Vec<&CurveId> {
+        let mut ids: Vec<&CurveId> = self.curves.keys().collect();
+        ids.sort();
+        ids
     }
 
     /// Iterate every stored curve as `(id, storage)` without typed lookups.

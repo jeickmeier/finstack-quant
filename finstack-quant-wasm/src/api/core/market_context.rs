@@ -632,13 +632,11 @@ impl JsMarketContext {
     /// @returns Curve ids in sorted order; surfaces, prices and series are not listed.
     #[wasm_bindgen(js_name = curveIds)]
     pub fn curve_ids(&self) -> Vec<String> {
-        let mut ids: Vec<String> = self
-            .inner
+        self.inner
             .curve_ids()
+            .into_iter()
             .map(|id| id.as_str().to_owned())
-            .collect();
-        ids.sort();
-        ids
+            .collect()
     }
 
     /// Whether the context holds no market data at all (`len() === 0`).

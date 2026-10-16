@@ -180,7 +180,10 @@ impl core::str::FromStr for Seniority {
             "senior" => Ok(Self::Senior),
             "subordinated" => Ok(Self::Subordinated),
             "junior" => Ok(Self::Junior),
-            _ => Err(crate::error::InputError::Invalid.into()),
+            other => Err(crate::Error::Validation(format!(
+                "unknown seniority {other:?}; expected one of senior_secured, senior, \
+                 subordinated, junior"
+            ))),
         }
     }
 }

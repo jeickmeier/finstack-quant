@@ -532,13 +532,11 @@ impl PyMarketContext {
     /// list[str]
     #[pyo3(text_signature = "(self)")]
     fn curve_ids(&self) -> Vec<String> {
-        let mut ids: Vec<String> = self
-            .inner
+        self.inner
             .curve_ids()
+            .into_iter()
             .map(|id| id.as_str().to_owned())
-            .collect();
-        ids.sort();
-        ids
+            .collect()
     }
 
     /// Whether nothing has been inserted (``len(ctx) == 0``): no curves,

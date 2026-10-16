@@ -375,7 +375,10 @@ impl std::str::FromStr for Compounding {
             "semi_annual" => Ok(Self::SEMI_ANNUAL),
             "quarterly" => Ok(Self::QUARTERLY),
             "monthly" => Ok(Self::MONTHLY),
-            _ => Err(crate::error::InputError::Invalid.into()),
+            other => Err(crate::Error::Validation(format!(
+                "unknown compounding {other:?}; expected one of continuous, simple, annual, \
+                 semi_annual, quarterly, monthly"
+            ))),
         }
     }
 }

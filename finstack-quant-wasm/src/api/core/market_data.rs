@@ -506,11 +506,7 @@ impl JsDiscountCurve {
 /// Parse an optional compounding name; omitted means continuous.
 fn compounding_arg(value: Option<&JsValue>) -> Result<Compounding, JsValue> {
     match js_opt_string(value, "compounding")? {
-        Some(name) => name.parse::<Compounding>().map_err(|_| {
-            to_js_err(format!(
-                "Invalid compounding {name:?}: expected one of continuous, simple, annual, semi_annual, quarterly, monthly"
-            ))
-        }),
+        Some(name) => name.parse::<Compounding>().map_err(to_js_err),
         None => Ok(Compounding::default()),
     }
 }
