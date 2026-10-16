@@ -439,6 +439,15 @@ pub fn build_snapshot_fx_matrix(
     Ok(Arc::new(matrix))
 }
 
+/// Values of `map` in ascending key order, each mapped through `f`.
+///
+/// Persisted snapshots must not depend on hash-map iteration order.
+fn sorted_by_id<V, T>(map: &crate::HashMap<CurveId, V>, f: impl Fn(&CurveId, &V) -> T) -> Vec<T> {
+    let mut keys: Vec<&CurveId> = map.keys().collect();
+    keys.sort();
+    keys.into_iter().map(|id| f(id, &map[id])).collect()
+}
+
 impl TryFrom<&MarketContext> for MarketContextState {
     type Error = crate::Error;
 
@@ -453,12 +462,7 @@ impl TryFrom<&MarketContext> for MarketContextState {
     ///
     /// Returns an error when the FX provider cannot supply a coherent snapshot.
     fn try_from(ctx: &MarketContext) -> crate::Result<Self> {
-        let mut curves: Vec<CurveState> = ctx
-            .curves
-            .values()
-            .map(|storage| storage.to_state())
-            .collect();
-        curves.sort_by(|a, b| a.id().cmp(b.id()));
+        let curves = sorted_by_id(&ctx.curves, |_, storage| storage.to_state());
 
         let fx = ctx
             .fx
@@ -466,13 +470,7 @@ impl TryFrom<&MarketContext> for MarketContextState {
             .map(|fx| fx.get_serializable_state())
             .transpose()?;
 
-        let mut surfaces_pairs: Vec<(CurveId, VolSurface)> = ctx
-            .surfaces
-            .iter()
-            .map(|(id, surf)| (id.clone(), (**surf).clone()))
-            .collect();
-        surfaces_pairs.sort_by(|a, b| a.0.cmp(&b.0));
-        let surfaces: Vec<_> = surfaces_pairs.into_iter().map(|(_, surf)| surf).collect();
+        let surfaces = sorted_by_id(&ctx.surfaces, |_, surf| (**surf).clone());
 
         let prices: std::collections::BTreeMap<String, _> = ctx
             .prices
@@ -480,84 +478,44 @@ impl TryFrom<&MarketContext> for MarketContextState {
             .map(|(id, scalar)| (id.to_string(), scalar.clone()))
             .collect();
 
-        let mut series_pairs: Vec<(CurveId, ScalarTimeSeries)> = ctx
-            .series
-            .iter()
-            .map(|(id, series)| (id.clone(), series.clone()))
-            .collect();
-        series_pairs.sort_by(|a, b| a.0.cmp(&b.0));
-        let series: Vec<_> = series_pairs.into_iter().map(|(_, series)| series).collect();
+        let series = sorted_by_id(&ctx.series, |_, series| series.clone());
 
-        let mut inflation_pairs: Vec<(CurveId, InflationIndex)> = ctx
-            .inflation_indices
-            .iter()
-            .map(|(id, idx)| (id.clone(), (**idx).clone()))
-            .collect();
-        inflation_pairs.sort_by(|a, b| a.0.cmp(&b.0));
-        let inflation_indices: Vec<_> = inflation_pairs.into_iter().map(|(_, idx)| idx).collect();
+        let inflation_indices = sorted_by_id(&ctx.inflation_indices, |_, idx| (**idx).clone());
 
-        let mut credit_pairs: Vec<(CurveId, CreditIndexState)> = ctx
-            .credit_indices
-            .iter()
-            .map(|(id, data)| {
-                let issuer_ids: Option<std::collections::BTreeMap<String, String>> =
-                    data.issuer_credit_curves.as_ref().map(|map| {
-                        map.iter()
-                            .map(|(issuer, curve)| (issuer.clone(), curve.id().to_string()))
-                            .collect()
-                    });
-                let issuer_recovery_rates: Option<std::collections::BTreeMap<String, f64>> = data
-                    .issuer_recovery_rates
-                    .as_ref()
-                    .map(|m| m.iter().map(|(k, v)| (k.clone(), *v)).collect());
-                let issuer_weights: Option<std::collections::BTreeMap<String, f64>> = data
-                    .issuer_weights
-                    .as_ref()
-                    .map(|m| m.iter().map(|(k, v)| (k.clone(), *v)).collect());
+        let credit_indices = sorted_by_id(&ctx.credit_indices, |id, data| {
+            let issuer_ids: Option<std::collections::BTreeMap<String, String>> =
+                data.issuer_credit_curves.as_ref().map(|map| {
+                    map.iter()
+                        .map(|(issuer, curve)| (issuer.clone(), curve.id().to_string()))
+                        .collect()
+                });
+            let issuer_recovery_rates: Option<std::collections::BTreeMap<String, f64>> = data
+                .issuer_recovery_rates
+                .as_ref()
+                .map(|m| m.iter().map(|(k, v)| (k.clone(), *v)).collect());
+            let issuer_weights: Option<std::collections::BTreeMap<String, f64>> = data
+                .issuer_weights
+                .as_ref()
+                .map(|m| m.iter().map(|(k, v)| (k.clone(), *v)).collect());
 
-                (
-                    id.clone(),
-                    CreditIndexState {
-                        id: id.to_string(),
-                        num_constituents: data.num_constituents,
-                        recovery_rate: data.recovery_rate,
-                        index_credit_curve_id: data.index_credit_curve.id().to_string(),
-                        base_correlation_curve_id: data.base_correlation_curve.id().to_string(),
-                        issuer_credit_curve_ids: issuer_ids,
-                        issuer_recovery_rates,
-                        issuer_weights,
-                    },
-                )
-            })
-            .collect();
-        credit_pairs.sort_by(|a, b| a.0.cmp(&b.0));
-        let credit_indices: Vec<CreditIndexState> =
-            credit_pairs.into_iter().map(|(_, s)| s).collect();
+            CreditIndexState {
+                id: id.to_string(),
+                num_constituents: data.num_constituents,
+                recovery_rate: data.recovery_rate,
+                index_credit_curve_id: data.index_credit_curve.id().to_string(),
+                base_correlation_curve_id: data.base_correlation_curve.id().to_string(),
+                issuer_credit_curve_ids: issuer_ids,
+                issuer_recovery_rates,
+                issuer_weights,
+            }
+        });
 
-        let mut dividend_pairs: Vec<(CurveId, DividendSchedule)> = ctx
-            .dividends
-            .iter()
-            .map(|(id, divs)| (id.clone(), (**divs).clone()))
-            .collect();
-        dividend_pairs.sort_by(|a, b| a.0.cmp(&b.0));
-        let dividends: Vec<_> = dividend_pairs.into_iter().map(|(_, d)| d).collect();
+        let dividends = sorted_by_id(&ctx.dividends, |_, divs| (**divs).clone());
 
-        let mut fx_delta_pairs: Vec<(CurveId, FxDeltaVolSurface)> = ctx
-            .fx_delta_vol_surfaces
-            .iter()
-            .map(|(id, surf)| (id.clone(), (**surf).clone()))
-            .collect();
-        fx_delta_pairs.sort_by(|a, b| a.0.cmp(&b.0));
-        let fx_delta_vol_surfaces: Vec<_> =
-            fx_delta_pairs.into_iter().map(|(_, surf)| surf).collect();
+        let fx_delta_vol_surfaces =
+            sorted_by_id(&ctx.fx_delta_vol_surfaces, |_, surf| (**surf).clone());
 
-        let mut vol_cube_pairs: Vec<(CurveId, VolCube)> = ctx
-            .vol_cubes
-            .iter()
-            .map(|(id, cube)| (id.clone(), (**cube).clone()))
-            .collect();
-        vol_cube_pairs.sort_by(|a, b| a.0.cmp(&b.0));
-        let vol_cubes: Vec<_> = vol_cube_pairs.into_iter().map(|(_, cube)| cube).collect();
+        let vol_cubes = sorted_by_id(&ctx.vol_cubes, |_, cube| (**cube).clone());
 
         let collateral: std::collections::BTreeMap<String, String> = ctx
             .collateral
@@ -587,19 +545,18 @@ fn restore_market_context(
     state: MarketContextState,
     limits: &LoadLimits,
 ) -> Result<(MarketContext, ValidationReport), ContractError> {
-    let mut report = validate_restore_references(&state, limits);
+    let report = validate_restore_references(&state, limits);
     if report.has_errors() {
         return Err(ContractError::Report(Box::new(report)));
     }
     let mut ctx = MarketContext::new();
 
     for curve_state in state.curves {
-        let storage = CurveStorage::from_state(curve_state);
-        Arc::make_mut(&mut ctx.curves).insert(storage.id().clone(), storage);
+        ctx.insert_mut(CurveStorage::from_state(curve_state));
     }
 
     for surface in state.surfaces {
-        Arc::make_mut(&mut ctx.surfaces).insert(surface.id().clone(), Arc::new(surface));
+        ctx.insert_surface_mut(surface);
     }
 
     // Persisted state does not encode the original live FX provider, only the
@@ -614,15 +571,15 @@ fn restore_market_context(
         provider.set_snapshot_pinned_quotes(&fx_state.provider_pinned_quotes)?;
         let matrix = FxMatrix::try_with_config(Arc::new(provider), fx_state.config)?;
         matrix.load_from_state(&fx_state)?;
-        ctx.fx = Some(Arc::new(matrix));
+        ctx.insert_fx_mut(matrix);
     }
 
     for (id_str, scalar) in state.prices {
-        Arc::make_mut(&mut ctx.prices).insert(CurveId::from(id_str), scalar);
+        ctx.insert_price_mut(id_str, scalar);
     }
 
     for series in state.series {
-        Arc::make_mut(&mut ctx.series).insert(series.id().clone(), series);
+        ctx.insert_series_mut(series);
     }
 
     for idx in state.inflation_indices {
@@ -630,8 +587,7 @@ fn restore_market_context(
     }
 
     for schedule in state.dividends {
-        let id = schedule.get_id().clone();
-        Arc::make_mut(&mut ctx.dividends).insert(id, Arc::new(schedule));
+        ctx.insert_dividends_mut(schedule);
     }
 
     for credit_state in state.credit_indices {
@@ -662,41 +618,21 @@ fn restore_market_context(
         if let Some(weights) = credit_state.issuer_weights {
             builder = builder.issuer_weights(weights);
         }
-        let data = builder.build()?;
-
-        Arc::make_mut(&mut ctx.credit_indices)
-            .insert(CurveId::from(credit_state.id), Arc::new(data));
-    }
-    let invalidated = ctx.rebind_all_credit_indices();
-    for id in invalidated {
-        report.push_bounded(
-                limits,
-                Diagnostic::new(
-                    "market-context/credit-index-rebind-failed",
-                    LoadPhase::Build,
-                    Severity::Error,
-                    format!(
-                        "credit index '{}' was dropped after its persisted curve references failed to rebind",
-                        id.as_str()
-                    ),
-                )
-                .with_pointer("/credit_indices")
-                .with_contract(MARKET_CONTEXT_STATE_CONTRACT.id),
-            );
+        // Every referenced curve resolved above, so the typed insert's own
+        // rebind cannot fail here.
+        ctx.insert_credit_index_mut(credit_state.id, builder.build()?)?;
     }
 
     for surface in state.fx_delta_vol_surfaces {
-        let id = surface.id().to_owned();
-        Arc::make_mut(&mut ctx.fx_delta_vol_surfaces).insert(id, Arc::new(surface));
+        ctx.insert_fx_delta_vol_surface_mut(surface);
     }
 
     for cube in state.vol_cubes {
-        let id = cube.id().to_owned();
-        Arc::make_mut(&mut ctx.vol_cubes).insert(id, Arc::new(cube));
+        ctx.insert_vol_cube_mut(cube);
     }
 
     for (csa, curve_id_str) in state.collateral {
-        Arc::make_mut(&mut ctx.collateral).insert(csa, CurveId::from(curve_id_str));
+        ctx.map_collateral_mut(csa, CurveId::from(curve_id_str));
     }
 
     ctx.hierarchy = state.hierarchy;
