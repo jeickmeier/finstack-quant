@@ -273,7 +273,7 @@ fn delta_based_engine_fails_closed_when_cross_currency_fx_is_missing() -> Result
         .expect_err("missing FX must fail closed");
     let message = error.to_string();
     assert!(
-        message.contains("FX matrix") || message.contains("FX conversion"),
+        message.contains("fx_matrix") || message.contains("FX conversion"),
         "unexpected error: {message}"
     );
     Ok(())
