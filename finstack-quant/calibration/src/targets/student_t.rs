@@ -97,12 +97,11 @@ impl StudentTTarget {
             return Ok(curve_id.clone());
         }
         // Preflight has already verified exactly one discount curve is present.
-        let (discount_curve_id, _) =
-            context.curves_of_type("Discount").next().ok_or_else(|| {
-                finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
-                    id: "discount curve".to_string(),
-                })
-            })?;
+        let (discount_curve_id, _) = context.iter_discount_curves().next().ok_or_else(|| {
+            finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
+                id: "discount curve".to_string(),
+            })
+        })?;
         Ok(discount_curve_id.clone())
     }
 

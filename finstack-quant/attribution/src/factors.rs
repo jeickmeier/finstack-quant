@@ -578,7 +578,7 @@ impl MarketSnapshot {
 
         // Every variant belongs to exactly one factor family. Retention also
         // removes dependent metadata only when its final curve is missing.
-        let mutation = new_market.retain_curves_mut(|id, curve| match curve {
+        let invalidated = new_market.retain_curves_mut(|id, curve| match curve {
             CurveStorage::Discount(_) => {
                 !restore_flags.contains(MarketRestoreFlags::DISCOUNT)
                     || snapshot.discount_curves.contains_key(id)
@@ -616,9 +616,9 @@ impl MarketSnapshot {
                     || snapshot.price_curves.contains_key(id)
             }
         });
-        if !mutation.invalidated_credit_indices.is_empty() {
+        if !invalidated.is_empty() {
             tracing::warn!(
-                invalidated = ?mutation.invalidated_credit_indices,
+                ?invalidated,
                 "credit indices invalidated during snapshot restore because required curves are absent"
             );
         }

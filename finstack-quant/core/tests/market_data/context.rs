@@ -657,8 +657,8 @@ fn retaining_curves_removes_dangling_indices_and_collateral_mappings() {
 
     for removed in ["INDEX-HAZ", "ISSUER-HAZ", "CORR"] {
         let mut retained = context.clone();
-        let info = retained.retain_curves_mut(|id, _| id.as_str() != removed);
-        assert_eq!(info.invalidated_credit_indices, vec![CurveId::new("INDEX")]);
+        let invalidated = retained.retain_curves_mut(|id, _| id.as_str() != removed);
+        assert_eq!(invalidated, vec![CurveId::new("INDEX")]);
         assert!(retained.get_credit_index("INDEX").is_err());
         assert!(retained.get_collateral("CSA").is_ok());
         let json = serde_json::to_string(&retained).expect("snapshot after retention");
@@ -666,8 +666,8 @@ fn retaining_curves_removes_dangling_indices_and_collateral_mappings() {
     }
 
     let mut retained = context;
-    let info = retained.retain_curves_mut(|id, _| id.as_str() != "USD-OIS");
-    assert!(info.invalidated_credit_indices.is_empty());
+    let invalidated = retained.retain_curves_mut(|id, _| id.as_str() != "USD-OIS");
+    assert!(invalidated.is_empty());
     assert!(retained.get_credit_index("INDEX").is_ok());
     assert!(retained.get_collateral("CSA").is_err());
     let json = serde_json::to_string(&retained).expect("snapshot without discount curve");
@@ -779,8 +779,7 @@ fn market_context_handles_additional_introspection() {
     assert!(!ctx.is_empty());
     assert!(ctx.curve("USD-OIS").is_some());
 
-    let collected: Vec<_> = ctx.curves_of_type("Discount").collect();
-    assert_eq!(collected.len(), 1);
+    assert_eq!(ctx.iter_discount_curves().count(), 1);
 
     let stats = ctx.stats();
     assert_eq!(stats.total_curves, 1);
@@ -841,11 +840,8 @@ fn market_context_mutations_preserve_and_report_credit_index_rebind_status() {
     assert!(bumped.get_credit_index("CDX-IG").is_ok());
 
     let mut cross_type = bumped;
-    let info = cross_type.retain_curves_mut(|id, _| id.as_str() != "CDX");
-    assert_eq!(
-        info.invalidated_credit_indices,
-        vec![CurveId::from("CDX-IG")]
-    );
+    let invalidated = cross_type.retain_curves_mut(|id, _| id.as_str() != "CDX");
+    assert_eq!(invalidated, vec![CurveId::from("CDX-IG")]);
     assert!(cross_type.get_credit_index("CDX-IG").is_err());
 }
 

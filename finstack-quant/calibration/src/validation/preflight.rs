@@ -80,7 +80,7 @@ fn validate_student_t_step(
     if let Some(curve_id) = &p.discount_curve_id {
         let _ = context.get_discount(curve_id)?;
     } else {
-        let mut discount_curves = context.curves_of_type("Discount");
+        let mut discount_curves = context.iter_discount_curves();
         if discount_curves.next().is_none() {
             return Err(finstack_quant_core::Error::Input(
                 finstack_quant_core::InputError::NotFound {

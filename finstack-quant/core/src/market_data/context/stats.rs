@@ -40,34 +40,6 @@ impl MarketContext {
         self.curves.iter()
     }
 
-    /// Iterate over curves matching a specific type name.
-    ///
-    /// # Parameters
-    /// - `curve_type`: string as returned by [`CurveStorage::curve_type`]
-    ///
-    /// # Examples
-    /// ```rust
-    /// # use finstack_quant_core::market_data::context::MarketContext;
-    /// # use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    /// # use finstack_quant_core::dates::Date;
-    /// # use time::Month;
-    /// # let curve = DiscountCurve::builder("USD-OIS")
-    /// #     .base_date(Date::from_calendar_date(2024, Month::January, 1).expect("Valid date"))
-    /// #     .knots([(0.0, 1.0), (1.0, 0.99)])
-    /// #     .build()
-    /// #     .expect("... builder should succeed");
-    /// # let ctx = MarketContext::new().insert(curve);
-    /// let mut iter = ctx.curves_of_type("Discount");
-    /// assert!(iter.next().is_some());
-    /// ```
-    pub fn curves_of_type<'a>(
-        &'a self,
-        curve_type: &'a str,
-    ) -> impl Iterator<Item = (&'a CurveId, &'a CurveStorage)> + 'a {
-        self.curves
-            .iter()
-            .filter(move |(_, storage)| storage.curve_type() == curve_type)
-    }
     /// Curve counts keyed by curve type, feeding [`ContextStats::curve_counts`].
     fn count_by_type(&self) -> BTreeMap<&'static str, usize> {
         let mut counts = BTreeMap::new();
@@ -225,17 +197,20 @@ impl MarketContext {
     ///
     /// * `pred` - Predicate called once per curve; `true` retains that ID and
     ///   `false` removes it. No iteration order is guaranteed.
+    ///
+    /// Returns the sorted identifiers of credit indices dropped because a
+    /// curve they depend on was removed.
     pub fn retain_curves_mut(
         &mut self,
         mut pred: impl FnMut(&CurveId, &CurveStorage) -> bool,
-    ) -> super::ContextMutationInfo {
+    ) -> Vec<CurveId> {
         Arc::make_mut(&mut self.curves).retain(|id, curve| pred(id, curve));
         let curves = &self.curves;
         Arc::make_mut(&mut self.collateral)
             .retain(|_, id| matches!(curves.get(id), Some(CurveStorage::Discount(_))));
-        super::ContextMutationInfo {
-            invalidated_credit_indices: self.rebind_all_credit_indices(),
-        }
+        let mut invalidated = self.rebind_all_credit_indices();
+        invalidated.sort();
+        invalidated
     }
 
     /// Iterate over the SABR volatility cubes.

@@ -76,16 +76,6 @@ use super::{
     term_structures::CreditIndexData,
 };
 
-/// Non-optional observability for market context mutations.
-///
-/// Returned by operations that can invalidate credit indices or change
-/// context state in non-obvious ways.
-#[derive(Clone, Debug, Default)]
-pub struct ContextMutationInfo {
-    /// Credit indices that were invalidated and removed because their
-    /// required curves are no longer present or changed type.
-    pub invalidated_credit_indices: Vec<CurveId>,
-}
 /// Reversible in-place bump token for scratch market-context workflows.
 ///
 /// This is intended for hot-path finite-difference calculations that need to
