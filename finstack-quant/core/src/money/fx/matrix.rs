@@ -5,7 +5,7 @@ use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::{recover_lock, HashMap, HashSet};
+use crate::{recover_lock, HashMap};
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     recover_lock(mutex.lock())
@@ -99,63 +99,6 @@ fn pivot_cross(
         (Ok(Some(first)), Ok(Some(second))) => Some(first * second),
         _ => None,
     }
-}
-
-fn validate_fx_snapshot(
-    global: &HashMap<Pair, f64>,
-    pinned: &HashMap<Pair, f64>,
-    observed: &HashMap<Pair, f64>,
-    tolerance_bp: f64,
-    scope: &str,
-) -> crate::Result<()> {
-    let mut currencies = HashSet::default();
-    for pair in global.keys().chain(pinned.keys()).chain(observed.keys()) {
-        currencies.insert(pair.0);
-        currencies.insert(pair.1);
-    }
-    let mut currencies: Vec<_> = currencies.into_iter().collect();
-    currencies.sort();
-
-    // Check explicit two-way inconsistencies as well as three-currency cycles.
-    for (i, &a) in currencies.iter().enumerate() {
-        for &b in currencies.iter().skip(i + 1) {
-            let (Some(ab), Some(ba)) = (
-                effective_snapshot_rate(global, pinned, observed, a, b)?,
-                effective_snapshot_rate(global, pinned, observed, b, a)?,
-            ) else {
-                continue;
-            };
-            let product = ab * ba;
-            let deviation_bp = (product - 1.0).abs() * 10_000.0;
-            if deviation_bp > tolerance_bp {
-                return Err(crate::Error::Validation(format!(
-                    "reciprocal FX inconsistency in {scope} for {a}<->{b}: product {product:.12} ({deviation_bp:.6} bp)"
-                )));
-            }
-        }
-    }
-
-    for (i, &a) in currencies.iter().enumerate() {
-        for (j, &b) in currencies.iter().enumerate().skip(i + 1) {
-            for &c in currencies.iter().skip(j + 1) {
-                let (Some(ab), Some(bc), Some(ca)) = (
-                    effective_snapshot_rate(global, pinned, observed, a, b)?,
-                    effective_snapshot_rate(global, pinned, observed, b, c)?,
-                    effective_snapshot_rate(global, pinned, observed, c, a)?,
-                ) else {
-                    continue;
-                };
-                let product = ab * bc * ca;
-                let deviation_bp = (product - 1.0).abs() * 10_000.0;
-                if deviation_bp > tolerance_bp {
-                    return Err(crate::Error::Validation(format!(
-                        "triangular arbitrage detected in {scope} for {a}->{b}->{c}->{a}: cycle product {product:.12} ({deviation_bp:.6} bp)"
-                    )));
-                }
-            }
-        }
-    }
-    Ok(())
 }
 
 /// Simplified FX matrix that stores quotes and computes cross rates on demand.
@@ -352,7 +295,7 @@ impl FxMatrix {
     /// }
     ///
     /// let matrix = FxMatrix::new(Arc::new(StaticFx));
-    /// assert_eq!(matrix.stored_quote_count(), 0);
+    /// assert!(matrix.get_serializable_state().expect("state").quotes.is_empty());
     /// ```
     pub fn new(provider: Arc<dyn FxProvider>) -> Self {
         Self::with_capacity(provider, FxConfig::default(), DEFAULT_CACHE_CAPACITY)
@@ -665,71 +608,6 @@ impl FxMatrix {
         Ok(())
     }
 
-    /// Remove every explicit pair-global quote, pinned fixing, and provider observation.
-    ///
-    /// Seeded pegs and date/policy fixings are deleted too; later lookups fall
-    /// back to the provider.
-    ///
-    /// # Examples
-    /// ```rust
-    /// # use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
-    /// # use finstack_quant_core::currency::Currency;
-    /// # use finstack_quant_core::dates::Date;
-    /// # use std::sync::Arc;
-    /// # use time::Month;
-    /// # struct StaticFx;
-    /// # impl FxProvider for StaticFx {
-    /// #     fn rate(&self, _from: Currency, _to: Currency, _on: Date, _policy: FxConversionPolicy)
-    /// #         -> finstack_quant_core::Result<f64> { Ok(1.0) }
-    /// # }
-    /// let matrix = FxMatrix::new(Arc::new(StaticFx));
-    /// matrix.clear_quotes();
-    /// ```
-    pub fn clear_quotes(&self) {
-        {
-            let mut quotes = lock(&self.quotes);
-            let mut pinned = lock(&self.pinned_quotes);
-            quotes.clear();
-            pinned.clear();
-            self.quote_revision.fetch_add(1, Ordering::AcqRel);
-        }
-        self.invalidate_observed_quotes();
-    }
-
-    /// Return the number of authoritative quotes and current observations.
-    ///
-    /// Observations from an earlier provider revision are excluded even when
-    /// their storage has not yet been reclaimed by the bounded cache.
-    ///
-    /// # Examples
-    /// ```rust
-    /// # use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
-    /// # use finstack_quant_core::currency::Currency;
-    /// # use finstack_quant_core::dates::Date;
-    /// # use std::sync::Arc;
-    /// # use time::Month;
-    /// # struct StaticFx;
-    /// # impl FxProvider for StaticFx {
-    /// #     fn rate(&self, _from: Currency, _to: Currency, _on: Date, _policy: FxConversionPolicy)
-    /// #         -> finstack_quant_core::Result<f64> { Ok(1.0) }
-    /// # }
-    /// let matrix = FxMatrix::new(Arc::new(StaticFx));
-    /// assert_eq!(matrix.stored_quote_count(), 0);
-    /// ```
-    pub fn stored_quote_count(&self) -> usize {
-        let quotes = lock(&self.quotes);
-        let revision = self.observation_revision();
-        let observed_quotes = lock(&self.observed_quotes);
-        // Authoritative pinned fixings remain valid across provider updates.
-        let pinned_quotes = lock(&self.pinned_quotes);
-        quotes.len()
-            + observed_quotes
-                .iter()
-                .filter(|(_, quote)| Some(quote.revision) == revision)
-                .count()
-            + pinned_quotes.len()
-    }
-
     /// Extract serializable state from the matrix.
     ///
     /// Returns the configuration and current quotes that can be persisted.
@@ -1001,90 +879,6 @@ impl FxMatrix {
             rate
         };
         validate_fx_rate(stored_from, stored_to, scaled)
-    }
-
-    /// Validate stored FX quotes for reciprocal and triangular consistency.
-    ///
-    /// Pair-global quotes are checked together. Provider-observed and pinned
-    /// quotes are checked only within the same `(date, policy)` snapshot, then
-    /// combined with pair-global quotes; this avoids false arbitrage signals
-    /// from comparing moving market data across dates. `tolerance_bp` is the
-    /// permitted absolute deviation of a reciprocal or three-leg cycle product
-    /// from one, expressed in basis points.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error when `tolerance_bp` is non-finite or
-    /// negative, when a reciprocal product differs from one beyond tolerance,
-    /// or when a three-currency cycle implies triangular arbitrage beyond
-    /// tolerance. A stored opposite quote whose reciprocal is not a finite
-    /// positive FX rate returns that input error instead of a cycle product.
-    /// The check uses the current stored snapshot only and never performs
-    /// provider I/O.
-    ///
-    /// # Arguments
-    ///
-    /// * `tolerance_bp` - Maximum absolute deviation of a reciprocal or three-leg cycle product from 1, in basis points. Must be finite and non-negative.
-    pub fn validate_triangular(&self, tolerance_bp: f64) -> crate::Result<()> {
-        if !tolerance_bp.is_finite() || tolerance_bp < 0.0 {
-            return Err(crate::Error::Validation(format!(
-                "triangular validation tolerance must be finite and non-negative, got {tolerance_bp}"
-            )));
-        }
-
-        let global: HashMap<Pair, f64> = lock(&self.quotes).clone();
-        validate_fx_snapshot(
-            &global,
-            &HashMap::default(),
-            &HashMap::default(),
-            tolerance_bp,
-            "global",
-        )?;
-
-        // Date/policy-sensitive quotes must only be compared within the same
-        // market snapshot. Combining observations from different dates creates
-        // false arbitrage signals in a moving FX market.
-        type Scope = (Date, FxConversionPolicy);
-        type ScopedRates = (HashMap<Pair, f64>, HashMap<Pair, f64>);
-        let mut scoped: HashMap<Scope, ScopedRates> = HashMap::default();
-        let revision = self.observation_revision();
-        {
-            let observed = lock(&self.observed_quotes);
-            for (query, quote) in observed.iter() {
-                if Some(quote.revision) == revision && quote.rate.is_finite() && quote.rate > 0.0 {
-                    scoped
-                        .entry((query.on, query.policy))
-                        .or_default()
-                        .1
-                        .insert(Pair(query.from, query.to), quote.rate);
-                }
-            }
-        }
-        {
-            let pinned = lock(&self.pinned_quotes);
-            for (query, &rate) in pinned.iter() {
-                if rate.is_finite() && rate > 0.0 {
-                    scoped
-                        .entry((query.on, query.policy))
-                        .or_default()
-                        .0
-                        .insert(Pair(query.from, query.to), rate);
-                }
-            }
-        }
-
-        let mut scopes: Vec<_> = scoped.into_iter().collect();
-        scopes.sort_by_key(|((date, policy), _)| (*date, *policy as u8));
-        for ((date, policy), (pinned, observed)) in scopes {
-            validate_fx_snapshot(
-                &global,
-                &pinned,
-                &observed,
-                tolerance_bp,
-                &format!("{date}/{policy}"),
-            )?;
-        }
-        Ok(())
     }
 
     /// Attempt to triangulate FX rate via the single configured pivot currency.
@@ -1416,7 +1210,7 @@ mod revision_tests {
             on,
             policy: FxConversionPolicy::CashflowDate,
         };
-        for mutation in ["single", "batch", "pinned", "clear"] {
+        for mutation in ["single", "batch", "pinned"] {
             let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
             matrix.set_quote(key.from, key.to, 1.1).expect("global");
             matrix
@@ -1435,7 +1229,6 @@ mod revision_tests {
                     "pinned" => matrix
                         .set_quote_on(key.from, key.to, on, key.policy, 1.2)
                         .expect("pinned update"),
-                    "clear" => matrix.clear_quotes(),
                     _ => unreachable!(),
                 });
                 loop {
@@ -1444,10 +1237,6 @@ mod revision_tests {
                             lock(&matrix.quotes).get(&Pair(key.from, key.to)) == Some(&1.2)
                         }
                         "pinned" => lock(&matrix.pinned_quotes).get(&key) == Some(&1.2),
-                        "clear" => {
-                            lock(&matrix.quotes).is_empty()
-                                && lock(&matrix.pinned_quotes).is_empty()
-                        }
                         _ => unreachable!(),
                     };
                     if published {

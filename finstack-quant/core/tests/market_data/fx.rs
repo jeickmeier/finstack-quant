@@ -10,6 +10,14 @@ fn test_date() -> Date {
     Date::from_calendar_date(2024, Month::January, 15).unwrap()
 }
 
+/// The provider's answer for `from → to` on the test date, or `None` when
+/// neither a direct nor a reciprocal quote is stored.
+fn direct(provider: &SimpleFxProvider, from: Currency, to: Currency) -> Option<f64> {
+    provider
+        .rate(from, to, test_date(), FxConversionPolicy::CashflowDate)
+        .ok()
+}
+
 #[test]
 fn simple_fx_provider_new_empty() {
     let provider = SimpleFxProvider::new();
@@ -51,7 +59,7 @@ fn simple_fx_provider_identity_rates() {
 }
 
 #[test]
-fn simple_fx_provider_set_and_get_direct() {
+fn simple_fx_provider_set_and_rate() {
     let provider = SimpleFxProvider::new();
 
     provider
@@ -59,13 +67,11 @@ fn simple_fx_provider_set_and_get_direct() {
         .expect("valid test quote");
 
     // Direct lookup
-    assert_eq!(
-        provider.get_direct(Currency::EUR, Currency::USD),
-        Some(1.15)
-    );
+    assert_eq!(direct(&provider, Currency::EUR, Currency::USD), Some(1.15));
 
-    // Opposite direction not set
-    assert_eq!(provider.get_direct(Currency::USD, Currency::EUR), None);
+    // Opposite direction is served through the reciprocal of the stored quote.
+    let reciprocal = direct(&provider, Currency::USD, Currency::EUR).expect("reciprocal");
+    assert!((reciprocal - 1.0 / 1.15).abs() < 1e-15);
 }
 
 #[test]
@@ -112,16 +118,10 @@ fn simple_fx_provider_set_quotes_bulk() {
         .expect("valid test quotes");
 
     // All should be retrievable
+    assert_eq!(direct(&provider, Currency::EUR, Currency::USD), Some(1.10));
+    assert_eq!(direct(&provider, Currency::GBP, Currency::USD), Some(1.25));
     assert_eq!(
-        provider.get_direct(Currency::EUR, Currency::USD),
-        Some(1.10)
-    );
-    assert_eq!(
-        provider.get_direct(Currency::GBP, Currency::USD),
-        Some(1.25)
-    );
-    assert_eq!(
-        provider.get_direct(Currency::JPY, Currency::USD),
+        direct(&provider, Currency::JPY, Currency::USD),
         Some(0.0091)
     );
 }
@@ -139,11 +139,8 @@ fn simple_fx_provider_set_quotes_is_atomic() {
             (Currency::GBP, Currency::USD, f64::NAN),
         ])
         .is_err());
-    assert_eq!(
-        provider.get_direct(Currency::EUR, Currency::USD),
-        Some(1.10)
-    );
-    assert_eq!(provider.get_direct(Currency::GBP, Currency::USD), None);
+    assert_eq!(direct(&provider, Currency::EUR, Currency::USD), Some(1.10));
+    assert_eq!(direct(&provider, Currency::GBP, Currency::USD), None);
 }
 
 #[test]
@@ -154,19 +151,13 @@ fn simple_fx_provider_update_existing_quote() {
     provider
         .set_quote(Currency::EUR, Currency::USD, 1.10)
         .expect("valid test quote");
-    assert_eq!(
-        provider.get_direct(Currency::EUR, Currency::USD),
-        Some(1.10)
-    );
+    assert_eq!(direct(&provider, Currency::EUR, Currency::USD), Some(1.10));
 
     // Update quote
     provider
         .set_quote(Currency::EUR, Currency::USD, 1.15)
         .expect("valid test quote");
-    assert_eq!(
-        provider.get_direct(Currency::EUR, Currency::USD),
-        Some(1.15)
-    );
+    assert_eq!(direct(&provider, Currency::EUR, Currency::USD), Some(1.15));
 }
 
 #[test]
@@ -289,14 +280,8 @@ fn simple_fx_provider_thread_safety() {
     handle.join().unwrap();
 
     // Both quotes should be available
-    assert_eq!(
-        provider.get_direct(Currency::EUR, Currency::USD),
-        Some(1.10)
-    );
-    assert_eq!(
-        provider.get_direct(Currency::GBP, Currency::USD),
-        Some(1.25)
-    );
+    assert_eq!(direct(&provider, Currency::EUR, Currency::USD), Some(1.10));
+    assert_eq!(direct(&provider, Currency::GBP, Currency::USD), Some(1.25));
 }
 
 #[test]
@@ -317,7 +302,7 @@ fn simple_fx_provider_many_currencies() {
 
     // Verify all are stored correctly
     for (from, to, expected) in pairs {
-        let rate = provider.get_direct(from, to);
+        let rate = direct(&provider, from, to);
         assert_eq!(rate, Some(expected));
     }
 }

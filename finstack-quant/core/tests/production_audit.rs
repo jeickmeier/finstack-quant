@@ -34,9 +34,6 @@ fn m9_global_source_precedes_orientation_and_pinned_fixing() {
     assert_eq!(forward, 1.25);
     assert!((forward * reverse - 1.0).abs() < 1e-12);
     matrix
-        .validate_triangular(1e-6)
-        .expect("effective quote snapshot is reciprocal");
-    matrix
         .set_quote(Currency::USD, Currency::GBP, 0.8)
         .expect("pivot leg");
     let cross = matrix

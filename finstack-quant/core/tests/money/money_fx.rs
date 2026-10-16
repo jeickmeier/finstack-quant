@@ -73,34 +73,10 @@ fn provider_cache_hits_refresh_recency_and_evict_the_least_recent_quote() {
         matrix.rate(query(day)).expect("provider rate");
     }
     assert_eq!(provider.0.load(Ordering::Relaxed), 3);
-    assert_eq!(matrix.stored_quote_count(), 2);
     matrix
         .rate(query(2))
         .expect("evicted quote is fetched again");
     assert_eq!(provider.0.load(Ordering::Relaxed), 4);
-    assert_eq!(matrix.stored_quote_count(), 2);
-}
-
-#[test]
-fn provider_cache_allocates_for_observations_instead_of_the_capacity_limit() {
-    let matrix = FxMatrix::try_with_config(
-        Arc::new(StaticFx { rate: 1.2 }),
-        FxConfig {
-            cache_capacity: usize::MAX,
-            ..Default::default()
-        },
-    )
-    .expect("nonzero capacity is valid");
-    assert_eq!(matrix.stored_quote_count(), 0);
-    let date = Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
-    assert_eq!(
-        matrix
-            .rate(FxQuery::new(Currency::EUR, Currency::USD, date))
-            .expect("provider rate")
-            .rate,
-        1.2
-    );
-    assert_eq!(matrix.stored_quote_count(), 1);
 }
 
 #[test]
@@ -296,8 +272,6 @@ fn providers_without_revisions_do_not_cache_observations() {
     provider.0.store(120, Ordering::Relaxed);
     assert_eq!(matrix.rate(query).expect("updated live rate").rate, 1.2);
     assert!((bumped.rate(query).expect("updated bumped rate").rate - 1.212).abs() < 1e-12);
-    assert_eq!(matrix.stored_quote_count(), 0);
-    assert_eq!(bumped.stored_quote_count(), 0);
 }
 
 #[test]
@@ -1564,114 +1538,6 @@ fn mutable_provider_cross_shock_overflow_is_not_replaced_by_unshocked_triangulat
 }
 
 #[test]
-fn validate_triangular_flags_inconsistent_crosses() {
-    struct MissingFx;
-    impl FxProvider for MissingFx {
-        fn rate(
-            &self,
-            from: Currency,
-            to: Currency,
-            _on: Date,
-            _policy: FxConversionPolicy,
-        ) -> finstack_quant_core::Result<f64> {
-            Err(finstack_quant_core::InputError::NotFound {
-                id: format!("FX:{from}->{to}"),
-            }
-            .into())
-        }
-    }
-
-    let matrix = FxMatrix::new(Arc::new(MissingFx));
-    matrix
-        .set_quotes(&[
-            (Currency::EUR, Currency::USD, 1.10),
-            (Currency::USD, Currency::GBP, 0.80),
-            (Currency::GBP, Currency::EUR, 1.20),
-        ])
-        .expect("valid quotes");
-
-    let err = matrix
-        .validate_triangular(5.0)
-        .expect_err("inconsistent triangle should be rejected");
-    assert!(matches!(err, finstack_quant_core::Error::Validation(_)));
-}
-
-#[test]
-fn validate_triangular_accepts_consistent_quotes_and_rejects_bad_tolerance() {
-    struct MissingFx;
-    impl FxProvider for MissingFx {
-        fn rate(
-            &self,
-            from: Currency,
-            to: Currency,
-            _on: Date,
-            _policy: FxConversionPolicy,
-        ) -> finstack_quant_core::Result<f64> {
-            Err(finstack_quant_core::InputError::NotFound {
-                id: format!("FX:{from}->{to}"),
-            }
-            .into())
-        }
-    }
-
-    let matrix = FxMatrix::new(Arc::new(MissingFx));
-    matrix
-        .set_quotes(&[
-            (Currency::EUR, Currency::USD, 1.10),
-            (Currency::USD, Currency::GBP, 0.80),
-            (Currency::GBP, Currency::EUR, 1.0 / (1.10 * 0.80)),
-        ])
-        .expect("valid quotes");
-
-    assert!(matrix.validate_triangular(5.0).is_ok());
-    assert!(matches!(
-        matrix.validate_triangular(-1.0),
-        Err(finstack_quant_core::Error::Validation(_))
-    ));
-    assert!(matches!(
-        matrix.validate_triangular(f64::NAN),
-        Err(finstack_quant_core::Error::Validation(_))
-    ));
-}
-
-#[test]
-fn validate_triangular_handles_normal_market_quote_directions() {
-    let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
-    matrix
-        .set_quotes(&[
-            (Currency::EUR, Currency::USD, 1.10),
-            (Currency::USD, Currency::JPY, 150.0),
-            (Currency::EUR, Currency::JPY, 160.0),
-        ])
-        .expect("valid quotes");
-
-    matrix
-        .validate_triangular(5.0)
-        .expect_err("EUR/JPY should be compared with EUR/USD x USD/JPY");
-}
-
-#[test]
-fn validate_triangular_does_not_mix_dates() {
-    let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
-    let jan = Date::from_calendar_date(2025, time::Month::January, 2).unwrap();
-    let feb = Date::from_calendar_date(2025, time::Month::February, 3).unwrap();
-    let mar = Date::from_calendar_date(2025, time::Month::March, 3).unwrap();
-    let policy = FxConversionPolicy::CashflowDate;
-
-    matrix
-        .set_quote_on(Currency::EUR, Currency::USD, jan, policy, 1.10)
-        .unwrap();
-    matrix
-        .set_quote_on(Currency::USD, Currency::JPY, feb, policy, 150.0)
-        .unwrap();
-    matrix
-        .set_quote_on(Currency::EUR, Currency::JPY, mar, policy, 160.0)
-        .unwrap();
-
-    assert!(matrix.validate_triangular(5.0).is_ok());
-}
-
-#[test]
 fn triangulation_missing_leg_only_queries_provider_once_per_leg() {
     struct CountingMissingFx {
         calls: AtomicUsize,
@@ -2088,16 +1954,6 @@ fn reciprocal_of_subnormal_rate_is_rejected() {
         result.is_err(),
         "infinite reciprocal must be rejected, got {result:?}"
     );
-    let err = matrix
-        .validate_triangular(5.0)
-        .expect_err("subnormal reciprocal is not a cycle product");
-    assert!(matches!(
-        err,
-        finstack_quant_core::Error::Input(finstack_quant_core::InputError::InvalidFxRate { .. })
-            | finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::NonFiniteValue { .. }
-            )
-    ));
 }
 
 /// Provider-observed rates must not depend on which pair direction warmed the

@@ -139,25 +139,6 @@ impl SimpleFxProvider {
         Ok(())
     }
 
-    /// Retrieve a direct quote if available.
-    ///
-    /// Returns `None` if no direct quote exists for the pair.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use finstack_quant_core::money::fx::SimpleFxProvider;
-    /// use finstack_quant_core::currency::Currency;
-    ///
-    /// let provider = SimpleFxProvider::new();
-    /// provider.set_quote(Currency::EUR, Currency::USD, 1.1).expect("valid rate");
-    ///
-    /// assert_eq!(provider.get_direct(Currency::EUR, Currency::USD), Some(1.1));
-    /// assert_eq!(provider.get_direct(Currency::USD, Currency::EUR), None);
-    /// ```
-    pub fn get_direct(&self, from: Currency, to: Currency) -> Option<f64> {
-        recover(self.quotes.read()).get(&(from, to)).copied()
-    }
-
     /// Load date/policy-scoped provider state without promoting its authority
     /// to the containing matrix's explicit pinned quote store.
     pub(crate) fn set_snapshot_pinned_quotes(
