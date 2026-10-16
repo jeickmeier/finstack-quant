@@ -766,7 +766,7 @@ impl SabrCalibrator {
                             .map_or(1e6, |model_vol| weight * (model_vol - market_vol));
                     }
                 };
-                solver.solve_system_with_dim_stats(residuals, &initial, market_vols.len())
+                solver.solve_system(residuals, &initial, market_vols.len())
             },
             |solution| {
                 let physical = [
@@ -932,7 +932,7 @@ impl SabrCalibrator {
                             .map_or(1e6, |model_vol| weights[index] * (model_vol - market_vol));
                     }
                 };
-                solver.solve_system_with_dim_stats(residuals, &initial, market_vols.len())
+                solver.solve_system(residuals, &initial, market_vols.len())
             },
             |solution| {
                 let nu = unconstrained_to_bounded(solution.params[0], 0.001, 2.0);

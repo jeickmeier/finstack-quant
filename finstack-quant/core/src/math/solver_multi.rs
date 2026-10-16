@@ -29,7 +29,7 @@
 //! };
 //!
 //! let solution = solver
-//!     .solve_system_with_dim_stats(residuals, &[0.0, 0.0], 2)
+//!     .solve_system(residuals, &[0.0, 0.0], 2)
 //!     .expect("system solve should succeed");
 //! assert!((solution.params[0] - 3.0).abs() < 1e-6);
 //! assert!((solution.params[1] - 2.0).abs() < 1e-6);
@@ -108,10 +108,8 @@ pub trait AnalyticalDerivatives {
         None
     }
 
-    /// Number of residual equations for Jacobian-based system solves, if known.
-    fn residual_count(&self) -> Option<usize> {
-        None
-    }
+    /// Number of residual equations the Jacobian has rows for.
+    fn residual_count(&self) -> usize;
 }
 
 /// Termination reason for the Levenberg-Marquardt solver.
@@ -579,7 +577,7 @@ impl LevenbergMarquardtSolver {
     }
 
     /// Solve system of equations with explicit residual dimension and stats.
-    pub fn solve_system_with_dim_stats<Res>(
+    pub fn solve_system<Res>(
         &self,
         residuals: Res,
         initial: &[f64],
@@ -606,7 +604,7 @@ impl LevenbergMarquardtSolver {
     }
 
     /// Solve system with analytical Jacobian and stats.
-    pub fn solve_system_with_jacobian_stats<Res, D>(
+    pub fn solve_system_with_jacobian<Res, D>(
         &self,
         residuals: Res,
         derivatives: &D,
@@ -619,12 +617,7 @@ impl LevenbergMarquardtSolver {
         if initial.is_empty() {
             return Err(InputError::Invalid.into());
         }
-        let n_residuals = derivatives.residual_count().ok_or_else(|| {
-            crate::Error::Validation(
-                "solve_system_with_jacobian_stats requires AnalyticalDerivatives::residual_count() to be implemented"
-                    .to_string(),
-            )
-        })?;
+        let n_residuals = derivatives.residual_count();
 
         let n_params = initial.len();
         let mut jac_scratch = JacobianScratch::new(n_params, n_residuals);
@@ -665,7 +658,7 @@ mod tests {
         for scale in [1e-12, 1.0, 1e12] {
             let solution = LevenbergMarquardtSolver::new()
                 .with_tolerance(scale * 1e-10)
-                .solve_system_with_dim_stats(
+                .solve_system(
                     |p, residuals| residuals[0] = scale * (p[0] - 2.0),
                     &[0.0],
                     1,
@@ -690,7 +683,7 @@ mod tests {
 
         let initial = vec![0.0, 0.0];
         let solution = solver
-            .solve_system_with_dim_stats(residuals, &initial, 2)
+            .solve_system(residuals, &initial, 2)
             .expect("stats solve should succeed");
 
         assert_eq!(
@@ -713,7 +706,7 @@ mod tests {
 
         let initial = vec![0.0];
         let solution = solver
-            .solve_system_with_dim_stats(residuals, &initial, 1)
+            .solve_system(residuals, &initial, 1)
             .expect("stats solve should succeed");
 
         assert_eq!(
@@ -741,8 +734,8 @@ mod tests {
                 Some(())
             }
 
-            fn residual_count(&self) -> Option<usize> {
-                Some(2)
+            fn residual_count(&self) -> usize {
+                2
             }
         }
 
@@ -757,7 +750,7 @@ mod tests {
         let initial = vec![1.0, 0.0];
 
         let result = solver
-            .solve_system_with_jacobian_stats(residuals, &derivatives, &initial)
+            .solve_system_with_jacobian(residuals, &derivatives, &initial)
             .expect("Minimization should succeed in test")
             .params;
 
@@ -787,8 +780,8 @@ mod tests {
 
         let initial = vec![0.0, 0.0];
         let result = solver
-            .solve_system_with_dim_stats(residuals, &initial, 5)
-            .expect("solve_system_with_dim_stats should succeed")
+            .solve_system(residuals, &initial, 5)
+            .expect("solve_system should succeed")
             .params;
 
         assert!(
@@ -825,8 +818,8 @@ mod tests {
 
         let initial = vec![0.0, 0.0];
         let result = solver
-            .solve_system_with_dim_stats(residuals, &initial, 20)
-            .expect("solve_system_with_dim_stats should not panic with 20 residuals")
+            .solve_system(residuals, &initial, 20)
+            .expect("solve_system should not panic with 20 residuals")
             .params;
 
         // Solution should be approximately x=3, y=2
@@ -854,7 +847,7 @@ mod tests {
 
         let initial = vec![0.0, 0.0, 0.0];
         let result = solver
-            .solve_system_with_dim_stats(residuals, &initial, 3)
+            .solve_system(residuals, &initial, 3)
             .expect("solve should succeed")
             .params;
 
@@ -873,8 +866,8 @@ mod tests {
                 Some(())
             }
 
-            fn residual_count(&self) -> Option<usize> {
-                Some(5)
+            fn residual_count(&self) -> usize {
+                5
             }
         }
 
@@ -889,37 +882,9 @@ mod tests {
         let initial = vec![0.0];
 
         let solution = solver
-            .solve_system_with_jacobian_stats(residuals, &TallJacobian, &initial)
+            .solve_system_with_jacobian(residuals, &TallJacobian, &initial)
             .expect("explicit residual count should avoid probe truncation");
 
         assert_eq!(solution.params.len(), 1);
-    }
-
-    #[test]
-    fn test_jacobian_system_requires_explicit_residual_count() {
-        struct MissingCountJacobian;
-
-        impl AnalyticalDerivatives for MissingCountJacobian {
-            fn jacobian(&self, _params: &[f64], jacobian: &mut [Vec<f64>]) -> Option<()> {
-                for row in jacobian.iter_mut() {
-                    row[0] = 1.0;
-                }
-                Some(())
-            }
-        }
-
-        let solver = LevenbergMarquardtSolver::new();
-        let residuals = |params: &[f64], resid: &mut [f64]| {
-            resid[0] = params[0] - 1.0;
-        };
-
-        let err = solver
-            .solve_system_with_jacobian_stats(residuals, &MissingCountJacobian, &[0.0])
-            .expect_err("missing residual_count should fail loudly");
-
-        assert!(
-            err.to_string().contains("residual_count"),
-            "expected residual_count guidance, got {err}"
-        );
     }
 }

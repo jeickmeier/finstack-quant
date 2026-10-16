@@ -766,8 +766,8 @@ where
             Some(())
         }
 
-        fn residual_count(&self) -> Option<usize> {
-            Some(self.active_quotes.len())
+        fn residual_count(&self) -> usize {
+            self.active_quotes.len()
         }
     }
 
@@ -780,11 +780,11 @@ where
             lb,
             ub,
         };
-        solver.solve_system_with_jacobian_stats(residuals_func, &derivatives, initials)?
+        solver.solve_system_with_jacobian(residuals_func, &derivatives, initials)?
     } else {
-        solver.solve_system_with_dim_stats(residuals_func, initials, n_residuals)?
+        solver.solve_system(residuals_func, initials, n_residuals)?
     };
-    // The LM core (`solve_system_with_dim_stats` / `solve_system_with_jacobian_stats`)
+    // The LM core (`solve_system` / `solve_system_with_jacobian`)
     // runs without native box constraints: the residual closure clamps a *local*
     // pricing copy but LM keeps the unclamped iterate. As a result the converged
     // `solution.params` can land outside the target's `lower_bounds()`/`upper_bounds()`.

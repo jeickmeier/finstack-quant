@@ -325,7 +325,7 @@ where
     let initial: Vec<f64> = active.iter().map(|&i| initial[i]).collect();
     let solution = finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new()
         .with_tolerance(INTERPOLANT_CALIBRATE_TOL * 0.1)
-        .solve_system_with_dim_stats(residuals, &initial, targets.len())?;
+        .solve_system(residuals, &initial, targets.len())?;
     let deltas = expand(&solution.params);
     // Solver termination alone is not acceptance: check every requested point
     // against the final rebuilt native interpolant, including exact pillars.

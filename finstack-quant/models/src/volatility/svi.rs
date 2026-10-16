@@ -524,7 +524,7 @@ pub fn calibrate_svi_with_solver(
         sigma_init.ln(),
     ];
 
-    let result = solver.solve_system_with_dim_stats(residuals, &x0, n_points);
+    let result = solver.solve_system(residuals, &x0, n_points);
 
     let sol = result.map_err(|e| {
         finstack_quant_core::Error::Validation(format!("SVI calibration failed: {e}"))
