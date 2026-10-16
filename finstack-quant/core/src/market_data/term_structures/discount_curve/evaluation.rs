@@ -78,8 +78,8 @@ impl DiscountCurve {
         let source = Self::builder(self.id.clone())
             .base_date(self.base)
             .knots(transform.source_points.iter().copied())
-            .interp(self.style)
-            .extrapolation(self.extrapolation)
+            .interp(self.interp.style())
+            .extrapolation(self.interp.extrapolation())
             .validation(super::ValidationMode::Raw {
                 allow_non_monotonic: true,
                 forward_floor: None,

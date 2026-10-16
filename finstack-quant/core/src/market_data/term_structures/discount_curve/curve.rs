@@ -195,13 +195,13 @@ impl DiscountCurve {
     /// Interpolation style used by this curve.
     #[inline]
     pub fn interp_style(&self) -> InterpStyle {
-        self.style
+        self.interp.style()
     }
 
     /// Extrapolation policy used by this curve.
     #[inline]
     pub fn extrapolation(&self) -> ExtrapolationPolicy {
-        self.extrapolation
+        self.interp.extrapolation()
     }
 
     /// Exact typed conventions and quotes used to calibrate this curve.
@@ -633,8 +633,8 @@ impl DiscountCurve {
             .base_date(self.base)
             .day_count(self.day_count)
             .calendar_id_opt(self.calendar.as_ref().map(|calendar| calendar.id.clone()))
-            .interp(self.style)
-            .extrapolation(self.extrapolation)
+            .interp(self.interp.style())
+            .extrapolation(self.interp.extrapolation())
             .min_forward_tenor(self.min_forward_tenor)
             .rate_calibration_opt(self.rate_calibration.clone())
             .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days)

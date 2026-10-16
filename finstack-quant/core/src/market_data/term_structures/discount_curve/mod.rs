@@ -176,10 +176,6 @@ pub struct DiscountCurve {
     pub(crate) interp: Interp,
     /// Exact accumulated roll and continuous zero-rate shock evaluation.
     transform: Option<evaluation::CurveTransform>,
-    /// Interpolation style (stored for serialization and bumping)
-    pub(crate) style: InterpStyle,
-    /// Extrapolation policy (stored for serialization and bumping)
-    pub(crate) extrapolation: ExtrapolationPolicy,
     /// Minimum forward rate floor used during validation, if any.
     pub(crate) min_forward_rate: Option<f64>,
     /// Whether non-monotonic discount factors were explicitly allowed.
@@ -264,8 +260,8 @@ impl From<DiscountCurve> for RawDiscountCurve {
             day_count: curve.day_count,
             calendar_id: curve.calendar.map(|calendar| calendar.id),
             knot_points,
-            interp_style: curve.style,
-            extrapolation: curve.extrapolation,
+            interp_style: curve.interp.style(),
+            extrapolation: curve.interp.extrapolation(),
             min_forward_rate: curve.min_forward_rate,
             allow_non_monotonic: curve.allow_non_monotonic,
             min_forward_tenor: curve.min_forward_tenor,

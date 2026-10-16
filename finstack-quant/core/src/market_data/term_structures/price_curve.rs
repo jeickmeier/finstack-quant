@@ -82,10 +82,7 @@
 //!   35(3), 98-105. `docs/REFERENCES.md#whaley-2009-vix`
 //! - CBOE (2019). "VIX White Paper." CBOE Global Markets. `docs/REFERENCES.md#cboe-vix-white-paper`
 
-use super::common::{
-    bump_knots_parallel, bump_knots_percentage, bump_knots_triangular, infer_spot_from_knots,
-    roll_knots, triangular_weight, validate_non_negative_knots, year_fraction_to,
-};
+use super::common::{roll_knots, triangular_weight, year_fraction_to};
 use crate::dates::DateExt;
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
 use crate::math::interp::types::InterpRollState;
@@ -958,6 +955,88 @@ impl Bumpable for PriceCurve {
             }
         }
     }
+}
+
+// Knot helpers specific to signed price pillars.
+
+/// Apply an additive parallel bump to a slice of (t, value) knots.
+///
+/// Signed prices are preserved: `v + bump`.
+/// Returns the bumped knots as a new `Vec`.
+#[inline]
+fn bump_knots_parallel(knots: &[f64], values: &[f64], bump: f64) -> Vec<(f64, f64)> {
+    knots
+        .iter()
+        .zip(values.iter())
+        .map(|(&t, &v)| (t, v + bump))
+        .collect()
+}
+
+/// Apply a multiplicative percentage bump to a slice of (t, value) knots.
+///
+/// Each signed price is scaled by `1 + pct`.
+#[inline]
+fn bump_knots_percentage(knots: &[f64], values: &[f64], pct: f64) -> Vec<(f64, f64)> {
+    let factor = 1.0 + pct;
+    knots
+        .iter()
+        .zip(values.iter())
+        .map(|(&t, &v)| (t, v * factor))
+        .collect()
+}
+
+/// Apply a triangular key-rate bump to a slice of (t, value) knots.
+///
+/// Each knot receives a weight in `[0, 1]` based on its proximity to
+/// `target_bucket`. `prev_bucket = None` / `next_bucket = None` make the
+/// bucket a half-triangle (flat wing) on that side. Spot (t=0) is
+/// typically excluded by the caller.
+#[inline]
+fn bump_knots_triangular(
+    knots: &[f64],
+    values: &[f64],
+    prev_bucket: Option<f64>,
+    target_bucket: f64,
+    next_bucket: Option<f64>,
+    bump: f64,
+) -> Vec<(f64, f64)> {
+    knots
+        .iter()
+        .zip(values.iter())
+        .map(|(&t, &v)| {
+            let w = triangular_weight(t, prev_bucket, target_bucket, next_bucket);
+            (t, v + bump * w)
+        })
+        .collect()
+}
+
+/// Validate that all values in a knot slice are non-negative.
+///
+/// Returns a descriptive error that includes the tenor and value for quick diagnosis.
+fn validate_non_negative_knots(
+    knots: &[f64],
+    values: &[f64],
+    value_label: &str,
+) -> crate::Result<()> {
+    for (i, (&t, &v)) in knots.iter().zip(values.iter()).enumerate() {
+        if v < 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "{value_label} must be non-negative at t={t:.6}: value={v:.8} (index {i})"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Infer the spot value from a knot set when the first knot is at t≈0.
+///
+/// Returns `Some(v)` when the first knot is at t=0 (within 1e-14), otherwise `None`.
+#[inline]
+fn infer_spot_from_knots(knots: &[f64], values: &[f64]) -> Option<f64> {
+    knots
+        .first()
+        .filter(|&&t| t.abs() <= 1e-14)
+        .map(|_| values[0])
 }
 
 #[cfg(test)]

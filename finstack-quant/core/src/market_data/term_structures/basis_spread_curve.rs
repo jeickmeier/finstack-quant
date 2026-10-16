@@ -247,12 +247,9 @@ impl BasisSpreadCurve {
                 "All knots expired after rolling forward".to_string(),
             ));
         }
-        Self::builder(self.id.clone())
+        self.metadata_builder(self.id.clone())
             .base_date(new_base)
-            .day_count(self.day_count)
             .knots(rolled)
-            .interp(self.interp.style())
-            .extrapolation(self.interp.extrapolation())
             .roll_transform(self.interp.next_roll_state(
                 dt,
                 self.knots.iter().copied().zip(self.spreads.iter().copied()),
@@ -270,21 +267,20 @@ impl BasisSpreadCurve {
     ///
     /// * `id` - Identifier of the rebuilt curve, the `MarketContext` lookup key.
     pub fn to_builder_with_id(&self, id: CurveId) -> BasisSpreadCurveBuilder {
-        let points: Vec<(f64, f64)> = self
-            .knots
-            .iter()
-            .zip(self.spreads.iter())
-            .map(|(&t, &s)| (t, s))
-            .collect();
-        BasisSpreadCurveBuilder {
-            id,
-            base: Some(self.base),
-            day_count: self.day_count,
-            points,
-            style: self.interp.style(),
-            extrapolation: self.interp.extrapolation(),
-            roll_transform: self.interp.roll_state(),
-        }
+        self.metadata_builder(id)
+            .knots(self.knots.iter().copied().zip(self.spreads.iter().copied()))
+            .roll_transform(self.interp.roll_state())
+    }
+
+    /// Builder seeded with this curve's base date, day count, interpolation
+    /// style and extrapolation policy; the caller supplies pillars and any
+    /// roll state.
+    fn metadata_builder(&self, id: CurveId) -> BasisSpreadCurveBuilder {
+        Self::builder(id)
+            .base_date(self.base)
+            .day_count(self.day_count)
+            .interp(self.interp.style())
+            .extrapolation(self.interp.extrapolation())
     }
 }
 

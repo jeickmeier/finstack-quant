@@ -66,7 +66,7 @@
 //!   Know About Multiple Interest Rate Curve Bootstrapping but Were Afraid to Ask."
 //!   SSRN Working Paper. `docs/REFERENCES.md#ametrano-bianchetti-2013`
 
-use crate::market_data::term_structures::common::{infer_forward_curve_defaults, roll_knots};
+use crate::market_data::term_structures::common::roll_knots;
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::{
     dates::{Date, DayCount},
@@ -119,6 +119,7 @@ pub struct ForwardCurve {
 }
 
 mod builder;
+mod conventions;
 mod curve;
 mod evaluation;
 #[cfg(test)]
@@ -126,4 +127,5 @@ mod tests;
 mod transform;
 mod wire;
 pub use builder::ForwardCurveBuilder;
+use conventions::infer_forward_curve_defaults;
 use wire::RawForwardCurve;

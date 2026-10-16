@@ -327,8 +327,6 @@ impl DiscountCurveBuilder {
             dfs,
             interp,
             transform: None,
-            style: self.style,
-            extrapolation: self.extrapolation,
             min_forward_rate: self.min_forward_rate,
             allow_non_monotonic: self.allow_non_monotonic,
             min_forward_tenor: self.min_forward_tenor,

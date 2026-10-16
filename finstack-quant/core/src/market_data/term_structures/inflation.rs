@@ -511,20 +511,27 @@ impl InflationCurve {
     ///
     /// * `new_id` - Identifier of the rebuilt curve, the `MarketContext` lookup key.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> InflationCurveBuilder {
-        InflationCurve::builder(new_id)
-            .base_cpi(self.base_cpi)
-            .base_date(self.base_date)
-            .day_count(self.day_count)
-            .indexation_lag_months(self.indexation_lag_months)
+        self.metadata_builder(new_id)
             .knots(
                 self.knots
                     .iter()
                     .copied()
                     .zip(self.cpi_levels.iter().copied()),
             )
+            .roll_transform(self.interp.roll_state())
+    }
+
+    /// Builder seeded with this curve's base CPI, base date, day count,
+    /// indexation lag, interpolation style and extrapolation policy; the
+    /// caller supplies pillars and any roll state.
+    fn metadata_builder(&self, id: impl Into<CurveId>) -> InflationCurveBuilder {
+        InflationCurve::builder(id)
+            .base_cpi(self.base_cpi)
+            .base_date(self.base_date)
+            .day_count(self.day_count)
+            .indexation_lag_months(self.indexation_lag_months)
             .interp(self.interp.style())
             .extrapolation(self.interp.extrapolation())
-            .roll_transform(self.interp.roll_state())
     }
 
     /// Roll the curve forward by a specified number of days.
@@ -561,14 +568,10 @@ impl InflationCurve {
         }
         rolled_points.insert(0, (0.0, new_base_cpi));
 
-        InflationCurve::builder(self.id.clone())
+        self.metadata_builder(self.id.clone())
             .base_date(new_base)
-            .day_count(self.day_count)
-            .indexation_lag_months(self.indexation_lag_months)
             .base_cpi(new_base_cpi)
             .knots(rolled_points)
-            .interp(self.interp.style())
-            .extrapolation(self.interp.extrapolation())
             .roll_transform(
                 self.interp.next_roll_state(
                     dt_years,
@@ -815,13 +818,7 @@ impl Bumpable for InflationCurve {
             shocked_cpi_from_rate(t, ((cpi.ln() - base_cpi.ln()) / t).exp_m1())
         };
 
-        let builder = InflationCurve::builder(bumped_id)
-            .base_cpi(base_cpi)
-            .base_date(self.base_date())
-            .day_count(self.day_count())
-            .indexation_lag_months(self.indexation_lag_months())
-            .interp(self.interp_style())
-            .extrapolation(self.extrapolation());
+        let builder = self.metadata_builder(bumped_id);
         // A rolled curve shocks its source pillars and reads its current
         // pillars back, so base and shocked curves share one interpolation.
         if let Some((state, levels)) =
