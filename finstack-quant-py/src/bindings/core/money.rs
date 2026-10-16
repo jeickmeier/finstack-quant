@@ -16,7 +16,7 @@ use pyo3::IntoPyObjectExt;
 
 use crate::bindings::core::config::{extract_rounding_mode, PyFinstackConfig};
 use crate::bindings::core::currency::{extract_currency, PyCurrency};
-use crate::errors::{core_to_py, display_to_py, value_error};
+use crate::errors::{core_to_py, display_to_py};
 
 static DECIMAL_TYPE: PyOnceLock<Py<PyType>> = PyOnceLock::new();
 
@@ -295,16 +295,6 @@ impl PyMoney {
         group: Option<&str>,
         rounding: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<String> {
-        let group = match group {
-            None => None,
-            Some(sep) => {
-                let mut chars = sep.chars();
-                match (chars.next(), chars.next()) {
-                    (Some(c), None) => Some(c),
-                    _ => return Err(value_error("group must be a single character such as ','")),
-                }
-            }
-        };
         let rounding = match rounding {
             Some(mode) => extract_rounding_mode(mode)?,
             None => RoundingMode::default(),

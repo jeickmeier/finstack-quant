@@ -232,22 +232,17 @@ impl JsMoney {
         let group = js_opt_string(group.as_ref(), "group")?;
         let rounding = js_opt_string(rounding.as_ref(), "rounding")?;
         let decimals: Option<usize> = js_opt_uint(Some(&decimals), "decimals")?;
-        let group = match group {
-            None => None,
-            Some(sep) => {
-                let mut chars = sep.chars();
-                match (chars.next(), chars.next()) {
-                    (Some(c), None) => Some(c),
-                    _ => return Err(to_js_err("group must be a single character such as ','")),
-                }
-            }
-        };
         let rounding = match rounding {
             Some(mode) => mode.parse::<RoundingMode>().map_err(to_js_err)?,
             None => RoundingMode::default(),
         };
-        let opts = FormatOpts::new(decimals, show_currency.unwrap_or(true), group, rounding)
-            .map_err(to_js_err)?;
+        let opts = FormatOpts::new(
+            decimals,
+            show_currency.unwrap_or(true),
+            group.as_deref(),
+            rounding,
+        )
+        .map_err(to_js_err)?;
         Ok(self.inner.format_with(opts))
     }
 

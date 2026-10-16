@@ -113,21 +113,23 @@ impl FormatOpts {
     /// # Errors
     ///
     /// Returns `Error::Validation` when `decimals` exceeds
-    /// [`Self::MAX_DECIMALS`].
+    /// [`Self::MAX_DECIMALS`] or `group` is not exactly one character.
     ///
     /// # Examples
     /// ```rust
     /// use finstack_quant_core::money::FormatOpts;
     /// use finstack_quant_core::config::RoundingMode;
     ///
-    /// let opts = FormatOpts::new(Some(2), true, Some(','), RoundingMode::Bankers)
+    /// let opts = FormatOpts::new(Some(2), true, Some(","), RoundingMode::Bankers)
     ///     .expect("bounded precision");
     /// assert_eq!(opts.decimals, Some(2));
+    /// assert_eq!(opts.group, Some(','));
+    /// assert!(FormatOpts::new(None, true, Some(", "), RoundingMode::Bankers).is_err());
     /// ```
     pub fn new(
         decimals: Option<usize>,
         show_currency: bool,
-        group: Option<char>,
+        group: Option<&str>,
         rounding: RoundingMode,
     ) -> Result<Self, Error> {
         if decimals.is_some_and(|precision| precision > Self::MAX_DECIMALS) {
@@ -136,6 +138,20 @@ impl FormatOpts {
                 Self::MAX_DECIMALS
             )));
         }
+        let group = match group {
+            None => None,
+            Some(separator) => {
+                let mut chars = separator.chars();
+                match (chars.next(), chars.next()) {
+                    (Some(c), None) => Some(c),
+                    _ => {
+                        return Err(Error::Validation(
+                            "group must be a single character such as ','".to_string(),
+                        ))
+                    }
+                }
+            }
+        };
         Ok(Self {
             decimals,
             show_currency,
@@ -1176,7 +1192,7 @@ mod tests {
         );
         assert!(matches!(result, Err(Error::Validation(_))));
         assert!(
-            FormatOpts::new(None, true, Some(','), RoundingMode::Bankers)
+            FormatOpts::new(None, true, Some(","), RoundingMode::Bankers)
                 .expect("unbounded precision")
                 .decimals
                 .is_none()
@@ -1214,7 +1230,7 @@ mod tests {
         for (amount, expected, mode, name) in vectors.iter().copied() {
             let money =
                 Money::from_decimal_str(amount, Currency::USD).expect("exact vector amount");
-            let opts = FormatOpts::new(Some(2), true, Some(','), mode)
+            let opts = FormatOpts::new(Some(2), true, Some(","), mode)
                 .expect("bounded formatting options");
             assert_eq!(money.format_with(opts), expected, "{name} {amount}");
             assert_eq!(
