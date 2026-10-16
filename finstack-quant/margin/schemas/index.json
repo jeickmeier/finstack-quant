@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/ead_result.schema.json",
-      "bytes": 9273,
+      "bytes": 9287,
       "kind": "output",
       "path": "schemas/margin/1/ead_result.schema.json",
       "summary": "SA-CCR Exposure at Default result.",
@@ -56,7 +56,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/frtb_sba_result.schema.json",
-      "bytes": 13114,
+      "bytes": 13128,
       "kind": "output",
       "path": "schemas/margin/1/frtb_sba_result.schema.json",
       "summary": "Complete FRTB SBA capital charge result.",
@@ -227,7 +227,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/xva_result.schema.json",
-      "bytes": 20049,
+      "bytes": 20063,
       "kind": "output",
       "path": "schemas/margin/1/xva_result.schema.json",
       "summary": "Result of XVA calculations.",

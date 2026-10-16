@@ -10,8 +10,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 
 pub(crate) use finstack_quant_core::validation::{
-    require, require_or, require_with, validate_f64_finite, validate_f64_non_negative,
-    validate_f64_positive,
+    require_or, require_with, validate_f64_finite, validate_f64_non_negative, validate_f64_positive,
 };
 
 /// Validate `end > start` for a date range.

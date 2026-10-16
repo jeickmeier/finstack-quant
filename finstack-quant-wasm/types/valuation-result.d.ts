@@ -3525,7 +3525,7 @@ export interface ResultsMeta2 {
 /**
  * Snapshot of active rounding settings used for result stamping.
  *
- * Instances are typically produced via [`rounding_context_from`] and persisted
+ * Instances are produced from a [`FinstackConfig`] via `RoundingContext::from` and persisted
  * alongside valuation results.
  *
  * This interface was referenced by `ValuationResult1`'s JSON-Schema

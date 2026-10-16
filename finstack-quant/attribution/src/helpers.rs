@@ -260,7 +260,7 @@ pub(crate) fn init_attribution(
 ) -> PnlAttribution {
     let mut attribution = PnlAttribution::new(total_pnl, instrument_id, as_of_t0, as_of_t1, method);
     if let Some(config) = config {
-        attribution.meta.rounding = finstack_quant_core::config::rounding_context_from(config);
+        attribution.meta.rounding = finstack_quant_core::config::RoundingContext::from(config);
     }
     attribution
 }

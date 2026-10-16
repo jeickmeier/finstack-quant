@@ -7,7 +7,7 @@
 //!
 //! Note: Formatting is intentionally non-locale. Separators are ASCII and
 //! currency code precedes the amount (e.g., "USD 1,234.56"). Use
-//! [`Money::format_with_config`] or wrap at the UI layer if locale-aware
+//! [`Money::format_with`] or wrap at the UI layer if locale-aware
 //! presentation is required; the numeric representation remains deterministic
 //! and stable for pipelines.
 //!
@@ -750,37 +750,6 @@ impl fmt::Display for Money {
             group: None,
             ..FormatOpts::default()
         }))
-    }
-}
-
-impl Money {
-    /// Format this money using an explicit configuration (rounding mode and per-currency scales).
-    ///
-    /// # Examples
-    /// ```rust
-    /// use finstack_quant_core::money::Money;
-    /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::config::FinstackConfig;
-    ///
-    /// let amt = Money::from((10_i64, Currency::USD));
-    /// let mut cfg = FinstackConfig::default();
-    /// cfg.rounding
-    ///     .output_scale
-    ///     .set_scale(Currency::USD, 4)
-    ///     .expect("supported decimal scale");
-    /// assert_eq!(amt.format_with_config(&cfg), "USD 10.0000");
-    /// ```
-    ///
-    /// # Arguments
-    ///
-    /// * `cfg` - Finstack configuration controlling rounding policy and money tolerances
-    pub fn format_with_config(&self, cfg: &FinstackConfig) -> String {
-        self.format_with(FormatOpts {
-            decimals: Some(cfg.output_scale(self.currency) as usize),
-            show_currency: true,
-            group: None,
-            rounding: cfg.rounding.mode,
-        })
     }
 }
 

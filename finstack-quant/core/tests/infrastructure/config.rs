@@ -1,8 +1,7 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
 use finstack_quant_core::config::{
-    rounding_context_from, CurrencyScalePolicy, FinstackConfig, RoundingContext, RoundingMode,
-    ToleranceConfig, ZeroKind,
+    CurrencyScalePolicy, FinstackConfig, RoundingContext, RoundingMode, ToleranceConfig, ZeroKind,
 };
 use finstack_quant_core::currency::Currency;
 use serde_json::json;
@@ -62,7 +61,7 @@ fn currency_scale_boundaries_roundtrip_and_keep_money_epsilon_finite_positive() 
         );
         let decoded: FinstackConfig = serde_json::from_value(encoded).expect("valid config");
         assert_eq!(decoded.ingest_scale(Currency::USD), scale);
-        let context = rounding_context_from(&decoded);
+        let context = RoundingContext::from(&decoded);
         let restored: RoundingContext =
             serde_json::from_value(serde_json::to_value(&context).expect("context JSON"))
                 .expect("valid context");
@@ -180,7 +179,7 @@ fn rounding_context_uses_configured_tolerances() {
     cfg.tolerances.rate_epsilon = 1e-10;
     cfg.tolerances.generic_epsilon = 1e-8;
 
-    let ctx = rounding_context_from(&cfg);
+    let ctx = RoundingContext::from(&cfg);
 
     // Test rate zero check with custom tolerance
     assert!(ctx.is_effectively_zero(5e-11, ZeroKind::Rate)); // Below 1e-10

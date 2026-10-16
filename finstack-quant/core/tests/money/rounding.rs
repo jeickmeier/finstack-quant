@@ -20,11 +20,16 @@ fn money_preserves_nonzero_amount_at_maximum_configured_scale() {
         .expect("smallest positive Decimal amount");
     assert_eq!(money.amount_decimal(), exact_amount);
     assert_eq!(
-        money.format_with_config(&cfg),
+        money.format_with(FormatOpts {
+            decimals: Some(cfg.output_scale(Currency::USD) as usize),
+            show_currency: true,
+            group: None,
+            rounding: cfg.rounding.mode,
+        }),
         "USD 0.0000000000000000000000000001"
     );
     assert!(
-        !finstack_quant_core::config::rounding_context_from(&cfg).is_effectively_zero(
+        !finstack_quant_core::config::RoundingContext::from(&cfg).is_effectively_zero(
             money.amount(),
             finstack_quant_core::config::ZeroKind::Money(Currency::USD)
         )
@@ -46,7 +51,12 @@ fn money_display_respects_output_scale() {
     cfg.rounding.output_scale =
         CurrencyScalePolicy::new(std::collections::BTreeMap::from([(Currency::USD, 3)]))
             .expect("supported decimal scale");
-    let s = m.format_with_config(&cfg);
+    let s = m.format_with(FormatOpts {
+        decimals: Some(cfg.output_scale(Currency::USD) as usize),
+        show_currency: true,
+        group: None,
+        rounding: cfg.rounding.mode,
+    });
     assert_eq!(s, "USD 1.235");
 }
 

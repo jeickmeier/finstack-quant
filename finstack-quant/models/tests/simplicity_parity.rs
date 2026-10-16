@@ -10,8 +10,8 @@
 //!    interpolation contract.
 //! 4. `VolSurface::value_checked` and `value_in_bounds` agree on interior
 //!    evaluation points (the shared bilinear kernel regression test).
-//! 5. `Rate::try_from(f64)` / `Bps::try_from(f64)` match the validating
-//!    constructors `from_decimal` and `try_new`.
+//! 5. `Rate::from_decimal` and `Bps::try_new` reject non-finite input (the
+//!    only fallible constructors; the `TryFrom<f64>` twins were removed).
 //! 6. `xirr(flows, None)` equals
 //!    `xirr_with_daycount(flows, DayCount::Act365F, None)`.
 //!
@@ -282,38 +282,20 @@ fn value_checked_matches_value_clamped_on_interior() {
     }
 }
 
-// Rate / Bps: fallible-construction parity and NaN rejection
+// Rate / Bps: NaN rejection by the validating constructors
 
 #[test]
-fn rate_try_from_f64_matches_try_from_decimal_for_valid_inputs() {
-    for &x in &[0.0, 0.05, -0.001, 1.5, -0.999_5] {
-        let via_constructor = Rate::from_decimal(x).unwrap();
-        let via_conversion = Rate::try_from(x).unwrap();
-        assert!(
-            (via_constructor.as_decimal() - via_conversion.as_decimal()).abs() < 1e-15,
-            "Rate parity mismatch at {x}",
-        );
-    }
-}
-
-#[test]
-fn rate_try_from_decimal_rejects_non_finite() {
+fn rate_from_decimal_rejects_non_finite() {
     assert!(Rate::from_decimal(f64::NAN).is_err());
     assert!(Rate::from_decimal(f64::INFINITY).is_err());
     assert!(Rate::from_decimal(f64::NEG_INFINITY).is_err());
 }
 
 #[test]
-fn bp_try_from_f64_matches_try_new() {
-    let via_try = Bps::try_from(25.0_f64).unwrap();
-    let via_new = Bps::try_new(25.0).unwrap();
-    assert_eq!(via_try.as_bp(), via_new.as_bp());
-}
-
-#[test]
-fn bp_try_from_f64_rejects_non_finite() {
-    assert!(Bps::try_from(f64::NAN).is_err());
-    assert!(Bps::try_from(f64::INFINITY).is_err());
+fn bp_try_new_rejects_non_finite() {
+    assert_eq!(Bps::try_new(25.0).unwrap().as_bp(), 25);
+    assert!(Bps::try_new(f64::NAN).is_err());
+    assert!(Bps::try_new(f64::INFINITY).is_err());
 }
 
 // XIRR: xirr() delegation to xirr_with_daycount(Act365F)

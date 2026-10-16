@@ -293,25 +293,23 @@ impl Basket {
     /// unit-only and mixed unit/weight baskets. Validation instead enforces
     /// the structural invariants shared by all of those modes.
     pub fn validate(&self) -> Result<()> {
-        validation::require(
-            !self.constituents.is_empty(),
-            "basket must contain at least one constituent",
-        )?;
-        validation::require(
+        validation::require_with(!self.constituents.is_empty(), || {
+            "basket must contain at least one constituent".to_string()
+        })?;
+        validation::require_with(
             self.constituents.iter().all(|constituent| {
                 constituent.weight.is_finite() && constituent.units.is_none_or(f64::is_finite)
             }),
-            "basket constituent weights and units must be finite",
+            || "basket constituent weights and units must be finite".to_string(),
         )?;
-        validation::require(
+        validation::require_with(
             self.pricing_config.days_in_year.is_finite() && self.pricing_config.days_in_year > 0.0,
-            "basket pricing days_in_year must be finite and positive",
+            || "basket pricing days_in_year must be finite and positive".to_string(),
         )?;
 
-        validation::require(
-            self.notional.currency() == self.reporting_currency,
-            "basket notional currency must match basket reporting_currency",
-        )?;
+        validation::require_with(self.notional.currency() == self.reporting_currency, || {
+            "basket notional currency must match basket reporting_currency".to_string()
+        })?;
 
         Ok(())
     }

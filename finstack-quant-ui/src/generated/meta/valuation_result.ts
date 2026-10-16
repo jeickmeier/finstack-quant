@@ -640,7 +640,7 @@ export default [
   {
     "path": "#/$defs/d_55fd8d302833a65d16f6",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/RoundingContext",
-    "description": "Snapshot of active rounding settings used for result stamping.\n\nInstances are typically produced via [`rounding_context_from`] and persisted\nalongside valuation results."
+    "description": "Snapshot of active rounding settings used for result stamping.\n\nInstances are produced from a [`FinstackConfig`] via `RoundingContext::from` and persisted\nalongside valuation results."
   },
   {
     "path": "#/$defs/d_55fd8d302833a65d16f6/properties/ingest_scale_by_currency",

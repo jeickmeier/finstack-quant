@@ -201,7 +201,7 @@ impl AttributionInputs {
             }
             _ => crate::attribute_pnl(&self.method, &request)?,
         };
-        attribution.meta.rounding = finstack_quant_core::config::rounding_context_from(&config);
+        attribution.meta.rounding = finstack_quant_core::config::RoundingContext::from(&config);
         attribution.compute_residual()?;
         attribution.meta.num_repricings += rounding_probe.successful_valuations();
 

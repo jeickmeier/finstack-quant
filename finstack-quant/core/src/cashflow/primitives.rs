@@ -65,9 +65,10 @@ where
 /// # Labels
 ///
 /// `Display`, `FromStr`, and serde share one snake_case label per kind
-/// (`"fixed"`, `"float_reset"`, `"pre_payment"`); `FromStr` matches it
-/// exactly, with no aliases or case folding. [`CFKind::parse_label`] adds the
-/// case-insensitive reporting aliases.
+/// (`"fixed"`, `"float_reset"`, `"pre_payment"`). `FromStr` is ASCII
+/// case-insensitive and also accepts the reporting aliases `"coupon"`
+/// ([`CFKind::Fixed`]) and `"principal"` ([`CFKind::Notional`]); serde
+/// accepts only the canonical label.
 #[non_exhaustive]
 #[derive(
     Clone,
@@ -85,6 +86,7 @@ where
 #[serde(rename_all = "snake_case")]
 #[strum(
     serialize_all = "snake_case",
+    ascii_case_insensitive,
     parse_err_ty = String,
     parse_err_fn = unknown_cf_kind
 )]
@@ -93,6 +95,7 @@ pub enum CFKind {
     ///
     /// Periodic interest payment calculated as: `notional × rate × accrual_factor`.
     /// The `rate` field on [`CashFlow`] stores the coupon rate used.
+    #[strum(to_string = "fixed", serialize = "coupon")]
     Fixed,
 
     /// Floating-rate coupon cash-flow (or index fixing event).
@@ -150,6 +153,7 @@ pub enum CFKind {
     /// Used for initial notional payment (at inception), final notional repayment
     /// (at maturity), or intermediate notional exchanges in cross-currency swaps.
     /// For bonds: initial = purchase price, final = par redemption.
+    #[strum(to_string = "notional", serialize = "principal")]
     Notional,
 
     /// Payment-in-kind interest capitalization.
@@ -300,27 +304,6 @@ impl CFKind {
     #[must_use]
     pub const fn is_cash_settlement(self) -> bool {
         !matches!(self, CFKind::Pik | CFKind::DefaultedNotional)
-    }
-
-    /// Parse a cashflow-kind label, accepting canonical `Display` names plus
-    /// the reporting aliases `coupon` → [`CFKind::Fixed`] and `principal` →
-    /// [`CFKind::Notional`]. Matching is ASCII case-insensitive.
-    ///
-    /// # Arguments
-    ///
-    /// * `s` - Kind label such as `"fixed"`, `"Notional"`, `"coupon"`, or
-    ///   `"principal"`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when `s` is not a known kind label or alias.
-    pub fn parse_label(s: &str) -> std::result::Result<Self, String> {
-        let normalized = s.trim().to_ascii_lowercase();
-        match normalized.as_str() {
-            "coupon" => Ok(Self::Fixed),
-            "principal" => Ok(Self::Notional),
-            other => other.parse(),
-        }
     }
 }
 
@@ -892,17 +875,20 @@ mod tests {
     }
 
     #[test]
-    fn cfkind_parse_label_accepts_aliases_and_mixed_case() {
-        assert_eq!(CFKind::parse_label("coupon").expect("alias"), CFKind::Fixed);
+    fn cfkind_fromstr_accepts_aliases_and_mixed_case() {
+        assert_eq!("coupon".parse::<CFKind>().expect("alias"), CFKind::Fixed);
         assert_eq!(
-            CFKind::parse_label("principal").expect("alias"),
+            "principal".parse::<CFKind>().expect("alias"),
             CFKind::Notional
         );
         assert_eq!(
-            CFKind::parse_label("Notional").expect("mixed case"),
+            "Notional".parse::<CFKind>().expect("mixed case"),
             CFKind::Notional
         );
-        assert!(CFKind::parse_label("not-a-kind").is_err());
+        assert!("not-a-kind".parse::<CFKind>().is_err());
+        // Display and serde keep the canonical label.
+        assert_eq!(CFKind::Fixed.to_string(), "fixed");
+        assert_eq!(CFKind::Notional.to_string(), "notional");
     }
 
     #[test]
@@ -1061,8 +1047,11 @@ mod tests {
 
     #[test]
     fn cfkind_from_str_rejects_noncanonical_spellings() {
-        for rejected in ["amort", "prepayment", "FIXED", "Float-Reset", " fixed"] {
-            assert!(rejected.parse::<CFKind>().is_err());
+        // ASCII case is folded, but punctuation, whitespace and retired labels
+        // are not: the wire label is `pre_payment`, never `prepayment`.
+        assert_eq!("FIXED".parse::<CFKind>().expect("case-folded"), CFKind::Fixed);
+        for rejected in ["amort", "prepayment", "Float-Reset", " fixed"] {
+            assert!(rejected.parse::<CFKind>().is_err(), "{rejected:?}");
         }
     }
 

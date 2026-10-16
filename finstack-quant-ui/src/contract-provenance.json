@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "0af91b46a9ded0e21ecfd5642b60f61f2f5dc085cea3c7cc9553be9e247b4beb",
+          "sha256": "cf4ee44890a4c7d97ad7f996993502acc57949391a04d3e809ef18f78c8811be",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -159,7 +159,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
-          "sha256": "3c2574a5815a997947dd7911a4a225cade3ba8541f7290f0ccc80d96f768fe09",
+          "sha256": "42be699f007668312f62b94616c423afedc2649a7ac2108b694690f6db51e1bd",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "6e7c1b3a537177b20d1fa88065156acffd274a16f1692e3350432551bc24af56",
+          "sha256": "917dab457228a56c97aa4ef8aaa5a5413ddeccb5adfd57cbec1fd8df0b4debfd",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -285,21 +285,21 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
-          "sha256": "66cee3a57ae281d8e8a058747294c2a07e255617a81c19b73b4ab96b1f534afb",
+          "sha256": "8354535a6e45db65307b32cc6f070032029b4c6a9ef85cf15675df070be5e08f",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/bond.schema.json",
-          "sha256": "93932b303a686f60b824cbe94155603eec101765c6113474e5e571c2a0a45096",
+          "sha256": "b1e3fa6273fe9f42472c5747266baad6f62e754ff99eb78703e55c3e7a581581",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/bond_future.schema.json",
-          "sha256": "88f5a361a7a60bc09d8d985108f3e183083a544191be3219e7a0c2d51ab0463c",
+          "sha256": "3a0a5df562ba1f8578411fe3ac932d8d6d30dd0afc8048b613d3273a67dc6cdc",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -334,7 +334,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/structured_credit.schema.json",
-          "sha256": "e593ed978163e6cc3648a8272e512c7b7f84ea8e0b1e6c40f7833d346057bc5f",
+          "sha256": "bb86ee47b4ed8f2a45b15f9038909e29495c088b65c9f4f41ea14fe8c16a1b27",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -979,7 +979,7 @@
           "uri": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/results/1/instrument_cashflow.schema.json",
-          "sha256": "07ddcb39445fc4b279016fde9dd7d8301287872f10a061209a58841b75db639e",
+          "sha256": "f54b9f8ed5b7ecc362206ccc2f5da27d5af75d1f3324560853e92a6b1c2d012c",
           "description": "Native cashflow rows, reporting-currency PV and reconciliation status."
         }
       ]
@@ -1319,7 +1319,7 @@
   ],
   "hostContract": {
     "source": "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
-    "sha256": "be83e43b7e8803ad76ad1ae74e759ed3729446fc067e24cf63dd3b989154b228"
+    "sha256": "17837ed07417ccf84ff726179dcbc1eb3c611c8f441bcafe7560418c8534282f"
   },
   "details": [
     {

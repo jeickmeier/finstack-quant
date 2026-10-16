@@ -469,7 +469,7 @@ impl Default for ToleranceConfig {
 
 /// Snapshot of active rounding settings used for result stamping.
 ///
-/// Instances are typically produced via [`rounding_context_from`] and persisted
+/// Instances are produced from a [`FinstackConfig`] via `RoundingContext::from` and persisted
 /// alongside valuation results.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -520,7 +520,7 @@ pub enum ZeroKind {
 
 impl Default for RoundingContext {
     fn default() -> Self {
-        rounding_context_from(&FinstackConfig::default())
+        RoundingContext::from(&FinstackConfig::default())
     }
 }
 
@@ -708,31 +708,10 @@ impl From<&FinstackConfig> for RoundingContext {
     }
 }
 
-/// Build a snapshot of the current rounding context from a config.
-///
-/// The snapshot captures the concrete overrides used during valuation and can
-/// later be embedded in [`ResultsMeta`].
-///
-/// # Examples
-/// ```rust
-/// use finstack_quant_core::config::{rounding_context_from, FinstackConfig};
-///
-/// let ctx = rounding_context_from(&FinstackConfig::default());
-/// assert_eq!(ctx.version, 1);
-/// ```
-///
-/// # Arguments
-///
-/// * `cfg` - Library configuration whose rounding overrides, tolerance policy,
-///   and rounding mode are copied into the immutable snapshot.
-pub fn rounding_context_from(cfg: &FinstackConfig) -> RoundingContext {
-    RoundingContext::from(cfg)
-}
-
 /// Construct a [`ResultsMeta`] snapshot for stamping into result envelopes.
 ///
 /// Convenience wrapper that combines [`NUMERIC_MODE_F64`] and
-/// [`rounding_context_from`], without a timestamp (deterministic).
+/// `RoundingContext::from`, without a timestamp (deterministic).
 ///
 /// # Examples
 /// ```rust
@@ -751,7 +730,7 @@ pub fn rounding_context_from(cfg: &FinstackConfig) -> RoundingContext {
 pub fn results_meta(cfg: &FinstackConfig) -> ResultsMeta {
     ResultsMeta {
         numeric_mode: NUMERIC_MODE_F64.to_owned(),
-        rounding: rounding_context_from(cfg),
+        rounding: RoundingContext::from(cfg),
         fx_policy_applied: None,
         parallel: false,
         timestamp: None,

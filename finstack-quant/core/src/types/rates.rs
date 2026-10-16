@@ -208,7 +208,7 @@ impl Rate {
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn try_from_bp(bp: f64) -> Result<Self> {
-        Bps::try_new(bp).map(Self::from)
+        Bps::try_new(bp).map(Bps::as_rate)
     }
 
     /// Return the internal decimal representation (0.05 for 5%).
@@ -370,15 +370,6 @@ impl std::str::FromStr for Rate {
         };
         let value: f64 = number.trim().parse().map_err(|_| invalid())?;
         Self::from_decimal(value / divisor)
-    }
-}
-
-impl TryFrom<f64> for Rate {
-    type Error = Error;
-
-    /// Fallible conversion from a decimal rate, where `0.05` represents 5%.
-    fn try_from(decimal: f64) -> Result<Self> {
-        Self::from_decimal(decimal)
     }
 }
 
@@ -605,6 +596,8 @@ impl fmt::Display for Bps {
     }
 }
 
+/// Whole basis points convert losslessly; this backs `impl Into<Bps>`
+/// parameters such as floating-rate spreads.
 impl From<i32> for Bps {
     fn from(bp: i32) -> Self {
         Self::new(bp)
@@ -614,16 +607,6 @@ impl From<i32> for Bps {
 impl From<Bps> for i32 {
     fn from(bp: Bps) -> Self {
         bp.as_bp()
-    }
-}
-
-impl TryFrom<f64> for Bps {
-    type Error = Error;
-
-    /// Fallible conversion from basis-point `f64`. Rejects `NaN`,
-    /// `±Infinity`, and fractional basis points (see [`Bps::try_new`]).
-    fn try_from(bp: f64) -> Result<Self> {
-        Self::try_new(bp)
     }
 }
 
@@ -680,12 +663,6 @@ impl Neg for Bps {
 impl From<Rate> for Bps {
     fn from(rate: Rate) -> Self {
         Bps::new(rate.as_bp())
-    }
-}
-
-impl From<Bps> for Rate {
-    fn from(bp: Bps) -> Self {
-        Rate::from_bp(bp.0)
     }
 }
 
@@ -774,13 +751,11 @@ mod tests {
     }
 
     #[test]
-    fn bp_try_new_and_try_from_reject_non_finite_values() {
+    fn bp_try_new_rejects_non_finite_values() {
         assert_eq!(Bps::try_new(12.0).expect("whole bp").as_bp(), 12);
-        assert_eq!(Bps::try_from(13.0).expect("whole bp").as_bp(), 13);
 
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert!(Bps::try_new(bad).is_err(), "try_new must reject {bad}");
-            assert!(Bps::try_from(bad).is_err(), "TryFrom must reject {bad}");
         }
     }
 
@@ -792,7 +767,6 @@ mod tests {
                 err.to_string().contains("whole number"),
                 "unexpected error for {fractional}: {err}"
             );
-            assert!(Bps::try_from(fractional).is_err());
         }
         // Whole-valued floats (including negatives and zero) are accepted.
         assert_eq!(Bps::try_new(-25.0).unwrap().as_bp(), -25);

@@ -492,7 +492,7 @@ pub struct CalendarYearLadderRow {
 
 /// Group dated cashflows into a calendar-year non-principal / principal / PV ladder.
 ///
-/// Kind labels use [`CFKind::parse_label`]. Unknown labels are rejected rather
+/// Kind labels parse with `CFKind`'s `FromStr` (aliases `"coupon"` and `"principal"` included). Unknown labels are rejected rather
 /// than silently treated as interest. The `non_principal` column is every
 /// classified kind that is not [`CFKind::is_principal_like`] (interest, fees,
 /// recovery, accrued-on-default, …).
@@ -546,7 +546,7 @@ pub fn calendar_year_ladder(
 
     calendar_year_ladder_rows(dates.iter().zip(kind_labels).zip(amounts).zip(pvs).map(
         |(((&date, kind_label), &amount), &pv)| {
-            let kind = CFKind::parse_label(kind_label).map_err(|err| {
+            let kind = kind_label.trim().parse::<CFKind>().map_err(|err| {
                 finstack_quant_core::Error::Validation(format!(
                     "calendar_year_ladder unknown cashflow kind '{kind_label}': {err}"
                 ))

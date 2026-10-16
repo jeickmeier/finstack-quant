@@ -3,32 +3,6 @@
 //! These helpers are convention-agnostic: they enforce structural invariants
 //! (conditions, ordering, finiteness) without encoding market-specific defaults.
 
-/// Require a condition to be true, otherwise return a validation error.
-///
-/// This is a concise guard for structural or domain invariants. `message` is
-/// converted only when `condition` is false; use [`require_with`] when forming
-/// that message itself is expensive.
-///
-/// # Arguments
-///
-/// * `condition` - Invariant or validation predicate that must evaluate to
-///   `true` for success.
-/// * `message` - Error text converted to an owned string only when `condition`
-///   is false.
-///
-/// # Errors
-///
-/// Returns [`crate::Error::Validation`] containing `message` when `condition`
-/// is false.
-#[inline]
-pub fn require(condition: bool, message: impl Into<String>) -> crate::Result<()> {
-    if condition {
-        Ok(())
-    } else {
-        Err(crate::Error::Validation(message.into()))
-    }
-}
-
 /// Require a condition to be true, otherwise return the provided error.
 ///
 /// Use this when a caller needs to preserve a domain-specific error variant
@@ -228,10 +202,11 @@ mod tests {
     use crate::{Error, InputError};
 
     #[test]
-    fn require_returns_validation_error_when_condition_is_false() {
-        assert!(require(true, "ok").is_ok());
+    fn require_with_returns_validation_error_when_condition_is_false() {
+        assert!(require_with(true, || unreachable!("message is never built")).is_ok());
 
-        let err = require(false, "missing invariant").expect_err("false condition should fail");
+        let err = require_with(false, || "missing invariant".to_string())
+            .expect_err("false condition should fail");
         assert!(matches!(err, Error::Validation(message) if message == "missing invariant"));
     }
 

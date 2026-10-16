@@ -71,7 +71,7 @@ fn explain_uses_stamped_rounding_context() {
     // falling back to default rounding.
     let as_of_t0 = date!(2025 - 01 - 01);
     let as_of_t1 = date!(2025 - 01 - 02);
-    let rounding = finstack_quant_core::config::rounding_context_from(&FinstackConfig::default());
+    let rounding = finstack_quant_core::config::RoundingContext::from(&FinstackConfig::default());
 
     let mut attr = PnlAttribution::new(
         Money::new(1000.0, Currency::USD).expect("valid money fixture"),
@@ -166,7 +166,7 @@ fn all_methods_stamp_configured_rounding_context() {
     )
     .expect("taylor attribution should succeed");
     let default_rounding =
-        finstack_quant_core::config::rounding_context_from(&FinstackConfig::default());
+        finstack_quant_core::config::RoundingContext::from(&FinstackConfig::default());
     assert_stamp(&taylor, "taylor");
 
     let val_t0 = instrument

@@ -156,7 +156,7 @@
       "type": "object"
     },
     "RoundingContext": {
-      "description": "Snapshot of active rounding settings used for result stamping.\n\nInstances are typically produced via [`rounding_context_from`] and persisted\nalongside valuation results.",
+      "description": "Snapshot of active rounding settings used for result stamping.\n\nInstances are produced from a [`FinstackConfig`] via `RoundingContext::from` and persisted\nalongside valuation results.",
       "properties": {
         "ingest_scale_by_currency": {
           "additionalProperties": {

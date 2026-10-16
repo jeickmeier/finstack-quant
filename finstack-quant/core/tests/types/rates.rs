@@ -82,7 +82,7 @@ fn rate_display_formatting() {
 
 #[test]
 fn rate_f64_conversions() {
-    let r = Rate::try_from(0.035).expect("finite decimal rate");
+    let r = Rate::from_decimal(0.035).expect("finite decimal rate");
     assert!((r.as_decimal() - 0.035).abs() < 1e-10);
 
     let f: f64 = r.into();
@@ -136,7 +136,7 @@ fn bp_display_formatting() {
 
 #[test]
 fn bp_from_conversions() {
-    let b: Bps = 250.into();
+    let b = Bps::new(250);
     assert_eq!(b.as_bp(), 250);
 
     let i: i32 = b.into();
@@ -155,7 +155,7 @@ fn cross_type_conversions() {
     let rate = Rate::from_percent(2.5).expect("valid rate fixture");
     let bp: Bps = rate.into();
     assert_eq!(bp.as_bp(), 250);
-    let rate_back: Rate = bp.into();
+    let rate_back = bp.as_rate();
     assert_eq!(rate.as_bp(), rate_back.as_bp());
 }
 
@@ -165,7 +165,7 @@ fn non_finite_constructors_reject_input() {
     assert!(Rate::from_percent(f64::NAN).is_err());
     assert!(Rate::from_percent(f64::INFINITY).is_err());
     assert!(Rate::from_percent(f64::NEG_INFINITY).is_err());
-    assert!(Rate::try_from(f64::NAN).is_err());
+    assert!(Rate::from_decimal(f64::NAN).is_err());
     assert!(Rate::try_from_bp(f64::NAN).is_err());
     assert!(Rate::try_from_bp(62.5).is_err());
     assert_eq!(

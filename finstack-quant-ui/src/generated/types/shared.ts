@@ -13677,9 +13677,10 @@ export type BoundsType = "absolute" | "relative_to_initial_spot";
  * # Labels
  *
  * `Display`, `FromStr`, and serde share one snake_case label per kind
- * (`"fixed"`, `"float_reset"`, `"pre_payment"`); `FromStr` matches it
- * exactly, with no aliases or case folding. [`CFKind::parse_label`] adds the
- * case-insensitive reporting aliases.
+ * (`"fixed"`, `"float_reset"`, `"pre_payment"`). `FromStr` is ASCII
+ * case-insensitive and also accepts the reporting aliases `"coupon"`
+ * ([`CFKind::Fixed`]) and `"principal"` ([`CFKind::Notional`]); serde
+ * accepts only the canonical label.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "CFKind".

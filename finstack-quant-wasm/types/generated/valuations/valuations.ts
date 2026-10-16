@@ -1273,9 +1273,10 @@ export type StubKind = "none" | "short_front" | "short_back" | "long_front" | "l
  * # Labels
  *
  * `Display`, `FromStr`, and serde share one snake_case label per kind
- * (`"fixed"`, `"float_reset"`, `"pre_payment"`); `FromStr` matches it
- * exactly, with no aliases or case folding. [`CFKind::parse_label`] adds the
- * case-insensitive reporting aliases.
+ * (`"fixed"`, `"float_reset"`, `"pre_payment"`). `FromStr` is ASCII
+ * case-insensitive and also accepts the reporting aliases `"coupon"`
+ * ([`CFKind::Fixed`]) and `"principal"` ([`CFKind::Notional`]); serde
+ * accepts only the canonical label.
  */
 export type CFKind =
   | "fixed"
@@ -18161,7 +18162,7 @@ export interface ResultsMeta {
 /**
  * Snapshot of active rounding settings used for result stamping.
  *
- * Instances are typically produced via [`rounding_context_from`] and persisted
+ * Instances are produced from a [`FinstackConfig`] via `RoundingContext::from` and persisted
  * alongside valuation results.
  */
 export interface RoundingContext {
