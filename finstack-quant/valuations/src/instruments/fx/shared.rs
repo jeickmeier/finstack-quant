@@ -87,11 +87,7 @@ pub(crate) fn collect_fx_forward_inputs(
     let spot = if let Some(spot) = request.quoted_spot {
         spot
     } else {
-        let matrix = request.market.fx().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "fx_matrix".to_string(),
-            })
-        })?;
+        let matrix = request.market.fx_required()?;
         matrix
             .rate(FxQuery::new(
                 request.base_currency,
@@ -203,11 +199,7 @@ pub(crate) fn resolve_fx_spot(
         return Ok(spot);
     }
 
-    let fx_matrix = request.market.fx().ok_or(finstack_quant_core::Error::from(
-        finstack_quant_core::InputError::NotFound {
-            id: "fx_matrix".to_string(),
-        },
-    ))?;
+    let fx_matrix = request.market.fx_required()?;
     let spot = fx_matrix
         .rate(FxQuery::new(
             request.base_currency,

@@ -349,11 +349,7 @@ impl FxTouchOption {
         }
 
         // Use FX spot bump via FX matrix
-        let fx_matrix = market.fx().ok_or(finstack_quant_core::Error::from(
-            finstack_quant_core::InputError::NotFound {
-                id: "fx_matrix".to_string(),
-            },
-        ))?;
+        let fx_matrix = market.fx_required()?;
         let current_spot = fx_matrix
             .rate(finstack_quant_core::money::fx::FxQuery::new(
                 self.base_currency,
@@ -416,11 +412,7 @@ impl FxTouchOption {
 
         let base_pv = self.value(market, as_of)?.amount();
 
-        let fx_matrix = market.fx().ok_or(finstack_quant_core::Error::from(
-            finstack_quant_core::InputError::NotFound {
-                id: "fx_matrix".to_string(),
-            },
-        ))?;
+        let fx_matrix = market.fx_required()?;
         let current_spot = fx_matrix
             .rate(finstack_quant_core::money::fx::FxQuery::new(
                 self.base_currency,

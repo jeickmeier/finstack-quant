@@ -214,8 +214,6 @@ impl MarketContext {
     where
         I: IntoIterator<Item = MarketBump>,
     {
-        use crate::error::InputError;
-
         let mut ctx = self.clone();
         let mut needs_credit_rebind = false;
         let mut processed_bumps = 0usize;
@@ -233,9 +231,7 @@ impl MarketContext {
                     pct,
                     as_of,
                 } => {
-                    let fx = ctx.fx.as_ref().ok_or_else(|| InputError::NotFound {
-                        id: "FX matrix".to_string(),
-                    })?;
+                    let fx = ctx.fx_required()?;
                     let bumped = fx.with_bumped_rate(base, quote, pct / 100.0, as_of)?;
                     ctx.fx = Some(Arc::new(bumped));
                 }

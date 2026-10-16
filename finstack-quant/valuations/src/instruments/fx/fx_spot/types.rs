@@ -642,11 +642,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
                 rate
             } else {
                 // Try market context FX matrix
-                let matrix = curves.fx().ok_or_else(|| {
-                    finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                        id: "fx_matrix".to_string(),
-                    })
-                })?;
+                let matrix = curves.fx_required()?;
                 let q = finstack_quant_core::money::fx::FxQuery::new(
                     self.base_currency,
                     self.quote_currency,

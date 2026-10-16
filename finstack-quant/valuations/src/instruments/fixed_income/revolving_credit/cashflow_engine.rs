@@ -19,6 +19,7 @@
 use finstack_quant_core::config::{RoundingContext, ZeroKind};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
@@ -511,7 +512,7 @@ impl<'a> CashflowEngine<'a> {
                                 )?;
                             projected_fixings.push(
                                 finstack_quant_cashflows::fixings::ProjectedFixing {
-                                    series_id: format!("FIXING:{}", spec.forward_curve_id),
+                                    series_id: fixing_series_id(spec.forward_curve_id.as_str()),
                                     date: fixing_date,
                                     value: Some(fixing_rate),
                                 },
@@ -535,7 +536,7 @@ impl<'a> CashflowEngine<'a> {
                             )?;
                             projected_fixings.push(
                                 finstack_quant_cashflows::fixings::ProjectedFixing {
-                                    series_id: format!("FIXING:{}", spec.forward_curve_id),
+                                    series_id: fixing_series_id(spec.forward_curve_id.as_str()),
                                     date: fixing_date,
                                     value: Some(index_rate),
                                 },

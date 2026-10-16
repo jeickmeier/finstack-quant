@@ -18,6 +18,7 @@
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::dates::{Date, DateExt, StubKind, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
@@ -214,7 +215,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
             )?;
         projected_fixings.extend(projection.observation_exposures.iter().map(|observation| {
             finstack_quant_cashflows::fixings::ProjectedFixing {
-                series_id: format!("FIXING:{}", float.forward_curve_id),
+                series_id: fixing_series_id(float.forward_curve_id.as_str()),
                 date: observation.observation_start,
                 value: Some(observation.projected_rate),
             }

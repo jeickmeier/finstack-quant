@@ -224,11 +224,7 @@ impl Equity {
             return Ok(price);
         }
 
-        let matrix = market.fx().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "fx_matrix".to_string(),
-            })
-        })?;
+        let matrix = market.fx_required()?;
 
         struct MatrixProvider<'a> {
             m: &'a finstack_quant_core::money::fx::FxMatrix,

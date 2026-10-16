@@ -22,6 +22,7 @@ use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
@@ -644,7 +645,7 @@ impl XccySwap {
                 if let Some(out) = projected_fixings {
                     out.extend(projection.observation_exposures.iter().map(|observation| {
                         finstack_quant_cashflows::fixings::ProjectedFixing {
-                            series_id: format!("FIXING:{}", leg.leg.forward_curve_id),
+                            series_id: fixing_series_id(leg.leg.forward_curve_id.as_str()),
                             date: observation.observation_start,
                             value: Some(observation.projected_rate),
                         }
@@ -676,7 +677,7 @@ impl XccySwap {
             };
             if let Some(out) = projected_fixings {
                 out.push(finstack_quant_cashflows::fixings::ProjectedFixing {
-                    series_id: format!("FIXING:{}", leg.leg.forward_curve_id),
+                    series_id: fixing_series_id(leg.leg.forward_curve_id.as_str()),
                     date: fixing_date,
                     value: Some(forward_rate),
                 });

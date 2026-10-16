@@ -3,6 +3,7 @@
 use crate::builder::CashFlowSchedule;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::fixings::FIXING_PREFIX;
 use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};
 use finstack_quant_core::{Error, Result};
 use std::collections::BTreeMap;
@@ -69,7 +70,9 @@ pub fn materialize_fixings<'a>(
             if fixing.date < old_date || fixing.date > new_date {
                 continue;
             }
-            if !fixing.series_id.starts_with("FIXING:") || fixing.series_id.len() == 7 {
+            if !fixing.series_id.starts_with(FIXING_PREFIX)
+                || fixing.series_id.len() == FIXING_PREFIX.len()
+            {
                 return Err(Error::Validation(format!(
                     "invalid projected fixing series '{}'",
                     fixing.series_id

@@ -13,6 +13,7 @@ use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, Tenor};
+use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -415,7 +416,7 @@ pub(super) fn project_revolver_floating_rate(
     if let Some(out) = projected_fixings {
         out.extend(projection.observation_exposures.iter().map(|observation| {
             finstack_quant_cashflows::fixings::ProjectedFixing {
-                series_id: format!("FIXING:{}", input.spec.forward_curve_id),
+                series_id: fixing_series_id(input.spec.forward_curve_id.as_str()),
                 date: observation.observation_start,
                 value: Some(observation.projected_rate),
             }
