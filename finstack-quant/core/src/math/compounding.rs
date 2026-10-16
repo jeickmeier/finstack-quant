@@ -375,10 +375,17 @@ impl std::str::FromStr for Compounding {
             "semi_annual" => Ok(Self::SEMI_ANNUAL),
             "quarterly" => Ok(Self::QUARTERLY),
             "monthly" => Ok(Self::MONTHLY),
-            other => Err(crate::Error::Validation(format!(
-                "unknown compounding {other:?}; expected one of continuous, simple, annual, \
-                 semi_annual, quarterly, monthly"
-            ))),
+            other => other
+                .strip_prefix("periodic(")
+                .and_then(|rest| rest.strip_suffix(')'))
+                .and_then(|n| n.parse::<u32>().ok())
+                .and_then(|n| std::num::NonZeroU32::new(n).map(Self::Periodic))
+                .ok_or_else(|| {
+                    crate::Error::Validation(format!(
+                        "unknown compounding {other:?}; expected one of continuous, simple, \
+                         annual, semi_annual, quarterly, monthly or periodic(n)"
+                    ))
+                }),
         }
     }
 }
@@ -811,8 +818,34 @@ mod tests {
             assert_eq!(v, parsed, "roundtrip failed for {s}");
         }
         for rejected in ["semiannual", "Semi-Annual", " semi_annual", "SEMI_ANNUAL"] {
-            assert!(Compounding::from_str(rejected).is_err());
+            assert!(rejected.parse::<Compounding>().is_err());
         }
         assert!(Compounding::from_str("invalid").is_err());
+    }
+
+    #[test]
+    fn periodic_label_round_trips_for_every_frequency() {
+        for n in [1_u32, 3, 6, 52, 365] {
+            let periodic = Compounding::Periodic(std::num::NonZeroU32::new(n).expect("non-zero"));
+            let label = periodic.to_string();
+            assert_eq!(
+                label.parse::<Compounding>().expect("round trip"),
+                periodic,
+                "{label}"
+            );
+        }
+        assert_eq!(
+            Compounding::Periodic(std::num::NonZeroU32::MIN).to_string(),
+            "periodic(1)"
+        );
+        for rejected in [
+            "periodic(0)",
+            "periodic()",
+            "periodic(-2)",
+            "periodic(2",
+            "periodic 2",
+        ] {
+            assert!(rejected.parse::<Compounding>().is_err(), "{rejected}");
+        }
     }
 }

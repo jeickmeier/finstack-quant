@@ -223,10 +223,10 @@ impl PyCompounding {
         }
     }
 
-    /// Variant name, e.g. ``"SemiAnnual"``.
+    /// The Rust label, e.g. ``"semi_annual"`` (same as ``value``).
     #[getter]
     fn name(&self) -> String {
-        compounding_name(self.inner)
+        self.inner.to_string()
     }
 
     /// Canonical label, e.g. ``"semi_annual"``.
@@ -236,20 +236,6 @@ impl PyCompounding {
     }
 
     fn __repr__(&self) -> String {
-        format!("Compounding.{}", compounding_name(self.inner))
-    }
-}
-
-fn compounding_name(value: Compounding) -> String {
-    match value {
-        Compounding::Simple => "Simple".to_string(),
-        Compounding::Continuous => "Continuous".to_string(),
-        Compounding::Annual => "Annual".to_string(),
-        Compounding::Periodic(n) => match n.get() {
-            2 => "SemiAnnual".to_string(),
-            4 => "Quarterly".to_string(),
-            12 => "Monthly".to_string(),
-            other => format!("Periodic({other})"),
-        },
+        format!("Compounding.{}", self.inner)
     }
 }

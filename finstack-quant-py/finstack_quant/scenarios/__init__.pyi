@@ -2329,7 +2329,7 @@ class Compounding:
         --------
         >>> from finstack_quant.scenarios import Compounding
         >>> str(Compounding.simple())
-        'Compounding.Simple'
+        'Compounding.simple'
         """
         ...
 
@@ -2351,7 +2351,7 @@ class Compounding:
         --------
         >>> from finstack_quant.scenarios import Compounding
         >>> str(Compounding.continuous())
-        'Compounding.Continuous'
+        'Compounding.continuous'
         """
         ...
 
@@ -2373,7 +2373,7 @@ class Compounding:
         --------
         >>> from finstack_quant.scenarios import Compounding
         >>> str(Compounding.annual())
-        'Compounding.Annual'
+        'Compounding.annual'
         """
         ...
 
@@ -2395,7 +2395,7 @@ class Compounding:
         --------
         >>> from finstack_quant.scenarios import Compounding
         >>> str(Compounding.semi_annual())
-        'Compounding.SemiAnnual'
+        'Compounding.semi_annual'
         """
         ...
 
@@ -2417,7 +2417,7 @@ class Compounding:
         --------
         >>> from finstack_quant.scenarios import Compounding
         >>> str(Compounding.quarterly())
-        'Compounding.Quarterly'
+        'Compounding.quarterly'
         """
         ...
 
@@ -2439,19 +2439,20 @@ class Compounding:
         --------
         >>> from finstack_quant.scenarios import Compounding
         >>> str(Compounding.monthly())
-        'Compounding.Monthly'
+        'Compounding.monthly'
         """
         ...
 
     @property
     def name(self) -> str:
         """
-        Variant name, e.g. ``"Continuous"``.
+        The Rust label, e.g. ``"continuous"`` or ``"semi_annual"``
+        (same as ``value``).
 
         Returns
         -------
         str
-            Pascal-case variant name.
+            Canonical snake_case label.
 
         Notes
         -----
