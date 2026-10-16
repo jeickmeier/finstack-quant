@@ -111,7 +111,7 @@ impl RatingLevel {
             score,
             min_score,
         };
-        validate_rating_level(&level)?;
+        validate_rating_level(&level, None)?;
         Ok(level)
     }
 
@@ -396,9 +396,8 @@ impl RatingScaleRegistry {
             }
         }
 
-        for entry in &self.rating_scales {
-            validate_scorecard_scale(&entry.scale, first_id(&entry.ids))?;
-        }
+        // Each `ScorecardScale` was already validated when it was built or
+        // deserialized (`ScorecardScale::try_new` via the wire `TryFrom`).
 
         Ok(())
     }
@@ -447,11 +446,14 @@ fn validate_registry(registry: RatingScaleRegistry) -> Result<RatingScaleRegistr
     Ok(registry)
 }
 
-fn validate_rating_level(level: &RatingLevel) -> Result<()> {
+/// Validate one rating level; `scale_label` names the owning scale in the
+/// blank-name message when the level is checked as part of a scale.
+fn validate_rating_level(level: &RatingLevel, scale_label: Option<&str>) -> Result<()> {
     if level.name.trim().is_empty() {
-        return Err(Error::Validation(
-            "rating level contains a blank name".to_string(),
-        ));
+        return Err(Error::Validation(match scale_label {
+            Some(label) => format!("rating scale '{label}' contains a blank rating level"),
+            None => "rating level contains a blank name".to_string(),
+        }));
     }
     validate_score(level.score, "rating level score")?;
     validate_score(level.min_score, "rating level minimum score")?;
@@ -472,14 +474,7 @@ fn validate_scorecard_scale(scale: &ScorecardScale, scale_label: &str) -> Result
                 level.name
             )));
         }
-        validate_rating_level(level).map_err(|err| match err {
-            Error::Validation(msg) if msg == "rating level contains a blank name" => {
-                Error::Validation(format!(
-                    "rating scale '{scale_label}' contains a blank rating level"
-                ))
-            }
-            other => other,
-        })?;
+        validate_rating_level(level, Some(scale_label))?;
     }
 
     // Ratings must be ordered best-to-worst: `determine_rating`-style lookups

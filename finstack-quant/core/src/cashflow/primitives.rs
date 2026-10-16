@@ -1049,7 +1049,10 @@ mod tests {
     fn cfkind_from_str_rejects_noncanonical_spellings() {
         // ASCII case is folded, but punctuation, whitespace and retired labels
         // are not: the wire label is `pre_payment`, never `prepayment`.
-        assert_eq!("FIXED".parse::<CFKind>().expect("case-folded"), CFKind::Fixed);
+        assert_eq!(
+            "FIXED".parse::<CFKind>().expect("case-folded"),
+            CFKind::Fixed
+        );
         for rejected in ["amort", "prepayment", "Float-Reset", " fixed"] {
             assert!(rejected.parse::<CFKind>().is_err(), "{rejected:?}");
         }
