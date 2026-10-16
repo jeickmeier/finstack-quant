@@ -230,8 +230,7 @@ const MARQUARDT_DIAG_FLOOR_REL: f64 = 1e-12;
 ///   in Least Squares." *Quarterly of Applied Mathematics*, 2(2), 164-168.
 /// - Marquardt, D. W. (1963). "An Algorithm for Least-Squares Estimation of Nonlinear
 ///   Parameters." *SIAM Journal*, 11(2), 431-441.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug)]
 pub struct LevenbergMarquardtSolver {
     /// Convergence tolerance for gradient norm
     pub tolerance: f64,

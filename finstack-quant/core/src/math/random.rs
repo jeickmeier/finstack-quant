@@ -141,8 +141,7 @@ use rand_pcg::Pcg64;
 /// - O'Neill, M. E. (2014). "PCG: A Family of Simple Fast Space-Efficient
 ///   Statistically Good Algorithms for Random Number Generation."
 ///   [https://www.pcg-random.org/](https://www.pcg-random.org/) `docs/REFERENCES.md#o-neill-2014-pcg`
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug)]
 pub struct Pcg64Rng {
     inner: Pcg64,
     cached_normal: Option<f64>,
@@ -569,33 +568,6 @@ mod tests {
             variance,
             expected_var
         );
-    }
-
-    #[test]
-    fn test_pcg64_rng_serde_roundtrip() {
-        let mut rng = Pcg64Rng::new(42);
-
-        // Advance the RNG state
-        for _ in 0..100 {
-            let _ = rng.uniform();
-        }
-
-        // Serialize the current state
-        let json = serde_json::to_string(&rng).expect("Failed to serialize Pcg64Rng");
-
-        // Deserialize into a new RNG
-        let mut rng2: Pcg64Rng =
-            serde_json::from_str(&json).expect("Failed to deserialize Pcg64Rng");
-
-        // Both RNGs must produce identical sequences from this point forward,
-        // proving the full internal PCG64 state was preserved (not just reseeded).
-        for _ in 0..100 {
-            assert_eq!(
-                rng.uniform(),
-                rng2.uniform(),
-                "Deserialized RNG diverged from original — serde roundtrip broken"
-            );
-        }
     }
 
     #[test]

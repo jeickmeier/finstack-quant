@@ -162,25 +162,6 @@ mod error_diagnostics {
 
 mod serde_tests {
     use finstack_quant_core::math::integration::GaussHermiteQuadrature;
-    use finstack_quant_core::math::solver::BrentSolver;
-
-    #[test]
-    fn brent_solver_roundtrip() {
-        let solver = BrentSolver::new()
-            .tolerance(1e-8)
-            .initial_bracket_size(Some(0.5));
-
-        let json = serde_json::to_string(&solver).unwrap();
-        let deserialized: BrentSolver = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(solver.tolerance, deserialized.tolerance);
-        assert_eq!(solver.max_iterations, deserialized.max_iterations);
-        assert_eq!(solver.bracket_expansion, deserialized.bracket_expansion);
-        assert_eq!(
-            solver.initial_bracket_size,
-            deserialized.initial_bracket_size
-        );
-    }
 
     #[test]
     fn gauss_hermite_new_supports_all_orders() {
