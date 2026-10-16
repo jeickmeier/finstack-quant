@@ -342,7 +342,7 @@ impl crate::instruments::common_impl::traits::Instrument for BarrierOption {
 
 crate::impl_empty_cashflow_provider!(
     BarrierOption,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
 
 #[cfg(test)]

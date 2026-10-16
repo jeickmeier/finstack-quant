@@ -1,10 +1,10 @@
 //! Contractual exercise cashflows shared by European and Bermudan HW trees.
-use crate::cashflow::builder::periods::{build_periods, period_accrual, BuildPeriodsParams};
-use crate::cashflow::builder::specs::RollRule;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::{FixedLegSpec, FloatLegSpec, OptionType};
 use crate::instruments::rates::swaption::CashSettlementMethod;
 use crate::instruments::SettlementType;
+use finstack_quant_cashflows::builder::RollRule;
+use finstack_quant_cashflows::builder::{build_periods, period_accrual, BuildPeriodsParams};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
@@ -66,7 +66,7 @@ impl HwSwaptionCashflows {
             calendar_id: float
                 .calendar_id
                 .as_deref()
-                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
             end_of_month: float.end_of_month,
             day_count: float.day_count,
             payment_lag_days: float.payment_lag_days,

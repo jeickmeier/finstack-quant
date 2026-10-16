@@ -6,7 +6,7 @@
 //! `attach_pct`/`detach_pct`. Each retired spelling is rejected by
 //! `deny_unknown_fields`, and the new selectors behave as documented.
 
-use finstack_quant_cashflows::builder::specs::RollRule;
+use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::StubKind;

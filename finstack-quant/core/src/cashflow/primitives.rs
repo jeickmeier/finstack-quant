@@ -292,6 +292,16 @@ impl CFKind {
         )
     }
 
+    /// Returns `true` when this classified flow represents a cash settlement.
+    ///
+    /// [`CFKind::Pik`] is a capitalization event and
+    /// [`CFKind::DefaultedNotional`] is a write-down; neither should be emitted
+    /// by APIs whose contract is dated cash.
+    #[must_use]
+    pub const fn is_cash_settlement(self) -> bool {
+        !matches!(self, CFKind::Pik | CFKind::DefaultedNotional)
+    }
+
     /// Parse a cashflow-kind label, accepting canonical `Display` names plus
     /// the reporting aliases `coupon` → [`CFKind::Fixed`] and `principal` →
     /// [`CFKind::Notional`]. Matching is ASCII case-insensitive.

@@ -4,10 +4,10 @@
 //! securities (FNMA, FHLMC, GNMA) with prepayment modeling, servicing fees,
 //! and payment delay conventions.
 
-use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::InstrumentPricingOverrides;
+use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
@@ -185,7 +185,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AgencyMbsPassthrough {
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
-    ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let _ = curves;
         let schedule =
             crate::instruments::fixed_income::mbs_passthrough::pricer::build_projected_schedule(
@@ -193,8 +193,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AgencyMbsPassthrough {
                 as_of,
                 Some(self.wam_months + 12),
             )?;
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 
@@ -241,7 +242,7 @@ pub enum PoolType {
 /// use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{
 ///     AgencyMbsPassthrough, AgencyProgram, PoolType,
 /// };
-/// use finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;
+/// use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::money::Money;
 /// use finstack_quant_core::dates::Date;

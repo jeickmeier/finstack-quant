@@ -675,7 +675,7 @@ impl Instrument for CompositeInstrument {
 
 crate::impl_empty_cashflow_provider!(
     CompositeInstrument,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
 
 #[cfg(test)]

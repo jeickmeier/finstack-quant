@@ -4,8 +4,8 @@
 //! generating projected cashflows with prepayment and payment delay adjustments.
 
 use super::AgencyMbsPassthrough;
-use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule};
-use crate::cashflow::primitives::{CFKind, CashFlow};
+use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
+use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -300,14 +300,15 @@ fn schedule_from_projection(
         }
     }
 
-    Ok(crate::cashflow::traits::schedule_from_classified_flows(
+    Ok(finstack_quant_cashflows::schedule_from_classified_flows(
         flows,
         mbs.day_count,
-        crate::cashflow::traits::ScheduleBuildOpts {
+        finstack_quant_cashflows::ScheduleBuildOpts {
             notional_hint: Some(mbs.current_face),
             meta: CashFlowMeta {
                 projected_fixings: Vec::new(),
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                representation:
+                    finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                 calendar_ids: Vec::new(),
                 commitment: None,
                 issue_date: Some(mbs.issue_date),
@@ -504,8 +505,8 @@ pub(crate) fn price_with_spread(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::builder::specs::PrepaymentModelSpec;
-    use crate::cashflow::primitives::CFKind;
+    use finstack_quant_cashflows::builder::PrepaymentModelSpec;
+    use finstack_quant_cashflows::primitives::CFKind;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;

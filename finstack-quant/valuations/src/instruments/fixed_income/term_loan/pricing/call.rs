@@ -1,8 +1,8 @@
 //! Shared clean redemption for dated loan call provisions.
 
-use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::fixed_income::bond::pricing::engine::tree::BondValuator;
 use crate::instruments::fixed_income::term_loan::{LoanCall, LoanCallType, TermLoan};
+use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -22,9 +22,11 @@ pub(crate) fn exercise_claim(
         .last()
         .map_or(0.0, |(_, amount)| amount.amount());
     let mut config = loan.accrual_config();
-    let cash = crate::cashflow::accrual::accrued_interest_amount(schedule, exercise, &config)?;
+    let cash =
+        finstack_quant_cashflows::accrual::accrued_interest_amount(schedule, exercise, &config)?;
     config.include_pik = true;
-    let total = crate::cashflow::accrual::accrued_interest_amount(schedule, exercise, &config)?;
+    let total =
+        finstack_quant_cashflows::accrual::accrued_interest_amount(schedule, exercise, &config)?;
     let capitalized_pending: f64 = schedule
         .get_flows()
         .iter()
@@ -81,8 +83,8 @@ pub(crate) fn clean_call_price(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::builder::CouponType;
     use crate::instruments::fixed_income::term_loan::{AmortizationSpec, RateSpec};
+    use finstack_quant_cashflows::builder::CouponType;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
     use finstack_quant_core::money::Money;

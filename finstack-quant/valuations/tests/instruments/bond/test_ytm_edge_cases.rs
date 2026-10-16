@@ -160,7 +160,7 @@ fn test_odd_first_coupon_ytm() {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }))
         .issue_date(issue)
@@ -280,7 +280,7 @@ fn test_long_first_coupon_ytm() {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }))
         .issue_date(issue)

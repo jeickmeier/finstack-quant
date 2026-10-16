@@ -22,8 +22,8 @@ fn expected_discount_projected_par_rate(
     market: &finstack_quant_core::market_data::context::MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> f64 {
-    use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
     use finstack_quant_cashflows::builder::RollRule;
+    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
     use finstack_quant_core::math::NeumaierAccumulator;
 
     let disc = market.get_discount("USD_OIS").expect("discount curve");

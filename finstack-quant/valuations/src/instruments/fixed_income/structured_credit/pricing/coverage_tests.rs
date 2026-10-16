@@ -1234,11 +1234,11 @@ mod tests {
 #[cfg(test)]
 mod haircut_tests {
     use super::*;
-    use crate::cashflow::builder::FloatingRateSpec;
     use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::types::{
         AssetPool, DealType, PoolAsset, Tranche, TrancheSeniority, TrancheStructure,
     };
+    use finstack_quant_cashflows::builder::FloatingRateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;

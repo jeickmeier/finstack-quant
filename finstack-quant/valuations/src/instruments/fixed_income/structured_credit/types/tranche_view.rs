@@ -15,9 +15,9 @@
 //! tranche.
 
 use super::{DealType, StructuredCredit};
-use crate::cashflow::traits::{schedule_from_classified_flows, ScheduleBuildOpts};
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::model_params::ModelParamsSnapshot;
+use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -65,7 +65,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCreditTranch
         &self,
         context: &MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let flows = (self.deal)
             .tranche_cashflows(&self.tranche_id, context, as_of)?
             .detailed_flows;
@@ -78,8 +78,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCreditTranch
             day_count,
             ScheduleBuildOpts {
                 notional_hint: finstack_quant_cashflows::CashflowScheduleSource::notional(self)?,
-                meta: crate::cashflow::builder::CashFlowMeta {
-                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                     ..Default::default()
                 },
             },

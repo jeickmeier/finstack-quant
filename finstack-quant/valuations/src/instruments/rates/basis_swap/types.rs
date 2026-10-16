@@ -25,13 +25,13 @@ use finstack_quant_core::{
     dates::Date, market_data::context::MarketContext, money::Money, types::InstrumentId, Result,
 };
 
-use crate::cashflow::builder::{
-    schedule::merge_cashflow_schedules, CashFlowSchedule, CouponType, FloatingCouponSpec,
-    FloatingRateFallback, FloatingRateSpec, Notional, PrincipalExchange,
-};
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::validation;
+use finstack_quant_cashflows::builder::{
+    merge_cashflow_schedules, CashFlowSchedule, CouponType, FloatingCouponSpec,
+    FloatingRateFallback, FloatingRateSpec, Notional, PrincipalExchange,
+};
 use rust_decimal::Decimal;
 
 use crate::instruments::common_impl::parameters::legs::FloatLegSpec;
@@ -353,7 +353,7 @@ impl BasisSwap {
             }
         }
         if self.allow_calendar_fallback {
-            return Ok(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
+            return Ok(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID);
         }
         Err(finstack_quant_core::Error::Validation(format!(
             "BasisSwap '{}' {} leg requires a resolvable calendar_id; set allow_calendar_fallback=true to opt into weekends_only",
@@ -436,8 +436,8 @@ impl BasisSwap {
         let fixing_calendar = finstack_quant_core::dates::calendar_by_id_strict(
             leg.fixing_calendar_id.as_deref().unwrap_or(calendar_id),
         )?;
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start: leg.start,
                 end: leg.end,
                 frequency: leg.frequency,
@@ -451,7 +451,7 @@ impl BasisSwap {
                 // Compute resets below without altering the canonical payments.
                 reset_lag_days: None,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )?;
 
@@ -485,7 +485,7 @@ impl BasisSwap {
                     as_of,
                 )?
             } else {
-                crate::cashflow::builder::rate_helpers::project_index_rate(
+                finstack_quant_cashflows::builder::project_index_rate(
                     reset_date,
                     &fwd,
                     period.accrual_start,
@@ -522,8 +522,8 @@ impl BasisSwap {
 
         let disc = market.get_discount(&leg.discount_curve_id)?;
 
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start: leg.start,
                 end: leg.end,
                 frequency: leg.frequency,
@@ -535,7 +535,7 @@ impl BasisSwap {
                 payment_lag_days: leg.payment_lag_days,
                 reset_lag_days: Some(leg.reset_lag_days),
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )?;
 
@@ -679,7 +679,7 @@ impl BasisSwap {
                     end_of_month: leg.end_of_month,
                     payment_lag_days: leg.payment_lag_days,
                     adjust_accrual_dates: false,
-                    roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                    roll_rule: finstack_quant_cashflows::builder::RollRule::None,
                 },
             });
         builder.build_as_of(market, as_of)
@@ -704,8 +704,8 @@ impl BasisSwap {
                 self.notional.currency(),
                 "BasisSwap",
             )?;
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start: leg.start,
                 end: leg.end,
                 frequency: leg.frequency,
@@ -717,7 +717,7 @@ impl BasisSwap {
                 payment_lag_days: leg.payment_lag_days,
                 reset_lag_days: Some(leg.reset_lag_days),
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )?;
         let fwd = market.get_forward(&leg.forward_curve_id)?;
@@ -758,7 +758,7 @@ impl BasisSwap {
                 need_observation_exposures: true,
             })?;
             projected_fixings.extend(projection.observation_exposures.iter().map(|observation| {
-                crate::cashflow::fixings::ProjectedFixing {
+                finstack_quant_cashflows::fixings::ProjectedFixing {
                     series_id: format!("FIXING:{}", leg.forward_curve_id),
                     date: observation.observation_start,
                     value: Some(observation.projected_rate),
@@ -785,12 +785,12 @@ impl BasisSwap {
                 Some(all_in_rate),
             ));
         }
-        Ok(crate::cashflow::traits::schedule_from_classified_flows(
+        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             leg.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
-                meta: crate::cashflow::builder::CashFlowMeta {
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
                     projected_fixings,
                     ..Default::default()
                 },
@@ -868,15 +868,15 @@ impl finstack_quant_cashflows::CashflowScheduleSource for BasisSwap {
             Notional::par(self.notional.amount(), self.notional.currency())?,
             self.primary_leg.day_count,
         )
-        .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        .with_representation(finstack_quant_cashflows::builder::CashflowRepresentation::Projected))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::CashflowProvider;
     use crate::instruments::common_impl::traits::Instrument;
+    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::StubKind;
     use finstack_quant_core::market_data::context::MarketContext;
@@ -1673,11 +1673,11 @@ mod tests {
         let first = schedule
             .get_flows()
             .iter()
-            .find(|cf| cf.kind == crate::cashflow::primitives::CFKind::FloatReset)
+            .find(|cf| cf.kind == finstack_quant_cashflows::primitives::CFKind::FloatReset)
             .expect("overnight coupon");
         let calendar = calendar_by_id("usny").expect("usny");
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start,
                 end,
                 frequency: Tenor::quarterly(),
@@ -1689,7 +1689,7 @@ mod tests {
                 payment_lag_days: 0,
                 reset_lag_days: Some(0),
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )
         .expect("periods");
@@ -1792,11 +1792,11 @@ mod tests {
         let first = schedule
             .get_flows()
             .iter()
-            .find(|cf| cf.kind == crate::cashflow::primitives::CFKind::FloatReset)
+            .find(|cf| cf.kind == finstack_quant_cashflows::primitives::CFKind::FloatReset)
             .expect("overnight coupon");
         let calendar = calendar_by_id("weekends_only").expect("fixing calendar");
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start,
                 end,
                 frequency: Tenor::quarterly(),
@@ -1808,7 +1808,7 @@ mod tests {
                 payment_lag_days: 0,
                 reset_lag_days: Some(0),
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )
         .expect("periods");
@@ -1900,8 +1900,8 @@ mod tests {
         let annuity = swap
             .annuity_for_leg(&swap.primary_leg, &market, start)
             .expect("overnight annuity");
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start,
                 end,
                 frequency: Tenor::annual(),
@@ -1913,7 +1913,7 @@ mod tests {
                 payment_lag_days: 0,
                 reset_lag_days: Some(0),
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )
         .expect("periods");

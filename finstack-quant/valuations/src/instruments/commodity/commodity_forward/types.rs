@@ -4,12 +4,12 @@
 //! commodity forward contracts. Pricing uses curve-based forward interpolation
 //! with an optional quoted forward override (`quoted_forward`).
 
-use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::CFKind;
 use crate::instruments::common_impl::parameters::{CommodityConvention, CommodityUnderlyingParams};
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::Position;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -488,28 +488,28 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommodityForward {
                         self.position.sign() * (forward - strike) * self.quantity * self.multiplier,
                         self.underlying.currency,
                     )?,
-                    crate::cashflow::builder::CashflowRepresentation::Projected,
+                    finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                 )
             }
             SettlementType::Physical => (
                 self.contractual_invoice_amount(market, as_of)?,
                 if self.contract_price.is_some() {
-                    crate::cashflow::builder::CashflowRepresentation::Contractual
+                    finstack_quant_cashflows::builder::CashflowRepresentation::Contractual
                 } else {
-                    crate::cashflow::builder::CashflowRepresentation::Projected
+                    finstack_quant_cashflows::builder::CashflowRepresentation::Projected
                 },
             ),
         };
-        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
             vec![(self.maturity, settlement)],
             CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(Money::new(
                     settlement.amount().abs(),
                     settlement.currency(),
                 )?),
-                meta: crate::cashflow::builder::CashFlowMeta {
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
                     representation,
                     ..Default::default()
                 },
@@ -522,9 +522,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommodityForward {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::CashflowProvider;
     use crate::instruments::common_impl::parameters::CommodityUnderlyingParams;
     use crate::instruments::common_impl::traits::Instrument;
+    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
     use time::Month;
 
@@ -983,7 +983,7 @@ mod tests {
 
     #[test]
     fn commodity_forward_cash_schedule_reconciles_pv_and_physical_invoice() {
-        use crate::cashflow::builder::CashflowRepresentation;
+        use finstack_quant_cashflows::builder::CashflowRepresentation;
         use finstack_quant_cashflows::CashflowScheduleSource;
         let as_of = Date::from_calendar_date(2025, Month::January, 15).expect("date");
         let market = test_market(as_of);

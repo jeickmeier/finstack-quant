@@ -8,7 +8,7 @@
 //! - Cashflow schedule consistency
 
 use crate::instruments::test_support::rates as test_utils;
-use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
+use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
@@ -872,7 +872,7 @@ fn test_irs_explicit_zero_payment_delay_preserved() {
         payment_lag_days: 0,
         reset_lag_days: None,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     })
     .expect("expected schedule");
     let first_payment = full_schedule

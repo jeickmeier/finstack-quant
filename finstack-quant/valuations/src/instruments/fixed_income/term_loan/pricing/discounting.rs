@@ -167,7 +167,7 @@ impl TermLoanDiscountingPricer {
         loan: &TermLoan,
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        schedule: &crate::cashflow::builder::schedule::CashFlowSchedule,
+        schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
     ) -> finstack_quant_core::Result<Money> {
         if loan.settlement_date(as_of)? >= loan.maturity {
             return Ok(Money::from((0_i64, loan.currency)));
@@ -206,7 +206,7 @@ impl TermLoanDiscountingPricer {
         loan: &TermLoan,
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        schedule: &crate::cashflow::builder::schedule::CashFlowSchedule,
+        schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
     ) -> finstack_quant_core::Result<(f64, Money)> {
         use finstack_quant_core::cashflow::CFKind;
 
@@ -247,7 +247,7 @@ impl TermLoanDiscountingPricer {
         loan: &TermLoan,
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        schedule: &crate::cashflow::builder::schedule::CashFlowSchedule,
+        schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
         settlement_value: Money,
     ) -> finstack_quant_core::Result<Money> {
         if as_of >= loan.maturity {
@@ -279,7 +279,7 @@ impl TermLoanDiscountingPricer {
         loan: &TermLoan,
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        schedule: &crate::cashflow::builder::schedule::CashFlowSchedule,
+        schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
         value: Money,
     ) -> finstack_quant_core::Result<Money> {
         let (df_settlement, pre_settlement) =
@@ -316,7 +316,7 @@ impl TermLoanDiscountingPricer {
     /// Returns an error when the settlement date cannot be resolved.
     pub(crate) fn pricing_flows(
         loan: &TermLoan,
-        schedule: &crate::cashflow::builder::schedule::CashFlowSchedule,
+        schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<(
         finstack_quant_core::dates::Date,
@@ -339,7 +339,7 @@ impl TermLoanDiscountingPricer {
         loan: &TermLoan,
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::schedule::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let mut schedule = generate_cashflows(loan, market)?;
         Self::apply_fixings(loan, market, as_of, &mut schedule)?;
         Ok(schedule)
@@ -351,7 +351,7 @@ impl TermLoanDiscountingPricer {
         loan: &TermLoan,
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        schedule: &mut crate::cashflow::builder::schedule::CashFlowSchedule,
+        schedule: &mut finstack_quant_cashflows::builder::CashFlowSchedule,
     ) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::cashflow::CFKind;
         use std::collections::BTreeMap;
@@ -370,7 +370,7 @@ impl TermLoanDiscountingPricer {
         // fixing cannot replace a daily average or compounded coupon (nor its
         // lookback, cut-off, floors and segmented outstanding balance).
         if float_spec.compounding.unwrap_or_default()
-            != crate::cashflow::builder::FloatingLegCompounding::Simple
+            != finstack_quant_cashflows::builder::FloatingLegCompounding::Simple
         {
             return Ok(());
         }
@@ -419,7 +419,8 @@ impl TermLoanDiscountingPricer {
             }
         }
 
-        let base_params = crate::cashflow::builder::FloatingRateParams::try_from(float_spec)?;
+        let base_params =
+            finstack_quant_cashflows::builder::FloatingRateParams::try_from(float_spec)?;
 
         let outstanding_path = schedule.outstanding_by_date()?;
         let initial_notional = schedule.get_notional().initial.amount();
@@ -465,9 +466,8 @@ impl TermLoanDiscountingPricer {
                         "margin step {active_delta_bp} bp is not representable as f64"
                     ))
                 })?;
-            let all_in_rate = crate::cashflow::builder::rate_helpers::calculate_floating_rate(
-                raw_fixing, &params,
-            );
+            let all_in_rate =
+                finstack_quant_cashflows::builder::calculate_floating_rate(raw_fixing, &params);
 
             // Rescaling retains the builder's accrual notional and any
             // intra-period balance segmentation. The balance fallback handles
@@ -509,10 +509,10 @@ impl Pricer for TermLoanDiscountingPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::builder::specs::CouponType;
-    use crate::cashflow::builder::FloatingRateSpec;
     use crate::instruments::fixed_income::term_loan::spec::AmortizationSpec;
     use crate::instruments::pricing_overrides::InstrumentPricingOverrides;
+    use finstack_quant_cashflows::builder::CouponType;
+    use finstack_quant_cashflows::builder::FloatingRateSpec;
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};

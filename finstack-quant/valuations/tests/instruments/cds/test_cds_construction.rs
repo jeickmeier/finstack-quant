@@ -139,7 +139,7 @@ fn test_builder_pattern() {
         .side(PayReceive::Pay)
         .convention(convention)
         .premium_leg(PremiumLegSpec {
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
             start,
             end,
             frequency: convention.get_spec().expect("CDS registry").frequency,

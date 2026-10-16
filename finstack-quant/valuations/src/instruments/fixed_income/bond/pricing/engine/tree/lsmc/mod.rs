@@ -12,13 +12,6 @@
 //! violate remaining-balance targets on sampled paths.
 
 use super::bond_valuator::BondValuator;
-use crate::cashflow::builder::specs::{CouponType, FloatingCouponSpec, FloatingRateFallback};
-use crate::cashflow::builder::{
-    CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
-    FloatingCouponReplayState, FloatingRateObservation, OvernightObservationSchedule,
-    OvernightRateConstraints,
-};
-use crate::cashflow::primitives::{is_cash_settlement_kind, CFKind, CashFlow};
 use crate::instruments::common_impl::helpers::resolve_mc_paths;
 use crate::instruments::common_impl::pricing::floating_reset_descriptors::params_from_spec;
 use crate::instruments::common_impl::pricing::rates_credit::continuous_frp_weight;
@@ -26,6 +19,13 @@ use crate::instruments::fixed_income::bond::pricing::return_floor::realized_dist
 use crate::instruments::fixed_income::bond::{
     Bond, CallPut, CashflowSpec, ProtectionWindow, ReturnFloorKind,
 };
+use finstack_quant_cashflows::builder::{
+    CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
+    FloatingCouponReplayState, FloatingRateObservation, OvernightObservationSchedule,
+    OvernightRateConstraints,
+};
+use finstack_quant_cashflows::builder::{CouponType, FloatingCouponSpec, FloatingRateFallback};
+use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{adjust, Date, DateExt, DayCount, DayCountContext, Duration};
 use finstack_quant_core::market_data::context::MarketContext;

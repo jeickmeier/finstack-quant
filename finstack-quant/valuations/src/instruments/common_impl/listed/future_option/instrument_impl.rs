@@ -200,18 +200,18 @@ macro_rules! impl_future_option_instrument {
                 &self,
                 _market: &finstack_quant_core::market_data::context::MarketContext,
                 _as_of: finstack_quant_core::dates::Date,
-            ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
-                Ok(crate::cashflow::traits::schedule_from_classified_flows(
+            ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
+                Ok(finstack_quant_cashflows::schedule_from_classified_flows(
                     Vec::new(),
                     self.terms.day_count,
-                    crate::cashflow::traits::ScheduleBuildOpts {
+                    finstack_quant_cashflows::ScheduleBuildOpts {
                         notional_hint: Some(finstack_quant_core::money::Money::new(
                             self.terms.contracts * self.terms.multiplier,
                             self.terms.currency,
                         )?),
-                        meta: crate::cashflow::builder::CashFlowMeta {
+                        meta: finstack_quant_cashflows::builder::CashFlowMeta {
                             representation:
-                                crate::cashflow::builder::CashflowRepresentation::Placeholder,
+                                finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder,
                             ..Default::default()
                         },
                     },

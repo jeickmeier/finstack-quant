@@ -15,7 +15,7 @@ use time::Month;
 
 #[test]
 fn test_bond_dated_cashflows_include_floating_cfkind() {
-    use crate::cashflow::traits::CashflowProvider;
+    use finstack_quant_cashflows::CashflowProvider;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2026, Month::July, 1).expect("Valid test date");
@@ -85,7 +85,7 @@ fn test_bond_dated_cashflows_include_floating_cfkind() {
 
 #[test]
 fn test_bond_serde_allows_missing_issue_date_with_custom_cashflows() {
-    use crate::cashflow::builder::{CashFlowSchedule, CouponType, FixedCouponSpec};
+    use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec};
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 
     let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid");
@@ -112,7 +112,7 @@ fn test_bond_serde_allows_missing_issue_date_with_custom_cashflows() {
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         })
         .build(None)
@@ -173,7 +173,7 @@ fn test_bond_serde_rejects_missing_issue_date_even_with_clean_price() {
 
 #[test]
 fn test_bond_custom_cashflows_serde_roundtrip() {
-    use crate::cashflow::builder::{CashFlowSchedule, CouponType, FixedCouponSpec};
+    use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec};
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 
     let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid");
@@ -200,7 +200,7 @@ fn test_bond_custom_cashflows_serde_roundtrip() {
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         })
         .build(None)
@@ -293,8 +293,8 @@ fn bond_price_merton_mc_api() {
 /// bullets off the base coupon spec.
 #[test]
 fn bond_price_merton_mc_rejects_amortizing() {
-    use crate::cashflow::builder::AmortizationSpec;
     use crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig;
+    use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_models::credit::MertonModel;
 
@@ -340,7 +340,7 @@ fn build_step_up_bond_schedule(
     step_schedule: Vec<(Date, f64)>,
     issue: Date,
     maturity: Date,
-) -> (Bond, crate::cashflow::builder::CashFlowSchedule) {
+) -> (Bond, finstack_quant_cashflows::builder::CashFlowSchedule) {
     let bond = Bond::builder()
         .id("STEP-UP-TEST".into())
         .notional(Money::from((1000000_i64, Currency::USD)))
@@ -379,7 +379,7 @@ fn build_step_up_bond_schedule(
 
 #[test]
 fn step_up_no_steps_equals_fixed_rate() {
-    use crate::cashflow::primitives::CFKind;
+    use finstack_quant_cashflows::primitives::CFKind;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
@@ -448,7 +448,7 @@ fn step_up_no_steps_equals_fixed_rate() {
 
 #[test]
 fn step_up_one_step_changes_rate() {
-    use crate::cashflow::primitives::CFKind;
+    use finstack_quant_cashflows::primitives::CFKind;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
@@ -514,7 +514,7 @@ fn step_up_one_step_changes_rate() {
 
 #[test]
 fn step_up_multiple_steps() {
-    use crate::cashflow::primitives::CFKind;
+    use finstack_quant_cashflows::primitives::CFKind;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2028, Month::January, 1).expect("Valid test date");

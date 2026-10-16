@@ -233,7 +233,7 @@ fn prepare_hw_cap_schedule(
     params: &CapFloorHullWhiteStepParams,
     maturity: finstack_quant_core::dates::Date,
 ) -> Result<CapFloorSchedule> {
-    use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
     use finstack_quant_core::dates::{adjust, DateExt, StubKind};
     use finstack_quant_models::rates::clock::model_time;
     use finstack_quant_valuations::market::conventions::{ConventionRegistry, RateIndexKind};
@@ -270,7 +270,7 @@ fn prepare_hw_cap_schedule(
         payment_lag_days: convention.default_payment_lag_days,
         reset_lag_days: Some(convention.default_reset_lag_days),
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     })?;
     Ok(CapFloorSchedule {
         periods: periods

@@ -15,10 +15,10 @@
 //! `cdr`): the multiplier is bumped such that the peak CDR (0.60% at 100% SDA)
 //! shifts by 1bp. `Constant`/no-curve specs bump `cdr` directly.
 
-use crate::cashflow::builder::DefaultModelSpec;
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
 use crate::metrics::{MetricCalculator, MetricContext};
+use finstack_quant_cashflows::builder::DefaultModelSpec;
 use finstack_quant_core::Result;
 
 /// Standard default bump: 1bp (0.0001) of annual CDR

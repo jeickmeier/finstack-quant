@@ -399,8 +399,8 @@ fn test_amortization_spec_linear_to_zero_ok() {
 
 mod computation {
     use super::*;
-    use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec};
     use finstack_quant_cashflows::builder::CashFlowSchedule;
+    use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
     use rust_decimal::Decimal;
@@ -420,7 +420,7 @@ mod computation {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }
     }
@@ -1073,8 +1073,8 @@ fn linear_to_decimal_scale_hashes_equal() {
 /// last three payment dates. Tolerance 1e-6 covers the Decimal→f64 cast.
 mod declining_and_dated_linear {
     use super::*;
-    use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec, ScheduleParams};
     use finstack_quant_cashflows::builder::CashFlowSchedule;
+    use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec, ScheduleParams};
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
     use rust_decimal::Decimal;
@@ -1093,7 +1093,7 @@ mod declining_and_dated_linear {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }
     }

@@ -2,13 +2,13 @@
 
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::{
-    cashflow::builder::ScheduleParams,
     instruments::common_impl::parameters::{
         legs::FinancingLegSpec, legs::PayReceive, trs_common::TrsScheduleSpec,
         underlying::IndexUnderlyingParams,
     },
     instruments::Attributes,
 };
+use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::{
     currency::Currency,
     dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor},
@@ -232,7 +232,7 @@ impl FiIndexTotalReturnSwap {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         );
         Self::builder()
@@ -367,17 +367,18 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FiIndexTotalReturnSwap
         &self,
         context: &MarketContext,
         as_of: Date,
-    ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let flows = super::pricer::net_cashflows(self, context, as_of)?;
 
-        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
-            crate::cashflow::primitives::CFKind::Fixed,
+            finstack_quant_cashflows::primitives::CFKind::Fixed,
             self.financing_leg.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: self.notional()?,
-                meta: crate::cashflow::builder::CashFlowMeta {
-                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                     ..Default::default()
                 },
             },

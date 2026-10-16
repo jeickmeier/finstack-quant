@@ -264,7 +264,7 @@ impl Bond {
     /// ex-coupon window of a coupon, that coupon is excluded: a buyer settling
     /// in the ex-window does not receive the imminent coupon (market standard,
     /// e.g. UK gilts). Accrued interest is correspondingly negative in that
-    /// window (see [`crate::cashflow::accrued_interest_amount`]).
+    /// window (see [`finstack_quant_cashflows::accrued_interest_amount`]).
     ///
     /// Internal pricing engines (discount, hazard, spread solvers) should use
     /// this instead of the public `CashflowProvider::dated_cashflows` which
@@ -327,7 +327,7 @@ impl Bond {
     /// be compared, avoiding repeated projection and schedule construction.
     pub(crate) fn pricing_dated_cashflows_from_schedule(
         &self,
-        schedule: &crate::cashflow::builder::CashFlowSchedule,
+        schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
         as_of: finstack_quant_core::dates::Date,
         entitlement_date: finstack_quant_core::dates::Date,
     ) -> Result<
@@ -348,7 +348,7 @@ impl Bond {
     /// `as_of`, retaining holder cash payable immediately before that decision.
     pub(crate) fn pricing_dated_cashflows_from_schedule_inclusive(
         &self,
-        schedule: &crate::cashflow::builder::CashFlowSchedule,
+        schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
         as_of: finstack_quant_core::dates::Date,
         entitlement_date: finstack_quant_core::dates::Date,
     ) -> Result<
@@ -367,7 +367,7 @@ impl Bond {
 
     fn pricing_dated_cashflows_from_schedule_with_boundary(
         &self,
-        schedule: &crate::cashflow::builder::CashFlowSchedule,
+        schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
         as_of: finstack_quant_core::dates::Date,
         entitlement_date: finstack_quant_core::dates::Date,
         include_as_of: bool,

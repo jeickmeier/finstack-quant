@@ -1,13 +1,13 @@
 use super::annuity::periods_per_year;
 use super::types::YieldCompounding;
 use super::ExitCandidate;
-use crate::cashflow::accrual::AccrualIndex;
-use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::CFKind;
 use crate::instruments::fixed_income::bond::pricing::engine::tree::BondValuator;
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
 use crate::instruments::fixed_income::bond::pricing::ytm_solver::{solve_bond_ytm, YtmPricingSpec};
 use crate::instruments::fixed_income::bond::Bond;
+use finstack_quant_cashflows::accrual::AccrualIndex;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
@@ -752,7 +752,7 @@ impl<'a> RedemptionBasis<'a> {
     ///   accrual method) used for accrued interest at exercise dates.
     pub(crate) fn new(
         schedule: &'a CashFlowSchedule,
-        accrual_config: &crate::cashflow::accrual::AccrualConfig,
+        accrual_config: &finstack_quant_cashflows::accrual::AccrualConfig,
     ) -> finstack_quant_core::Result<Self> {
         Ok(Self {
             schedule,
@@ -1256,11 +1256,11 @@ pub(crate) fn price_from_i_spread(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::builder::{CashFlowMeta, Notional};
-    use crate::cashflow::primitives::CashFlow;
     use crate::instruments::fixed_income::bond::{
         CallPut, CallPutSchedule, MakeWholeSpec, ProtectionWindow, ReturnFloorSpec,
     };
+    use finstack_quant_cashflows::builder::{CashFlowMeta, Notional};
+    use finstack_quant_cashflows::primitives::CashFlow;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -1731,7 +1731,7 @@ mod tests {
 
         let (principal, replaced) = RedemptionBasis::new(
             &schedule,
-            &crate::cashflow::accrual::AccrualConfig::default(),
+            &finstack_quant_cashflows::accrual::AccrualConfig::default(),
         )
         .expect("redemption basis")
         .exercise_principal_and_replaced_redemption(maturity, maturity);

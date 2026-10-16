@@ -1987,7 +1987,7 @@ mod tests {
         }
     }
 
-    impl finstack_quant_cashflows::traits::CashflowScheduleSource for MockInstrument {
+    impl finstack_quant_cashflows::CashflowScheduleSource for MockInstrument {
         fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
             Ok(None)
         }
@@ -2006,13 +2006,11 @@ mod tests {
                 .iter()
                 .map(|(date, amount)| CashFlow::new(*date, None, *amount, CFKind::Fixed, 0.0, None))
                 .collect();
-            Ok(
-                finstack_quant_cashflows::traits::schedule_from_classified_flows(
-                    flows,
-                    DayCount::Act365F,
-                    finstack_quant_cashflows::traits::ScheduleBuildOpts::default(),
-                ),
-            )
+            Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+                flows,
+                DayCount::Act365F,
+                finstack_quant_cashflows::ScheduleBuildOpts::default(),
+            ))
         }
     }
 

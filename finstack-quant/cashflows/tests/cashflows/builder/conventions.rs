@@ -69,9 +69,9 @@ fn test_single_currency_aggregation() {
 /// Build a USD bond and verify every flow is USD-denominated.
 #[test]
 fn test_all_flows_preserve_currency() {
-    use finstack_quant_cashflows::builder::specs::CouponType;
-    use finstack_quant_cashflows::builder::specs::FixedCouponSpec;
     use finstack_quant_cashflows::builder::CashFlowSchedule;
+    use finstack_quant_cashflows::builder::CouponType;
+    use finstack_quant_cashflows::builder::FixedCouponSpec;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
     use rust_decimal::Decimal;
 
@@ -98,7 +98,7 @@ fn test_all_flows_preserve_currency() {
             payment_lag_days: 0,
 
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -166,7 +166,7 @@ fn test_bus_252_requires_calendar() {
 
 #[test]
 fn contractual_accrual_boundaries_are_not_business_day_adjusted() {
-    use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 
     let periods = build_periods(BuildPeriodsParams {
@@ -181,7 +181,7 @@ fn contractual_accrual_boundaries_are_not_business_day_adjusted() {
         payment_lag_days: 0,
         reset_lag_days: None,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     })
     .expect("schedule should build");
 
@@ -261,7 +261,7 @@ fn sofr_swap_preset_adjusts_accrual_boundaries() {
 
 #[test]
 fn preceding_adjusted_february_termination_matches_coupon_emission() {
-    use finstack_quant_cashflows::builder::periods::{
+    use finstack_quant_cashflows::builder::{
         build_periods, build_single_period, period_accrual, BuildPeriodsParams,
     };
     use finstack_quant_cashflows::builder::{
@@ -317,10 +317,10 @@ fn preceding_adjusted_february_termination_matches_coupon_emission() {
 
 #[test]
 fn public_period_builders_reject_negative_lags_without_panicking() {
-    use finstack_quant_cashflows::builder::periods::{
+    use finstack_quant_cashflows::builder::ScheduleParams;
+    use finstack_quant_cashflows::builder::{
         build_periods, build_single_period, BuildPeriodsParams,
     };
-    use finstack_quant_cashflows::builder::ScheduleParams;
 
     let schedule = ScheduleParams::quarterly_act360();
     let base = BuildPeriodsParams::from_schedule(&schedule, d(2025, 1, 15), d(2025, 4, 15), None);
@@ -347,8 +347,8 @@ fn public_period_builders_reject_negative_lags_without_panicking() {
 
 #[test]
 fn icma_eom_requires_a_month_end_reference_anchor() {
-    use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
     use finstack_quant_cashflows::builder::ScheduleParams;
+    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 
     let mut schedule = ScheduleParams::quarterly_act360();

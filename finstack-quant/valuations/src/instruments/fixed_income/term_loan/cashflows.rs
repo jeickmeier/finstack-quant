@@ -4,19 +4,27 @@
 //! amortization, and fees) via the unified `CashFlowBuilder` so date logic and
 //! floating-rate conventions stay consistent across instruments.
 
-use crate::cashflow::builder::schedule::{merge_cashflow_schedules, CashFlowSchedule};
-use crate::cashflow::builder::specs::{
+use crate::instruments::fixed_income::term_loan::types::TermLoan;
+use finstack_quant_cashflows::builder::{merge_cashflow_schedules, CashFlowSchedule};
+use finstack_quant_cashflows::builder::{CashFlowBuilder, ScheduleParams};
+use finstack_quant_cashflows::builder::{
     CouponType, FeeBase, FeeSpec, FloatingCouponSpec, FloatingRateSpec, StepUpCouponSpec,
 };
-use crate::cashflow::builder::{CashFlowBuilder, PrincipalEvent, ScheduleParams};
-use crate::cashflow::primitives::{CFKind, CashFlow};
-use crate::instruments::fixed_income::term_loan::types::TermLoan;
+use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use std::collections::BTreeMap;
+
+struct PrincipalEvent {
+    date: Date,
+    payment_date: Date,
+    delta: Money,
+    cash: Money,
+    kind: CFKind,
+}
 
 fn loan_schedule_params(loan: &TermLoan) -> ScheduleParams {
     ScheduleParams {
@@ -26,12 +34,12 @@ fn loan_schedule_params(loan: &TermLoan) -> ScheduleParams {
         calendar_id: loan
             .calendar_id
             .clone()
-            .unwrap_or_else(|| crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.into()),
+            .unwrap_or_else(|| finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID.into()),
         stub: loan.stub,
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: crate::cashflow::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     }
 }
 
@@ -157,7 +165,7 @@ pub(crate) fn generate_cashflows(
     // accrual-period start grid used to snap floating margin steps to
     // whole-period boundaries.
     let (coupon_dates, accrual_starts): (Vec<(Date, Date)>, Vec<Date>) = {
-        use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
+        use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 
         let schedule = loan_schedule_params(loan);
         let periods = build_periods(BuildPeriodsParams::from_schedule(
@@ -265,17 +273,17 @@ pub(crate) fn generate_cashflows(
         )
         .amortization(match &loan.amortization {
             super::spec::AmortizationSpec::PercentOfRemainingPerPeriod { pct } => {
-                crate::cashflow::builder::AmortizationSpec::PercentOfRemainingPerPeriod {
+                finstack_quant_cashflows::builder::AmortizationSpec::PercentOfRemainingPerPeriod {
                     pct: *pct,
                 }
             }
             super::spec::AmortizationSpec::LinearBetween { start, end } => {
-                crate::cashflow::builder::AmortizationSpec::LinearBetween {
+                finstack_quant_cashflows::builder::AmortizationSpec::LinearBetween {
                     start: *start,
                     end: *end,
                 }
             }
-            _ => crate::cashflow::builder::AmortizationSpec::None,
+            _ => finstack_quant_cashflows::builder::AmortizationSpec::None,
         });
     for event in &principal_events {
         let _ = builder.add_principal_event(
@@ -417,10 +425,11 @@ pub(crate) fn generate_cashflows(
                 calendar_id: loan
                     .calendar_id
                     .as_deref()
-                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
+                    .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
                     .to_string(),
                 stub: loan.stub,
-                accrual_basis: crate::cashflow::builder::FeeAccrualBasis::TimeWeightedAverage,
+                accrual_basis:
+                    finstack_quant_cashflows::builder::FeeAccrualBasis::TimeWeightedAverage,
             });
         }
     }
@@ -434,10 +443,10 @@ pub(crate) fn generate_cashflows(
             if !commitment_fees.is_empty() {
                 let notional = schedule.get_notional().clone();
                 let day_count = schedule.get_day_count();
-                let fee_schedule = crate::cashflow::traits::schedule_from_classified_flows(
+                let fee_schedule = finstack_quant_cashflows::schedule_from_classified_flows(
                     commitment_fees,
                     day_count,
-                    crate::cashflow::traits::ScheduleBuildOpts {
+                    finstack_quant_cashflows::ScheduleBuildOpts {
                         notional_hint: Some(notional.initial),
                         meta: schedule.get_meta().clone(),
                     },
@@ -483,7 +492,7 @@ fn build_commitment_fee_flows(
         return Ok(Vec::new());
     }
 
-    use crate::cashflow::builder::periods::{build_periods, period_accrual, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::{build_periods, period_accrual, BuildPeriodsParams};
 
     // Fees accrue on the loan's own period grid and are paid once per period
     // on its payment date; the availability window may start and end off it.

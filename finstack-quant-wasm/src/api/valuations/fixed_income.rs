@@ -507,7 +507,7 @@ impl JsRevolvingCredit {
         market_json: JsValue,
         as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
-        use finstack_quant_cashflows::traits::CashflowScheduleSource;
+        use finstack_quant_cashflows::CashflowScheduleSource;
         let market = super::pricing::parse_market_json(&json_text(&market_json, "marketJson")?)?;
         let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
         to_js_value(

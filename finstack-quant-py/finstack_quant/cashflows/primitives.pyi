@@ -37,7 +37,7 @@ import datetime
 from finstack_quant.core.money import Money
 from finstack_quant.core.dates import DayCount
 
-__all__ = ["CFKind", "CashFlow", "CashFlowAccrual", "is_cash_settlement_kind"]
+__all__ = ["CFKind", "CashFlow", "CashFlowAccrual"]
 
 class CFKind:
     """
@@ -162,6 +162,26 @@ class CFKind:
         -------
         bool
             ``True`` for principal-balance kinds, ``False`` otherwise.
+
+        Notes
+        -----
+        This method does not raise; it returns ``True`` or ``False``.
+        """
+        ...
+
+    def is_cash_settlement(self) -> bool:
+        """
+        Return whether this kind represents a cash settlement.
+
+        ``PIK`` is a capitalization event and ``DEFAULTED_NOTIONAL`` is a
+        write-down; both return ``False``. All other (settlement) kinds return
+        ``True``.
+
+        Returns
+        -------
+        bool
+            ``True`` for settlement kinds, ``False`` for ``PIK`` and
+            ``DEFAULTED_NOTIONAL``.
 
         Notes
         -----
@@ -640,38 +660,3 @@ class CashFlow:
             or another field cannot be serialized.
         """
         ...
-
-def is_cash_settlement_kind(kind: CFKind | str) -> bool:
-    """
-    Return whether a classified flow represents a cash settlement.
-
-    ``PIK`` is a capitalization event and ``DEFAULTED_NOTIONAL`` is a
-    write-down; both return ``False``. All other (settlement) kinds return
-    ``True``.
-
-    Parameters
-    ----------
-    kind : CFKind | str
-        Classified cashflow kind to test, either a ``CFKind`` instance or
-        its snake_case label string.
-
-    Returns
-    -------
-    bool
-        ``True`` for settlement kinds, ``False`` for ``PIK`` and
-        ``DEFAULTED_NOTIONAL``.
-
-    Raises
-    ------
-    ValueError
-        If *kind* is a string that does not match a known label.
-
-    Examples
-    --------
-    >>> from finstack_quant.cashflows.primitives import CFKind, is_cash_settlement_kind
-    >>> is_cash_settlement_kind(CFKind.FIXED)
-    True
-    >>> is_cash_settlement_kind(CFKind.PIK)
-    False
-    """
-    ...

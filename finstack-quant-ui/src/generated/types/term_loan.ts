@@ -767,7 +767,7 @@ export interface D_937C784C4C0Df9557E1F {
  *
  * # Cashflow Generation
  *
- * Uses the [`CashflowProvider`](crate::cashflow::traits::CashflowProvider) trait:
+ * Uses the [`CashflowProvider`](finstack_quant_cashflows::CashflowProvider) trait:
  * - `dated_cashflows()` returns signed canonical schedule flows (coupons, amortization, redemptions)
  * - `cashflow_schedule()` returns the signed canonical schedule with `CFKind` metadata
  *

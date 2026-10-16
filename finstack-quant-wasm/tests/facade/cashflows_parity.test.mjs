@@ -368,7 +368,7 @@ const cases = {
         cashflows.cfKindIsPrincipalLike(kind)
       ),
       cash_settlement: ['fixed', 'pik', 'defaulted_notional', 'notional'].map((kind) =>
-        cashflows.isCashSettlementKind(kind)
+        cashflows.cfKindIsCashSettlement(kind)
       ),
       balance_date: [
         cashflows.cashFlowGetBalanceDate(flow),

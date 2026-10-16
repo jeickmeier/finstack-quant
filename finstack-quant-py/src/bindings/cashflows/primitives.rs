@@ -1,8 +1,6 @@
 //! Python bindings for `finstack_quant_cashflows::primitives`.
 
-use finstack_quant_cashflows::primitives::{
-    is_cash_settlement_kind, CFKind, CashFlow, CashFlowAccrual,
-};
+use finstack_quant_cashflows::primitives::{CFKind, CashFlow, CashFlowAccrual};
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
@@ -10,6 +8,7 @@ use pyo3::types::{PyList, PyModule, PyType};
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::wire_methods;
 use crate::errors::core_to_py;
 
 /// Wrapper for [`CFKind`] exposed as `finstack_quant.cashflows.primitives.CFKind`.
@@ -126,6 +125,11 @@ impl PyCFKind {
     /// Whether this kind changes principal balance (notional, PIK, amortization, …).
     fn is_principal_like(&self) -> bool {
         self.inner.is_principal_like()
+    }
+
+    /// Whether this kind represents a cash settlement (all kinds except PIK and DefaultedNotional).
+    fn is_cash_settlement(&self) -> bool {
+        self.inner.is_cash_settlement()
     }
 
     /// Hash consistent with equality on the underlying kind.
@@ -475,40 +479,6 @@ impl PyCashFlow {
         self.inner.validate().map_err(core_to_py)
     }
 
-    /// Serialize to the canonical JSON row format.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the effective rate or projected index rate is non-finite, or the
-    ///     row cannot be serialized. Invalid rates are never encoded as absent.
-    #[allow(clippy::wrong_self_convention)]
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "failed to serialize CashFlow"))
-    }
-
-    /// Deserialize from the canonical JSON row format.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed or carries unknown fields.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str::<CashFlow>(json)
-            .map(Self::from_inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid CashFlow JSON"))
-    }
-
-    /// Support ``pickle`` through the JSON wire form.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Python-style representation.
     fn __repr__(&self) -> String {
         let reset = self
@@ -530,20 +500,7 @@ impl PyCashFlow {
     }
 }
 
-/// Whether a classified flow represents a cash settlement.
-///
-/// ``PIK`` is a capitalization event and ``DefaultedNotional`` is a write-down;
-/// both return ``False``. All settlement kinds return ``True``.
-///
-/// Parameters
-/// ----------
-/// kind : CFKind or str
-///     Classified cashflow kind to test.
-#[pyfunction(name = "is_cash_settlement_kind")]
-#[pyo3(text_signature = "(kind)")]
-fn py_is_cash_settlement_kind(kind: &Bound<'_, PyAny>) -> PyResult<bool> {
-    Ok(is_cash_settlement_kind(extract_cf_kind(kind)?))
-}
+wire_methods!(PyCashFlow, CashFlow, "CashFlow");
 
 /// Register the `finstack_quant.cashflows.primitives` submodule.
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -555,17 +512,8 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     module.add_class::<PyCFKind>()?;
     module.add_class::<PyCashFlow>()?;
     module.add_class::<PyCashFlowAccrual>()?;
-    module.add_function(wrap_pyfunction!(py_is_cash_settlement_kind, &module)?)?;
 
-    let all = PyList::new(
-        py,
-        [
-            "CFKind",
-            "CashFlow",
-            "CashFlowAccrual",
-            "is_cash_settlement_kind",
-        ],
-    )?;
+    let all = PyList::new(py, ["CFKind", "CashFlow", "CashFlowAccrual"])?;
     module.setattr("__all__", all)?;
 
     crate::bindings::module_utils::attach_submodule(

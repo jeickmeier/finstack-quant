@@ -30,7 +30,7 @@ use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Teno
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_cashflows::builder::specs::RollRule;
+/// use finstack_quant_cashflows::builder::RollRule;
 ///
 /// let rule = RollRule::default();
 /// assert_eq!(rule, RollRule::None);

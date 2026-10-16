@@ -54,7 +54,7 @@ fn build_monthly(base: Date, years: i32) -> CashFlowSchedule {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         })
         .build(None)
@@ -87,7 +87,7 @@ fn build_adjusted(
                 end_of_month: false,
                 payment_lag_days: lag,
                 adjust_accrual_dates,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         })
         .build(None)
@@ -164,7 +164,7 @@ fn bench_amortizing_build_scaling(c: &mut Criterion) {
                     end_of_month: false,
                     payment_lag_days: 0,
                     adjust_accrual_dates: false,
-                    roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                    roll_rule: finstack_quant_cashflows::builder::RollRule::None,
                 },
             });
         group.throughput(Throughput::Elements(coupons));

@@ -4,11 +4,11 @@
 //! and discount them to present value, then compares to the trade price.
 
 use super::AgencyTba;
-use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::instruments::fixed_income::mbs_passthrough::{
     pricer::{price_mbs, quote_basis_pool},
     AgencyMbsPassthrough, AgencyProgram, PoolType,
 };
+use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::embedded_registry::EmbeddedJsonRegistry;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -304,7 +304,7 @@ mod tests {
         let as_of = Date::from_calendar_date(2027, Month::January, 15).expect("valid");
         let market = create_test_market(as_of);
         let err =
-            crate::cashflow::traits::CashflowProvider::cashflow_schedule(&tba, &market, as_of)
+            finstack_quant_cashflows::CashflowProvider::cashflow_schedule(&tba, &market, as_of)
                 .expect_err("physical TBA delivery is not a standalone cashflow schedule");
         assert!(err.to_string().contains("physically settled forward"));
     }

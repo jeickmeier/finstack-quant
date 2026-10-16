@@ -1,8 +1,8 @@
 //! Duration calculators for structured credit.
 
-use crate::cashflow::traits::DatedFlows;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};
+use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;

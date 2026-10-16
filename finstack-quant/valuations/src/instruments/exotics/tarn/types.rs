@@ -247,7 +247,7 @@ impl crate::instruments::common_impl::traits::Instrument for Tarn {
 
 crate::impl_empty_cashflow_provider!(
     Tarn,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
 
 #[cfg(test)]

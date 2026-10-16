@@ -241,7 +241,7 @@ impl CommoditySwaption {
             .build()
     }
 
-    fn swap_periods(&self) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+    fn swap_periods(&self) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
         self.validate()?;
         super::super::averaging::commodity_periods(
             self.underlying_start_date,
@@ -733,7 +733,7 @@ fn black76_swaption_price(
 
 crate::impl_empty_cashflow_provider!(
     CommoditySwaption,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
 
 #[cfg(test)]

@@ -10,7 +10,7 @@
 //! Market Standards Review (Week 5)
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_cashflows::builder::specs::CouponType;
+use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;

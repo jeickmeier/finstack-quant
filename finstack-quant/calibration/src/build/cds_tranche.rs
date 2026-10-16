@@ -4,7 +4,7 @@ use crate::build::cds::cds_accrual_start;
 use crate::build::helpers::resolve_spot_date;
 use crate::build::BuildCtx;
 use crate::quotes::cds_tranche::CdsTrancheQuote;
-use finstack_quant_cashflows::builder::specs::RollRule;
+use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{

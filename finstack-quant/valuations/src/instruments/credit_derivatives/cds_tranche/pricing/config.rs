@@ -1,6 +1,6 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
-use crate::cashflow::primitives::CashFlow;
+use finstack_quant_cashflows::primitives::CashFlow;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::{Error as CoreError, Result as CoreResult};
@@ -171,7 +171,7 @@ pub(super) struct EffectiveStructure {
 pub(super) type ProjectionInputs = (
     std::sync::Arc<CreditIndexData>,
     Date,
-    Vec<crate::cashflow::builder::SchedulePeriod>,
+    Vec<finstack_quant_cashflows::builder::SchedulePeriod>,
     Vec<ElWdPoint>,
 );
 

@@ -1,6 +1,5 @@
 //! Spread calculators for structured credit (Z-spread, CS01, Spread Duration).
 
-use crate::cashflow::traits::DatedFlows;
 use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::structured_credit::types::constants::{
@@ -9,6 +8,7 @@ use crate::instruments::fixed_income::structured_credit::types::constants::{
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
 use crate::instruments::Instrument;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;

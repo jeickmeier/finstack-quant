@@ -195,7 +195,7 @@ fn conventions(
 }
 
 fn payment_dates_in(facility: &RevolvingCredit, year: i32, month: time::Month) -> Vec<time::Date> {
-    use finstack_quant_cashflows::traits::CashflowScheduleSource;
+    use finstack_quant_cashflows::CashflowScheduleSource;
     let schedule = facility
         .raw_cashflow_schedule(&market(), AS_OF)
         .expect("schedule");
@@ -260,7 +260,7 @@ fn calendar_id_is_the_only_way_to_adjust_for_holidays() {
 /// first period is unchanged while its payment date rolls forward by the lag.
 #[test]
 fn payment_lag_moves_the_payment_date_but_not_the_accrual() {
-    use finstack_quant_cashflows::traits::CashflowScheduleSource;
+    use finstack_quant_cashflows::CashflowScheduleSource;
     use finstack_quant_core::dates::BusinessDayConvention;
 
     let flat = conventions(
@@ -326,7 +326,7 @@ use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
 };
 
 fn flows_of(facility: &RevolvingCredit) -> Vec<finstack_quant_core::cashflow::CashFlow> {
-    use finstack_quant_cashflows::traits::CashflowScheduleSource;
+    use finstack_quant_cashflows::CashflowScheduleSource;
     facility
         .raw_cashflow_schedule(&market(), AS_OF)
         .expect("schedule")
@@ -731,7 +731,7 @@ fn flow_amount(
 /// tier evaluated at 50% (drawn plus LC).
 #[test]
 fn letters_of_credit_reduce_availability_and_pay_lc_and_fronting_fees() {
-    use finstack_quant_cashflows::traits::CashflowScheduleSource;
+    use finstack_quant_cashflows::CashflowScheduleSource;
     let facility = with_lc(
         DrawRepaySpec::Deterministic(vec![]),
         lc_spec(2_000_000.0, vec![], 0.0),
@@ -772,7 +772,7 @@ fn letters_of_credit_reduce_availability_and_pay_lc_and_fronting_fees() {
 /// period is `2M × 325 bp × 30/360 + 3M × 325 bp × 60/360`.
 #[test]
 fn lc_issuance_inside_a_period_slices_the_accrual() {
-    use finstack_quant_cashflows::traits::CashflowScheduleSource;
+    use finstack_quant_cashflows::CashflowScheduleSource;
     let facility = with_lc(
         DrawRepaySpec::Deterministic(vec![]),
         lc_spec(

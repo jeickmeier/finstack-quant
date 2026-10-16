@@ -4,7 +4,6 @@ use super::{
     CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, MertonMcRun, PikMode,
     PikSchedule,
 };
-use crate::cashflow::builder::specs::CouponType;
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
     clean_price_from_japanese_simple_yield, price_from_ytm, price_from_ytw, price_from_z_spread,
     BondQuoteInput,
@@ -12,6 +11,7 @@ use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
 use crate::instruments::fixed_income::bond::types::Bond;
 use crate::instruments::fixed_income::bond::CashflowSpec;
+use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{InputError, Result};

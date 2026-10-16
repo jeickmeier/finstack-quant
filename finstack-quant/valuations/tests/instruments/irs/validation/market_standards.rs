@@ -11,7 +11,7 @@
 //! - Market practice for USD swaps
 
 use crate::instruments::test_support::rates as test_utils;
-use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
+use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     calendar_by_id, BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind,
@@ -966,7 +966,7 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
         payment_lag_days: 0,
         reset_lag_days: Some(0),
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     })
     .unwrap();
     for (market, curve_id, pv) in [
@@ -1102,7 +1102,7 @@ fn test_sofr_ois_par_rate_matches_quantlib_identity() {
         payment_lag_days: conv.default_payment_lag_days,
         reset_lag_days: None,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     })
     .expect("periods");
 

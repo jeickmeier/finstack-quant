@@ -3,13 +3,13 @@
 //! A dollar roll is a simultaneous sale and purchase of agency MBS TBAs
 //! for different settlement months, used for financing and carry trades.
 
-use crate::cashflow::builder::specs::PrepaymentModelSpec;
-use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::CFKind;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::mbs_passthrough::AgencyProgram;
 use crate::instruments::fixed_income::tba::{AgencyTba, TbaTerm};
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::builder::PrepaymentModelSpec;
+use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, SifmaSettlementClass};
 use finstack_quant_core::money::Money;
@@ -434,7 +434,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DollarRoll {
         let front_date = self.effective_front_settlement_date()?;
         let back_date = self.effective_back_settlement_date()?;
         let ccy = self.notional.currency();
-        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
             vec![
                 (
                     front_date,
@@ -447,10 +447,11 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DollarRoll {
             ],
             CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
-                meta: crate::cashflow::builder::CashFlowMeta {
-                    representation: crate::cashflow::builder::CashflowRepresentation::Contractual,
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Contractual,
                     ..Default::default()
                 },
             },
@@ -462,7 +463,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DollarRoll {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::CashflowProvider;
+    use finstack_quant_cashflows::CashflowProvider;
 
     #[test]
     fn test_dollar_roll_example() {

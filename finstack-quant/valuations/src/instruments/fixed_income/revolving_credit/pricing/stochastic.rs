@@ -6,12 +6,12 @@ use super::results::EnhancedMonteCarloResult;
 use super::unified::{
     RevolvingCreditPricer, DEFAULT_CREDIT_SPREAD_IMPLIED_VOL, DEFAULT_UTIL_CREDIT_CORR,
 };
-use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
-use crate::cashflow::traits::{schedule_from_classified_flows, ScheduleBuildOpts};
 use crate::instruments::fixed_income::revolving_credit::cashflow_engine::CashflowEngine;
 use crate::instruments::fixed_income::revolving_credit::types::{
     DrawRepaySpec, RevolvingCredit, RevolvingCreditMcRun,
 };
+use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
+use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

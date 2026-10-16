@@ -49,7 +49,7 @@
 //! - [`Bond`] for standard fixed/floating rate bonds
 //! - [`StructuredCredit`] for ABS, CLO, and securitized products
 //! - [`AgencyMbsPassthrough`] for mortgage pass-throughs
-//! - [`crate::cashflow`] for cashflow generation
+//! - [`finstack_quant_cashflows`] for cashflow generation
 
 /// Revolving credit facility module.
 pub mod asset_backed_facility;

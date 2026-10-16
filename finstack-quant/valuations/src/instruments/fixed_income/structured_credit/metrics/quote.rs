@@ -1,9 +1,9 @@
 //! Settlement and target amounts shared by structured-credit price and spread metrics.
 
 use super::pricing::{accrued::accrued_at, prices::quote_notional};
-use crate::cashflow::traits::DatedFlows;
 use crate::instruments::fixed_income::structured_credit::{StructuredCredit, TrancheCashflows};
 use crate::metrics::MetricContext;
+use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::{Error, Result};

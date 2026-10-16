@@ -7,7 +7,7 @@
 use crate::utils::input::js_string;
 use crate::utils::wire::js_wire;
 use crate::utils::{date_to_iso, to_js_err, to_js_value};
-use finstack_quant_cashflows::primitives::{is_cash_settlement_kind, CFKind, CashFlow};
+use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use wasm_bindgen::prelude::*;
 
 /// Parse a cashflow kind label into its `CFKind` wire string.
@@ -54,9 +54,9 @@ pub fn cf_kind_is_principal_like(kind: JsValue) -> Result<bool, JsValue> {
 /// @param kind - `CFKind` wire string.
 /// @returns `true` when flows of this kind are paid or received in cash.
 /// @throws If `kind` is not a `CFKind` wire string (kind `validation`).
-#[wasm_bindgen(js_name = isCashSettlementKind)]
-pub fn is_cash_settlement_kind_js(kind: JsValue) -> Result<bool, JsValue> {
-    Ok(is_cash_settlement_kind(js_wire::<CFKind>(&kind, "kind")?))
+#[wasm_bindgen(js_name = cfKindIsCashSettlement)]
+pub fn cf_kind_is_cash_settlement(kind: JsValue) -> Result<bool, JsValue> {
+    Ok(js_wire::<CFKind>(&kind, "kind")?.is_cash_settlement())
 }
 
 /// Date on which a cashflow changes the outstanding balance.

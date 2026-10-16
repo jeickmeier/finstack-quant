@@ -9,10 +9,9 @@ use crate::api::core::market_context::JsMarketContext;
 use crate::utils::input::{js_f64, js_f64_seq, js_string, json_text};
 use crate::utils::wire::{js_date, js_opt_wire, js_wire};
 use crate::utils::{date_to_iso, to_js_err, to_js_value};
-use finstack_quant_cashflows::builder::schedule::merge_cashflow_schedules;
 use finstack_quant_cashflows::builder::{
-    CashFlowBuilder, CashFlowMeta, CashFlowSchedule, CashflowRepresentation, CouponType,
-    FixedCouponSpec, FloatingCouponSpec, Notional,
+    merge_cashflow_schedules, CashFlowBuilder, CashFlowMeta, CashFlowSchedule,
+    CashflowRepresentation, CouponType, FixedCouponSpec, FloatingCouponSpec, Notional,
 };
 use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_cashflows::{CashflowScheduleBuildSpec, DatedFlowJson, ScheduleBuildOpts};
@@ -707,7 +706,7 @@ pub fn build_cashflow_schedule_with_market(
 /// @throws If the schedule fails validation (kind `validation`).
 #[wasm_bindgen(js_name = datedFlows)]
 pub fn dated_flows(schedule: &JsCashFlowSchedule) -> Result<JsValue, JsValue> {
-    dated_flows_wire(finstack_quant_cashflows::dated_flows(&schedule.inner).map_err(to_js_err)?)
+    dated_flows_wire(schedule.inner.dated_flows().map_err(to_js_err)?)
 }
 
 /// Build a schedule from dated amounts that all share one cashflow kind.

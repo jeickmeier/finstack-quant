@@ -7,12 +7,12 @@ use super::types::AgencyCmo;
 #[cfg(test)]
 use super::types::{CmoTranche, CmoTrancheType};
 use super::waterfall::execute_waterfall_with_principal_breakdown;
-use crate::cashflow::builder::specs::PrepaymentModelSpec;
-use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule};
-use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::instruments::fixed_income::mbs_passthrough::pricer::generate_cashflows;
 use crate::instruments::fixed_income::mbs_passthrough::{AgencyMbsPassthrough, PoolType};
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry;
+use finstack_quant_cashflows::builder::PrepaymentModelSpec;
+use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
+use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -180,14 +180,15 @@ pub(crate) fn build_reference_tranche_schedule(
         }
     }
 
-    Ok(crate::cashflow::traits::schedule_from_classified_flows(
+    Ok(finstack_quant_cashflows::schedule_from_classified_flows(
         flows,
         DayCount::Thirty360,
-        crate::cashflow::traits::ScheduleBuildOpts {
+        finstack_quant_cashflows::ScheduleBuildOpts {
             notional_hint: Some(tranche.current_face),
             meta: CashFlowMeta {
                 projected_fixings: Vec::new(),
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                representation:
+                    finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                 calendar_ids: Vec::new(),
                 commitment: None,
                 issue_date: Some(cmo.issue_date),
@@ -271,7 +272,7 @@ pub(crate) fn price_cmo(cmo: &AgencyCmo, market: &MarketContext, as_of: Date) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::primitives::CFKind;
+    use finstack_quant_cashflows::primitives::CFKind;
     use finstack_quant_core::dates::DayCountContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;

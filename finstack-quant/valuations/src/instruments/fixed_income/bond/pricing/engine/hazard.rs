@@ -40,11 +40,10 @@ use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
-use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::is_cash_settlement_kind;
 use crate::instruments::common_impl::pricing::rates_credit::{
     build_daily_bond_rates_credit_targets, continuous_frp_weight,
 };
+use finstack_quant_cashflows::builder::CashFlowSchedule;
 
 use super::super::super::types::Bond;
 
@@ -157,7 +156,7 @@ impl HazardBondEngine {
         let Some(final_payment_date) = schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.date > as_of && is_cash_settlement_kind(flow.kind))
+            .filter(|flow| flow.date > as_of && flow.kind.is_cash_settlement())
             .map(|flow| flow.date)
             .max()
         else {
@@ -266,7 +265,6 @@ impl HazardBondEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::builder::CouponType;
     use crate::instruments::common_impl::traits::Attributes;
     use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::fixed_income::bond::pricing::engine::discount::BondEngine;
@@ -278,6 +276,7 @@ mod tests {
     };
     use crate::pricer::{ModelKey, PricingError};
     use crate::results::ValuationDetails;
+    use finstack_quant_cashflows::builder::CouponType;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::term_structures::DiscountCurve;

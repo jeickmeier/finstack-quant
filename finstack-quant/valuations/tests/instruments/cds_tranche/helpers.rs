@@ -27,7 +27,7 @@ pub fn maturity_5y() -> Date {
 }
 
 fn with_imm_dates(mut tranche: CdsTranche) -> CdsTranche {
-    tranche.roll_rule = finstack_quant_cashflows::builder::specs::RollRule::CdsImm;
+    tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::CdsImm;
     tranche
 }
 

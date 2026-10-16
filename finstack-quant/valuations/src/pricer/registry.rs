@@ -796,7 +796,7 @@ mod tests {
 
     crate::impl_empty_cashflow_provider!(
         InvalidTestInstrument,
-        crate::cashflow::builder::CashflowRepresentation::NoResidual
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
     );
 
     impl Priceable for InvalidTestInstrument {
@@ -851,7 +851,7 @@ mod tests {
 
     crate::impl_empty_cashflow_provider!(
         RawLifecycleInstrument,
-        crate::cashflow::builder::CashflowRepresentation::NoResidual
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
     );
 
     impl Priceable for RawLifecycleInstrument {

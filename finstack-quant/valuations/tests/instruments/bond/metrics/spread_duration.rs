@@ -181,7 +181,7 @@ fn credit_curve_bond_spread_duration_stays_on_z_spread_basis() {
 #[test]
 fn callable_bond_spread_duration_uses_quote_reproducing_workout_path() {
     use finstack_quant_cashflows::accrual::accrued_interest_amount;
-    use finstack_quant_cashflows::traits::CashflowProvider;
+    use finstack_quant_cashflows::CashflowProvider;
 
     let as_of = date!(2025 - 01 - 06);
     let quote_date = date!(2025 - 01 - 09);

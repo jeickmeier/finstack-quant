@@ -283,5 +283,5 @@ impl Instrument for CommoditySpreadOption {
 
 crate::impl_empty_cashflow_provider!(
     CommoditySpreadOption,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );

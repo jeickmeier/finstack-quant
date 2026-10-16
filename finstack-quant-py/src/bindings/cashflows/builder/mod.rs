@@ -150,7 +150,6 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
 
     specs::add_classes(&module)?;
     module.add_class::<orchestrator::PyCashFlowBuilder>()?;
-    module.add_class::<orchestrator::PyPrincipalEvent>()?;
     module.add_class::<schedule::PyCashFlowMeta>()?;
     module.add_class::<schedule::PyCashFlowSchedule>()?;
     module.add_function(wrap_pyfunction!(
@@ -183,7 +182,6 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
             "Notional",
             "OvernightIndexConstraintApplication",
             "PrepaymentModelSpec",
-            "PrincipalEvent",
             "PrincipalExchange",
             "RecoveryModelSpec",
             "RollRule",

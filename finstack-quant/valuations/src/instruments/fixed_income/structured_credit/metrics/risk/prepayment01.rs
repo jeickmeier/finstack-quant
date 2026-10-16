@@ -17,9 +17,9 @@
 //! the attribution layer's PSA ≈ 6% terminal-CPR convention). `CmbsLockout`
 //! and `Constant` read `cpr` directly.
 
-use crate::cashflow::builder::PrepaymentModelSpec;
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
 use crate::metrics::{MetricCalculator, MetricContext};
+use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::Result;
 
 /// Standard prepayment bump: 1bp (0.0001) of annual CPR

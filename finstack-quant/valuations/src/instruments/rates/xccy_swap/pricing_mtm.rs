@@ -19,12 +19,12 @@
 //! Canonical citation: `docs/REFERENCES.md`
 //! (`#andersen-piterbarg-xccy-mtm-reset`).
 
-use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::rates::xccy_swap::types::{
     initial_principal_sign, ResettingSide, XccySwap,
 };
+use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::fx::FxQuery;
@@ -40,7 +40,7 @@ use finstack_quant_core::Result;
 fn build_xccy_mtm_periods(
     swap: &XccySwap,
     leg: &crate::instruments::rates::xccy_swap::XccySwapLeg,
-) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
     let cal_id = swap.resolve_leg_calendar_id(leg)?;
     build_periods(BuildPeriodsParams {
         start: leg.leg.start,
@@ -54,7 +54,7 @@ fn build_xccy_mtm_periods(
         payment_lag_days: leg.leg.payment_lag_days,
         reset_lag_days: leg.period_reset_lag(),
         adjust_accrual_dates: false,
-        roll_rule: crate::cashflow::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     })
 }
 
@@ -165,10 +165,10 @@ fn project_mtm_cashflows(
     context: &finstack_quant_core::market_data::context::MarketContext,
     as_of: Date,
 ) -> Result<(
-    Vec<crate::cashflow::primitives::CashFlow>,
-    crate::cashflow::builder::CashFlowMeta,
+    Vec<finstack_quant_cashflows::primitives::CashFlow>,
+    finstack_quant_cashflows::builder::CashFlowMeta,
 )> {
-    use crate::cashflow::primitives::{CFKind, CashFlow};
+    use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
     use finstack_quant_core::money::fx::FxQuery;
     use finstack_quant_core::money::Money;
 
@@ -323,7 +323,7 @@ fn project_mtm_cashflows(
         };
 
         if j > 0 {
-            projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
+            projected_fixings.push(finstack_quant_cashflows::fixings::ProjectedFixing {
                 series_id: mtm_fx_fixing_series_id(
                     resetting_leg.notional.currency(),
                     constant_leg.notional.currency(),
@@ -397,7 +397,7 @@ fn project_mtm_cashflows(
 
     Ok((
         flows,
-        crate::cashflow::builder::CashFlowMeta {
+        finstack_quant_cashflows::builder::CashFlowMeta {
             projected_fixings,
             ..Default::default()
         },
@@ -409,13 +409,13 @@ pub(crate) fn mtm_cashflow_schedule(
     resetting_side: ResettingSide,
     context: &finstack_quant_core::market_data::context::MarketContext,
     as_of: Date,
-) -> Result<crate::cashflow::builder::CashFlowSchedule> {
+) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
     let (flows, meta) = project_mtm_cashflows(swap, resetting_side, context, as_of)?;
     let (_, resetting_leg) = swap.partition_legs(resetting_side)?;
-    Ok(crate::cashflow::traits::schedule_from_classified_flows(
+    Ok(finstack_quant_cashflows::schedule_from_classified_flows(
         flows,
         resetting_leg.leg.day_count,
-        crate::cashflow::traits::ScheduleBuildOpts {
+        finstack_quant_cashflows::ScheduleBuildOpts {
             notional_hint: Some(resetting_leg.notional),
             meta,
         },

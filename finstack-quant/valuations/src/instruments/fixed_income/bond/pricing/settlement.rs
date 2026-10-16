@@ -110,7 +110,7 @@ impl QuoteDateContext {
         let quote_date = settlement_date(bond, as_of)?;
 
         let schedule = bond.full_cashflow_schedule(curves)?;
-        let accrued_at_quote_date = crate::cashflow::accrual::accrued_interest_amount(
+        let accrued_at_quote_date = finstack_quant_cashflows::accrual::accrued_interest_amount(
             &schedule,
             quote_date,
             &bond.accrual_config(),

@@ -229,7 +229,7 @@ impl BondFuturePricer {
         delivery_date: Date,
         financing_curve_id: &finstack_quant_core::types::CurveId,
     ) -> Result<f64> {
-        use crate::cashflow::accrual::accrued_interest_amount;
+        use finstack_quant_cashflows::accrual::accrued_interest_amount;
         use finstack_quant_core::math::summation::NeumaierAccumulator;
 
         if !conversion_factor.is_finite() || conversion_factor <= 0.0 {
@@ -426,9 +426,9 @@ mod tests {
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use time::macros::date;
 
-    use crate::cashflow::traits::CashflowProvider;
     use crate::instruments::fixed_income::bond::Bond;
     use crate::instruments::{ListedFutureTerms, Position};
+    use finstack_quant_cashflows::CashflowProvider;
 
     /// CME U.S. Treasury contract spec (6% notional coupon) with the given
     /// standard maturity, which selects the conversion-factor rounding rules.
@@ -911,7 +911,7 @@ mod tests {
     /// spot-clean proxy by the carry over the delivery horizon.
     #[test]
     fn model_price_is_carry_adjusted_forward() {
-        use crate::cashflow::accrual::accrued_interest_amount;
+        use finstack_quant_cashflows::accrual::accrued_interest_amount;
 
         // Discount/premium CTD over a steep curve so carry is material.
         let bond = create_test_bond(

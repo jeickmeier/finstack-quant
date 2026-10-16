@@ -71,8 +71,8 @@ fn test_asw_par_tracks_coupon_minus_par_rate() {
     let CashflowSpec::Fixed(spec) = &bond.cashflow_spec else {
         panic!("expected fixed bond")
     };
-    let periods = finstack_quant_cashflows::builder::periods::build_periods(
-        finstack_quant_cashflows::builder::periods::BuildPeriodsParams {
+    let periods = finstack_quant_cashflows::builder::build_periods(
+        finstack_quant_cashflows::builder::BuildPeriodsParams {
             start: bond.issue_date,
             end: bond.maturity,
             frequency: spec.schedule.frequency,
@@ -84,7 +84,7 @@ fn test_asw_par_tracks_coupon_minus_par_rate() {
             payment_lag_days: spec.schedule.payment_lag_days,
             reset_lag_days: None,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     )
     .expect("schedule build should succeed");

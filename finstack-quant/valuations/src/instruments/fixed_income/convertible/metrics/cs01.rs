@@ -199,12 +199,12 @@ impl MetricCalculator for BucketedCs01Calculator {
 mod tests {
     use std::sync::Arc;
 
-    use crate::cashflow::builder::specs::{CouponType, FixedCouponSpec};
     use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::fixed_income::convertible::{
         AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
     };
     use crate::metrics::{MetricCalculator, MetricContext};
+    use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -229,7 +229,7 @@ mod tests {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         };
 

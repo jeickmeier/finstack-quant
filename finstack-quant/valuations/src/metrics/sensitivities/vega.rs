@@ -285,7 +285,7 @@ mod tests {
 
     crate::impl_empty_cashflow_provider!(
         MultiSurfaceVegaInstrument,
-        crate::cashflow::builder::CashflowRepresentation::NoResidual
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
     );
 
     impl MultiSurfaceVegaInstrument {

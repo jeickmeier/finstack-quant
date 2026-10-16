@@ -19,9 +19,9 @@
 //! returns one crossing of a possibly non-monotone curve and should be treated
 //! as indicative.
 
-use crate::cashflow::builder::DefaultModelSpec;
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
 use crate::instruments::Instrument;
+use finstack_quant_cashflows::builder::DefaultModelSpec;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;

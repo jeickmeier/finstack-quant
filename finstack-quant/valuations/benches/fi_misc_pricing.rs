@@ -11,7 +11,7 @@
 #![allow(clippy::unwrap_used)]
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_cashflows::builder::specs::CouponType;
+use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -393,7 +393,7 @@ fn bench_fi_trs_pv(c: &mut Criterion) {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         );
         group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {

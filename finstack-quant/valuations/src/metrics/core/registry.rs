@@ -626,7 +626,7 @@ mod tests {
 
     crate::impl_empty_cashflow_provider!(
         MockInstrument,
-        crate::cashflow::builder::CashflowRepresentation::NoResidual
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
     );
 
     impl MockInstrument {

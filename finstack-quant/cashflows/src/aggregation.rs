@@ -28,7 +28,6 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Period, Period
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 
-use crate::primitives::is_cash_settlement_kind;
 use indexmap::IndexMap;
 
 /// Per-period, per-currency totals produced by [`aggregate_by_period`] and
@@ -190,7 +189,7 @@ fn sum_by_period<T: HasDate>(
     sorted: &[T],
     periods: &[Period],
     mut value: impl FnMut(usize, &T) -> finstack_quant_core::Result<(Currency, f64)>,
-) -> finstack_quant_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
+) -> finstack_quant_core::Result<PeriodAggregation> {
     debug_assert!(
         sorted
             .windows(2)
@@ -225,7 +224,7 @@ fn sum_by_period<T: HasDate>(
         }
         out.insert(p.id, result);
     }
-    Ok(out)
+    Ok(PeriodAggregation(out))
 }
 
 /// Validate the aggregation period contract: sorted by start, non-overlapping,
@@ -273,20 +272,6 @@ pub(crate) fn validate_periods(periods: &[Period]) -> finstack_quant_core::Resul
         }
     }
     Ok(())
-}
-
-/// Currency-preserving aggregation of cashflows into `Period`s.
-///
-/// Groups cashflows by time period while preserving currency separation.
-/// Returns a map: `PeriodId -> (Currency -> Money)`. Per-currency sums use
-/// Neumaier-compensated f64 accumulation (see module docs).
-fn aggregate_by_period_sorted(
-    sorted: &[crate::DatedFlow],
-    periods: &[Period],
-) -> finstack_quant_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
-    sum_by_period(sorted, periods, |_, &(_d, m)| {
-        Ok((m.currency(), m.amount()))
-    })
 }
 
 /// Aggregate cashflows by period with currency preservation.
@@ -348,13 +333,14 @@ pub fn aggregate_by_period(
     if flows.is_empty() || periods.is_empty() {
         return Ok(PeriodAggregation::default());
     }
-    let is_sorted = flows.windows(2).all(|w| w[0].0 <= w[1].0);
-    if is_sorted {
-        return aggregate_by_period_sorted(flows, periods).and_then(PeriodAggregation::try_from);
+    if flows.windows(2).all(|w| w[0].0 <= w[1].0) {
+        return sum_by_period(flows, periods, |_, &(_d, m)| Ok((m.currency(), m.amount())));
     }
     let mut sorted: Vec<crate::DatedFlow> = flows.to_vec();
     sorted.sort_unstable_by_key(|(d, _)| *d);
-    aggregate_by_period_sorted(&sorted, periods).and_then(PeriodAggregation::try_from)
+    sum_by_period(&sorted, periods, |_, &(_d, m)| {
+        Ok((m.currency(), m.amount()))
+    })
 }
 
 use finstack_quant_core::market_data::term_structures::HazardCurve;
@@ -415,16 +401,6 @@ pub fn aggregate_cashflows_checked(
     Money::new(acc.total(), target)
 }
 
-fn pv_by_period_precomputed(
-    sorted: &[CashFlow],
-    pv_per_flow: &[(Currency, f64)],
-    periods: &[Period],
-) -> finstack_quant_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
-    debug_assert_eq!(sorted.len(), pv_per_flow.len());
-    validate_periods(periods)?;
-    sum_by_period(sorted, periods, |index, _| Ok(pv_per_flow[index]))
-}
-
 /// Checked variant that works directly on `CashFlow` slices without intermediate allocation.
 ///
 /// Filters out `DefaultedNotional` flows during PV computation. Requires flows
@@ -438,11 +414,11 @@ pub(crate) fn pv_by_period_cashflows_sorted_checked(
     periods: &[Period],
     disc: &dyn Discounting,
     date_ctx: DateContext<'_>,
-) -> finstack_quant_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
+) -> finstack_quant_core::Result<PeriodAggregation> {
     validate_periods(periods)?;
     sum_by_period(sorted, periods, |_, flow| {
         let (df, _) = discount_survival(flow.date, disc, None, &date_ctx)?;
-        let pv = if !is_cash_settlement_kind(flow.kind) || flow.date <= date_ctx.base {
+        let pv = if !flow.kind.is_cash_settlement() || flow.date <= date_ctx.base {
             0.0
         } else {
             flow.amount.amount() * df
@@ -628,7 +604,7 @@ pub(crate) fn calendar_year_ladder_rows(
 
 /// Survival-weighted settlement PV, excluding any estimated principal recovery.
 fn credit_adjusted_period_pv(cf: &CashFlow, df: f64, sp: f64, base: Date) -> f64 {
-    if !is_cash_settlement_kind(cf.kind) || cf.date <= base {
+    if !cf.kind.is_cash_settlement() || cf.date <= base {
         return 0.0;
     }
 
@@ -1037,11 +1013,11 @@ pub(crate) fn pv_by_period_credit_adjusted(
     hazard: Option<&HazardCurve>,
     recovery_rate: Option<f64>,
     date_ctx: DateContext<'_>,
-) -> finstack_quant_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
+) -> finstack_quant_core::Result<PeriodAggregation> {
     validate_periods(periods)?;
     validate_recovery(flows, hazard, recovery_rate)?;
     if flows.is_empty() || periods.is_empty() {
-        return Ok(IndexMap::new());
+        return Ok(PeriodAggregation::default());
     }
     let hazard = hazard.ok_or_else(|| {
         finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
@@ -1069,12 +1045,9 @@ pub(crate) fn pv_by_period_credit_adjusted(
         .collect::<finstack_quant_core::Result<_>>()?;
     let pvs =
         credit_adjusted_cashflow_pvs(sorted, &discounts, Some(hazard), recovery_rate, date_ctx)?;
-    let pv_per_flow: Vec<_> = sorted
-        .iter()
-        .zip(pvs)
-        .map(|(cf, pv)| (cf.amount.currency(), pv))
-        .collect();
-    pv_by_period_precomputed(sorted, &pv_per_flow, periods)
+    sum_by_period(sorted, periods, |index, cf| {
+        Ok((cf.amount.currency(), pvs[index]))
+    })
 }
 
 #[cfg(test)]

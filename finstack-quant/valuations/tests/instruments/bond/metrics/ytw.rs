@@ -122,7 +122,7 @@ fn test_ytw_tracks_quoted_price_not_model_pv() {
 #[test]
 fn test_ytw_off_cycle_call_uses_dirty_street_redemption() {
     use finstack_quant_cashflows::accrual::accrued_interest_amount;
-    use finstack_quant_cashflows::traits::CashflowProvider;
+    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::YieldCompounding;

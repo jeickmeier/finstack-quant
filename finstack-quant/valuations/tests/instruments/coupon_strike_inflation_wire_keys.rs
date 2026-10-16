@@ -125,8 +125,8 @@ fn contractual_rate_reference(
     market: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> f64 {
-    use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
-    use finstack_quant_cashflows::builder::specs::RollRule;
+    use finstack_quant_cashflows::builder::RollRule;
+    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
     use finstack_quant_core::dates::{DayCount, DayCountContext};
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::types::IndexId;

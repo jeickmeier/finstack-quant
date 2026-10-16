@@ -12,9 +12,9 @@ use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
-use crate::cashflow::builder::{schedule::merge_cashflow_schedules, CashFlowSchedule, Notional};
-use crate::cashflow::primitives::CFKind;
 use crate::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_cashflows::builder::{merge_cashflow_schedules, CashFlowSchedule, Notional};
+use finstack_quant_cashflows::primitives::CFKind;
 
 /// FX Swap instrument definition
 #[derive(
@@ -346,11 +346,11 @@ impl FxSwap {
         } else {
             vec![(payment_date, amount)]
         };
-        Ok(crate::cashflow::traits::schedule_from_dated_flows(
+        Ok(finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
             CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(Money::new(amount.amount().abs(), amount.currency())?),
                 ..Default::default()
             },
@@ -418,14 +418,14 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
 
         self.validate()?;
         if crate::instruments::fx::shared::event_has_occurred(self.far_date, as_of) {
-            return Ok(crate::cashflow::traits::schedule_from_classified_flows(
+            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 finstack_quant_core::dates::DayCount::Act365F,
-                crate::cashflow::traits::ScheduleBuildOpts {
+                finstack_quant_cashflows::ScheduleBuildOpts {
                     notional_hint: Some(Money::from((0_i64, self.base_currency))),
-                    meta: crate::cashflow::builder::CashFlowMeta {
+                    meta: finstack_quant_cashflows::builder::CashFlowMeta {
                         representation:
-                            crate::cashflow::builder::CashflowRepresentation::NoResidual,
+                            finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual,
                         ..Default::default()
                     },
                 },
@@ -468,15 +468,15 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
             Notional::par(0.0, self.base_currency)?,
             finstack_quant_core::dates::DayCount::Act365F,
         )
-        .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        .with_representation(finstack_quant_cashflows::builder::CashflowRepresentation::Projected))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::CashflowProvider;
     use crate::instruments::common_impl::traits::Instrument;
+    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};

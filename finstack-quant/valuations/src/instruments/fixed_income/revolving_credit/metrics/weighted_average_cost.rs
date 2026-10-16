@@ -40,9 +40,7 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
                 let mut params =
                     finstack_quant_cashflows::builder::FloatingRateParams::try_from(spec)?;
                 params.spread_bp += facility.margin_delta_bp_at(context.as_of);
-                finstack_quant_cashflows::builder::rate_helpers::calculate_floating_rate(
-                    index_rate, &params,
-                )
+                finstack_quant_cashflows::builder::calculate_floating_rate(index_rate, &params)
             }
         };
 
@@ -109,7 +107,7 @@ fn average_forward_rate(
             period.accrual_end,
             DayCountContext::default(),
         )?;
-        let rate = crate::cashflow::builder::rate_helpers::project_index_rate(
+        let rate = finstack_quant_cashflows::builder::project_index_rate(
             remaining_start,
             forward,
             period.accrual_start,

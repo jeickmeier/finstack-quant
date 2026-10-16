@@ -11,6 +11,7 @@ use crate::bindings::cashflows::builder::schedule::PyCashFlowSchedule;
 use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::wire_methods;
 use crate::errors::core_to_py;
 
 /// Accrual method selector (``AccrualMethod.LINEAR`` / ``AccrualMethod.COMPOUNDED``).
@@ -41,21 +42,15 @@ pub struct PyAccrualMethod {
 impl PyAccrualMethod {
     /// Linear accrual: ``Accrued = Coupon × (elapsed / period)`` (default; ICMA 251.1).
     #[classattr]
-    #[allow(non_snake_case)]
-    fn LINEAR() -> Self {
-        Self {
-            inner: AccrualMethod::Linear,
-        }
-    }
+    const LINEAR: Self = Self {
+        inner: AccrualMethod::Linear,
+    };
 
     /// Compounded accrual: ``Accrued = N × [(1 + r)^f − 1]`` (not ICMA-style).
     #[classattr]
-    #[allow(non_snake_case)]
-    fn COMPOUNDED() -> Self {
-        Self {
-            inner: AccrualMethod::Compounded,
-        }
-    }
+    const COMPOUNDED: Self = Self {
+        inner: AccrualMethod::Compounded,
+    };
 
     /// Canonical snake_case label (``"linear"`` / ``"compounded"``).
     #[getter]
@@ -200,39 +195,13 @@ impl PyExCouponRule {
             .map_err(core_to_py)
     }
 
-    /// Serialize to JSON.
-    #[allow(clippy::wrong_self_convention)]
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "failed to serialize ExCouponRule"))
-    }
-
-    /// Deserialize from JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str::<ExCouponRule>(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid ExCouponRule JSON"))
-    }
-
-    /// Support ``pickle`` through the JSON wire form.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Python-style field summary.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ExCouponRule", &self.inner)
     }
 }
+
+wire_methods!(PyExCouponRule, ExCouponRule, "ExCouponRule");
 
 /// Configuration for schedule-driven interest accrual.
 ///
@@ -322,39 +291,13 @@ impl PyAccrualConfig {
         self.inner.frequency.map(PyTenor::from_inner)
     }
 
-    /// Serialize to JSON.
-    #[allow(clippy::wrong_self_convention)]
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "failed to serialize AccrualConfig"))
-    }
-
-    /// Deserialize from JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str::<AccrualConfig>(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid AccrualConfig JSON"))
-    }
-
-    /// Support ``pickle`` through the JSON wire form.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Python-style field summary.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("AccrualConfig", &self.inner)
     }
 }
+
+wire_methods!(PyAccrualConfig, AccrualConfig, "AccrualConfig");
 
 /// Prebuilt accrual state for repeated ``accrued_at`` queries on one schedule.
 ///

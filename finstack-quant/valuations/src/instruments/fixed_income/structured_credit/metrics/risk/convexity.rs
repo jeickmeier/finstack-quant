@@ -17,8 +17,8 @@
 //! an effective measure would reprice through the cashflow engine at ±Δy. Units
 //! are years².
 
-use crate::cashflow::traits::DatedFlows;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::summation::NeumaierAccumulator;

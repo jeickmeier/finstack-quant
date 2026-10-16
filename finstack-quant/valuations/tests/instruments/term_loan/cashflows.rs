@@ -1,6 +1,6 @@
 //! Term loan cashflow generation tests.
 
-use finstack_quant_cashflows::builder::specs::CouponType;
+use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;

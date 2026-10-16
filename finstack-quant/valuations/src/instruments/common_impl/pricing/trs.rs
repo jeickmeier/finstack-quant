@@ -150,7 +150,7 @@ fn financing_period_projection(
                         currency,
                         "TRS financing",
                     )?
-                } else if calendar_id == crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID {
+                } else if calendar_id == finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID {
                     &finstack_quant_core::dates::WEEKENDS_ONLY
                 } else {
                     super::overnight::resolve_overnight_fixing_calendar(
@@ -678,12 +678,12 @@ mod tests {
         financing_period_projection, financing_period_rate, TotalReturnLegParams, TrsEngine,
         TrsReturnModel,
     };
-    use crate::cashflow::builder::ScheduleParams;
     use crate::instruments::common_impl::parameters::legs::FinancingLegSpec;
     use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
     use crate::instruments::common_impl::pricing::swap_legs;
     use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
     use crate::instruments::rates::irs::FloatingLegCompounding;
+    use finstack_quant_cashflows::builder::ScheduleParams;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{
         BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
@@ -745,7 +745,7 @@ mod tests {
                     end_of_month: false,
                     payment_lag_days: 0,
                     adjust_accrual_dates: false,
-                    roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                    roll_rule: finstack_quant_cashflows::builder::RollRule::None,
                 },
             );
             let market = MarketContext::new()
@@ -882,7 +882,7 @@ mod tests {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         );
 
@@ -928,7 +928,7 @@ mod tests {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         );
 
@@ -997,7 +997,7 @@ mod tests {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         );
 
@@ -1157,7 +1157,7 @@ mod tests {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         );
 
@@ -1296,7 +1296,7 @@ mod tests {
             year_fraction,
             Tenor::quarterly(),
             as_of,
-            crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+            finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
             Currency::USD,
         )
         .expect_err("started term period without fixing must fail");
@@ -1314,7 +1314,7 @@ mod tests {
             year_fraction,
             Tenor::quarterly(),
             as_of,
-            crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+            finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
             Currency::USD,
         )
         .expect("exact reset fixing");
@@ -1329,7 +1329,7 @@ mod tests {
             year_fraction,
             Tenor::quarterly(),
             as_of,
-            crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+            finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
             Currency::USD,
         )
         .expect("future term period projects");
@@ -1357,7 +1357,7 @@ mod tests {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         );
 

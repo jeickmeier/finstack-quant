@@ -14,9 +14,9 @@
 
 use std::sync::Arc;
 
-use crate::cashflow::builder::schedule::CashFlowSchedule;
 use crate::instruments::TermLoan;
 use crate::metrics::MetricContext;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::{xirr_with_daycount, CFKind};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
@@ -105,7 +105,7 @@ pub(crate) fn quoted_dirty_from_clean_px(
             _ => 0.0,
         })
         .sum();
-    let accrued = crate::cashflow::accrual::accrued_interest_amount(
+    let accrued = finstack_quant_cashflows::accrual::accrued_interest_amount(
         schedule,
         settlement,
         &loan.accrual_config(),

@@ -11,7 +11,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::Decimal;
 
-use crate::cashflow::builder::{evaluate_fee_tiers, FeeTier, FloatingRateSpec};
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
@@ -19,6 +18,7 @@ use crate::instruments::fixed_income::loan_terms::{
     CommitmentStep, FeeStep, LetterOfCreditSpec, MarginStep, OidEirSpec, RateSpec, ScheduledFee,
     UpfrontFee,
 };
+use finstack_quant_cashflows::builder::{evaluate_fee_tiers, FeeTier, FloatingRateSpec};
 use rust_decimal::prelude::ToPrimitive;
 
 /// Revolving credit facility instrument.
@@ -1270,7 +1270,7 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
 }
 
 // Implement CashflowProvider for standard cashflow interface
-impl crate::cashflow::traits::CashflowScheduleSource for RevolvingCredit {
+impl finstack_quant_cashflows::CashflowScheduleSource for RevolvingCredit {
     fn notional(&self) -> finstack_quant_core::Result<Option<finstack_quant_core::money::Money>> {
         Ok(Some(self.commitment))
     }
@@ -1279,7 +1279,7 @@ impl crate::cashflow::traits::CashflowScheduleSource for RevolvingCredit {
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         // Stochastic facilities expose their Monte Carlo expected schedule
         // (path-averaged flow by flow) so theta carry and the exporters work.
         if self.is_stochastic() {
@@ -1288,7 +1288,7 @@ impl crate::cashflow::traits::CashflowScheduleSource for RevolvingCredit {
             )
             .map(|schedule| {
                 schedule.with_representation(
-                    crate::cashflow::builder::CashflowRepresentation::Projected,
+                    finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                 )
             });
         }
@@ -1307,9 +1307,9 @@ impl crate::cashflow::traits::CashflowScheduleSource for RevolvingCredit {
         };
         let engine = CashflowEngine::new(self, Some(curves), as_of, fixings)?;
         let path_schedule = engine.generate_deterministic()?;
-        Ok(path_schedule
-            .schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(path_schedule.schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 

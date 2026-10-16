@@ -9,10 +9,10 @@ use finstack_quant_core::dates::{calendar_by_id, Date};
 use rust_decimal::Decimal;
 
 use super::types::{CreditSpreadProcessSpec, DrawRepaySpec, RevolvingCredit, UtilizationProcess};
-use crate::cashflow::builder::FeeTier;
 use crate::instruments::common_impl::validation;
 use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::loan_terms::UpfrontFee;
+use finstack_quant_cashflows::builder::FeeTier;
 
 /// Validate a dated step schedule: strictly increasing, after the commitment
 /// date and, depending on `allow_maturity`, on or strictly before maturity.
@@ -463,7 +463,7 @@ impl RevolvingCredit {
                      curve or fixing is an error"
                         .to_string()
                 })?;
-                let _ = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
+                let _ = finstack_quant_cashflows::builder::FloatingRateParams::try_from(spec)?;
                 let _ = crate::instruments::common_impl::pricing::overnight_conventions::resolved_overnight_compounding(
                     spec.forward_curve_id.as_str(),
                     spec.compounding.as_ref(),

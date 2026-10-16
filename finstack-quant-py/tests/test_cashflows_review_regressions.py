@@ -38,8 +38,7 @@ def test_aggregation_round_trip_preserves_currency_labels() -> None:
     ]
 
 
-@pytest.mark.parametrize("as_json", [False, True])
-def test_dated_flows_rejects_same_invalid_economics_as_json(as_json: bool) -> None:
+def test_dated_flows_rejects_same_invalid_economics_as_json() -> None:
     schedule = CashFlowSchedule.from_flows(
         [CashFlow(dt.date(2025, 6, 15), Money(150, "USD"), "amortization", 0.0)],
         Notional.par(100, "USD"),
@@ -47,7 +46,7 @@ def test_dated_flows_rejects_same_invalid_economics_as_json(as_json: bool) -> No
     )
     wire = schedule.to_json()
     with pytest.raises(ValueError, match="repayments exceed outstanding"):
-        dated_flows(wire if as_json else schedule)
+        dated_flows(schedule)
     with pytest.raises(ValueError, match="repayments exceed outstanding"):
         dated_flows_json(wire)
 
@@ -64,7 +63,7 @@ def test_dated_flows_preserves_cash_and_omits_state_rows() -> None:
         DayCount.ACT_360,
     )
     assert dated_flows(schedule) == [(date, Money(10, "USD"))]
-    assert dated_flows(schedule.to_json()) == dated_flows(schedule)
+    assert dated_flows(CashFlowSchedule.from_json(schedule.to_json())) == dated_flows(schedule)
     assert json.loads(dated_flows_json(schedule.to_json())) == [
         {"date": "2025-06-15", "amount": {"amount": "10", "currency": "USD"}}
     ]

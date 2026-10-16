@@ -9,7 +9,7 @@
 //!   schedule.
 
 use crate::instruments::common::test_helpers::flat_discount_curve;
-use finstack_quant_cashflows::builder::specs::CouponType;
+use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;

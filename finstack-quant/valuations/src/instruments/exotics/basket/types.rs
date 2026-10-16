@@ -361,7 +361,7 @@ impl Instrument for Basket {
 // Declare canonical market dependencies for the DV01 calculator.
 crate::impl_empty_cashflow_provider!(
     Basket,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
 
 #[cfg(test)]

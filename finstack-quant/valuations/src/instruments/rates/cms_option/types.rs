@@ -209,7 +209,7 @@ impl crate::instruments::common_impl::traits::Instrument for CmsOption {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Option<finstack_quant_core::dates::Date>> {
         let schedule =
-            crate::cashflow::traits::CashflowProvider::cashflow_schedule(self, curves, as_of)?;
+            finstack_quant_cashflows::CashflowProvider::cashflow_schedule(self, curves, as_of)?;
         Ok(schedule
             .get_flows()
             .iter()
@@ -269,7 +269,7 @@ impl crate::instruments::common_impl::traits::Instrument for CmsOption {
 // Declare canonical market dependencies for the DV01 calculator.
 crate::impl_empty_cashflow_provider!(
     CmsOption,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
 
 #[cfg(test)]

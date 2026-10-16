@@ -204,8 +204,8 @@ mod tests {
     use finstack_quant_core::money::Money;
     use time::Month;
 
-    use crate::cashflow::builder::specs::{CouponType, FixedCouponSpec};
     use crate::instruments::common_impl::traits::Instrument;
+    use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
 
     fn make_bond_with_quote(notional_usd: f64, quoted_clean_pct: f64) -> ConvertibleBond {
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
@@ -230,7 +230,7 @@ mod tests {
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         };
 

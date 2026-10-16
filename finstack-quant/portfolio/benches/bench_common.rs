@@ -8,8 +8,8 @@
 
 #![allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
 
-use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec};
 use finstack_quant_cashflows::builder::ScheduleParams;
+use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -633,7 +633,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let cds_id = format!("CDS_{}", i);
         let convention = CdsConvention::IsdaNa;
         let premium = PremiumLegSpec {
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
             start: base,
             end: maturity_5y(),
             frequency: convention.get_spec().expect("CDS registry").frequency,
@@ -950,7 +950,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         };
         let mut tranche = CdsTranche::new(
             tranche_id.clone(),
@@ -961,7 +961,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             PayReceive::Pay,
         )
         .expect("Valid tranche parameters");
-        tranche.roll_rule = finstack_quant_cashflows::builder::specs::RollRule::CdsImm;
+        tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::CdsImm;
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(
@@ -1131,7 +1131,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         };
         let convertible = ConvertibleBond {

@@ -140,20 +140,20 @@ impl BermudanSchedule {
         swap_end: Date,
         fixed_frequency: Tenor,
     ) -> finstack_quant_core::Result<Self> {
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start: first_exercise,
                 end: swap_end,
                 frequency: fixed_frequency,
                 stub: StubKind::None,
                 business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                calendar_id: crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+                calendar_id: finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
                 end_of_month: false,
                 day_count: finstack_quant_core::dates::DayCount::Act365F,
                 payment_lag_days: 0,
                 reset_lag_days: None,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )?;
         // Exercise dates are all coupon dates except the last one (maturity),

@@ -431,17 +431,17 @@ impl BermudanSwaption {
     /// Build the canonical fixed-leg periods used by Bermudan pricing paths.
     pub(crate) fn fixed_schedule_periods(
         &self,
-    ) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+    ) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
         self.fixed_schedule_periods_at(self.get_underlying_start_date())
     }
 
     fn fixed_schedule_periods_at(
         &self,
         start: Date,
-    ) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+    ) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
         let underlier = self.underlying_irs_at(start)?;
         let fixed = underlier.resolved_fixed_leg()?;
-        crate::cashflow::builder::periods::build_periods(fixed.schedule_params(false))
+        finstack_quant_cashflows::builder::build_periods(fixed.schedule_params(false))
     }
 
     fn underlying_irs_at(&self, start: Date) -> Result<InterestRateSwap> {
@@ -609,7 +609,7 @@ impl crate::instruments::common_impl::traits::Instrument for BermudanSwaption {
 
 crate::impl_empty_cashflow_provider!(
     BermudanSwaption,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
 
 #[cfg(test)]

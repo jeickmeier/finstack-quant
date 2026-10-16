@@ -1,6 +1,6 @@
 //! Term loan construction and validation tests.
 
-use finstack_quant_cashflows::builder::specs::{CouponType, FloatingRateSpec};
+use finstack_quant_cashflows::builder::{CouponType, FloatingRateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;

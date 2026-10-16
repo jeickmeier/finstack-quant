@@ -4,12 +4,12 @@
 //! price exchange contracts. One party pays a fixed price per unit while
 //! the other pays a floating price based on an index.
 
-use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::instruments::common_impl::parameters::legs::PayReceive;
 use crate::instruments::common_impl::parameters::CommodityUnderlyingParams;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{calendar_by_id, BusinessDayConvention, Date, DateExt, Tenor};
@@ -278,7 +278,7 @@ impl CommoditySwap {
         Ok(pv)
     }
 
-    fn periods(&self) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+    fn periods(&self) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
         self.validate()?;
         super::super::averaging::commodity_periods(
             self.start_date,
@@ -303,8 +303,8 @@ impl CommoditySwap {
         &self,
         market: &MarketContext,
         as_of: Date,
-        periods: impl IntoIterator<Item = crate::cashflow::builder::periods::SchedulePeriod>,
-    ) -> Result<Vec<(crate::cashflow::builder::periods::SchedulePeriod, f64)>> {
+        periods: impl IntoIterator<Item = finstack_quant_cashflows::builder::SchedulePeriod>,
+    ) -> Result<Vec<(finstack_quant_cashflows::builder::SchedulePeriod, f64)>> {
         let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
         let calendar = self
             .calendar_id
@@ -353,7 +353,7 @@ impl CommoditySwap {
 
     fn classified_flow(
         &self,
-        period: &crate::cashflow::builder::periods::SchedulePeriod,
+        period: &finstack_quant_cashflows::builder::SchedulePeriod,
         amount: f64,
         kind: CFKind,
     ) -> Result<CashFlow> {
@@ -455,28 +455,30 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommoditySwap {
                 CFKind::FloatReset,
             )?);
         }
-        let schedule = crate::cashflow::traits::schedule_from_classified_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             finstack_quant_core::dates::DayCount::Act365F,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(Money::from((0_i64, self.underlying.currency))),
-                meta: crate::cashflow::builder::CashFlowMeta {
-                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                     ..Default::default()
                 },
             },
         );
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::CashflowProvider;
     use crate::instruments::common_impl::parameters::CommodityUnderlyingParams;
     use crate::instruments::common_impl::traits::Instrument;
+    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
     use time::Month;
 

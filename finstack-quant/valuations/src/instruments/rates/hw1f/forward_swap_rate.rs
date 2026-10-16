@@ -93,8 +93,8 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
         .market
         .get_discount(inputs.discount_curve_id.as_ref())?;
 
-    let sched_fixed = crate::cashflow::builder::periods::build_periods(
-        crate::cashflow::builder::periods::BuildPeriodsParams {
+    let sched_fixed = finstack_quant_cashflows::builder::build_periods(
+        finstack_quant_cashflows::builder::BuildPeriodsParams {
             start: inputs.start,
             end: inputs.end,
             frequency: inputs.fixed_frequency,
@@ -106,7 +106,7 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
             payment_lag_days: inputs.payment_lag_days,
             reset_lag_days: None,
             adjust_accrual_dates: false,
-            roll_rule: crate::cashflow::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     )?;
 
@@ -139,8 +139,8 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
         }
         Some(curve)
     };
-    let sched_float = crate::cashflow::builder::periods::build_periods(
-        crate::cashflow::builder::periods::BuildPeriodsParams {
+    let sched_float = finstack_quant_cashflows::builder::build_periods(
+        finstack_quant_cashflows::builder::BuildPeriodsParams {
             start: inputs.start,
             end: inputs.end,
             frequency: inputs.float_frequency,
@@ -152,7 +152,7 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
             payment_lag_days: inputs.payment_lag_days,
             reset_lag_days: None,
             adjust_accrual_dates: false,
-            roll_rule: crate::cashflow::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     )?;
 
@@ -213,7 +213,7 @@ mod tests {
             fixed_day_count: DayCount::Act365F,
             float_frequency: "1Y".parse().expect("tenor"),
             float_day_count: DayCount::Act365F,
-            calendar_id: crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+            calendar_id: finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             stub: StubKind::None,
             end_of_month: false,
@@ -239,7 +239,7 @@ mod tests {
             .expect("curve");
         let market = MarketContext::new().insert(curve);
         let disc = market.get_discount("USD-OIS").expect("curve");
-        let calendar_id = crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID;
+        let calendar_id = finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID;
         let calendar = calendar_by_id(calendar_id).expect("calendar");
         for business_day_convention in [
             BusinessDayConvention::Unadjusted,
