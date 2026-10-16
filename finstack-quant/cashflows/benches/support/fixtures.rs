@@ -43,7 +43,7 @@ pub fn weekends_params(frequency: Tenor) -> ScheduleParams {
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     }
 }
 
@@ -57,7 +57,7 @@ pub fn float_params(frequency: Tenor) -> ScheduleParams {
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     }
 }
 
@@ -135,7 +135,7 @@ pub fn build_monthly(base: Date, years: i32) -> CashFlowSchedule {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         })
         .build(None)
@@ -167,7 +167,7 @@ pub fn build_adjusted(
                 end_of_month: false,
                 payment_lag_days: lag,
                 adjust_accrual_dates,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         })
         .build(None)

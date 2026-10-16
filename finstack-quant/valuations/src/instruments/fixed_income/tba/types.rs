@@ -4,10 +4,10 @@
 //! pools to be delivered are not known at trade time. Instead, pools must
 //! meet good delivery standards (coupon, term, agency).
 
-use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::mbs_passthrough::{AgencyMbsPassthrough, AgencyProgram};
+use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, SifmaSettlementClass};
 use finstack_quant_core::money::Money;
@@ -375,7 +375,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AgencyTba {
         &self,
         _curves: &finstack_quant_core::market_data::context::MarketContext,
         _as_of: Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         Err(finstack_quant_core::Error::Validation(format!(
             "AgencyTba '{}' is a physically settled forward and has no standalone cashflow schedule; represent the delivered pool separately after settlement",
             self.id

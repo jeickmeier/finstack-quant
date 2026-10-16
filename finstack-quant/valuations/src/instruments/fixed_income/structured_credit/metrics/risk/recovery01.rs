@@ -21,7 +21,7 @@ impl MetricCalculator for Recovery01Calculator {
             .resolved_for_pricing()?;
         let as_of = context.as_of;
 
-        use crate::cashflow::builder::RecoveryModelSpec;
+        use finstack_quant_cashflows::builder::RecoveryModelSpec;
 
         // Get current recovery spec and create bumped versions; a severity
         // vector by month of default is bumped entry by entry.

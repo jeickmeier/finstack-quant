@@ -26,7 +26,7 @@
 use super::super::{clamped_cpr_to_smm, expected_shocked_smm};
 use super::traits::StochasticPrepayment;
 use finstack_quant_cashflows::builder::smm_to_cpr;
-use finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;
+use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
 /// Factor-correlated prepayment model.
 ///

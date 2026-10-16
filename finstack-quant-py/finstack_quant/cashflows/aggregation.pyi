@@ -334,6 +334,10 @@ def calendar_year_ladder(
     """
     Group dated cashflows into a calendar-year non-principal / principal / PV ladder.
 
+    Returns raw ``(year, non_principal, principal, pv)`` tuples over parallel
+    array inputs; use :meth:`finstack_quant.cashflows.builder.CashFlowSchedule.calendar_year_ladder`
+    for a ``pandas.DataFrame`` view of a built schedule.
+
     Parameters
     ----------
     dates : list[datetime.date]

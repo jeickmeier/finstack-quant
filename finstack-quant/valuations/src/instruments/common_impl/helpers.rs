@@ -198,7 +198,7 @@ pub fn schedule_pv<S>(
     discount_curve_id: &finstack_quant_core::types::CurveId,
 ) -> finstack_quant_core::Result<Money>
 where
-    S: crate::cashflow::traits::CashflowProvider,
+    S: finstack_quant_cashflows::CashflowProvider,
 {
     use finstack_quant_core::cashflow::npv;
 
@@ -229,7 +229,7 @@ pub fn schedule_pv_raw<S>(
     discount_curve_id: &finstack_quant_core::types::CurveId,
 ) -> finstack_quant_core::Result<f64>
 where
-    S: crate::cashflow::traits::CashflowProvider,
+    S: finstack_quant_cashflows::CashflowProvider,
 {
     use finstack_quant_core::cashflow::npv_amounts_with_curve;
 
@@ -262,7 +262,7 @@ pub fn schedule_trade_pv_raw<S>(
     discount_curve_id: &finstack_quant_core::types::CurveId,
 ) -> finstack_quant_core::Result<f64>
 where
-    S: crate::cashflow::traits::CashflowProvider,
+    S: finstack_quant_cashflows::CashflowProvider,
 {
     use finstack_quant_core::math::NeumaierAccumulator;
 
@@ -701,11 +701,11 @@ pub(crate) fn build_with_metrics_dyn(
 #[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
-    use crate::cashflow::builder::CashFlowSchedule;
-    use crate::cashflow::traits::{schedule_from_dated_flows, ScheduleBuildOpts};
     use crate::instruments::common_impl::traits::{Attributes, Instrument};
     use crate::metrics::MetricId;
     use crate::pricer::InstrumentType;
+    use finstack_quant_cashflows::builder::CashFlowSchedule;
+    use finstack_quant_cashflows::{schedule_from_dated_flows, ScheduleBuildOpts};
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
@@ -775,7 +775,7 @@ mod tests {
 
     crate::impl_empty_cashflow_provider!(
         StubInstrument,
-        crate::cashflow::builder::CashflowRepresentation::NoResidual
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
     );
 
     impl StubInstrument {
@@ -810,7 +810,7 @@ mod tests {
                         Money::from((100_i64, Currency::USD)),
                     ),
                 ],
-                crate::cashflow::primitives::CFKind::Fixed,
+                finstack_quant_cashflows::primitives::CFKind::Fixed,
                 DayCount::Act365F,
                 ScheduleBuildOpts {
                     notional_hint: self.notional().expect("valid notional"),

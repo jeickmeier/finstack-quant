@@ -228,7 +228,7 @@ impl crate::instruments::Instrument for FxFuture {
 
 crate::impl_empty_cashflow_provider!(
     FxFuture,
-    crate::cashflow::builder::CashflowRepresentation::NoResidual
+    finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
 );
 
 #[cfg(test)]

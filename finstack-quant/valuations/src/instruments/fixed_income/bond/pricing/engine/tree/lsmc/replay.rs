@@ -8,7 +8,7 @@ impl FloatingCoupon {
         &self,
         state: &FloatingRuntimeState,
         path: &[RatesCreditPathState],
-    ) -> Result<crate::cashflow::builder::FloatingCouponSettlement> {
+    ) -> Result<finstack_quant_cashflows::builder::FloatingCouponSettlement> {
         let mut settlement_state = state.clone();
         if let FloatingRateModel::Overnight(overnight) = &self.rate_model {
             self.compiled.advance_overnight(
@@ -128,7 +128,7 @@ impl ReplayCursor {
         template: &ReplayTemplate,
         path: &[RatesCreditPathState],
         coupon_id: usize,
-    ) -> Result<crate::cashflow::builder::FloatingCouponSettlement> {
+    ) -> Result<finstack_quant_cashflows::builder::FloatingCouponSettlement> {
         let coupon = &template.floating[coupon_id];
         // Early payment requires every remaining fixing to be known, which
         // template construction checks before replay starts.
@@ -276,7 +276,7 @@ struct TemplateInputs<'a> {
     as_of: Date,
     times: &'a [f64],
     step_dates: &'a [Option<Date>],
-    schedule: &'a crate::cashflow::builder::CashFlowSchedule,
+    schedule: &'a finstack_quant_cashflows::builder::CashFlowSchedule,
     discount: &'a std::sync::Arc<finstack_quant_core::market_data::term_structures::DiscountCurve>,
     final_redemption_date: Option<Date>,
 }
@@ -396,7 +396,7 @@ impl ReplayTemplate {
         if matches!(
             &bond.cashflow_spec,
             CashflowSpec::Amortizing { schedule, .. }
-                if !matches!(schedule, crate::cashflow::builder::AmortizationSpec::None)
+                if !matches!(schedule, finstack_quant_cashflows::builder::AmortizationSpec::None)
         ) && floating.iter().any(|coupon| {
             coupon.compiled.economics().pik_fraction > 0.0
                 && match &coupon.rate_model {
@@ -928,7 +928,7 @@ impl ReplayTemplate {
                     let has_later_reference_cash = schedule
                         .get_flows()
                         .iter()
-                        .any(|flow| flow.date > date && is_cash_settlement_kind(flow.kind));
+                        .any(|flow| flow.date > date && flow.kind.is_cash_settlement());
                     let make_whole = if call.make_whole.is_none() {
                         None
                     } else if date == bond.maturity && !has_later_reference_cash {
@@ -1075,7 +1075,7 @@ impl ReplayTemplate {
             {
                 static_redemption_pik += static_balance_delta(flow, false).unwrap_or(0.0);
             }
-            if flow.date >= as_of && is_cash_settlement_kind(flow.kind) && !terminal_redemption {
+            if flow.date >= as_of && flow.kind.is_cash_settlement() && !terminal_redemption {
                 let entitlement_key = (flow.date, flow.amount.amount().to_bits());
                 let entitled = entitled_counts
                     .get_mut(&entitlement_key)

@@ -55,7 +55,6 @@ __all__ = [
     "Notional",
     "OvernightIndexConstraintApplication",
     "PrepaymentModelSpec",
-    "PrincipalEvent",
     "PrincipalExchange",
     "RecoveryModelSpec",
     "RollRule",
@@ -1576,6 +1575,10 @@ class CashFlowSchedule:
     def calendar_year_ladder(self, pvs: list[float]) -> pd.DataFrame:
         """
         Calendar-year non-principal / principal / PV ladder of this schedule.
+
+        Returns a ``pandas.DataFrame`` view alongside :meth:`to_dataframe`; use
+        :func:`finstack_quant.cashflows.aggregation.calendar_year_ladder` for raw
+        ``(year, non_principal, principal, pv)`` tuples over parallel arrays.
 
         Parameters
         ----------
@@ -4383,143 +4386,6 @@ class PrepaymentModelSpec:
             If the value holds a non-finite float that JSON cannot carry.
         """
         ...
-
-class PrincipalEvent:
-    """
-    Principal event applied during schedule build (a draw or a repayment).
-
-    Constructed directly or emitted internally by :meth:`CashFlowBuilder.principal`
-    and :meth:`CashFlowBuilder.add_principal_event`; ``delta`` is the source
-    of truth for outstanding-balance movement, while ``cash`` is the
-    settled cash leg (which can differ for OID/fee-adjusted draws).
-
-    Examples
-    --------
-    >>> import datetime
-    >>> from finstack_quant.cashflows.builder import PrincipalEvent
-    >>> from finstack_quant.cashflows.primitives import CFKind
-    >>> from finstack_quant.core.money import Money
-    >>> event = PrincipalEvent(
-    ...     datetime.date(2025, 1, 15),
-    ...     datetime.date(2025, 1, 15),
-    ...     Money(1_000_000.0, "USD"),
-    ...     Money(1_000_000.0, "USD"),
-    ...     CFKind.NOTIONAL,
-    ... )
-    >>> event.kind == CFKind.NOTIONAL
-    True
-    """
-
-    def __init__(
-        self,
-        date: datetime.date,
-        payment_date: datetime.date,
-        delta: Money,
-        cash: Money,
-        kind: CFKind | str,
-    ) -> None:
-        """
-        Construct a principal event.
-
-        Parameters
-        ----------
-        date : datetime.date
-            Economic date from which principal changes interest accrual.
-        payment_date : datetime.date
-            Cash settlement date, independently adjusted from the economic date.
-        delta : Money
-            Outstanding delta (positive increases the balance, negative
-            repays it).
-        cash : Money
-            Cash leg paid or received; may differ from *delta* for
-            OID/fee-adjusted draws.
-        kind : CFKind | str
-            Classification for the emitted cashflow.
-
-        Raises
-        ------
-        ValueError
-            If a date cannot be converted from the supplied value, or
-            *kind* is not a recognized ``CFKind`` label.
-        """
-        ...
-
-    @property
-    def date(self) -> datetime.date:
-        """
-        Date on which this principal event occurs.
-
-        Returns
-        -------
-        datetime.date
-            The date on which this principal event occurs.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    @property
-    def payment_date(self) -> datetime.date:
-        """Return the cash settlement date.
-
-        Returns
-        -------
-        datetime.date
-            Settlement date, independent of the economic event date. Access does not raise.
-        """
-        ...
-
-    @property
-    def delta(self) -> Money:
-        """
-        Signed change in outstanding principal for this event.
-
-        Returns
-        -------
-        Money
-            The balance movement (positive increases, negative repays).
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def cash(self) -> Money:
-        """
-        Cash leg paid or received.
-
-        Returns
-        -------
-        Money
-            The settled cash amount, which may differ from *delta*.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def kind(self) -> CFKind:
-        """
-        Emitted cashflow classification.
-
-        Returns
-        -------
-        CFKind
-            The classification recorded on the emitted cashflow.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    def __repr__(self) -> str: ...
 
 class RecoveryModelSpec:
     """

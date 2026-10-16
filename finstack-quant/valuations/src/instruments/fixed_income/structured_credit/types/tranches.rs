@@ -1114,7 +1114,7 @@ mod tests {
             .seniority(TrancheSeniority::Senior)
             .balance(Money::from((900_000_000_i64, Currency::USD)))
             .coupon(RateSpec::Floating(
-                crate::cashflow::builder::FloatingRateSpec {
+                finstack_quant_cashflows::builder::FloatingRateSpec {
                     forward_curve_id: CurveId::new("SOFR-3M".to_string()),
                     spread_bp: rust_decimal::Decimal::try_from(150.0).expect("valid"),
                     gearing: rust_decimal::Decimal::ONE,

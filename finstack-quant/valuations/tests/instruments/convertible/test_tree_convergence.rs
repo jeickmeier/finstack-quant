@@ -10,7 +10,7 @@
 //! - Final price stabilizes within tolerance (asymptotic stability)
 //! - Richardson extrapolation test for O(1/N) convergence rate
 
-use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec};
+use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -57,7 +57,7 @@ fn create_test_convertible() -> ConvertibleBond {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 

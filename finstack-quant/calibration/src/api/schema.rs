@@ -14,7 +14,7 @@ use crate::api::prior_market::PriorMarketObject;
 use crate::config::{CalibrationConfig, CalibrationMethod, RatesStepConventions};
 use crate::quotes::ids::QuoteId;
 use crate::CalibrationReport;
-use finstack_quant_cashflows::builder::specs::RollRule;
+use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_core::config::ResultsMeta;
 use finstack_quant_core::contract::{
     deserialize_json_value, parse_json_value, ContractDescriptor, ContractError, Diagnostic,

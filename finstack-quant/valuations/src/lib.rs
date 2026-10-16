@@ -92,8 +92,6 @@
 
 extern crate self as finstack_quant_valuations;
 
-/// Cashflow schedule generation and builders.
-pub(crate) use finstack_quant_cashflows as cashflow;
 /// Shared numerical constants and basis point helpers.
 pub mod constants;
 pub(crate) mod contract_specs;

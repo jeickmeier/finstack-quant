@@ -678,7 +678,7 @@ impl crate::instruments::common_impl::traits::Instrument for Autocallable {
 
 crate::impl_empty_cashflow_provider!(
     Autocallable,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
 
 #[cfg(test)]

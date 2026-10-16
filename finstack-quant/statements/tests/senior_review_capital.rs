@@ -1,7 +1,7 @@
 //! Regression coverage for capital-structure review findings.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-use finstack_quant_cashflows::builder::specs::CouponType;
+use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
 use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_cashflows::CashflowScheduleSource;

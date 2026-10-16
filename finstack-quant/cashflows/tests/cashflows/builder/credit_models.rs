@@ -496,7 +496,7 @@ fn non_finite_speed_multiplier_rejected() {
 
 #[test]
 fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
-    use finstack_quant_cashflows::builder::schedule::CashFlowMeta;
+    use finstack_quant_cashflows::builder::CashFlowMeta;
     use finstack_quant_cashflows::builder::Notional;
     use finstack_quant_core::cashflow::{CFKind, CashFlow};
     use finstack_quant_core::currency::Currency;
@@ -510,7 +510,7 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
     let default_date = Date::from_calendar_date(2025, Month::June, 1).unwrap();
     let recovery_date = Date::from_calendar_date(2025, Month::December, 1).unwrap();
 
-    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule::from_parts(
+    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
         vec![
             CashFlow::new(
                 default_date,
@@ -557,7 +557,7 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
 
 #[test]
 fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
-    use finstack_quant_cashflows::builder::schedule::CashFlowMeta;
+    use finstack_quant_cashflows::builder::CashFlowMeta;
     use finstack_quant_cashflows::builder::Notional;
     use finstack_quant_core::cashflow::{CFKind, CashFlow};
     use finstack_quant_core::currency::Currency;
@@ -571,7 +571,7 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
     let default_date = Date::from_calendar_date(2025, Month::June, 1).unwrap();
     let recovery_date = Date::from_calendar_date(2025, Month::December, 1).unwrap();
 
-    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule::from_parts(
+    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
         vec![
             CashFlow::new(
                 default_date,

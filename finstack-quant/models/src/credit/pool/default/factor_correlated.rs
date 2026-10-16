@@ -5,7 +5,7 @@
 //! base default curve UP when `Z` falls (`exp(−loading·Z·σ)`).
 
 use super::traits::StochasticDefault;
-use finstack_quant_cashflows::builder::specs::DefaultModelSpec;
+use finstack_quant_cashflows::builder::DefaultModelSpec;
 
 /// Default model that shocks a deterministic default curve by a systematic factor.
 #[derive(Debug, Clone)]

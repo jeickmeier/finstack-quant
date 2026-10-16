@@ -1,6 +1,6 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
-use finstack_quant_cashflows::builder::specs::{CouponType, FloatingRateSpec};
+use finstack_quant_cashflows::builder::{CouponType, FloatingRateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -43,7 +43,7 @@ fn build_simple_term_loan(as_of: Date, maturity: Date) -> TermLoan {
         .stub(finstack_quant_core::dates::StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
         .amortization(term_loan::AmortizationSpec::None)
-        .coupon_type(finstack_quant_cashflows::builder::specs::CouponType::Cash)
+        .coupon_type(finstack_quant_cashflows::builder::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)

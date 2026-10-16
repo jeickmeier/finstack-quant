@@ -27,8 +27,7 @@
 //! ```
 
 use super::helpers::d;
-use finstack_quant_cashflows::builder::schedule::CashflowRepresentation;
-use finstack_quant_cashflows::primitives::is_cash_settlement_kind;
+use finstack_quant_cashflows::builder::CashflowRepresentation;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -75,7 +74,7 @@ fn verify_provider_contract<T: CashflowProvider>(
     let flattened_schedule_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| is_cash_settlement_kind(cf.kind))
+        .filter(|cf| cf.kind.is_cash_settlement())
         .map(|cf| (cf.date, cf.amount))
         .collect();
     assert_eq!(
@@ -143,7 +142,7 @@ fn verify_public_instrument_cashflow_surface<T: PublicInstrument>(
         schedule
             .get_flows()
             .iter()
-            .filter(|flow| is_cash_settlement_kind(flow.kind))
+            .filter(|flow| flow.kind.is_cash_settlement())
             .count()
     );
 }

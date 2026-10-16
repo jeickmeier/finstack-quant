@@ -2,10 +2,10 @@
 //!
 use super::engine::{AodInputs, CdsPricer, CouponPeriod};
 use super::helpers::sp_cond_to;
-use crate::cashflow::builder::specs::RollRule;
 use crate::constants::{credit, numerical, BASIS_POINTS_PER_UNIT, ONE_BASIS_POINT};
 use crate::instruments::common_impl::helpers::year_fraction;
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
+use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_core::dates::{
     Date, DayCountContext, Schedule, ScheduleBuilder, StubKind, Tenor,
 };

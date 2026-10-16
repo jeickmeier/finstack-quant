@@ -369,7 +369,7 @@ impl crate::instruments::Instrument for CommodityFuture {
 
 crate::impl_empty_cashflow_provider!(
     CommodityFuture,
-    crate::cashflow::builder::CashflowRepresentation::NoResidual
+    finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
 );
 
 #[cfg(test)]

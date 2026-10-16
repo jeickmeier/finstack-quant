@@ -4,7 +4,7 @@
 #![allow(clippy::expect_used)]
 #![allow(dead_code)]
 
-use finstack_quant_cashflows::builder::specs::CouponType;
+use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, PeriodId, StubKind, Tenor,
 };

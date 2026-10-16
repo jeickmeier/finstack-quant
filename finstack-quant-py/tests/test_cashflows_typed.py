@@ -66,15 +66,14 @@ class TestPrimitives:
         with pytest.raises(ValueError, match="accrual_factor"):
             cf.validate()
 
-    def test_is_cash_settlement_kind(self) -> None:
-        from finstack_quant.cashflows.primitives import CFKind, is_cash_settlement_kind
+    def test_is_cash_settlement(self) -> None:
+        from finstack_quant.cashflows.primitives import CFKind
 
-        assert is_cash_settlement_kind(CFKind.FIXED)
-        assert is_cash_settlement_kind(CFKind.AMORTIZATION)
-        assert not is_cash_settlement_kind(CFKind.PIK)
-        assert not is_cash_settlement_kind(CFKind.DEFAULTED_NOTIONAL)
-        # str form is accepted too
-        assert not is_cash_settlement_kind("pik")
+        assert CFKind.FIXED.is_cash_settlement()
+        assert CFKind.AMORTIZATION.is_cash_settlement()
+        assert not CFKind.PIK.is_cash_settlement()
+        assert not CFKind.DEFAULTED_NOTIONAL.is_cash_settlement()
+        assert not CFKind.parse("pik").is_cash_settlement()
 
 
 class TestBuilderSpecs:
@@ -1257,11 +1256,10 @@ class TestTypedJsonEquivalence:
         import json
 
         from finstack_quant.cashflows import dated_flows_json
-        from finstack_quant.cashflows.primitives import is_cash_settlement_kind
 
         schedule = TestCashFlowBuilder._quarterly_bond()
         bridge_rows = json.loads(dated_flows_json(schedule.to_json()))
-        typed_cash = [f for f in schedule.get_flows() if is_cash_settlement_kind(f.kind)]
+        typed_cash = [f for f in schedule.get_flows() if f.kind.is_cash_settlement()]
         assert len(bridge_rows) == len(typed_cash)
 
 
@@ -1285,6 +1283,7 @@ class TestTypedTwinsAndWire:
         import json
 
         from finstack_quant.cashflows import build_cashflow_schedule, build_cashflow_schedule_json, dated_flows
+        from finstack_quant.cashflows.builder import CashFlowSchedule
 
         spec = {
             "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
@@ -1308,7 +1307,7 @@ class TestTypedTwinsAndWire:
         flows = dated_flows(typed)
         assert flows
         assert isinstance(flows[0][1], Money)
-        assert dated_flows(typed.to_json()) == flows
+        assert dated_flows(CashFlowSchedule.from_json(typed.to_json())) == flows
 
     def test_schedule_from_flows_and_meta(self) -> None:
         import pickle

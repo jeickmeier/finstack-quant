@@ -144,10 +144,10 @@ pub(crate) fn register_mbs_passthrough_metrics(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::builder::specs::PrepaymentModelSpec;
     use crate::instruments::fixed_income::mbs_passthrough::pricer::price_with_spread;
     use crate::instruments::fixed_income::mbs_passthrough::{AgencyProgram, PoolType};
     use crate::metrics::{MetricCalculator, MetricContext};
+    use finstack_quant_cashflows::builder::PrepaymentModelSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::context::MarketContext;

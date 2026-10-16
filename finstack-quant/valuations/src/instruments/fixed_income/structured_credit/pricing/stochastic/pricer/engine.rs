@@ -4,7 +4,6 @@ use finstack_quant_models::monte_carlo::estimate::independent_estimator_stats;
 
 use super::config::{StochasticPricerConfig, StructuredCreditPricingMode};
 use super::result::{StochasticPricingResult, TranchePricingResult};
-use crate::cashflow::builder::schedule::weighted_average_life_from_principal;
 use crate::instruments::fixed_income::structured_credit::pricing::simulation_engine::{
     prepare_deal_simulation, simulate_prepared, InstrumentPathFlowSource, PathShocks,
     PerNameDefaultEngine, PerNamePeriodInput, PeriodPoolShock, PreparedDealSimulation,
@@ -13,6 +12,7 @@ use crate::instruments::fixed_income::structured_credit::pricing::simulation_eng
 use crate::instruments::fixed_income::structured_credit::types::{
     StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority,
 };
+use finstack_quant_cashflows::builder::weighted_average_life_from_principal;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::OnlineStats;

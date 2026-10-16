@@ -1,12 +1,12 @@
 //! Zero-coupon Inflation Swap types and pricing implementation.
 
-use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::legs::PayReceive;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
@@ -316,20 +316,20 @@ impl InflationSwap {
                 DayCountContext::default(),
             );
         }
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start: self.start_date,
                 end: self.maturity,
                 frequency: Tenor::annual(),
                 stub: StubKind::ShortFront,
                 business_day_convention: BusinessDayConvention::Unadjusted,
-                calendar_id: crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+                calendar_id: finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
                 end_of_month: false,
                 day_count: DayCount::OneOne,
                 payment_lag_days: 0,
                 reset_lag_days: None,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )?;
         let Some(first) = periods.first() else {
@@ -588,19 +588,21 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
             day_count: self.day_count,
             projected_index_rate: inflation_rate,
         });
-        let schedule = crate::cashflow::traits::schedule_from_classified_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
             vec![fixed_flow, inflation_flow],
             self.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
-                meta: crate::cashflow::builder::CashFlowMeta {
-                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                     ..Default::default()
                 },
             },
         );
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 
@@ -787,8 +789,8 @@ impl YoYInflationSwap {
 
     fn schedule(&self) -> finstack_quant_core::Result<Vec<(Date, Date, Date)>> {
         let business_day_convention = self.business_day_convention;
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start: self.start_date,
                 end: self.maturity,
                 frequency: self.frequency,
@@ -797,13 +799,13 @@ impl YoYInflationSwap {
                 calendar_id: self
                     .calendar_id
                     .as_deref()
-                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                    .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
                 end_of_month: false,
                 day_count: self.day_count,
                 payment_lag_days: 0,
                 reset_lag_days: None,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )?;
 
@@ -1079,27 +1081,29 @@ impl finstack_quant_cashflows::CashflowScheduleSource for YoYInflationSwap {
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         let flows = self.signed_period_flows(curves, as_of)?;
-        let schedule = crate::cashflow::traits::schedule_from_classified_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             self.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
-                meta: crate::cashflow::builder::CashFlowMeta {
-                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    representation:
+                        finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
                     ..Default::default()
                 },
             },
         );
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::CashflowProvider;
     use crate::instruments::common_impl::traits::Instrument;
+    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::scalars::InflationIndex;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};

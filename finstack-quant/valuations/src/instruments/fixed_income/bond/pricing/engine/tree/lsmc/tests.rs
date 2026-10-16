@@ -167,7 +167,9 @@ fn overnight_pik_test_bond(as_of: Date, maturity: Date) -> Bond {
     };
     spec.coupon_type = CouponType::Pik;
     spec.rate_spec.compounding = Some(
-        crate::cashflow::builder::FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+        finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 0,
+        },
     );
     spec.rate_spec.overnight_basis = Some(DayCount::Act360);
     spec.rate_spec.fixing_calendar_id = Some("weekends_only".into());
@@ -396,7 +398,7 @@ fn past_overnight_payment_retains_only_fully_determined_pending_pik() {
 
 #[test]
 fn term_act365l_balance_segments_replay_the_full_coupon_leap_denominator() {
-    use crate::cashflow::builder::AmortizationSpec;
+    use finstack_quant_cashflows::builder::AmortizationSpec;
     let as_of = time::macros::date!(2023 - 12 - 01);
     let maturity = time::macros::date!(2024 - 03 - 01);
     let market = stochastic_test_market(as_of);
@@ -466,7 +468,9 @@ fn term_act365l_balance_segments_replay_the_full_coupon_leap_denominator() {
 
 #[test]
 fn segmented_overnight_templates_reject_loss_of_full_coupon_scope() {
-    use crate::cashflow::builder::{AmortizationSpec, OvernightIndexConstraintApplication};
+    use finstack_quant_cashflows::builder::{
+        AmortizationSpec, OvernightIndexConstraintApplication,
+    };
     let as_of = time::macros::date!(2025 - 01 - 01);
     let maturity = time::macros::date!(2025 - 04 - 01);
     let market = stochastic_test_market(as_of);
@@ -662,7 +666,7 @@ fn floating_pik_uses_accrual_boundaries_with_lagged_and_early_cash_dates() {
 
 #[test]
 fn scheduled_amortization_reduces_balance_before_lagged_cash_settlement() {
-    use crate::cashflow::builder::AmortizationSpec;
+    use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_core::dates::BusinessDayConvention;
     let as_of = time::macros::date!(2025 - 01 - 15);
     let maturity = time::macros::date!(2026 - 01 - 15);
@@ -759,7 +763,7 @@ fn explicit_principal_delta_preserves_movements_paid_on_redemption_date() {
 
 #[test]
 fn stochastic_floating_pik_with_amortization_rejects_projected_balance_targets() {
-    use crate::cashflow::builder::AmortizationSpec;
+    use finstack_quant_cashflows::builder::AmortizationSpec;
     let as_of = time::macros::date!(2025 - 01 - 01);
     let maturity = time::macros::date!(2026 - 01 - 01);
     let market = stochastic_test_market(as_of);

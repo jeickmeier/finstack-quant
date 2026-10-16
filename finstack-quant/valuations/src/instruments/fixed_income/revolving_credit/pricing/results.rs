@@ -1,7 +1,7 @@
 //! Path-level revolving-credit pricing results.
 
-use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::fixed_income::revolving_credit::cashflow_engine::ThreeFactorPathData;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::results::{MoneyEstimate, MonteCarloResult};
 

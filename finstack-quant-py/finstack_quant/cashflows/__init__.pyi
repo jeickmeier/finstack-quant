@@ -178,14 +178,14 @@ def build_cashflow_schedule(spec: dict[str, Any] | str, market: MarketContext | 
     """
     ...
 
-def dated_flows(schedule: CashFlowSchedule | str) -> list[tuple[datetime.date, Money]]:
+def dated_flows(schedule: CashFlowSchedule) -> list[tuple[datetime.date, Money]]:
     """
     Settlement cash entries of a schedule (typed twin of :func:`dated_flows_json`).
 
     Parameters
     ----------
-    schedule : CashFlowSchedule or str
-        Typed schedule or its canonical JSON.
+    schedule : CashFlowSchedule
+        Canonical cashflow schedule.
 
     Returns
     -------
@@ -197,13 +197,10 @@ def dated_flows(schedule: CashFlowSchedule | str) -> list[tuple[datetime.date, M
     Raises
     ------
     ValueError
-        If ``schedule`` is malformed or its amounts, accrual metadata, row
-        currencies, or dates are invalid. Single-currency principal paths
-        must reconcile with the opening notional. Composite principal paths
-        in multiple currencies receive structural validation without scalar
-        balance reconciliation.
-    TypeError
-        If ``schedule`` is neither a ``CashFlowSchedule`` nor a string.
+        If ``schedule`` amounts, accrual metadata, row currencies, or dates are
+        invalid. Single-currency principal paths must reconcile with the
+        opening notional. Composite principal paths in multiple currencies
+        receive structural validation without scalar balance reconciliation.
 
     Examples
     --------

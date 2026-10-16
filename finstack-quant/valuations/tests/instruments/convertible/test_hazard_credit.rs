@@ -4,8 +4,8 @@
 //! drift `r - q + lambda`; default extinguishes the equity and debt.
 
 use super::fixtures::*;
-use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec, RollRule};
 use finstack_quant_cashflows::builder::ScheduleParams;
+use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec, RollRule};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;

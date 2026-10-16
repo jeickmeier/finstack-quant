@@ -3,12 +3,12 @@ use super::{
     compute_conversion_value, prepare_for_pricing, price_convertible_bond, settlement_date,
     ConvertibleBondValuator, DEFAULT_CONVERTIBLE_TREE_STEPS,
 };
-use crate::cashflow::builder::specs::{CouponType, FixedCouponSpec};
 use crate::instruments::fixed_income::convertible::ConvertibleBond;
 use crate::instruments::fixed_income::convertible::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
 };
 use crate::instruments::GreekBumps;
+use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -56,7 +56,7 @@ fn create_test_bond() -> ConvertibleBond {
             payment_lag_days: 0,
 
             adjust_accrual_dates: false,
-            roll_rule: crate::cashflow::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -576,7 +576,7 @@ fn test_thirty_360_day_count_corporate_convention() {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: crate::cashflow::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 

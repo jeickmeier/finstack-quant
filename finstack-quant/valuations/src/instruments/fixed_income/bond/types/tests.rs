@@ -1,10 +1,12 @@
 //! Bond type tests (construction, cashflows, floating, amortization).
 
 use super::*;
-use crate::cashflow::builder::{CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams};
-use crate::cashflow::traits::CashflowProvider;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::InstrumentPricingOverrides;
+use finstack_quant_cashflows::builder::{
+    CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
+};
+use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -32,7 +34,7 @@ fn test_bond_with_custom_cashflows() {
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: crate::cashflow::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     };
 
     let step1_date = Date::from_calendar_date(2026, Month::January, 15).expect("Valid test date");
@@ -89,7 +91,7 @@ fn test_bond_with_custom_cashflows() {
     let expected_flow_count = custom_schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind != crate::cashflow::primitives::CFKind::Pik)
+        .filter(|cf| cf.kind != finstack_quant_cashflows::primitives::CFKind::Pik)
         .count();
     assert_eq!(flows.len(), expected_flow_count);
 }
@@ -124,7 +126,7 @@ fn test_bond_builder_with_custom_cashflows() {
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         })
         .build(None)
@@ -199,7 +201,7 @@ fn test_bond_with_cashflows_method() {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         })
         .build(None)
@@ -254,7 +256,7 @@ fn test_custom_cashflows_override_regular_generation() {
                 end_of_month: false,
                 payment_lag_days: 0,
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         })
         .build(None)
@@ -328,7 +330,7 @@ fn test_bond_floating_value() {
 
 #[test]
 fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
-    use crate::cashflow::primitives::CFKind;
+    use finstack_quant_cashflows::primitives::CFKind;
     use time::Duration;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -387,7 +389,7 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
     let schedule_before = bond
         .full_cashflow_schedule(&ctx)
         .expect("Full schedule should build");
-    let ai_before = crate::cashflow::accrual::accrued_interest_amount(
+    let ai_before = finstack_quant_cashflows::accrual::accrued_interest_amount(
         &schedule_before,
         day_before_record,
         &bond.accrual_config(),
@@ -398,7 +400,7 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
         "Accrued interest should be positive before the record date"
     );
 
-    let ai_record = crate::cashflow::accrual::accrued_interest_amount(
+    let ai_record = finstack_quant_cashflows::accrual::accrued_interest_amount(
         &full_schedule,
         record_date,
         &bond.accrual_config(),
@@ -414,7 +416,7 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
     let schedule_ex = bond
         .full_cashflow_schedule(&ctx)
         .expect("Full schedule should build");
-    let ai_ex = crate::cashflow::accrual::accrued_interest_amount(
+    let ai_ex = finstack_quant_cashflows::accrual::accrued_interest_amount(
         &schedule_ex,
         record_date + Duration::days(1),
         &bond.accrual_config(),
@@ -429,8 +431,8 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
 
 #[test]
 fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
-    use crate::cashflow::builder::AmortizationSpec;
-    use crate::cashflow::primitives::CFKind;
+    use finstack_quant_cashflows::builder::AmortizationSpec;
+    use finstack_quant_cashflows::primitives::CFKind;
     use time::Duration;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -506,7 +508,7 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
     let schedule_before = bond
         .full_cashflow_schedule(&ctx)
         .expect("Full schedule should build");
-    let ai_before = crate::cashflow::accrual::accrued_interest_amount(
+    let ai_before = finstack_quant_cashflows::accrual::accrued_interest_amount(
         &schedule_before,
         day_before_record,
         &bond.accrual_config(),
@@ -517,7 +519,7 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
         "Accrued interest should be positive before the record date for amortizing bond"
     );
 
-    let ai_record = crate::cashflow::accrual::accrued_interest_amount(
+    let ai_record = finstack_quant_cashflows::accrual::accrued_interest_amount(
         &full_schedule,
         record_date,
         &bond.accrual_config(),
@@ -533,7 +535,7 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
     let schedule_ex = bond
         .full_cashflow_schedule(&ctx)
         .expect("Full schedule should build");
-    let ai_ex = crate::cashflow::accrual::accrued_interest_amount(
+    let ai_ex = finstack_quant_cashflows::accrual::accrued_interest_amount(
         &schedule_ex,
         record_date + Duration::days(1),
         &bond.accrual_config(),
@@ -548,8 +550,8 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
 
 #[test]
 fn test_bond_frn_dated_cashflows_uses_builder() {
-    use crate::cashflow::primitives::CFKind;
-    use crate::cashflow::traits::CashflowProvider;
+    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_cashflows::CashflowProvider;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date");
@@ -614,9 +616,9 @@ fn test_bond_frn_dated_cashflows_uses_builder() {
 
 #[test]
 fn test_bond_amortization_signed_schedule_preserves_all_flows() {
-    use crate::cashflow::builder::AmortizationSpec;
-    use crate::cashflow::primitives::CFKind;
-    use crate::cashflow::traits::CashflowProvider;
+    use finstack_quant_cashflows::builder::AmortizationSpec;
+    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_cashflows::CashflowProvider;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");

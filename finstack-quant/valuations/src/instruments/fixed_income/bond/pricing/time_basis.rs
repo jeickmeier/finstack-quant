@@ -64,7 +64,7 @@ pub(crate) fn bond_coupon_dates(bond: &Bond) -> Result<Vec<(Date, Date, Date)>> 
         }
         return Ok(periods);
     }
-    use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
     Ok(build_periods(BuildPeriodsParams::from_schedule(
         bond.cashflow_spec.schedule(),
         bond.issue_date,
@@ -217,7 +217,7 @@ pub(crate) fn bond_model_schedule(bond: &Bond, as_of: Date) -> Result<BondModelS
         .into_iter()
         .map(|(date, accrual)| Ok((year_fraction(date)?, accrual, date)))
         .collect::<Result<Vec<_>>>()?;
-    let accrued = crate::cashflow::accrual::accrued_interest_amount(
+    let accrued = finstack_quant_cashflows::accrual::accrued_interest_amount(
         &schedule,
         as_of,
         &bond.accrual_config(),

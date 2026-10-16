@@ -1,93 +1,44 @@
 //! Internal date-by-date build pipeline for [`CashFlowBuilder`](super::CashFlowBuilder).
 
-use std::sync::Arc;
-
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::decimal::f64_to_decimal;
-use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
-use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 
-use crate::builder::compiler::{FixedSchedule, FloatSchedule, PeriodicFee};
 use crate::builder::emission::{
     emit_amortization_on, emit_fees_on, emit_fixed_coupons_on, emit_float_coupons_on,
     FloatEmissionOutput, ResolvedFloatMarket,
 };
 use crate::builder::orchestrator::{
-    apply_principal_event, AmortizationSetup, BuildState, PreparedAmortization, PrincipalEvent,
+    apply_principal_event, BuildState, CompiledCashFlowPlan, PreparedAmortization,
 };
 use crate::builder::PrincipalExchange;
 use crate::primitives::{CFKind, CashFlow};
 
-#[derive(Clone, Copy)]
-pub(super) struct BuildContext<'a> {
-    pub(super) ccy: Currency,
-    pub(super) issue: Date,
-    pub(super) observation_date: Option<Date>,
-    /// Payment date of the coupon window ending at maturity, including its
-    /// business-day adjustment and payment lag. Equals the raw `maturity`
-    /// when no coupon schedule exists.
-    pub(super) redemption_date: Date,
-    /// Contractual accrual boundary at which final principal ceases accruing.
-    pub(super) redemption_effective_date: Date,
-    /// Whether to emit the maturity balloon as `CFKind::Notional`.
-    pub(super) principal_exchange: PrincipalExchange,
-    pub(super) fixed_schedules: &'a [FixedSchedule],
-    pub(super) float_schedules: &'a [FloatSchedule],
-    pub(super) periodic_fees: &'a [PeriodicFee],
-    pub(super) fixed_fees: &'a [(Date, Money)],
-    pub(super) principal_events: &'a [PrincipalEvent],
-}
-
-/// Processes cashflows for a single schedule date.
-pub(super) struct DateProcessor<'a> {
-    ctx: &'a BuildContext<'a>,
-    amort_setup: &'a AmortizationSetup,
-    resolved_curves: &'a [Option<Arc<ForwardCurve>>],
-    /// Per-float-schedule historical fixing series (`FIXING:{forward_curve_id}`),
-    /// aligned with `resolved_curves`; used for seasoned coupons whose
-    /// observation dates precede the curve base date.
-    resolved_fixings: &'a [Option<ScalarTimeSeries>],
-}
-
-impl<'a> DateProcessor<'a> {
-    pub(super) fn new(
-        ctx: &'a BuildContext<'a>,
-        amort_setup: &'a AmortizationSetup,
-        resolved_curves: &'a [Option<Arc<ForwardCurve>>],
-        resolved_fixings: &'a [Option<ScalarTimeSeries>],
-    ) -> Self {
-        Self {
-            ctx,
-            amort_setup,
-            resolved_curves,
-            resolved_fixings,
-        }
-    }
-
+impl CompiledCashFlowPlan {
     /// Emit fixed and floating coupons, returning total PIK amount to capitalize.
-    fn emit_coupons(&self, d: Date, state: &mut BuildState) -> finstack_quant_core::Result<f64> {
+    fn emit_coupons(
+        &self,
+        d: Date,
+        state: &mut BuildState,
+        market: ResolvedFloatMarket<'_>,
+    ) -> finstack_quant_core::Result<f64> {
+        let ccy = self.notional.initial.currency();
         let pik_f = emit_fixed_coupons_on(
             d,
-            self.ctx.fixed_schedules,
+            &self.fixed_schedules,
             &state.outstanding_history,
             state.outstanding,
-            self.ctx.ccy,
+            ccy,
             &mut state.flows,
         )?;
         let pik_fl = emit_float_coupons_on(
             d,
-            self.ctx.float_schedules,
+            &self.float_schedules,
             &state.outstanding_history,
             state.outstanding,
-            self.ctx.ccy,
-            ResolvedFloatMarket {
-                curves: self.resolved_curves,
-                observation_date: self.ctx.observation_date,
-                fixings: self.resolved_fixings,
-            },
+            ccy,
+            market,
             FloatEmissionOutput {
                 flows: &mut state.flows,
                 projected_fixings: &mut state.projected_fixings,
@@ -103,18 +54,19 @@ impl<'a> DateProcessor<'a> {
         state: &mut BuildState,
     ) -> finstack_quant_core::Result<()> {
         let first_flow = state.flows.len();
+        let amort_setup = &self.amort_setup;
         emit_amortization_on(
             d,
-            self.ctx.ccy,
+            self.notional.initial.currency(),
             &mut state.outstanding,
-            self.amort_setup,
+            amort_setup,
             state.linear_between_installment,
-            self.amort_setup.final_amortization_date == Some(d),
+            amort_setup.final_amortization_date == Some(d),
             &mut state.flows,
         )?;
         for flow in &mut state.flows[first_flow..] {
             flow.principal_date = Some(d);
-            flow.date = self.amort_setup.payment_dates.get(&d).copied().unwrap_or(d);
+            flow.date = amort_setup.payment_dates.get(&d).copied().unwrap_or(d);
         }
         Ok(())
     }
@@ -124,11 +76,11 @@ impl<'a> DateProcessor<'a> {
         &self,
         state: &mut BuildState,
     ) -> finstack_quant_core::Result<()> {
-        self.emit_amortization(self.ctx.issue, state)?;
+        self.emit_amortization(self.issue, state)?;
         if let Some((_, balance)) = state.outstanding_history.last_mut() {
             *balance = state.outstanding;
         }
-        self.initialize_linear_between(self.ctx.issue, state);
+        self.initialize_linear_between(self.issue, state);
         Ok(())
     }
 
@@ -142,28 +94,15 @@ impl<'a> DateProcessor<'a> {
         }
     }
 
-    /// Emit fee flows (periodic and fixed).
-    fn emit_fees(&self, d: Date, state: &mut BuildState) -> finstack_quant_core::Result<()> {
-        emit_fees_on(
-            d,
-            self.ctx.periodic_fees,
-            self.ctx.fixed_fees,
-            state.outstanding,
-            &state.outstanding_history,
-            self.ctx.ccy,
-            &mut state.flows,
-        )
-    }
-
     /// Process custom principal events (draws/repays) for this date.
     fn process_principal_events(
         &self,
         d: Date,
         state: &mut BuildState,
     ) -> finstack_quant_core::Result<Decimal> {
-        let first = self.ctx.principal_events.partition_point(|ev| ev.date < d);
+        let first = self.principal_events.partition_point(|ev| ev.date < d);
         let mut funded = Decimal::ZERO;
-        for ev in self.ctx.principal_events[first..]
+        for ev in self.principal_events[first..]
             .iter()
             .take_while(|ev| ev.date == d)
         {
@@ -186,16 +125,16 @@ impl<'a> DateProcessor<'a> {
     /// Computes at the terminal accrual boundary after PIK capitalization.
     /// Cash settles on the independently adjusted redemption payment date.
     fn handle_maturity(&self, d: Date, state: &mut BuildState) -> finstack_quant_core::Result<()> {
-        if d == self.ctx.redemption_effective_date
-            && self.ctx.principal_exchange == PrincipalExchange::InitialAndFinal
+        if d == self.redemption_effective_date
+            && self.principal_exchange == PrincipalExchange::InitialAndFinal
             && state.outstanding > Decimal::ZERO
         {
             let outstanding_f64 = finstack_quant_core::decimal::decimal_to_f64(state.outstanding)?;
             state.flows.push(
                 CashFlow::new(
-                    self.ctx.redemption_date,
+                    self.redemption_date,
                     None,
-                    Money::new(outstanding_f64, self.ctx.ccy)?,
+                    Money::new(outstanding_f64, self.notional.initial.currency())?,
                     CFKind::Notional,
                     0.0,
                     None,
@@ -208,12 +147,13 @@ impl<'a> DateProcessor<'a> {
     }
 
     /// Process all stages for a single date.
-    pub(super) fn process(
+    pub(super) fn process_date(
         &self,
         d: Date,
-        mut state: BuildState,
-    ) -> finstack_quant_core::Result<BuildState> {
-        let pik_to_add = self.emit_coupons(d, &mut state)?;
+        state: &mut BuildState,
+        market: ResolvedFloatMarket<'_>,
+    ) -> finstack_quant_core::Result<()> {
+        let pik_to_add = self.emit_coupons(d, state, market)?;
         if pik_to_add > 0.0 {
             state.outstanding = state
                 .outstanding
@@ -224,10 +164,18 @@ impl<'a> DateProcessor<'a> {
                     )
                 })?;
         }
-        let funded = self.process_principal_events(d, &mut state)?;
-        self.emit_amortization(d, &mut state)?;
-        self.emit_fees(d, &mut state)?;
-        self.initialize_linear_between(d, &mut state);
+        let funded = self.process_principal_events(d, state)?;
+        self.emit_amortization(d, state)?;
+        emit_fees_on(
+            d,
+            &self.periodic_fees,
+            &self.fixed_fees,
+            state.outstanding,
+            &state.outstanding_history,
+            self.notional.initial.currency(),
+            &mut state.flows,
+        )?;
+        self.initialize_linear_between(d, state);
         if let PreparedAmortization::LinearBetween { start, end, .. } = &self.amort_setup.rule {
             if funded > Decimal::ZERO && d > *start && d < *end {
                 // Each later draw repays equally over its remaining dates.
@@ -246,7 +194,7 @@ impl<'a> DateProcessor<'a> {
                 }
             }
         }
-        self.handle_maturity(d, &mut state)?;
+        self.handle_maturity(d, state)?;
 
         debug_assert!(
             state
@@ -260,6 +208,6 @@ impl<'a> DateProcessor<'a> {
             _ => state.outstanding_history.push((d, state.outstanding)),
         }
 
-        Ok(state)
+        Ok(())
     }
 }

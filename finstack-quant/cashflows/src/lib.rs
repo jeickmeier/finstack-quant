@@ -21,9 +21,9 @@
 //!
 //! [`builder`] creates currency-tagged [`builder::CashFlowSchedule`] values;
 //! [`accrual`] and [`aggregation`] provide schedule-level calculations;
-//! [`traits`] integrates instrument cashflow providers; and [`json`] plus
-//! [`schema`] expose serde and schema boundaries. Instrument pricing belongs in
-//! the valuation crates.
+//! [`CashflowProvider`] integrates instrument cashflow providers; and
+//! [`build_cashflow_schedule_json`] plus [`schema`] expose serde and schema
+//! boundaries. Instrument pricing belongs in the valuation crates.
 //!
 //! # Conventions
 //!
@@ -76,23 +76,9 @@
 //! - Day-count and schedule conventions: `docs/REFERENCES.md#isda-2006-definitions`
 //! - Bond-market accrued-interest conventions: `docs/REFERENCES.md#icma-rule-book`
 
-/// Cash-flow primitives (`CashFlow`, `CFKind`).
+/// Cash-flow primitives (`CashFlow`, `CFKind`, `CashFlowAccrual`).
 pub mod primitives {
     pub use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
-
-    /// Returns whether a classified flow represents a cash settlement.
-    ///
-    /// PIK is a capitalization event and `DefaultedNotional` is a write-down;
-    /// neither should be emitted by APIs whose contract is dated cash.
-    ///
-    /// # Arguments
-    ///
-    /// * `kind` - Classified cashflow kind to test; `PIK` and
-    ///   `DefaultedNotional` return `false`, while all settlement kinds return
-    ///   `true`.
-    pub fn is_cash_settlement_kind(kind: CFKind) -> bool {
-        !matches!(kind, CFKind::Pik | CFKind::DefaultedNotional)
-    }
 }
 
 /// Currency-preserving aggregation utilities for cashflows.
@@ -103,34 +89,30 @@ pub mod fixings;
 /// Composable cashflow builder.
 pub mod builder;
 
-/// Cashflow-related traits and aliases.
-pub mod traits;
+mod traits;
 
 /// Generic schedule-driven interest accrual engine.
 pub mod accrual;
-pub mod json;
+mod json;
 #[cfg(feature = "json-schema")]
 pub mod schema;
 
-/// Serde default helpers shared by the spec types and host bindings.
-pub mod serde_defaults;
+pub(crate) mod serde_defaults;
 
 pub use accrual::{
     accrued_interest_amount, AccrualConfig, AccrualIndex, AccrualMethod, ExCouponRule,
 };
 pub use aggregation::PeriodAggregation;
-pub use builder::CashFlowBuilder;
 pub use json::{
     build_cashflow_schedule_json, dated_flows_json, validate_cashflow_schedule_json,
     CashflowScheduleBuildSpec, CouponLegSpec, DatedFlowJson, PaymentProgramSpec,
 };
 pub use traits::{
-    dated_flows, schedule_from_classified_flows, schedule_from_dated_flows, CashflowProvider,
+    schedule_from_classified_flows, schedule_from_dated_flows, CashflowProvider,
     CashflowScheduleSource, ScheduleBuildOpts,
 };
 
-pub use finstack_quant_core::dates::Date;
-pub use finstack_quant_core::money::Money;
+use finstack_quant_core::{dates::Date, money::Money};
 
 /// Single dated amount in a specific currency.
 pub type DatedFlow = (Date, Money);

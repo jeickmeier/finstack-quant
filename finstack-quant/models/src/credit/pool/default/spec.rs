@@ -8,7 +8,7 @@ use super::{
     CopulaBasedDefault, FactorCorrelatedDefault, IntensityProcessDefault, StochasticDefault,
 };
 use crate::correlation::copula::CopulaSpec;
-use finstack_quant_cashflows::builder::specs::DefaultModelSpec;
+use finstack_quant_cashflows::builder::DefaultModelSpec;
 
 /// Stochastic default model specification.
 ///

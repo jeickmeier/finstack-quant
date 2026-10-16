@@ -128,8 +128,8 @@ impl FixedLegSpec {
     pub(crate) fn schedule_params(
         &self,
         adjust_accrual_dates: bool,
-    ) -> crate::cashflow::builder::periods::BuildPeriodsParams<'_> {
-        crate::cashflow::builder::periods::BuildPeriodsParams {
+    ) -> finstack_quant_cashflows::builder::BuildPeriodsParams<'_> {
+        finstack_quant_cashflows::builder::BuildPeriodsParams {
             start: self.start,
             end: self.end,
             frequency: self.frequency,
@@ -138,13 +138,13 @@ impl FixedLegSpec {
             calendar_id: self
                 .calendar_id
                 .as_deref()
-                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
             end_of_month: self.end_of_month,
             day_count: self.day_count,
             payment_lag_days: self.payment_lag_days,
             reset_lag_days: None,
             adjust_accrual_dates,
-            roll_rule: crate::cashflow::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         }
     }
 
@@ -310,7 +310,7 @@ pub struct PremiumLegSpec {
     /// maturity stub, and requires quarterly `frequency` and `short_front`
     /// `stub`. `none` generates a bespoke schedule from the supplied
     /// `frequency` and `stub`. The equity-futures `imm` grid is rejected.
-    pub roll_rule: finstack_quant_cashflows::builder::specs::RollRule,
+    pub roll_rule: finstack_quant_cashflows::builder::RollRule,
     /// Start date of protection
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(

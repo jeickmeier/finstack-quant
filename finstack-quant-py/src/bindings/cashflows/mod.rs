@@ -15,7 +15,7 @@ use pyo3::types::{PyList, PyModule};
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::date_to_py;
-use builder::schedule::{extract_schedule, PyCashFlowMeta, PyCashFlowSchedule};
+use builder::schedule::{PyCashFlowMeta, PyCashFlowSchedule};
 use primitives::{extract_cf_kind, PyCashFlow};
 
 /// Build a cashflow schedule from a JSON spec and return canonical schedule JSON.
@@ -180,8 +180,8 @@ fn dated_flows_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
 ///
 /// Parameters
 /// ----------
-/// schedule : CashFlowSchedule or str
-///     Typed schedule or its canonical JSON.
+/// schedule : CashFlowSchedule
+///     Canonical cashflow schedule.
 ///
 /// Returns
 /// -------
@@ -193,13 +193,10 @@ fn dated_flows_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
 /// Raises
 /// ------
 /// ValueError
-///     If ``schedule`` is malformed or its amounts, accrual metadata, row
-///     currencies, or dates are invalid. Single-currency principal paths
-///     must reconcile with the opening notional. Composite principal paths
-///     in multiple currencies receive structural validation without scalar
-///     balance reconciliation.
-/// TypeError
-///     If ``schedule`` is neither a ``CashFlowSchedule`` nor a string.
+///     If ``schedule`` amounts, accrual metadata, row currencies, or dates are
+///     invalid. Single-currency principal paths must reconcile with the
+///     opening notional. Composite principal paths in multiple currencies
+///     receive structural validation without scalar balance reconciliation.
 ///
 /// Examples
 /// --------
@@ -214,10 +211,11 @@ fn dated_flows_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
 #[pyo3(text_signature = "(schedule)")]
 fn dated_flows<'py>(
     py: Python<'py>,
-    schedule: &Bound<'py, PyAny>,
+    schedule: PyRef<'py, PyCashFlowSchedule>,
 ) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
-    let schedule = extract_schedule(schedule)?;
-    finstack_quant_cashflows::dated_flows(&schedule)
+    schedule
+        .inner
+        .dated_flows()
         .map_err(crate::errors::core_to_py)?
         .into_iter()
         .map(|(date, amount)| Ok((date_to_py(py, date)?, PyMoney::from_inner(amount))))

@@ -3,7 +3,7 @@
 use crate::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
@@ -86,30 +86,23 @@ pub(in crate::builder) fn emit_fees_on(
             for (accrual_start, accrual_end, effective_outstanding) in segments {
                 let is_termination_date = pf.terminal_accrual_end == Some(accrual_end);
                 let full_period = (period.accrual_start, period.accrual_end);
-                let coupon_period = if pf.day_count == DayCount::Act365L {
-                    Some(full_period)
-                } else {
-                    crate::builder::date_generation::icma_coupon_period(
-                        period.unadjusted_start,
-                        period.unadjusted_end,
-                        pf.frequency,
-                        pf.stub,
-                        false,
-                        crate::builder::RollRule::None,
-                    )
-                };
+                let day_count_ctx = crate::builder::periods::period_day_count_context(
+                    period,
+                    pf.calendar,
+                    pf.frequency,
+                    pf.day_count,
+                    pf.stub,
+                    false,
+                    crate::builder::RollRule::None,
+                    is_termination_date,
+                );
+                let coupon_period = day_count_ctx.coupon_period;
                 let yf = crate::builder::periods::contractual_accrual(
                     pf.day_count,
                     full_period,
                     accrual_start,
                     accrual_end,
-                    finstack_quant_core::dates::DayCountContext {
-                        calendar: Some(pf.calendar),
-                        frequency: Some(pf.frequency),
-                        bus_basis: None,
-                        coupon_period,
-                        end_is_termination_date: is_termination_date,
-                    },
+                    day_count_ctx,
                 )?;
 
                 let base_amt = match &pf.base {

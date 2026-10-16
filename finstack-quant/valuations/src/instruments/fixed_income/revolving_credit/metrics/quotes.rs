@@ -21,15 +21,14 @@ use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::Result;
 use rust_decimal::prelude::ToPrimitive;
 
-use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::is_cash_settlement_kind;
-use crate::cashflow::traits::CashflowScheduleSource;
 use crate::instruments::fixed_income::loan_quotes::{
     all_in_rate_from_schedule, pv_with_discount_margin, solve_discount_margin,
 };
 use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::RevolvingCredit;
 use crate::metrics::{MetricCalculator, MetricContext};
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::CashflowScheduleSource;
 
 /// The facility's settlement schedule, built once per metric context.
 fn cached_schedule(context: &mut MetricContext) -> Result<Arc<CashFlowSchedule>> {
@@ -109,7 +108,7 @@ fn holder_flows(schedule: &CashFlowSchedule, settlement: Date) -> Vec<(Date, f64
     schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.date > settlement && is_cash_settlement_kind(cf.kind))
+        .filter(|cf| cf.date > settlement && cf.kind.is_cash_settlement())
         .map(|cf| (cf.date, cf.amount.amount()))
         .collect()
 }
@@ -276,10 +275,10 @@ impl MetricCalculator for AllInRateCalculator {
                 0.0,
                 None,
             ));
-            with_opening = crate::cashflow::traits::schedule_from_classified_flows(
+            with_opening = finstack_quant_cashflows::schedule_from_classified_flows(
                 flows,
                 facility.day_count,
-                crate::cashflow::traits::ScheduleBuildOpts {
+                finstack_quant_cashflows::ScheduleBuildOpts {
                     notional_hint: Some(finstack_quant_core::money::Money::from((
                         0_i64,
                         facility.commitment.currency(),

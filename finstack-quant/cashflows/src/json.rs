@@ -283,7 +283,7 @@ impl CashflowScheduleBuildSpec {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_cashflows::json::CashflowScheduleBuildSpec;
+    /// use finstack_quant_cashflows::CashflowScheduleBuildSpec;
     /// use finstack_quant_core::dates::Date;
     /// use time::Month;
     ///
@@ -523,7 +523,7 @@ pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String> {
 /// # Errors
 ///
 /// Returns an error if the schedule JSON is invalid, the schedule fails
-/// validation (see [`crate::dated_flows`]), or the output cannot be serialized.
+/// validation (see [`CashFlowSchedule::dated_flows`]), or the output cannot be serialized.
 ///
 /// # Examples
 ///
@@ -548,7 +548,8 @@ pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String> {
 /// ```
 pub fn dated_flows_json(schedule_json: &str) -> Result<String> {
     let schedule = parse_schedule(schedule_json)?;
-    let flows: Vec<DatedFlowJson> = crate::dated_flows(&schedule)?
+    let flows: Vec<DatedFlowJson> = schedule
+        .dated_flows()?
         .into_iter()
         .map(|(date, amount)| DatedFlowJson { date, amount })
         .collect();

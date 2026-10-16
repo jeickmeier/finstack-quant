@@ -1,12 +1,12 @@
 //! Embedded structured-credit assumptions registry.
 
-use crate::cashflow::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use crate::instruments::fixed_income::structured_credit::pricing::stochastic::calibrations::{
     CloCalibration, CmbsCalibration, RmbsCalibration,
 };
 use crate::instruments::fixed_income::structured_credit::types::{
     DealFees, DealType, IncentiveFeeSpec,
 };
+use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::embedded_registry::EmbeddedJsonRegistry;
@@ -676,7 +676,7 @@ mod tests {
     /// at month 45 and 0.03% at month 90.
     #[test]
     fn sda_curve_golden_values() {
-        let spec = crate::cashflow::builder::DefaultModelSpec::sda(1.0);
+        let spec = finstack_quant_cashflows::builder::DefaultModelSpec::sda(1.0);
         for (month, expected) in [
             (0, 0.0),
             (15, 0.003),

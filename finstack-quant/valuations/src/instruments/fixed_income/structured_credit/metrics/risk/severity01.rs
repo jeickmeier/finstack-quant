@@ -36,7 +36,7 @@ impl MetricCalculator for Severity01Calculator {
             .resolved_for_pricing()?;
         let as_of = context.as_of;
 
-        use crate::cashflow::builder::RecoveryModelSpec;
+        use finstack_quant_cashflows::builder::RecoveryModelSpec;
 
         // Loss Severity = 1 - Recovery Rate
         // So bumping severity up means bumping recovery down, and vice versa.

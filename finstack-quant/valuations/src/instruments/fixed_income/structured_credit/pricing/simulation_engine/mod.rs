@@ -5,7 +5,6 @@
 //! stochastic pricing differ only in how they source pool SMM/MDR/recovery
 //! assumptions for each legal payment period.
 
-use crate::cashflow::traits::DatedFlows;
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry;
 use crate::instruments::fixed_income::structured_credit::types::{
     AdvancingPolicy, AssetPool, CallScope, CardPortfolioSpec, CoverageTestType, DealFees,
@@ -14,6 +13,7 @@ use crate::instruments::fixed_income::structured_credit::types::{
     Waterfall, WaterfallDistribution,
 };
 use crate::instruments::fixed_income::structured_credit::utils::simulation::RecoveryQueue;
+use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::HolidayCalendar;

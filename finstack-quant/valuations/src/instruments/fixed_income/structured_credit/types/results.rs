@@ -3,8 +3,8 @@
 //! This module provides result types for individual tranche valuation within
 //! structured credit instruments (CLO, ABS, RMBS, CMBS).
 
-use crate::cashflow::traits::DatedFlows;
 use crate::metrics::MetricId;
+use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::money::Money;

@@ -50,7 +50,7 @@ from finstack_quant.cashflows.builder import (
     merge_cashflow_schedules,
 )
 from finstack_quant.cashflows.fixings import materialize_fixings
-from finstack_quant.cashflows.primitives import CashFlow, CashFlowAccrual, CFKind, is_cash_settlement_kind
+from finstack_quant.cashflows.primitives import CashFlow, CashFlowAccrual, CFKind
 from finstack_quant.core.dates import DayCount, Tenor, build_periods
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
@@ -340,7 +340,7 @@ def _primitives() -> Any:
             CFKind.parse(kind).is_principal_like() for kind in ("fixed", "pik", "amortization", "recovery")
         ],
         "cash_settlement": [
-            is_cash_settlement_kind(kind) for kind in ("fixed", "pik", "defaulted_notional", "notional")
+            CFKind.parse(kind).is_cash_settlement() for kind in ("fixed", "pik", "defaulted_notional", "notional")
         ],
         "balance_date": [
             wire(flow.get_balance_date()),

@@ -80,7 +80,7 @@ pub(crate) fn financing_schedules_supported(
     inst: &LeveredRealEstateEquity,
     market: &MarketContext,
     as_of: Date,
-) -> finstack_quant_core::Result<Vec<crate::cashflow::builder::CashFlowSchedule>> {
+) -> finstack_quant_core::Result<Vec<finstack_quant_cashflows::builder::CashFlowSchedule>> {
     let mut schedules = Vec::with_capacity(inst.financing.len());
     for financing in &inst.financing {
         schedules.push(financing.cashflow_schedule(market, as_of)?);

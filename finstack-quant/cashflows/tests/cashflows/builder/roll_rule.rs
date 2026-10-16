@@ -11,9 +11,9 @@
 //! References: ISDA CDS Standard Model conventions (Big Bang Protocol,
 //! April 2009); CME IMM date rules.
 
-use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
-use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec, RollRule};
+use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 use finstack_quant_cashflows::builder::{CashFlowSchedule, ScheduleParams};
+use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec, RollRule};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};

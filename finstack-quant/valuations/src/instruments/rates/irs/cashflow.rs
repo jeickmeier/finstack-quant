@@ -24,13 +24,12 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use rust_decimal::Decimal;
 
-use crate::cashflow::builder::{
-    periods::{build_periods, BuildPeriodsParams, SchedulePeriod},
-    schedule::merge_cashflow_schedules,
-    CashFlowSchedule, FloatingCouponSpec, FloatingRateSpec, Notional, PrincipalExchange,
-};
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::rates::irs::{FloatingLegCompounding, InterestRateSwap, PayReceive};
+use finstack_quant_cashflows::builder::{
+    build_periods, merge_cashflow_schedules, BuildPeriodsParams, CashFlowSchedule,
+    FloatingCouponSpec, FloatingRateSpec, Notional, PrincipalExchange, SchedulePeriod,
+};
 
 /// Total backward shift (in business days) applied to overnight observation
 /// dates.
@@ -139,19 +138,19 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         calendar_id: float
             .calendar_id
             .as_deref()
-            .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+            .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
         end_of_month: float.end_of_month,
         day_count: float.day_count,
         payment_lag_days: float.payment_lag_days,
         reset_lag_days: None,
         adjust_accrual_dates: irs.adjust_float_accrual_dates,
-        roll_rule: crate::cashflow::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     })?;
     if periods.is_empty() {
-        return Ok(crate::cashflow::traits::schedule_from_classified_flows(
+        return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             Vec::new(),
             float.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(irs.notional),
                 ..Default::default()
             },
@@ -214,7 +213,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
                 },
             )?;
         projected_fixings.extend(projection.observation_exposures.iter().map(|observation| {
-            crate::cashflow::fixings::ProjectedFixing {
+            finstack_quant_cashflows::fixings::ProjectedFixing {
                 series_id: format!("FIXING:{}", float.forward_curve_id),
                 date: observation.observation_start,
                 value: Some(observation.projected_rate),
@@ -246,12 +245,12 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         ));
     }
 
-    Ok(crate::cashflow::traits::schedule_from_classified_flows(
+    Ok(finstack_quant_cashflows::schedule_from_classified_flows(
         flows,
         float.day_count,
-        crate::cashflow::traits::ScheduleBuildOpts {
+        finstack_quant_cashflows::ScheduleBuildOpts {
             notional_hint: Some(irs.notional),
-            meta: crate::cashflow::builder::CashFlowMeta {
+            meta: finstack_quant_cashflows::builder::CashFlowMeta {
                 projected_fixings,
                 ..Default::default()
             },
@@ -284,7 +283,7 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
     let calendar_id = fixed
         .calendar_id
         .as_deref()
-        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
+        .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID);
     let adjust_accrual_dates = irs.adjust_fixed_accrual_dates;
     let periods = build_periods(BuildPeriodsParams {
         start: fixed.start,
@@ -298,7 +297,7 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
         payment_lag_days: fixed.payment_lag_days,
         reset_lag_days: None,
         adjust_accrual_dates,
-        roll_rule: crate::cashflow::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     })?;
     let period_count = periods.len();
     let rate = decimal_to_f64(fixed.rate, "fixed leg rate")?;
@@ -324,10 +323,10 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
             ))
         })
         .collect::<Result<Vec<_>>>()?;
-    Ok(crate::cashflow::traits::schedule_from_classified_flows(
+    Ok(finstack_quant_cashflows::schedule_from_classified_flows(
         flows,
         fixed.day_count,
-        crate::cashflow::traits::ScheduleBuildOpts {
+        finstack_quant_cashflows::ScheduleBuildOpts {
             notional_hint: Some(irs.notional),
             ..Default::default()
         },
@@ -418,12 +417,12 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
                 ),
                 overnight_basis: None,
                 fallback: if curves.is_some() {
-                    crate::cashflow::builder::FloatingRateFallback::Error
+                    finstack_quant_cashflows::builder::FloatingRateFallback::Error
                 } else {
-                    crate::cashflow::builder::FloatingRateFallback::SpreadOnly
+                    finstack_quant_cashflows::builder::FloatingRateFallback::SpreadOnly
                 },
             },
-            coupon_type: crate::cashflow::builder::CouponType::Cash,
+            coupon_type: finstack_quant_cashflows::builder::CouponType::Cash,
             schedule: finstack_quant_cashflows::builder::ScheduleParams {
                 frequency: float.frequency,
                 day_count: float.day_count,
@@ -436,7 +435,7 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
                 end_of_month: float.end_of_month,
                 payment_lag_days: float.payment_lag_days,
                 adjust_accrual_dates: irs.adjust_float_accrual_dates,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         });
     match (curves, as_of) {
@@ -498,7 +497,7 @@ pub(crate) fn full_signed_schedule_with_curves_as_of(
 /// * `paid_after` - Only periods with `payment_date > paid_after` contribute
 ///   (the valuation date for a spot annuity, the exercise date for a forward one).
 pub(crate) fn fixed_leg_annuity(
-    periods: &[crate::cashflow::builder::periods::SchedulePeriod],
+    periods: &[finstack_quant_cashflows::builder::SchedulePeriod],
     disc: &dyn finstack_quant_core::market_data::traits::Discounting,
     as_of: finstack_quant_core::dates::Date,
     paid_after: finstack_quant_core::dates::Date,

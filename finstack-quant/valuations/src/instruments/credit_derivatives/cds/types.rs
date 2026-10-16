@@ -418,7 +418,7 @@ impl CreditDefaultSwap {
             .side(PayReceive::Pay)
             .convention(convention)
             .premium_leg(PremiumLegSpec {
-                roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
                 start: date!(2024 - 03 - 20),
                 end: date!(2029 - 03 - 20),
                 frequency,
@@ -476,7 +476,7 @@ impl CreditDefaultSwap {
             side,
             convention,
             premium_leg: PremiumLegSpec {
-                roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
                 start,
                 end,
                 frequency,
@@ -526,7 +526,7 @@ impl CreditDefaultSwap {
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::types::CurveId;
-    /// use finstack_quant_cashflows::builder::specs::RollRule;
+    /// use finstack_quant_cashflows::builder::RollRule;
     /// use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
     /// use finstack_quant_valuations::instruments::credit_derivatives::cds::CdsConvention;
     /// use finstack_quant_valuations::instruments::{
@@ -667,7 +667,7 @@ impl CreditDefaultSwap {
 
     fn build_premium_leg_schedule(
         &self,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let spread = self.premium_leg.coupon_bp.to_f64().ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "premium.coupon_bp cannot be represented as f64".to_string(),
@@ -707,10 +707,10 @@ impl CreditDefaultSwap {
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
-        Ok(crate::cashflow::traits::schedule_from_classified_flows(
+        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             self.premium_leg.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
                 ..Default::default()
             },
@@ -807,7 +807,7 @@ impl crate::instruments::common_impl::traits::Instrument for CreditDefaultSwap {
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
-impl crate::cashflow::traits::CashflowScheduleSource for CreditDefaultSwap {
+impl finstack_quant_cashflows::CashflowScheduleSource for CreditDefaultSwap {
     fn notional(&self) -> finstack_quant_core::Result<Option<finstack_quant_core::money::Money>> {
         Ok(Some(self.notional))
     }
@@ -816,7 +816,7 @@ impl crate::cashflow::traits::CashflowScheduleSource for CreditDefaultSwap {
         &self,
         _curves: &MarketContext,
         _as_of: Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let mut schedule = self.build_premium_leg_schedule()?;
 
         if let Some((dt, amount)) = self.upfront {
@@ -844,8 +844,9 @@ impl crate::cashflow::traits::CashflowScheduleSource for CreditDefaultSwap {
             };
         });
 
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 

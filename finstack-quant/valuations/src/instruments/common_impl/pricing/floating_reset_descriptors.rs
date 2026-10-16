@@ -22,10 +22,10 @@
 //!   `projected_index_rate`.
 //! - Every fixed-rate, fee, and principal flow.
 
-use crate::cashflow::builder::rate_helpers::FloatingRateParams;
-use crate::cashflow::builder::schedule::CashFlowSchedule;
-use crate::cashflow::builder::specs::{FloatingRateSpec, OvernightIndexConstraintApplication};
-use crate::cashflow::primitives::CFKind;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::builder::FloatingRateParams;
+use finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};
+use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::{Error, Result};

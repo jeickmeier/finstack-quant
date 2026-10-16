@@ -29,7 +29,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-use crate::cashflow::builder::FloatingRateSpec;
+use finstack_quant_cashflows::builder::FloatingRateSpec;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Rate;
@@ -109,7 +109,7 @@ impl RateSpec {
             Self::Fixed { rate } => Ok(*rate),
             Self::Floating(spec) => {
                 let fwd = market.get_forward(spec.forward_curve_id.as_str())?;
-                let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
+                let params = finstack_quant_cashflows::builder::FloatingRateParams::try_from(spec)?;
                 let calendar_id = spec
                     .fixing_calendar_id
                     .as_deref()
@@ -144,13 +144,11 @@ impl RateSpec {
                             reset_date,
                             as_of,
                         )?;
-                    return Ok(
-                        crate::cashflow::builder::rate_helpers::calculate_floating_rate(
-                            raw, &params,
-                        ),
-                    );
+                    return Ok(finstack_quant_cashflows::builder::calculate_floating_rate(
+                        raw, &params,
+                    ));
                 }
-                crate::cashflow::builder::project_floating_rate(
+                finstack_quant_cashflows::builder::project_floating_rate(
                     accrual_start,
                     fwd.as_ref(),
                     &params,

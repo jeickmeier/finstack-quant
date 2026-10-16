@@ -432,7 +432,7 @@ impl crate::instruments::common_impl::traits::Instrument for AsianOption {
 
 crate::impl_empty_cashflow_provider!(
     AsianOption,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
 
 #[cfg(test)]

@@ -20,7 +20,6 @@
 use super::exercise::{worst_call_period, ExerciseTerms, ExerciseWindow, RateView};
 use super::reserve::{fund_collateral_draws, replenish_reserve_from_repayments};
 use super::*;
-use crate::cashflow::builder::{CashFlowSchedule, FloatingRateParams};
 use crate::instruments::fixed_income::bond::CashflowSpec;
 use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::revolving_credit::pricing::path_generator::build_credit_spread_params;
@@ -34,7 +33,8 @@ use crate::instruments::fixed_income::revolving_credit::{
 use crate::instruments::fixed_income::structured_credit::types::{
     CallExercisePolicy, CollateralInstrument, InstrumentCollateral, PutExercisePolicy,
 };
-use finstack_quant_cashflows::traits::CashflowScheduleSource;
+use finstack_quant_cashflows::builder::{CashFlowSchedule, FloatingRateParams};
+use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_models::monte_carlo::process::cir::CirProcess;
@@ -92,12 +92,10 @@ impl InterestComponent {
             return None;
         }
         let (index_rate, params) = (self.index_rate?, params?);
-        Some(
-            crate::cashflow::builder::rate_helpers::calculate_floating_rate(
-                index_rate + shift,
-                params,
-            ),
-        )
+        Some(finstack_quant_cashflows::builder::calculate_floating_rate(
+            index_rate + shift,
+            params,
+        ))
     }
 
     /// Coupon amount under an additive shift of the index rate.

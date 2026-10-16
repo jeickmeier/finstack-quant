@@ -1,6 +1,6 @@
 //! Fluent `CashFlowBuilder` methods for coupon, fee, and payment-split legs.
 //!
-//! These `impl CashFlowBuilder` blocks accumulate coupon, fee, and
+//! This `impl CashFlowBuilder` block accumulates coupon, fee, and
 //! payment-program state on the builder. The build orchestration that
 //! consumes that state — validation, compilation, date collection, and
 //! projection — lives in [`super::orchestrator`].
@@ -40,15 +40,6 @@ impl CashFlowBuilder {
         self
     }
 
-    fn push_full_horizon_coupon(
-        &mut self,
-        schedule: ScheduleParams,
-        coupon: CouponSpec,
-        split: CouponType,
-    ) -> &mut Self {
-        self.push_coupon_program(ProgramWindow::full_horizon(), schedule, coupon, split)
-    }
-
     fn push_payment_program(&mut self, window: ProgramWindow, split: CouponType) -> &mut Self {
         self.payment_program
             .push(PaymentProgramPiece { window, split });
@@ -63,9 +54,7 @@ impl CashFlowBuilder {
         next.rate_spec.spread_bp = spread_bp;
         next
     }
-}
 
-impl CashFlowBuilder {
     /// Adds a fixed coupon over the half-open window `[start, end)`.
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn add_fixed_window(&mut self, start: Date, end: Date, spec: FixedCouponSpec) -> &mut Self {
@@ -143,7 +132,8 @@ impl CashFlowBuilder {
     /// ```
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn fixed_cf(&mut self, spec: FixedCouponSpec) -> &mut Self {
-        self.push_full_horizon_coupon(
+        self.push_coupon_program(
+            ProgramWindow::full_horizon(),
             spec.schedule.clone(),
             CouponSpec::Fixed { rate: spec.rate },
             spec.coupon_type,
@@ -217,7 +207,8 @@ impl CashFlowBuilder {
     /// ```
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn floating_cf(&mut self, spec: FloatingCouponSpec) -> &mut Self {
-        self.push_full_horizon_coupon(
+        self.push_coupon_program(
+            ProgramWindow::full_horizon(),
             spec.schedule.clone(),
             CouponSpec::Float {
                 rate_spec: spec.rate_spec,
@@ -225,9 +216,7 @@ impl CashFlowBuilder {
             spec.coupon_type,
         )
     }
-}
 
-impl CashFlowBuilder {
     /// Adds a fee specification.
     ///
     /// Fixed fees emit a one-time `Fee` cashflow on their configured date.
@@ -280,9 +269,7 @@ impl CashFlowBuilder {
         self.fees.push(spec);
         self
     }
-}
 
-impl CashFlowBuilder {
     /// Adds (or overrides) a payment split over a single date window.
     ///
     /// The lower-level primitive behind [`payment_split_program`](Self::payment_split_program).
@@ -307,11 +294,7 @@ impl CashFlowBuilder {
     /// Mutable builder reference for fluent chaining.
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn add_payment_window(&mut self, start: Date, end: Date, split: CouponType) -> &mut Self {
-        self.payment_program.push(PaymentProgramPiece {
-            window: ProgramWindow::explicit(start, end),
-            split,
-        });
-        self
+        self.push_payment_program(ProgramWindow::explicit(start, end), split)
     }
 
     /// Convenience: payment split program with boundary dates (PIK toggle windows).
@@ -407,9 +390,7 @@ impl CashFlowBuilder {
         );
         self
     }
-}
 
-impl CashFlowBuilder {
     /// Adds a step-up coupon specification.
     ///
     /// A step-up coupon starts at an initial rate and steps to different rates
@@ -457,7 +438,8 @@ impl CashFlowBuilder {
     /// ```
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn step_up_cf(&mut self, spec: StepUpCouponSpec) -> &mut Self {
-        self.push_full_horizon_coupon(
+        self.push_coupon_program(
+            ProgramWindow::full_horizon(),
             spec.schedule.clone(),
             CouponSpec::StepUp {
                 initial_rate: spec.initial_rate,

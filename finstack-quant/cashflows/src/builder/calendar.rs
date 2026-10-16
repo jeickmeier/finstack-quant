@@ -31,7 +31,7 @@ pub const WEEKENDS_ONLY_ID: &str = "weekends_only";
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_cashflows::builder::calendar::adjust_date;
+/// use finstack_quant_cashflows::builder::adjust_date;
 /// use finstack_quant_core::dates::{BusinessDayConvention, Date};
 /// use time::Month;
 ///

@@ -12,11 +12,11 @@
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 
-use crate::cashflow::primitives::CFKind;
 use crate::instruments::fixed_income::bond::pricing::engine::tree::BondValuator;
 use crate::instruments::fixed_income::bond::{
     Bond, CallPut, CallPutSchedule, ProtectionWindow, ReturnFloorKind, ReturnFloorSpec,
 };
+use finstack_quant_cashflows::primitives::CFKind;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// One candidate redemption date with the cash paid at it and the running state.
@@ -225,7 +225,7 @@ pub(crate) fn lower_return_floor(
     let issue = bond.issue_date;
     let schedule = bond.full_cashflow_schedule(curves)?;
     let accrual_index =
-        crate::cashflow::accrual::AccrualIndex::build(&schedule, &bond.accrual_config())?;
+        finstack_quant_cashflows::accrual::AccrualIndex::build(&schedule, &bond.accrual_config())?;
     // The XIRR floor discounts on the same basis as the verification metric
     // (`core::cashflow::xirr`, Act/365F) so the guarantee holds exactly.
     let day_count = spec.day_count.unwrap_or(DayCount::Act365F);
@@ -470,8 +470,8 @@ mod tests {
 
     #[test]
     fn seasoned_pik_and_amortization_follow_canonical_balance_path() {
-        use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-        use crate::cashflow::primitives::CashFlow;
+        use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
+        use finstack_quant_cashflows::primitives::CashFlow;
 
         let issue = date!(2024 - 01 - 01);
         let pik_date = date!(2024 - 07 - 01);
@@ -654,11 +654,13 @@ mod tests {
             .expect("the protection window starts at as_of");
         assert_eq!(call.end, between_coupon_date);
         let full_schedule = bond.full_cashflow_schedule(&curves).unwrap();
-        let accrued =
-            crate::cashflow::accrual::AccrualIndex::build(&full_schedule, &bond.accrual_config())
-                .unwrap()
-                .accrued_at(between_coupon_date)
-                .unwrap();
+        let accrued = finstack_quant_cashflows::accrual::AccrualIndex::build(
+            &full_schedule,
+            &bond.accrual_config(),
+        )
+        .unwrap()
+        .accrued_at(between_coupon_date)
+        .unwrap();
         assert!(accrued > 0.0, "fixture must exercise between coupons");
         assert!(
             (call.price_pct_of_par + accrued - 125.0).abs() < 1.0e-10,
@@ -689,11 +691,13 @@ mod tests {
             .find(|call| call.start == exercise_date)
             .expect("between-coupon floor date");
         let full_schedule = bond.full_cashflow_schedule(&curves).unwrap();
-        let accrued =
-            crate::cashflow::accrual::AccrualIndex::build(&full_schedule, &bond.accrual_config())
-                .unwrap()
-                .accrued_at(exercise_date)
-                .unwrap();
+        let accrued = finstack_quant_cashflows::accrual::AccrualIndex::build(
+            &full_schedule,
+            &bond.accrual_config(),
+        )
+        .unwrap()
+        .accrued_at(exercise_date)
+        .unwrap();
         let flows = [
             (bond.issue_date, -bond.notional.amount()),
             (exercise_date, call.price_pct_of_par + accrued),
@@ -942,7 +946,7 @@ mod tests {
             let cashflow_schedule = bond
                 .full_cashflow_schedule(&market)
                 .expect("cashflow schedule");
-            let accrual_index = crate::cashflow::accrual::AccrualIndex::build(
+            let accrual_index = finstack_quant_cashflows::accrual::AccrualIndex::build(
                 &cashflow_schedule,
                 &bond.accrual_config(),
             )
@@ -992,7 +996,7 @@ mod tests {
         let cashflow_schedule = bond
             .full_cashflow_schedule(&market)
             .expect("cashflow schedule");
-        let accrual_index = crate::cashflow::accrual::AccrualIndex::build(
+        let accrual_index = finstack_quant_cashflows::accrual::AccrualIndex::build(
             &cashflow_schedule,
             &bond.accrual_config(),
         )
@@ -1059,7 +1063,7 @@ mod tests {
         let cashflow_schedule = bond
             .full_cashflow_schedule(&market)
             .expect("cashflow schedule");
-        let accrual_index = crate::cashflow::accrual::AccrualIndex::build(
+        let accrual_index = finstack_quant_cashflows::accrual::AccrualIndex::build(
             &cashflow_schedule,
             &bond.accrual_config(),
         )
@@ -1156,7 +1160,7 @@ mod tests {
             let cashflow_schedule = bond
                 .full_cashflow_schedule(&market)
                 .expect("cashflow schedule");
-            let accrual_index = crate::cashflow::accrual::AccrualIndex::build(
+            let accrual_index = finstack_quant_cashflows::accrual::AccrualIndex::build(
                 &cashflow_schedule,
                 &bond.accrual_config(),
             )

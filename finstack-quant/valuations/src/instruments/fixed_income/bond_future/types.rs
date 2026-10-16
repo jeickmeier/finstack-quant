@@ -3,12 +3,12 @@
 //! This module defines the data structures for bond futures, including
 //! the deliverable basket, contract specifications, and the main BondFuture type.
 
-use crate::cashflow::builder::CashFlowSchedule;
 use crate::contract_specs::{embedded_registry, ContractSpecRegistry};
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::common_impl::listed::ListedFutureTerms;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -724,9 +724,9 @@ Provide it at construction time via BondFutureBuilder::ctd_bond(...) or by using
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::CashflowProvider;
     use crate::instruments::fixed_income::bond::Bond;
     use crate::instruments::Position;
+    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::types::CurveId;

@@ -58,7 +58,7 @@ fn create_tranche(attach_pct: f64, detach_pct: f64, tenor_years: i32) -> CdsTran
         PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
-    tranche.roll_rule = finstack_quant_cashflows::builder::specs::RollRule::CdsImm;
+    tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::CdsImm;
     tranche
 }
 

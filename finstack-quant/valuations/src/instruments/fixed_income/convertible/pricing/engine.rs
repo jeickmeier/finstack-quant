@@ -9,13 +9,13 @@ use finstack_quant_core::types::PriceId;
 use finstack_quant_core::InputError;
 use finstack_quant_core::{Error, Result};
 
-use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::common_impl::traits::{GreekBumps, Instrument};
 use crate::instruments::fixed_income::convertible::{
     market_inputs::resolve_dividend_yield, ConversionEvent, ConversionPolicy, ConvertibleBond,
     ConvertibleGreeks,
 };
 use crate::metrics::bump_discount_curve_parallel;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
 
 use super::credit_tree::{terminal_payoff, CreditTreeEngine, CreditTreeMarketInputs};
 use super::valuator::ConvertibleBondValuator;
@@ -357,9 +357,11 @@ fn resolved_value(
         .map(|id| market.get_hazard(id.as_str()))
         .transpose()?;
     let mut value = 0.0;
-    for cf in schedule.get_flows().iter().filter(|cf| {
-        cf.date > as_of && finstack_quant_cashflows::primitives::is_cash_settlement_kind(cf.kind)
-    }) {
+    for cf in schedule
+        .get_flows()
+        .iter()
+        .filter(|cf| cf.date > as_of && cf.kind.is_cash_settlement())
+    {
         let earned_coupon = cf
             .accrual
             .as_ref()
@@ -417,10 +419,12 @@ fn price_convertible_bond_with_inputs(
         let mut maturity_coupon = 0.0;
         let mut redemption_pv = 0.0;
         let mut principal = 0.0;
-        for cf in inputs.cashflow_schedule.get_flows().iter().filter(|cf| {
-            cf.date >= as_of
-                && finstack_quant_cashflows::primitives::is_cash_settlement_kind(cf.kind)
-        }) {
+        for cf in inputs
+            .cashflow_schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| cf.date >= as_of && cf.kind.is_cash_settlement())
+        {
             let survival = if let Some(curve) = &hazard {
                 let sp = curve.survival_at_dates(&[as_of, cf.date])?;
                 if sp[0] <= 0.0 {
@@ -560,10 +564,7 @@ pub(crate) fn price_bond_floor(
         return schedule
             .get_flows()
             .iter()
-            .filter(|cf| {
-                cf.date >= as_of
-                    && finstack_quant_cashflows::primitives::is_cash_settlement_kind(cf.kind)
-            })
+            .filter(|cf| cf.date >= as_of && cf.kind.is_cash_settlement())
             .try_fold(0.0, |value, cf| {
                 Ok(value + cf.amount.amount() * curve.df_between_dates(as_of, cf.date)?)
             });
@@ -856,11 +857,11 @@ pub(crate) fn settlement_dirty_price(
         .transpose()?;
     let schedule = build_convertible_schedule(bond, market)?;
     let mut interim = 0.0;
-    for cf in schedule.get_flows().iter().filter(|cf| {
-        cf.date > as_of
-            && cf.date <= settle
-            && finstack_quant_cashflows::primitives::is_cash_settlement_kind(cf.kind)
-    }) {
+    for cf in schedule
+        .get_flows()
+        .iter()
+        .filter(|cf| cf.date > as_of && cf.date <= settle && cf.kind.is_cash_settlement())
+    {
         let survival = if let Some(curve) = &hazard {
             let sp = curve.survival_at_dates(&[as_of, cf.date])?;
             if sp[0] <= 0.0 {
@@ -916,12 +917,12 @@ pub fn calculate_accrued_interest(
 pub(super) fn accrual_index(
     bond: &ConvertibleBond,
     schedule: &CashFlowSchedule,
-) -> Result<crate::cashflow::accrual::AccrualIndex> {
+) -> Result<finstack_quant_cashflows::accrual::AccrualIndex> {
     let frequency = Some(bond.cashflow_spec.frequency());
-    crate::cashflow::accrual::AccrualIndex::build(
+    finstack_quant_cashflows::accrual::AccrualIndex::build(
         schedule,
-        &crate::cashflow::accrual::AccrualConfig {
-            method: crate::cashflow::accrual::AccrualMethod::Linear,
+        &finstack_quant_cashflows::accrual::AccrualConfig {
+            method: finstack_quant_cashflows::accrual::AccrualMethod::Linear,
             ex_coupon: None,
             include_pik: true,
             frequency,

@@ -369,8 +369,8 @@ impl StructuredCredit {
         // severities by month of default are deterministic-only.
         if matches!(
             model.default_spec,
-            crate::cashflow::builder::DefaultModelSpec::CumulativeLoss { .. }
-                | crate::cashflow::builder::DefaultModelSpec::Timing { .. }
+            finstack_quant_cashflows::builder::DefaultModelSpec::CumulativeLoss { .. }
+                | finstack_quant_cashflows::builder::DefaultModelSpec::Timing { .. }
         ) {
             return Err(finstack_quant_core::Error::Validation(
                 "stochastic pricing supports constant, SDA and vector default curves; \
@@ -629,7 +629,7 @@ impl StructuredCredit {
 #[cfg(test)]
 mod production_structured_assumptions {
     use super::*;
-    use crate::cashflow::builder::{DefaultModelSpec, PrepaymentModelSpec};
+    use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
     use time::macros::date;
 
     #[test]

@@ -875,11 +875,11 @@ mod tests {
 
     crate::impl_empty_cashflow_provider!(
         TestFdInstrument,
-        crate::cashflow::builder::CashflowRepresentation::NoResidual
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
     );
     crate::impl_empty_cashflow_provider!(
         RoundingSensitiveInstrument,
-        crate::cashflow::builder::CashflowRepresentation::NoResidual
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
     );
 
     impl RoundingSensitiveInstrument {
@@ -1409,7 +1409,7 @@ mod tests {
 
     crate::impl_empty_cashflow_provider!(
         VolLinearInstrument,
-        crate::cashflow::builder::CashflowRepresentation::NoResidual
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
     );
 
     impl VolLinearInstrument {

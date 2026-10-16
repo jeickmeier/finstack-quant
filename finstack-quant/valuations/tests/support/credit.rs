@@ -227,7 +227,7 @@ pub fn cds_buy_protection(
         .side(PayReceive::Pay)
         .convention(convention)
         .premium_leg(PremiumLegSpec {
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
             start,
             end: maturity,
             frequency,
@@ -291,7 +291,7 @@ pub fn cds_sell_protection(
         .side(PayReceive::Receive)
         .convention(convention)
         .premium_leg(PremiumLegSpec {
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
             start,
             end: maturity,
             frequency,

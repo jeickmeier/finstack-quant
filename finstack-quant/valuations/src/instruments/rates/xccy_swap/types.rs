@@ -12,13 +12,13 @@
 //!   legs (`compounding` other than Simple) use the shared daily compounded
 //!   projector. Historical fixings are required once the fixing date is past.
 
-use crate::cashflow::builder::{schedule::merge_cashflow_schedules, CashFlowSchedule, Notional};
-use crate::cashflow::primitives::CFKind;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::legs::FloatLegSpec;
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::PayReceive;
+use finstack_quant_cashflows::builder::{merge_cashflow_schedules, CashFlowSchedule, Notional};
+use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -533,7 +533,7 @@ impl XccySwap {
                 Ok(id)
             }
             _ if self.allow_calendar_fallback => {
-                Ok(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
+                Ok(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
             }
             _ => Err(finstack_quant_core::Error::Validation(format!(
                 "XccySwap leg {} requires a resolvable calendar_id; set allow_calendar_fallback=true to opt into weekends_only",
@@ -562,9 +562,9 @@ impl XccySwap {
         &self,
         leg: &XccySwapLeg,
         calendar_id: &str,
-    ) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
-        crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
+    ) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
+        finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start: leg.leg.start,
                 end: leg.leg.end,
                 frequency: leg.leg.frequency,
@@ -576,7 +576,7 @@ impl XccySwap {
                 payment_lag_days: leg.leg.payment_lag_days,
                 reset_lag_days: leg.period_reset_lag(),
                 adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )
     }
@@ -599,9 +599,9 @@ impl XccySwap {
         leg: &XccySwapLeg,
         fwd: &finstack_quant_core::market_data::term_structures::ForwardCurve,
         fixings: Option<&finstack_quant_core::market_data::scalars::ScalarTimeSeries>,
-        period: &crate::cashflow::builder::periods::SchedulePeriod,
+        period: &finstack_quant_cashflows::builder::SchedulePeriod,
         as_of: Date,
-        projected_fixings: Option<&mut Vec<crate::cashflow::fixings::ProjectedFixing>>,
+        projected_fixings: Option<&mut Vec<finstack_quant_cashflows::fixings::ProjectedFixing>>,
     ) -> Result<ProjectedXccyPeriod> {
         use crate::instruments::common_impl::pricing::overnight::{
             adjust_overnight_accrual_boundaries, project_overnight_coupon,
@@ -643,7 +643,7 @@ impl XccySwap {
                 })?;
                 if let Some(out) = projected_fixings {
                     out.extend(projection.observation_exposures.iter().map(|observation| {
-                        crate::cashflow::fixings::ProjectedFixing {
+                        finstack_quant_cashflows::fixings::ProjectedFixing {
                             series_id: format!("FIXING:{}", leg.leg.forward_curve_id),
                             date: observation.observation_start,
                             value: Some(observation.projected_rate),
@@ -675,7 +675,7 @@ impl XccySwap {
                 )?
             };
             if let Some(out) = projected_fixings {
-                out.push(crate::cashflow::fixings::ProjectedFixing {
+                out.push(finstack_quant_cashflows::fixings::ProjectedFixing {
                     series_id: format!("FIXING:{}", leg.leg.forward_curve_id),
                     date: fixing_date,
                     value: Some(forward_rate),
@@ -730,21 +730,21 @@ impl XccySwap {
             )?;
             let all_in = projected.all_in_rate(spread);
             let amount = leg.side.sign() * projected.unsigned_coupon(leg.notional.amount(), spread);
-            flows.push(crate::cashflow::primitives::CashFlow::new(
+            flows.push(finstack_quant_cashflows::primitives::CashFlow::new(
                 period.payment_date,
                 projected.fixing_date.or(period.reset_date),
                 Money::new(amount, leg.notional.currency())?,
-                crate::cashflow::primitives::CFKind::FloatReset,
+                finstack_quant_cashflows::primitives::CFKind::FloatReset,
                 projected.year_fraction,
                 Some(all_in),
             ));
         }
-        Ok(crate::cashflow::traits::schedule_from_classified_flows(
+        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             leg.leg.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(leg.notional),
-                meta: crate::cashflow::builder::CashFlowMeta {
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
                     projected_fixings,
                     ..Default::default()
                 },
@@ -942,7 +942,7 @@ impl crate::instruments::common_impl::traits::Instrument for XccySwap {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Option<finstack_quant_core::dates::Date>> {
         let schedule =
-            crate::cashflow::traits::CashflowProvider::cashflow_schedule(self, curves, as_of)?;
+            finstack_quant_cashflows::CashflowProvider::cashflow_schedule(self, curves, as_of)?;
         Ok(schedule
             .get_flows()
             .iter()
@@ -1067,7 +1067,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
                 )?;
             return Ok(schedule
                 .with_notional(Notional::par(0.0, self.reporting_currency)?)
-                .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected));
+                .with_representation(
+                    finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+                ));
         }
 
         let leg1_schedule = self.leg_coupon_schedule(&self.leg1, market, as_of)?;
@@ -1080,15 +1082,15 @@ impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
             Notional::par(0.0, self.reporting_currency)?,
             self.leg1.leg.day_count,
         )
-        .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        .with_representation(finstack_quant_cashflows::builder::CashflowRepresentation::Projected))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::CashflowProvider;
     use crate::instruments::common_impl::traits::Instrument;
+    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use time::Month;
 
@@ -1633,7 +1635,7 @@ mod tests {
             .build()
             .expect("estr forward");
         let compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
-        let period = crate::cashflow::builder::periods::SchedulePeriod {
+        let period = finstack_quant_cashflows::builder::SchedulePeriod {
             accrual_start: start,
             accrual_end: end,
             payment_date: end,
@@ -1716,7 +1718,7 @@ mod tests {
             .knots(vec![(0.0, 0.03), (1.0, 0.03)])
             .build()
             .expect("estr forward");
-        let period = crate::cashflow::builder::periods::SchedulePeriod {
+        let period = finstack_quant_cashflows::builder::SchedulePeriod {
             accrual_start: start,
             accrual_end: end,
             payment_date: end,

@@ -1,11 +1,11 @@
 //! Canonical optioned-coupon projection for every cap/floor pathway.
 
-use crate::cashflow::builder::periods::SchedulePeriod;
 use crate::instruments::common_impl::pricing::overnight::{
     project_overnight_coupon, resolve_overnight_fixing_calendar, OvernightCouponProjectionInput,
     OvernightObservationExposure, OvernightProjectionCurve,
 };
 use crate::instruments::rates::cap_floor::{CapFloor, OvernightSpreadCompounding};
+use finstack_quant_cashflows::builder::SchedulePeriod;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 

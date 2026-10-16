@@ -4,7 +4,6 @@ use super::super::super::super::types::Bond;
 use super::bond_valuator::BondValuator;
 use super::config::{TreeModelChoice, TreePricerConfig};
 use super::lsmc::{price_bond_lsmc, BondLsmcConfig};
-use crate::cashflow::primitives::is_cash_settlement_kind;
 use crate::instruments::common_impl::pricing::rates_credit::build_daily_bond_rates_credit_targets;
 use crate::instruments::pricing_overrides::resolve_rates_credit_config;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -104,7 +103,7 @@ impl TreePricer {
         if let Some(date) = schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.date > origin && is_cash_settlement_kind(flow.kind))
+            .filter(|flow| flow.date > origin && flow.kind.is_cash_settlement())
             .map(|flow| flow.date)
             .max()
         {

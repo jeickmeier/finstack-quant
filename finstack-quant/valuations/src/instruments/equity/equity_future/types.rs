@@ -439,7 +439,7 @@ impl crate::instruments::Instrument for EquityFuture {
 
 crate::impl_empty_cashflow_provider!(
     EquityFuture,
-    crate::cashflow::builder::CashflowRepresentation::NoResidual
+    finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
 );
 
 #[cfg(test)]

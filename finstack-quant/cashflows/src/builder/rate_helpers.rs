@@ -97,7 +97,7 @@ impl FloatingRateParams {
     ///
     /// # Example
     /// ```rust
-    /// use finstack_quant_cashflows::builder::rate_helpers::FloatingRateParams;
+    /// use finstack_quant_cashflows::builder::FloatingRateParams;
     ///
     /// let params = FloatingRateParams::with_spread(200.0); // 200 bp spread
     /// assert_eq!(params.spread_bp, 200.0);
@@ -270,7 +270,7 @@ impl TryFrom<&crate::builder::specs::FloatingRateSpec> for ResolvedFloatingRateS
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_cashflows::builder::rate_helpers::{calculate_floating_rate, FloatingRateParams};
+/// use finstack_quant_cashflows::builder::{calculate_floating_rate, FloatingRateParams};
 ///
 /// let params = FloatingRateParams::with_spread(200.0); // 200 bp spread
 /// let rate = calculate_floating_rate(0.03, &params); // 3% index + 2% spread = 5%
@@ -338,7 +338,7 @@ pub fn calculate_floating_rate(index_rate: f64, params: &FloatingRateParams) -> 
 ///   seasoned resets from a `MarketContext` `ScalarTimeSeries` with id
 ///   `FIXING:{forward_curve_id}` *before* calling this function, and routes this
 ///   error through the spec's
-///   [`crate::builder::specs::FloatingRateFallback`] policy when no series
+///   [`crate::builder::FloatingRateFallback`] policy when no series
 ///   is provided. A reset exactly on the curve base date (T+0) is projected
 ///   from `t = 0`.
 /// - the accrual window or fraction is invalid, or a required curve-time
@@ -354,7 +354,7 @@ pub fn calculate_floating_rate(index_rate: f64, params: &FloatingRateParams) -> 
 /// ```rust
 /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 /// use finstack_quant_core::market_data::term_structures::ForwardCurve;
-/// use finstack_quant_cashflows::builder::rate_helpers::{project_floating_rate, FloatingRateParams};
+/// use finstack_quant_cashflows::builder::{project_floating_rate, FloatingRateParams};
 /// use time::Month;
 ///
 /// let reset = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");

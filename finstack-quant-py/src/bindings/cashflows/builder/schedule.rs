@@ -1,7 +1,8 @@
-//! Python bindings for `finstack_quant_cashflows::builder::schedule`.
+//! Python bindings for `finstack_quant_cashflows::builder` schedule types.
 
-use finstack_quant_cashflows::builder::schedule::merge_cashflow_schedules;
-use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
+use finstack_quant_cashflows::builder::{
+    merge_cashflow_schedules, CashFlowMeta, CashFlowSchedule, CashflowRepresentation,
+};
 use finstack_quant_cashflows::primitives::CashFlow;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
@@ -15,6 +16,7 @@ use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::wire_methods;
 use crate::errors::core_to_py;
 
 use super::orchestrator::PyCashFlowBuilder;
@@ -143,39 +145,13 @@ impl PyCashFlowMeta {
             .collect()
     }
 
-    /// Serialize to canonical JSON.
-    #[allow(clippy::wrong_self_convention)]
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "failed to serialize CashFlowMeta"))
-    }
-
-    /// Deserialize from canonical JSON (strict field names).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed or carries unknown fields.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str::<CashFlowMeta>(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid CashFlowMeta JSON"))
-    }
-
-    /// Support ``pickle`` through the JSON wire form.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Python-style field summary.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CashFlowMeta", &self.inner)
     }
 }
+
+wire_methods!(PyCashFlowMeta, CashFlowMeta, "CashFlowMeta");
 
 /// Canonical, sorted cashflow schedule with notional, day count and metadata.
 ///
@@ -209,17 +185,7 @@ impl PyCashFlowSchedule {
     }
 }
 
-/// Extract a `CashFlowSchedule` from a wrapper or its JSON string.
-pub(crate) fn extract_schedule(obj: &Bound<'_, PyAny>) -> PyResult<CashFlowSchedule> {
-    if let Ok(schedule) = obj.extract::<PyRef<'_, PyCashFlowSchedule>>() {
-        return Ok(schedule.inner.clone());
-    }
-    let json: String = obj.extract().map_err(|_| {
-        pyo3::exceptions::PyTypeError::new_err("expected CashFlowSchedule or JSON str")
-    })?;
-    serde_json::from_str::<CashFlowSchedule>(&json)
-        .map_err(|e| crate::errors::serde_json_to_py(e, "invalid CashFlowSchedule JSON"))
-}
+wire_methods!(PyCashFlowSchedule, CashFlowSchedule, "CashFlowSchedule");
 
 /// Extract one string column of a DataFrame-like object as Python objects.
 fn frame_column<'py>(
@@ -652,6 +618,10 @@ impl PyCashFlowSchedule {
 
     /// Calendar-year non-principal / principal / PV ladder as a DataFrame.
     ///
+    /// Returns a ``pandas.DataFrame`` view alongside ``to_dataframe()``; use
+    /// ``finstack_quant.cashflows.aggregation.calendar_year_ladder`` for raw
+    /// ``(year, non_principal, principal, pv)`` tuples over parallel arrays.
+    ///
     /// Parameters
     /// ----------
     /// pvs : list[float]
@@ -687,45 +657,6 @@ impl PyCashFlowSchedule {
         )?;
         columns.set_item("pv", rows.iter().map(|r| r.pv).collect::<Vec<_>>())?;
         crate::bindings::pandas_utils::dict_to_dataframe(py, &columns, None)
-    }
-
-    /// Serialize the canonical schedule to JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a flow's effective rate or projected index rate is non-finite,
-    ///     or the schedule cannot be serialized. Invalid rates are never
-    ///     encoded as absent.
-    #[allow(clippy::wrong_self_convention)]
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "failed to serialize CashFlowSchedule"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a schedule from canonical JSON (strict field names).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed or carries unknown fields.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str::<CashFlowSchedule>(json)
-            .map(Self::from_inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid CashFlowSchedule JSON"))
     }
 
     /// Flows as a pandas DataFrame.

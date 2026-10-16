@@ -1,7 +1,7 @@
 //! Smoke tests for the `finstack_quant_cashflows` bridge re-export.
 
-use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec, ScheduleParams};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec, ScheduleParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;
@@ -44,7 +44,7 @@ fn bridge_builder_schedule_builds() {
             payment_lag_days: 0,
 
             adjust_accrual_dates: false,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     };
 
@@ -77,11 +77,11 @@ fn bridge_period_generation_works() {
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
     };
 
-    let periods = finstack_quant_cashflows::builder::periods::build_periods(
-        finstack_quant_cashflows::builder::periods::BuildPeriodsParams {
+    let periods = finstack_quant_cashflows::builder::build_periods(
+        finstack_quant_cashflows::builder::BuildPeriodsParams {
             start: issue,
             end: maturity,
             frequency: params.frequency,
@@ -93,7 +93,7 @@ fn bridge_period_generation_works() {
             payment_lag_days: params.payment_lag_days,
             reset_lag_days: None,
             adjust_accrual_dates: params.adjust_accrual_dates,
-            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         },
     )
     .expect("bridge date generation should work");

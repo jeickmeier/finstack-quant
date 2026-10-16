@@ -2,10 +2,10 @@
 //! facilities: the origination effective rate including the upfront fee and,
 //! by default, every running fee.
 
-use crate::cashflow::traits::CashflowScheduleSource;
 use crate::instruments::fixed_income::loan_quotes::oid_eir_schedule_from_flows;
 use crate::instruments::RevolvingCredit;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_cashflows::CashflowScheduleSource;
 
 /// Computes the EIR amortization series from the origination date and
 /// returns the total amortization; stores `oid_eir_rate` and the dated

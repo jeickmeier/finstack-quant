@@ -870,7 +870,7 @@ impl crate::instruments::common_impl::traits::Instrument for EquityOption {
 
 crate::impl_empty_cashflow_provider!(
     EquityOption,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
 
 #[cfg(test)]

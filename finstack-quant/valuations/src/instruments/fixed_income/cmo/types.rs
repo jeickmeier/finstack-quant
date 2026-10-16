@@ -705,14 +705,15 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AgencyCmo {
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let _ = curves;
         let schedule =
             crate::instruments::fixed_income::cmo::pricer::build_reference_tranche_schedule(
                 self, as_of, None,
             )?;
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 

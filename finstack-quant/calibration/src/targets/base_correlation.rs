@@ -12,7 +12,7 @@ use crate::solver::bootstrap::SequentialBootstrapper;
 use crate::solver::traits::BootstrapTarget;
 use crate::targets::util::ContextScratch;
 use crate::CalibrationReport;
-use finstack_quant_cashflows::builder::specs::RollRule;
+use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;

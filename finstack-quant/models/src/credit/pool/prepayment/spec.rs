@@ -7,7 +7,7 @@ use super::super::clamped_cpr_to_smm;
 use super::{
     FactorCorrelatedPrepay, RegimeSwitchingPrepay, RichardRollPrepay, StochasticPrepayment,
 };
-use finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;
+use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
 /// Stochastic prepayment model specification.
 ///

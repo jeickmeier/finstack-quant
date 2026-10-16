@@ -21,7 +21,7 @@ use super::compiler::{
     build_fee_schedules, compute_coupon_schedules, CompiledSchedules, CouponProgramPiece,
     FixedSchedule, FloatSchedule, PaymentProgramPiece, PeriodicFee,
 };
-use super::pipeline::{BuildContext, DateProcessor};
+use super::emission::ResolvedFloatMarket;
 use super::specs::FeeSpec;
 use smallvec::SmallVec;
 use tracing::debug;
@@ -62,17 +62,17 @@ pub(super) struct BuildState {
 /// change the balance at the contractual accrual boundary, independently of
 /// adjusted cash payment dates. Term-index reset dates remain contractual.
 #[derive(Debug, Clone)]
-pub struct PrincipalEvent {
+pub(super) struct PrincipalEvent {
     /// Economic date on which outstanding principal changes.
-    pub date: Date,
+    pub(super) date: Date,
     /// Cash settlement date, independent of the economic balance date.
-    pub payment_date: Date,
+    pub(super) payment_date: Date,
     /// Outstanding delta (positive = increases balance, negative = repays)
-    pub delta: Money,
+    pub(super) delta: Money,
     /// Cash leg paid/received (may differ from delta for OID/fees)
-    pub cash: Money,
+    pub(super) cash: Money,
     /// Classification for emitted cashflow
-    pub kind: CFKind,
+    pub(super) kind: CFKind,
 }
 
 #[derive(Debug, Clone)]
@@ -530,20 +530,20 @@ impl Default for CashFlowBuilder {
 }
 
 #[derive(Clone)]
-struct CompiledCashFlowPlan {
-    notional: Notional,
-    issue: Date,
-    maturity: Date,
-    fixed_schedules: Vec<FixedSchedule>,
-    float_schedules: Vec<FloatSchedule>,
-    periodic_fees: Vec<PeriodicFee>,
-    fixed_fees: Vec<(Date, Money)>,
-    principal_events: Vec<PrincipalEvent>,
-    dates: Vec<Date>,
-    amort_setup: AmortizationSetup,
-    redemption_date: Date,
-    redemption_effective_date: Date,
-    principal_exchange: PrincipalExchange,
+pub(super) struct CompiledCashFlowPlan {
+    pub(super) notional: Notional,
+    pub(super) issue: Date,
+    pub(super) maturity: Date,
+    pub(super) fixed_schedules: Vec<FixedSchedule>,
+    pub(super) float_schedules: Vec<FloatSchedule>,
+    pub(super) periodic_fees: Vec<PeriodicFee>,
+    pub(super) fixed_fees: Vec<(Date, Money)>,
+    pub(super) principal_events: Vec<PrincipalEvent>,
+    pub(super) dates: Vec<Date>,
+    pub(super) amort_setup: AmortizationSetup,
+    pub(super) redemption_date: Date,
+    pub(super) redemption_effective_date: Date,
+    pub(super) principal_exchange: PrincipalExchange,
 }
 
 impl CashFlowBuilder {
@@ -563,8 +563,8 @@ impl CashFlowBuilder {
     /// # Conventions
     ///
     /// - **Interest base:** coupons accrue on each constant-balance interval;
-    ///   principal events change interest from their economic effective date
-    ///   (see [`PrincipalEvent`]'s interest-base convention).
+    ///   principal events change interest from their economic effective date,
+    ///   independently of adjusted cash payment dates.
     /// - **Redemption conventions:** business-day adjustment and payment lag
     ///   follow the coupon window ending at maturity. Principal events must
     ///   occur on or before its effective terminal accrual boundary; when
@@ -773,7 +773,6 @@ impl CompiledCashFlowPlan {
             &self.principal_events,
             self.principal_exchange,
         )?;
-        let ccy = self.notional.initial.currency();
         // Pre- and at-issue fees emit here; the date loop only covers dates after issue.
         for (fee_date, amount) in &self.fixed_fees {
             if *fee_date <= self.issue && amount.amount() != 0.0 {
@@ -787,19 +786,6 @@ impl CompiledCashFlowPlan {
                 ));
             }
         }
-        let ctx = BuildContext {
-            ccy,
-            observation_date,
-            issue: self.issue,
-            redemption_date: self.redemption_date,
-            redemption_effective_date: self.redemption_effective_date,
-            principal_exchange: self.principal_exchange,
-            fixed_schedules: &self.fixed_schedules,
-            float_schedules: &self.float_schedules,
-            periodic_fees: &self.periodic_fees,
-            fixed_fees: &self.fixed_fees,
-            principal_events: &self.principal_events,
-        };
 
         let (resolved_curves, resolved_fixings): (
             Vec<Option<Arc<ForwardCurve>>>,
@@ -855,11 +841,17 @@ impl CompiledCashFlowPlan {
             }
         }
 
-        let processor =
-            DateProcessor::new(&ctx, &self.amort_setup, &resolved_curves, &resolved_fixings);
-        processor.process_issue_amortization(&mut state)?;
+        self.process_issue_amortization(&mut state)?;
         for &d in self.dates.iter().filter(|&&d| d > self.issue) {
-            state = processor.process(d, state)?;
+            self.process_date(
+                d,
+                &mut state,
+                ResolvedFloatMarket {
+                    curves: &resolved_curves,
+                    observation_date,
+                    fixings: &resolved_fixings,
+                },
+            )?;
         }
 
         let threshold = Decimal::new(1, 4); // 1e-4 = 1 bp relative

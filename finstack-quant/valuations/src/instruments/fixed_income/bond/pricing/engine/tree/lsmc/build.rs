@@ -382,7 +382,7 @@ pub(super) fn make_whole_value(
     let mut value = 0.0;
     for flow in flows
         .iter()
-        .filter(|flow| flow.date > exercise_date && is_cash_settlement_kind(flow.kind))
+        .filter(|flow| flow.date > exercise_date && flow.kind.is_cash_settlement())
     {
         let tau = reference.day_count().year_fraction(
             exercise_date,

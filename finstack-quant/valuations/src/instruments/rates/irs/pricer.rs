@@ -124,8 +124,8 @@ impl InterestRateSwap {
             if flow.date > as_of
                 && matches!(
                     flow.kind,
-                    crate::cashflow::primitives::CFKind::Fixed
-                        | crate::cashflow::primitives::CFKind::Stub
+                    finstack_quant_cashflows::primitives::CFKind::Fixed
+                        | finstack_quant_cashflows::primitives::CFKind::Stub
                 )
             {
                 let discount = relative_df_discount_curve(disc, as_of, flow.date)?;

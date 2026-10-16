@@ -31,8 +31,8 @@ use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
-use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::common_impl::pricing::time::z_spread_discount_factor;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
 
 /// Absolute sanity bound on a solved discount margin, decimal (±5000 bp).
 /// Distressed loans legitimately solve well above 2000 bp; the bound only

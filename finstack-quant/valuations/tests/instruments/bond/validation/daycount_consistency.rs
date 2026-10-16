@@ -8,8 +8,8 @@
 //!
 //! **Market Standards Review (Week 3 Edge Cases)**
 
-use finstack_quant_cashflows::builder::specs::FixedCouponSpec;
 use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::FixedCouponSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -66,7 +66,7 @@ fn create_bond_with_daycount(
                 payment_lag_days: 0,
 
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }))
         .discount_curve_id("USD-OIS".into())

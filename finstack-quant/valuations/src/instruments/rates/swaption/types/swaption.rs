@@ -670,9 +670,9 @@ impl Swaption {
     /// Accrual periods of the underlying fixed leg.
     fn fixed_schedule_periods(
         &self,
-    ) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+    ) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
         let fixed = &self.underlying_fixed_leg;
-        crate::cashflow::builder::periods::build_periods(fixed.schedule_params(false))
+        finstack_quant_cashflows::builder::build_periods(fixed.schedule_params(false))
     }
 
     /// Cash settlement annuity using the par-yield method.
@@ -819,8 +819,8 @@ impl Swaption {
         as_of: Date,
         fixed_annuity: f64,
     ) -> Result<f64> {
-        use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
         use crate::instruments::common_impl::numeric::decimal_to_f64;
+        use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 
         let float = &self.underlying_float_leg;
         let periods = build_periods(BuildPeriodsParams {
@@ -832,13 +832,13 @@ impl Swaption {
             calendar_id: float
                 .calendar_id
                 .as_deref()
-                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
             end_of_month: float.end_of_month,
             day_count: float.day_count,
             payment_lag_days: float.payment_lag_days,
             reset_lag_days: Some(float.reset_lag_days),
             adjust_accrual_dates: false,
-            roll_rule: crate::cashflow::builder::specs::RollRule::None,
+            roll_rule: finstack_quant_cashflows::builder::RollRule::None,
         })?;
         let spread = decimal_to_f64(float.spread_bp, "swaption underlier spread_bp")? / 10_000.0;
         let (float_pv, _) = single_curve_float_leg_pv(disc, as_of, &periods, spread)?;
@@ -988,7 +988,7 @@ impl Swaption {
 fn single_curve_float_leg_pv(
     disc: &dyn Discounting,
     as_of: Date,
-    periods: &[crate::cashflow::builder::periods::SchedulePeriod],
+    periods: &[finstack_quant_cashflows::builder::SchedulePeriod],
     spread: f64,
 ) -> Result<(f64, f64)> {
     use crate::instruments::common_impl::pricing::time::relative_df_discounting;
@@ -1098,5 +1098,5 @@ impl crate::instruments::common_impl::traits::Instrument for Swaption {
 // Declare canonical market dependencies for the DV01 calculator.
 crate::impl_empty_cashflow_provider!(
     Swaption,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );

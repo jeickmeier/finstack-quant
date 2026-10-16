@@ -740,7 +740,7 @@ impl crate::instruments::common_impl::traits::Instrument for CdsOption {
 // Declare canonical market dependencies for the DV01 calculator.
 crate::impl_empty_cashflow_provider!(
     CdsOption,
-    crate::cashflow::builder::CashflowRepresentation::Placeholder
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
 
 #[cfg(test)]

@@ -374,7 +374,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
         &self,
         _curves: &MarketContext,
         _as_of: Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         // Validate deposit parameters before building schedule
         // (includes effective date ordering check)
         self.validate()?;
@@ -400,50 +400,51 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
         let redemption = self.notional.checked_mul_f64(1.0 + r * yf)?;
         let interest = redemption.checked_sub(self.notional)?;
         let flows = vec![
-            crate::cashflow::primitives::CashFlow::new(
+            finstack_quant_cashflows::primitives::CashFlow::new(
                 effective_start,
                 None,
                 self.notional.checked_neg(),
-                crate::cashflow::primitives::CFKind::Notional,
+                finstack_quant_cashflows::primitives::CFKind::Notional,
                 0.0,
                 None,
             ),
-            crate::cashflow::primitives::CashFlow::new(
+            finstack_quant_cashflows::primitives::CashFlow::new(
                 effective_end,
                 None,
                 self.notional,
-                crate::cashflow::primitives::CFKind::Notional,
+                finstack_quant_cashflows::primitives::CFKind::Notional,
                 0.0,
                 None,
             ),
-            crate::cashflow::primitives::CashFlow::new(
+            finstack_quant_cashflows::primitives::CashFlow::new(
                 effective_end,
                 None,
                 interest,
-                crate::cashflow::primitives::CFKind::Fixed,
+                finstack_quant_cashflows::primitives::CFKind::Fixed,
                 yf,
                 Some(r),
             ),
         ];
 
-        let schedule = crate::cashflow::traits::schedule_from_classified_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             self.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
+            finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: self.notional()?,
                 ..Default::default()
             },
         );
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Contractual))
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Contractual,
+        ))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::traits::CashflowProvider;
     use crate::instruments::common_impl::traits::Attributes;
+    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::currency::Currency;
     use time::macros::date;

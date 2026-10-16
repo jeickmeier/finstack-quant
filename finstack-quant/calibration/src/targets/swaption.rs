@@ -786,9 +786,9 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
         start: finstack_quant_core::dates::Date,
         end: finstack_quant_core::dates::Date,
         leg_conv: &SwaptionLegConventions<'_>,
-    ) -> Result<Vec<finstack_quant_cashflows::builder::periods::SchedulePeriod>> {
-        finstack_quant_cashflows::builder::periods::build_periods(
-            finstack_quant_cashflows::builder::periods::BuildPeriodsParams {
+    ) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
+        finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start,
                 end,
                 frequency: leg_conv.float_frequency,
@@ -800,7 +800,7 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
                 payment_lag_days: leg_conv.float_payment_lag_days,
                 reset_lag_days: Some(leg_conv.float_reset_lag_days),
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )
     }
@@ -809,9 +809,9 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
         start: finstack_quant_core::dates::Date,
         end: finstack_quant_core::dates::Date,
         leg_conv: &SwaptionLegConventions<'_>,
-    ) -> Result<Vec<finstack_quant_cashflows::builder::periods::SchedulePeriod>> {
-        finstack_quant_cashflows::builder::periods::build_periods(
-            finstack_quant_cashflows::builder::periods::BuildPeriodsParams {
+    ) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
+        finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start,
                 end,
                 frequency: leg_conv.fixed_frequency,
@@ -823,7 +823,7 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
                 payment_lag_days: leg_conv.fixed_payment_lag_days,
                 reset_lag_days: None,
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )
     }
@@ -1763,8 +1763,8 @@ mod tests {
         let pv01 =
             SwaptionVolTarget::calculate_pv01_proper(swap_start, swap_end, &leg, disc.as_ref())
                 .expect("pv01");
-        let schedule = finstack_quant_cashflows::builder::periods::build_periods(
-            finstack_quant_cashflows::builder::periods::BuildPeriodsParams {
+        let schedule = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start: swap_start,
                 end: swap_end,
                 frequency: leg.float_frequency,
@@ -1776,7 +1776,7 @@ mod tests {
                 payment_lag_days: leg.float_payment_lag_days,
                 reset_lag_days: Some(leg.float_reset_lag_days),
                 adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )
         .expect("floating schedule");
