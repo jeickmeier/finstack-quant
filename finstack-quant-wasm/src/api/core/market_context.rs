@@ -8,7 +8,8 @@ use crate::api::core::currency::JsCurrency;
 use crate::api::core::market_curves::{
     JsBaseCorrelationCurve, JsCreditIndexData, JsInflationCurve, JsPriceCurve,
 };
-use crate::api::core::market_data::{JsDiscountCurve, JsForwardCurve, JsFxMatrix, JsHazardCurve};
+use crate::api::core::market_data::{JsDiscountCurve, JsForwardCurve, JsHazardCurve};
+use crate::api::core::market_fx::JsFxMatrix;
 use crate::api::core::market_scalars::{JsInflationIndex, JsScalarTimeSeries};
 use crate::api::core::money::JsMoney;
 use crate::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube, JsVolSurface};

@@ -10,6 +10,7 @@ pub mod imm;
 pub mod market_context;
 pub mod market_curves;
 pub mod market_data;
+pub mod market_fx;
 pub mod market_scalars;
 pub mod math;
 pub mod money;
