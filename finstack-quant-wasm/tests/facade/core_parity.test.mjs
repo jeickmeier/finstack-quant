@@ -284,11 +284,6 @@ const CASES = {
     core.CreditRating.d().isDefault(),
     core.CreditRating.bbbMinus().toJson(),
   ],
-  identifiers: () => [
-    new core.CurveId('USD-OIS').toJson(),
-    new core.InstrumentId('BOND_A').asStr(),
-    new core.CurveId('').isEmpty(),
-  ],
   attributes: () => ({
     json: JSON.parse(attributes().toJson()),
     matches: [
@@ -605,7 +600,6 @@ test('handles round-trip through their JSON wire form', () => {
     assert.equal(handle.fromJson(JSON.parse(json)).toJson(), json);
   }
   assert.equal(core.CreditRating.fromJson(core.CreditRating.bbbMinus().toJson()).name, 'BBB-');
-  assert.equal(core.CurveId.fromJson(new core.CurveId('USD-OIS').toJson()).toString(), 'USD-OIS');
 });
 
 test('ScheduleBuilder setters update the builder in place and round-trip its spec', () => {

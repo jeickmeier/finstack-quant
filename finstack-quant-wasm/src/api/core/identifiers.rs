@@ -3,7 +3,7 @@
 
 use crate::utils::input::{from_js_json, js_string};
 use crate::utils::to_js_err;
-use finstack_quant_core::types::{Attributes, CreditRating, CurveId, InstrumentId};
+use finstack_quant_core::types::{Attributes, CreditRating};
 use wasm_bindgen::prelude::*;
 
 /// Agency credit rating on the 23-step S&P/Fitch scale (`AAA` … `D`, plus `NR`).
@@ -326,117 +326,6 @@ impl JsCreditRating {
         self.inner.to_string()
     }
 }
-
-macro_rules! define_js_id_wrapper {
-    ($(#[$meta:meta])* $wrapper:ident, $js_name:ident, $inner:ty) => {
-        $(#[$meta])*
-        #[wasm_bindgen(js_name = $js_name)]
-        #[derive(Clone, Debug)]
-        pub struct $wrapper {
-            pub(crate) inner: $inner,
-        }
-
-        #[wasm_bindgen(js_class = $js_name)]
-        impl $wrapper {
-            /// Wrap identifier text; the text is stored unchanged.
-            ///
-            /// # Arguments
-            ///
-            /// * `value` - Identifier text; it is not trimmed or case-folded.
-            ///
-            /// @returns The identifier wrapper.
-            /// @throws `TypeError` (kind `invalid_type`) if `value` is not a string.
-            #[wasm_bindgen(constructor)]
-            pub fn new(value: JsValue) -> Result<$wrapper, JsValue> {
-                Ok(Self {
-                    inner: <$inner>::new(js_string(&value, "value")?),
-                })
-            }
-
-            /// The identifier text.
-            ///
-            /// @returns The text passed at construction.
-            #[wasm_bindgen(js_name = asStr)]
-            pub fn as_str(&self) -> String {
-                self.inner.as_str().to_string()
-            }
-
-            /// Whether the identifier text is empty.
-            ///
-            /// @returns `true` for the empty string.
-            #[wasm_bindgen(js_name = isEmpty)]
-            pub fn is_empty(&self) -> bool {
-                self.inner.is_empty()
-            }
-
-            /// Serialize to the canonical JSON wire form (a quoted string).
-            ///
-            /// @returns JSON text holding the quoted identifier.
-            /// @throws If serialization fails (not expected).
-            #[wasm_bindgen(js_name = toJson)]
-            pub fn to_json(&self) -> Result<String, JsValue> {
-                serde_json::to_string(&self.inner).map_err(to_js_err)
-            }
-
-            /// Deserialize from the canonical JSON wire form produced by `toJson`.
-            ///
-            /// # Arguments
-            ///
-            /// * `json` - JSON text holding the quoted identifier.
-            ///
-            /// @returns The parsed identifier wrapper.
-            /// @throws `TypeError` if `json` is not a string; `FinstackError` (kind
-            /// `validation`) if it is not a JSON string.
-            #[wasm_bindgen(js_name = fromJson)]
-            pub fn from_json(json: JsValue) -> Result<$wrapper, JsValue> {
-                serde_json::from_str(&js_string(&json, "json")?)
-                    .map(|inner| Self { inner })
-                    .map_err(to_js_err)
-            }
-
-            /// The identifier text (same as `asStr`).
-            ///
-            /// @returns The text passed at construction.
-            #[wasm_bindgen(js_name = toString)]
-            #[allow(clippy::inherent_to_string)]
-            pub fn to_string(&self) -> String {
-                self.inner.as_str().to_string()
-            }
-        }
-    };
-}
-
-define_js_id_wrapper!(
-    /// Typed identifier of a market curve, such as `"USD-OIS"`.
-    ///
-    /// @example
-    /// ```typescript
-    /// import init, { core } from "finstack-quant-wasm";
-    /// await init();
-    /// const id = new core.CurveId("USD-OIS");
-    /// id.asStr(); // "USD-OIS"
-    /// core.CurveId.fromJson(id.toJson()).isEmpty(); // false
-    /// ```
-    JsCurveId,
-    CurveId,
-    CurveId
-);
-
-define_js_id_wrapper!(
-    /// Typed identifier of an instrument, such as `"BOND_A"`.
-    ///
-    /// @example
-    /// ```typescript
-    /// import init, { core } from "finstack-quant-wasm";
-    /// await init();
-    /// const id = new core.InstrumentId("BOND_A");
-    /// id.asStr(); // "BOND_A"
-    /// core.InstrumentId.fromJson(id.toJson()).isEmpty(); // false
-    /// ```
-    JsInstrumentId,
-    InstrumentId,
-    InstrumentId
-);
 
 /// Tags and key/value metadata attached to an instrument or position, used
 /// by scenario and reporting selectors.

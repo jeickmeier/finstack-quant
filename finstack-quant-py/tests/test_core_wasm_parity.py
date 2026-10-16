@@ -291,11 +291,6 @@ CASES: dict[str, Callable[[], Any]] = {
         types.CreditRating.D.is_default(),
         types.CreditRating.BBB_MINUS.to_json(),
     ],
-    "identifiers": lambda: [
-        types.CurveId("USD-OIS").to_json(),
-        types.InstrumentId("BOND_A").as_str(),
-        types.CurveId("").is_empty(),
-    ],
     "attributes": lambda: {
         "json": json.loads(_attributes().to_json()),
         "matches": [_attributes().matches_selector("tag:energy"), _attributes().matches_selector("meta:sector=tech")],

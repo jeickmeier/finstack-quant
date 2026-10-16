@@ -237,11 +237,6 @@
     "is_holiday": true,
     "metadata_id": "nyse"
   },
-  "identifiers": [
-    "\"USD-OIS\"",
-    "BOND_A",
-    true
-  ],
   "imm_option_expiry": "2025-03-14",
   "inflation_curve": {
     "base_cpi": 300.0,

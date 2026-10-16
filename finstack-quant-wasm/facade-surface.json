@@ -767,7 +767,6 @@
       "CreditIndexData",
       "CreditRating",
       "Currency",
-      "CurveId",
       "DayCount",
       "DayCountContext",
       "DiscountCurve",
@@ -784,7 +783,6 @@
       "HolidayCalendar",
       "InflationCurve",
       "InflationIndex",
-      "InstrumentId",
       "MarketContext",
       "Money",
       "PeriodId",
@@ -1123,18 +1121,6 @@
       "toString"
     ],
     "getters": ["name"]
-  },
-  "core.CurveId": {
-    "kind": "class",
-    "statics": ["fromJson"],
-    "methods": ["asStr", "free", "isEmpty", "toJson", "toString"],
-    "getters": []
-  },
-  "core.InstrumentId": {
-    "kind": "class",
-    "statics": ["fromJson"],
-    "methods": ["asStr", "free", "isEmpty", "toJson", "toString"],
-    "getters": []
   },
   "core.Attributes": {
     "kind": "class",

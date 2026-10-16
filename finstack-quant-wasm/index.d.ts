@@ -6361,147 +6361,6 @@ export interface CreditRatingConstructor {
   nr(): CreditRating;
 }
 
-/**
- * Typed identifier of a market curve, such as `"USD-OIS"`.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * const id = new core.CurveId("USD-OIS");
- * id.asStr(); // "USD-OIS"
- * core.CurveId.fromJson(id.toJson()).isEmpty(); // false
- * ```
- */
-export interface CurveId extends WasmOwned {
-  /**
-   * The identifier text.
-   *
-   * @returns The text passed at construction.
-   */
-  asStr(): string;
-  /**
-   * Whether the identifier text is empty.
-   *
-   * @returns `true` for the empty string.
-   */
-  isEmpty(): boolean;
-  /**
-   * Serialize to the canonical JSON wire form (a quoted string).
-   *
-   * @returns JSON text holding the quoted identifier.
-   * @throws If serialization fails (not expected).
-   */
-  toJson(): string;
-  /**
-   * The identifier text (same as `asStr`).
-   *
-   * @returns The text passed at construction.
-   */
-  toString(): string;
-}
-
-/**
- * Typed identifier of a market curve, such as `"USD-OIS"`.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * const id = new core.CurveId("USD-OIS");
- * id.asStr(); // "USD-OIS"
- * core.CurveId.fromJson(id.toJson()).isEmpty(); // false
- * ```
- */
-export interface CurveIdConstructor {
-  /**
-   * Wrap identifier text; the text is stored unchanged.
-   *
-   * @param value - Identifier text; it is not trimmed or case-folded.
-   * @returns The identifier wrapper.
-   * @throws `TypeError` (kind `invalid_type`) if `value` is not a string.
-   */
-  new (value: string): CurveId;
-  /**
-   * Deserialize from the canonical JSON wire form produced by `toJson`.
-   *
-   * @param json - JSON text holding the quoted identifier.
-   * @returns The parsed identifier wrapper.
-   * @throws `TypeError` if `json` is not a string; `FinstackError` (kind `validation`) if it is not a JSON string.
-   */
-  fromJson(json: string): CurveId;
-}
-
-/**
- * Typed identifier of an instrument, such as `"BOND_A"`.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * const id = new core.InstrumentId("BOND_A");
- * id.asStr(); // "BOND_A"
- * core.InstrumentId.fromJson(id.toJson()).isEmpty(); // false
- * ```
- */
-export interface InstrumentId extends WasmOwned {
-  /**
-   * The identifier text.
-   *
-   * @returns The text passed at construction.
-   */
-  asStr(): string;
-  /**
-   * Whether the identifier text is empty.
-   *
-   * @returns `true` for the empty string.
-   */
-  isEmpty(): boolean;
-  /**
-   * Serialize to the canonical JSON wire form (a quoted string).
-   *
-   * @returns JSON text holding the quoted identifier.
-   * @throws If serialization fails (not expected).
-   */
-  toJson(): string;
-  /**
-   * The identifier text (same as `asStr`).
-   *
-   * @returns The text passed at construction.
-   */
-  toString(): string;
-}
-
-/**
- * Typed identifier of an instrument, such as `"BOND_A"`.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * const id = new core.InstrumentId("BOND_A");
- * id.asStr(); // "BOND_A"
- * core.InstrumentId.fromJson(id.toJson()).isEmpty(); // false
- * ```
- */
-export interface InstrumentIdConstructor {
-  /**
-   * Wrap identifier text; the text is stored unchanged.
-   *
-   * @param value - Identifier text; it is not trimmed or case-folded.
-   * @returns The identifier wrapper.
-   * @throws `TypeError` (kind `invalid_type`) if `value` is not a string.
-   */
-  new (value: string): InstrumentId;
-  /**
-   * Deserialize from the canonical JSON wire form produced by `toJson`.
-   *
-   * @param json - JSON text holding the quoted identifier.
-   * @returns The parsed identifier wrapper.
-   * @throws `TypeError` if `json` is not a string; `FinstackError` (kind `validation`) if it is not a JSON string.
-   */
-  fromJson(json: string): InstrumentId;
-}
 
 /**
  * Tags and key/value metadata attached to an instrument or position, used
@@ -8439,14 +8298,6 @@ export interface CoreNamespace {
    * Agency credit rating on the 23-step scale (`new core.CreditRating("BBB-")`).
    */
   CreditRating: CreditRatingConstructor;
-  /**
-   * Typed market-curve identifier constructor (`new core.CurveId("USD-OIS")`).
-   */
-  CurveId: CurveIdConstructor;
-  /**
-   * Typed instrument identifier constructor (`new core.InstrumentId("BOND_A")`).
-   */
-  InstrumentId: InstrumentIdConstructor;
   /**
    * Tags and key/value metadata used by scenario and reporting selectors.
    */
@@ -14929,8 +14780,6 @@ export interface CashflowsNamespace {
    * @throws If `fields` is missing a required field, has an unknown field or a field of the wrong shape (kind `validation`).
    */
   feeSpecPeriodicBp(fields: Record<string, unknown>): generated.cashflows.FeeSpec;
-
-
 
 
 
@@ -28346,7 +28195,6 @@ export interface ModelCreditNamespace {
     currentAssetsToCurrentLiabilities: number
   ): generated.models.ScoringResult;
 }
-
 
 
 /**

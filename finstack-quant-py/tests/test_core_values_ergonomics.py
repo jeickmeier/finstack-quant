@@ -17,7 +17,7 @@ import pytest
 from finstack_quant.core.config import FinstackConfig, RoundingMode, ToleranceConfig
 from finstack_quant.core.money import Money
 from finstack_quant.core.rating_scales import RatingLevel, ScorecardScale, embedded_registry
-from finstack_quant.core.types import Attributes, Bps, CreditRating, CurveId, InstrumentId, Rate
+from finstack_quant.core.types import Attributes, Bps, CreditRating, Rate
 
 
 class TestRateFamily:
@@ -73,14 +73,7 @@ class TestCreditRating:
         assert pickle.loads(pickle.dumps(CreditRating.CCC_MINUS)) == CreditRating.CCC_MINUS  # noqa: S301
 
 
-class TestIdsAndAttributes:
-    def test_ids(self) -> None:
-        assert CurveId("A") < CurveId("B")
-        assert len(InstrumentId("BOND")) == 4
-        assert CurveId("").is_empty()
-        assert CurveId.from_json(CurveId("USD-OIS").to_json()) == CurveId("USD-OIS")
-        assert pickle.loads(pickle.dumps(InstrumentId("X"))) == InstrumentId("X")  # noqa: S301
-
+class TestAttributes:
     def test_attributes_mapping(self) -> None:
         attrs = Attributes()
         attrs.add_tag("energy")

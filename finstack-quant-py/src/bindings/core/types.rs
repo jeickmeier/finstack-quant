@@ -1,7 +1,7 @@
 //! Python bindings for `finstack_quant_core::types`.
 
 use crate::errors::{core_to_py, serde_json_to_py};
-use finstack_quant_core::types::{Attributes, Bps, CreditRating, CurveId, InstrumentId, Rate};
+use finstack_quant_core::types::{Attributes, Bps, CreditRating, Rate};
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyKeyError, PyTypeError};
 use pyo3::prelude::*;
@@ -725,135 +725,6 @@ pub(crate) fn extract_credit_rating(obj: &Bound<'_, PyAny>) -> PyResult<CreditRa
     Err(PyTypeError::new_err("expected CreditRating or rating str"))
 }
 
-macro_rules! define_py_id_wrapper {
-    (
-        $(#[$meta:meta])*
-        $wrapper:ident,
-        $py_name:literal,
-        $inner:ty
-    ) => {
-        $(#[$meta])*
-        #[pyclass(
-            module = "finstack_quant.core.types",
-            name = $py_name,
-            frozen,
-            eq,
-            ord,
-            hash,
-            skip_from_py_object
-        )]
-        #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-        pub struct $wrapper {
-            /// Underlying Rust identifier.
-            pub(crate) inner: $inner,
-        }
-
-        impl $wrapper {
-            /// Build a Python wrapper from a Rust identifier.
-            pub(crate) fn from_inner(inner: $inner) -> Self {
-                Self { inner }
-            }
-        }
-
-        #[pymethods]
-        impl $wrapper {
-            /// Create an identifier from its string value (empty ids are accepted).
-            #[new]
-            #[pyo3(text_signature = "(value)")]
-            fn new(value: &str) -> Self {
-                Self::from_inner(<$inner>::from(value))
-            }
-
-            /// Underlying string value.
-            #[pyo3(text_signature = "(self)")]
-            fn as_str(&self) -> &str {
-                self.inner.as_str()
-            }
-
-            /// ``True`` when the identifier is the empty string.
-            #[pyo3(text_signature = "(self)")]
-            fn is_empty(&self) -> bool {
-                self.inner.is_empty()
-            }
-
-            /// Length of the identifier in bytes (UTF-8).
-            fn __len__(&self) -> usize {
-                self.inner.len()
-            }
-
-            /// Return ``repr(self)``.
-            fn __repr__(&self) -> String {
-                format!("{}({:?})", $py_name, self.inner.as_str())
-            }
-
-            /// Return ``str(self)`` — the underlying identifier string.
-            fn __str__(&self) -> String {
-                self.inner.as_str().to_string()
-            }
-
-            /// Serialize to JSON (a quoted string).
-            fn to_json(&self) -> PyResult<String> {
-                to_json_impl(&self.inner, concat!("invalid ", $py_name))
-            }
-
-            /// Deserialize from JSON (a quoted string).
-            #[staticmethod]
-            #[pyo3(text_signature = "(json)")]
-            fn from_json(json: &str) -> PyResult<Self> {
-                from_json_impl(json, concat!("invalid ", $py_name, " JSON")).map(Self::from_inner)
-            }
-
-            /// Support ``pickle`` via the JSON wire format.
-            fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-                let from_json = py.get_type::<Self>().getattr("from_json")?;
-                crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-            }
-        }
-    };
-}
-
-define_py_id_wrapper!(
-    /// A unique identifier for a market data curve.
-    ///
-    /// Immutable, hashable, ordered string wrapper. Empty identifiers are
-    /// accepted (``is_empty()`` reports them); ordering is lexicographic.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Curve identifier text, stored verbatim.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.core.types import CurveId
-    /// >>> CurveId("USD-OIS").as_str()
-    /// 'USD-OIS'
-    PyCurveId,
-    "CurveId",
-    CurveId
-);
-
-define_py_id_wrapper!(
-    /// A unique identifier for a financial instrument.
-    ///
-    /// Immutable, hashable, ordered string wrapper. Empty identifiers are
-    /// accepted (``is_empty()`` reports them); ordering is lexicographic.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Instrument identifier text, stored verbatim.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.core.types import InstrumentId
-    /// >>> InstrumentId("BOND_A").as_str()
-    /// 'BOND_A'
-    PyInstrumentId,
-    "InstrumentId",
-    InstrumentId
-);
-
 /// User-defined tags and string metadata attached to instruments.
 ///
 /// Tags are a sorted set of labels; ``meta`` is a sorted ``str -> str`` map.
@@ -1017,20 +888,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyRate>()?;
     m.add_class::<PyBps>()?;
     m.add_class::<PyCreditRating>()?;
-    m.add_class::<PyCurveId>()?;
-    m.add_class::<PyInstrumentId>()?;
     m.add_class::<PyAttributes>()?;
-    let all = PyList::new(
-        py,
-        [
-            "Attributes",
-            "Bps",
-            "CreditRating",
-            "CurveId",
-            "InstrumentId",
-            "Rate",
-        ],
-    )?;
+    let all = PyList::new(py, ["Attributes", "Bps", "CreditRating", "Rate"])?;
     m.setattr("__all__", all)?;
 
     crate::bindings::module_utils::attach_submodule(

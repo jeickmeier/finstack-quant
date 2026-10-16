@@ -105,8 +105,6 @@ export const core = {
   Rate: wasm.Rate,
   Bps: wasm.Bps,
   CreditRating: wasm.CreditRating,
-  CurveId: wasm.CurveId,
-  InstrumentId: wasm.InstrumentId,
   Attributes: wasm.Attributes,
   RoundingMode: wasm.RoundingMode,
   FinstackConfig: wasm.FinstackConfig,
