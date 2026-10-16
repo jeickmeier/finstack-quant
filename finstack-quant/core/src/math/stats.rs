@@ -353,29 +353,6 @@ fn default_annualization_factor() -> f64 {
     crate::dates::PeriodKind::Daily.annualization_factor()
 }
 
-impl std::fmt::Display for RealizedVarMethod {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.label())
-    }
-}
-
-impl std::str::FromStr for RealizedVarMethod {
-    type Err = crate::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "close_to_close" => Ok(Self::CloseToClose),
-            "parkinson" => Ok(Self::Parkinson),
-            "garman_klass" => Ok(Self::GarmanKlass),
-            "rogers_satchell" => Ok(Self::RogersSatchell),
-            "yang_zhang" => Ok(Self::YangZhang),
-            _ => Err(crate::Error::Validation(format!(
-                "unknown realized-variance method {s:?}"
-            ))),
-        }
-    }
-}
-
 /// Calculate log returns from a price series.
 ///
 /// Each element is `ln(p_t / p_{t-1})` when both prices are finite and strictly
@@ -1544,45 +1521,23 @@ mod tests {
     // ── RealizedVarMethod FromStr / Display roundtrip ──
 
     #[test]
-    fn realized_var_method_display_roundtrip() {
+    fn realized_var_method_label_is_the_serde_name() {
         use super::RealizedVarMethod;
 
-        let all = [
+        for method in [
             RealizedVarMethod::CloseToClose,
             RealizedVarMethod::Parkinson,
             RealizedVarMethod::GarmanKlass,
             RealizedVarMethod::RogersSatchell,
             RealizedVarMethod::YangZhang,
-        ];
-
-        for method in &all {
-            let label = method.to_string();
-            assert!(
-                matches!(label.parse::<RealizedVarMethod>(), Ok(value) if value == *method),
-                "roundtrip failed for {label}"
-            );
-        }
-    }
-
-    #[test]
-    fn realized_var_method_from_str_rejects_noncanonical_spellings() {
-        use super::RealizedVarMethod;
-
-        for rejected in [
-            "close",
-            "closetoclose",
-            "garmanklass",
-            "rogerssatchell",
-            "yangzhang",
-            "YangZhang",
         ] {
-            assert!(rejected.parse::<RealizedVarMethod>().is_err());
+            let label = crate::wire::serde_label(&method).expect("label");
+            assert_eq!(label, method.label());
+            let parsed: RealizedVarMethod = crate::wire::serde_parse(&label).expect("parse");
+            assert_eq!(parsed, method);
         }
-    }
-
-    #[test]
-    fn realized_var_method_from_str_unknown() {
-        assert!("garbage".parse::<super::RealizedVarMethod>().is_err());
+        assert!(crate::wire::serde_parse::<RealizedVarMethod>("YangZhang").is_err());
+        assert!(crate::wire::serde_parse::<RealizedVarMethod>("garbage").is_err());
     }
 
     #[test]

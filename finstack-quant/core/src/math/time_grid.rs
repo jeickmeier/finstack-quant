@@ -56,7 +56,6 @@
 
 use crate::dates::{Date, DayCount, DayCountContext};
 use crate::Result;
-use thiserror::Error;
 
 /// Time grid for Monte Carlo simulation.
 ///
@@ -71,15 +70,9 @@ pub struct TimeGrid {
     t_max: f64,
 }
 
-/// Error type for time grid construction and validation
-#[derive(Debug, Clone, PartialEq, Error, serde::Serialize, serde::Deserialize)]
-#[error("Invalid time grid: {0}")]
-pub struct TimeGridError(String);
-
-impl TimeGridError {
-    fn new(message: impl Into<String>) -> Self {
-        Self(message.into())
-    }
+/// Validation error for time-grid construction, keeping the historical prefix.
+fn invalid(message: impl Into<String>) -> crate::Error {
+    crate::Error::Validation(format!("Invalid time grid: {}", message.into()))
 }
 
 impl TimeGrid {
@@ -114,26 +107,25 @@ impl TimeGrid {
             .checked_add(1)
             .filter(|&capacity| capacity <= max_f64_capacity)
             .ok_or_else(|| {
-                TimeGridError::new(format!(
+                invalid(format!(
                     "uniform grid step count {num_steps} exceeds vector capacity"
                 ))
             })?;
         if num_steps > max_f64_capacity {
-            return Err(TimeGridError::new(format!(
+            return Err(invalid(format!(
                 "uniform grid step count {num_steps} exceeds vector capacity"
-            ))
-            .into());
+            )));
         }
 
         let mut times = Vec::new();
         times.try_reserve_exact(times_capacity).map_err(|error| {
-            TimeGridError::new(format!(
+            invalid(format!(
                 "could not reserve {times_capacity} uniform time knots: {error}"
             ))
         })?;
         let mut dts = Vec::new();
         dts.try_reserve_exact(num_steps).map_err(|error| {
-            TimeGridError::new(format!(
+            invalid(format!(
                 "could not reserve {num_steps} uniform time steps: {error}"
             ))
         })?;
@@ -210,10 +202,9 @@ impl TimeGrid {
         // Rust's saturating float-cast behavior turning an oversized request
         // into `usize::MAX`.
         if rounded_steps >= max_f64_capacity as f64 {
-            return Err(TimeGridError::new(format!(
+            return Err(invalid(format!(
                 "uniform_with_required_times step count {rounded_steps} exceeds capacity"
-            ))
-            .into());
+            )));
         }
         let num_steps = (rounded_steps as usize).max(min_steps);
         let capacity = num_steps
@@ -221,11 +212,11 @@ impl TimeGrid {
             .and_then(|value| value.checked_add(1))
             .filter(|&value| value <= max_f64_capacity)
             .ok_or_else(|| {
-                TimeGridError::new("uniform_with_required_times merged grid capacity overflowed")
+                invalid("uniform_with_required_times merged grid capacity overflowed")
             })?;
         let mut times = Vec::new();
         times.try_reserve_exact(capacity).map_err(|error| {
-            TimeGridError::new(format!(
+            invalid(format!(
                 "uniform_with_required_times could not reserve {capacity} knots: {error}"
             ))
         })?;
@@ -304,7 +295,7 @@ impl TimeGrid {
         let dts_capacity = times.len() - 1;
         let mut dts = Vec::new();
         dts.try_reserve_exact(dts_capacity).map_err(|error| {
-            TimeGridError::new(format!(
+            invalid(format!(
                 "could not reserve {dts_capacity} custom time steps: {error}"
             ))
         })?;
@@ -520,8 +511,8 @@ mod tests {
         for num_steps in [usize::MAX, isize::MAX as usize] {
             let result = std::panic::catch_unwind(|| TimeGrid::uniform(1.0, num_steps));
             assert!(
-                matches!(result, Ok(Err(crate::Error::TimeGrid(_)))),
-                "num_steps={num_steps} must return TimeGridError without panicking"
+                matches!(result, Ok(Err(crate::Error::Validation(_)))),
+                "num_steps={num_steps} must return an error without panicking"
             );
         }
     }
