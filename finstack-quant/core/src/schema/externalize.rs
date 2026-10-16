@@ -109,24 +109,53 @@ pub fn externalize_schema_definitions(
     Ok(())
 }
 
-/// Rewrite every whole-document `$ref: "#"` to `root_ref`.
-fn rename_root_refs(value: &mut Value, root_ref: &str) {
+/// Visit every JSON object in `value`, children before their parent.
+pub(super) fn for_each_object(value: &Value, visit: &mut impl FnMut(&Map<String, Value>)) {
     match value {
-        Value::Object(map) => {
-            if map.get("$ref").and_then(Value::as_str) == Some("#") {
-                map.insert("$ref".to_string(), Value::String(root_ref.to_string()));
+        Value::Object(object) => {
+            for nested in object.values() {
+                for_each_object(nested, visit);
             }
-            for child in map.values_mut() {
-                rename_root_refs(child, root_ref);
-            }
+            visit(object);
         }
         Value::Array(items) => {
             for item in items {
-                rename_root_refs(item, root_ref);
+                for_each_object(item, visit);
             }
         }
         _ => {}
     }
+}
+
+/// Mutably visit every JSON object in `value`, children before their parent,
+/// so a rewrite of a node sees its already-rewritten children.
+pub(super) fn for_each_object_mut(
+    value: &mut Value,
+    visit: &mut impl FnMut(&mut Map<String, Value>),
+) {
+    match value {
+        Value::Object(object) => {
+            for nested in object.values_mut() {
+                for_each_object_mut(nested, visit);
+            }
+            visit(object);
+        }
+        Value::Array(items) => {
+            for item in items {
+                for_each_object_mut(item, visit);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Rewrite every whole-document `$ref: "#"` to `root_ref`.
+fn rename_root_refs(value: &mut Value, root_ref: &str) {
+    for_each_object_mut(value, &mut |map| {
+        if map.get("$ref").and_then(Value::as_str) == Some("#") {
+            map.insert("$ref".to_string(), Value::String(root_ref.to_string()));
+        }
+    });
 }
 
 pub(super) fn validation_view(
@@ -138,20 +167,9 @@ pub(super) fn validation_view(
         Value::Object(map) => {
             let mut assertions = Map::new();
             for (key, child) in map {
-                if matches!(
-                    key.as_str(),
-                    "$schema"
-                        | "$id"
-                        | "$defs"
-                        | "$comment"
-                        | "title"
-                        | "description"
-                        | "default"
-                        | "deprecated"
-                        | "examples"
-                        | "readOnly"
-                        | "writeOnly"
-                ) {
+                if matches!(key.as_str(), "$schema" | "$id" | "$defs")
+                    || ANNOTATION_KEYWORDS.contains(&key.as_str())
+                {
                     continue;
                 }
                 assertions.insert(key.clone(), child.clone());
@@ -219,32 +237,21 @@ pub(super) fn validation_view(
 }
 
 pub(super) fn externalize_refs(value: &mut Value, external_refs: &BTreeMap<String, String>) {
-    match value {
-        Value::Object(map) => {
-            let replacement = map
-                .get("$ref")
-                .and_then(Value::as_str)
-                .and_then(local_definition_ref)
-                .and_then(|(name, suffix)| {
-                    external_refs.get(&name).map(|reference| match suffix {
-                        Some(suffix) => format!("{reference}#/{suffix}"),
-                        None => reference.clone(),
-                    })
-                });
-            if let Some(reference) = replacement {
-                map.insert("$ref".to_string(), Value::String(reference));
-            }
-            for child in map.values_mut() {
-                externalize_refs(child, external_refs);
-            }
+    for_each_object_mut(value, &mut |map| {
+        let replacement = map
+            .get("$ref")
+            .and_then(Value::as_str)
+            .and_then(local_definition_ref)
+            .and_then(|(name, suffix)| {
+                external_refs.get(&name).map(|reference| match suffix {
+                    Some(suffix) => format!("{reference}#/{suffix}"),
+                    None => reference.clone(),
+                })
+            });
+        if let Some(reference) = replacement {
+            map.insert("$ref".to_string(), Value::String(reference));
         }
-        Value::Array(items) => {
-            for item in items {
-                externalize_refs(item, external_refs);
-            }
-        }
-        _ => {}
-    }
+    });
 }
 
 pub(super) fn local_definition_ref(reference: &str) -> Option<(String, Option<&str>)> {
@@ -260,27 +267,16 @@ pub(super) fn local_definition_ref(reference: &str) -> Option<(String, Option<&s
 }
 
 pub(super) fn collect_local_def_refs(value: &Value, refs: &mut BTreeSet<String>) {
-    match value {
-        Value::Object(map) => {
-            if let Some(name) = map
-                .get("$ref")
-                .and_then(Value::as_str)
-                .and_then(local_definition_ref)
-                .map(|(name, _)| name)
-            {
-                refs.insert(name);
-            }
-            for child in map.values() {
-                collect_local_def_refs(child, refs);
-            }
+    for_each_object(value, &mut |map| {
+        if let Some(name) = map
+            .get("$ref")
+            .and_then(Value::as_str)
+            .and_then(local_definition_ref)
+            .map(|(name, _)| name)
+        {
+            refs.insert(name);
         }
-        Value::Array(items) => {
-            for item in items {
-                collect_local_def_refs(item, refs);
-            }
-        }
-        _ => {}
-    }
+    });
 }
 
 pub(super) fn prune_unreachable_defs(value: &mut Value) {

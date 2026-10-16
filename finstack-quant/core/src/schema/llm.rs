@@ -172,47 +172,55 @@ pub(super) fn definition_name_for(id: &str) -> String {
 
 /// Collect every absolute `$ref` target in a document.
 pub(super) fn collect_external_refs(node: &Value, found: &mut BTreeSet<String>) {
-    match node {
-        Value::Object(object) => {
-            if let Some(Value::String(target)) = object.get("$ref") {
-                if !target.starts_with('#') {
-                    found.insert(target.clone());
-                }
-            }
-            for nested in object.values() {
-                collect_external_refs(nested, found);
+    for_each_object(node, &mut |object| {
+        if let Some(Value::String(target)) = object.get("$ref") {
+            if !target.starts_with('#') {
+                found.insert(target.clone());
             }
         }
-        Value::Array(items) => {
-            for item in items {
-                collect_external_refs(item, found);
-            }
-        }
-        _ => {}
-    }
+    });
 }
 
 /// Rewrite absolute `$ref`s to local ones, given the id-to-name mapping.
 pub(super) fn rewrite_refs(node: &mut Value, names: &BTreeMap<String, String>) {
-    match node {
-        Value::Object(object) => {
-            if let Some(Value::String(target)) = object.get("$ref") {
-                if let Some(name) = names.get(target) {
-                    let local = format!("#/$defs/{name}");
-                    object.insert("$ref".to_string(), Value::String(local));
-                }
-            }
-            for nested in object.values_mut() {
-                rewrite_refs(nested, names);
+    for_each_object_mut(node, &mut |object| {
+        if let Some(Value::String(target)) = object.get("$ref") {
+            if let Some(name) = names.get(target) {
+                let local = format!("#/$defs/{name}");
+                object.insert("$ref".to_string(), Value::String(local));
             }
         }
-        Value::Array(items) => {
-            for item in items {
-                rewrite_refs(item, names);
-            }
-        }
-        _ => {}
+    });
+}
+
+/// A permissive stand-in for a definition too large to inline: the body's
+/// own top-level `type` (open to any contents when that is `object`) and a
+/// `description` telling the reader where the real contract lives.
+fn handle_for(body: &Value, description: String) -> Map<String, Value> {
+    let mut handle = Map::new();
+    if let Some(kind) = body.get("type").cloned() {
+        handle.insert("type".to_string(), kind);
     }
+    if handle.get("type").is_some_and(|kind| kind == "object") {
+        handle.insert("additionalProperties".to_string(), Value::Bool(true));
+    }
+    handle.insert("description".to_string(), Value::String(description));
+    handle
+}
+
+/// Append `note` to the object's `description`, separated by a blank line.
+fn append_description_note(object: &mut Map<String, Value>, note: &str) {
+    let existing = object
+        .get("description")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
+    let combined = if existing.is_empty() {
+        note.to_string()
+    } else {
+        format!("{existing}\n\n{note}")
+    };
+    object.insert("description".to_string(), Value::String(combined));
 }
 
 /// Pull every resolvable external reference into local `$defs`.
@@ -248,20 +256,9 @@ pub(super) fn inline_external_references(
                 .get("description")
                 .and_then(Value::as_str)
                 .map(str::to_string);
-            let mut handle = Map::new();
-            // Keep the target's own top-level type. Forcing a string here would
-            // be wrong wherever the reference stands for an object, so the
-            // handle stays shape-correct and merely permissive about contents.
-            if let Some(kind) = document.get("type").cloned() {
-                handle.insert("type".to_string(), kind);
-            }
-            if handle.get("type").is_some_and(|kind| kind == "object") {
-                handle.insert("additionalProperties".to_string(), Value::Bool(true));
-            }
-            handle.insert(RESOLVES_FROM_KEYWORD.to_string(), Value::String(id.clone()));
-            handle.insert(
-                "description".to_string(),
-                Value::String(match summary {
+            let mut handle = handle_for(
+                &document,
+                match summary {
                     Some(text) => format!(
                         "{text}\n\nToo large to inline here: build this against `{id}` and \
                          validate it separately."
@@ -269,8 +266,9 @@ pub(super) fn inline_external_references(
                     None => format!(
                         "Value matching `{id}`; build and validate it against that contract."
                     ),
-                }),
+                },
             );
+            handle.insert(RESOLVES_FROM_KEYWORD.to_string(), Value::String(id.clone()));
             let mut candidate = definition_name_for(&id);
             while bodies.contains_key(&candidate) {
                 candidate.push('_');
@@ -362,19 +360,9 @@ pub(super) fn substitute_oversized_local_definitions(schema: &mut Value, max_inl
             .get("description")
             .and_then(Value::as_str)
             .map(str::to_string);
-        let mut handle = Map::new();
-        // Keep the definition's own top-level type where it declares one, so
-        // the handle stays shape-correct and is merely permissive about
-        // contents.
-        if let Some(kind) = body.get("type").cloned() {
-            handle.insert("type".to_string(), kind);
-        }
-        if handle.get("type").is_some_and(|kind| kind == "object") {
-            handle.insert("additionalProperties".to_string(), Value::Bool(true));
-        }
-        handle.insert(
-            "description".to_string(),
-            Value::String(match summary {
+        let handle = handle_for(
+            body,
+            match summary {
                 Some(text) => format!(
                     "{text}\n\nToo large to inline here: build this sub-document on its own \
                      and validate it against the canonical contract."
@@ -383,7 +371,7 @@ pub(super) fn substitute_oversized_local_definitions(schema: &mut Value, max_inl
                     "A `{name}` value. Too large to inline here: build this sub-document on \
                      its own and validate it against the canonical contract."
                 ),
-            }),
+            },
         );
         defs.insert(name, Value::Object(handle));
     }
@@ -396,83 +384,64 @@ pub(super) fn substitute_oversized_local_definitions(schema: &mut Value, max_inl
 /// is folded into the parent description when it is short enough to be worth
 /// the tokens.
 pub(super) fn flatten_const_unions(node: &mut Value) {
-    match node {
-        Value::Object(object) => {
-            for nested in object.values_mut() {
-                flatten_const_unions(nested);
-            }
+    for_each_object_mut(node, &mut flatten_const_union);
+}
 
-            let Some(branches) = object.get("oneOf").and_then(Value::as_array) else {
-                return;
-            };
-            if branches.len() < 2 {
-                return;
-            }
-            let mut values = Vec::with_capacity(branches.len());
-            let mut notes = Vec::new();
-            for branch in branches {
-                let Some(branch) = branch.as_object() else {
-                    return;
-                };
-                let Some(Value::String(constant)) = branch.get("const") else {
-                    return;
-                };
-                if branch
-                    .keys()
-                    .any(|key| !matches!(key.as_str(), "const" | "type" | "description" | "title"))
-                {
-                    return;
+/// [`flatten_const_unions`] on one object.
+fn flatten_const_union(object: &mut Map<String, Value>) {
+    let Some(branches) = object.get("oneOf").and_then(Value::as_array) else {
+        return;
+    };
+    if branches.len() < 2 {
+        return;
+    }
+    let mut values = Vec::with_capacity(branches.len());
+    let mut notes = Vec::new();
+    for branch in branches {
+        let Some(branch) = branch.as_object() else {
+            return;
+        };
+        let Some(Value::String(constant)) = branch.get("const") else {
+            return;
+        };
+        if branch
+            .keys()
+            .any(|key| !matches!(key.as_str(), "const" | "type" | "description" | "title"))
+        {
+            return;
+        }
+        if let Some(Value::String(note)) = branch.get("description") {
+            if let Some(first) = note.lines().find(|line| !line.trim().is_empty()) {
+                let mut gloss = format!("`{constant}`: {}", first.trim());
+                // The variant's standards citation is the part that
+                // tells a payload author whether this is the spelling
+                // their contract actually calls for, so it rides along
+                // with the summary rather than being dropped with the
+                // rest of the body.
+                let citations = collect_citation_lines(note);
+                if !citations.is_empty() {
+                    gloss.push_str(" (");
+                    gloss.push_str(&citations.join("; "));
+                    gloss.push(')');
                 }
-                if let Some(Value::String(note)) = branch.get("description") {
-                    if let Some(first) = note.lines().find(|line| !line.trim().is_empty()) {
-                        let mut gloss = format!("`{constant}`: {}", first.trim());
-                        // The variant's standards citation is the part that
-                        // tells a payload author whether this is the spelling
-                        // their contract actually calls for, so it rides along
-                        // with the summary rather than being dropped with the
-                        // rest of the body.
-                        let citations = collect_citation_lines(note);
-                        if !citations.is_empty() {
-                            gloss.push_str(" (");
-                            gloss.push_str(&citations.join("; "));
-                            gloss.push(')');
-                        }
-                        notes.push(gloss);
-                    }
-                }
-                values.push(Value::String(constant.clone()));
-            }
-
-            // A long variant gloss costs more than it teaches; ISO currency
-            // codes are the case that made this threshold necessary. Glosses
-            // carrying a standards citation are exempt: a wrong day count is a
-            // priced error, and the citation is what prevents it.
-            const MAX_FOLDED_NOTE_BYTES: usize = 600;
-            let carries_citation = notes.iter().any(|note| mentions_a_standard(note));
-            let folded = notes.join(" · ");
-            object.remove("oneOf");
-            object.insert("type".to_string(), Value::String("string".to_string()));
-            object.insert("enum".to_string(), Value::Array(values));
-            if !folded.is_empty() && (carries_citation || folded.len() <= MAX_FOLDED_NOTE_BYTES) {
-                let existing = object
-                    .get("description")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default()
-                    .to_string();
-                let combined = if existing.is_empty() {
-                    folded
-                } else {
-                    format!("{existing}\n\n{folded}")
-                };
-                object.insert("description".to_string(), Value::String(combined));
+                notes.push(gloss);
             }
         }
-        Value::Array(items) => {
-            for item in items {
-                flatten_const_unions(item);
-            }
-        }
-        _ => {}
+        values.push(Value::String(constant.clone()));
+    }
+
+    // A long variant gloss costs more than it teaches; ISO currency
+    // codes are the case that made this threshold necessary. Glosses
+    // carrying a standards citation are exempt: a wrong day count is a
+    // priced error, and the citation is what prevents it.
+    const MAX_FOLDED_NOTE_BYTES: usize = 600;
+    let carries_citation = notes.iter().any(|note| mentions_a_standard(note));
+    let folded = notes.join(" · ");
+    object.remove("oneOf");
+    object.insert("type".to_string(), Value::String("string".to_string()));
+    object.insert("enum".to_string(), Value::Array(values));
+    if !folded.is_empty() && (carries_citation || folded.len() <= MAX_FOLDED_NOTE_BYTES) {
+        append_description_note(object, &folded);
     }
 }
 
@@ -730,18 +699,10 @@ pub(super) fn apply_strict_shape(node: &mut Value) {
             for keyword in NON_PORTABLE_KEYWORDS {
                 if let Some(default) = object.remove(*keyword) {
                     if *keyword == "default" {
-                        let note = format!("Defaults to `{default}` when omitted upstream.");
-                        let existing = object
-                            .get("description")
-                            .and_then(Value::as_str)
-                            .unwrap_or_default()
-                            .to_string();
-                        let combined = if existing.is_empty() {
-                            note
-                        } else {
-                            format!("{existing}\n\n{note}")
-                        };
-                        object.insert("description".to_string(), Value::String(combined));
+                        append_description_note(
+                            object,
+                            &format!("Defaults to `{default}` when omitted upstream."),
+                        );
                     }
                 }
             }
@@ -770,18 +731,10 @@ pub(super) fn apply_strict_shape(node: &mut Value) {
                     "maxItems".to_string(),
                     Value::Number(serde_json::Number::from(count)),
                 );
-                let note = format!("Fixed-length array of {count} positional values.");
-                let existing = object
-                    .get("description")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default()
-                    .to_string();
-                let combined = if existing.is_empty() {
-                    note
-                } else {
-                    format!("{existing}\n\n{note}")
-                };
-                object.insert("description".to_string(), Value::String(combined));
+                append_description_note(
+                    object,
+                    &format!("Fixed-length array of {count} positional values."),
+                );
             }
 
             if let Some(Value::Object(properties)) = object.get("properties") {

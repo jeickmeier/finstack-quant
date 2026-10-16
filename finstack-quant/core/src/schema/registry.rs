@@ -430,40 +430,28 @@ pub(super) const ANNOTATION_KEYWORDS: &[&str] = &[
 /// asserts exactly what the branch asserted. Sibling annotations win over the
 /// branch's, keeping the field-level documentation that the wrapper carries.
 pub(super) fn collapse_single_branch_unions(value: &mut Value) {
-    match value {
-        Value::Object(object) => {
-            for nested in object.values_mut() {
-                collapse_single_branch_unions(nested);
-            }
-
-            let collapsible = object
-                .get("oneOf")
-                .and_then(Value::as_array)
-                .is_some_and(|branches| branches.len() == 1 && branches[0].is_object())
-                && object
-                    .keys()
-                    .all(|key| key == "oneOf" || ANNOTATION_KEYWORDS.contains(&key.as_str()));
-            if !collapsible {
-                return;
-            }
-
-            let Some(Value::Array(mut branches)) = object.remove("oneOf") else {
-                return;
-            };
-            let Some(Value::Object(branch)) = branches.pop() else {
-                return;
-            };
-            for (key, nested) in branch {
-                object.entry(key).or_insert(nested);
-            }
+    for_each_object_mut(value, &mut |object| {
+        let collapsible = object
+            .get("oneOf")
+            .and_then(Value::as_array)
+            .is_some_and(|branches| branches.len() == 1 && branches[0].is_object())
+            && object
+                .keys()
+                .all(|key| key == "oneOf" || ANNOTATION_KEYWORDS.contains(&key.as_str()));
+        if !collapsible {
+            return;
         }
-        Value::Array(items) => {
-            for item in items {
-                collapse_single_branch_unions(item);
-            }
+
+        let Some(Value::Array(mut branches)) = object.remove("oneOf") else {
+            return;
+        };
+        let Some(Value::Object(branch)) = branches.pop() else {
+            return;
+        };
+        for (key, nested) in branch {
+            object.entry(key).or_insert(nested);
         }
-        _ => {}
-    }
+    });
 }
 
 pub(super) fn generate_artifact<T: SerdeSchema>(artifact: &SchemaArtifact) -> Result<Value> {
