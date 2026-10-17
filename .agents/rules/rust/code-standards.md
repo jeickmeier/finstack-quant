@@ -181,8 +181,7 @@ The complete set of features across all crates (read from each `Cargo.toml`) is:
 
 | Crate | Features |
 | --- | --- |
-| `core` | `json-schema` (default) |
-| `cashflows`, `valuations` | `json-schema` (default), `jsonschema-validate` (default; implies `json-schema`) |
+| `core`, `cashflows`, `valuations` | `json-schema` (default), `jsonschema-validate` (default; implies `json-schema`) |
 | `models`, `calibration`, `portfolio` | `json-schema` (default) |
 | `analytics`, `covenants`, `features`, `margin`, `attribution`, `statements`, `statements-analytics`, `scenarios` | `json-schema` (default) |
 | `finstack-quant` (umbrella) | `json-schema` (default), `jsonschema-validate` (default) |
