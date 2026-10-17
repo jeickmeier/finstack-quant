@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import init, { core , models } from '../../index.js';
+import init, { core, models } from '../../index.js';
 
 await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
