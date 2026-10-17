@@ -24,7 +24,7 @@ mod fixtures;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use finstack_quant_cashflows::aggregation::{
-    aggregate_by_period, aggregate_cashflows_checked, calendar_year_ladder, DateContext,
+    aggregate_by_period, aggregate_cashflows_checked, calendar_year_ladder,
 };
 use finstack_quant_cashflows::builder::merge_cashflow_schedules;
 use finstack_quant_cashflows::builder::{
@@ -38,7 +38,7 @@ use finstack_quant_cashflows::{
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DayCount, DayCountContext, Period, PeriodId, StubKind, Tenor,
+    BusinessDayConvention, Date, DayCount, Period, PeriodId, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};

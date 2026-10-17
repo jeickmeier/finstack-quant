@@ -3,6 +3,7 @@
 use criterion::{measurement::WallTime, BenchmarkGroup, Criterion};
 
 /// Simple helper to reduce repetitive `bench_function` + `iter` boilerplate.
+#[allow(dead_code)]
 pub fn bench_iter<F>(group: &mut BenchmarkGroup<WallTime>, id: impl Into<String>, mut f: F)
 where
     F: FnMut(),

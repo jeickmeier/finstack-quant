@@ -120,7 +120,7 @@ fn create_market() -> MarketContext {
 
     source_market
         .insert(index_curve)
-        .insert(Arc::clone(&index_data.base_correlation_curve))
+        .insert(Arc::clone(index_data.base_correlation_curve()))
         .insert_credit_index("CDX.NA.IG.42", index_data)
         .expect("Credit index dependencies should be registered")
 }
@@ -201,10 +201,9 @@ fn create_market_with_issuers(num_issuers: usize) -> MarketContext {
 
     let mut market = source_market
         .insert(index_curve)
-        .insert(Arc::clone(&index_data.base_correlation_curve));
+        .insert(Arc::clone(index_data.base_correlation_curve()));
     for curve in index_data
-        .issuer_credit_curves
-        .as_ref()
+        .issuer_credit_curves()
         .expect("Issuer curves should exist")
         .values()
     {

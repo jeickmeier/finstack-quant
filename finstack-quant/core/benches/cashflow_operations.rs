@@ -6,10 +6,6 @@
 //! - `Discounting` trait dispatch
 //! - Neumaier compensated summation at scale
 
-#[path = "support/bench_utils.rs"]
-mod bench_utils;
-
-use bench_utils::bench_iter;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use finstack_quant_core::cashflow::npv;
 use finstack_quant_core::currency::Currency;

@@ -20,9 +20,7 @@ use finstack_quant_cashflows::builder::{
 };
 use finstack_quant_cashflows::{AccrualConfig, AccrualIndex};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
-};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;
 use rust_decimal_macros::dec;
 use std::hint::black_box;

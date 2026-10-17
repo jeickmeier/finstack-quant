@@ -208,7 +208,7 @@ fn benchmark_lm_global_sizes(c: &mut Criterion) {
                     let residuals =
                         |params: &[f64], resid: &mut [f64]| system.residuals(params, resid);
                     solver
-                        .solve_system_with_dim_stats(residuals, &initial, n_residuals)
+                        .solve_system(residuals, &initial, n_residuals)
                         .expect("LM solve should succeed");
                 });
             }

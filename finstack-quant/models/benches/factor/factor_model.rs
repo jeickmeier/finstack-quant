@@ -23,8 +23,8 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_models::factor::credit::calibration::CovarianceStrategy;
 use finstack_quant_models::factor::credit::decomposition::{decompose_levels, decompose_period};
 use finstack_quant_models::factor::matching::{
-    CascadeMatcher, CreditHierarchicalMatcher, DependencyFilter, FactorMatcher, FactorNode,
-    HierarchicalMatcher, MappingTableMatcher,
+    DependencyFilter, FactorMatcher, FactorNode, HierarchicalConfig, MappingTableMatcher,
+    MatchingConfig,
 };
 use finstack_quant_models::factor::{
     CurveType, FactorCovarianceMatrix, FactorId, MarketDependency, SensitivityMatrix,
@@ -195,7 +195,11 @@ fn bench_hierarchical_matcher(c: &mut Criterion) {
 
     for (name, depth, branching) in configs {
         let root = build_tree(depth, branching);
-        let matcher = HierarchicalMatcher::new(DependencyFilter::default(), root);
+        let matcher = MatchingConfig::Hierarchical(HierarchicalConfig {
+            dependency_filter: DependencyFilter::default(),
+            root,
+        })
+        .build_matcher();
 
         let attrs_hit = Attributes::default().with_tag("sector-0");
 
@@ -236,10 +240,11 @@ fn bench_cascade_matcher(c: &mut Criterion) {
         factor_id: FactorId::new("Generic-Credit"),
     }];
 
-    let cascade = CascadeMatcher::new(vec![
-        Box::new(MappingTableMatcher::new(exact_rules)),
-        Box::new(MappingTableMatcher::new(fallback_rules)),
-    ]);
+    let cascade = MatchingConfig::Cascade(vec![
+        MatchingConfig::MappingTable(exact_rules),
+        MatchingConfig::MappingTable(fallback_rules),
+    ])
+    .build_matcher();
     let attrs = Attributes::default();
 
     let exact_dep = MarketDependency::CreditCurve {
@@ -392,7 +397,8 @@ fn bench_credit_decomposition(c: &mut Criterion) {
 fn bench_credit_hierarchical_matcher(c: &mut Criterion) {
     let mut group = c.benchmark_group("credit_hierarchical_matcher");
 
-    let matcher = CreditHierarchicalMatcher::new(credit_hierarchical_config(200));
+    let matcher =
+        MatchingConfig::CreditHierarchical(credit_hierarchical_config(200)).build_matcher();
     let known_dep = credit_dependency("ISSUER-0000-HAZARD");
     let known_attrs = known_issuer_attrs(0);
     group.bench_function("known_issuer/200", |b| {

@@ -18,8 +18,8 @@ a risk run repeats once per instrument leg.
 | `covariance_lookups` | `variance/50`, `covariance/50`, `correlation/50` | Single-entry lookups by `FactorId` |
 | `covariance_batch_lookups` | `all_variances/50`, `all_correlations/50` | The N and N(N−1)/2 loop shapes a risk run actually issues |
 | `mapping_table_matcher` | `hit_first/50`, `hit_last/50`, `miss/50` | `MappingTableMatcher::match_factor` over 50 rules; the three ids bracket best case, worst case, and full-scan miss |
-| `hierarchical_matcher` | `{shallow_2x3,medium_3x3,deep_4x2}_{hit,fallback}` | `HierarchicalMatcher` tree traversal at three depth/branching shapes, matched on an `Attributes` tag and on a tag that hits no child |
-| `cascade_matcher` | `hit_first_stage`, `hit_second_stage`, `miss_all_stages` | `CascadeMatcher` over two `MappingTableMatcher` stages (exact rule, then generic-credit fallback) |
+| `hierarchical_matcher` | `{shallow_2x3,medium_3x3,deep_4x2}_{hit,fallback}` | `MatchingConfig::Hierarchical` tree traversal at three depth/branching shapes, matched on an `Attributes` tag and on a tag that hits no child |
+| `cascade_matcher` | `hit_first_stage`, `hit_second_stage`, `miss_all_stages` | `MatchingConfig::Cascade` over two `MatchingConfig::MappingTable` stages (exact rule, then generic-credit fallback) |
 
 `hit_first` vs `hit_last` vs `miss` in `mapping_table_matcher` is the linear-scan guard:
 if rule matching ever gains an index, `hit_last` should collapse toward `hit_first`. If

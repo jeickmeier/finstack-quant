@@ -17,9 +17,7 @@ use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criteri
 use finstack_quant_core::types::Attributes;
 use finstack_quant_models::factor::credit::calibration::{CovarianceStrategy, CreditCalibrator};
 use finstack_quant_models::factor::credit::decomposition::decompose_levels;
-use finstack_quant_models::factor::matching::{
-    CreditHierarchicalMatcher, FactorMatcher, MappingTableMatcher,
-};
+use finstack_quant_models::factor::matching::{FactorMatcher, MappingTableMatcher, MatchingConfig};
 use finstack_quant_models::factor::{CurveType, FactorCovarianceMatrix, MarketDependency};
 use fixtures::{
     credit_dependency, credit_hierarchical_config, factor_ids, known_issuer_attrs, mapping_rules,
@@ -71,7 +69,7 @@ fn scaling_credit_matcher(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_credit_matcher");
     for n in [50_usize, 200, 1_000] {
         let config = credit_hierarchical_config(n);
-        let matcher = CreditHierarchicalMatcher::new(config.clone());
+        let matcher = MatchingConfig::CreditHierarchical(config.clone()).build_matcher();
         let dep = credit_dependency(&format!("ISSUER-{:04}-HAZARD", n - 1));
         let attrs = known_issuer_attrs(n - 1);
         group.throughput(Throughput::Elements(n as u64));
