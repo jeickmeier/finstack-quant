@@ -32,7 +32,7 @@ from finstack_quant.core.market_data import (
     VolCubeExpirySlice,
     VolSurface,
 )
-from finstack_quant.models import correlation, liquidity, monte_carlo, volatility
+from finstack_quant.models import correlation, factor as factor_model, liquidity, monte_carlo, volatility
 from finstack_quant.models.credit import (
     AssetDynamics,
     CreditState,
@@ -541,7 +541,7 @@ def _correlation_cases() -> dict[str, Callable[[], Any]]:
 
 
 def _factor_cases() -> dict[str, Callable[[], Any]]:
-    matrix = lambda: factor_credit.FactorCovarianceMatrix(["rates", "credit"], [0.04, 0.01, 0.01, 0.09])  # noqa: E731
+    matrix = lambda: factor_model.FactorCovarianceMatrix(["rates", "credit"], [0.04, 0.01, 0.01, 0.09])  # noqa: E731
     model = lambda: factor_credit.CreditFactorModel.from_json(CANONICAL_MODEL.read_text())  # noqa: E731
     decomposition = lambda: factor_risk.parametric_var_decomposition(  # noqa: E731
         ["A", "B"], [1.0, 2.0], [[0.04, 0.01], [0.01, 0.09]]

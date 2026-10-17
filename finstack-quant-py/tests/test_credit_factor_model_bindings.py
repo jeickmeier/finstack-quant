@@ -17,12 +17,11 @@ import math
 
 import pytest
 
+from finstack_quant.models.factor import FactorCovarianceMatrix, FactorModelConfig
 from finstack_quant.models.factor.credit import (
     CreditCalibrator,
     CreditFactorModel,
     FactorCovarianceForecast,
-    FactorCovarianceMatrix,
-    FactorModelConfig,
     LevelsAtDate,
     PeriodDecomposition,
     VolHorizon,

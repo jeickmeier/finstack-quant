@@ -339,13 +339,13 @@ test('factor handles and helpers follow the Rust accessors', () => {
   assert.throws(() => forecast.factorModelAt(oneStep, 'nope'), kind('validation'));
   const firstFactor = model.factorIds()[0];
   assert.equal(
-    factorCredit.factorVariance(covariance, firstFactor),
-    factorCredit.factorCovariance(covariance, firstFactor, firstFactor)
+    models.factor.factorVariance(covariance, firstFactor),
+    models.factor.factorCovariance(covariance, firstFactor, firstFactor)
   );
-  assert.equal(factorCredit.factorVariance(covariance, 'unknown'), 0);
-  assert.equal(factorCredit.factorCovarianceRows(covariance).length, model.nFactors);
-  assert.equal(factorCredit.validateFactorModelConfig(model.config), undefined);
-  assert.throws(() => factorCredit.validateFactorModelConfig({}), kind('validation'));
+  assert.equal(models.factor.factorVariance(covariance, 'unknown'), 0);
+  assert.equal(models.factor.factorCovarianceRows(covariance).length, model.nFactors);
+  assert.equal(models.factor.validateFactorModelConfig(model.config), undefined);
+  assert.throws(() => models.factor.validateFactorModelConfig({}), kind('validation'));
   assert.equal(typeof new factorCredit.CreditCalibrator().config.policy, 'string');
 
   const decomposition = factorRisk.parametricVarDecomposition(

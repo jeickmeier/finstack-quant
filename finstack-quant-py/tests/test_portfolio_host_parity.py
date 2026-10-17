@@ -22,7 +22,8 @@ from typing import Any
 import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
-from finstack_quant.models.factor.credit import CreditFactorModel, FactorModelConfig
+from finstack_quant.models.factor import FactorModelConfig
+from finstack_quant.models.factor.credit import CreditFactorModel
 from finstack_quant.models.factor.risk import RiskDecomposition
 from finstack_quant.portfolio import (
     FactorAssignmentReport,

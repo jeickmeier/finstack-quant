@@ -2900,7 +2900,16 @@
   },
   "models.factor": {
     "kind": "namespace",
-    "keys": ["credit", "risk", "schema"]
+    "keys": [
+      "credit",
+      "factorCorrelation",
+      "factorCovariance",
+      "factorCovarianceRows",
+      "factorVariance",
+      "risk",
+      "schema",
+      "validateFactorModelConfig"
+    ]
   },
   "models.factor.credit": {
     "kind": "namespace",
@@ -2912,12 +2921,7 @@
       "PeriodDecomposition",
       "VolHorizon",
       "decomposeLevels",
-      "decomposePeriod",
-      "factorCorrelation",
-      "factorCovariance",
-      "factorCovarianceRows",
-      "factorVariance",
-      "validateFactorModelConfig"
+      "decomposePeriod"
     ]
   },
   "models.factor.credit.CreditFactorModel": {
@@ -2976,19 +2980,19 @@
   "models.factor.credit.decomposePeriod": {
     "kind": "function"
   },
-  "models.factor.credit.factorVariance": {
+  "models.factor.factorVariance": {
     "kind": "function"
   },
-  "models.factor.credit.factorCovariance": {
+  "models.factor.factorCovariance": {
     "kind": "function"
   },
-  "models.factor.credit.factorCorrelation": {
+  "models.factor.factorCorrelation": {
     "kind": "function"
   },
-  "models.factor.credit.factorCovarianceRows": {
+  "models.factor.factorCovarianceRows": {
     "kind": "function"
   },
-  "models.factor.credit.validateFactorModelConfig": {
+  "models.factor.validateFactorModelConfig": {
     "kind": "function"
   },
   "models.factor.risk": {

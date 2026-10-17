@@ -25,7 +25,8 @@ from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.table import ArrowTable
 from finstack_quant.margin import ImCollateralResult, ImMethodology, NettingSetId, SimmSensitivities
-from finstack_quant.models.factor.credit import CreditFactorModel, FactorModelConfig
+from finstack_quant.models.factor import FactorModelConfig
+from finstack_quant.models.factor.credit import CreditFactorModel
 from finstack_quant.models.factor.risk import RiskDecomposition
 from finstack_quant.portfolio import schema as schema
 from finstack_quant.scenarios import ApplicationReport, ScenarioSpec

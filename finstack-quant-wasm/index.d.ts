@@ -9984,45 +9984,6 @@ export interface FactorModelCreditNamespace {
    * Forecast horizon of the covariance and idiosyncratic-vol forecasts.
    */
   VolHorizon: VolHorizonConstructor;
-  /**
-   * Correlation between two factors in a factor covariance matrix.
-   * @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
-   * @param lhs - First factor identifier; an unknown identifier or a non-positive variance returns 0.
-   * @param rhs - Second factor identifier; an unknown identifier or a non-positive variance returns 0.
-   * @returns The correlation of the two factors, from -1 through 1.
-   * @throws Error - Throws a `validation` error if `matrix` is malformed or not a valid covariance matrix.
-   */
-  factorCorrelation(matrix: FactorCovarianceMatrix | string, lhs: string, rhs: string): number;
-  /**
-   * Covariance between two factors in a factor covariance matrix.
-   * @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
-   * @param lhs - First factor identifier; an unknown identifier returns 0.
-   * @param rhs - Second factor identifier; an unknown identifier returns 0.
-   * @returns The covariance of the two factors.
-   * @throws Error - Throws a `validation` error if `matrix` is malformed or not a valid covariance matrix.
-   */
-  factorCovariance(matrix: FactorCovarianceMatrix | string, lhs: string, rhs: string): number;
-  /**
-   * Factor covariance matrix as one row per factor (the twin of Python `to_numpy`).
-   * @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
-   * @returns An array of `number[]` rows, `nFactors` by `nFactors`, in `factor_ids` order.
-   * @throws Error - Throws a `validation` error if `matrix` is malformed or not a valid covariance matrix.
-   */
-  factorCovarianceRows(matrix: FactorCovarianceMatrix | string): number[][];
-  /**
-   * Variance of one factor in a factor covariance matrix.
-   * @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
-   * @param factorId - Factor whose diagonal variance is requested; an unknown identifier returns 0.
-   * @returns The factor's variance.
-   * @throws Error - Throws a `validation` error if `matrix` is malformed or not a valid covariance matrix.
-   */
-  factorVariance(matrix: FactorCovarianceMatrix | string, factorId: string): number;
-  /**
-   * Validate a factor-model configuration: factor ordering, matching rules and the risk measure.
-   * @param config - `FactorModelConfig` object or JSON, as returned by `CreditFactorModel.config` or `factorModelAt`.
-   * @throws Error - Throws a `validation` error naming the first inconsistency.
-   */
-  validateFactorModelConfig(config: FactorModelConfig | string): void;
 }
 
 /**
@@ -10178,6 +10139,45 @@ export interface FactorRiskNamespace {
  * ```
  */
 export interface FactorNamespace {
+  /**
+   * Correlation between two factors in a factor covariance matrix.
+   * @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+   * @param lhs - First factor identifier; an unknown identifier or a non-positive variance returns 0.
+   * @param rhs - Second factor identifier; an unknown identifier or a non-positive variance returns 0.
+   * @returns The correlation of the two factors, from -1 through 1.
+   * @throws Error - Throws a `validation` error if `matrix` is malformed or not a valid covariance matrix.
+   */
+  factorCorrelation(matrix: FactorCovarianceMatrix | string, lhs: string, rhs: string): number;
+  /**
+   * Covariance between two factors in a factor covariance matrix.
+   * @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+   * @param lhs - First factor identifier; an unknown identifier returns 0.
+   * @param rhs - Second factor identifier; an unknown identifier returns 0.
+   * @returns The covariance of the two factors.
+   * @throws Error - Throws a `validation` error if `matrix` is malformed or not a valid covariance matrix.
+   */
+  factorCovariance(matrix: FactorCovarianceMatrix | string, lhs: string, rhs: string): number;
+  /**
+   * Factor covariance matrix as one row per factor (the twin of Python `to_numpy`).
+   * @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+   * @returns An array of `number[]` rows, `nFactors` by `nFactors`, in `factor_ids` order.
+   * @throws Error - Throws a `validation` error if `matrix` is malformed or not a valid covariance matrix.
+   */
+  factorCovarianceRows(matrix: FactorCovarianceMatrix | string): number[][];
+  /**
+   * Variance of one factor in a factor covariance matrix.
+   * @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+   * @param factorId - Factor whose diagonal variance is requested; an unknown identifier returns 0.
+   * @returns The factor's variance.
+   * @throws Error - Throws a `validation` error if `matrix` is malformed or not a valid covariance matrix.
+   */
+  factorVariance(matrix: FactorCovarianceMatrix | string, factorId: string): number;
+  /**
+   * Validate a factor-model configuration: factor ordering, matching rules and the risk measure.
+   * @param config - `FactorModelConfig` object or JSON, as returned by the credit factor model `config` getter or `factorModelAt`.
+   * @throws Error - Throws a `validation` error naming the first inconsistency.
+   */
+  validateFactorModelConfig(config: FactorModelConfig | string): void;
   /**
    * Credit factor hierarchy artifacts, calibration, and decomposition.
    */

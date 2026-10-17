@@ -183,7 +183,7 @@ python_package = "finstack_quant.models.factor"
 visibility = "pub"
 status = "exists"
 note = "Generic factor-model types are exported at the Rust crate root. Credit hierarchy and forecast APIs live under finstack_quant.models.factor.credit; pure covariance, decomposition, position-risk, stress-attribution, and risk-budget kernels live under finstack_quant.models.factor.risk."
-public = ["credit", "risk", "schema"]
+public = ["FactorCovarianceMatrix", "FactorModelConfig", "credit", "risk", "schema"]
 
 [crates.models.factor.modules]
 matching           = { python = "finstack_quant.models.factor.matching", status = "missing", note = "MatchingConfig typed host-language constructors deferred; JSON contracts remain Rust-owned. The crate-root matching re-exports (CascadeMatcher, HierarchicalMatcher, MappingTableMatcher, FactorMatcher trait family, MappingRule, AttributeFilter, DependencyFilter) are Rust-only." }
@@ -197,7 +197,10 @@ schema             = { python = "finstack_quant.models.factor.schema", status = 
 # inside FactorModelConfig or through explicit JSON inputs rather than parallel
 # constructor APIs.
 [crates.models.factor.symbols]
-public = []
+public = [
+    "FactorCovarianceMatrix",
+    "FactorModelConfig",
+]
 
 [crates.models.factor.module_symbols.credit]
 python_package = "finstack_quant.models.factor.credit"
@@ -205,8 +208,6 @@ public = [
     "CreditCalibrator",
     "CreditFactorModel",
     "FactorCovarianceForecast",
-    "FactorCovarianceMatrix",
-    "FactorModelConfig",
     "LevelsAtDate",
     "PeriodDecomposition",
     "VolHorizon",
@@ -2040,9 +2041,12 @@ types = { RecoveryAllocation = "RecoveryAllocation", RecoveryClaim = "RecoveryCl
 js = "models.credit"
 types = { ScoringResult = "ScoringResult" }
 
+[parity.modules."finstack_quant.models.factor"]
+js = "models.factor"
+types = { FactorCovarianceMatrix = "FactorCovarianceMatrix", FactorModelConfig = "FactorModelConfig" }
+
 [parity.modules."finstack_quant.models.factor.credit"]
 js = "models.factor.credit"
-types = { FactorCovarianceMatrix = "FactorCovarianceMatrix", FactorModelConfig = "FactorModelConfig" }
 
 [parity.modules."finstack_quant.models.factor.risk"]
 js = "models.factor.risk"
@@ -2321,7 +2325,7 @@ bsGreeksIsValid = "free-function twin of Python BsGreeks.is_valid: the type is a
 collateralPieceLiquidationValue = "free-function twin of the Python property CollateralPiece.liquidation_value (Rust CollateralPiece::liquidation_value), which is not serialized: the type is a plain object in WASM"
 recoveryClaimTotalClaim = "free-function twin of the Python property RecoveryClaim.total_claim (Rust RecoveryClaim::total_claim), which is not serialized: the type is a plain object in WASM"
 
-[parity.js."models.factor.credit".wasm_only]
+[parity.js."models.factor".wasm_only]
 factorCorrelation = "free-function twin of Python FactorCovarianceMatrix.correlation: the type is a plain object in WASM"
 factorCovariance = "free-function twin of Python FactorCovarianceMatrix.covariance: the type is a plain object in WASM"
 factorCovarianceRows = "nested-row twin of Python FactorCovarianceMatrix.to_numpy"
@@ -2774,24 +2778,24 @@ renames = { cap_floor_vol = { js = "calibration.volQuoteCapFloorVol", reason = "
 [parity.members."finstack_quant.models.BsGreeks".renames]
 is_valid = { js = "models.bsGreeksIsValid", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
 
-[parity.members."finstack_quant.models.factor.credit.FactorCovarianceMatrix".renames]
-correlation = { js = "models.factor.credit.factorCorrelation", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
-covariance = { js = "models.factor.credit.factorCovariance", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
-to_numpy = { js = "models.factor.credit.factorCovarianceRows", reason = "nested-row twin of the NumPy matrix exit (Rust FactorCovarianceMatrix::to_rows)" }
-variance = { js = "models.factor.credit.factorVariance", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+[parity.members."finstack_quant.models.factor.FactorCovarianceMatrix".renames]
+correlation = { js = "models.factor.factorCorrelation", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+covariance = { js = "models.factor.factorCovariance", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+to_numpy = { js = "models.factor.factorCovarianceRows", reason = "nested-row twin of the NumPy matrix exit (Rust FactorCovarianceMatrix::to_rows)" }
+variance = { js = "models.factor.factorVariance", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
 
-[parity.members."finstack_quant.models.factor.credit.FactorModelConfig".renames]
-validate = { js = "models.factor.credit.validateFactorModelConfig", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+[parity.members."finstack_quant.models.factor.FactorModelConfig".renames]
+validate = { js = "models.factor.validateFactorModelConfig", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
 
 # Properties of `models` data classes that the TypeScript type has no field
 # for. Each one below is a plain view of wire fields (a count, an element of a
 # tuple, a column of a matrix, an enum tag, a host-attached label list), so the
 # TypeScript object is its twin (`literal`). Properties computed by a Rust
 # method are recorded as renames to their WASM free-function twins instead.
-[parity.members."finstack_quant.models.factor.credit.FactorCovarianceMatrix".excluded]
+[parity.members."finstack_quant.models.factor.FactorCovarianceMatrix".excluded]
 n_factors = "literal"
 
-[parity.members."finstack_quant.models.factor.credit.FactorModelConfig".excluded]
+[parity.members."finstack_quant.models.factor.FactorModelConfig".excluded]
 factor_ids = "literal"
 n_factors = "literal"
 

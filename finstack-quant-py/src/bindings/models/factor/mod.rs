@@ -1,7 +1,9 @@
 //! Python bindings for `finstack_quant_models::factor`.
 //!
-//! The module mirrors the Rust crate boundary. Credit hierarchy bindings are
-//! registered under `finstack_quant.models.factor.credit`.
+//! The module mirrors the Rust crate boundary: `FactorCovarianceMatrix` and
+//! `FactorModelConfig` sit on `finstack_quant.models.factor` like their Rust
+//! crate-root exports; credit hierarchy bindings are registered under
+//! `finstack_quant.models.factor.credit`.
 
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -33,8 +35,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "LevelsAtDate",
             "PeriodDecomposition",
             "FactorCovarianceForecast",
-            "FactorCovarianceMatrix",
-            "FactorModelConfig",
             "VolHorizon",
             "decompose_levels",
             "decompose_period",
@@ -86,7 +86,21 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     schema::register(py, &m)?;
 
-    let all = PyList::new(py, ["credit", "risk", "schema"])?;
+    // Exported at the Rust crate root (`finstack_quant_models::factor`), so
+    // they live on `finstack_quant.models.factor`, not under `credit`.
+    m.add_class::<credit::PyFactorCovarianceMatrix>()?;
+    m.add_class::<credit::PyFactorModelConfig>()?;
+
+    let all = PyList::new(
+        py,
+        [
+            "FactorCovarianceMatrix",
+            "FactorModelConfig",
+            "credit",
+            "risk",
+            "schema",
+        ],
+    )?;
     m.setattr("__all__", all)?;
     crate::bindings::module_utils::attach_submodule(
         parent,

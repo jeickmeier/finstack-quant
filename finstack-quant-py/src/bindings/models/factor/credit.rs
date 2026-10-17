@@ -1040,13 +1040,13 @@ fn decompose_period(
 /// positive semidefiniteness.
 ///
 /// Example:
-///     >>> from finstack_quant.models.factor.credit import FactorCovarianceMatrix
+///     >>> from finstack_quant.models.factor import FactorCovarianceMatrix
 ///     >>> matrix = FactorCovarianceMatrix(["a", "b"], [[0.04, 0.0], [0.0, 0.01]])
 ///     >>> (matrix.variance("a"), matrix.to_dataframe().loc["b", "b"])
 ///     (0.04, 0.01)
 #[pyclass(
     name = "FactorCovarianceMatrix",
-    module = "finstack_quant.models.factor.credit",
+    module = "finstack_quant.models.factor",
     frozen,
     eq,
     skip_from_py_object
@@ -1175,13 +1175,13 @@ wire_methods!(
 /// Portfolio factor-model configuration assembled at a forecast horizon.
 ///
 /// Example:
-///     >>> from finstack_quant.models.factor.credit import FactorModelConfig
+///     >>> from finstack_quant.models.factor import FactorModelConfig
 ///     >>> config = FactorModelConfig.from_json('{"factors":[],"covariance":{"factor_ids":[],"n":0,"data":[]},"matching":{"mapping_table":[]},"risk_measure":"variance"}')
 ///     >>> config.n_factors
 ///     0
 #[pyclass(
     name = "FactorModelConfig",
-    module = "finstack_quant.models.factor.credit",
+    module = "finstack_quant.models.factor",
     frozen,
     skip_from_py_object
 )]
@@ -1593,8 +1593,6 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCreditCalibrator>()?;
     m.add_class::<PyLevelsAtDate>()?;
     m.add_class::<PyPeriodDecomposition>()?;
-    m.add_class::<PyFactorCovarianceMatrix>()?;
-    m.add_class::<PyFactorModelConfig>()?;
     m.add_class::<PyFactorCovarianceForecast>()?;
     m.add_function(pyo3::wrap_pyfunction!(decompose_levels, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(decompose_period, m)?)?;

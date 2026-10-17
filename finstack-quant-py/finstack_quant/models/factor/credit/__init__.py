@@ -19,8 +19,6 @@ CreditCalibrator = _credit.CreditCalibrator
 LevelsAtDate = _credit.LevelsAtDate
 PeriodDecomposition = _credit.PeriodDecomposition
 FactorCovarianceForecast = _credit.FactorCovarianceForecast
-FactorCovarianceMatrix = _credit.FactorCovarianceMatrix
-FactorModelConfig = _credit.FactorModelConfig
 VolHorizon = _credit.VolHorizon
 decompose_levels = _credit.decompose_levels
 decompose_period = _credit.decompose_period
@@ -29,8 +27,6 @@ __all__: list[str] = [
     "CreditCalibrator",
     "CreditFactorModel",
     "FactorCovarianceForecast",
-    "FactorCovarianceMatrix",
-    "FactorModelConfig",
     "LevelsAtDate",
     "PeriodDecomposition",
     "VolHorizon",

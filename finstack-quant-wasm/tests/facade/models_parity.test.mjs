@@ -552,10 +552,10 @@ const CASES = {
   'factor.covariance_matrix': () => {
     const matrix = { factor_ids: ['rates', 'credit'], n: 2, data: [0.04, 0.01, 0.01, 0.09] };
     return [
-      factorCredit.factorVariance(matrix, 'rates'),
-      factorCredit.factorCovariance(matrix, 'rates', 'credit'),
-      factorCredit.factorCorrelation(matrix, 'rates', 'credit'),
-      factorCredit.factorCovarianceRows(matrix),
+      models.factor.factorVariance(matrix, 'rates'),
+      models.factor.factorCovariance(matrix, 'rates', 'credit'),
+      models.factor.factorCorrelation(matrix, 'rates', 'credit'),
+      models.factor.factorCovarianceRows(matrix),
     ];
   },
   'factor.credit_factor_model': () => {

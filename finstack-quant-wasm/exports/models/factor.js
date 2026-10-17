@@ -10,11 +10,6 @@ const credit = {
   VolHorizon: wasm.VolHorizon,
   decomposeLevels: wasm.decomposeLevels,
   decomposePeriod: wasm.decomposePeriod,
-  factorVariance: wasm.factorVariance,
-  factorCovariance: wasm.factorCovariance,
-  factorCorrelation: wasm.factorCorrelation,
-  factorCovarianceRows: wasm.factorCovarianceRows,
-  validateFactorModelConfig: wasm.validateFactorModelConfig,
 };
 
 const risk = {
@@ -28,6 +23,11 @@ const risk = {
 };
 
 export const factor = {
+  factorVariance: wasm.factorVariance,
+  factorCovariance: wasm.factorCovariance,
+  factorCorrelation: wasm.factorCorrelation,
+  factorCovarianceRows: wasm.factorCovarianceRows,
+  validateFactorModelConfig: wasm.validateFactorModelConfig,
   credit,
   risk,
   schema,

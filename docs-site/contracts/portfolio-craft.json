@@ -180,7 +180,7 @@
       "finstack_quant.analytics.Performance",
       "finstack_quant.analytics.MultiFactorResult",
       "finstack_quant.models.factor.credit.CreditFactorModel",
-      "finstack_quant.models.factor.credit.FactorCovarianceMatrix",
+      "finstack_quant.models.factor.FactorCovarianceMatrix",
       "finstack_quant.models.factor.risk.RiskDecomposition"
     ],
     "expected_exceptions": [],

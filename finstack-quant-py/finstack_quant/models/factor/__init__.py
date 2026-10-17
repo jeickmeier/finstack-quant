@@ -1,7 +1,8 @@
 """Factor-model primitives, calibration, and decomposition.
 
-Bindings for ``finstack_quant_models::factor``. Credit hierarchy calibration
-lives under :mod:`finstack_quant.models.factor.credit`.
+Bindings for ``finstack_quant_models::factor``. ``FactorCovarianceMatrix`` and
+``FactorModelConfig`` are exported here, matching the Rust crate root; credit
+hierarchy calibration lives under :mod:`finstack_quant.models.factor.credit`.
 
 Examples:
 --------
@@ -20,7 +21,12 @@ from finstack_quant.models.factor import credit as credit, risk as risk
 # registers it as `finstack_quant.models.factor.schema`.
 schema = _models.factor.schema
 
+FactorCovarianceMatrix = _models.factor.FactorCovarianceMatrix
+FactorModelConfig = _models.factor.FactorModelConfig
+
 __all__: list[str] = [
+    "FactorCovarianceMatrix",
+    "FactorModelConfig",
     "credit",
     "risk",
     "schema",

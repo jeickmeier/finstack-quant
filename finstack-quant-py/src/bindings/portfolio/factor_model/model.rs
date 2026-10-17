@@ -51,7 +51,7 @@ impl PyFactorModel {
     /// Parameters
     /// ----------
     /// config : FactorModelConfig | str
-    ///     Typed ``finstack_quant.models.factor.credit.FactorModelConfig`` or
+    ///     Typed ``finstack_quant.models.factor.FactorModelConfig`` or
     ///     its canonical JSON: factor definitions, covariance matrix (axes in
     ///     factor order), matching rules, pricing mode, bump sizes and risk
     ///     measure.
