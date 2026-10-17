@@ -6,6 +6,7 @@
 
 mod budget;
 mod math;
+pub(crate) use math::validate_covariance;
 mod parametric;
 mod position;
 mod residual;

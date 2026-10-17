@@ -26,7 +26,7 @@ pub(super) fn normal_pdf(x: f64) -> f64 {
 /// # Errors
 ///
 /// Returns a validation error for a malformed, asymmetric or indefinite matrix.
-pub(super) fn validate_covariance(data: &[f64], n: usize) -> finstack_quant_core::Result<()> {
+pub(crate) fn validate_covariance(data: &[f64], n: usize) -> finstack_quant_core::Result<()> {
     if n.checked_mul(n) != Some(data.len()) {
         return Err(finstack_quant_core::Error::Validation(format!(
             "Covariance storage length {} does not match matrix dimension {n}x{n}",

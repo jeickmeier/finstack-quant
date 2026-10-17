@@ -83,28 +83,7 @@ impl FactorCovarianceMatrix {
         }
 
         let index = Self::build_index(&factor_ids)?;
-
-        for i in 0..n {
-            for j in (i + 1)..n {
-                let lhs = data[i * n + j];
-                let rhs = data[j * n + i];
-                // Scale-relative tolerance: an absolute 1e-12 would reject
-                // machine-symmetric matrices on bp² scales (entries ~1e4)
-                // while being needlessly loose on tiny-variance scales.
-                let tol = 1e-12 * lhs.abs().max(rhs.abs()).max(1.0);
-                if (lhs - rhs).abs() > tol {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Covariance matrix is not symmetric at ({i}, {j}): {lhs} vs {rhs}"
-                    )));
-                }
-            }
-        }
-
-        if let Err(e) = finstack_quant_core::math::linalg::cholesky_correlation(&data, n) {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Covariance matrix is not positive semi-definite: {e}"
-            )));
-        }
+        super::risk::validate_covariance(&data, n)?;
 
         let stdevs = (0..n)
             .map(|i| {
