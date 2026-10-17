@@ -1624,7 +1624,7 @@ mod tests {
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
         use crate::instruments::rates::irs::FloatingLegCompounding;
-        use finstack_quant_core::dates::calendar_by_id;
+        use finstack_quant_core::dates::calendar_by_id_strict;
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
 
         let start = Date::from_calendar_date(2025, time::Month::January, 2).expect("date");
@@ -1670,7 +1670,7 @@ mod tests {
         let projected = no_fallback_swap()
             .projected_leg_period(&leg, &fwd, None, &mismatched, start, None)
             .expect("overnight xccy period");
-        let calendar = calendar_by_id("target2").expect("target2");
+        let calendar = calendar_by_id_strict("target2").expect("target2");
         let expected = project_overnight_coupon(OvernightCouponProjectionInput {
             curve: OvernightProjectionCurve::Forward(&fwd),
             fixings: None,

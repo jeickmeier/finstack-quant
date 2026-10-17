@@ -425,14 +425,13 @@ pub(crate) fn adjustment_failed(date: Date, convention: BusinessDayConvention) -
 /// Identifiers are lowercase, stable market codes (e.g., `"gblo"`, `"target2"`).
 /// They are suitable for serialization and long-lived pipelines.
 ///
-/// Example using the free resolution API:
+/// Example using the strict resolution API:
 /// ```
-/// use finstack_quant_core::dates::{available_calendars, calendar_by_id};
+/// use finstack_quant_core::dates::{available_calendars, calendar_by_id_strict};
 /// use finstack_quant_core::types::CalendarId;
 /// let ids = available_calendars();
 /// let id = CalendarId::from(ids[0]);
-/// let maybe = calendar_by_id(id.as_str());
-/// assert!(maybe.is_some());
+/// assert!(calendar_by_id_strict(id.as_str()).is_ok());
 /// ```
 #[inline]
 pub const fn available_calendars() -> &'static [&'static str] {

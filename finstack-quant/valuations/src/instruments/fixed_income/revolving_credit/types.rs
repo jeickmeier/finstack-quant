@@ -5,7 +5,7 @@
 //! commitment, usage, and facility fees) and both fixed and floating rate bases.
 
 use finstack_quant_core::dates::{
-    calendar_by_id, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
+    calendar_by_id_strict, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -915,11 +915,7 @@ impl RevolvingCredit {
         })?;
         match self.calendar_id.as_deref() {
             Some(calendar_id) => {
-                let calendar = calendar_by_id(calendar_id).ok_or_else(|| {
-                    finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
-                        id: format!("calendar:{calendar_id}"),
-                    })
-                })?;
+                let calendar = calendar_by_id_strict(calendar_id)?;
                 as_of.add_business_days(settlement_days, calendar)
             }
             None => as_of.add_weekdays(settlement_days),

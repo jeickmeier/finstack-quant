@@ -5,7 +5,7 @@
 //! schedules, fee tiers, the coupon specification and the draw/repay or
 //! stochastic utilization specification.
 
-use finstack_quant_core::dates::{calendar_by_id, Date};
+use finstack_quant_core::dates::{calendar_by_id_strict, Date};
 use rust_decimal::Decimal;
 
 use super::types::{CreditSpreadProcessSpec, DrawRepaySpec, RevolvingCredit, UtilizationProcess};
@@ -189,7 +189,7 @@ impl RevolvingCredit {
         )?;
 
         if let Some(calendar_id) = self.calendar_id.as_deref() {
-            validation::require_with(calendar_by_id(calendar_id).is_some(), || {
+            validation::require_with(calendar_by_id_strict(calendar_id).is_ok(), || {
                 format!(
                     "RevolvingCredit {} unknown calendar_id '{calendar_id}'",
                     self.id

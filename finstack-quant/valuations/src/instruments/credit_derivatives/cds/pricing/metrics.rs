@@ -282,7 +282,8 @@ impl CdsPricer {
                 .premium_leg
                 .calendar_id
                 .as_deref()
-                .and_then(finstack_quant_core::dates::calendar_by_id);
+                .map(finstack_quant_core::dates::calendar_by_id_strict)
+                .transpose()?;
             let mut ann = 0.0;
             for period in periods {
                 let start_date = period.accrual_start;
@@ -366,7 +367,8 @@ impl CdsPricer {
             .premium_leg
             .calendar_id
             .as_deref()
-            .and_then(finstack_quant_core::dates::calendar_by_id);
+            .map(finstack_quant_core::dates::calendar_by_id_strict)
+            .transpose()?;
 
         // Pre-compute year fractions once to avoid repeated day-count calls.
         let disc_day_count = disc.day_count();

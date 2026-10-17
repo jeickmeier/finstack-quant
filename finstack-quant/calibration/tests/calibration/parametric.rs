@@ -18,14 +18,14 @@ use time::Month;
 use crate::calibration::calibration_support as cal_utils;
 
 fn contractual_quote_dates(base: Date, index: &str, tenor: &str) -> (Date, Date) {
-    use finstack_quant_core::dates::{adjust, calendar_by_id, DateExt};
+    use finstack_quant_core::dates::{adjust, calendar_by_id_strict, DateExt};
     use finstack_quant_valuations::market::conventions::ConventionRegistry;
 
     let registry = ConventionRegistry::try_global().expect("conventions");
     let convention = registry
         .require_rate_index(&IndexId::new(index))
         .expect("index conventions");
-    let calendar = calendar_by_id(&convention.market_calendar_id).expect("calendar");
+    let calendar = calendar_by_id_strict(&convention.market_calendar_id).expect("calendar");
     let spot = base
         .add_business_days(convention.market_settlement_days, calendar)
         .expect("spot date");
@@ -451,7 +451,7 @@ fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
     use finstack_quant_cashflows::builder::RollRule;
     use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{adjust, calendar_by_id, DayCount, DayCountContext};
+    use finstack_quant_core::dates::{adjust, calendar_by_id_strict, DayCount, DayCountContext};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{NelsonSiegelModel, ParametricCurve};
     use finstack_quant_core::market_data::traits::Discounting;
@@ -533,7 +533,7 @@ fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
         );
         let calendar_id = fixed.calendar_id.as_deref().expect("OIS calendar");
         assert_eq!(float.calendar_id.as_deref(), Some(calendar_id));
-        let calendar = calendar_by_id(calendar_id).expect("calendar");
+        let calendar = calendar_by_id_strict(calendar_id).expect("calendar");
         let periods = build_periods(BuildPeriodsParams {
             start: fixed.start,
             end: fixed.end,

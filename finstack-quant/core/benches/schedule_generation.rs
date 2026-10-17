@@ -14,7 +14,7 @@ mod bench_utils;
 use bench_utils::bench_iter;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use finstack_quant_core::dates::{
-    calendar_by_id, BusinessDayConvention, ScheduleBuilder, StubKind, Tenor,
+    calendar_by_id_strict, BusinessDayConvention, ScheduleBuilder, StubKind, Tenor,
 };
 use std::hint::black_box;
 use time::{Date, Month};
@@ -207,7 +207,7 @@ fn bench_business_day_adjustment(c: &mut Criterion) {
         black_box(sched);
     });
 
-    if let Some(nyse) = calendar_by_id("nyse") {
+    if let Ok(nyse) = calendar_by_id_strict("nyse") {
         bench_iter(&mut group, "mod_following_nyse", || {
             let sched = ScheduleBuilder::new(start, end)
                 .unwrap()

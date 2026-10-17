@@ -10,7 +10,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    calendar_by_id, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
+    calendar_by_id_strict, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -31,7 +31,7 @@ use time::macros::date;
 const SOFR: f64 = 0.04;
 
 fn usny_business_days(from: Date, through: Date) -> Vec<Date> {
-    let calendar = calendar_by_id("usny").expect("USNY calendar");
+    let calendar = calendar_by_id_strict("usny").expect("USNY calendar");
     let mut days = Vec::new();
     let mut day = from;
     while day <= through {

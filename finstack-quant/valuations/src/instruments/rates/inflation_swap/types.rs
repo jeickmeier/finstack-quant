@@ -247,13 +247,8 @@ impl InflationSwap {
     fn adjusted_payment_date(&self, date: Date) -> finstack_quant_core::Result<Date> {
         let business_day_convention = self.business_day_convention;
         if let Some(ref cal_id) = self.calendar_id {
-            use finstack_quant_core::dates::calendar_by_id;
-            let cal = calendar_by_id(cal_id).ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "InflationSwap '{}' calendar '{}' is not registered",
-                    self.id, cal_id
-                ))
-            })?;
+            use finstack_quant_core::dates::calendar_by_id_strict;
+            let cal = calendar_by_id_strict(cal_id)?;
             return finstack_quant_core::dates::adjust(date, business_day_convention, cal);
         }
         // No calendar specified - return unadjusted (common for inflation swaps)

@@ -1613,7 +1613,7 @@ mod tests {
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
         use crate::instruments::rates::irs::FloatingLegCompounding;
-        use finstack_quant_core::dates::calendar_by_id;
+        use finstack_quant_core::dates::calendar_by_id_strict;
 
         let start = date(2025, 1, 2);
         let end = date(2026, 1, 2);
@@ -1675,7 +1675,7 @@ mod tests {
             .iter()
             .find(|cf| cf.kind == finstack_quant_cashflows::primitives::CFKind::FloatReset)
             .expect("overnight coupon");
-        let calendar = calendar_by_id("usny").expect("usny");
+        let calendar = calendar_by_id_strict("usny").expect("usny");
         let periods = finstack_quant_cashflows::builder::build_periods(
             finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start,
@@ -1732,7 +1732,7 @@ mod tests {
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
         use crate::instruments::rates::irs::FloatingLegCompounding;
-        use finstack_quant_core::dates::calendar_by_id;
+        use finstack_quant_core::dates::calendar_by_id_strict;
 
         let start = date(2025, 1, 2);
         let end = date(2026, 1, 2);
@@ -1794,7 +1794,7 @@ mod tests {
             .iter()
             .find(|cf| cf.kind == finstack_quant_cashflows::primitives::CFKind::FloatReset)
             .expect("overnight coupon");
-        let calendar = calendar_by_id("weekends_only").expect("fixing calendar");
+        let calendar = calendar_by_id_strict("weekends_only").expect("fixing calendar");
         let periods = finstack_quant_cashflows::builder::build_periods(
             finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start,
@@ -1848,7 +1848,7 @@ mod tests {
     #[test]
     fn overnight_annuity_uses_projector_year_fraction() {
         use crate::instruments::rates::irs::FloatingLegCompounding;
-        use finstack_quant_core::dates::calendar_by_id;
+        use finstack_quant_core::dates::calendar_by_id_strict;
 
         let start = date(2025, 7, 4);
         let end = date(2025, 10, 6);
@@ -1917,7 +1917,7 @@ mod tests {
             },
         )
         .expect("periods");
-        let calendar = calendar_by_id("usny").expect("usny");
+        let calendar = calendar_by_id_strict("usny").expect("usny");
         let disc = market.get_discount("USD-OIS").expect("discount");
         let fwd = market.get_forward("USD-SOFR-OIS").expect("forward");
         let mut expected = 0.0;

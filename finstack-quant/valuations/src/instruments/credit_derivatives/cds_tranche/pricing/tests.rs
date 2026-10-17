@@ -747,7 +747,8 @@ fn standard_constructor_uses_imm_cds_dates() {
             .all(|p| finstack_quant_core::dates::is_cds_date(p.accrual_end)),
         "contractual accrual boundaries must stay on CDS roll dates"
     );
-    let calendar = finstack_quant_core::dates::calendar_by_id("weekends_only").expect("calendar");
+    let calendar =
+        finstack_quant_core::dates::calendar_by_id_strict("weekends_only").expect("calendar");
     for period in periods {
         assert_eq!(
             period.payment_date,

@@ -347,16 +347,12 @@ impl Repo {
         calendar_id: impl Into<CalendarId>,
         discount_curve_id: impl Into<CurveId>,
     ) -> Result<Self> {
-        use finstack_quant_core::dates::calendar_by_id;
+        use finstack_quant_core::dates::calendar_by_id_strict;
 
         let defaults =
             embedded_registry()?.repo_defaults(repo_specs_id(cash_amount.currency())?)?;
         let cal_id = calendar_id.into();
-        let calendar = calendar_by_id(&cal_id).ok_or_else(|| {
-            Error::Input(finstack_quant_core::InputError::NotFound {
-                id: format!("calendar:{}", cal_id),
-            })
-        })?;
+        let calendar = calendar_by_id_strict(&cal_id)?;
 
         // Adjust start date to next business day if needed
         let adj_start = adjust(start_date, BusinessDayConvention::Following, calendar)?;
@@ -588,7 +584,7 @@ impl Repo {
     /// - `calendar_id` is not specified (required for repos)
     /// - `calendar_id` references an unknown calendar
     pub fn adjusted_dates(&self) -> Result<(Date, Date)> {
-        use finstack_quant_core::dates::{available_calendars, calendar_by_id};
+        use finstack_quant_core::dates::calendar_by_id_strict;
 
         let cal_id = self.calendar_id.as_ref().ok_or_else(|| {
             Error::Validation(
@@ -599,15 +595,7 @@ impl Repo {
             )
         })?;
 
-        let calendar = calendar_by_id(cal_id).ok_or_else(|| {
-            Error::Input(finstack_quant_core::InputError::NotFound {
-                id: format!(
-                    "calendar_id:{} (available: {})",
-                    cal_id,
-                    available_calendars().join(", ")
-                ),
-            })
-        })?;
+        let calendar = calendar_by_id_strict(cal_id)?;
 
         let adj_start = adjust(self.start_date, self.business_day_convention, calendar)?;
         let adj_maturity = adjust(self.maturity, self.business_day_convention, calendar)?;

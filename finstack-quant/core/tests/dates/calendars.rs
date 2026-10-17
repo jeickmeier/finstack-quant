@@ -8,7 +8,7 @@ use finstack_quant_core::dates::calendar::{
     TARGET2 as Target2, TSX as Tsx, USNY as Usny,
 };
 use finstack_quant_core::dates::{
-    adjust, available_calendars, calendar_by_id, BusinessDayConvention, Date, DateExt,
+    adjust, available_calendars, calendar_by_id_strict, BusinessDayConvention, Date, DateExt,
     HolidayCalendar, Month, Rule,
 };
 use std::collections::HashSet;
@@ -36,7 +36,7 @@ fn calendars_match_complete_published_years_including_open_days() {
         assert_eq!(fields.len(), 3, "invalid fixture row {row}");
         let id = fields[0];
         let year = fields[1].parse::<i32>().unwrap();
-        let calendar = calendar_by_id(id).unwrap();
+        let calendar = calendar_by_id_strict(id).unwrap();
         let closed: HashSet<_> = fields[2]
             .split(';')
             .map(|value| {
@@ -65,7 +65,7 @@ fn calendars_match_complete_published_years_including_open_days() {
 #[test]
 fn calendar_conventions_preserve_neighboring_open_dates() {
     for id in ["cato", "tsx"] {
-        let calendar = calendar_by_id(id).unwrap();
+        let calendar = calendar_by_id_strict(id).unwrap();
         assert_eq!(
             adjust(
                 make_date(2026, 5, 18),
@@ -78,12 +78,12 @@ fn calendar_conventions_preserve_neighboring_open_dates() {
         assert!(calendar.is_business_day(make_date(2026, 5, 25)));
     }
     for id in ["asx", "auce"] {
-        let calendar = calendar_by_id(id).unwrap();
+        let calendar = calendar_by_id_strict(id).unwrap();
         assert!(!calendar.is_business_day(make_date(2024, 1, 26)));
         assert!(calendar.is_business_day(make_date(2024, 1, 29)));
     }
     for id in ["asx", "auce", "cato", "tsx", "nzau"] {
-        let calendar = calendar_by_id(id).unwrap();
+        let calendar = calendar_by_id_strict(id).unwrap();
         for closed in [make_date(2027, 12, 27), make_date(2027, 12, 28)] {
             assert!(!calendar.is_business_day(closed), "{id}: {closed}");
         }
@@ -112,7 +112,7 @@ fn holiday_adoption_bounds_are_respected() {
     }
     assert!(Cato.is_business_day(make_date(2020, 9, 30)));
     assert!(!Cato.is_business_day(make_date(2021, 9, 30)));
-    let auckland = calendar_by_id("nzau").unwrap();
+    let auckland = calendar_by_id_strict("nzau").unwrap();
     assert!(!auckland.is_business_day(make_date(2022, 6, 24)));
     assert!(!auckland.is_business_day(make_date(2052, 6, 21)));
     assert!(auckland.is_business_day(make_date(2021, 6, 25)));
@@ -221,7 +221,7 @@ fn hong_kong_matches_published_general_holidays() {
         ),
     ];
     for id in ["hkhk", "hkex"] {
-        let calendar = calendar_by_id(id).unwrap();
+        let calendar = calendar_by_id_strict(id).unwrap();
         for &(year, month_days) in years {
             let expected: HashSet<_> = month_days
                 .iter()
@@ -244,7 +244,7 @@ fn hong_kong_matches_published_general_holidays() {
 #[test]
 fn hong_kong_historical_adoption_and_substitution() {
     for id in ["hkhk", "hkex"] {
-        let calendar = calendar_by_id(id).unwrap();
+        let calendar = calendar_by_id_strict(id).unwrap();
         for date in [
             make_date(1981, 7, 29),  // Royal wedding one-off holiday.
             make_date(1982, 4, 21),  // Colonial Queen's Birthday.
@@ -310,7 +310,7 @@ fn japan_matches_cabinet_office_holidays_1970_through_2027() {
                 && !matches!(date.weekday(), Weekday::Saturday | Weekday::Sunday);
             for id in ["jpto", "jpx"] {
                 assert_eq!(
-                    calendar_by_id(id).unwrap().is_business_day(date),
+                    calendar_by_id_strict(id).unwrap().is_business_day(date),
                     business,
                     "{id} {date}"
                 );
@@ -322,7 +322,7 @@ fn japan_matches_cabinet_office_holidays_1970_through_2027() {
 #[test]
 fn japan_golden_week_and_citizens_holiday_adjustments() {
     for id in ["jpto", "jpx"] {
-        let calendar = calendar_by_id(id).unwrap();
+        let calendar = calendar_by_id_strict(id).unwrap();
         assert_eq!(
             adjust(
                 make_date(2026, 5, 5),
@@ -800,11 +800,11 @@ fn calendars_match_sample_expectations() {
 #[test]
 fn test_calendar_by_id_lookup() {
     for &id in available_calendars() {
-        let cal = calendar_by_id(id);
-        assert!(cal.is_some(), "Calendar '{}' should be found", id);
+        let cal = calendar_by_id_strict(id);
+        assert!(cal.is_ok(), "Calendar '{}' should be found", id);
 
-        let typed = calendar_by_id(id);
-        assert!(typed.is_some(), "Free resolver should find '{}'", id);
+        let typed = calendar_by_id_strict(id);
+        assert!(typed.is_ok(), "Free resolver should find '{}'", id);
 
         let mid_week_date = make_date(2025, 6, 18);
         let _ = cal.unwrap().is_holiday(mid_week_date);
@@ -813,7 +813,7 @@ fn test_calendar_by_id_lookup() {
 
 #[test]
 fn test_unknown_calendar_id() {
-    assert!(calendar_by_id("unknown_calendar").is_none());
+    assert!(calendar_by_id_strict("unknown_calendar").is_err());
 }
 
 #[test]
@@ -1067,7 +1067,7 @@ fn usny_fed_observance_saturday_no_substitute_sunday_to_monday() {
 
 #[test]
 fn sofr_calendar_follows_repo_closures_independently_of_banking_and_trading() {
-    let sofr = calendar_by_id("sofr").expect("registered SOFR calendar");
+    let sofr = calendar_by_id_strict("sofr").expect("registered SOFR calendar");
     // NY Fed operating policies 250328a, 260312a and 260618a: there is no
     // SOFR value date on these Fridays; Thursday's fixing covers to Monday.
     for (holiday, following) in [

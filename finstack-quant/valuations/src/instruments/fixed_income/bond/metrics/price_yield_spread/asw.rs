@@ -13,7 +13,7 @@ use finstack_quant_cashflows::{
     primitives::CFKind,
 };
 use finstack_quant_core::dates::{
-    calendar_by_id, BusinessDayConvention, Date, DayCount, HolidayCalendar, ScheduleBuilder,
+    calendar_by_id_strict, BusinessDayConvention, Date, DayCount, HolidayCalendar, ScheduleBuilder,
     StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
@@ -712,8 +712,10 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                         workout_maturity,
                         frequency,
                         StubKind::ShortBack,
-                        calendar_by_id(&params.calendar_id)
-                            .map(|cal| (params.business_day_convention, cal)),
+                        Some((
+                            params.business_day_convention,
+                            calendar_by_id_strict(&params.calendar_id)?,
+                        )),
                     )?;
                     if fixed_schedule.len() < 2 {
                         return Err(finstack_quant_core::Error::Validation(

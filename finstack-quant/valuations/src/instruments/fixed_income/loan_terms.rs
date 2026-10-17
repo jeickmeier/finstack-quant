@@ -114,13 +114,7 @@ impl RateSpec {
                     .fixing_calendar_id
                     .as_deref()
                     .unwrap_or("weekends_only");
-                let calendar =
-                    finstack_quant_core::dates::calendar_by_id(calendar_id).ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(format!(
-                            "structured-credit tranche fixing calendar '{}' is not registered",
-                            calendar_id
-                        ))
-                    })?;
+                let calendar = finstack_quant_core::dates::calendar_by_id_strict(calendar_id)?;
                 let reset_date = finstack_quant_core::dates::DateExt::add_business_days(
                     accrual_start,
                     -spec.reset_lag_days,

@@ -11,7 +11,7 @@
 //! - ISDA "Big Bang" Protocol (June 20, 2009) - European T+1 settlement
 //! - ISDA "Small Bang" Protocol (July 27, 2009) - European convention updates
 
-use finstack_quant_core::dates::{calendar_by_id, DayCount};
+use finstack_quant_core::dates::{calendar_by_id_strict, DayCount};
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CdsConvention;
 use time::{Date, Month};
 
@@ -24,9 +24,9 @@ fn test_cds_convention_calendars_resolve() {
         .expect("CDS registry")
         .calendar_id
         .as_str();
-    let na_calendar = calendar_by_id(na_calendar_id);
+    let na_calendar = calendar_by_id_strict(na_calendar_id);
     assert!(
-        na_calendar.is_some(),
+        na_calendar.is_ok(),
         "North American calendar '{}' should resolve to a valid calendar",
         na_calendar_id
     );
@@ -37,9 +37,9 @@ fn test_cds_convention_calendars_resolve() {
         .expect("CDS registry")
         .calendar_id
         .as_str();
-    let eu_calendar = calendar_by_id(eu_calendar_id);
+    let eu_calendar = calendar_by_id_strict(eu_calendar_id);
     assert!(
-        eu_calendar.is_some(),
+        eu_calendar.is_ok(),
         "European calendar '{}' should resolve to a valid calendar",
         eu_calendar_id
     );
@@ -50,9 +50,9 @@ fn test_cds_convention_calendars_resolve() {
         .expect("CDS registry")
         .calendar_id
         .as_str();
-    let as_calendar = calendar_by_id(as_calendar_id);
+    let as_calendar = calendar_by_id_strict(as_calendar_id);
     assert!(
-        as_calendar.is_some(),
+        as_calendar.is_ok(),
         "Asian calendar '{}' should resolve to a valid calendar",
         as_calendar_id
     );
@@ -136,7 +136,7 @@ fn test_cds_day_count_conventions() {
 /// Verify that the NYSE calendar correctly identifies US market holidays.
 #[test]
 fn test_nyse_calendar_holidays() {
-    let calendar = calendar_by_id("nyse").expect("NYSE calendar should exist");
+    let calendar = calendar_by_id_strict("nyse").expect("NYSE calendar should exist");
 
     // US Independence Day (July 4th)
     let independence_day = Date::from_calendar_date(2025, Month::July, 4).unwrap();
@@ -163,7 +163,7 @@ fn test_nyse_calendar_holidays() {
 /// Verify that the TARGET2 calendar correctly identifies ECB holidays.
 #[test]
 fn test_target2_calendar_holidays() {
-    let calendar = calendar_by_id("target2").expect("TARGET2 calendar should exist");
+    let calendar = calendar_by_id_strict("target2").expect("TARGET2 calendar should exist");
 
     // New Year's Day
     let new_year = Date::from_calendar_date(2025, Month::January, 1).unwrap();
@@ -197,7 +197,7 @@ fn test_target2_calendar_holidays() {
 /// Verify that the Tokyo calendar correctly identifies Japanese market holidays.
 #[test]
 fn test_tokyo_calendar_holidays() {
-    let calendar = calendar_by_id("jpto").expect("Tokyo calendar should exist");
+    let calendar = calendar_by_id_strict("jpto").expect("Tokyo calendar should exist");
 
     // New Year's Day
     let new_year = Date::from_calendar_date(2025, Month::January, 1).unwrap();

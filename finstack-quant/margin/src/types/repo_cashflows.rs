@@ -200,7 +200,7 @@ mod tests {
             &spec,
             cash,
             &valuations,
-            finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
+            finstack_quant_core::dates::calendar_by_id_strict("usny").expect("calendar"),
         )
         .expect("valid margin cashflows fixture");
         assert!(cashflows.is_empty());
@@ -219,7 +219,7 @@ mod tests {
             &spec,
             cash,
             &valuations,
-            finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
+            finstack_quant_core::dates::calendar_by_id_strict("usny").expect("calendar"),
         )
         .expect("valid margin cashflows fixture");
 
@@ -244,7 +244,7 @@ mod tests {
             &spec,
             cash,
             &valuations,
-            finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
+            finstack_quant_core::dates::calendar_by_id_strict("usny").expect("calendar"),
         )
         .expect("valid margin cashflows fixture");
 
@@ -266,7 +266,7 @@ mod tests {
             &spec,
             cash,
             &valuations,
-            finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
+            finstack_quant_core::dates::calendar_by_id_strict("usny").expect("calendar"),
         )
         .expect("valid margin cashflows fixture");
 
@@ -288,7 +288,7 @@ mod tests {
             &spec,
             cash,
             &valuations,
-            finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
+            finstack_quant_core::dates::calendar_by_id_strict("usny").expect("calendar"),
         )
         .expect("valid margin cashflows fixture");
 

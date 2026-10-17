@@ -63,14 +63,13 @@
 //!
 //! ```rust
 //! use finstack_quant_core::dates::{
-//!     adjust, calendar_by_id, BusinessDayConvention, HolidayCalendar,
+//!     adjust, calendar_by_id_strict, BusinessDayConvention, HolidayCalendar,
 //! };
 //! use time::{Date, Month};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!
 //! // Get New York Stock Exchange calendar
-//! let nyse = calendar_by_id("nyse")
-//!     .ok_or("NYSE calendar not found")?;
+//! let nyse = calendar_by_id_strict("nyse")?;
 //!
 //! // Check if a date is a business day
 //! let date = Date::from_calendar_date(2025, Month::December, 25)?;

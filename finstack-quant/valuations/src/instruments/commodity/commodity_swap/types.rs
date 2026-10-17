@@ -12,7 +12,9 @@ use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{calendar_by_id, BusinessDayConvention, Date, DateExt, Tenor};
+use finstack_quant_core::dates::{
+    calendar_by_id_strict, BusinessDayConvention, Date, DateExt, Tenor,
+};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
@@ -187,12 +189,7 @@ impl CommoditySwap {
             ));
         }
         if let Some(calendar_id) = self.calendar_id.as_deref() {
-            calendar_by_id(calendar_id).ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "CommoditySwap '{}' references unknown calendar_id '{calendar_id}'",
-                    self.id
-                ))
-            })?;
+            calendar_by_id_strict(calendar_id)?;
         }
         let mut seen = std::collections::BTreeSet::new();
         for (date, value) in &self.past_fixings {
@@ -309,14 +306,7 @@ impl CommoditySwap {
         let calendar = self
             .calendar_id
             .as_deref()
-            .map(|id| {
-                calendar_by_id(id).ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(format!(
-                        "CommoditySwap '{}' references unknown calendar_id '{id}'",
-                        self.id
-                    ))
-                })
-            })
+            .map(|id| calendar_by_id_strict(id))
             .transpose()?;
         let fixings: std::collections::BTreeMap<Date, f64> =
             self.past_fixings.iter().copied().collect();

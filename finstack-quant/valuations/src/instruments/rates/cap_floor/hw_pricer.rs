@@ -491,7 +491,7 @@ mod tests {
     use date_support::date;
     use discount_forward_curve_support::{flat_discount_with_tenor, flat_forward_with_tenor};
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{calendar_by_id, DateExt, DayCount, DayCountContext};
+    use finstack_quant_core::dates::{calendar_by_id_strict, DateExt, DayCount, DayCountContext};
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use finstack_quant_core::money::Money;
     use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
@@ -1347,7 +1347,7 @@ mod tests {
             .model_config
             .hw1f_mean_reversion = Some(0.05);
         caplet.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.012);
-        let calendar = calendar_by_id("usny").expect("USNY calendar");
+        let calendar = calendar_by_id_strict("usny").expect("USNY calendar");
         let mut fixing_values = Vec::new();
         let mut observation_date = accrual_start;
         while observation_date < accrual_end {

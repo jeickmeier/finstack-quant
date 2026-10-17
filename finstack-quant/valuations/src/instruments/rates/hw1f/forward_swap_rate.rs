@@ -227,7 +227,7 @@ mod tests {
     }
     #[test]
     fn single_curve_forward_prices_actual_adjusted_and_lagged_payments() {
-        use finstack_quant_core::dates::{adjust, calendar_by_id, DateExt};
+        use finstack_quant_core::dates::{adjust, calendar_by_id_strict, DateExt};
         let as_of = Date::from_calendar_date(2025, Month::January, 2).expect("date");
         let start = Date::from_calendar_date(2025, Month::January, 31).expect("date");
         let end = Date::from_calendar_date(2027, Month::January, 31).expect("date");
@@ -240,7 +240,7 @@ mod tests {
         let market = MarketContext::new().insert(curve);
         let disc = market.get_discount("USD-OIS").expect("curve");
         let calendar_id = finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID;
-        let calendar = calendar_by_id(calendar_id).expect("calendar");
+        let calendar = calendar_by_id_strict(calendar_id).expect("calendar");
         for business_day_convention in [
             BusinessDayConvention::Unadjusted,
             BusinessDayConvention::Following,

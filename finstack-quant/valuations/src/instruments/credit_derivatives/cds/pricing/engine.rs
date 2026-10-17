@@ -196,7 +196,8 @@ impl CdsPricer {
             .premium_leg
             .calendar_id
             .as_deref()
-            .and_then(finstack_quant_core::dates::calendar_by_id);
+            .map(finstack_quant_core::dates::calendar_by_id_strict)
+            .transpose()?;
 
         // Compute survival at as_of for conditioning
         let sp_asof = surv.sp(t_asof);
@@ -248,7 +249,8 @@ impl CdsPricer {
             .premium_leg
             .calendar_id
             .as_deref()
-            .and_then(finstack_quant_core::dates::calendar_by_id);
+            .map(finstack_quant_core::dates::calendar_by_id_strict)
+            .transpose()?;
         let periods = self.coupon_periods(cds, as_of)?;
         let spread = cds.premium_leg.coupon_bp.to_f64().ok_or_else(|| {
             Error::Validation("premium.coupon_bp cannot be represented as f64".into())
@@ -537,7 +539,8 @@ impl CdsHazardRepriceCache {
             .premium_leg
             .calendar_id
             .as_deref()
-            .and_then(finstack_quant_core::dates::calendar_by_id);
+            .map(finstack_quant_core::dates::calendar_by_id_strict)
+            .transpose()?;
         let mut premium_pv = 0.0;
         for &(period, accrual, df) in &self.periods {
             self.pricer.add_premium_period(

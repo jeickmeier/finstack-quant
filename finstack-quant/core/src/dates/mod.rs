@@ -68,7 +68,6 @@ pub use calendar::business_days::{
     adjust, available_calendars, calendar_by_id_strict, canonical_calendar_id, resolve_calendar,
     resolve_joint_calendar, BusinessDayConvention, CalendarMetadata, HolidayCalendar,
 };
-pub use calendar::calendars_generated::registry::calendar_by_id;
 pub use calendar::WEEKENDS_ONLY;
 
 mod schedule;

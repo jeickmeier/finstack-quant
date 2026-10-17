@@ -77,14 +77,13 @@
 //!
 //! With business day adjustment:
 //! ```rust
-//! use finstack_quant_core::dates::{calendar_by_id, ScheduleBuilder, Tenor, BusinessDayConvention};
+//! use finstack_quant_core::dates::{calendar_by_id_strict, ScheduleBuilder, Tenor, BusinessDayConvention};
 //! use time::{Date, Month};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!
 //! let start = Date::from_calendar_date(2025, Month::June, 15)?;
 //! let end = Date::from_calendar_date(2025, Month::December, 15)?;
-//! let nyse = calendar_by_id("nyse")
-//!     .ok_or("NYSE calendar not found")?;
+//! let nyse = calendar_by_id_strict("nyse")?;
 //!
 //! let sched = ScheduleBuilder::new(start, end)?
 //!     .frequency(Tenor::monthly())

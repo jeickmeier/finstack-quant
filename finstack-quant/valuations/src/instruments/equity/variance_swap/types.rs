@@ -238,14 +238,7 @@ impl VarianceSwap {
                     .to_string(),
             ));
         }
-        finstack_quant_core::dates::calendar_by_id(&self.observation_calendar_id).ok_or_else(
-            || {
-                finstack_quant_core::Error::Validation(format!(
-                    "VarianceSwap '{}' references unknown observation_calendar_id '{}'",
-                    self.id, self.observation_calendar_id
-                ))
-            },
-        )?;
+        finstack_quant_core::dates::calendar_by_id_strict(&self.observation_calendar_id)?;
         for (name, id) in [
             ("open_series_id", self.open_series_id.as_deref()),
             ("high_series_id", self.high_series_id.as_deref()),

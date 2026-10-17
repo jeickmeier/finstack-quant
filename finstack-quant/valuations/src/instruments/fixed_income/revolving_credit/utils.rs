@@ -726,7 +726,7 @@ mod tests {
         use crate::instruments::common_impl::pricing::overnight::{
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
-        use finstack_quant_core::dates::calendar_by_id;
+        use finstack_quant_core::dates::calendar_by_id_strict;
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
         use rust_decimal::Decimal;
 
@@ -777,7 +777,7 @@ mod tests {
         let compounding = resolved_overnight_compounding(&spec)
             .expect("resolve")
             .expect("overnight");
-        let calendar = calendar_by_id("usny").expect("usny");
+        let calendar = calendar_by_id_strict("usny").expect("usny");
         let expected = project_overnight_coupon(OvernightCouponProjectionInput {
             curve: OvernightProjectionCurve::Forward(&forward),
             fixings: None,
@@ -803,7 +803,7 @@ mod tests {
 
     #[test]
     fn act365l_overnight_slices_keep_the_actual_annual_coupon_denominator() {
-        use finstack_quant_core::dates::calendar_by_id;
+        use finstack_quant_core::dates::calendar_by_id_strict;
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
         use rust_decimal::Decimal;
         use time::macros::date;
@@ -835,7 +835,7 @@ mod tests {
             .knots([(0.0, 0.05), (2.0, 0.05)])
             .build()
             .expect("flat overnight curve");
-        let calendar = calendar_by_id("weekends_only").expect("weekend calendar");
+        let calendar = calendar_by_id_strict("weekends_only").expect("weekend calendar");
         for (start, end, margin_delta_bp) in
             [(coupon_start, split, 0.0), (split, coupon_end, 100.0)]
         {
@@ -884,7 +884,7 @@ mod tests {
         use finstack_quant_cashflows::builder::{
             FloatingLegCompounding, OvernightIndexConstraintApplication,
         };
-        use finstack_quant_core::dates::{calendar_by_id, DateExt};
+        use finstack_quant_core::dates::{calendar_by_id_strict, DateExt};
         use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
         use rust_decimal::Decimal;
@@ -893,7 +893,7 @@ mod tests {
         let end = Date::from_calendar_date(2025, Month::April, 2).expect("date");
         let switch = Date::from_calendar_date(2025, Month::February, 14).expect("date");
         let fixing = |date: Date| if date < switch { -0.01 } else { 0.02 };
-        let calendar = calendar_by_id("usny").expect("usny");
+        let calendar = calendar_by_id_strict("usny").expect("usny");
         let mut observations = Vec::new();
         let mut date = start;
         while date < end {

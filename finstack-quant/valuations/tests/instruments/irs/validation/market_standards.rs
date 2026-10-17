@@ -14,8 +14,8 @@ use crate::instruments::test_support::rates as test_utils;
 use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    calendar_by_id, BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind,
-    Tenor,
+    calendar_by_id_strict, BusinessDayConvention, Date, DateExt, DayCount, DayCountContext,
+    StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -1020,7 +1020,7 @@ fn test_sofr_ois_par_rate_matches_quantlib_identity() {
     // QuantLib identity for single-curve OIS:
     // par_rate = PV_float / annuity, where PV_float uses DF ratios per period.
     let as_of = date!(2025 - 01 - 02);
-    let calendar = calendar_by_id("usny").expect("USNY calendar");
+    let calendar = calendar_by_id_strict("usny").expect("USNY calendar");
     let start = as_of.add_business_days(2, calendar).expect("spot start");
     let end = Tenor::annual()
         .add_to_date(
