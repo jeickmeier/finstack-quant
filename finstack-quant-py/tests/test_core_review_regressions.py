@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import numpy as np
 import pytest
+from finstack_quant.models.volatility import get_surface_vol
 
 from finstack_quant.core.market_data import MarketContext, ScalarTimeSeries, VolSurface
 from finstack_quant.models.correlation import validate_correlation_matrix
@@ -49,7 +50,7 @@ def test_surface_preserves_valid_shape_and_quote_conventions(values: object) -> 
         interpolation_mode="total_variance",
         quote_type="normal",
     )
-    assert surface.vol(1.0, 2.0) == 0.2
+    assert get_surface_vol(surface, 1.0, 2.0) == 0.2
     assert surface.secondary_axis == "tenor"
     assert surface.interpolation_mode == "total_variance"
     assert surface.quote_type == "normal"

@@ -131,6 +131,17 @@ impl VolCubeExpirySlice {
     pub fn vols(&self) -> &[f64] {
         &self.vols
     }
+    /// Every node as `(tenor, strike, vol)` in tenor-major order.
+    pub fn grid_points(&self) -> impl Iterator<Item = (f64, f64, f64)> + '_ {
+        let n_strikes = self.strikes.len();
+        self.vols.iter().enumerate().map(move |(index, &vol)| {
+            (
+                self.tenors[index / n_strikes],
+                self.strikes[index % n_strikes],
+                vol,
+            )
+        })
+    }
     /// Units and pricing convention of the stored volatility quotes.
     pub fn quote_type(&self) -> VolQuoteType {
         self.quote_type

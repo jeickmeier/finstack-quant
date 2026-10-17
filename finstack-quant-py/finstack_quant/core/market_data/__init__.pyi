@@ -2922,7 +2922,8 @@ class VolSurface:
     >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.22, 0.20, 0.21], [0.23, 0.21, 0.22]])
     >>> surface.grid_shape
     (2, 3)
-    >>> round(surface.vol(1.5, 100.0), 4)
+    >>> from finstack_quant.models.volatility import get_surface_vol
+    >>> round(get_surface_vol(surface, 1.5, 100.0), 4)
     0.205
     >>> surface.vols[0]
     [0.22, 0.2, 0.21]
@@ -3026,31 +3027,6 @@ class VolSurface:
         ------
         ValueError
             If the surface cannot be serialized.
-        """
-        ...
-
-    def vol(self, expiry: float, strike: float) -> float:
-        """
-        Interpolated volatility (decimal) at an expiry / secondary-axis point.
-
-        Bilinear in vol or in total variance according to ``interpolation_mode``.
-
-        Parameters
-        ----------
-        expiry : float
-            Expiry in years; must lie within the ``expiries`` range.
-        strike : float
-            Secondary-axis coordinate; must lie within the ``strikes`` range.
-
-        Returns
-        -------
-        float
-            Volatility as a decimal.
-
-        Raises
-        ------
-        ValueError
-            If a coordinate is non-finite or outside the grid.
         """
         ...
 

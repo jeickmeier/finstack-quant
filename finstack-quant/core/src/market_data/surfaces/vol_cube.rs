@@ -246,6 +246,23 @@ impl VolCube {
         &self.forwards
     }
 
+    /// Every node as `(expiry, tenor, parameters, forward)` in row-major order.
+    pub fn nodes(&self) -> impl Iterator<Item = (f64, f64, &SabrParameterData, f64)> + '_ {
+        let n_tenors = self.tenors.len();
+        self.params
+            .iter()
+            .zip(self.forwards.iter())
+            .enumerate()
+            .map(move |(index, (params, &forward))| {
+                (
+                    self.expiries[index / n_tenors],
+                    self.tenors[index % n_tenors],
+                    params,
+                    forward,
+                )
+            })
+    }
+
     /// Interpolation contract used between expiry pillars.
     #[must_use]
     pub fn interpolation_mode(&self) -> VolInterpolationMode {

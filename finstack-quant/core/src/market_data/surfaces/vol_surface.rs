@@ -271,6 +271,18 @@ impl VolSurface {
         &self.vols
     }
 
+    /// Every grid node as `(expiry, strike, vol)` in expiry-major row order.
+    pub fn grid_points(&self) -> impl Iterator<Item = (f64, f64, f64)> + '_ {
+        let n_strikes = self.strikes.len();
+        self.vols.iter().enumerate().map(move |(index, &vol)| {
+            (
+                self.expiries[index / n_strikes],
+                self.strikes[index % n_strikes],
+                vol,
+            )
+        })
+    }
+
     /// Semantic meaning of the secondary axis.
     pub fn secondary_axis(&self) -> VolSurfaceAxis {
         self.secondary_axis

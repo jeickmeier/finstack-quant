@@ -7003,7 +7003,7 @@ export interface CreditIndexDataConstructor {
  *
  * @example
  * ```typescript
- * import init, { core } from "finstack-quant-wasm";
+ * import init, { core, models } from "finstack-quant-wasm";
  * await init();
  * const surface = new core.VolSurface(
  *   "SPX-VOL",
@@ -7011,7 +7011,7 @@ export interface CreditIndexDataConstructor {
  *   [90, 100, 110],
  *   [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
  * );
- * surface.vol(0.75, 100); // 0.205
+ * models.volatility.getSurfaceVol(surface.toJson(), 0.75, 100); // 0.205
  * surface.gridShape; // [2, 3]
  * ```
  */
@@ -7069,16 +7069,28 @@ export interface VolSurface extends WasmOwned {
    * @throws If serialization fails (not expected for a valid surface).
    */
   toJson(): string;
+}
+
+/**
+ * Optional keys of the `VolSurface` constructor; every omitted key takes the Rust default.
+ */
+export interface VolSurfaceOptions {
   /**
-   * Implied volatility at an expiry and strike inside the grid (Rust
-   * `models::volatility::get_surface_vol`).
-   *
-   * @param expiry - Option expiry in years, within the expiry axis.
-   * @param strike - Secondary-axis coordinate, within the strike (or tenor) axis.
-   * @returns The interpolated volatility as a decimal.
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for a non-finite or out-of-grid coordinate, or when total-variance interpolation is invalid.
+   * What `strikes` holds: `"strike"` (default) or `"tenor"`.
    */
-  vol(expiry: number, strike: number): number;
+  secondaryAxis?: string | null;
+  /**
+   * `"vol"` (default) or `"total_variance"`.
+   */
+  interpolationMode?: string | null;
+  /**
+   * `"black_lognormal"` (default), `"shifted_black_lognormal"` or `"normal"`.
+   */
+  quoteType?: string | null;
+  /**
+   * One shifted-Black displacement per expiry; required for `"shifted_black_lognormal"` quotes.
+   */
+  displacements?: NumericArray | null;
 }
 
 /**
@@ -7090,7 +7102,7 @@ export interface VolSurface extends WasmOwned {
  *
  * @example
  * ```typescript
- * import init, { core } from "finstack-quant-wasm";
+ * import init, { core, models } from "finstack-quant-wasm";
  * await init();
  * const surface = new core.VolSurface(
  *   "SPX-VOL",
@@ -7098,7 +7110,7 @@ export interface VolSurface extends WasmOwned {
  *   [90, 100, 110],
  *   [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
  * );
- * surface.vol(0.75, 100); // 0.205
+ * models.volatility.getSurfaceVol(surface.toJson(), 0.75, 100); // 0.205
  * surface.gridShape; // [2, 3]
  * ```
  */
@@ -7111,10 +7123,7 @@ export interface VolSurfaceConstructor {
    * @param expiries - Option expiries in years, strictly increasing.
    * @param strikes - Secondary-axis coordinates (strikes, or swap tenors in years), strictly increasing.
    * @param vols - Decimal volatilities, either as a flat row-major grid of `expiries.length * strikes.length` entries or as `expiries.length` rows of `strikes.length` values. Entries must be finite and non-negative.
-   * @param secondaryAxis - What `strikes` holds: `"strike"` or `"tenor"`; omitted uses the Rust default (`"strike"`).
-   * @param interpolationMode - `"vol"` or `"total_variance"`; omitted uses the Rust default (`"vol"`).
-   * @param quoteType - `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`; omitted uses the Rust default (`"black_lognormal"`).
-   * @param displacements - Shifted-Black displacements in strike/rate units, one per expiry; required for `"shifted_black_lognormal"` quotes and omitted for the other conventions.
+   * @param options - Optional `{ secondaryAxis, interpolationMode, quoteType, displacements }`: `secondaryAxis` is `"strike"` or `"tenor"`, `interpolationMode` is `"vol"` or `"total_variance"`, `quoteType` is `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`, and `displacements` holds one shifted-Black displacement per expiry (required for `"shifted_black_lognormal"` quotes). Every omitted key takes the Rust default.
    * @returns The validated `VolSurface`.
    * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an empty or unsorted axis, a grid of the wrong length, a negative or non-finite volatility, an unknown axis, mode or quote-type name, or displacements that do not match the quote convention and the expiry count.
    */
@@ -7123,10 +7132,7 @@ export interface VolSurfaceConstructor {
     expiries: NumericArray,
     strikes: NumericArray,
     vols: NumericArray,
-    secondaryAxis?: string | null,
-    interpolationMode?: string | null,
-    quoteType?: string | null,
-    displacements?: NumericArray | null
+    options?: VolSurfaceOptions | null
   ): VolSurface;
   /**
    * Deserialize from the canonical JSON wire form shared with Python `VolSurface.to_json`.

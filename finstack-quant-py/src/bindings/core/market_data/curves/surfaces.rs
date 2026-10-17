@@ -2,7 +2,6 @@
 
 use finstack_quant_core::market_data::surfaces::{
     FxDeltaVolSurface, SabrParameterData, VolCube, VolGridOpts, VolInterpolationMode, VolSurface,
-    VolSurfaceAxis,
 };
 use finstack_quant_core::wire::{serde_label, serde_parse};
 use pyo3::types::PyDict;
@@ -54,7 +53,8 @@ fn extract_vol_grid(obj: &Bound<'_, PyAny>) -> PyResult<VolInput> {
 /// >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.22, 0.20, 0.21], [0.23, 0.21, 0.22]])
 /// >>> surface.grid_shape
 /// (2, 3)
-/// >>> round(surface.vol(1.5, 100.0), 4)
+/// >>> from finstack_quant.models.volatility import get_surface_vol
+/// >>> round(get_surface_vol(surface, 1.5, 100.0), 4)
 /// 0.205
 #[pyclass(
     name = "VolSurface",
@@ -113,21 +113,29 @@ impl PyVolSurface {
     /// >>> VolSurface("EQ-VOL", [1.0], [90.0, 100.0], [0.22, 0.20]).strikes
     /// [90.0, 100.0]
     #[new]
-    #[pyo3(signature = (id, expiries, strikes, vols, *, secondary_axis="strike", interpolation_mode="vol", quote_type="black_lognormal", displacements=None))]
+    #[pyo3(signature = (id, expiries, strikes, vols, *, secondary_axis=None, interpolation_mode=None, quote_type=None, displacements=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         id: &str,
         expiries: Vec<f64>,
         strikes: Vec<f64>,
         vols: &Bound<'_, PyAny>,
-        secondary_axis: &str,
-        interpolation_mode: &str,
-        quote_type: &str,
+        secondary_axis: Option<&str>,
+        interpolation_mode: Option<&str>,
+        quote_type: Option<&str>,
         displacements: Option<Vec<f64>>,
     ) -> PyResult<Self> {
-        let axis: VolSurfaceAxis = serde_parse(secondary_axis).map_err(core_to_py)?;
-        let mode: VolInterpolationMode = serde_parse(interpolation_mode).map_err(core_to_py)?;
-        let quote = parse_vol_quote_type(quote_type)?;
+        // Rust `VolGridOpts::default()` is the single source of the defaults.
+        let mut opts = VolGridOpts::default();
+        if let Some(axis) = secondary_axis {
+            opts.secondary_axis = serde_parse(axis).map_err(core_to_py)?;
+        }
+        if let Some(mode) = interpolation_mode {
+            opts.interpolation_mode = serde_parse(mode).map_err(core_to_py)?;
+        }
+        if let Some(quote) = quote_type {
+            opts.quote_type = parse_vol_quote_type(quote)?;
+        }
         let grid = extract_vol_grid(vols)?;
         let surface = match grid {
             VolInput::Flat(values) => VolSurface::from_grid_opts(
@@ -135,24 +143,20 @@ impl PyVolSurface {
                 &expiries,
                 &strikes,
                 &values,
-                VolGridOpts {
-                    secondary_axis: axis,
-                    interpolation_mode: mode,
-                    quote_type: quote,
-                },
+                opts,
                 displacements.as_deref(),
             ),
             VolInput::Rows(rows) => {
                 let mut builder = VolSurface::builder(id)
                     .expiries(&expiries)
                     .strikes(&strikes)
-                    .secondary_axis(axis)
-                    .interpolation_mode(mode)
+                    .secondary_axis(opts.secondary_axis)
+                    .interpolation_mode(opts.interpolation_mode)
                     .rows(&rows);
                 if let Some(shifts) = displacements.as_deref() {
                     builder = builder.displacements(shifts);
                 }
-                builder.quote_type(quote).build()
+                builder.quote_type(opts.quote_type).build()
             }
         }
         .map_err(core_to_py)?;
@@ -162,31 +166,6 @@ impl PyVolSurface {
         })
     }
 
-    /// Interpolated volatility (decimal) at an expiry / secondary-axis point.
-    ///
-    /// Bilinear in vol or in total variance according to ``interpolation_mode``.
-    ///
-    /// Parameters
-    /// ----------
-    /// expiry : float
-    ///     Expiry in years; must lie within the ``expiries`` range.
-    /// strike : float
-    ///     Secondary-axis coordinate; must lie within the ``strikes`` range.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a coordinate is non-finite or outside the grid.
-    #[pyo3(text_signature = "(self, expiry, strike)")]
-    fn vol(&self, expiry: f64, strike: f64) -> PyResult<f64> {
-        finstack_quant_models::volatility::get_surface_vol(&self.inner, expiry, strike)
-            .map_err(core_to_py)
-    }
-
     /// Export the grid in long form with columns ``expiry``, ``strike`` and ``vol``.
     ///
     /// Returns
@@ -194,24 +173,12 @@ impl PyVolSurface {
     /// pandas.DataFrame
     ///     One row per grid node, expiries outer and strikes inner.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let expiries = self.inner.expiries();
-        let strikes = self.inner.strikes();
-        let mut exp_col = Vec::with_capacity(expiries.len() * strikes.len());
-        let mut strike_col = Vec::with_capacity(exp_col.capacity());
-        for &e in expiries {
-            for &k in strikes {
-                exp_col.push(e);
-                strike_col.push(k);
-            }
-        }
-        columns_to_dataframe(
-            py,
-            &[
-                ("expiry", exp_col),
-                ("strike", strike_col),
-                ("vol", self.inner.vols().to_vec()),
-            ],
-        )
+        let (expiry, (strike, vol)): (Vec<f64>, (Vec<f64>, Vec<f64>)) = self
+            .inner
+            .grid_points()
+            .map(|(expiry, strike, vol)| (expiry, (strike, vol)))
+            .unzip();
+        columns_to_dataframe(py, &[("expiry", expiry), ("strike", strike), ("vol", vol)])
     }
 
     /// Surface identifier string.
@@ -833,35 +800,20 @@ impl PyVolCube {
     /// -------
     /// pandas.DataFrame
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let expiries = self.inner.expiries();
-        let tenors = self.inner.tenors();
-        let params = self.inner.params();
-        let n = params.len();
-        let mut exp_col = Vec::with_capacity(n);
-        let mut ten_col = Vec::with_capacity(n);
-        for &e in expiries {
-            for &t in tenors {
-                exp_col.push(e);
-                ten_col.push(t);
-            }
-        }
+        type Node<'a> = (f64, f64, &'a SabrParameterData, f64);
+        let nodes: Vec<Node<'_>> = self.inner.nodes().collect();
+        let column = |f: &dyn Fn(&Node<'_>) -> f64| -> Vec<f64> { nodes.iter().map(f).collect() };
         columns_to_dataframe(
             py,
             &[
-                ("expiry", exp_col),
-                ("tenor", ten_col),
-                ("alpha", params.iter().map(|p| p.alpha()).collect()),
-                ("beta", params.iter().map(|p| p.beta()).collect()),
-                ("rho", params.iter().map(|p| p.rho()).collect()),
-                ("nu", params.iter().map(|p| p.nu()).collect()),
-                (
-                    "shift",
-                    params
-                        .iter()
-                        .map(|p| p.shift().unwrap_or(f64::NAN))
-                        .collect(),
-                ),
-                ("forward", self.inner.forwards().to_vec()),
+                ("expiry", column(&|n| n.0)),
+                ("tenor", column(&|n| n.1)),
+                ("alpha", column(&|n| n.2.alpha())),
+                ("beta", column(&|n| n.2.beta())),
+                ("rho", column(&|n| n.2.rho())),
+                ("nu", column(&|n| n.2.nu())),
+                ("shift", column(&|n| n.2.shift().unwrap_or(f64::NAN))),
+                ("forward", column(&|n| n.3)),
             ],
         )
     }

@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import init, { core } from '../../index.js';
+import init, { core , models } from '../../index.js';
 
 await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
@@ -339,7 +339,7 @@ const CASES = {
   base_correlation: () => baseCorrelation().correlation(5.0),
   vol_surface: () => JSON.parse(surface().toJson()),
   vol_surface_queries: () => [
-    surface().vol(0.75, 100.0),
+    models.volatility.getSurfaceVol(surface().toJson(), 0.75, 100.0),
     Array.from(surface().gridShape),
     surface().secondaryAxis,
     surface().quoteType,
@@ -355,10 +355,7 @@ const CASES = {
       [0.5, 1.0],
       [90.0, 100.0, 110.0],
       [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
-      null,
-      null,
-      'shifted_black_lognormal',
-      [0.01, 0.015]
+      { quoteType: 'shifted_black_lognormal', displacements: [0.01, 0.015] }
     ).toJson() === shiftedSurface().toJson(),
   ],
   vol_cube_expiry_slice: () => JSON.parse(expirySlice().toJson()),
@@ -411,7 +408,7 @@ const CASES = {
     contains: [market().contains('USD-OIS'), market().contains('missing')],
     is_empty: [market().isEmpty(), new core.MarketContext().isEmpty()],
     df: market().getDiscount('USD-OIS').df(1.0),
-    vol: market().getSurface('SPX-VOL').vol(0.75, 100.0),
+    vol: models.volatility.getSurfaceVol(market().getSurface('SPX-VOL').toJson(), 0.75, 100.0),
     series: market().getSeries('SOFR-FIXINGS').valueOn('2025-01-06'),
     index_lag: market().getInflationIndex('US-CPI-U').lag,
     credit_index: market().getCreditIndex('CDX-IG-43').numConstituents,
