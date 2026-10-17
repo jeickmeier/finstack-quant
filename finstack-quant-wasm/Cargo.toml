@@ -51,6 +51,23 @@ time = { workspace = true }
 # `.cargo/config.toml` (and the CI WASM job) already pass.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }
+# Feature pin, not used by the lib. `wasm-bindgen-test` (dev-dependency) enables
+# `num-traits/libm`, and resolver v2 unifies dev-dependency features only when
+# the tests are built. Without this pin the `wasm-pack build --profile wasm-test`
+# facade builds in `mise run wasm-test` resolve `num-traits` without `libm`,
+# get a different metadata hash for it and everything downstream (nalgebra,
+# rust_decimal, every workspace crate), and recompile the graph that
+# `wasm-pack test` just built. See `syn` under `[build-dependencies]`.
+num-traits = { version = "0.2", features = ["libm"] }
+
+# Host-side feature pin, same reason as `num-traits` above: `wasm-bindgen-test`
+# pulls `async-trait`, a proc-macro that enables `syn/full` and `syn/visit-mut`
+# on the host. Without the pin the lib-only build compiles `syn` with fewer
+# features, so every derive crate built on it (serde_derive, thiserror-impl,
+# schemars_derive, ref-cast-impl) changes hash and the crates using those
+# derives recompile. Native builds already resolve these `syn` features.
+[build-dependencies]
+syn = { version = "3", features = ["full", "visit-mut"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

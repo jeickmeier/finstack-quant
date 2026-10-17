@@ -522,7 +522,7 @@ uv run python scripts/check_python_materialization_regressions.py compare \
 description = "Build dev Python bindings, then run fast Python tests"
 run = """
 mise run python-build
-uv run --no-sync pytest -v -m 'not slow'
+uv run --no-sync pytest -v -n auto -m 'not slow'
 """
 
 [tasks.python-test-file]
@@ -534,14 +534,14 @@ run = 'uv run --no-sync pytest -q "${usage_test?}"'
 description = "Build dev Python bindings, then run slow Python tests"
 run = """
 mise run python-build
-uv run --no-sync pytest -v -m slow
+uv run --no-sync pytest -v -n auto -m slow
 """
 
 [tasks.python-test-all]
 description = "Build dev Python bindings, then run the full Python test suite"
 run = """
 mise run python-build
-uv run --no-sync pytest -v
+uv run --no-sync pytest -v -n auto
 """
 
 [tasks.python-test-cov]
@@ -549,7 +549,7 @@ description = "Build dev Python bindings, then run Python tests with HTML and So
 run = """
 mkdir -p coverage/python
 mise run python-build
-uv run --no-sync pytest -v --cov=finstack-quant-py/finstack_quant --cov-report=term-missing --cov-report=html:target/python-cov --cov-report=xml:coverage/python/coverage.xml
+uv run --no-sync pytest -v -n auto --cov=finstack-quant-py/finstack_quant --cov-report=term-missing --cov-report=html:target/python-cov --cov-report=xml:coverage/python/coverage.xml
 echo "Cobertura report: coverage/python/coverage.xml"
 """
 
@@ -616,7 +616,10 @@ run = "wasm-pack build finstack-quant-wasm --target web"
 [tasks.wasm-test]
 description = "Run WASM package tests (wasm-bindgen + Node facade) and the facade JSDoc sync check"
 # Facade builds use profile.wasm-test (opt-level 1, no LTO). Published packages
-# stay on wasm-build / wasm-pkg.
+# stay on wasm-build / wasm-pkg. The npm `test` script forwards
+# `-- --profile wasm-test` to the `cargo test` that wasm-pack runs, so the
+# wasm-bindgen test build and the two facade builds below share one set of
+# wasm32 artifacts instead of compiling the test profile as well.
 run = [
   "npm --prefix finstack-quant-wasm run test",
   "wasm-pack build finstack-quant-wasm --target web --profile wasm-test --no-opt --out-dir pkg",
@@ -801,7 +804,17 @@ run = [
   done
   """,
   "uv run --no-sync python scripts/check_schema_generation.py",
+  # The schema-contract nextest run below is skipped when `CI` is set: it compiles
+  # the whole workspace in the test profile (14 min on a 4-core runner) to run
+  # 141 tests in 30 s, and the Test Rust job already runs every one of them in
+  # `rust-test-cov` (`--workspace --lib --test '*'`) in the same workflow.
+  # Locally it stays on so `mise run gen-check` is a complete schema gate.
   """
+  set -eu
+  if [ -n "${CI:-}" ]; then
+    echo "CI: skipping schema-contract nextest run (covered by rust-test-cov in the Test Rust job)"
+    exit 0
+  fi
   cargo nextest run --no-fail-fast -E '\
     (binary_id(finstack-quant-analytics::analytics) & test(/schema_contract::/)) | \
     (binary_id(finstack-quant-covenants::covenants) & test(/schema_contract::/)) | \
