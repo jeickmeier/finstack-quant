@@ -11,6 +11,38 @@ const TOL: f64 = 1e-12;
 
 mod scalar_curve_invariants {
     use super::{Date, Duration, Month, PriceCurve, PriceCurveKind, TOL};
+    use finstack_quant_core::market_data::bumps::{
+        BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable,
+    };
+
+    /// Parallel price shock in native price units.
+    fn par(value: f64) -> BumpSpec {
+        BumpSpec {
+            mode: BumpMode::Additive,
+            units: BumpUnits::Fraction,
+            value,
+            bump_type: BumpType::Parallel,
+        }
+    }
+
+    /// Triangular key-rate price shock in native price units.
+    fn key_rate(
+        prev_bucket: Option<f64>,
+        target_bucket: f64,
+        next_bucket: Option<f64>,
+        value: f64,
+    ) -> BumpSpec {
+        BumpSpec {
+            mode: BumpMode::Additive,
+            units: BumpUnits::Fraction,
+            value,
+            bump_type: BumpType::TriangularKeyRate {
+                prev_bucket,
+                target_bucket,
+                next_bucket,
+            },
+        }
+    }
     use finstack_quant_core::math::interp::InterpStyle;
 
     fn base_date() -> Date {
@@ -56,8 +88,8 @@ mod scalar_curve_invariants {
         let vc = vol_curve();
         let bump = 2.5;
 
-        let bumped_pc = pc.with_parallel_bump(bump).unwrap();
-        let bumped_vc = vc.with_parallel_bump(bump).unwrap();
+        let bumped_pc = pc.apply_bump(par(bump)).unwrap();
+        let bumped_vc = vc.apply_bump(par(bump)).unwrap();
 
         assert!((bumped_pc.spot_price() - (pc.spot_price() + bump)).abs() < TOL);
         assert!((bumped_vc.spot_price() - (vc.spot_price() + bump)).abs() < TOL);
@@ -75,8 +107,8 @@ mod scalar_curve_invariants {
         let pc = price_curve();
         let vc = vol_curve();
 
-        let bumped_pc = pc.with_parallel_bump(0.0).unwrap();
-        let bumped_vc = vc.with_parallel_bump(0.0).unwrap();
+        let bumped_pc = pc.apply_bump(par(0.0)).unwrap();
+        let bumped_vc = vc.apply_bump(par(0.0)).unwrap();
 
         for t in [0.0, 0.25, 0.5, 1.0] {
             assert!((bumped_pc.price(t) - pc.price(t)).abs() < TOL);
@@ -90,17 +122,17 @@ mod scalar_curve_invariants {
         let vc = vol_curve();
 
         let double_bump_pc = pc
-            .with_parallel_bump(1.0)
+            .apply_bump(par(1.0))
             .unwrap()
-            .with_parallel_bump(2.0)
+            .apply_bump(par(2.0))
             .unwrap();
-        let single_bump_pc = pc.with_parallel_bump(3.0).unwrap();
+        let single_bump_pc = pc.apply_bump(par(3.0)).unwrap();
         let double_bump_vc = vc
-            .with_parallel_bump(1.0)
+            .apply_bump(par(1.0))
             .unwrap()
-            .with_parallel_bump(2.0)
+            .apply_bump(par(2.0))
             .unwrap();
-        let single_bump_vc = vc.with_parallel_bump(3.0).unwrap();
+        let single_bump_vc = vc.apply_bump(par(3.0)).unwrap();
 
         for t in [0.0, 0.25, 0.5, 1.0] {
             assert!((double_bump_pc.price(t) - single_bump_pc.price(t)).abs() < TOL);
@@ -114,10 +146,10 @@ mod scalar_curve_invariants {
         let vc = vol_curve();
 
         let bumped_pc = pc
-            .with_triangular_key_rate_bump_neighbors(Some(0.25), 0.5, Some(1.0), 3.0)
+            .apply_bump(key_rate(Some(0.25), 0.5, Some(1.0), 3.0))
             .unwrap();
         let bumped_vc = vc
-            .with_triangular_key_rate_bump_neighbors(Some(0.25), 0.5, Some(1.0), 3.0)
+            .apply_bump(key_rate(Some(0.25), 0.5, Some(1.0), 3.0))
             .unwrap();
 
         assert!((bumped_pc.spot_price() - pc.spot_price()).abs() < TOL);
@@ -130,10 +162,10 @@ mod scalar_curve_invariants {
         let vc = vol_curve();
 
         let bumped_pc = pc
-            .with_triangular_key_rate_bump_neighbors(Some(0.25), 0.5, Some(1.0), 3.0)
+            .apply_bump(key_rate(Some(0.25), 0.5, Some(1.0), 3.0))
             .unwrap();
         let bumped_vc = vc
-            .with_triangular_key_rate_bump_neighbors(Some(0.25), 0.5, Some(1.0), 3.0)
+            .apply_bump(key_rate(Some(0.25), 0.5, Some(1.0), 3.0))
             .unwrap();
 
         let idx_pc = pc

@@ -54,7 +54,7 @@ fn hazard_recipe_invalidation_covers_synthetic_transformations() {
 
     let mut in_place = source;
     in_place
-        .bump_in_place(&BumpSpec::parallel_bp(1.0))
+        .bump_in_place(&BumpSpec::parallel_bp(1.0), HazardBumpTarget::ParSpread)
         .expect("in-place bump");
     assert!(in_place.hazard_calibration().is_none());
 }
@@ -305,7 +305,7 @@ fn zero_size_bump_in_place_is_noop_for_zero_anchored_curve() {
 
     let mut bumped = curve.clone();
     bumped
-        .bump_in_place(&BumpSpec::parallel_bp(0.0))
+        .bump_in_place(&BumpSpec::parallel_bp(0.0), HazardBumpTarget::ParSpread)
         .expect("zero bump succeeds");
 
     for t in [0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 7.0] {
@@ -340,7 +340,10 @@ fn small_bump_in_place_shifts_average_hazard_uniformly() {
 
     let mut bumped = curve.clone();
     bumped
-        .bump_in_place(&BumpSpec::parallel_bp(spread_bp))
+        .bump_in_place(
+            &BumpSpec::parallel_bp(spread_bp),
+            HazardBumpTarget::ParSpread,
+        )
         .expect("small bump succeeds");
 
     for t in [0.5, 1.0, 2.0, 3.0, 5.0] {
@@ -374,7 +377,7 @@ fn bump_in_place_clears_stale_par_spread_quotes() {
         .expect("quoted hazard curve builds");
 
     curve
-        .bump_in_place(&BumpSpec::parallel_bp(10.0))
+        .bump_in_place(&BumpSpec::parallel_bp(10.0), HazardBumpTarget::ParSpread)
         .expect("bump succeeds");
 
     assert_eq!(
@@ -502,7 +505,7 @@ fn failed_bump_in_place_is_atomic() {
     let mut attempted = original.clone();
 
     attempted
-        .bump_in_place(&BumpSpec::parallel_bp(-30.0))
+        .bump_in_place(&BumpSpec::parallel_bp(-30.0), HazardBumpTarget::ParSpread)
         .expect_err("second hazard node would become negative");
 
     assert_eq!(

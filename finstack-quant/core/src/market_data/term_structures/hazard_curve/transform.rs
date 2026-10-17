@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::dates::DateExt;
-use crate::market_data::bumps::{BumpSpec, BumpType, Bumpable};
+use crate::market_data::bumps::{BumpSpec, BumpType, BumpUnits, Bumpable};
 
 impl HazardCurve {
     /// Create a copy of this curve with its `recovery_rate` metadata overridden.
@@ -63,21 +63,32 @@ impl HazardCurve {
     /// Clone the curve under `id` and apply `spec` through [`Self::bump_in_place`],
     /// the single bump implementation; the `with_*` helpers and `Bumpable`
     /// are thin wrappers over this.
-    pub(crate) fn bumped_with_id(&self, id: CurveId, spec: &BumpSpec) -> crate::Result<Self> {
+    pub(crate) fn bumped_with_id(
+        &self,
+        id: CurveId,
+        spec: &BumpSpec,
+        target: HazardBumpTarget,
+    ) -> crate::Result<Self> {
         let mut bumped = self.clone();
         bumped.id = id;
-        bumped.bump_in_place(spec)?;
+        bumped.bump_in_place(spec, target)?;
         Ok(bumped)
     }
 
     /// Apply a bump specification in-place, mutating lambda values and rebuilding the interpolator.
     ///
-    /// The spread shift `s` is converted to a hazard shift `s / (1 − R)`
-    /// (credit triangle). A parallel bump adds it to every hazard rate; a
-    /// triangular key-rate bump scales it at each knot by the bucket's
-    /// triangular weight, so the bucket shifts sum to the parallel shift at
-    /// every knot.
-    pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
+    /// For [`HazardBumpTarget::ParSpread`] the spread shift `s` is converted
+    /// to a hazard shift `s / (1 − R)` (credit triangle); for
+    /// [`HazardBumpTarget::HazardRate`] the shift is applied to the
+    /// intensities as given and must stay within the curve's hazard cap. A
+    /// parallel bump adds it to every hazard rate; a triangular key-rate bump
+    /// scales it at each knot by the bucket's triangular weight, so the
+    /// bucket shifts sum to the parallel shift at every knot.
+    pub(crate) fn bump_in_place(
+        &mut self,
+        spec: &BumpSpec,
+        target: HazardBumpTarget,
+    ) -> crate::Result<()> {
         spec.validate()?;
         let bucket = match spec.bump_type {
             BumpType::Parallel => None,
@@ -88,19 +99,6 @@ impl HazardCurve {
             } => Some((prev_bucket, target_bucket, next_bucket)),
         };
 
-        // Recovery must be within [0, 1) for the par spread ⇢ hazard
-        // conversion below; recovery == 1.0 would divide by zero and yield an
-        // infinite shift. Mirrors the guard in `Bumpable::apply_bump`.
-        let recovery = self.recovery_rate;
-        if !recovery.is_finite() || !(0.0..1.0).contains(&recovery) {
-            return Err(crate::error::InputError::UnsupportedBump {
-                reason: format!(
-                    "HazardCurve bump requires recovery rate in [0, 1), got {}",
-                    recovery
-                ),
-            }
-            .into());
-        }
         let (spread, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
             crate::error::InputError::UnsupportedBump {
                 reason: format!(
@@ -116,7 +114,27 @@ impl HazardCurve {
             .into());
         }
 
-        let shift = spread / (1.0 - recovery);
+        let shift = match target {
+            HazardBumpTarget::ParSpread => {
+                // Recovery must be within [0, 1) for the par spread ⇢ hazard
+                // conversion; recovery == 1.0 would divide by zero and yield an
+                // infinite shift.
+                let recovery = self.recovery_rate;
+                if !recovery.is_finite() || !(0.0..1.0).contains(&recovery) {
+                    return Err(crate::error::InputError::UnsupportedBump {
+                        reason: format!(
+                            "HazardCurve bump requires recovery rate in [0, 1), got {}",
+                            recovery
+                        ),
+                    }
+                    .into());
+                }
+                spread / (1.0 - recovery)
+            }
+            // One basis point of intensity is 1e-4, kept as the exact product.
+            HazardBumpTarget::HazardRate if spec.units == BumpUnits::RateBp => spec.value * 1e-4,
+            HazardBumpTarget::HazardRate => spread,
+        };
         // Clone the hazard array only, not the whole curve. Early returns below
         // still leave `self` untouched, and nothing is committed until the
         // fallible interpolator build succeeds.
@@ -133,6 +151,12 @@ impl HazardCurve {
                     reason: "non-finite or negative hazard rate after bump".to_string(),
                 }
                 .into());
+            }
+            if target == HazardBumpTarget::HazardRate && shifted > self.max_hazard_rate {
+                return Err(crate::Error::Validation(format!(
+                    "Hazard rate {shifted:.4} at t={t:.4}y exceeds maximum {:.4} after bump",
+                    self.max_hazard_rate
+                )));
             }
             *lambda = shifted;
         }
@@ -172,31 +196,13 @@ impl HazardCurve {
     /// # Errors
     ///
     /// Returns an error when the shock is non-finite, makes a hazard rate
-    /// negative, or makes it exceed the builder's maximum hazard-rate limit
-    /// (10.0 unless the source curve was built with a different limit, which
-    /// is not retained by this method).
+    /// negative, or makes it exceed the curve's hazard-rate cap.
     pub fn with_parallel_hazard_rate_bump_bp(&self, bump_bp: f64) -> crate::Result<Self> {
-        if !bump_bp.is_finite() {
-            return Err(crate::error::InputError::UnsupportedBump {
-                reason: "hazard-rate basis-point bump must be finite".to_string(),
-            }
-            .into());
-        }
-        let shift = bump_bp * 1e-4;
-        let mut shifted_points = Vec::with_capacity(self.knots.len());
-        for (t, lambda) in self.knot_points() {
-            let shifted = lambda + shift;
-            if shifted < 0.0 {
-                return Err(crate::error::InputError::UnsupportedBump {
-                    reason: "negative hazard rate after bump".to_string(),
-                }
-                .into());
-            }
-            shifted_points.push((t, shifted));
-        }
-        self.metadata_builder(self.id.clone())
-            .knots(shifted_points)
-            .build()
+        self.bumped_with_id(
+            self.id.clone(),
+            &BumpSpec::parallel_bp(bump_bp),
+            HazardBumpTarget::HazardRate,
+        )
     }
 
     /// Create a curve with direct hazard-rate shocks at tenor segments.
@@ -343,6 +349,10 @@ impl Bumpable for HazardCurve {
         // (converted to hazard via 1/(1 - recovery)), rejects bumps that would
         // drive a hazard rate negative, and drops the stored par-spread quotes
         // that were calibrated to the unbumped hazards.
-        self.bumped_with_id(spec.hazard_shift_id(self.id()), &spec)
+        self.bumped_with_id(
+            spec.hazard_shift_id(self.id()),
+            &spec,
+            HazardBumpTarget::ParSpread,
+        )
     }
 }

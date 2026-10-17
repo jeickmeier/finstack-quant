@@ -504,10 +504,8 @@ pub trait Bumpable: Sized + Send + Sync {
 /// compute `∞/∞ = NaN` for knots beyond `target` and corrupt the curve.
 /// Wing buckets must be expressed with `None`, not infinite sentinels.
 ///
-/// Called from [`BumpSpec::validate`] and from the raw-bucket
-/// `PriceCurve::with_triangular_key_rate_bump_neighbors`, so every bump path
-/// rejects the same malformed grids.
-pub(crate) fn validate_triangular_bucket_grid(
+/// Called from [`BumpSpec::validate`], the one gate every bump path passes.
+fn validate_triangular_bucket_grid(
     prev: Option<f64>,
     target: f64,
     next: Option<f64>,

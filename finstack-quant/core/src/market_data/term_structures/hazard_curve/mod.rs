@@ -138,6 +138,15 @@ pub struct HazardCurve {
     fx_policy: Option<String>,
 }
 
+/// What a hazard-curve bump shifts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HazardBumpTarget {
+    /// The CDS par spread: the hazard shift is `s / (1 - R)` (credit triangle).
+    ParSpread,
+    /// The hazard intensity itself, in the bump's rate units.
+    HazardRate,
+}
+
 /// Default cap on hazard rates accepted by [`HazardCurveBuilder::max_hazard_rate`]:
 /// a rate above 10 implies more than 99.995% one-year default probability.
 pub const DEFAULT_MAX_HAZARD_RATE: f64 = 10.0;

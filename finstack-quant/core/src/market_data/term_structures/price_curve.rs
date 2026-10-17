@@ -478,137 +478,30 @@ impl PriceCurve {
             .build()
     }
 
-    /// Create a new curve with a parallel bump applied (additive, in price units).
-    ///
-    /// # Arguments
-    /// * `bump` - Bump size in price units (e.g., 1.0 adds $1 to all prices)
-    ///
-    /// # Returns
-    /// A new price curve with all prices shifted.
-    ///
-    /// Prices are bumped additively in the curve's native price unit (for
-    /// example, USD/bbl), including the stored spot. Finite negative prices are
-    /// valid for markets such as power and are preserved. Volatility-index
-    /// curves reject shocks that produce negative levels.
-    ///
-    /// # Errors
-    ///
-    /// Propagates reconstruction errors if `bump` produces non-finite knot
-    /// prices or an invalid interpolation configuration. A successful result
-    /// preserves base date, day count, interpolation, and extrapolation.
-    pub fn with_parallel_bump(&self, bump: f64) -> crate::Result<Self> {
-        if !bump.is_finite() {
-            return Err(InputError::Invalid.into());
-        }
-        let bumped_points = bump_knots_parallel(&self.knots, &self.prices, bump);
-        let new_id = crate::market_data::bumps::id_bump_bp(self.id.as_str(), bump * 100.0);
-
-        self.rebuild_shocked(new_id, self.spot_price + bump, bumped_points, |_, price| {
-            price + bump
-        })
-    }
-
-    /// Create a new curve with a percentage bump applied (multiplicative).
-    ///
-    /// # Arguments
-    /// * `pct` - Percentage bump (e.g., 0.01 = +1%, -0.05 = -5%)
-    ///
-    /// # Returns
-    /// A new price curve with all prices scaled.
-    ///
-    /// Each knot is multiplied by `1 + pct`; the stored spot uses the same
-    /// multiplier, preserving signed prices. Volatility-index curves reject
-    /// shocks that produce negative levels. The method changes price levels,
-    /// not delivery dates or interpolation mechanics.
-    ///
-    /// # Errors
-    ///
-    /// Propagates reconstruction errors if `pct` produces non-finite knot
-    /// prices or invalid interpolation inputs. No range is imposed on a finite
-    /// percentage bump because signed forward-price markets can require shocks
-    /// outside conventional equity-style bounds.
-    pub fn with_percentage_bump(&self, pct: f64) -> crate::Result<Self> {
-        if !pct.is_finite() {
-            return Err(InputError::Invalid.into());
-        }
-        let bumped_points = bump_knots_percentage(&self.knots, &self.prices, pct);
-        let new_id = format!("{}+{:.2}%", self.id.as_str(), pct * 100.0);
-
-        self.rebuild_shocked(
-            new_id,
-            self.spot_price * (1.0 + pct),
-            bumped_points,
-            |_, price| price * (1.0 + pct),
-        )
-    }
-
-    /// Create a new curve with a triangular key-rate bump at a specific tenor.
-    ///
-    /// # Arguments
-    /// * `prev_bucket` - Previous bucket time in years; `None` for the first bucket
-    /// * `target_bucket` - Target bucket time in years (peak of the triangle)
-    /// * `next_bucket` - Next bucket time in years; `None` for the last bucket
-    /// * `bump` - Bump size in price units
-    ///
-    /// # Returns
-    /// A new price curve with the triangular key-rate bump applied.
-    ///
-    /// The bump is zero outside the neighbor interval and reaches `bump` at
-    /// `target_bucket`; when the curve has fewer than two knots, this degrades
-    /// to [`with_parallel_bump`](Self::with_parallel_bump). Spot is deliberately
-    /// unchanged for a key-rate shock, reflecting a sensitivity to future
-    /// delivery buckets rather than a spot-price scenario.
-    ///
-    /// # Errors
-    ///
-    /// Rejects non-finite bump magnitudes and bucket coordinates or neighbors
-    /// that do not satisfy `prev_bucket < target_bucket < next_bucket`.
-    /// Propagates builder/interpolation validation errors after applying the
-    /// triangular knot shock, including non-finite resulting prices or invalid
-    /// interpolation input. A successful result retains all curve conventions
-    /// except for its bumped identifier and knot values.
-    pub fn with_triangular_key_rate_bump_neighbors(
+    /// Rebuild with every pillar mapped through `map` and the given spot.
+    fn shocked(
         &self,
-        prev_bucket: Option<f64>,
-        target_bucket: f64,
-        next_bucket: Option<f64>,
-        bump: f64,
+        new_id: impl Into<CurveId>,
+        spot: f64,
+        map: impl Fn(f64, f64) -> f64,
     ) -> crate::Result<Self> {
-        crate::market_data::bumps::validate_triangular_bucket_grid(
-            prev_bucket,
-            target_bucket,
-            next_bucket,
-        )?;
-        if !bump.is_finite() {
-            return Err(InputError::Invalid.into());
-        }
-        if self.knots.len() < 2 {
-            return self.with_parallel_bump(bump);
-        }
+        let pillars: Vec<(f64, f64)> = self
+            .knots
+            .iter()
+            .zip(self.prices.iter())
+            .map(|(&t, &price)| (t, map(t, price)))
+            .collect();
+        self.rebuild_shocked(new_id, spot, pillars, map)
+    }
 
-        let mut bumped_points = bump_knots_triangular(
-            &self.knots,
-            &self.prices,
-            prev_bucket,
-            target_bucket,
-            next_bucket,
-            bump,
-        );
-        for (t, price) in &mut bumped_points {
-            if *t == 0.0 {
-                *price = self.spot_price;
-            }
-        }
-        let new_id = crate::market_data::bumps::id_bump_bp(self.id.as_str(), bump * 100.0);
-        // Spot is not bumped in a key-rate shock; neither are rolled source
-        // pillars at or before the current origin.
-        self.rebuild_shocked(new_id, self.spot_price, bumped_points, |t, price| {
-            if t <= 0.0 {
-                price
-            } else {
-                price + bump * triangular_weight(t, prev_bucket, target_bucket, next_bucket)
-            }
-        })
+    /// Scale every pillar and the spot by `1 + pct`, preserving signed prices.
+    fn scaled(&self, pct: f64) -> crate::Result<Self> {
+        let factor = 1.0 + pct;
+        self.shocked(
+            format!("{}+{:.2}%", self.id.as_str(), pct * 100.0),
+            self.spot_price * factor,
+            |_, price| price * factor,
+        )
     }
 
     /// Roll the curve forward by a specified number of days.
@@ -869,147 +762,96 @@ impl PriceCurveBuilder {
     }
 }
 
-/// Unit convention for price and volatility-index curves (both are
-/// [`PriceCurve`]): the curve's native level unit (USD/bbl, index points, ...)
-/// is the additive unit, so `Additive/Fraction` is an absolute shift,
-/// `Additive/Percent` is a percentage of the current level, and
-/// `Multiplicative/{Factor,Percent}` scale every level. `RateBp` is rejected:
-/// a basis point has no meaning for a price or an index level.
-/// A percentage key-rate shock scales each future knot by its own level and
-/// triangular weight; the spot level remains unchanged.
+/// Bumps rebuild the curve through one shocked-pillar path. Additive
+/// `Fraction` shocks are in price units and move the stored spot with the
+/// pillars; `Percent`/`Factor` shocks scale pillars and spot. A key-rate shock
+/// applies the triangular weight to pillars after the origin only; the spot
+/// level remains unchanged.
 impl Bumpable for PriceCurve {
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
         spec.validate()?;
+        let id = self.id.as_str();
         match spec.bump_type {
-            BumpType::Parallel => {
-                match (spec.mode, spec.units) {
-                    (BumpMode::Additive, BumpUnits::Fraction) => {
-                        self.with_parallel_bump(spec.value)
-                    }
-                    (BumpMode::Additive, BumpUnits::Percent)
-                    | (BumpMode::Multiplicative, BumpUnits::Percent) => {
-                        let pct = spec.value / 100.0;
-                        self.with_percentage_bump(pct)
-                    }
-                    (BumpMode::Multiplicative, BumpUnits::Factor) => {
-                        let pct = spec.value - 1.0;
-                        self.with_percentage_bump(pct)
-                    }
-                    _ => Err(InputError::UnsupportedBump {
-                        reason: format!(
-                            "PriceCurve parallel bump: unsupported mode/units {:?}/{:?}. \
-                             Use Additive/{{Fraction,Percent}} or Multiplicative/{{Factor,Percent}}",
-                            spec.mode, spec.units
-                        ),
-                    }
-                    .into()),
+            BumpType::Parallel => match (spec.mode, spec.units) {
+                (BumpMode::Additive, BumpUnits::Fraction) => {
+                    let bump = spec.value;
+                    self.shocked(
+                        crate::market_data::bumps::id_bump_bp(id, bump * 100.0),
+                        self.spot_price + bump,
+                        |_, price| price + bump,
+                    )
                 }
-            }
+                (BumpMode::Additive, BumpUnits::Percent)
+                | (BumpMode::Multiplicative, BumpUnits::Percent) => self.scaled(spec.value / 100.0),
+                (BumpMode::Multiplicative, BumpUnits::Factor) => self.scaled(spec.value - 1.0),
+                _ => Err(InputError::UnsupportedBump {
+                    reason: format!(
+                        "PriceCurve parallel bump: unsupported mode/units {:?}/{:?}. \
+                         Use Additive/{{Fraction,Percent}} or Multiplicative/{{Factor,Percent}}",
+                        spec.mode, spec.units
+                    ),
+                }
+                .into()),
+            },
             BumpType::TriangularKeyRate {
                 prev_bucket,
                 target_bucket,
                 next_bucket,
-            } => {
-                match (spec.mode, spec.units) {
-                    (BumpMode::Additive, BumpUnits::Fraction) => {
-                        self.with_triangular_key_rate_bump_neighbors(
-                            prev_bucket, target_bucket, next_bucket, spec.value,
-                        )
+            } => match (spec.mode, spec.units) {
+                (BumpMode::Additive, BumpUnits::Fraction) => {
+                    let bump = spec.value;
+                    let new_id = crate::market_data::bumps::id_bump_bp(id, bump * 100.0);
+                    if self.knots.len() < 2 {
+                        return self
+                            .shocked(new_id, self.spot_price + bump, |_, price| price + bump);
                     }
-                    (BumpMode::Additive, BumpUnits::Percent) => {
-                        let percentage = spec.value / 100.0;
-                        // Spot is not bumped in a key-rate shock; neither are
-                        // rolled source pillars at or before the current origin.
-                        let shock = |time: f64, price: f64| {
+                    // Spot is not bumped in a key-rate shock; neither are rolled
+                    // source pillars at or before the current origin.
+                    self.shocked(new_id, self.spot_price, |t, price| {
+                        if t <= 0.0 {
+                            price
+                        } else {
+                            price
+                                + bump
+                                    * triangular_weight(t, prev_bucket, target_bucket, next_bucket)
+                        }
+                    })
+                }
+                (BumpMode::Additive, BumpUnits::Percent) => {
+                    let percentage = spec.value / 100.0;
+                    // Spot is not bumped in a key-rate shock; neither are
+                    // rolled source pillars at or before the current origin.
+                    self.shocked(
+                        spec.standard_bump_id(self.id()),
+                        self.spot_price,
+                        |time, price| {
                             if time <= 0.0 {
                                 price
                             } else {
                                 let weight = triangular_weight(
-                                    time, prev_bucket, target_bucket, next_bucket,
+                                    time,
+                                    prev_bucket,
+                                    target_bucket,
+                                    next_bucket,
                                 );
                                 price * (1.0 + percentage * weight)
                             }
-                        };
-                        let points: Vec<(f64, f64)> = self
-                            .knots
-                            .iter()
-                            .zip(self.prices.iter())
-                            .map(|(&time, &price)| (time, shock(time, price)))
-                            .collect();
-                        self.rebuild_shocked(
-                            spec.standard_bump_id(self.id()),
-                            self.spot_price,
-                            points,
-                            shock,
-                        )
-                    }
-                    _ => {
-                        Err(InputError::UnsupportedBump {
-                            reason: format!(
-                                "PriceCurve key-rate bump requires Additive mode, got {:?}/{:?}",
-                                spec.mode, spec.units
-                            ),
-                        }
-                        .into())
-                    }
+                        },
+                    )
                 }
-            }
+                _ => Err(InputError::UnsupportedBump {
+                    reason: format!(
+                        "PriceCurve key-rate bump requires Additive mode, got {:?}/{:?}",
+                        spec.mode, spec.units
+                    ),
+                }
+                .into()),
+            },
         }
     }
 }
 
 // Knot helpers specific to signed price pillars.
-
-/// Apply an additive parallel bump to a slice of (t, value) knots.
-///
-/// Signed prices are preserved: `v + bump`.
-/// Returns the bumped knots as a new `Vec`.
-#[inline]
-fn bump_knots_parallel(knots: &[f64], values: &[f64], bump: f64) -> Vec<(f64, f64)> {
-    knots
-        .iter()
-        .zip(values.iter())
-        .map(|(&t, &v)| (t, v + bump))
-        .collect()
-}
-
-/// Apply a multiplicative percentage bump to a slice of (t, value) knots.
-///
-/// Each signed price is scaled by `1 + pct`.
-#[inline]
-fn bump_knots_percentage(knots: &[f64], values: &[f64], pct: f64) -> Vec<(f64, f64)> {
-    let factor = 1.0 + pct;
-    knots
-        .iter()
-        .zip(values.iter())
-        .map(|(&t, &v)| (t, v * factor))
-        .collect()
-}
-
-/// Apply a triangular key-rate bump to a slice of (t, value) knots.
-///
-/// Each knot receives a weight in `[0, 1]` based on its proximity to
-/// `target_bucket`. `prev_bucket = None` / `next_bucket = None` make the
-/// bucket a half-triangle (flat wing) on that side. Spot (t=0) is
-/// typically excluded by the caller.
-#[inline]
-fn bump_knots_triangular(
-    knots: &[f64],
-    values: &[f64],
-    prev_bucket: Option<f64>,
-    target_bucket: f64,
-    next_bucket: Option<f64>,
-    bump: f64,
-) -> Vec<(f64, f64)> {
-    knots
-        .iter()
-        .zip(values.iter())
-        .map(|(&t, &v)| {
-            let w = triangular_weight(t, prev_bucket, target_bucket, next_bucket);
-            (t, v + bump * w)
-        })
-        .collect()
-}
 
 /// Validate that all values in a knot slice are non-negative.
 ///
@@ -1165,7 +1007,14 @@ mod tests {
     #[test]
     fn parallel_bump() {
         let curve = sample_wti_curve();
-        let bumped = curve.with_parallel_bump(2.0).expect("Bump should succeed");
+        let bumped = curve
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Fraction,
+                value: 2.0,
+                bump_type: BumpType::Parallel,
+            })
+            .expect("Bump should succeed");
         assert!((bumped.spot_price() - 77.0).abs() < 1e-10);
         assert!((bumped.price(0.25) - 78.5).abs() < 1e-10);
     }
@@ -1174,7 +1023,12 @@ mod tests {
     fn percentage_bump() {
         let curve = sample_wti_curve();
         let bumped = curve
-            .with_percentage_bump(0.10)
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Percent,
+                value: 10.0,
+                bump_type: BumpType::Parallel,
+            })
             .expect("Bump should succeed");
         // 75.0 * 1.10 = 82.5
         assert!((bumped.spot_price() - 82.5).abs() < 1e-10);
@@ -1203,7 +1057,16 @@ mod tests {
             .unwrap();
         for bump in [0.0, -2.0, 6.0] {
             let bumped = curve
-                .with_triangular_key_rate_bump_neighbors(None, 0.25, Some(0.5), bump)
+                .apply_bump(BumpSpec {
+                    mode: BumpMode::Additive,
+                    units: BumpUnits::Fraction,
+                    value: bump,
+                    bump_type: BumpType::TriangularKeyRate {
+                        prev_bucket: None,
+                        target_bucket: 0.25,
+                        next_bucket: Some(0.5),
+                    },
+                })
                 .unwrap();
             assert_eq!(bumped.price(0.25), -5.0 + bump);
             assert_eq!(bumped.price(0.5), -3.0);
@@ -1217,7 +1080,16 @@ mod tests {
         for curve in [sample_wti_curve(), sample_vix_curve()] {
             for bump in [-5.0, 0.0, 5.0] {
                 let bumped = curve
-                    .with_triangular_key_rate_bump_neighbors(None, 0.25, Some(0.5), bump)
+                    .apply_bump(BumpSpec {
+                        mode: BumpMode::Additive,
+                        units: BumpUnits::Fraction,
+                        value: bump,
+                        bump_type: BumpType::TriangularKeyRate {
+                            prev_bucket: None,
+                            target_bucket: 0.25,
+                            next_bucket: Some(0.5),
+                        },
+                    })
                     .unwrap();
                 assert_eq!(bumped.knots(), curve.knots());
                 assert_eq!(bumped.spot_price(), curve.spot_price());
@@ -1229,7 +1101,16 @@ mod tests {
             }
         }
         let bumped = sample_vix_curve()
-            .with_triangular_key_rate_bump_neighbors(None, 0.25, Some(0.5), -20.0)
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Fraction,
+                value: -20.0,
+                bump_type: BumpType::TriangularKeyRate {
+                    prev_bucket: None,
+                    target_bucket: 0.25,
+                    next_bucket: Some(0.5),
+                },
+            })
             .expect("zero delivery level is valid while spot stays unchanged");
         assert_eq!(bumped.price(0.25), 0.0);
         assert_eq!(bumped.prices()[0], 18.5);
@@ -1239,7 +1120,16 @@ mod tests {
     fn triangular_bumps_reject_negative_vol_index_levels() {
         let curve = sample_vix_curve();
         let error = curve
-            .with_triangular_key_rate_bump_neighbors(None, 0.25, Some(0.5), -21.0)
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Fraction,
+                value: -21.0,
+                bump_type: BumpType::TriangularKeyRate {
+                    prev_bucket: None,
+                    target_bucket: 0.25,
+                    next_bucket: Some(0.5),
+                },
+            })
             .expect_err("negative volatility index level must fail");
         assert!(error.to_string().contains("non-negative"), "{error}");
     }
@@ -1255,11 +1145,29 @@ mod tests {
             (Some(0.0), 1.0, Some(1.0)),
         ] {
             assert!(curve
-                .with_triangular_key_rate_bump_neighbors(previous, target, next, 10.0)
+                .apply_bump(BumpSpec {
+                    mode: BumpMode::Additive,
+                    units: BumpUnits::Fraction,
+                    value: 10.0,
+                    bump_type: BumpType::TriangularKeyRate {
+                        prev_bucket: previous,
+                        target_bucket: target,
+                        next_bucket: next
+                    }
+                })
                 .is_err());
         }
         assert!(curve
-            .with_triangular_key_rate_bump_neighbors(None, 1.0, None, f64::NAN)
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Fraction,
+                value: f64::NAN,
+                bump_type: BumpType::TriangularKeyRate {
+                    prev_bucket: None,
+                    target_bucket: 1.0,
+                    next_bucket: None
+                }
+            })
             .is_err());
     }
 
@@ -1312,11 +1220,25 @@ mod tests {
         let twice = restored.roll_forward(180).unwrap();
         assert!((twice.price(0.5) - source.price(1.5 + 180.0 / 365.0)).abs() < 1e-12);
 
-        let bumped = restored.with_parallel_bump(2.0).unwrap();
+        let bumped = restored
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Fraction,
+                value: 2.0,
+                bump_type: BumpType::Parallel,
+            })
+            .unwrap();
         assert!((bumped.price(0.5) - (restored.price(0.5) + 2.0)).abs() < 1e-12);
 
         // A zero shock leaves the rolled Hermite shape untouched off-pillar.
-        let flat = rolled.with_parallel_bump(0.0).unwrap();
+        let flat = rolled
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Fraction,
+                value: 0.0,
+                bump_type: BumpType::Parallel,
+            })
+            .unwrap();
         for time in [0.1, 0.25, 0.75] {
             assert_eq!(flat.price(time), rolled.price(time));
         }
@@ -1336,7 +1258,12 @@ mod tests {
             .unwrap();
 
         let bumped = rolled
-            .with_parallel_bump(2.0)
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Fraction,
+                value: 2.0,
+                bump_type: BumpType::Parallel,
+            })
             .expect("additive shock on a rolled curve");
         assert!((bumped.spot_price() - (rolled.spot_price() + 2.0)).abs() < 1e-12);
         for &time in rolled.knots() {
@@ -1345,7 +1272,16 @@ mod tests {
 
         // A key-rate shock leaves the spot where it is.
         let key_rate = rolled
-            .with_triangular_key_rate_bump_neighbors(None, 0.5, Some(1.5), 1.0)
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Fraction,
+                value: 1.0,
+                bump_type: BumpType::TriangularKeyRate {
+                    prev_bucket: None,
+                    target_bucket: 0.5,
+                    next_bucket: Some(1.5),
+                },
+            })
             .expect("key-rate shock on a rolled curve");
         assert!((key_rate.spot_price() - rolled.spot_price()).abs() < 1e-12);
         assert!(key_rate.price(rolled.knots()[1]) > rolled.price(rolled.knots()[1]));
@@ -1508,12 +1444,24 @@ mod tests {
     #[test]
     fn vol_index_bumps_preserve_kind() {
         let curve = sample_vix_curve();
-        let bumped = curve.with_parallel_bump(2.0).expect("Bump should succeed");
+        let bumped = curve
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Fraction,
+                value: 2.0,
+                bump_type: BumpType::Parallel,
+            })
+            .expect("Bump should succeed");
         assert_eq!(bumped.kind(), PriceCurveKind::VolIndex);
         assert!((bumped.spot_price() - 20.5).abs() < 1e-10);
         assert!((bumped.price(0.25) - 22.0).abs() < 1e-10);
         let scaled = curve
-            .with_percentage_bump(0.1)
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Percent,
+                value: 10.0,
+                bump_type: BumpType::Parallel,
+            })
             .expect("Bump should succeed");
         assert_eq!(scaled.kind(), PriceCurveKind::VolIndex);
         assert!((scaled.spot_price() - 20.35).abs() < 1e-10);
