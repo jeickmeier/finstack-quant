@@ -575,128 +575,47 @@ impl LsmcPricer {
         let path_values =
             checked_path_values(self.config.num_paths, num_steps, self.config.antithetic)?;
         let time_grid = TimeGrid::uniform(time_to_maturity, num_steps)?;
-
-        #[cfg(not(target_arch = "wasm32"))]
-        if self.config.use_parallel {
-            return self.generate_paths_parallel(
-                process,
-                initial_spot,
-                &time_grid,
-                num_steps,
-                seed,
-                path_values,
-            );
-        }
-
-        self.generate_paths_serial(
-            process,
-            initial_spot,
-            &time_grid,
-            num_steps,
-            seed,
-            path_values,
-        )
-    }
-
-    /// Serial path generation.
-    fn generate_paths_serial(
-        &self,
-        process: &GbmProcess,
-        initial_spot: f64,
-        time_grid: &TimeGrid,
-        num_steps: usize,
-        seed: u64,
-        path_values: usize,
-    ) -> Result<PathMatrix> {
-        let disc = ExactGbm::new();
-        let rng = PhiloxRng::new(seed);
-        let stride = num_steps + 1;
-        let antithetic = self.config.antithetic;
-        let mut data = vec![0.0; path_values];
-
-        for path_id in 0..self.config.num_paths {
-            let mut path_rng = rng.substream(path_id as u64);
-            if antithetic {
-                let base = 2 * path_id * stride;
-                let (primary, rest) = data[base..base + 2 * stride].split_at_mut(stride);
-                fill_gbm_antithetic_pair(
-                    &disc,
-                    process,
-                    initial_spot,
-                    time_grid,
-                    num_steps,
-                    &mut path_rng,
-                    primary,
-                    rest,
-                );
-            } else {
-                let row = &mut data[path_id * stride..(path_id + 1) * stride];
-                fill_gbm_row(
-                    &disc,
-                    process,
-                    initial_spot,
-                    time_grid,
-                    num_steps,
-                    &mut path_rng,
-                    row,
-                );
-            }
-        }
-
-        Ok(PathMatrix { data, stride })
-    }
-
-    /// Parallel path generation using rayon with deterministic per-path RNG.
-    #[cfg(not(target_arch = "wasm32"))]
-    fn generate_paths_parallel(
-        &self,
-        process: &GbmProcess,
-        initial_spot: f64,
-        time_grid: &TimeGrid,
-        num_steps: usize,
-        seed: u64,
-        path_values: usize,
-    ) -> Result<PathMatrix> {
-        use rayon::prelude::*;
-
         let rng = PhiloxRng::new(seed);
         let disc = ExactGbm::new();
         let stride = num_steps + 1;
         let antithetic = self.config.antithetic;
         let mut data = vec![0.0; path_values];
         let chunk = if antithetic { 2 * stride } else { stride };
+        let fill_chunk = |(path_id, rows): (usize, &mut [f64])| {
+            let mut path_rng = rng.substream(path_id as u64);
+            if antithetic {
+                let (primary, anti) = rows.split_at_mut(stride);
+                fill_gbm_antithetic_pair(
+                    &disc,
+                    process,
+                    initial_spot,
+                    &time_grid,
+                    num_steps,
+                    &mut path_rng,
+                    primary,
+                    anti,
+                );
+            } else {
+                fill_gbm_row(
+                    &disc,
+                    process,
+                    initial_spot,
+                    &time_grid,
+                    num_steps,
+                    &mut path_rng,
+                    rows,
+                );
+            }
+        };
 
-        // Each path fills its own contiguous row (or antithetic pair of rows);
-        // `substream(path_id)` keeps the result independent of thread count.
-        data.par_chunks_mut(chunk)
-            .enumerate()
-            .for_each(|(path_id, rows)| {
-                let mut path_rng = rng.substream(path_id as u64);
-                if antithetic {
-                    let (primary, anti) = rows.split_at_mut(stride);
-                    fill_gbm_antithetic_pair(
-                        &disc,
-                        process,
-                        initial_spot,
-                        time_grid,
-                        num_steps,
-                        &mut path_rng,
-                        primary,
-                        anti,
-                    );
-                } else {
-                    fill_gbm_row(
-                        &disc,
-                        process,
-                        initial_spot,
-                        time_grid,
-                        num_steps,
-                        &mut path_rng,
-                        rows,
-                    );
-                }
-            });
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.config.use_parallel {
+            use rayon::prelude::*;
+            data.par_chunks_mut(chunk).enumerate().for_each(fill_chunk);
+            return Ok(PathMatrix { data, stride });
+        }
 
+        data.chunks_mut(chunk).enumerate().for_each(fill_chunk);
         Ok(PathMatrix { data, stride })
     }
 
@@ -963,6 +882,12 @@ impl LsmcPricer {
     }
 
     /// Fit continuation coefficients and retain the training-path values.
+    ///
+    /// # Discounting Convention
+    ///
+    /// Uses exponential discounting with a flat rate: `exp(-r * t)`.
+    /// Contrast with Swaption LSMC (`swaption_lsmc.rs`), which uses discount
+    /// factors from a yield curve (`df_t / df_0`).
     fn train_exercise_policy<B>(
         &self,
         paths: &PathMatrix,
