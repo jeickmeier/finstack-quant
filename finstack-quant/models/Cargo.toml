@@ -25,7 +25,7 @@ nalgebra = { version = "0.34", default-features = false, features = ["std", "ser
 time = { workspace = true }
 schemars = { workspace = true, optional = true }
 thiserror = { workspace = true }
-num-complex = "0.4"
+num-complex = { version = "0.4", default-features = false, features = ["std"] }
 
 # rayon has no working thread pool on single-threaded wasm32; parallel
 # code paths are cfg-gated to native targets, so the dependency is too.

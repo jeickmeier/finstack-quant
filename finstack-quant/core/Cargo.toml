@@ -16,11 +16,11 @@ autotests = false
 serde = { workspace = true, features = ["rc"] }
 serde_json = { workspace = true, features = ["raw_value"] }
 sha2 = { workspace = true }
-strum = { workspace = true }
+strum = { workspace = true, features = ["derive"] }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 time = { workspace = true, features = ["macros", "formatting", "parsing", "serde", "serde-human-readable"] }
-smallvec = { version = "1.15", default-features = false, features = ["serde"] }
+smallvec = { version = "1.15", features = ["serde", "const_generics"] }
 phf = { version = "0.13", features = ["macros"], default-features = false }
 rustc-hash = { workspace = true }
 lru = { version = "0.18", default-features = false }
@@ -32,7 +32,7 @@ nalgebra = { version = "0.34", default-features = false, features = ["std", "ser
 # Production-grade random number generation
 rand = { version = "0.9.3", default-features = false, features = ["std"] }
 rand_pcg = { version = "0.9", features = ["serde"] }
-tracing = { version = "0.1", default-features = false }
+tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 
 jsonschema = { version = "0.28", default-features = false, optional = true }
 
@@ -45,7 +45,7 @@ time = { workspace = true, features = ["wasm-bindgen"] }
 rayon = "1.11"
 
 [features]
-default = ["json-schema"]
+default = ["json-schema", "jsonschema-validate"]
 json-schema = ["dep:schemars"]
 jsonschema-validate = ["json-schema", "dep:jsonschema"]
 
