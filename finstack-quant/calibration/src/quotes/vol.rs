@@ -161,14 +161,11 @@ impl VolQuote {
 
     /// Validate the quote before calibration or bumping.
     pub fn validate(&self) -> Result<()> {
+        use super::validate;
         match self {
             Self::OptionVol { strike, vol, .. } => {
-                if !strike.is_finite() || *strike <= 0.0 {
-                    return Err(Error::Validation(format!(
-                        "option volatility strike must be finite and positive, got {strike}"
-                    )));
-                }
-                validate_volatility(*vol)
+                validate::positive(*strike, "strike")?;
+                validate::non_negative(*vol, "vol")
             }
             Self::SwaptionVol {
                 expiry,
@@ -182,30 +179,13 @@ impl VolQuote {
                         "swaption volatility maturity must be after expiry".to_string(),
                     ));
                 }
-                if !strike.is_finite() {
-                    return Err(Error::Validation(
-                        "swaption volatility strike must be finite".to_string(),
-                    ));
-                }
-                validate_volatility(*vol)
+                validate::finite(*strike, "strike")?;
+                validate::non_negative(*vol, "vol")
             }
             Self::CapFloorVol { strike, vol, .. } => {
-                if !strike.is_finite() {
-                    return Err(Error::Validation(
-                        "cap/floor volatility strike must be finite".to_string(),
-                    ));
-                }
-                validate_volatility(*vol)
+                validate::finite(*strike, "strike")?;
+                validate::non_negative(*vol, "vol")
             }
         }
     }
-}
-
-fn validate_volatility(volatility: f64) -> Result<()> {
-    if !volatility.is_finite() || volatility < 0.0 {
-        return Err(Error::Validation(format!(
-            "implied volatility must be finite and non-negative, got {volatility}"
-        )));
-    }
-    Ok(())
 }

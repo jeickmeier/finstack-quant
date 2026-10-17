@@ -2,26 +2,29 @@
 //!
 //! The Python and WASM bindings expose one named constructor per quote type
 //! and per step kind (`RateQuote.deposit`, `CalibrationStep.discount`, ...).
-//! Each of them marshals its arguments into the serde wire fields of the
-//! target type and calls one of the `from_wire_fields` constructors here.
-//! This module owns everything beyond that marshalling: the authoring
-//! defaults, the discriminator, string-pillar parsing, strict deserialization
-//! (unknown fields rejected) and quote validation.
+//! Quote constructors call the typed constructors here directly without a JSON
+//! round-trip; step constructors marshal their open-ended keyword overrides
+//! into [`CalibrationStep::from_wire_fields`].
 
 use crate::api::schema::CalibrationStep;
 use crate::quotes::cds::CdsQuote;
 use crate::quotes::cds_tranche::CdsTrancheQuote;
-use crate::quotes::ids::Pillar;
+use crate::quotes::ids::{Pillar, QuoteId};
 use crate::quotes::inflation::InflationQuote;
 use crate::quotes::rates::RateQuote;
 use crate::quotes::vol::VolQuote;
 use crate::quotes::xccy::XccyQuote;
-use finstack_quant_core::dates::Tenor;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::{Date, Tenor};
+use finstack_quant_core::market_data::surfaces::VolQuoteType;
+use finstack_quant_core::types::{IndexId, UnderlyingId};
 use finstack_quant_core::{Error, Result};
+use finstack_quant_valuations::instruments::OptionType;
+use finstack_quant_valuations::market::conventions::ids::{
+    CdsConventionKey, CdsDocClause, InflationSwapConventionId, IrFutureContractId,
+    SwaptionConventionId, XccyConventionId,
+};
 use serde_json::{Map, Value};
-
-/// Wire fields that hold a [`Pillar`] on rate, CDS and cross-currency quotes.
-const PILLAR_FIELDS: [&str; 4] = ["pillar", "start", "end", "far_pillar"];
 
 /// Step kinds whose produced object is identified by `curve_id`.
 const CURVE_ID_KINDS: [&str; 6] = [
@@ -46,88 +49,223 @@ fn default_field(fields: &mut Map<String, Value>, key: &str, value: Value) {
     }
 }
 
-/// Replace string pillars (`"5Y"`, `"2030-06-20"`) with their wire objects.
-fn normalize_pillars(fields: &mut Map<String, Value>) -> Result<()> {
-    for key in PILLAR_FIELDS {
-        let Some(Value::String(text)) = fields.get(key) else {
-            continue;
-        };
-        let pillar: Pillar = text.parse()?;
-        let wire = serde_json::to_value(pillar)
-            .map_err(|error| Error::Validation(format!("failed to encode pillar: {error}")))?;
-        fields.insert(key.to_string(), wire);
-    }
-    Ok(())
-}
-
 /// Strictly deserialize a wire object, labelling the failure.
 fn from_wire<T: serde::de::DeserializeOwned>(value: Value, label: &str) -> Result<T> {
     serde_json::from_value(value)
         .map_err(|error| Error::Validation(format!("invalid {label}: {error}")))
 }
 
+fn parse_cds_convention(currency: &str, doc_clause: &str) -> Result<CdsConventionKey> {
+    let currency: Currency = currency.parse()?;
+    let doc_clause: CdsDocClause = doc_clause.parse().map_err(Error::Validation)?;
+    Ok(CdsConventionKey {
+        currency,
+        doc_clause,
+    })
+}
+
 impl RateQuote {
     /// Convexity adjustment (decimal rate) of a futures quote authored without one.
     pub const DEFAULT_CONVEXITY_ADJUSTMENT: f64 = 0.0;
 
-    /// Build a validated rate quote from its type label and serde wire fields.
+    /// Build a validated money-market deposit quote.
     ///
     /// # Arguments
     ///
-    /// * `kind` - Quote type label: `"deposit"`, `"fra"`, `"futures"` or
-    ///   `"swap"`. It becomes the `type` discriminator, replacing any `type`
-    ///   entry in `fields`.
-    /// * `fields` - Remaining wire fields of that variant (`id`, `index`,
-    ///   `pillar`, `rate`, ...), with rates as decimals. A pillar given as a
-    ///   string is parsed as a tenor (`"3M"`) or ISO-8601 date. An omitted or
-    ///   `null` futures `convexity_adjustment` is
-    ///   [`Self::DEFAULT_CONVEXITY_ADJUSTMENT`]. Unknown fields are rejected.
+    /// * `id` - Unique quote identifier used as the residual key in calibration reports.
+    /// * `index` - Rate index identifier (for example `"USD-SOFR-OIS"`).
+    /// * `pillar` - Maturity pillar as a tenor or calendar date.
+    /// * `rate` - Simple deposit rate as a decimal (`0.0525` for 5.25%).
     ///
     /// # Errors
     ///
-    /// Returns a validation error for an unknown `kind`, an unparsable pillar,
-    /// a missing, unknown or mistyped field, or a quote that fails
-    /// [`RateQuote::validate`].
-    pub fn from_wire_fields(kind: &str, mut fields: Map<String, Value>) -> Result<Self> {
-        normalize_pillars(&mut fields)?;
-        if kind == "futures" {
-            default_field(
-                &mut fields,
-                "convexity_adjustment",
-                Value::from(Self::DEFAULT_CONVEXITY_ADJUSTMENT),
-            );
-        }
-        fields.insert("type".to_string(), Value::String(kind.to_string()));
-        let quote: Self = from_wire(Value::Object(fields), "RateQuote")?;
+    /// Returns a validation error if `rate` is not finite.
+    pub fn deposit(
+        id: impl Into<QuoteId>,
+        index: impl Into<IndexId>,
+        pillar: Pillar,
+        rate: f64,
+    ) -> Result<Self> {
+        let quote = Self::Deposit {
+            id: id.into(),
+            index: index.into(),
+            pillar,
+            rate,
+        };
+        quote.validate()?;
+        Ok(quote)
+    }
+
+    /// Build a validated forward-rate-agreement quote.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique quote identifier used as the residual key in calibration reports.
+    /// * `index` - Rate index identifier of the underlying floating rate.
+    /// * `start` - Accrual start pillar as a tenor or calendar date.
+    /// * `end` - Accrual end pillar as a tenor or calendar date.
+    /// * `rate` - Quoted FRA rate as a decimal (`0.045` for 4.5%).
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `rate` is not finite.
+    pub fn fra(
+        id: impl Into<QuoteId>,
+        index: impl Into<IndexId>,
+        start: Pillar,
+        end: Pillar,
+        rate: f64,
+    ) -> Result<Self> {
+        let quote = Self::Fra {
+            id: id.into(),
+            index: index.into(),
+            start,
+            end,
+            rate,
+        };
+        quote.validate()?;
+        Ok(quote)
+    }
+
+    /// Build a validated interest-rate futures price quote.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique quote identifier used as the residual key in calibration reports.
+    /// * `contract` - Futures contract identifier (for example `"CME:SR3"`).
+    /// * `expiry` - Last trading date of the contract.
+    /// * `price` - Quoted futures price (for example `98.50`; implied rate is `(100 - price) / 100`).
+    /// * `convexity_adjustment` - Optional convexity adjustment as a decimal rate subtracted
+    ///   from the futures-implied forward (Hull convention); `None` uses
+    ///   [`Self::DEFAULT_CONVEXITY_ADJUSTMENT`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `price` or `convexity_adjustment` is not finite.
+    pub fn futures(
+        id: impl Into<QuoteId>,
+        contract: impl Into<IrFutureContractId>,
+        expiry: Date,
+        price: f64,
+        convexity_adjustment: Option<f64>,
+    ) -> Result<Self> {
+        let quote = Self::Futures {
+            id: id.into(),
+            contract: contract.into(),
+            expiry,
+            price,
+            convexity_adjustment: convexity_adjustment
+                .unwrap_or(Self::DEFAULT_CONVEXITY_ADJUSTMENT),
+        };
+        quote.validate()?;
+        Ok(quote)
+    }
+
+    /// Build a validated par interest-rate swap quote.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique quote identifier used as the residual key in calibration reports.
+    /// * `index` - Floating-leg rate index identifier (for example `"USD-SOFR-OIS"`).
+    /// * `pillar` - Swap maturity pillar as a tenor or calendar date.
+    /// * `rate` - Fixed par swap rate as a decimal (`0.045` for 4.5%).
+    /// * `spread_decimal` - Optional floating-leg spread as a decimal (`0.0010` for 10 bp).
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `rate` or a supplied `spread_decimal` is not finite.
+    pub fn swap(
+        id: impl Into<QuoteId>,
+        index: impl Into<IndexId>,
+        pillar: Pillar,
+        rate: f64,
+        spread_decimal: Option<f64>,
+    ) -> Result<Self> {
+        let quote = Self::Swap {
+            id: id.into(),
+            index: index.into(),
+            pillar,
+            rate,
+            spread_decimal,
+        };
         quote.validate()?;
         Ok(quote)
     }
 }
 
 impl CdsQuote {
-    /// Build a validated CDS quote from its type label and serde wire fields.
+    /// Build a validated running par-spread CDS quote.
     ///
     /// # Arguments
     ///
-    /// * `kind` - Quote type label: `"cds_par_spread"` or `"cds_upfront"`. It
-    ///   becomes the `type` discriminator, replacing any `type` entry in
-    ///   `fields`.
-    /// * `fields` - Remaining wire fields of that variant: `id`, `entity`,
-    ///   `convention` (`{"currency", "doc_clause"}`), `pillar`,
-    ///   `recovery_rate` (decimal) and either `spread_bp` (basis points) or
-    ///   `coupon_bp` (basis points) with `upfront_pct`. A pillar given as a
-    ///   string is parsed as a tenor (`"5Y"`) or ISO-8601 date. Unknown
-    ///   fields are rejected.
+    /// * `id` - Unique quote identifier.
+    /// * `entity` - Reference entity name.
+    /// * `currency` - ISO-4217 contract currency code of the CDS convention.
+    /// * `doc_clause` - ISDA documentation clause (`"isda_na"`, `"isda_eu"`, `"cr14"`, `"mr14"`, `"mm14"`, `"xr14"`, ...).
+    /// * `pillar` - Maturity pillar as a tenor or calendar date.
+    /// * `spread_bp` - Quoted par spread in basis points (`80.0` for 80 bp).
+    /// * `recovery_rate` - Assumed recovery rate as a decimal in `[0, 1)`.
     ///
     /// # Errors
     ///
-    /// Returns a validation error for an unknown `kind`, an unparsable pillar,
-    /// a missing, unknown or mistyped field, or a quote that fails
-    /// [`CdsQuote::validate`].
-    pub fn from_wire_fields(kind: &str, mut fields: Map<String, Value>) -> Result<Self> {
-        normalize_pillars(&mut fields)?;
-        fields.insert("type".to_string(), Value::String(kind.to_string()));
-        let quote: Self = from_wire(Value::Object(fields), "CdsQuote")?;
+    /// Returns a validation error if `currency` or `doc_clause` cannot be parsed or the quote fails [`CdsQuote::validate`].
+    pub fn par_spread(
+        id: impl Into<QuoteId>,
+        entity: impl Into<String>,
+        currency: &str,
+        doc_clause: &str,
+        pillar: Pillar,
+        spread_bp: f64,
+        recovery_rate: f64,
+    ) -> Result<Self> {
+        let quote = Self::CdsParSpread {
+            id: id.into(),
+            entity: entity.into(),
+            convention: parse_cds_convention(currency, doc_clause)?,
+            pillar,
+            spread_bp,
+            recovery_rate,
+        };
+        quote.validate()?;
+        Ok(quote)
+    }
+
+    /// Build a validated upfront-plus-running-coupon CDS quote.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique quote identifier.
+    /// * `entity` - Reference entity name.
+    /// * `currency` - ISO-4217 contract currency code of the CDS convention.
+    /// * `doc_clause` - ISDA documentation clause (`"isda_na"`, `"isda_eu"`, `"cr14"`, `"mr14"`, `"mm14"`, `"xr14"`, ...).
+    /// * `pillar` - Maturity pillar as a tenor or calendar date.
+    /// * `coupon_bp` - Contractual standard running coupon in basis points (`25.0`, `100.0`, `500.0` or `1000.0`).
+    /// * `upfront_pct` - Upfront payment as a decimal fraction of notional (`0.01` for 1%).
+    /// * `recovery_rate` - Assumed recovery rate as a decimal in `[0, 1)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `currency` or `doc_clause` cannot be parsed or the quote fails [`CdsQuote::validate`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn upfront(
+        id: impl Into<QuoteId>,
+        entity: impl Into<String>,
+        currency: &str,
+        doc_clause: &str,
+        pillar: Pillar,
+        coupon_bp: f64,
+        upfront_pct: f64,
+        recovery_rate: f64,
+    ) -> Result<Self> {
+        let quote = Self::CdsUpfront {
+            id: id.into(),
+            entity: entity.into(),
+            convention: parse_cds_convention(currency, doc_clause)?,
+            pillar,
+            coupon_bp,
+            upfront_pct,
+            recovery_rate,
+        };
         quote.validate()?;
         Ok(quote)
     }
@@ -141,133 +279,264 @@ impl VolQuote {
     /// Cap (`true`) or floor (`false`) side of a cap/floor quote authored without one.
     pub const DEFAULT_IS_CAP: bool = true;
 
-    /// Build a validated volatility quote from its variant label and serde wire fields.
+    /// Build a validated equity or FX option implied-volatility quote.
     ///
     /// # Arguments
     ///
-    /// * `kind` - Variant label: `"option_vol"`, `"swaption_vol"` or
-    ///   `"cap_floor_vol"`. It becomes the external tag of the wire object.
-    /// * `fields` - Wire fields of that variant (`id`, `expiry` as an ISO-8601
-    ///   date, `strike`, `vol` as a decimal, ...). Omitted or `null` entries
-    ///   take the authoring defaults: `option_type` is
-    ///   [`Self::DEFAULT_OPTION_TYPE`], a swaption `convention` is
-    ///   [`Self::DEFAULT_SWAPTION_CONVENTION`] and `is_cap` is
-    ///   [`Self::DEFAULT_IS_CAP`]. A swaption or cap/floor `quote_type`
-    ///   (`"normal"` or `"black_lognormal"`) has no default: it decides
-    ///   whether `vol` is an absolute or a relative volatility, so it must
-    ///   be stated. Unknown fields are rejected.
+    /// * `id` - Unique quote identifier.
+    /// * `underlying` - Underlying identifier (ticker) the surface is keyed by.
+    /// * `expiry` - Option expiry date.
+    /// * `strike` - Absolute strike in underlying price units (> 0).
+    /// * `vol` - Black implied volatility as an annualized decimal (`0.28` for 28%).
+    /// * `option_type` - Optional payoff direction (`"call"` or `"put"`); `None` uses [`Self::DEFAULT_OPTION_TYPE`].
     ///
     /// # Errors
     ///
-    /// Returns a validation error for an unknown `kind`, a missing, unknown or
-    /// mistyped field, or a quote that fails [`VolQuote::validate`].
-    pub fn from_wire_fields(kind: &str, mut fields: Map<String, Value>) -> Result<Self> {
-        match kind {
-            "option_vol" => {
-                default_field(
-                    &mut fields,
-                    "option_type",
-                    Value::from(Self::DEFAULT_OPTION_TYPE),
-                );
-            }
-            "swaption_vol" => {
-                default_field(
-                    &mut fields,
-                    "convention",
-                    Value::from(Self::DEFAULT_SWAPTION_CONVENTION),
-                );
-            }
-            "cap_floor_vol" => {
-                default_field(&mut fields, "is_cap", Value::from(Self::DEFAULT_IS_CAP));
-            }
-            _ => {}
-        }
-        let mut outer = Map::new();
-        outer.insert(kind.to_string(), Value::Object(fields));
-        let quote: Self = from_wire(Value::Object(outer), "VolQuote")?;
+    /// Returns a validation error if `option_type` is unknown or the quote fails [`VolQuote::validate`].
+    pub fn option_vol(
+        id: impl Into<QuoteId>,
+        underlying: impl Into<UnderlyingId>,
+        expiry: Date,
+        strike: f64,
+        vol: f64,
+        option_type: Option<&str>,
+    ) -> Result<Self> {
+        let option_type: OptionType = option_type
+            .unwrap_or(Self::DEFAULT_OPTION_TYPE)
+            .parse()
+            .map_err(Error::Validation)?;
+        let quote = Self::OptionVol {
+            id: id.into(),
+            underlying: underlying.into(),
+            expiry,
+            strike,
+            vol,
+            option_type,
+        };
+        quote.validate()?;
+        Ok(quote)
+    }
+
+    /// Build a validated swaption implied-volatility quote.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique quote identifier.
+    /// * `expiry` - Option expiry date.
+    /// * `maturity` - Underlying swap maturity date (must be after `expiry`).
+    /// * `strike` - Fixed strike rate as a decimal.
+    /// * `vol` - Implied volatility in canonical decimal units (absolute rate volatility for `"normal"`, relative volatility for `"black_lognormal"`).
+    /// * `quote_type` - Volatility quoting convention (`"normal"`, `"black_lognormal"`, or `"shifted_black_lognormal"`).
+    /// * `convention` - Optional swaption market convention identifier; `None` uses [`Self::DEFAULT_SWAPTION_CONVENTION`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `quote_type` is unknown or the quote fails [`VolQuote::validate`].
+    pub fn swaption_vol(
+        id: impl Into<QuoteId>,
+        expiry: Date,
+        maturity: Date,
+        strike: f64,
+        vol: f64,
+        quote_type: &str,
+        convention: Option<&str>,
+    ) -> Result<Self> {
+        let quote_type: VolQuoteType = quote_type.parse()?;
+        let convention =
+            SwaptionConventionId::new(convention.unwrap_or(Self::DEFAULT_SWAPTION_CONVENTION));
+        let quote = Self::SwaptionVol {
+            id: id.into(),
+            expiry,
+            maturity,
+            strike,
+            vol,
+            quote_type,
+            convention,
+        };
+        quote.validate()?;
+        Ok(quote)
+    }
+
+    /// Build a validated cap or floor implied-volatility quote.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique quote identifier.
+    /// * `expiry` - Cap/floor maturity or caplet expiry date.
+    /// * `strike` - Strike rate as a decimal.
+    /// * `vol` - Implied volatility in canonical decimal units (absolute rate volatility for `"normal"`, relative volatility for `"black_lognormal"`).
+    /// * `quote_type` - Volatility quoting convention (`"normal"`, `"black_lognormal"`, or `"shifted_black_lognormal"`).
+    /// * `is_cap` - Optional cap (`true`) or floor (`false`) indicator; `None` uses [`Self::DEFAULT_IS_CAP`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `quote_type` is unknown or the quote fails [`VolQuote::validate`].
+    pub fn cap_floor_vol(
+        id: impl Into<QuoteId>,
+        expiry: Date,
+        strike: f64,
+        vol: f64,
+        quote_type: &str,
+        is_cap: Option<bool>,
+    ) -> Result<Self> {
+        let quote_type: VolQuoteType = quote_type.parse()?;
+        let quote = Self::CapFloorVol {
+            id: id.into(),
+            expiry,
+            strike,
+            vol,
+            quote_type,
+            is_cap: is_cap.unwrap_or(Self::DEFAULT_IS_CAP),
+        };
         quote.validate()?;
         Ok(quote)
     }
 }
 
 impl InflationQuote {
-    /// Build a validated inflation quote from its variant label and serde wire fields.
+    /// Build a validated zero-coupon inflation swap quote.
     ///
     /// # Arguments
     ///
-    /// * `kind` - Variant label: `"inflation_swap"` (zero-coupon) or
-    ///   `"yoy_inflation_swap"` (year-on-year). It becomes the external tag of
-    ///   the wire object.
-    /// * `fields` - Wire fields of that variant: `id`, `maturity` (ISO-8601
-    ///   date), `rate` (fixed swap rate as a decimal), `index` (inflation index
-    ///   identifier such as `"USA-CPI-U"`), `convention` (inflation-swap
-    ///   convention identifier) and, for year-on-year swaps, `frequency`
-    ///   (payment tenor as a string such as `"1Y"`, or the tenor wire
-    ///   object). Every field is required; unknown fields are rejected.
+    /// * `id` - Unique quote identifier.
+    /// * `maturity` - Swap maturity date.
+    /// * `rate` - Fixed zero-coupon swap rate as a decimal (`0.025` for 2.5%).
+    /// * `index` - Inflation index identifier (for example `"USA-CPI-U"`).
+    /// * `convention` - Inflation-swap convention identifier (for example `"USD"`).
     ///
     /// # Errors
     ///
-    /// Returns a validation error for an unknown `kind`, a missing, unknown or
-    /// mistyped field, an unparsable frequency, or a quote that fails
-    /// [`InflationQuote::validate`].
-    pub fn from_wire_fields(kind: &str, mut fields: Map<String, Value>) -> Result<Self> {
-        if let Some(Value::String(text)) = fields.get("frequency") {
-            let tenor: Tenor = text.parse()?;
-            let wire = serde_json::to_value(tenor)
-                .map_err(|error| Error::Validation(format!("failed to encode tenor: {error}")))?;
-            fields.insert("frequency".to_string(), wire);
-        }
-        let mut outer = Map::new();
-        outer.insert(kind.to_string(), Value::Object(fields));
-        let quote: Self = from_wire(Value::Object(outer), "InflationQuote")?;
+    /// Returns a validation error if `rate` is not finite.
+    pub fn inflation_swap(
+        id: impl Into<QuoteId>,
+        maturity: Date,
+        rate: f64,
+        index: impl Into<String>,
+        convention: impl Into<InflationSwapConventionId>,
+    ) -> Result<Self> {
+        let quote = Self::InflationSwap {
+            id: id.into(),
+            maturity,
+            rate,
+            index: index.into(),
+            convention: convention.into(),
+        };
+        quote.validate()?;
+        Ok(quote)
+    }
+
+    /// Build a validated year-on-year inflation swap quote.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique quote identifier.
+    /// * `maturity` - Swap maturity date.
+    /// * `rate` - Fixed year-on-year swap rate as a decimal (`0.025` for 2.5%).
+    /// * `index` - Inflation index identifier (for example `"USA-CPI-U"`).
+    /// * `frequency` - Payment frequency tenor string (for example `"1Y"`).
+    /// * `convention` - Inflation-swap convention identifier (for example `"USD"`).
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `frequency` cannot be parsed as a [`Tenor`] or `rate` is not finite.
+    pub fn yoy_inflation_swap(
+        id: impl Into<QuoteId>,
+        maturity: Date,
+        rate: f64,
+        index: impl Into<String>,
+        frequency: &str,
+        convention: impl Into<InflationSwapConventionId>,
+    ) -> Result<Self> {
+        let frequency: Tenor = frequency.parse()?;
+        let quote = Self::YoYInflationSwap {
+            id: id.into(),
+            maturity,
+            rate,
+            index: index.into(),
+            frequency,
+            convention: convention.into(),
+        };
         quote.validate()?;
         Ok(quote)
     }
 }
 
 impl XccyQuote {
-    /// Build a validated cross-currency basis-swap quote from its serde wire fields.
+    /// Build a validated cross-currency basis-swap quote.
     ///
     /// # Arguments
     ///
-    /// * `fields` - Wire fields: `id`, `convention` (cross-currency convention
-    ///   identifier), `far_pillar` (maturity as a tenor string such as `"5Y"`,
-    ///   an ISO-8601 date string or the pillar wire object), `basis_spread_bp`
-    ///   (basis spread in basis points) and optional `spot_fx` (spot FX rate
-    ///   override, quote currency per base currency). Unknown fields are
-    ///   rejected.
+    /// * `id` - Unique quote identifier.
+    /// * `convention` - Cross-currency swap convention identifier (for example `"EUR-USD"`).
+    /// * `far_pillar` - Far-leg maturity pillar as a tenor or calendar date.
+    /// * `basis_spread_bp` - Basis spread in basis points on the base-currency leg.
+    /// * `spot_fx` - Optional spot FX rate override (quote currency per 1 unit of base currency, > 0).
     ///
     /// # Errors
     ///
-    /// Returns a validation error for an unparsable pillar, a missing, unknown
-    /// or mistyped field, or a quote that fails [`XccyQuote::validate`].
-    pub fn from_wire_fields(mut fields: Map<String, Value>) -> Result<Self> {
-        normalize_pillars(&mut fields)?;
-        let quote: Self = from_wire(Value::Object(fields), "XccyQuote")?;
+    /// Returns a validation error if `basis_spread_bp` is not finite or `spot_fx` is not positive.
+    pub fn new(
+        id: impl Into<QuoteId>,
+        convention: impl Into<XccyConventionId>,
+        far_pillar: Pillar,
+        basis_spread_bp: f64,
+        spot_fx: Option<f64>,
+    ) -> Result<Self> {
+        let quote = Self {
+            id: id.into(),
+            convention: convention.into(),
+            far_pillar,
+            basis_spread_bp,
+            spot_fx,
+        };
         quote.validate()?;
         Ok(quote)
     }
 }
 
 impl CdsTrancheQuote {
-    /// Build a validated CDS index tranche quote from its serde wire fields.
+    /// Build a validated CDS index tranche quote.
     ///
     /// # Arguments
     ///
-    /// * `fields` - Wire fields: `id`, `index` (credit index name such as
-    ///   `"CDX.NA.IG"`), `series` (index series number), `attachment` and
-    ///   `detachment` (tranche bounds as decimal loss fractions in `[0, 1]`),
-    ///   `maturity` (ISO-8601 date), `upfront_pct` (upfront as a decimal
-    ///   fraction of notional, `|upfront_pct| <= 1`), `coupon_bp` (running
-    ///   coupon in basis points) and `convention` (`{"currency",
-    ///   "doc_clause"}`). Every field is required; unknown fields are rejected.
+    /// * `id` - Unique quote identifier.
+    /// * `index` - Credit index name (for example `"CDX.NA.IG"`).
+    /// * `series` - CDS index series number.
+    /// * `attachment` - Tranche attachment point as a decimal loss fraction in `[0, 1]`.
+    /// * `detachment` - Tranche detachment point as a decimal loss fraction in `[0, 1]`, strictly above `attachment`.
+    /// * `maturity` - Tranche maturity date.
+    /// * `upfront_pct` - Upfront payment as a decimal fraction of tranche notional (`|upfront_pct| <= 1`).
+    /// * `coupon_bp` - Contractual running coupon in basis points (> 0).
+    /// * `currency` - ISO-4217 contract currency code of the CDS convention.
+    /// * `doc_clause` - ISDA documentation clause (`"isda_na"`, `"cr14"`, ...).
     ///
     /// # Errors
     ///
-    /// Returns a validation error for a missing, unknown or mistyped field, or
-    /// a quote that fails [`CdsTrancheQuote::validate`].
-    pub fn from_wire_fields(fields: Map<String, Value>) -> Result<Self> {
-        let quote: Self = from_wire(Value::Object(fields), "CdsTrancheQuote")?;
+    /// Returns a validation error if `currency` or `doc_clause` cannot be parsed or the quote fails [`CdsTrancheQuote::validate`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        id: impl Into<QuoteId>,
+        index: impl Into<String>,
+        series: u16,
+        attachment: f64,
+        detachment: f64,
+        maturity: Date,
+        upfront_pct: f64,
+        coupon_bp: f64,
+        currency: &str,
+        doc_clause: &str,
+    ) -> Result<Self> {
+        let quote = Self {
+            id: id.into(),
+            index: index.into(),
+            series,
+            attachment,
+            detachment,
+            maturity,
+            upfront_pct,
+            coupon_bp,
+            convention: parse_cds_convention(currency, doc_clause)?,
+        };
         quote.validate()?;
         Ok(quote)
     }
@@ -346,6 +615,7 @@ mod tests {
     use super::*;
     use crate::api::schema::StepParams;
     use serde_json::json;
+    use time::macros::date;
 
     fn map(value: Value) -> Map<String, Value> {
         match value {
@@ -355,12 +625,10 @@ mod tests {
     }
 
     #[test]
-    fn rate_quote_parses_string_pillars_and_defaults_convexity() {
-        let deposit = RateQuote::from_wire_fields(
-            "deposit",
-            map(json!({"id": "D3M", "index": "USD-SOFR-OIS", "pillar": "3M", "rate": 0.052})),
-        )
-        .expect("deposit");
+    fn rate_quote_constructors_build_and_validate() {
+        let deposit =
+            RateQuote::deposit("D3M", "USD-SOFR-OIS", "3M".parse().expect("tenor"), 0.052)
+                .expect("deposit");
         let wire = serde_json::to_value(&deposit).expect("wire");
         assert_eq!(wire["type"], "deposit");
         assert_eq!(
@@ -368,9 +636,12 @@ mod tests {
             serde_json::to_value("3M".parse::<Pillar>().expect("tenor")).expect("pillar")
         );
 
-        let dated = RateQuote::from_wire_fields(
-            "swap",
-            map(json!({"id": "S", "index": "USD-SOFR-OIS", "pillar": "2030-06-20", "rate": 0.04})),
+        let dated = RateQuote::swap(
+            "S",
+            "USD-SOFR-OIS",
+            "2030-06-20".parse().expect("date pillar"),
+            0.04,
+            None,
         )
         .expect("swap");
         assert_eq!(
@@ -378,144 +649,156 @@ mod tests {
             "2030-06-20"
         );
 
-        let futures = RateQuote::from_wire_fields(
-            "futures",
-            map(
-                json!({"id": "F", "contract": "CME:SR3", "expiry": "2026-09-15", "price": 96.5,
-                       "convexity_adjustment": null}),
-            ),
-        )
-        .expect("futures");
+        let futures =
+            RateQuote::futures("F", "CME:SR3", date!(2026 - 09 - 15), 96.5, None).expect("futures");
         assert_eq!(
             serde_json::to_value(&futures).expect("wire")["convexity_adjustment"],
             0.0
         );
-    }
 
-    #[test]
-    fn rate_quote_rejects_unknown_kinds_fields_and_pillars() {
-        let fields = || map(json!({"id": "D", "index": "X", "pillar": "3M", "rate": 0.05}));
-        assert!(RateQuote::from_wire_fields("bond", fields()).is_err());
-        let mut extra = fields();
-        extra.insert("bogus".into(), json!(1));
-        assert!(RateQuote::from_wire_fields("deposit", extra).is_err());
-        let mut bad_pillar = fields();
-        bad_pillar.insert("pillar".into(), json!("soon"));
-        assert!(RateQuote::from_wire_fields("deposit", bad_pillar).is_err());
-        let mut non_finite = fields();
-        non_finite.insert("rate".into(), json!(null));
-        assert!(RateQuote::from_wire_fields("deposit", non_finite).is_err());
+        assert!(RateQuote::deposit("D", "X", "3M".parse().expect("tenor"), f64::NAN).is_err());
+        assert!(
+            RateQuote::swap("S", "X", "3M".parse().expect("tenor"), 0.04, Some(f64::NAN)).is_err()
+        );
     }
 
     #[test]
     fn cds_quote_builds_both_variants() {
-        let convention = json!({"currency": "USD", "doc_clause": "isda_na"});
-        let par = CdsQuote::from_wire_fields(
-            "cds_par_spread",
-            map(
-                json!({"id": "ACME-5Y", "entity": "ACME", "convention": convention, "pillar": "5Y",
-                       "spread_bp": 80.0, "recovery_rate": 0.4}),
-            ),
+        let par = CdsQuote::par_spread(
+            "ACME-5Y",
+            "ACME",
+            "USD",
+            "isda_na",
+            "5Y".parse().expect("tenor"),
+            80.0,
+            0.4,
         )
         .expect("par spread");
         assert_eq!(par.coupon_bp(), 80.0);
-        let upfront = CdsQuote::from_wire_fields(
-            "cds_upfront",
-            map(json!({"id": "ACME-5Y-U", "entity": "ACME", "convention": convention, "pillar": "5Y",
-                       "coupon_bp": 100.0, "upfront_pct": 0.01, "recovery_rate": 0.4})),
+
+        let upfront = CdsQuote::upfront(
+            "ACME-5Y-U",
+            "ACME",
+            "USD",
+            "isda_na",
+            "5Y".parse().expect("tenor"),
+            100.0,
+            0.01,
+            0.4,
         )
         .expect("upfront");
         assert_eq!(upfront.coupon_bp(), 100.0);
-        assert!(CdsQuote::from_wire_fields("cds_upfront", Map::new()).is_err());
+        assert!(CdsQuote::par_spread(
+            "ACME-5Y",
+            "ACME",
+            "USD",
+            "bogus_clause",
+            "5Y".parse().expect("tenor"),
+            80.0,
+            0.4,
+        )
+        .is_err());
     }
 
     #[test]
     fn vol_quote_applies_authoring_defaults() {
-        let option = VolQuote::from_wire_fields(
-            "option_vol",
-            map(json!({"id": "O", "underlying": "AAPL", "expiry": "2027-05-08", "strike": 155.0, "vol": 0.28})),
-        )
-        .expect("option vol");
+        let option = VolQuote::option_vol("O", "AAPL", date!(2027 - 05 - 08), 155.0, 0.28, None)
+            .expect("option vol");
         assert_eq!(
             serde_json::to_value(&option).expect("wire")["option_vol"]["option_type"],
             "call"
         );
 
-        let swaption = VolQuote::from_wire_fields(
-            "swaption_vol",
-            map(json!({"id": "S", "expiry": "2027-05-08", "maturity": "2032-05-08", "strike": 0.04, "vol": 0.007, "quote_type": "normal"})),
+        let swaption = VolQuote::swaption_vol(
+            "S",
+            date!(2027 - 05 - 08),
+            date!(2032 - 05 - 08),
+            0.04,
+            0.007,
+            "normal",
+            None,
         )
         .expect("swaption vol");
         let wire = serde_json::to_value(&swaption).expect("wire");
         assert_eq!(wire["swaption_vol"]["quote_type"], "normal");
         assert_eq!(wire["swaption_vol"]["convention"], "USD");
 
-        let floor = VolQuote::from_wire_fields(
-            "cap_floor_vol",
-            map(json!({"id": "C", "expiry": "2027-05-08", "strike": 0.04, "vol": 0.20, "is_cap": false, "quote_type": "black_lognormal"})),
+        let floor = VolQuote::cap_floor_vol(
+            "C",
+            date!(2027 - 05 - 08),
+            0.04,
+            0.20,
+            "black_lognormal",
+            Some(false),
         )
         .expect("floor vol");
         let wire = serde_json::to_value(&floor).expect("wire");
         assert_eq!(wire["cap_floor_vol"]["is_cap"], false);
         assert_eq!(wire["cap_floor_vol"]["quote_type"], "black_lognormal");
 
-        // The quote type decides the unit of `vol`, so it is never defaulted.
-        for kind in ["swaption_vol", "cap_floor_vol"] {
-            let mut without = map(
-                json!({"id": "Q", "expiry": "2027-05-08", "maturity": "2032-05-08", "strike": 0.04, "vol": 0.2}),
-            );
-            if kind == "cap_floor_vol" {
-                without.remove("maturity");
-            }
-            assert!(
-                VolQuote::from_wire_fields(kind, without).is_err(),
-                "{kind} without quote_type must be rejected"
-            );
-        }
-        assert!(VolQuote::from_wire_fields("fx_vol", Map::new()).is_err());
+        assert!(VolQuote::swaption_vol(
+            "Q",
+            date!(2027 - 05 - 08),
+            date!(2032 - 05 - 08),
+            0.04,
+            0.2,
+            "bogus",
+            None,
+        )
+        .is_err());
     }
 
     #[test]
     fn inflation_xccy_and_tranche_quotes_build_and_validate() {
-        let zc = InflationQuote::from_wire_fields(
-            "inflation_swap",
-            map(
-                json!({"id": "ZC5Y", "maturity": "2031-05-08", "rate": 0.025,
-                       "index": "USA-CPI-U", "convention": "USD"}),
-            ),
+        let zc = InflationQuote::inflation_swap(
+            "ZC5Y",
+            date!(2031 - 05 - 08),
+            0.025,
+            "USA-CPI-U",
+            "USD",
         )
         .expect("zero-coupon inflation swap");
         assert_eq!(zc.id().as_str(), "ZC5Y");
-        let yoy = InflationQuote::from_wire_fields(
-            "yoy_inflation_swap",
-            map(
-                json!({"id": "YOY5Y", "maturity": "2031-05-08", "rate": 0.025,
-                       "index": "USA-CPI-U", "frequency": "1Y", "convention": "USD"}),
-            ),
+
+        let yoy = InflationQuote::yoy_inflation_swap(
+            "YOY5Y",
+            date!(2031 - 05 - 08),
+            0.025,
+            "USA-CPI-U",
+            "1Y",
+            "USD",
         )
         .expect("yoy inflation swap");
         assert!(serde_json::to_value(&yoy).expect("wire")["yoy_inflation_swap"].is_object());
-        assert!(InflationQuote::from_wire_fields("cpi_swap", Map::new()).is_err());
 
-        let xccy = XccyQuote::from_wire_fields(map(
-            json!({"id": "X5Y", "convention": "EUR-USD", "far_pillar": "5Y", "basis_spread_bp": -12.5}),
-        ))
-        .expect("xccy quote");
+        let xccy = XccyQuote::new("X5Y", "EUR-USD", "5Y".parse().expect("tenor"), -12.5, None)
+            .expect("xccy quote");
         assert_eq!(
             serde_json::to_value(&xccy.far_pillar).expect("pillar"),
             serde_json::to_value("5Y".parse::<Pillar>().expect("tenor")).expect("pillar")
         );
-        assert!(XccyQuote::from_wire_fields(map(
-            json!({"id": "X", "convention": "EUR-USD", "far_pillar": "5Y", "basis_spread_bp": 1.0, "spot_fx": -1.0}),
-        ))
+        assert!(XccyQuote::new(
+            "X",
+            "EUR-USD",
+            "5Y".parse().expect("tenor"),
+            1.0,
+            Some(-1.0),
+        )
         .is_err());
 
         let tranche = |attachment: f64| {
-            CdsTrancheQuote::from_wire_fields(map(json!({
-                "id": "IG-3-7", "index": "CDX.NA.IG", "series": 42, "attachment": attachment,
-                "detachment": 0.07, "maturity": "2031-06-20", "upfront_pct": 0.01,
-                "coupon_bp": 100.0, "convention": {"currency": "USD", "doc_clause": "isda_na"}
-            })))
+            CdsTrancheQuote::new(
+                "IG-3-7",
+                "CDX.NA.IG",
+                42,
+                attachment,
+                0.07,
+                date!(2031 - 06 - 20),
+                0.01,
+                100.0,
+                "USD",
+                "isda_na",
+            )
         };
         assert!(tranche(0.03).is_ok());
         assert!(

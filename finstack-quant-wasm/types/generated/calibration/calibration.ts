@@ -97,7 +97,7 @@ export type MarketDatum =
            * `forward = (100 - price) / 100 − convexity_adjustment`.
            * A positive adjustment lowers the futures-implied rate toward the true
            * forward. The wire field is required; the host authoring
-           * constructors ([`RateQuote::from_wire_fields`]) fill an omitted value
+           * constructor ([`RateQuote::futures`]) fills an omitted value
            * with [`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`].
            */
           convexity_adjustment: number;
@@ -3185,7 +3185,7 @@ export type MarketQuote =
            * `forward = (100 - price) / 100 − convexity_adjustment`.
            * A positive adjustment lowers the futures-implied rate toward the true
            * forward. The wire field is required; the host authoring
-           * constructors ([`RateQuote::from_wire_fields`]) fill an omitted value
+           * constructor ([`RateQuote::futures`]) fills an omitted value
            * with [`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`].
            */
           convexity_adjustment: number;
@@ -3584,7 +3584,7 @@ export type RateQuote =
        * `forward = (100 - price) / 100 − convexity_adjustment`.
        * A positive adjustment lowers the futures-implied rate toward the true
        * forward. The wire field is required; the host authoring
-       * constructors ([`RateQuote::from_wire_fields`]) fill an omitted value
+       * constructor ([`RateQuote::futures`]) fills an omitted value
        * with [`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`].
        */
       convexity_adjustment: number;
@@ -5419,7 +5419,7 @@ export interface CalibrationReport {
    * Set by every calibrator in this crate and mirrored as the
    * `residual_units` entry of [`Self::metadata`]. `None` only on reports
    * built directly through [`Self::new`] or
-   * [`Self::for_type_with_tolerance`] without a solver, and on JSON
+   * `Self::for_type_with_tolerance` without a solver, and on JSON
    * written before this field existed.
    */
   residual_units?: ResidualUnits | null;
@@ -5451,7 +5451,7 @@ export interface CalibrationReport {
    * Numerical procedure that produced this report.
    *
    * Set by every calibrator in this crate. `None` only on reports built
-   * directly through [`Self::new`] or [`Self::for_type_with_tolerance`]
+   * directly through [`Self::new`] or `Self::for_type_with_tolerance`
    * without a solver, and on JSON written before this field existed.
    */
   solver_method?: SolverMethod | null;
@@ -5462,7 +5462,7 @@ export interface CalibrationReport {
   /**
    * Configured tolerance used to determine [`Self::success`] from residuals.
    *
-   * Set by [`Self::for_type_with_tolerance`]; `None` for reports built via [`Self::new`]
+   * Set by `Self::for_type_with_tolerance`; `None` for reports built via [`Self::new`]
    * directly (no tolerance gate applied). This is the typed source of truth for the
    * success-gate tolerance; it is distinct from `solver_config.tolerance()`, which controls
    * when the numerical root-finder stops.

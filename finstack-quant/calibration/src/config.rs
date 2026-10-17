@@ -875,7 +875,7 @@ impl CalibrationConfig {
     /// # Errors
     ///
     /// Returns a validation error if the solver stopping settings are invalid.
-    pub fn create_lm_solver(
+    pub(crate) fn create_lm_solver(
         &self,
     ) -> finstack_quant_core::Result<
         finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver,

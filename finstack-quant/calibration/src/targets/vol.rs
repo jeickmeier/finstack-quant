@@ -3,15 +3,15 @@
 use crate::api::schema::SurfaceExtrapolationPolicy;
 use crate::api::schema::VolSurfaceParams;
 use crate::config::CalibrationConfig;
-use crate::quotes::market_quote::MarketQuote;
 use crate::quotes::vol::VolQuote;
+use crate::quotes::MarketQuote;
 use crate::targets::util::{
-    interpolate_total_variance, resolve_equity_forward_inputs, surface_quote_residuals,
+    extract_equity_option_quotes, interpolate_total_variance, resolve_equity_forward_inputs,
+    resolve_equity_spot, surface_quote_residuals,
 };
 use crate::validation::ValidationConfig;
 use crate::CalibrationReport;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
 use finstack_quant_core::Result;
 use finstack_quant_models::{SabrCalibrator, SabrParameters, SabrShift};
@@ -79,25 +79,7 @@ impl VolSurfaceTarget {
         }
 
         // Use only option quotes for the requested underlying.
-        let vol_quotes: Vec<&VolQuote> = quotes
-            .iter()
-            .filter_map(|q| match q {
-                MarketQuote::Vol(vq) => Some(vq),
-                _ => None,
-            })
-            .filter(|vq| match vq {
-                VolQuote::OptionVol { underlying, .. } => {
-                    underlying.as_str() == params.underlying_ticker.as_str()
-                }
-                VolQuote::SwaptionVol { .. } | VolQuote::CapFloorVol { .. } => false,
-            })
-            .collect();
-
-        if vol_quotes.is_empty() {
-            return Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::TooFewPoints,
-            ));
-        }
+        let vol_quotes = extract_equity_option_quotes(quotes, &params.underlying_ticker)?;
 
         // Group by expiry (year fraction)
         let mut quotes_by_expiry: BTreeMap<OrderedF64, Vec<&VolQuote>> = BTreeMap::new();
@@ -119,19 +101,7 @@ impl VolSurfaceTarget {
 
         // Forward function
         // Need spot and dividend yield
-        let spot = if let Some(s) = params.spot_override {
-            s
-        } else {
-            let scalar = context.get_price(&params.underlying_ticker).map_err(|_| {
-                finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
-                    id: params.underlying_ticker.clone(),
-                })
-            })?;
-            match scalar {
-                MarketScalar::Price(m) => m.amount(),
-                MarketScalar::Unitless(v) => *v,
-            }
-        };
+        let spot = resolve_equity_spot(params.spot_override, &params.underlying_ticker, context)?;
 
         let disc_id = params
             .discount_curve_id

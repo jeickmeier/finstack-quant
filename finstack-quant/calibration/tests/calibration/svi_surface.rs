@@ -31,8 +31,8 @@ use finstack_quant_calibration::api::schema::{
     SviSurfaceParams, VolSurfaceParams,
 };
 use finstack_quant_calibration::quotes::ids::QuoteId;
-use finstack_quant_calibration::quotes::market_quote::MarketQuote;
 use finstack_quant_calibration::quotes::vol::VolQuote;
+use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

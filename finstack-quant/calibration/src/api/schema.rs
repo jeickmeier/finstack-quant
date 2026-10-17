@@ -638,6 +638,26 @@ pub(crate) struct StepIo {
 }
 
 impl StepParams {
+    /// Step kind tag as serialized in envelope JSON (`"discount"`, `"forward"`, ...).
+    #[must_use]
+    pub const fn kind_str(&self) -> &'static str {
+        match self {
+            Self::Discount(_) => "discount",
+            Self::Forward(_) => "forward",
+            Self::Hazard(_) => "hazard",
+            Self::Inflation(_) => "inflation",
+            Self::VolSurface(_) => "vol_surface",
+            Self::SwaptionVol(_) => "swaption_vol",
+            Self::BaseCorrelation(_) => "base_correlation",
+            Self::StudentT(_) => "student_t",
+            Self::HullWhite(_) => "hull_white",
+            Self::CapFloorHullWhite(_) => "cap_floor_hull_white",
+            Self::SviSurface(_) => "svi_surface",
+            Self::XccyBasis(_) => "xccy_basis",
+            Self::Parametric(_) => "parametric",
+        }
+    }
+
     /// Return the static dependency metadata for this step.
     pub(crate) fn io(&self) -> StepIo {
         match self {
@@ -713,7 +733,7 @@ impl StepParams {
             }
             StepParams::HullWhite(p) => {
                 let (kappa_key, sigma_key) =
-                    crate::hull_white::hw1f_scalar_keys(p.curve_id.as_str());
+                    finstack_quant_models::rates::hull_white::hw1f_scalar_keys(p.curve_id.as_str());
                 StepIo {
                     kind: "hull_white",
                     reads: vec![p.curve_id.to_string()],
@@ -726,11 +746,13 @@ impl StepParams {
                     reads.push(p.forward_curve_id.to_string());
                 }
                 let (kappa_key, sigma_key) =
-                    crate::hull_white::capfloor_hw1f_scalar_keys(p.discount_curve_id.as_str());
+                    finstack_quant_models::rates::hull_white::capfloor_hw1f_scalar_keys(
+                        p.discount_curve_id.as_str(),
+                    );
                 let volatility_key = match p.volatility_mode {
                     HullWhiteVolatilityMode::Scalar => sigma_key,
                     HullWhiteVolatilityMode::Piecewise => {
-                        crate::hull_white::capfloor_hw1f_sigma_schedule_key(
+                        finstack_quant_models::rates::hull_white::capfloor_hw1f_sigma_schedule_key(
                             p.discount_curve_id.as_str(),
                         )
                     }

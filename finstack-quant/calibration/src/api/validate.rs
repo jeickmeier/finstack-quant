@@ -29,7 +29,7 @@ use crate::api::errors::EnvelopeError;
 use crate::api::market_datum::MarketDatum;
 use crate::api::prior_market::PriorMarketObject;
 use crate::api::schema::{CalibrationEnvelope, StepParams, CALIBRATION_CONTRACT};
-use crate::quotes::market_quote::MarketQuote;
+use crate::quotes::MarketQuote;
 #[cfg(test)]
 use crate::quotes::{cds::CdsQuote, rates::RateQuote};
 #[cfg(test)]

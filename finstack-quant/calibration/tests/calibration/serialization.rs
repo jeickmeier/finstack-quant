@@ -16,9 +16,9 @@ use finstack_quant_calibration::api::schema::{
 use finstack_quant_calibration::quotes::cds::CdsQuote;
 use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
 use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-use finstack_quant_calibration::quotes::market_quote::MarketQuote;
 use finstack_quant_calibration::quotes::rates::RateQuote;
 use finstack_quant_calibration::quotes::vol::VolQuote;
+use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::CalibrationMethod;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;

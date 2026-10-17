@@ -29,9 +29,6 @@ use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 /// | **XCCY** | *(none at context level)* | `"domestic_discount"`, `"foreign_discount"`, `"domestic_forward"`, `"foreign_forward"` (convention-derived defaults) |
 /// | **CDS Tranche** | `"discount"`, `"credit"` | *(none -- errors if missing)* |
 ///
-/// This table covers the public quote-to-instrument builders re-exported from
-/// `crate::market`. Internal builders may use additional roles.
-///
 /// # Examples
 ///
 /// Basic usage:
@@ -62,7 +59,7 @@ use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 /// );
 /// ```
 #[derive(Debug, Clone)]
-pub struct BuildCtx {
+pub(crate) struct BuildCtx {
     /// The valuation date for which the instrument is being built.
     ///
     /// This date is used to calculate spot dates, fixing dates, and all other
@@ -104,31 +101,7 @@ pub struct BuildCtx {
 
 impl BuildCtx {
     /// Create a new build context.
-    ///
-    /// # Arguments
-    ///
-    /// * `as_of` - Valuation date for all instruments built with this context
-    /// * `notional` - Standard notional amount to use for instruments
-    /// * `curve_ids` - Mapping of curve roles to curve identifiers
-    ///
-    /// # Returns
-    ///
-    /// A new `BuildCtx`.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// use finstack_quant_calibration::build::BuildCtx;
-    /// use finstack_quant_core::dates::Date;
-    /// use finstack_quant_core::HashMap;
-    ///
-    /// let ctx = BuildCtx::new(
-    ///     Date::from_calendar_date(2024, time::Month::January, 2).unwrap(),
-    ///     1_000_000.0,
-    ///     HashMap::default(),
-    /// );
-    /// ```
-    pub fn new(as_of: Date, notional: f64, curve_ids: HashMap<String, String>) -> Self {
+    pub(crate) fn new(as_of: Date, notional: f64, curve_ids: HashMap<String, String>) -> Self {
         Self {
             as_of,
             notional,
@@ -174,54 +147,22 @@ impl BuildCtx {
     }
 
     /// Valuation date for instruments built with this context.
-    pub fn as_of(&self) -> Date {
+    pub(crate) fn as_of(&self) -> Date {
         self.as_of
     }
 
     /// Default notional applied during instrument construction.
-    pub fn notional(&self) -> f64 {
+    pub(crate) fn notional(&self) -> f64 {
         self.notional
     }
 
     /// Get a curve ID by role name.
-    ///
-    /// # Arguments
-    ///
-    /// * `role` - The curve role name (e.g., "discount", "forward", "credit")
-    ///
-    /// # Returns
-    ///
-    /// `Some(curve_id)` if the role is mapped, `None` otherwise.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// use finstack_quant_calibration::build::BuildCtx;
-    /// use finstack_quant_core::dates::Date;
-    /// use finstack_quant_core::HashMap;
-    ///
-    /// let mut curve_ids = HashMap::default();
-    /// curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
-    ///
-    /// let ctx = BuildCtx::new(
-    ///     Date::from_calendar_date(2024, time::Month::January, 2).unwrap(),
-    ///     1_000_000.0,
-    ///     curve_ids,
-    /// );
-    ///
-    /// assert_eq!(ctx.curve_id("discount"), Some("USD-OIS"));
-    /// assert_eq!(ctx.curve_id("forward"), None);
-    /// ```
-    pub fn curve_id(&self, role: &str) -> Option<&str> {
+    pub(crate) fn curve_id(&self, role: &str) -> Option<&str> {
         self.curve_ids.get(role).map(|s| s.as_str())
     }
 
     /// Get a required curve ID by role name.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`InputError::NotFound`] when the role is not mapped in this context.
-    pub fn require_curve_id(&self, role: &str) -> Result<&str> {
+    pub(crate) fn require_curve_id(&self, role: &str) -> Result<&str> {
         self.curve_id(role).ok_or_else(|| {
             Error::Input(InputError::NotFound {
                 id: format!("curve role '{}'", role),

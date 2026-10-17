@@ -4,10 +4,10 @@
 //! market instruments using the Levenberg-Marquardt optimizer.
 
 use crate::api::schema::ParametricCurveParams;
+use crate::build::prepared::PreparedQuote;
 use crate::config::CalibrationConfig;
-use crate::prepared::CalibrationQuote;
-use crate::quotes::market_quote::MarketQuote;
 use crate::quotes::rates::RateQuote;
+use crate::quotes::MarketQuote;
 use crate::solver::global::GlobalFitOptimizer;
 use crate::solver::traits::GlobalSolveTarget;
 use crate::targets::util::{
@@ -57,23 +57,16 @@ pub(crate) struct ParametricCurveTarget {
     sample_times: Vec<f64>,
     /// Reusable scratch context (see [`ContextScratch`]).
     scratch: ContextScratch,
-    /// Residual normalization notional, mirroring the notional used to build
-    /// the calibration instruments. Residuals are divided by this value so that
-    /// the solver works in per-notional units and `validation_tolerance` (default
-    /// `1e-8`) is comparable to the sibling targets.
-    residual_notional: f64,
 }
 
 impl ParametricCurveTarget {
     /// Create a new parametric curve target with pre-computed sample times.
     pub(crate) fn new(params: ParametricCurveTargetParams, sample_times: Vec<f64>) -> Self {
         let scratch = ContextScratch::new(params.base_context.clone());
-        let residual_notional = params.residual_notional;
         Self {
             params,
             sample_times,
             scratch,
-            residual_notional,
         }
     }
 
@@ -89,15 +82,13 @@ impl ParametricCurveTarget {
     /// Every future date used by the canonical rate pricers is consequently an
     /// exact knot. Residuals depend on analytical discount factors, without an
     /// interpolation approximation or a tolerance-dependent sampling heuristic.
-    fn build_sample_times(base_date: Date, quotes: &[CalibrationQuote]) -> Result<Vec<f64>> {
+    fn build_sample_times(
+        base_date: Date,
+        quotes: &[PreparedQuote<RateQuote>],
+    ) -> Result<Vec<f64>> {
         let mut dates = BTreeSet::from([base_date]);
         let mut daily_horizon = base_date;
-        for quote in quotes {
-            let CalibrationQuote::Rates(prepared) = quote else {
-                return Err(finstack_quant_core::Error::Validation(
-                    "Parametric calibration requires rate quotes".to_string(),
-                ));
-            };
+        for prepared in quotes {
             if matches!(prepared.quote.as_ref(), RateQuote::Deposit { .. }) {
                 let deposit = prepared
                     .instrument
@@ -239,15 +230,15 @@ impl ParametricCurveTarget {
 }
 
 impl GlobalSolveTarget for ParametricCurveTarget {
-    type Quote = CalibrationQuote;
+    type Quote = PreparedQuote<RateQuote>;
     type Curve = ParametricCurve;
 
     fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
-        Some(quote.quote_value())
+        Some(quote.quote.value())
     }
 
     fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
-        quote.quote_id().to_string()
+        quote.quote.id().as_str().to_string()
     }
 
     fn build_time_grid_and_guesses(
@@ -307,7 +298,7 @@ impl GlobalSolveTarget for ParametricCurveTarget {
         self.scratch.with_curve(&disc_curve, |ctx| {
             for (i, q) in quotes.iter().enumerate() {
                 let pv = q.calibration_value_raw(ctx, self.params.base_date)?;
-                residuals[i] = pv / self.residual_notional;
+                residuals[i] = pv / self.params.residual_notional;
             }
             Ok(())
         })

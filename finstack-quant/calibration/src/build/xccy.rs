@@ -15,14 +15,7 @@ use finstack_quant_valuations::market::conventions::ConventionRegistry;
 use rust_decimal::Decimal;
 
 /// Build a cross-currency swap instrument from an [`XccyQuote`].
-///
-/// # Arguments
-///
-/// * `quote` - Cross-currency basis-swap market quote supplying convention ID,
-///   maturity pillar, basis spread, and required FX spot input.
-/// * `ctx` - Build context with optional curve-ID overrides used to wire the
-///   domestic and foreign discounting and forwarding dependencies.
-pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<XccySwap> {
+pub(crate) fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<XccySwap> {
     tracing::debug!(quote_id = %quote.id(), "building XCCY instrument");
     quote.validate()?;
     let registry = ConventionRegistry::try_global()?;
@@ -63,22 +56,6 @@ pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<XccySw
             "XCCY quote build requires `spot_fx` to derive FX-equivalent leg notionals".to_string(),
         )
     })?;
-    if !fx_spot.is_finite() || fx_spot <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "XCCY quote build requires positive finite `spot_fx`; got {}",
-            fx_spot
-        )));
-    }
-    if !basis_spread_bp.is_finite() {
-        let kind = if basis_spread_bp.is_nan() {
-            finstack_quant_core::NonFiniteKind::NaN
-        } else if basis_spread_bp.is_sign_positive() {
-            finstack_quant_core::NonFiniteKind::PosInfinity
-        } else {
-            finstack_quant_core::NonFiniteKind::NegInfinity
-        };
-        return Err(finstack_quant_core::InputError::NonFiniteValue { kind }.into());
-    }
 
     // CLS-consistent spot roll: a US holiday on an intermediate day does
     // not delay a USD pair's spot date (2026-06-09 core quant review,

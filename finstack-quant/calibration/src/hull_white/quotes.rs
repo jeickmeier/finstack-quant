@@ -9,7 +9,7 @@ use super::*;
 /// be represented by this type.
 ///
 /// Deserialization rejects unknown fields and applies the same validation as
-/// [`SwaptionQuote::try_new`].
+/// [`SwaptionQuote::new`].
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "SwaptionQuoteRaw")]
@@ -34,44 +34,44 @@ pub struct SwaptionQuote {
 /// settlement, payment lags, and business-day adjustments from accrual
 /// fractions instead of approximating dates by cumulative accruals.
 #[derive(Debug, Clone)]
-pub struct SwaptionSchedule {
+pub(crate) struct SwaptionSchedule {
     /// Convention-adjusted underlying swap start time.
-    pub swap_start_time: f64,
+    pub(crate) swap_start_time: f64,
     /// Strictly increasing fixed-leg payment times.
-    pub payment_times: Vec<f64>,
+    pub(crate) payment_times: Vec<f64>,
     /// Positive fixed-leg accrual factors aligned with `payment_times`.
-    pub accruals: Vec<f64>,
+    pub(crate) accruals: Vec<f64>,
     /// Underlying swap accrual-end time in ACT/365F model years from valuation date.
-    pub maturity_time: f64,
+    pub(crate) maturity_time: f64,
     /// Contiguous floating periods covering the contractual underlying swap.
     /// Floating payments and fixings retain their own lags and calendars.
-    pub floating_periods: Vec<SwaptionFloatingPeriod>,
+    pub(crate) floating_periods: Vec<SwaptionFloatingPeriod>,
     /// Whether the floating coupons compound unshifted overnight rates.
     /// `false` means simple term rates; lookbacks, observation shifts and rate
     /// cutoffs are outside this schedule's contract.
-    pub floating_is_compounded: bool,
+    pub(crate) floating_is_compounded: bool,
 }
 
 /// Contractual timing of one simple or unshifted overnight swap coupon.
 #[derive(Debug, Clone, Copy)]
-pub struct SwaptionFloatingPeriod {
+pub(crate) struct SwaptionFloatingPeriod {
     /// Simple term-rate fixing in ACT/365F model years, at or after expiry.
     /// For compounded overnight coupons this is the accrual start.
-    pub fixing_time: f64,
+    pub(crate) fixing_time: f64,
     /// Coupon accrual-start time in ACT/365F years from valuation date.
-    pub start_time: f64,
+    pub(crate) start_time: f64,
     /// Coupon accrual-end time in ACT/365F years from valuation date.
-    pub end_time: f64,
+    pub(crate) end_time: f64,
     /// Payment time in ACT/365F years, at or after accrual start for simple
     /// coupons and at or after accrual end for compounded coupons. Simple
     /// payments can precede the unadjusted end after business-day adjustment.
-    pub payment_time: f64,
+    pub(crate) payment_time: f64,
     /// Positive contractual index day-count fraction, independent of model time.
-    pub accrual: f64,
+    pub(crate) accrual: f64,
 }
 
 /// Wire shape for [`SwaptionQuote`]: rejects unknown fields, then routes
-/// through [`SwaptionQuote::try_new`] for value validation.
+/// through [`SwaptionQuote::new`] for value validation.
 #[derive(serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -91,7 +91,7 @@ impl TryFrom<SwaptionQuoteRaw> for SwaptionQuote {
     type Error = finstack_quant_core::Error;
 
     fn try_from(raw: SwaptionQuoteRaw) -> Result<Self, Self::Error> {
-        Self::try_new(raw.expiry, raw.tenor, raw.volatility, raw.is_normal_vol)
+        Self::new(raw.expiry, raw.tenor, raw.volatility, raw.is_normal_vol)
     }
 }
 
@@ -110,7 +110,7 @@ impl TryFrom<SwaptionQuoteRaw> for SwaptionQuote {
 /// date. Synthetic schedules fix at period start and pay at period end.
 ///
 /// Deserialization rejects unknown fields and applies the same validation as
-/// [`CapFloorQuote::try_new`].
+/// [`CapFloorQuote::new`].
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "CapFloorQuoteRaw")]
@@ -129,7 +129,7 @@ pub struct CapFloorQuote {
 }
 
 /// Wire shape for [`CapFloorQuote`]: rejects unknown fields, then routes
-/// through [`CapFloorQuote::try_new`] for value validation.
+/// through [`CapFloorQuote::new`] for value validation.
 #[derive(serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -151,7 +151,7 @@ impl TryFrom<CapFloorQuoteRaw> for CapFloorQuote {
     type Error = finstack_quant_core::Error;
 
     fn try_from(raw: CapFloorQuoteRaw) -> Result<Self, Self::Error> {
-        Self::try_new(
+        Self::new(
             raw.maturity,
             raw.strike,
             raw.volatility,
@@ -173,7 +173,7 @@ impl CapFloorQuote {
     ///   (`0.0088` is 88 bp).
     /// * `is_cap` - `true` for a cap, `false` for a floor.
     /// * `is_normal_vol` - `true` for Bachelier vol. Lognormal quotes are rejected.
-    pub fn try_new(
+    pub fn new(
         maturity: f64,
         strike: f64,
         volatility: f64,
@@ -216,6 +216,29 @@ pub struct CapFloorCalibrationConfig {
     pub initial_guess: Option<HullWhiteCalibrationParams>,
 }
 
+pub(super) fn validate_swaption_quote(
+    expiry: f64,
+    tenor: f64,
+    volatility: f64,
+) -> finstack_quant_core::Result<()> {
+    if !expiry.is_finite() || expiry <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Swaption expiry must be positive, got {expiry}"
+        )));
+    }
+    if !tenor.is_finite() || tenor <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Swaption tenor must be positive, got {tenor}"
+        )));
+    }
+    if !volatility.is_finite() || volatility <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Swaption volatility must be positive, got {volatility}"
+        )));
+    }
+    Ok(())
+}
+
 impl SwaptionQuote {
     /// Construct a validated swaption market quote.
     ///
@@ -225,27 +248,13 @@ impl SwaptionQuote {
     /// * `tenor` - Underlying swap tenor in years (for example `5.0` for 5Y).
     /// * `volatility` - Market-quoted volatility. Must be finite and positive.
     /// * `is_normal_vol` - `true` for Bachelier vol, `false` for Black-76.
-    pub fn try_new(
+    pub fn new(
         expiry: f64,
         tenor: f64,
         volatility: f64,
         is_normal_vol: bool,
     ) -> finstack_quant_core::Result<Self> {
-        if !expiry.is_finite() || expiry <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Swaption expiry must be positive, got {expiry}"
-            )));
-        }
-        if !tenor.is_finite() || tenor <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Swaption tenor must be positive, got {tenor}"
-            )));
-        }
-        if !volatility.is_finite() || volatility <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Swaption volatility must be positive, got {volatility}"
-            )));
-        }
+        validate_swaption_quote(expiry, tenor, volatility)?;
         Ok(Self {
             expiry,
             tenor,

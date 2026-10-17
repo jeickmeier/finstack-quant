@@ -25,16 +25,16 @@ use crate::api::schema::SurfaceExtrapolationPolicy;
 use crate::api::schema::SviSurfaceParams;
 use crate::config::CalibrationConfig;
 use crate::constants::OrderedF64;
-use crate::quotes::market_quote::MarketQuote;
 use crate::quotes::vol::VolQuote;
+use crate::quotes::MarketQuote;
 use crate::targets::util::{
-    interpolate_total_variance, resolve_equity_forward_inputs, surface_quote_residuals,
+    extract_equity_option_quotes, interpolate_total_variance, resolve_equity_forward_inputs,
+    resolve_equity_spot, surface_quote_residuals,
 };
 use crate::validation::ValidationConfig;
 use crate::CalibrationReport;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
 use finstack_quant_core::Result;
 use std::collections::BTreeMap;
@@ -71,34 +71,8 @@ impl SviSurfaceTarget {
                 finstack_quant_core::InputError::TooFewPoints,
             ));
         }
-        let option_quotes: Vec<&VolQuote> = quotes
-            .iter()
-            .filter_map(|quote| match quote {
-                MarketQuote::Vol(vol_quote) => Some(vol_quote),
-                _ => None,
-            })
-            .filter(|quote| match quote {
-                VolQuote::OptionVol { underlying, .. } => {
-                    underlying.as_str() == params.underlying_ticker.as_str()
-                }
-                VolQuote::SwaptionVol { .. } | VolQuote::CapFloorVol { .. } => false,
-            })
-            .collect();
-
-        if option_quotes.is_empty() {
-            return Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::TooFewPoints,
-            ));
-        }
-
-        let spot = if let Some(spot) = params.spot_override {
-            spot
-        } else {
-            match context.get_price(&params.underlying_ticker)? {
-                MarketScalar::Price(money) => money.amount(),
-                MarketScalar::Unitless(value) => *value,
-            }
-        };
+        let option_quotes = extract_equity_option_quotes(quotes, &params.underlying_ticker)?;
+        let spot = resolve_equity_spot(params.spot_override, &params.underlying_ticker, context)?;
         Self::validate_positive_input("SVI spot", spot)?;
 
         let discount = params
@@ -108,34 +82,20 @@ impl SviSurfaceTarget {
             .transpose()?;
 
         let zero_rate_yield = if discount.is_none() {
-            let value = if let Some(value) = params.dividend_yield_override {
-                value
-            } else {
-                let key = format!("{}-DIVYIELD", params.underlying_ticker);
-                match context.get_price(&key) {
-                    Ok(MarketScalar::Unitless(value)) => *value,
-                    Ok(MarketScalar::Price(_)) => {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "equity carry scalar '{key}' must be unitless"
-                        )))
-                    }
-                    Err(_) => {
-                        return Err(finstack_quant_core::Error::Input(
-                            finstack_quant_core::InputError::NotFound {
-                                id: format!(
-                                "explicit dividend yield for equity '{}' without a discount curve",
-                                params.underlying_ticker
-                            ),
-                            },
-                        ))
-                    }
-                }
-            };
-            if !value.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "SVI dividend yield must be finite, got {value}"
-                )));
-            }
+            let value = super::util::resolve_continuous_dividend_yield(
+                &params.underlying_ticker,
+                params.dividend_yield_override,
+                context,
+                "SVI",
+            )?
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
+                    id: format!(
+                        "explicit dividend yield for equity '{}' without a discount curve",
+                        params.underlying_ticker
+                    ),
+                })
+            })?;
             Some(value)
         } else {
             None
@@ -399,8 +359,8 @@ mod tests {
     use super::*;
     use crate::api::schema::SviSurfaceParams;
     use crate::quotes::ids::QuoteId;
-    use crate::quotes::market_quote::MarketQuote;
     use crate::quotes::vol::VolQuote;
+    use crate::quotes::MarketQuote;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::types::UnderlyingId;
     use finstack_quant_valuations::instruments::OptionType;

@@ -1,7 +1,8 @@
+use super::quotes::validate_swaption_quote;
 use super::targets::{
-    quote_fit_report, reject_at_bound_params, require_quote_vega, validate_fit_tolerance,
-    HullWhiteSwaptionTarget, PreparedSwaption, HW_NUM_RESTARTS, HW_PERTURB_SCALE,
-    SWAPTION_VEGA_FLOOR,
+    quote_fit_report, reject_at_bound_params, require_quote_vega, solve_hw1f_two_param,
+    validate_fit_tolerance, HullWhiteSwaptionTarget, PreparedSwaption, SwaptionPayoff,
+    HW_NUM_RESTARTS, SWAPTION_VEGA_FLOOR,
 };
 use super::*;
 use finstack_quant_models::rates::hull_white::{hw_b, hw_bond_vol, hw_ln_a};
@@ -75,7 +76,7 @@ use finstack_quant_models::rates::hull_white::{hw_b, hw_bond_vol, hw_ln_a};
 /// Contractual floating coupons may be simple term rates or unshifted
 /// compounded overnight rates. Overnight observation shifts, lookbacks and
 /// rate cutoffs are not represented by [`SwaptionSchedule`].
-pub fn calibrate_hull_white_to_swaptions_with_fn(
+pub(crate) fn calibrate_hull_white_to_swaptions_with_fn(
     df: &(dyn Fn(f64) -> f64 + Sync),
     quotes: &[SwaptionQuote],
     frequency: SwapFrequency,
@@ -101,18 +102,12 @@ pub fn calibrate_hull_white_to_swaptions_with_fn(
         }
     }
     for (i, q) in quotes.iter().enumerate() {
-        if !q.expiry.is_finite()
-            || !q.tenor.is_finite()
-            || !q.volatility.is_finite()
-            || q.expiry <= 0.0
-            || q.tenor <= 0.0
-            || q.volatility <= 0.0
-        {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Invalid swaption quote at index {i}: expiry={}, tenor={}, vol={}",
+        validate_swaption_quote(q.expiry, q.tenor, q.volatility).map_err(|err| {
+            finstack_quant_core::Error::Validation(format!(
+                "Invalid swaption quote at index {i}: {err} (expiry={}, tenor={}, vol={})",
                 q.expiry, q.tenor, q.volatility
-            )));
-        }
+            ))
+        })?;
     }
 
     let n_quotes = quotes.len();
@@ -146,18 +141,19 @@ pub fn calibrate_hull_white_to_swaptions_with_fn(
             swaption_atm_vega(annuity, fwd_rate, q.expiry, q.volatility, q.is_normal_vol);
         let label = format!("{}Yx{}Y", q.expiry, q.tenor);
         let vega = require_quote_vega(raw_vega, SWAPTION_VEGA_FLOOR, &label)?;
+        let payoff = match schedule {
+            Some(schedule) => SwaptionPayoff::Contractual(schedule.clone()),
+            None => SwaptionPayoff::Synthetic {
+                swap_start_time: q.expiry,
+                cashflows: build_swaption_cashflows(fwd_rate, q.expiry, q.tenor, ppy),
+            },
+        };
         prepared.push(PreparedSwaption {
             market_price,
             annuity,
             fwd_swap_rate: fwd_rate,
             vega,
-            swap_start_time: schedule.map_or(q.expiry, |schedule| schedule.swap_start_time),
-            cashflows: if schedule.is_none() {
-                build_swaption_cashflows(fwd_rate, q.expiry, q.tenor, ppy)
-            } else {
-                Vec::new()
-            },
-            schedule: schedule.cloned(),
+            payoff,
         });
         fwd_swap_rates.push(fwd_rate);
     }
@@ -173,25 +169,7 @@ pub fn calibrate_hull_white_to_swaptions_with_fn(
         prepared,
     };
 
-    // Use solver tolerance 1e-12 (matches the prior hand-rolled LM
-    // settings) and validation tolerance 1e-6 (the historical
-    // accept/reject threshold for HW1F price residuals).
-    let mut config = CalibrationConfig::default();
-    config.solver = config.solver.with_tolerance(1e-12).with_max_iterations(300);
-
-    let multi_start = MultiStartConfig {
-        num_restarts: HW_NUM_RESTARTS,
-        perturbation_scale: HW_PERTURB_SCALE,
-    };
-
-    let (params, mut report) = GlobalFitOptimizer::optimize_with_multi_start(
-        &target,
-        quotes,
-        &config,
-        fit_tolerance,
-        Some(&multi_start),
-        false,
-    )?;
+    let (params, mut report) = solve_hw1f_two_param(&target, quotes, fit_tolerance)?;
 
     let mut quote_residuals = BTreeMap::new();
     for (idx, (quote, pre)) in quotes.iter().zip(&target.prepared).enumerate() {
@@ -298,6 +276,32 @@ pub(crate) fn compute_swap_annuity_and_rate(
     compute_swap_annuity_and_rate_inner(df, t0, tenor, periods_per_year, None)
 }
 
+/// Compute annuity and par forward swap rate from a contractual [`SwaptionSchedule`].
+pub(crate) fn contractual_swap_annuity_and_forward(
+    df: &(dyn Fn(f64) -> f64 + Sync),
+    schedule: &SwaptionSchedule,
+) -> (f64, f64) {
+    let annuity = schedule
+        .payment_times
+        .iter()
+        .zip(&schedule.accruals)
+        .map(|(payment_time, accrual)| accrual * df(*payment_time))
+        .sum();
+    let fwd_rate = if annuity > 1e-15 {
+        schedule
+            .floating_periods
+            .iter()
+            .map(|period| {
+                (df(period.start_time) / df(period.end_time) - 1.0) * df(period.payment_time)
+            })
+            .sum::<f64>()
+            / annuity
+    } else {
+        0.0
+    };
+    (annuity, fwd_rate)
+}
+
 pub(super) fn compute_swap_annuity_and_rate_inner(
     df: &(dyn Fn(f64) -> f64 + Sync),
     t0: f64,
@@ -305,26 +309,8 @@ pub(super) fn compute_swap_annuity_and_rate_inner(
     periods_per_year: usize,
     schedule: Option<&SwaptionSchedule>,
 ) -> (f64, f64) {
-    if let Some(schedule) = valid_swap_schedule(schedule, t0) {
-        let annuity = schedule
-            .payment_times
-            .iter()
-            .zip(&schedule.accruals)
-            .map(|(payment_time, accrual)| accrual * df(*payment_time))
-            .sum();
-        let fwd_rate = if annuity > 1e-15 {
-            schedule
-                .floating_periods
-                .iter()
-                .map(|period| {
-                    (df(period.start_time) / df(period.end_time) - 1.0) * df(period.payment_time)
-                })
-                .sum::<f64>()
-                / annuity
-        } else {
-            0.0
-        };
-        return (annuity, fwd_rate);
+    if let Some(schedule) = schedule {
+        return contractual_swap_annuity_and_forward(df, schedule);
     }
 
     let n_periods = (tenor * periods_per_year as f64).round().max(1.0) as usize;

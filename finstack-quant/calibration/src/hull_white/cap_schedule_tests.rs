@@ -5,10 +5,11 @@ use crate::hull_white::pricing::{
 };
 use crate::hull_white::{
     bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
-    calibrate_hull_white_to_cap_floors_with_fn, CapFloorCalibrationConfig, HullWhiteParams,
+    calibrate_hull_white_to_cap_floors_with_fn, CapFloorCalibrationConfig,
     PiecewiseSigmaCalibrationConfig,
 };
 use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
+use finstack_quant_models::rates::hull_white::HullWhiteParams;
 
 fn quarterly_act360_schedule(maturity: f64) -> CapFloorSchedule {
     let mut schedule = CapFloorSchedule::synthetic(maturity, SwapFrequency::Quarterly);
@@ -30,7 +31,7 @@ fn config() -> CapFloorCalibrationConfig {
 #[test]
 fn contractual_act360_cap_reprices_in_production_term_kernel() {
     let df = |time: f64| (-0.03 * time).exp();
-    let quote = CapFloorQuote::try_new(5.0, 0.03, 0.01, true, true).expect("valid quote");
+    let quote = CapFloorQuote::new(5.0, 0.03, 0.01, true, true).expect("valid quote");
     let schedule = quarterly_act360_schedule(5.0);
     let (params, report) = calibrate_hull_white_to_cap_floors_with_fn(
         &df,
@@ -103,7 +104,7 @@ fn contractual_fixings_payments_and_stub_accruals_survive_calibration() {
             )
         })
         .sum();
-    let quote = CapFloorQuote::try_new(1.1, strike, normal_vol, false, true).expect("valid quote");
+    let quote = CapFloorQuote::new(1.1, strike, normal_vol, false, true).expect("valid quote");
     let (params, report) = calibrate_hull_white_to_cap_floors_with_fn(
         &discount_df,
         &forward_df,
@@ -166,7 +167,7 @@ fn piecewise_bootstrap_sorts_quotes_with_contractual_schedules() {
                 .expect("source price");
             let vol = scheduled_cap_floor_implied_normal_vol(price, &df, &df, schedule, 0.03, true)
                 .expect("source normal quote");
-            CapFloorQuote::try_new(
+            CapFloorQuote::new(
                 schedule.periods.last().expect("live periods").end_time,
                 0.03,
                 vol,
@@ -202,7 +203,7 @@ fn piecewise_bootstrap_sorts_quotes_with_contractual_schedules() {
 
 #[test]
 fn malformed_contractual_cap_schedules_fail_before_fitting() {
-    let quote = CapFloorQuote::try_new(1.0, 0.03, 0.01, true, true).expect("valid quote");
+    let quote = CapFloorQuote::new(1.0, 0.03, 0.01, true, true).expect("valid quote");
     let valid = quarterly_act360_schedule(1.0);
     assert!(prepare_cap_floor_schedules(&[quote], Some(&[]), SwapFrequency::Quarterly).is_err());
     for case in 0..7 {
@@ -242,7 +243,7 @@ fn term_caplet_allows_payment_before_unadjusted_accrual_end() {
     let normal_vol =
         scheduled_cap_floor_implied_normal_vol(premium, &df, &df, &schedule, 0.03, true)
             .expect("normal quote");
-    let quote = CapFloorQuote::try_new(0.5, 0.03, normal_vol, true, true).expect("quote");
+    let quote = CapFloorQuote::new(0.5, 0.03, normal_vol, true, true).expect("quote");
     let (fitted, report) =
         calibrate_hull_white_to_cap_floors_with_fn(&df, &df, &[quote], Some(&[schedule]), config())
             .expect("valid early-payment calibration");

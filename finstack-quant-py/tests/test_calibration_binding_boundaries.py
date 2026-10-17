@@ -202,7 +202,7 @@ def test_typed_quotes_expose_fields_and_reject_invalid_inputs() -> None:
         "USD",
     )
     assert str(yoy.maturity) == "2031-05-08"
-    with pytest.raises(ValueError, match="invalid InflationQuote"):
+    with pytest.raises(ValueError, match="rate must be finite"):
         InflationQuote.inflation_swap("ZC", "2031-05-08", float("nan"), "USA-CPI-U", "USD")
     with pytest.raises(ValueError, match="spot_fx"):
         XccyQuote("X", "EUR-USD", "5Y", -12.5, spot_fx=-1.0)

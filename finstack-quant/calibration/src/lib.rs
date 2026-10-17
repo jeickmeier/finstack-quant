@@ -109,13 +109,11 @@ pub(crate) mod build;
 /// Hull-White one-factor model calibration to European swaptions.
 pub mod hull_white;
 /// Bermudan LMM loading-scale calibration.
-pub mod lmm;
+mod lmm;
 pub use lmm::{calibrate_bermudan_lmm_base_vol, calibrate_bermudan_lmm_base_vol_from_json};
 /// Checked-in JSON Schema artifacts owned by this crate.
 #[cfg(feature = "json-schema")]
 pub mod json_schema;
-/// Prepared quotes for calibration.
-pub(crate) mod prepared;
 /// Raw market quote data-transfer objects.
 pub mod quotes;
 /// Solver utilities and implementations used by calibration.
@@ -169,4 +167,4 @@ pub use report::{
 };
 
 /// Calibration methodology identifiers recorded in audit reports.
-pub mod versions;
+pub(crate) mod versions;

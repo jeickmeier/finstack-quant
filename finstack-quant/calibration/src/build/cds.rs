@@ -219,7 +219,7 @@ fn resolve_cds_dates(
 ///
 /// - [`CdsQuote`] for supported quote types
 /// - [`BuildCtx`] for build context configuration
-pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<CreditDefaultSwap> {
+pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<CreditDefaultSwap> {
     tracing::debug!(quote_id = %quote.id(), "building CDS instrument");
     quote.validate()?;
     let registry = ConventionRegistry::try_global()?;

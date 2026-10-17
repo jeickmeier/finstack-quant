@@ -7,13 +7,12 @@ use crate::config::CalibrationConfig;
 use crate::hull_white::{
     bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
     calibrate_hull_white_to_cap_floors_with_fn, calibrate_hull_white_to_swaptions_with_fn,
-    capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key, hw1f_scalar_keys,
     CapFloorCalibrationConfig, CapFloorQuote, CapFloorSchedule, CapletSchedule,
     PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionFloatingPeriod, SwaptionQuote,
     SwaptionSchedule,
 };
-use crate::quotes::market_quote::MarketQuote;
 use crate::quotes::vol::VolQuote;
+use crate::quotes::MarketQuote;
 use crate::targets::base_correlation::BaseCorrelationTarget;
 use crate::targets::discount::DiscountCurveTarget;
 use crate::targets::forward::ForwardCurveTarget;
@@ -38,7 +37,10 @@ use finstack_quant_core::market_data::surfaces::{VolCube, VolQuoteType, VolSurfa
 use finstack_quant_core::market_data::term_structures::{CreditIndexData, DiscountCurve};
 use finstack_quant_core::Result;
 use finstack_quant_models::rates::clock::model_time_on_curve;
-use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
+use finstack_quant_models::rates::hull_white::{
+    capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key, hw1f_scalar_keys,
+    HullWhiteCalibrationParams,
+};
 use std::sync::Arc;
 
 /// Normalized output payload for a step.
@@ -145,14 +147,10 @@ fn prepare_hw_swaption_input(
 
     let model_curve =
         finstack_quant_models::rates::clock::ModelDiscountCurve::new(disc_curve, base_date)?;
-    let time_from_base = |date| -> Result<f64> {
-        Ok(finstack_quant_models::rates::clock::model_time(
-            base_date, date,
-        ))
-    };
-    let expiry_time = time_from_base(*expiry)?;
-    let swap_start_time = time_from_base(swap_start)?;
-    let maturity_time = time_from_base(swap_end)?;
+    let time_from_base = |date| finstack_quant_models::rates::clock::model_time(base_date, date);
+    let expiry_time = time_from_base(*expiry);
+    let swap_start_time = time_from_base(swap_start);
+    let maturity_time = time_from_base(swap_end);
     let tenor = finstack_quant_models::rates::clock::model_time(swap_start, swap_end);
     if expiry_time <= 0.0 || tenor <= 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -160,49 +158,40 @@ fn prepare_hw_swaption_input(
         )));
     }
 
-    let payment_times = periods
+    let payment_times: Vec<f64> = periods
         .iter()
         .map(|period| time_from_base(period.payment_date))
-        .collect::<Result<Vec<_>>>()?;
+        .collect();
     let accruals: Vec<f64> = periods
         .iter()
         .map(|period| period.accrual_year_fraction)
         .collect();
-    let floating_periods = floating_periods
+    let floating_periods: Vec<SwaptionFloatingPeriod> = floating_periods
         .iter()
-        .map(|period| {
-            Ok(SwaptionFloatingPeriod {
-                fixing_time: time_from_base(if floating_is_compounded {
-                    period.accrual_start
-                } else {
-                    period.reset_date.unwrap_or(period.accrual_start)
-                })?,
-                start_time: time_from_base(period.accrual_start)?,
-                end_time: time_from_base(period.accrual_end)?,
-                payment_time: time_from_base(period.payment_date)?,
-                accrual: period.accrual_year_fraction,
-            })
+        .map(|period| SwaptionFloatingPeriod {
+            fixing_time: time_from_base(if floating_is_compounded {
+                period.accrual_start
+            } else {
+                period.reset_date.unwrap_or(period.accrual_start)
+            }),
+            start_time: time_from_base(period.accrual_start),
+            end_time: time_from_base(period.accrual_end),
+            payment_time: time_from_base(period.payment_date),
+            accrual: period.accrual_year_fraction,
         })
-        .collect::<Result<Vec<_>>>()?;
+        .collect();
 
-    let annuity: f64 = payment_times
-        .iter()
-        .zip(&accruals)
-        .map(|(time, accrual)| model_curve.get_df(*time).unwrap_or(f64::NAN) * accrual)
-        .sum();
-    let floating_pv = floating_periods
-        .iter()
-        .map(|period| {
-            Ok(
-                (model_curve.get_df(period.start_time)? / model_curve.get_df(period.end_time)?
-                    - 1.0)
-                    * model_curve.get_df(period.payment_time)?,
-            )
-        })
-        .collect::<Result<Vec<_>>>()?
-        .into_iter()
-        .sum::<f64>();
-    let forward = floating_pv / annuity;
+    let schedule = SwaptionSchedule {
+        swap_start_time,
+        payment_times,
+        accruals,
+        maturity_time,
+        floating_periods,
+        floating_is_compounded,
+    };
+    let df = |time: f64| model_curve.get_df(time).unwrap_or(f64::NAN);
+    let (_annuity, forward) =
+        crate::hull_white::contractual_swap_annuity_and_forward(&df, &schedule);
     // SwaptionQuote is an ATM-only contract. Never reinterpret an explicit
     // off-ATM strike as the forward rate. Tolerance is 0.0001 basis points.
     if !forward.is_finite() || (*strike - forward).abs() > 1e-8 {
@@ -218,14 +207,7 @@ fn prepare_hw_swaption_input(
             volatility: *vol,
             is_normal_vol,
         },
-        SwaptionSchedule {
-            swap_start_time,
-            payment_times,
-            accruals,
-            maturity_time,
-            floating_periods,
-            floating_is_compounded,
-        },
+        schedule,
     ))
 }
 
@@ -299,34 +281,29 @@ pub(crate) fn apply_output(
 ) -> Result<()> {
     match output {
         StepOutput::Curve(curve) => {
-            *context = std::mem::take(context).insert(curve);
+            context.insert_mut(curve);
         }
         StepOutput::Curves(curves) => {
-            let mut updated = std::mem::take(context);
             for curve in curves {
-                updated = updated.insert(curve);
+                context.insert_mut(curve);
             }
-            *context = updated;
         }
         StepOutput::Surface(surface) => {
-            *context = std::mem::take(context).insert_surface(surface);
+            context.insert_surface_mut(surface);
         }
         StepOutput::VolCube(cube) => {
-            *context = std::mem::take(context).insert_vol_cube(cube);
+            context.insert_vol_cube_mut(cube);
         }
         StepOutput::Scalars(values) => {
-            let mut updated = std::mem::take(context);
             for (key, value) in values {
-                updated = updated.insert_price(&key, value);
+                context.insert_price_mut(&key, value);
             }
-            *context = updated;
         }
         StepOutput::ScalarsAndSeries { scalars, series } => {
-            let mut updated = std::mem::take(context);
             for (key, value) in scalars {
-                updated = updated.insert_price(&key, value);
+                context.insert_price_mut(&key, value);
             }
-            *context = updated.insert_series(series);
+            context.insert_series_mut(series);
         }
     }
 
@@ -746,7 +723,7 @@ mod tests {
     };
     use crate::hull_white::{
         contractual_swaption_price, scheduled_cap_floor_implied_normal_vol,
-        scheduled_cap_floor_price, HullWhiteParams,
+        scheduled_cap_floor_price,
     };
     use crate::quotes::cds_tranche::CdsTrancheQuote;
     use crate::quotes::ids::QuoteId;
@@ -756,6 +733,7 @@ mod tests {
         BaseCorrelationCurve, CreditIndexData, DiscountCurve, HazardCurve,
     };
     use finstack_quant_core::types::{CurveId, UnderlyingId};
+    use finstack_quant_models::rates::hull_white::HullWhiteParams;
     use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
         CdsTranchePricer, CopulaSpec,
     };

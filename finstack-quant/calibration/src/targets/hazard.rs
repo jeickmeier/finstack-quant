@@ -2,11 +2,11 @@
 //!
 use crate::api::schema::HazardCurveParams;
 use crate::build::context::BuildCtx;
+use crate::build::prepared::PreparedQuote;
 use crate::config::{CalibrationConfig, CalibrationMethod, HazardCurveSolveConfig};
 use crate::constants::WEIGHT_MIN_FLOOR;
-use crate::prepared::CalibrationQuote;
 use crate::quotes::cds::CdsQuote;
-use crate::quotes::market_quote::{ExtractQuotes, MarketQuote};
+use crate::quotes::{ExtractQuotes, MarketQuote};
 use crate::solver::bootstrap::SequentialBootstrapper;
 use crate::solver::global::GlobalFitOptimizer;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
@@ -346,7 +346,8 @@ impl HazardCurveTarget {
         let target =
             HazardCurveTarget::new(params.clone(), context.clone(), config.clone(), &cds_quotes)?;
 
-        let mut prepared_quotes: Vec<CalibrationQuote> = Vec::with_capacity(cds_quotes.len());
+        let mut prepared_quotes: Vec<PreparedQuote<CdsQuote>> =
+            Vec::with_capacity(cds_quotes.len());
         let mut curve_ids = HashMap::default();
         curve_ids.insert("discount".to_string(), params.discount_curve_id.to_string());
         curve_ids.insert("credit".to_string(), params.curve_id.to_string());
@@ -368,7 +369,7 @@ impl HazardCurveTarget {
                 ))
             })?;
 
-            prepared_quotes.push(CalibrationQuote::Cds(prepared));
+            prepared_quotes.push(prepared);
         }
 
         // Target-specific validation tolerance for hazard curves.
@@ -409,9 +410,6 @@ impl HazardCurveTarget {
         let mut calibration_inputs = Vec::with_capacity(prepared_quotes.len());
         let mut spread_risk_inputs = Vec::with_capacity(prepared_quotes.len());
         for prepared in &prepared_quotes {
-            let CalibrationQuote::Cds(prepared) = prepared else {
-                continue;
-            };
             let original_quote = prepared.quote.as_ref();
             let original_payload = serde_json::to_value(original_quote).map_err(|error| {
                 finstack_quant_core::Error::Validation(format!(
@@ -429,14 +427,7 @@ impl HazardCurveTarget {
                     par_points.push((prepared.pillar_time, *spread_bp));
                     original_quote.clone()
                 }
-                crate::quotes::cds::CdsQuote::CdsUpfront {
-                    id,
-                    entity,
-                    convention,
-                    pillar,
-                    recovery_rate,
-                    ..
-                } => {
+                crate::quotes::cds::CdsQuote::CdsUpfront { id, pillar, .. } => {
                     let cds = prepared
                         .instrument
                         .as_any()
@@ -459,14 +450,7 @@ impl HazardCurveTarget {
                             ))
                         })?;
                     par_points.push((prepared.pillar_time, spread_bp));
-                    crate::quotes::cds::CdsQuote::CdsParSpread {
-                        id: id.clone(),
-                        entity: entity.clone(),
-                        convention: convention.clone(),
-                        pillar: pillar.clone(),
-                        spread_bp,
-                        recovery_rate: *recovery_rate,
-                    }
+                    original_quote.to_par_spread_quote(pillar.clone(), spread_bp)
                 }
             };
             spread_risk_inputs.push(HazardCalibrationInput {
@@ -509,11 +493,7 @@ impl HazardCurveTarget {
         Ok((curve, report))
     }
 
-    fn quote_hazard_guess(&self, quote: &CalibrationQuote) -> Option<f64> {
-        let CalibrationQuote::Cds(pq) = quote else {
-            return None;
-        };
-
+    fn quote_hazard_guess(&self, pq: &PreparedQuote<CdsQuote>) -> Option<f64> {
         // W6: prefer the *curve's* recovery (`params.recovery_rate`) for the
         // initial guess. The quote-level `recovery_rate` is the protection
         // seller's assumption at quote time; the curve-level recovery is what
@@ -573,24 +553,22 @@ impl HazardCurveTarget {
 }
 
 impl BootstrapTarget for HazardCurveTarget {
-    type Quote = crate::prepared::CalibrationQuote;
+    type Quote = PreparedQuote<CdsQuote>;
     type Curve = HazardCurve;
 
     fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
-        Some(quote.quote_value())
+        Some(match quote.quote.as_ref() {
+            CdsQuote::CdsParSpread { spread_bp, .. } => *spread_bp,
+            CdsQuote::CdsUpfront { upfront_pct, .. } => *upfront_pct,
+        })
     }
 
     fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
-        quote.quote_id().to_string()
+        quote.quote.id().as_str().to_string()
     }
 
     fn quote_time(&self, quote: &Self::Quote) -> Result<f64> {
-        match quote {
-            crate::prepared::CalibrationQuote::Cds(pq) => Ok(pq.pillar_time),
-            _ => Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::Invalid,
-            )),
-        }
+        Ok(quote.pillar_time)
     }
 
     fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
@@ -615,14 +593,9 @@ impl BootstrapTarget for HazardCurveTarget {
     }
 
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
-        let crate::prepared::CalibrationQuote::Cds(pq) = quote else {
-            return Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::Invalid,
-            ));
-        };
         let base_date = self.params.base_date;
         self.with_temp_context(curve, |ctx| {
-            let npv = pq.instrument.value_raw(ctx, base_date)?;
+            let npv = quote.instrument.value_raw(ctx, base_date)?;
             Ok(npv / self.params.notional)
         })
     }
@@ -648,7 +621,7 @@ impl BootstrapTarget for HazardCurveTarget {
         // The scan grid is maturity- and quote-agnostic; it depends only on the
         // spread-implied `initial_guess` and the configured hazard bounds. The grid
         // construction is factored into the free function `hazard_scan_grid` so it can
-        // be unit-tested directly (item 6) without fabricating a `CalibrationQuote`.
+        // be unit-tested directly (item 6) without fabricating a prepared quote.
         Ok(hazard_scan_grid(&self.config.hazard_curve, initial_guess))
     }
 
@@ -697,7 +670,7 @@ impl BootstrapTarget for HazardCurveTarget {
 }
 
 impl GlobalSolveTarget for HazardCurveTarget {
-    type Quote = CalibrationQuote;
+    type Quote = PreparedQuote<CdsQuote>;
     type Curve = HazardCurve;
 
     fn build_time_grid_and_guesses(
@@ -774,12 +747,7 @@ impl GlobalSolveTarget for HazardCurveTarget {
 
         self.with_temp_context(curve, |ctx| {
             for (i, quote) in quotes.iter().enumerate() {
-                let CalibrationQuote::Cds(pq) = quote else {
-                    return Err(finstack_quant_core::Error::Input(
-                        finstack_quant_core::InputError::Invalid,
-                    ));
-                };
-                let npv = pq.instrument.value_raw(ctx, self.params.base_date)?;
+                let npv = quote.instrument.value_raw(ctx, self.params.base_date)?;
                 residuals[i] = npv / self.params.notional;
             }
             Ok(())
@@ -787,12 +755,14 @@ impl GlobalSolveTarget for HazardCurveTarget {
     }
 
     fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
-        Some(quote.quote_value())
+        Some(match quote.quote.as_ref() {
+            CdsQuote::CdsParSpread { spread_bp, .. } => *spread_bp,
+            CdsQuote::CdsUpfront { upfront_pct, .. } => *upfront_pct,
+        })
     }
 
     fn residual_key(&self, quote: &Self::Quote, idx: usize) -> String {
-        let q = quote.get_instrument();
-        format!("{}-{:03}", q.id(), idx)
+        format!("{}-{:03}", quote.instrument.id(), idx)
     }
 
     fn residual_weights(&self, quotes: &[Self::Quote], weights_out: &mut [f64]) -> Result<()> {

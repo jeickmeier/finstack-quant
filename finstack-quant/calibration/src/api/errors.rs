@@ -50,12 +50,7 @@ pub struct StrictLoadDiagnostic {
 
 impl StrictLoadDiagnostic {
     /// Project a core contract diagnostic onto the host-facing record.
-    ///
-    /// # Arguments
-    ///
-    /// * `diagnostic` - Bounded-loader finding to flatten; phase and severity
-    ///   are rendered as their snake-case labels.
-    pub fn from_contract(diagnostic: &finstack_quant_core::contract::Diagnostic) -> Self {
+    fn from_contract(diagnostic: &finstack_quant_core::contract::Diagnostic) -> Self {
         use finstack_quant_core::contract::{LoadPhase, Severity};
         let phase = match diagnostic.phase {
             LoadPhase::Parse => "parse",

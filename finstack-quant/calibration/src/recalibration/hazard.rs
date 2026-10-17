@@ -5,7 +5,7 @@ use super::ensure_replay_fit_accepted;
 use crate::api::schema::{HazardCurveParams, StepParams};
 use crate::quotes::cds::CdsQuote;
 use crate::quotes::ids::Pillar;
-use crate::quotes::market_quote::MarketQuote;
+use crate::quotes::MarketQuote;
 use crate::step_runtime;
 use crate::targets::hazard::ReplayQuote;
 use crate::CalibrationConfig;
@@ -224,31 +224,19 @@ pub(crate) fn hazard_with_deal_quote_override(
                 hazard.id()
             ))
         })?;
-    let deal_quote = match template_quote {
-        CdsQuote::CdsParSpread {
-            id,
-            entity,
-            convention,
-            recovery_rate,
-            ..
-        } => CdsQuote::CdsParSpread {
-            id,
-            entity,
-            convention,
-            pillar: Pillar::Date(deal_override.contract_end),
-            spread_bp: deal_override.spread_bp,
-            recovery_rate,
-        },
-        CdsQuote::CdsUpfront { .. } => {
-            return Err(finstack_quant_core::Error::Calibration {
-                message: format!(
-                    "CDS quote override for '{}' found an upfront quote in par-spread risk inputs",
-                    hazard.id()
-                ),
-                category: "cs01_rebootstrap".to_string(),
-            });
-        }
-    };
+    if matches!(template_quote, CdsQuote::CdsUpfront { .. }) {
+        return Err(finstack_quant_core::Error::Calibration {
+            message: format!(
+                "CDS quote override for '{}' found an upfront quote in par-spread risk inputs",
+                hazard.id()
+            ),
+            category: "cs01_rebootstrap".to_string(),
+        });
+    }
+    let deal_quote = template_quote.to_par_spread_quote(
+        Pillar::Date(deal_override.contract_end),
+        deal_override.spread_bp,
+    );
     let build_ctx = crate::build::BuildCtx::new(
         hazard.base_date(),
         1.0,
@@ -288,32 +276,17 @@ pub(crate) fn hazard_with_deal_quote_override(
                 hazard.id()
             ))
         })?;
-    let overridden_quote = match source_quote {
-        CdsQuote::CdsParSpread {
-            id,
-            entity,
-            convention,
-            pillar,
-            recovery_rate,
-            ..
-        } => CdsQuote::CdsParSpread {
-            id,
-            entity,
-            convention,
-            pillar,
-            spread_bp: deal_override.spread_bp,
-            recovery_rate,
-        },
-        CdsQuote::CdsUpfront { .. } => {
-            return Err(finstack_quant_core::Error::Calibration {
-                message: format!(
-                    "CDS quote override for '{}' found an upfront quote in par-spread risk inputs",
-                    hazard.id()
-                ),
-                category: "cs01_rebootstrap".to_string(),
-            });
-        }
-    };
+    if matches!(source_quote, CdsQuote::CdsUpfront { .. }) {
+        return Err(finstack_quant_core::Error::Calibration {
+            message: format!(
+                "CDS quote override for '{}' found an upfront quote in par-spread risk inputs",
+                hazard.id()
+            ),
+            category: "cs01_rebootstrap".to_string(),
+        });
+    }
+    let overridden_quote =
+        source_quote.to_par_spread_quote(source_quote.pillar().clone(), deal_override.spread_bp);
     risk_inputs[target_index].quote = serde_json::to_value(overridden_quote).map_err(|error| {
         finstack_quant_core::Error::Validation(format!(
             "failed to persist CDS quote override for '{}': {error}",
@@ -361,43 +334,6 @@ fn bump_for_pillar(tenor_years: f64, bump: Option<&QuoteBump>) -> f64 {
     }
 }
 
-fn with_quote_recovery(quote: &CdsQuote, recovery_rate: f64) -> CdsQuote {
-    match quote {
-        CdsQuote::CdsParSpread {
-            id,
-            entity,
-            convention,
-            pillar,
-            spread_bp,
-            ..
-        } => CdsQuote::CdsParSpread {
-            id: id.clone(),
-            entity: entity.clone(),
-            convention: convention.clone(),
-            pillar: pillar.clone(),
-            spread_bp: *spread_bp,
-            recovery_rate,
-        },
-        CdsQuote::CdsUpfront {
-            id,
-            entity,
-            convention,
-            pillar,
-            coupon_bp,
-            upfront_pct,
-            ..
-        } => CdsQuote::CdsUpfront {
-            id: id.clone(),
-            entity: entity.clone(),
-            convention: convention.clone(),
-            pillar: pillar.clone(),
-            coupon_bp: *coupon_bp,
-            upfront_pct: *upfront_pct,
-            recovery_rate,
-        },
-    }
-}
-
 fn replay_once(
     request: &HazardParRecalibration<'_>,
     mut params: HazardCurveParams,
@@ -418,7 +354,10 @@ fn replay_once(
                     |(_, bump_bp)| bump_bp,
                 );
             MarketQuote::Cds(
-                with_quote_recovery(&input.quote, request.recovery_rate).bump_spread_bp(bump_bp),
+                input
+                    .quote
+                    .with_recovery_rate(request.recovery_rate)
+                    .bump_spread_bp(bump_bp),
             )
         })
         .collect::<Vec<_>>();
@@ -740,35 +679,19 @@ pub(crate) fn replay_hazard_at_horizon(
         .into_iter()
         .filter(|input| input.pillar_date > params.base_date)
     {
-        let mut quote = match input.quote {
-            CdsQuote::CdsParSpread {
-                id,
-                entity,
-                convention,
-                recovery_rate,
-                spread_bp,
-                ..
-            } => CdsQuote::CdsParSpread {
-                id,
-                entity,
-                convention,
-                recovery_rate,
-                pillar: Pillar::Date(input.pillar_date),
-                spread_bp,
-            },
-            CdsQuote::CdsUpfront { .. } => {
-                return Err(finstack_quant_core::Error::Validation(
-                    "hazard spread-risk inputs must contain par quotes".to_string(),
-                ))
-            }
+        let CdsQuote::CdsParSpread { spread_bp, .. } = &input.quote else {
+            return Err(finstack_quant_core::Error::Validation(
+                "hazard spread-risk inputs must contain par quotes".to_string(),
+            ));
         };
-        let instrument = crate::build::cds::build_cds_instrument(&quote, &build_ctx)?;
-        let cds = instrument;
+        let initial_quote = input
+            .quote
+            .to_par_spread_quote(Pillar::Date(input.pillar_date), *spread_bp);
+        let cds = crate::build::cds::build_cds_instrument(&initial_quote, &build_ctx)?;
         let par = cds.par_spread(&request.target_market, params.base_date)?;
-        if let CdsQuote::CdsParSpread { spread_bp, .. } = &mut quote {
-            *spread_bp = par;
-        }
-        horizon_quotes.push(MarketQuote::Cds(quote));
+        horizon_quotes.push(MarketQuote::Cds(
+            initial_quote.to_par_spread_quote(Pillar::Date(input.pillar_date), par),
+        ));
     }
     if horizon_quotes.is_empty() {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -844,32 +767,9 @@ pub(crate) fn replay_hazard_on_dependency_market(
     })
 }
 
-/// Re-bootstrap a hazard curve with a *new* recovery assumption while holding
+/// Re-bootstrap a hazard curve with a new recovery assumption while holding
 /// observed CDS par spreads constant.
-///
-/// This is the operation a Recovery01 metric needs in order to capture the
-/// indirect effect of recovery changes on the survival probability term
-/// structure. Because `h ≈ S / (1 - R)` to first order, raising `R` while
-/// holding `S` constant requires the bootstrap to lift `h` (and vice versa).
-/// A naive Recovery01 that bumps the instrument LGD without recalibrating
-/// the hazard curve typically *understates* the true recovery sensitivity by
-/// 2-5x, which matters materially for distressed credits.
-///
-/// # Errors
-///
-/// Returns an error if the curve has no lossless calibration recipe, if a
-/// caller-supplied convention conflicts with that recipe, if zero-shock replay
-/// is not identical, or if the original calibration cannot be replayed.
-///
-/// # Arguments
-///
-/// * `hazard` — source curve carrying its lossless calibration recipe
-/// * `new_recovery` — recovery rate used for the replay, clamped to `[0, 1)`
-/// * `context` — market context providing the stored calibration dependencies
-/// * `discount_id` — discount curve identifier, which must match the stored recipe
-/// * `doc_clause` — optional documentation-clause assertion
-/// * `cds_valuation_convention` — optional valuation-convention assertion
-pub fn recalibrate_hazard_with_recovery(
+pub(super) fn recalibrate_hazard_with_recovery(
     hazard: &HazardCurve,
     new_recovery: f64,
     context: &MarketContext,
@@ -877,10 +777,7 @@ pub fn recalibrate_hazard_with_recovery(
     doc_clause: Option<CdsDocClause>,
     cds_valuation_convention: Option<CdsValuationConvention>,
 ) -> finstack_quant_core::Result<HazardCurve> {
-    // Clamp recovery to a numerically safe range. R = 1 leaves zero LGD which
-    // makes spreads non-identifying; we leave a small floor below 1.
     let new_recovery = new_recovery.clamp(0.0, 0.999_999);
-
     let discount_id = require_discount_id(discount_id)?;
     recalibrate_from_par_spreads(HazardParRecalibration {
         hazard,

@@ -33,7 +33,7 @@
 //!
 //! # See Also
 //!
-//! - [`crate::quotes::market_quote::MarketQuote`] for the unified quote enum
+//! - [`crate::quotes::MarketQuote`] for the unified quote enum
 //! - [`crate::quotes::ids::QuoteId`] for quote identifiers
 //! - [`crate::quotes::ids::Pillar`] for maturity pillars
 
@@ -46,7 +46,7 @@ pub mod ids;
 /// Inflation quotes.
 pub mod inflation;
 /// Unified MarketQuote enum.
-pub mod market_quote;
+mod market_quote;
 /// Interest rate quotes (Deposit, FRA, Futures, Swap).
 pub mod rates;
 /// Shared numeric quote validation.
@@ -56,4 +56,5 @@ pub mod vol;
 /// Cross-currency swap quotes.
 pub mod xccy;
 
+pub(crate) use market_quote::ExtractQuotes;
 pub use market_quote::MarketQuote;

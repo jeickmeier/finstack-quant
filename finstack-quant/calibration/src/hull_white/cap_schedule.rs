@@ -10,18 +10,18 @@ use finstack_quant_core::{Error, Result};
 /// Compounded overnight coupons require a different option model and are not
 /// represented by this term-index schedule.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct CapletSchedule {
+pub(crate) struct CapletSchedule {
     /// Positive rate fixing time, at or before the accrual-period start.
-    pub fixing_time: f64,
+    pub(crate) fixing_time: f64,
     /// Accrual-period start time, including contractual spot settlement.
-    pub start_time: f64,
+    pub(crate) start_time: f64,
     /// Accrual-period end time, before any payment delay.
-    pub end_time: f64,
+    pub(crate) end_time: f64,
     /// Coupon payment time, at or after accrual start. Calendar adjustment may
     /// move payment before the unadjusted accrual end.
-    pub payment_time: f64,
+    pub(crate) payment_time: f64,
     /// Positive coupon year fraction under the index day count, including stubs.
-    pub accrual: f64,
+    pub(crate) accrual: f64,
 }
 
 /// Contractual live term-index coupons underlying one flat cap/floor quote.
@@ -30,9 +30,9 @@ pub struct CapletSchedule {
 /// Periods must be ordered and non-overlapping; the final accrual-period end
 /// must equal the associated quote's maturity on the model clock.
 #[derive(Clone, Debug, PartialEq)]
-pub struct CapFloorSchedule {
+pub(crate) struct CapFloorSchedule {
     /// Live caplet/floorlet periods in increasing fixing-time order.
-    pub periods: Vec<CapletSchedule>,
+    pub(crate) periods: Vec<CapletSchedule>,
 }
 
 impl CapFloorSchedule {

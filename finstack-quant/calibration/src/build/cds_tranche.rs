@@ -34,29 +34,29 @@ use finstack_quant_valuations::market::conventions::ConventionRegistry;
 /// overrides.day_count = Some(finstack_quant_core::dates::DayCount::Act360);
 /// ```
 #[derive(Debug, Clone)]
-pub struct CdsTrancheBuildOverrides {
+pub(crate) struct CdsTrancheBuildOverrides {
     /// Optional payment frequency override.
     ///
     /// If `None`, uses the payment frequency from the CDS convention.
-    pub frequency: Option<Tenor>,
+    pub(crate) frequency: Option<Tenor>,
     /// Optional day count override.
     ///
     /// If `None`, uses the day count from the CDS convention.
-    pub day_count: Option<DayCount>,
+    pub(crate) day_count: Option<DayCount>,
     /// Optional business day convention override.
     ///
     /// If `None`, uses the business day convention from the CDS convention.
-    pub business_day_convention: Option<BusinessDayConvention>,
+    pub(crate) business_day_convention: Option<BusinessDayConvention>,
     /// Optional calendar identifier override.
     ///
     /// If `None`, uses the calendar ID from the CDS convention.
-    pub calendar_id: Option<String>,
+    pub(crate) calendar_id: Option<String>,
     /// Coupon roll-date grid for the built tranche.
     ///
     /// `CdsImm` aligns payment dates to CDS IMM dates (20th of
     /// Mar/Jun/Sep/Dec); `None` follows the convention frequency and stub.
     /// `Imm` is rejected.
-    pub roll_rule: RollRule,
+    pub(crate) roll_rule: RollRule,
 }
 
 impl Default for CdsTrancheBuildOverrides {
@@ -72,90 +72,7 @@ impl Default for CdsTrancheBuildOverrides {
 }
 
 /// Build a CDS Tranche instrument from a [`CdsTrancheQuote`].
-///
-/// This function resolves CDS conventions, calculates tranche notional based on attachment
-/// and detachment points, and constructs a CDS tranche instrument with upfront and running
-/// spread payments.
-///
-/// # Arguments
-///
-/// * `quote` - The CDS tranche market quote with attachment/detachment and pricing
-/// * `ctx` - Build context with valuation date, notional, and curve mappings
-/// * `overrides` - Optional schedule-convention overrides
-///
-/// # Returns
-///
-/// `Ok(CdsTranche)` with the constructed CDS tranche instrument, or `Err` if:
-/// - Convention lookup fails (missing CDS convention key)
-/// - Calendar resolution fails
-/// - Invalid tranche width (detachment <= attachment or non-finite values)
-/// - Instrument construction fails (invalid parameters)
-///
-/// # Tranche Notional Calculation
-///
-/// The tranche notional is calculated as:
-/// ```text
-/// tranche_notional = base_notional * (detachment - attachment)
-/// ```
-///
-/// The upfront payment (if present) is calculated as:
-/// ```text
-/// upfront_amount = tranche_notional * upfront_pct
-/// ```
-///
-/// Note: `upfront_pct` is a decimal fraction (e.g., -0.025 for -2.5%).
-///
-/// With the default `CdsImm` roll rule, premium accrual starts on the
-/// unadjusted quarterly CDS roll on or before the trade date. Upfront cash
-/// settles separately at the convention's settlement date. A `None` roll rule
-/// retains a custom schedule starting on that settlement date.
-///
-/// # Examples
-///
-/// ```text
-/// use finstack_quant_calibration::build::BuildCtx;
-/// use finstack_quant_calibration::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOverrides};
-/// use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
-/// use finstack_quant_calibration::quotes::ids::QuoteId;
-/// use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
-/// use finstack_quant_core::dates::Date;
-/// use finstack_quant_core::currency::Currency;
-/// use finstack_quant_core::HashMap;
-///
-/// # fn example() -> finstack_quant_core::Result<()> {
-/// let ctx = BuildCtx::new(
-///     Date::from_calendar_date(2024, time::Month::January, 2).unwrap(),
-///     100_000_000.0, // Base notional
-///     HashMap::default(),
-/// );
-///
-/// let quote = CdsTrancheQuote {
-///     id: QuoteId::new("CDX-IG-3-7"),
-///     index: "CDX.NA.IG".to_string(),
-///     series: 46,
-///     attachment: 0.03,  // 3%
-///     detachment: 0.07,   // 7%
-///     maturity: Date::from_calendar_date(2029, time::Month::June, 20).unwrap(),
-///     upfront_pct: -0.025, // -2.5% upfront (decimal fraction)
-///     coupon_bp: 500.0,
-///     convention: CdsConventionKey {
-///         currency: Currency::USD,
-///         doc_clause: CdsDocClause::Cr14,
-///     },
-/// };
-///
-/// let overrides = CdsTrancheBuildOverrides::default();
-/// let instrument = build_cds_tranche_instrument(&quote, &ctx, &overrides)?;
-/// # Ok(())
-/// # }
-/// ```
-///
-/// # See Also
-///
-/// - [`CdsTrancheQuote`] for quote structure
-/// - [`BuildCtx`] for build context configuration
-/// - [`CdsTrancheBuildOverrides`] for override options
-pub fn build_cds_tranche_instrument(
+pub(crate) fn build_cds_tranche_instrument(
     quote: &CdsTrancheQuote,
     ctx: &BuildCtx,
     overrides: &CdsTrancheBuildOverrides,
@@ -190,23 +107,7 @@ pub fn build_cds_tranche_instrument(
     let credit_id = ctx.require_curve_id("credit")?.to_string();
 
     let normalization_factor = detachment - attachment;
-    if !normalization_factor.is_finite() || normalization_factor <= 0.0 {
-        return Err(Error::Validation(format!(
-            "Invalid tranche width: attachment={} detachment={}",
-            attachment, detachment
-        )));
-    }
     let notional_amt = ctx.notional() * normalization_factor;
-
-    // Validate upfront_pct is in decimal fraction format (not percentage points).
-    // Reject values > 1.0 to prevent accidental misuse of old percentage-point notation.
-    if upfront_pct.abs() > 1.0 {
-        return Err(Error::Validation(format!(
-            "upfront_pct must be a decimal fraction (e.g., -0.025 for -2.5%), got {}; \
-             values with abs() > 1.0 are rejected to prevent unit confusion",
-            upfront_pct
-        )));
-    }
 
     // `upfront_pct` is expressed as a decimal fraction (e.g. -0.025 means -2.5% of tranche notional).
     let upfront = (upfront_pct.abs() > 0.0)

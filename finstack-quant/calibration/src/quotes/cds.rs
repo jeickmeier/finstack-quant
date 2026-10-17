@@ -154,6 +154,9 @@ impl CdsQuote {
     }
 
     /// Bump by spread in basis points (e.g., `1.0` = 1bp).
+    ///
+    /// # Arguments
+    /// * `bump_bp` - Additive shift in basis points applied to `spread_bp` (par spread) or `coupon_bp` (upfront).
     pub fn bump_spread_bp(&self, bump_bp: f64) -> Self {
         let mut quote = self.clone();
         match &mut quote {
@@ -161,6 +164,35 @@ impl CdsQuote {
             Self::CdsUpfront { coupon_bp, .. } => *coupon_bp += bump_bp,
         }
         quote
+    }
+
+    /// Return a copy of this quote with `recovery_rate` replaced.
+    pub(crate) fn with_recovery_rate(&self, recovery_rate: f64) -> Self {
+        let mut quote = self.clone();
+        match &mut quote {
+            Self::CdsParSpread {
+                recovery_rate: current,
+                ..
+            }
+            | Self::CdsUpfront {
+                recovery_rate: current,
+                ..
+            } => *current = recovery_rate,
+        }
+        quote
+    }
+
+    /// Project this quote's identity, entity, convention, and recovery rate onto a
+    /// [`CdsQuote::CdsParSpread`] with the supplied `pillar` and `spread_bp`.
+    pub(crate) fn to_par_spread_quote(&self, pillar: Pillar, spread_bp: f64) -> Self {
+        Self::CdsParSpread {
+            id: self.id().clone(),
+            entity: self.entity().to_string(),
+            convention: self.convention().clone(),
+            pillar,
+            spread_bp,
+            recovery_rate: self.recovery_rate(),
+        }
     }
 
     /// Validate spreads, recovery, upfront amount, and market-standard running coupons.
@@ -234,7 +266,7 @@ impl CdsQuote {
     /// Validate market-standard constraints that depend on the quote style.
     ///
     /// ISDA-style upfront quotes are only supported with standard running coupons.
-    pub fn validate_market_conventions(&self) -> Result<()> {
+    fn validate_market_conventions(&self) -> Result<()> {
         if let CdsQuote::CdsUpfront { coupon_bp, .. } = self {
             if !is_standard_upfront_running_coupon_bp(*coupon_bp) {
                 return Err(Error::Validation(format!(

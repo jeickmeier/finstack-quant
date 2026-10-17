@@ -4,9 +4,9 @@ use super::pricing::{
     scheduled_cap_floor_implied_normal_vol, scheduled_cap_floor_price, scheduled_forward_rate,
 };
 use super::targets::{
-    quote_fit_report, reject_at_bound_params, require_quote_vega, validate_fit_tolerance,
-    HullWhiteCapFloorTarget, PreparedCapFloor, HW_NUM_RESTARTS, HW_PERTURB_SCALE, KAPPA_MAX,
-    KAPPA_MIN, SIGMA_MAX, SWAPTION_VEGA_FLOOR,
+    cap_floor_quote_key, cap_floor_quote_label, quote_fit_report, reject_at_bound_params,
+    require_quote_vega, solve_hw1f_two_param, validate_fit_tolerance, HullWhiteCapFloorTarget,
+    PreparedCapFloor, KAPPA_MAX, KAPPA_MIN, SIGMA_MAX, SWAPTION_VEGA_FLOOR,
 };
 use super::*;
 
@@ -34,7 +34,7 @@ use super::*;
 ///   coupons require a different model and are not supported by this API.
 /// * `config` - Frequency plus fixed-mean-reversion or initial-parameter
 ///   settings. A one-quote calibration requires `config.fixed_kappa`.
-pub fn calibrate_hull_white_to_cap_floors_with_fn(
+pub(crate) fn calibrate_hull_white_to_cap_floors_with_fn(
     discount_df: &(dyn Fn(f64) -> f64 + Sync),
     forward_df: &(dyn Fn(f64) -> f64 + Sync),
     quotes: &[CapFloorQuote],
@@ -95,13 +95,7 @@ pub fn calibrate_hull_white_to_cap_floors_with_fn(
                 quote.strike,
                 quote.volatility,
             );
-            let label = format!(
-                "{}Y_{}_{:.6}",
-                quote.maturity,
-                if quote.is_cap { "cap" } else { "floor" },
-                quote.strike
-            );
-            require_quote_vega(raw, SWAPTION_VEGA_FLOOR, &label)
+            require_quote_vega(raw, SWAPTION_VEGA_FLOOR, &cap_floor_quote_label(quote))
         })
         .collect::<finstack_quant_core::Result<Vec<f64>>>()?;
 
@@ -136,35 +130,9 @@ pub fn calibrate_hull_white_to_cap_floors_with_fn(
                  with the fixed kappa = {fixed:.6}"
             )));
         }
-        let mut residuals = BTreeMap::new();
         let model = HullWhiteParams::constant(fixed, sigma)?;
-        for (idx, (quote, schedule)) in quotes.iter().zip(&schedules).enumerate() {
-            let model_price = scheduled_cap_floor_price(
-                &model,
-                discount_df,
-                forward_df,
-                schedule,
-                quote.strike,
-                quote.is_cap,
-            )?;
-            residuals.insert(
-                format!(
-                    "{idx}:{}Y_{}_{:.6}",
-                    quote.maturity,
-                    if quote.is_cap { "cap" } else { "floor" },
-                    quote.strike
-                ),
-                // Reconstruct the quote exactly for the acceptance decision.
-                scheduled_cap_floor_implied_normal_vol(
-                    model_price,
-                    discount_df,
-                    forward_df,
-                    schedule,
-                    quote.strike,
-                    quote.is_cap,
-                )? - quote.volatility,
-            );
-        }
+        let residuals =
+            compute_cap_floor_vol_residuals(&model, quotes, &schedules, discount_df, forward_df)?;
         let moneyness = cap_floor_moneyness_summary(quotes, forward_df, &schedules);
         let report = enrich_cap_floor_report(
             CalibrationReport::for_type_with_tolerance(
@@ -206,25 +174,7 @@ pub fn calibrate_hull_white_to_cap_floors_with_fn(
         prepared,
     };
 
-    let mut config_lm = CalibrationConfig::default();
-    config_lm.solver = config_lm
-        .solver
-        .with_tolerance(1e-12)
-        .with_max_iterations(300);
-
-    let multi_start = MultiStartConfig {
-        num_restarts: HW_NUM_RESTARTS,
-        perturbation_scale: HW_PERTURB_SCALE,
-    };
-
-    let (params, report) = GlobalFitOptimizer::optimize_with_multi_start(
-        &target,
-        quotes,
-        &config_lm,
-        config.fit_tolerance,
-        Some(&multi_start),
-        false,
-    )?;
+    let (params, report) = solve_hw1f_two_param(&target, quotes, config.fit_tolerance)?;
 
     reject_at_bound_params(
         params.kappa,
@@ -233,37 +183,8 @@ pub fn calibrate_hull_white_to_cap_floors_with_fn(
     )?;
 
     let model = HullWhiteParams::constant(params.kappa, params.sigma)?;
-    let residuals = quotes
-        .iter()
-        .zip(&schedules)
-        .enumerate()
-        .map(|(idx, (quote, schedule))| {
-            let price = scheduled_cap_floor_price(
-                &model,
-                discount_df,
-                forward_df,
-                schedule,
-                quote.strike,
-                quote.is_cap,
-            )?;
-            Ok((
-                format!(
-                    "{idx}:{}Y_{}_{:.6}",
-                    quote.maturity,
-                    if quote.is_cap { "cap" } else { "floor" },
-                    quote.strike
-                ),
-                scheduled_cap_floor_implied_normal_vol(
-                    price,
-                    discount_df,
-                    forward_df,
-                    schedule,
-                    quote.strike,
-                    quote.is_cap,
-                )? - quote.volatility,
-            ))
-        })
-        .collect::<finstack_quant_core::Result<BTreeMap<_, _>>>()?;
+    let residuals =
+        compute_cap_floor_vol_residuals(&model, quotes, &schedules, discount_df, forward_df)?;
     let report = quote_fit_report(report, residuals, config.fit_tolerance);
 
     let moneyness = cap_floor_moneyness_summary(quotes, forward_df, &schedules);
@@ -281,6 +202,42 @@ pub fn calibrate_hull_white_to_cap_floors_with_fn(
         HullWhiteCalibrationParams::new(params.kappa, params.sigma)?,
         report,
     ))
+}
+
+fn compute_cap_floor_vol_residuals(
+    model: &HullWhiteParams,
+    quotes: &[CapFloorQuote],
+    schedules: &[CapFloorSchedule],
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
+) -> finstack_quant_core::Result<BTreeMap<String, f64>> {
+    quotes
+        .iter()
+        .zip(schedules)
+        .enumerate()
+        .map(|(idx, (quote, schedule))| {
+            let price = scheduled_cap_floor_price(
+                model,
+                discount_df,
+                forward_df,
+                schedule,
+                quote.strike,
+                quote.is_cap,
+            )?;
+            let implied_vol = scheduled_cap_floor_implied_normal_vol(
+                price,
+                discount_df,
+                forward_df,
+                schedule,
+                quote.strike,
+                quote.is_cap,
+            )?;
+            Ok((
+                cap_floor_quote_key(idx, quote),
+                implied_vol - quote.volatility,
+            ))
+        })
+        .collect()
 }
 
 /// Apply cap/floor metadata shared by the fixed-kappa and two-parameter paths.
@@ -576,7 +533,7 @@ impl PiecewiseSigmaCalibrationConfig {
 ///   Compounded overnight coupons are not supported by this term-index API.
 /// * `config` - Fixed mean-reversion, sigma search bounds, and coupon
 ///   frequency used while sequentially solving the volatility schedule.
-pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
+pub(crate) fn bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
     discount_df: &(dyn Fn(f64) -> f64 + Sync),
     forward_df: &(dyn Fn(f64) -> f64 + Sync),
     quotes: &[CapFloorQuote],

@@ -12,10 +12,6 @@ use finstack_quant_calibration::validation as rust_validation;
 use finstack_quant_calibration::ValidationConfig;
 use wasm_bindgen::prelude::*;
 
-fn parse_config(value: &JsValue) -> Result<ValidationConfig, JsValue> {
-    from_js_json(value, "config")
-}
-
 /// Run the calendar-spread, butterfly-spread and volatility-bound checks on a surface.
 ///
 /// Free-function twin of Python `calibration.validate_surface` (Rust `validation::validate_surface`).
@@ -28,7 +24,8 @@ fn parse_config(value: &JsValue) -> Result<ValidationConfig, JsValue> {
 /// a `FinstackError` (`kind: "validation"`) if `config` is malformed or any check fails.
 #[wasm_bindgen(js_name = validateSurface)]
 pub fn validate_surface(surface: &JsVolSurface, config: JsValue) -> Result<(), JsValue> {
-    rust_validation::validate_surface(&surface.inner, &parse_config(&config)?).map_err(to_js_err)
+    let config: ValidationConfig = from_js_json(&config, "config")?;
+    rust_validation::validate_surface(&surface.inner, &config).map_err(to_js_err)
 }
 
 /// Run the forward-aware calendar-spread and call-convexity checks plus the volatility bounds.
@@ -48,9 +45,10 @@ pub fn validate_surface_with_forwards(
     config: JsValue,
     forwards: JsValue,
 ) -> Result<(), JsValue> {
+    let config: ValidationConfig = from_js_json(&config, "config")?;
     rust_validation::validate_surface_with_forwards(
         &surface.inner,
-        &parse_config(&config)?,
+        &config,
         &js_f64_seq(&forwards, "forwards")?,
     )
     .map_err(to_js_err)
@@ -68,8 +66,8 @@ pub fn validate_surface_with_forwards(
 /// a `FinstackError` (`kind: "validation"`) if `config` is malformed or total variance decreases between two expiries.
 #[wasm_bindgen(js_name = validateCalendarSpread)]
 pub fn validate_calendar_spread(surface: &JsVolSurface, config: JsValue) -> Result<(), JsValue> {
-    rust_validation::validate_calendar_spread(&surface.inner, &parse_config(&config)?)
-        .map_err(to_js_err)
+    let config: ValidationConfig = from_js_json(&config, "config")?;
+    rust_validation::validate_calendar_spread(&surface.inner, &config).map_err(to_js_err)
 }
 
 /// Check that total variance does not decrease with expiry at each forward moneyness.
@@ -89,9 +87,10 @@ pub fn validate_calendar_spread_with_forwards(
     config: JsValue,
     forwards: JsValue,
 ) -> Result<(), JsValue> {
+    let config: ValidationConfig = from_js_json(&config, "config")?;
     rust_validation::validate_calendar_spread_with_forwards(
         &surface.inner,
-        &parse_config(&config)?,
+        &config,
         &js_f64_seq(&forwards, "forwards")?,
     )
     .map_err(to_js_err)
@@ -109,8 +108,8 @@ pub fn validate_calendar_spread_with_forwards(
 /// a `FinstackError` (`kind: "validation"`) if `config` is malformed or a butterfly violation exceeds the tolerance.
 #[wasm_bindgen(js_name = validateButterflySpread)]
 pub fn validate_butterfly_spread(surface: &JsVolSurface, config: JsValue) -> Result<(), JsValue> {
-    rust_validation::validate_butterfly_spread(&surface.inner, &parse_config(&config)?)
-        .map_err(to_js_err)
+    let config: ValidationConfig = from_js_json(&config, "config")?;
+    rust_validation::validate_butterfly_spread(&surface.inner, &config).map_err(to_js_err)
 }
 
 /// Check that undiscounted Black call prices are convex in strike at each expiry.
@@ -133,9 +132,10 @@ pub fn validate_butterfly_call_convexity(
     config: JsValue,
     forwards: JsValue,
 ) -> Result<(), JsValue> {
+    let config: ValidationConfig = from_js_json(&config, "config")?;
     rust_validation::validate_butterfly_call_convexity(
         &surface.inner,
-        &parse_config(&config)?,
+        &config,
         &js_f64_seq(&forwards, "forwards")?,
     )
     .map_err(to_js_err)
@@ -153,5 +153,6 @@ pub fn validate_butterfly_call_convexity(
 /// a `FinstackError` (`kind: "validation"`) if `config` is malformed or a volatility is not positive or exceeds `max_volatility`.
 #[wasm_bindgen(js_name = validateVolBounds)]
 pub fn validate_vol_bounds(surface: &JsVolSurface, config: JsValue) -> Result<(), JsValue> {
-    rust_validation::validate_vol_bounds(&surface.inner, &parse_config(&config)?).map_err(to_js_err)
+    let config: ValidationConfig = from_js_json(&config, "config")?;
+    rust_validation::validate_vol_bounds(&surface.inner, &config).map_err(to_js_err)
 }

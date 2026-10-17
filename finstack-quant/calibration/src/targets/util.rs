@@ -2,12 +2,12 @@
 //!
 use crate::api::schema::SurfaceExtrapolationPolicy;
 use crate::build::context::BuildCtx;
+use crate::build::prepared::PreparedQuote;
 use crate::config::ResidualWeightingScheme;
 use crate::constants::{OrderedF64, TOLERANCE_DUP_KNOTS, WEIGHT_MIN_FLOOR};
-use crate::prepared::CalibrationQuote;
-use crate::quotes::market_quote::{ExtractQuotes, MarketQuote};
 use crate::quotes::rates::RateQuote;
 use crate::quotes::vol::VolQuote;
+use crate::quotes::{ExtractQuotes, MarketQuote};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::dividends::DividendKind;
@@ -100,6 +100,76 @@ impl EquityForwardInputs {
     }
 }
 
+/// Filter market quotes down to equity option volatility quotes for `underlying_ticker`.
+pub(crate) fn extract_equity_option_quotes<'a>(
+    quotes: &'a [MarketQuote],
+    underlying_ticker: &str,
+) -> Result<Vec<&'a VolQuote>> {
+    let option_quotes: Vec<&'a VolQuote> = quotes
+        .iter()
+        .filter_map(|quote| match quote {
+            MarketQuote::Vol(vol_quote) => Some(vol_quote),
+            _ => None,
+        })
+        .filter(|vol_quote| match vol_quote {
+            VolQuote::OptionVol { underlying, .. } => underlying.as_str() == underlying_ticker,
+            VolQuote::SwaptionVol { .. } | VolQuote::CapFloorVol { .. } => false,
+        })
+        .collect();
+    if option_quotes.is_empty() {
+        return Err(finstack_quant_core::Error::Input(
+            finstack_quant_core::InputError::TooFewPoints,
+        ));
+    }
+    Ok(option_quotes)
+}
+
+/// Resolve an equity spot price from an explicit override or a `MarketContext` price scalar.
+pub(crate) fn resolve_equity_spot(
+    spot_override: Option<f64>,
+    underlying_ticker: &str,
+    context: &MarketContext,
+) -> Result<f64> {
+    if let Some(spot) = spot_override {
+        return Ok(spot);
+    }
+    match context.get_price(underlying_ticker)? {
+        MarketScalar::Price(money) => Ok(money.amount()),
+        MarketScalar::Unitless(value) => Ok(*value),
+    }
+}
+
+pub(crate) fn resolve_continuous_dividend_yield(
+    ticker: &str,
+    dividend_yield_override: Option<f64>,
+    context: &MarketContext,
+    label: &str,
+) -> Result<Option<f64>> {
+    let continuous_yield = match dividend_yield_override {
+        Some(value) => Some(value),
+        None => {
+            let scalar_key = format!("{ticker}-DIVYIELD");
+            match context.get_price(&scalar_key) {
+                Ok(MarketScalar::Unitless(value)) => Some(*value),
+                Ok(MarketScalar::Price(_)) => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "equity carry scalar '{scalar_key}' must be unitless"
+                    )))
+                }
+                Err(_) => None,
+            }
+        }
+    };
+    if let Some(value) = continuous_yield {
+        if !value.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{label} dividend yield must be finite, got {value}"
+            )));
+        }
+    }
+    Ok(continuous_yield)
+}
+
 pub(crate) fn resolve_equity_forward_inputs(
     ticker: &str,
     base_date: Date,
@@ -113,25 +183,9 @@ pub(crate) fn resolve_equity_forward_inputs(
             "equity spot must be finite and positive, got {spot}"
         )));
     }
-    let scalar_key = format!("{ticker}-DIVYIELD");
-    let continuous_yield = match dividend_yield_override {
-        Some(value) => Some(value),
-        None => match context.get_price(&scalar_key) {
-            Ok(MarketScalar::Unitless(value)) => Some(*value),
-            Ok(MarketScalar::Price(_)) => {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "equity carry scalar '{scalar_key}' must be unitless"
-                )))
-            }
-            Err(_) => None,
-        },
-    };
-    if let Some(value) = continuous_yield {
-        if !value.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "equity dividend yield must be finite, got {value}"
-            )));
-        }
+    if let Some(value) =
+        resolve_continuous_dividend_yield(ticker, dividend_yield_override, context, "equity")?
+    {
         return Ok(EquityForwardInputs {
             base_date,
             spot,
@@ -255,14 +309,13 @@ pub(crate) fn curve_day_count_from_quotes(quotes: &[RateQuote]) -> Result<DayCou
 /// Result of preparing rate quotes for a calibration target.
 pub(crate) struct PreparedRateQuotes {
     /// Prepared quotes ready for the solver.
-    pub(crate) quotes: Vec<CalibrationQuote>,
+    pub(crate) quotes: Vec<PreparedQuote<RateQuote>>,
     /// Day count convention used for curve time-axis.
     pub(crate) curve_day_count: DayCount,
 }
 
 /// Common preflight for rates calibration targets: extract `RateQuote`s, resolve day count,
-/// build a `BuildCtx`, and convert each quote into a `PreparedQuote` wrapped in
-/// [`CalibrationQuote::Rates`].
+/// build a `BuildCtx`, and convert each quote into a [`PreparedQuote`].
 ///
 /// Pass `curve_ids` as the role -> id mapping the underlying instruments expect (typically
 /// "discount" and, for projection-aware quotes, "forward"). Pass `explicit_curve_day_count = None`
@@ -301,7 +354,7 @@ pub(crate) fn prepare_rate_calibration_quotes(
             base_date,
             true,
         )?;
-        prepared.push(CalibrationQuote::Rates(pq));
+        prepared.push(pq);
     }
 
     Ok(PreparedRateQuotes {
@@ -332,17 +385,8 @@ pub(crate) fn discount_and_forward_curve_ids(
 /// period instrument (deposit / FRA) it reduces to `≈ t`, which is the correct
 /// PV01 there. The proxy needs only the quote's own par rate, so it works inside
 /// `residual_weights` where no calibrated curve is yet available.
-///
-/// `r` is taken from the quote when it carries a par rate (rate quotes); other
-/// quote kinds fall back to a small representative rate, for which `A ≈ t`.
-pub(crate) fn quote_annuity_proxy(quote: &CalibrationQuote, t: f64) -> f64 {
-    // Representative rate for the discount factor in the annuity integral.
-    let r = match quote {
-        CalibrationQuote::Rates(pq) => pq.quote.implied_rate(),
-        // Inflation / xccy-basis quotes do not carry a comparable fixed par rate;
-        // a small rate makes the proxy degrade gracefully to `A ≈ t`.
-        _ => 0.0,
-    };
+pub(crate) fn quote_annuity_proxy(quote: &PreparedQuote<RateQuote>, t: f64) -> f64 {
+    let r = quote.quote.implied_rate();
     // Use the absolute rate: a negative-rate regime (EUR/JPY) still has a
     // well-defined positive annuity, and `(1 − e^{−r·t})/r` is symmetric in the
     // sign of `r` only to second order — `|r|` keeps the proxy stable and positive.
@@ -420,7 +464,7 @@ impl ContextScratch {
 /// * `t` - Pillar time in years (positive).
 /// * `scheme` - Weighting scheme selected for the curve family being solved.
 pub(crate) fn pv01_residual_weight(
-    quote: &CalibrationQuote,
+    quote: &PreparedQuote<RateQuote>,
     t: f64,
     scheme: &ResidualWeightingScheme,
 ) -> f64 {

@@ -30382,7 +30382,7 @@ export interface CalibrationNamespace {
   /**
    * Build a money-market deposit rate quote.
    *
-   * Free-function twin of Python `RateQuote.deposit` (Rust `RateQuote::from_wire_fields`).
+   * Free-function twin of Python `RateQuote.deposit` (Rust `RateQuote::deposit`).
    * @param id - Unique quote identifier (the residual key in calibration reports).
    * @param index - Rate index identifier (for example `"USD-SOFR-OIS"`).
    * @param pillar - Maturity pillar: tenor string (`"3M"`, `"5Y"`), ISO-8601 date string, or a `{"tenor": {...}}` / `{"date": "..."}` object.
@@ -30399,7 +30399,7 @@ export interface CalibrationNamespace {
   /**
    * Build a forward-rate-agreement quote.
    *
-   * Free-function twin of Python `RateQuote.fra` (Rust `RateQuote::from_wire_fields`).
+   * Free-function twin of Python `RateQuote.fra` (Rust `RateQuote::fra`).
    * @param id - Unique quote identifier (the residual key in calibration reports).
    * @param index - Rate index identifier of the underlying floating rate.
    * @param start - Accrual start pillar: tenor string, ISO-8601 date string, or pillar object.
@@ -30418,7 +30418,7 @@ export interface CalibrationNamespace {
   /**
    * Build an interest-rate futures price quote.
    *
-   * Free-function twin of Python `RateQuote.futures` (Rust `RateQuote::from_wire_fields`).
+   * Free-function twin of Python `RateQuote.futures` (Rust `RateQuote::futures`).
    * @param id - Unique quote identifier (the residual key in calibration reports).
    * @param contract - Futures contract identifier (for example `"CME:SR3"`).
    * @param expiry - ISO-8601 last trading date of the contract.
@@ -30437,7 +30437,7 @@ export interface CalibrationNamespace {
   /**
    * Build a par swap rate quote.
    *
-   * Free-function twin of Python `RateQuote.swap` (Rust `RateQuote::from_wire_fields`).
+   * Free-function twin of Python `RateQuote.swap` (Rust `RateQuote::swap`).
    * @param id - Unique quote identifier (the residual key in calibration reports).
    * @param index - Floating-leg index identifier (for example `"USD-SOFR-OIS"`).
    * @param pillar - Swap maturity pillar: tenor string (`"5Y"`), ISO-8601 date string, or pillar object.
@@ -30456,7 +30456,7 @@ export interface CalibrationNamespace {
   /**
    * Build a running par-spread CDS quote.
    *
-   * Free-function twin of Python `CdsQuote.par_spread` (Rust `CdsQuote::from_wire_fields`).
+   * Free-function twin of Python `CdsQuote.par_spread` (Rust `CdsQuote::par_spread`).
    * @param id - Unique quote identifier.
    * @param entity - Reference entity name.
    * @param currency - ISO-4217 contract currency of the CDS convention.
@@ -30479,7 +30479,7 @@ export interface CalibrationNamespace {
   /**
    * Build an upfront-plus-running-coupon CDS quote.
    *
-   * Free-function twin of Python `CdsQuote.upfront` (Rust `CdsQuote::from_wire_fields`).
+   * Free-function twin of Python `CdsQuote.upfront` (Rust `CdsQuote::upfront`).
    * @param id - Unique quote identifier.
    * @param entity - Reference entity name.
    * @param currency - ISO-4217 contract currency of the CDS convention.
@@ -30504,7 +30504,7 @@ export interface CalibrationNamespace {
   /**
    * Build a listed equity or FX option implied-volatility quote.
    *
-   * Free-function twin of Python `VolQuote.option_vol` (Rust `VolQuote::from_wire_fields`).
+   * Free-function twin of Python `VolQuote.option_vol` (Rust `VolQuote::option_vol`).
    * @param id - Unique quote identifier.
    * @param underlying - Underlying identifier (ticker) the surface is keyed by.
    * @param expiry - ISO-8601 option expiry date.
@@ -30525,7 +30525,7 @@ export interface CalibrationNamespace {
   /**
    * Build a swaption volatility quote.
    *
-   * Free-function twin of Python `VolQuote.swaption_vol` (Rust `VolQuote::from_wire_fields`).
+   * Free-function twin of Python `VolQuote.swaption_vol` (Rust `VolQuote::swaption_vol`).
    * @param id - Unique quote identifier.
    * @param expiry - ISO-8601 option expiry date.
    * @param maturity - ISO-8601 maturity date of the underlying swap.
@@ -30548,7 +30548,7 @@ export interface CalibrationNamespace {
   /**
    * Build a cap or floor volatility quote.
    *
-   * Free-function twin of Python `VolQuote.cap_floor_vol` (Rust `VolQuote::from_wire_fields`).
+   * Free-function twin of Python `VolQuote.cap_floor_vol` (Rust `VolQuote::cap_floor_vol`).
    * @param id - Unique quote identifier.
    * @param expiry - ISO-8601 cap/floor maturity date.
    * @param strike - Strike rate as a decimal.
@@ -30988,7 +30988,7 @@ export interface CalibrationNamespace {
   /**
    * Build a zero-coupon inflation swap quote.
    *
-   * Free-function twin of Python `InflationQuote.inflation_swap` (Rust `InflationQuote::from_wire_fields`).
+   * Free-function twin of Python `InflationQuote.inflation_swap` (Rust `InflationQuote::inflation_swap`).
    * @param id - Unique quote identifier.
    * @param maturity - ISO-8601 swap maturity date.
    * @param rate - Fixed zero-coupon swap rate as a decimal (`0.025` is 2.5%).
@@ -31007,7 +31007,7 @@ export interface CalibrationNamespace {
   /**
    * Build a year-on-year inflation swap quote.
    *
-   * Free-function twin of Python `InflationQuote.yoy_inflation_swap` (Rust `InflationQuote::from_wire_fields`).
+   * Free-function twin of Python `InflationQuote.yoy_inflation_swap` (Rust `InflationQuote::yoy_inflation_swap`).
    * @param id - Unique quote identifier.
    * @param maturity - ISO-8601 swap maturity date.
    * @param rate - Fixed year-on-year swap rate as a decimal.

@@ -5,7 +5,6 @@
 //! | Asset class       | Functions                                                   |
 //! |-------------------|-------------------------------------------------------------|
 //! | Discount rates    | `bump_discount_curve_from_rate_calibration` |
-//! | Forward rates     | `bump_forward_curve_from_rate_calibration`                    |
 //! | Credit hazard     | `bump_hazard_spreads`                                        |
 //!
 //! # Convention
@@ -36,9 +35,7 @@ pub(crate) mod rates;
 
 pub use hazard::bump_hazard_spreads;
 pub use provider::{pricing_options, CachedRecalibrationProvider};
-pub use rates::{
-    bump_discount_curve_from_rate_calibration, bump_forward_curve_from_rate_calibration,
-};
+pub use rates::bump_discount_curve_from_rate_calibration;
 
 use crate::CalibrationConfig;
 

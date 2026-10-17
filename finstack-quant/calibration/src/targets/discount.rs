@@ -1,12 +1,12 @@
 //! Calibration target construction and shared input validation.
 //!
 use crate::api::schema::DiscountCurveParams;
+use crate::build::prepared::PreparedQuote;
 use crate::config::{CalibrationConfig, CalibrationMethod};
 use crate::constants::*;
-use crate::prepared::CalibrationQuote;
-use crate::quotes::market_quote::ExtractQuotes;
-use crate::quotes::market_quote::MarketQuote;
 use crate::quotes::rates::RateQuote;
+use crate::quotes::ExtractQuotes;
+use crate::quotes::MarketQuote;
 use crate::solver::bootstrap::SequentialBootstrapper;
 use crate::solver::global::GlobalFitOptimizer;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
@@ -22,7 +22,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
     DiscountCurve, DiscountCurveBuilder, RateCalibrationCurveRole, RateCalibrationRecipe,
-    ValidationMode,
+    ValidationMode as CurveValidationMode,
 };
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
@@ -263,12 +263,12 @@ impl DiscountCurveTarget {
         allow_non_monotonic: bool,
     ) -> DiscountCurveBuilder {
         let validation = if allow_non_monotonic {
-            ValidationMode::Raw {
+            CurveValidationMode::Raw {
                 allow_non_monotonic: true,
                 forward_floor: None,
             }
         } else {
-            ValidationMode::MarketStandard
+            CurveValidationMode::MarketStandard
         };
         DiscountCurve::builder(id.clone())
             .base_date(self.params.base_date)
@@ -566,19 +566,19 @@ impl DiscountCurveTarget {
 }
 
 impl BootstrapTarget for DiscountCurveTarget {
-    type Quote = CalibrationQuote;
+    type Quote = PreparedQuote<RateQuote>;
     type Curve = DiscountCurve;
 
     fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
-        Some(quote.quote_value())
+        Some(quote.quote.value())
     }
 
     fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
-        quote.quote_id().to_string()
+        quote.quote.id().as_str().to_string()
     }
 
     fn quote_time(&self, quote: &Self::Quote) -> Result<f64> {
-        Ok(quote.pillar_time())
+        Ok(quote.pillar_time)
     }
 
     fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
@@ -609,7 +609,7 @@ impl BootstrapTarget for DiscountCurveTarget {
         // The solver curve respects the final curve's monotonic policy but not
         // its forward floor, which only the final build enforces.
         self.curve_builder(&self.params.discount_curve_id, knots, allow_non_monotonic)
-            .validation(ValidationMode::Raw {
+            .validation(CurveValidationMode::Raw {
                 allow_non_monotonic,
                 forward_floor: None,
             })
@@ -651,12 +651,7 @@ impl BootstrapTarget for DiscountCurveTarget {
     fn initial_guess(&self, quote: &Self::Quote, _previous_knots: &[(f64, f64)]) -> Result<f64> {
         let t = self.quote_time(quote)?;
         let (df_lo, df_hi) = self.df_bounds_for_time(t);
-        let CalibrationQuote::Rates(prepared) = quote else {
-            return Err(finstack_quant_core::Error::Validation(
-                "discount curve calibration requires a rates quote".to_string(),
-            ));
-        };
-        Ok((1.0 / (1.0 + prepared.quote.implied_rate() * t)).clamp(df_lo, df_hi))
+        Ok((1.0 / (1.0 + quote.quote.implied_rate() * t)).clamp(df_lo, df_hi))
     }
 
     fn scan_points(&self, quote: &Self::Quote, initial_guess: f64) -> Result<Vec<f64>> {
@@ -713,7 +708,7 @@ impl BootstrapTarget for DiscountCurveTarget {
 }
 
 impl GlobalSolveTarget for DiscountCurveTarget {
-    type Quote = CalibrationQuote;
+    type Quote = PreparedQuote<RateQuote>;
     type Curve = DiscountCurve;
 
     fn build_time_grid_and_guesses(
@@ -785,12 +780,11 @@ impl GlobalSolveTarget for DiscountCurveTarget {
     }
 
     fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
-        Some(quote.quote_value())
+        Some(quote.quote.value())
     }
 
     fn residual_key(&self, quote: &Self::Quote, idx: usize) -> String {
-        let q = quote.get_instrument();
-        format!("{}-{:03}", q.id(), idx)
+        format!("{}-{:03}", quote.instrument.id(), idx)
     }
 
     fn residual_weights(&self, quotes: &[Self::Quote], weights_out: &mut [f64]) -> Result<()> {
@@ -945,7 +939,6 @@ impl GlobalSolveTarget for DiscountCurveTarget {
 mod tests {
     use super::*;
     use crate::build::prepared::PreparedQuote;
-    use crate::prepared::CalibrationQuote;
     use crate::solver::global::GlobalFitOptimizer;
     use crate::solver::traits::BootstrapTarget;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCountContext};
@@ -1026,9 +1019,8 @@ mod tests {
             pay_date,
             expected_yf,
         );
-        let cal_quote = CalibrationQuote::Rates(pq);
 
-        let actual = BootstrapTarget::quote_time(&target, &cal_quote).expect("quote_time");
+        let actual = BootstrapTarget::quote_time(&target, &pq).expect("quote_time");
         assert!((actual - expected_yf).abs() < 1e-15);
     }
 
@@ -1086,7 +1078,7 @@ mod tests {
         );
 
         let pq = PreparedQuote::new(std::sync::Arc::new(quote), instrument, maturity, p_time);
-        let quotes = vec![CalibrationQuote::Rates(pq)];
+        let quotes = vec![pq];
 
         let (_curve, report) = GlobalFitOptimizer::optimize(
             &target,
@@ -1161,7 +1153,7 @@ mod tests {
 
                 let pq =
                     PreparedQuote::new(std::sync::Arc::new(quote), instrument, maturity, p_time);
-                quotes.push(CalibrationQuote::Rates(pq));
+                quotes.push(pq);
             }
 
             let (curve, report) = GlobalFitOptimizer::optimize(
@@ -1242,7 +1234,7 @@ mod tests {
             .expect("year_fraction");
 
         // Build two futures quotes: one without adjustment, one with 20bp adjustment
-        let make_futures_quote = |adj: f64| -> CalibrationQuote {
+        let make_futures_quote = |adj: f64| -> PreparedQuote<RateQuote> {
             let quote = crate::quotes::rates::RateQuote::Futures {
                 id: crate::quotes::ids::QuoteId::new("FUT-3M"),
                 contract:
@@ -1273,8 +1265,7 @@ mod tests {
                 },
             );
 
-            let pq = PreparedQuote::new(std::sync::Arc::new(quote), instrument, maturity, p_time);
-            CalibrationQuote::Rates(pq)
+            PreparedQuote::new(std::sync::Arc::new(quote), instrument, maturity, p_time)
         };
 
         let quote_no_adj = make_futures_quote(0.0);

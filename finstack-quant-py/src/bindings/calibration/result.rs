@@ -49,13 +49,6 @@ impl PyCalibrationResult {
             cached_market_json: OnceLock::new(),
         }
     }
-
-    fn find_step_report(
-        &self,
-        step_id: &str,
-    ) -> PyResult<&finstack_quant_calibration::CalibrationReport> {
-        self.inner.result.step_report(step_id).map_err(core_to_py)
-    }
 }
 
 fn cached_json<'py, F>(
@@ -238,9 +231,8 @@ impl PyCalibrationResult {
     ///     If no step with the given ``step_id`` exists.
     #[pyo3(text_signature = "($self, step_id)")]
     fn step_report(&self, step_id: &str) -> PyResult<PyCalibrationReport> {
-        Ok(PyCalibrationReport::from_inner(
-            self.find_step_report(step_id)?.clone(),
-        ))
+        let report = self.inner.result.step_report(step_id).map_err(core_to_py)?;
+        Ok(PyCalibrationReport::from_inner(report.clone()))
     }
 
     /// Per-step calibration report as a compact JSON string.
@@ -258,7 +250,8 @@ impl PyCalibrationResult {
     ///     If serialization fails.
     #[pyo3(text_signature = "($self, step_id)")]
     fn step_report_json(&self, step_id: &str) -> PyResult<String> {
-        serde_json::to_string(self.find_step_report(step_id)?)
+        let report = self.inner.result.step_report(step_id).map_err(core_to_py)?;
+        serde_json::to_string(report)
             .map_err(|e| serde_json_to_py(e, "failed to serialize CalibrationReport"))
     }
 
@@ -279,7 +272,8 @@ impl PyCalibrationResult {
     ///     If no step with the given ``step_id`` exists.
     #[pyo3(text_signature = "($self, step_id)")]
     fn residuals<'py>(&self, py: Python<'py>, step_id: &str) -> PyResult<Bound<'py, PyAny>> {
-        quote_quality_dataframe(py, &self.find_step_report(step_id)?.quote_rows())
+        let report = self.inner.result.step_report(step_id).map_err(core_to_py)?;
+        quote_quality_dataframe(py, &report.quote_rows())
     }
 
     /// Export the per-step summary as a pandas ``DataFrame``.

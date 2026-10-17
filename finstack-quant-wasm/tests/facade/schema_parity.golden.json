@@ -823,14 +823,14 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 216526
+            "bytes": 216517
           },
           {
             "path": "schemas/calibration/1/calibration_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
             "type_name": "CalibrationResultEnvelope",
             "kind": "output",
-            "bytes": 132481
+            "bytes": 132475
           },
           {
             "path": "schemas/calibration/1/calibration_validation_report.schema.json",
@@ -900,14 +900,14 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/market_quote.schema.json",
             "type_name": "MarketQuote",
             "kind": "component",
-            "bytes": 30570
+            "bytes": 30561
           },
           {
             "path": "schemas/market/1/rate_quote.schema.json",
             "$id": "https://finstack_quant.dev/schemas/market/1/rate_quote.schema.json",
             "type_name": "RateQuote",
             "kind": "component",
-            "bytes": 8852
+            "bytes": 8843
           },
           {
             "path": "schemas/market/1/vol_quote.schema.json",
@@ -3603,7 +3603,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 216526
+            "bytes": 216517
           },
           {
             "domain": "calibration",
@@ -3611,7 +3611,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
             "type_name": "CalibrationResultEnvelope",
             "kind": "output",
-            "bytes": 132481
+            "bytes": 132475
           },
           {
             "domain": "calibration",
@@ -3691,7 +3691,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/market_quote.schema.json",
             "type_name": "MarketQuote",
             "kind": "component",
-            "bytes": 30570
+            "bytes": 30561
           },
           {
             "domain": "calibration",
@@ -3699,7 +3699,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/rate_quote.schema.json",
             "type_name": "RateQuote",
             "kind": "component",
-            "bytes": 8852
+            "bytes": 8843
           },
           {
             "domain": "calibration",

@@ -2778,7 +2778,7 @@ export default [
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/0/oneOf/2/properties/convexity_adjustment",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/0/oneOf/2/properties/convexity_adjustment",
-    "description": "Convexity adjustment as a decimal rate (Hull convention).\n\nThe implied forward is\n`forward = (100 - price) / 100 − convexity_adjustment`.\nA positive adjustment lowers the futures-implied rate toward the true\nforward. The wire field is required; the host authoring\nconstructors ([`RateQuote::from_wire_fields`]) fill an omitted value\nwith [`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`].",
+    "description": "Convexity adjustment as a decimal rate (Hull convention).\n\nThe implied forward is\n`forward = (100 - price) / 100 − convexity_adjustment`.\nA positive adjustment lowers the futures-implied rate toward the true\nforward. The wire field is required; the host authoring\nconstructor ([`RateQuote::futures`]) fills an omitted value\nwith [`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`].",
     "format": "double"
   },
   {

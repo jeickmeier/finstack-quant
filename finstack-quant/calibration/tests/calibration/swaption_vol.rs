@@ -12,7 +12,7 @@ use finstack_quant_calibration::api::schema::{
     SwaptionVolConvention, SwaptionVolParams,
 };
 use finstack_quant_calibration::quotes::ids::QuoteId;
-use finstack_quant_calibration::quotes::market_quote::MarketQuote;
+use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{

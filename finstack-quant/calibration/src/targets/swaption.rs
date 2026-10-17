@@ -4,8 +4,8 @@ use crate::api::schema::{
     SabrInterpolationMethod, SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams,
 };
 use crate::config::CalibrationConfig;
-use crate::quotes::market_quote::MarketQuote;
 use crate::quotes::vol::VolQuote;
+use crate::quotes::MarketQuote;
 use crate::CalibrationReport;
 use finstack_quant_core::dates::{
     adjust, BusinessDayConvention, DateExt, DayCount, DayCountContext, StubKind, Tenor,

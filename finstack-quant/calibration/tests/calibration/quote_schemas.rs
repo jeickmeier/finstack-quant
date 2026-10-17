@@ -113,7 +113,10 @@ fn inflation_quote_maturity() {
         index: "US-CPI-U".to_string(),
         convention: InflationSwapConventionId::new("USD-CPI"),
     };
-    assert_eq!(zcis.maturity_date(), Some(d(2029, time::Month::June, 20)));
+    assert_eq!(zcis.maturity(), d(2029, time::Month::June, 20));
+    assert_eq!(zcis.rate(), 0.025);
+    assert_eq!(zcis.index(), "US-CPI-U");
+    assert_eq!(zcis.convention().as_str(), "USD-CPI");
 
     let yoy = InflationQuote::YoYInflationSwap {
         id: QuoteId::new("USA-CPI-U-YOY-5Y"),
@@ -124,7 +127,10 @@ fn inflation_quote_maturity() {
             .expect("valid tenor fixture"),
         convention: InflationSwapConventionId::new("USD-CPI"),
     };
-    assert_eq!(yoy.maturity_date(), Some(d(2029, time::Month::June, 20)));
+    assert_eq!(yoy.maturity(), d(2029, time::Month::June, 20));
+    assert_eq!(yoy.rate(), 0.03);
+    assert_eq!(yoy.index(), "US-CPI-U");
+    assert_eq!(yoy.convention().as_str(), "USD-CPI");
 }
 
 #[test]

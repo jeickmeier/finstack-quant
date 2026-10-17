@@ -7,7 +7,7 @@ use finstack_quant_calibration::api::schema::{
 };
 use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
 use finstack_quant_calibration::quotes::ids::QuoteId;
-use finstack_quant_calibration::quotes::market_quote::MarketQuote;
+use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_core::currency::Currency;

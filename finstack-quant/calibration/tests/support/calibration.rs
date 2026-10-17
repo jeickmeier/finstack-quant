@@ -7,7 +7,7 @@ use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepParams,
 };
 use finstack_quant_calibration::quotes::ids::QuoteId;
-use finstack_quant_calibration::quotes::market_quote::MarketQuote;
+use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::{CalibrationConfig, CalibrationReport};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::{CurveState, MarketContext, MarketContextState};

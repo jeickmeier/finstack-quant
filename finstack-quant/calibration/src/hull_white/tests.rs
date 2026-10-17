@@ -1,7 +1,9 @@
 use super::cap_floor::solve_cap_floor_sigma_for_fixed_kappa;
 use super::pricing::{cap_floor_periods, forward_rate_from_df, normal_caplet_price};
 use super::swaption::infer_hw_initial_guess;
-use super::targets::{HullWhiteSwaptionTarget, PreparedSwaption, KAPPA_MAX, KAPPA_MIN};
+use super::targets::{
+    HullWhiteSwaptionTarget, PreparedSwaption, SwaptionPayoff, KAPPA_MAX, KAPPA_MIN,
+};
 use super::*;
 use finstack_quant_models::rates::hull_white::{
     hw1f_caplet_forward_rate_normal_vol, hw1f_convexity_adjustment, hw_b, hw_bond_vol,
@@ -160,7 +162,7 @@ fn piecewise_cap_floor_bootstrap_recovers_synthetic_segments() {
 #[test]
 fn piecewise_cap_floor_bootstrap_rejects_missing_live_fixing_horizon() {
     let df = flat_df(0.03);
-    let quote = CapFloorQuote::try_new(0.25, 0.03, 0.01, true, true).expect("quote");
+    let quote = CapFloorQuote::new(0.25, 0.03, 0.01, true, true).expect("quote");
     let error = bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
         &df,
         &df,
@@ -818,9 +820,10 @@ fn hw1f_residuals_signal_err_on_non_finite_price_no_magic_literal() {
             annuity: 1.0,
             fwd_swap_rate: 0.03,
             vega: 0.5,
-            swap_start_time: 1.0,
-            cashflows: vec![(1.5, 0.015), (2.0, 1.015)],
-            schedule: None,
+            payoff: SwaptionPayoff::Synthetic {
+                swap_start_time: 1.0,
+                cashflows: vec![(1.5, 0.015), (2.0, 1.015)],
+            },
         })
         .collect();
 
