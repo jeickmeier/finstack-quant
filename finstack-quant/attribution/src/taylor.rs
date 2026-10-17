@@ -1681,11 +1681,13 @@ mod tests {
 
         fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
             // Price in USD as the EUR notional converted at the market FX rate.
-            let usd = market.convert_money(
-                Money::new(self.eur_notional, Currency::EUR).expect("valid money fixture"),
-                Currency::USD,
-                as_of,
-            )?;
+            let usd = market
+                .convert_money(
+                    Money::new(self.eur_notional, Currency::EUR).expect("valid money fixture"),
+                    Currency::USD,
+                    as_of,
+                )?
+                .amount;
             Ok(usd)
         }
 
@@ -2155,11 +2157,14 @@ mod tests {
                 }
                 MockPayoff::FxOptional { eur_notional } => {
                     if market.fx().is_some() {
-                        market.convert_money(
-                            Money::new(*eur_notional, Currency::EUR).expect("valid money fixture"),
-                            Currency::USD,
-                            as_of,
-                        )
+                        market
+                            .convert_money(
+                                Money::new(*eur_notional, Currency::EUR)
+                                    .expect("valid money fixture"),
+                                Currency::USD,
+                                as_of,
+                            )
+                            .map(|converted| converted.amount)
                     } else {
                         Ok(Money::new(*eur_notional, Currency::USD).expect("valid money fixture"))
                     }

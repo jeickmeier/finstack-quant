@@ -501,7 +501,7 @@ impl PyMarketContext {
                 extract_currency(target_currency)?,
                 py_to_date(as_of)?,
             )
-            .map(PyMoney::from_inner)
+            .map(|converted| PyMoney::from_inner(converted.amount))
             .map_err(core_to_py)
     }
 

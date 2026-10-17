@@ -2,7 +2,7 @@
 //!
 use crate::metrics::MetricId;
 use crate::pricer::ModelKey;
-use finstack_quant_core::config::{results_meta_now, FinstackConfig, ResultsMeta};
+use finstack_quant_core::config::{results_meta, FinstackConfig, ResultsMeta};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::explain::ExplanationTrace;
 use finstack_quant_core::money::Money;
@@ -393,7 +393,7 @@ impl ValuationResult {
         // Default stamping uses default configuration; callers needing custom
         // policy should construct core `ResultsMeta` and use
         // `stamped_with_meta` to avoid creating a fresh config here.
-        let meta = results_meta_now(&FinstackConfig::default());
+        let meta = results_meta(&FinstackConfig::default());
         Self::stamped_with_meta(instrument_id, as_of, value, meta)
     }
 
@@ -408,7 +408,7 @@ impl ValuationResult {
         value: Money,
         cfg: &FinstackConfig,
     ) -> Self {
-        let meta = results_meta_now(cfg);
+        let meta = results_meta(cfg);
         Self::stamped_with_meta(instrument_id, as_of, value, meta)
     }
 
@@ -436,7 +436,7 @@ impl ValuationResult {
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::dates::create_date;
-    /// use finstack_quant_core::config::{FinstackConfig, results_meta_now};
+    /// use finstack_quant_core::config::{FinstackConfig, results_meta};
     /// use time::Month;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -445,7 +445,7 @@ impl ValuationResult {
     ///
     /// // Pre-construct metadata once for batch pricing
     /// let config = FinstackConfig::default();
-    /// let meta = results_meta_now(&config);
+    /// let meta = results_meta(&config);
     ///
     /// let result = ValuationResult::stamped_with_meta("BOND-001", as_of, pv, meta);
     /// assert_eq!(result.instrument_id, "BOND-001");

@@ -5,7 +5,7 @@
 
 use super::{InstrumentType, ModelKey, PricerKey, PricingError, PricingErrorContext};
 use crate::instruments::common_impl::traits::Instrument as Priceable;
-use finstack_quant_core::config::{results_meta_now, FinstackConfig};
+use finstack_quant_core::config::{results_meta, FinstackConfig};
 use finstack_quant_core::market_data::context::MarketContext as Market;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -574,7 +574,7 @@ fn stamp_results_meta(
     previous.fx_policy_applied = previous
         .fx_policy_applied
         .or_else(|| collect_fx_policy_from_curves(instrument, market));
-    result.meta = previous.overlay_request(results_meta_now(cfg));
+    result.meta = previous.overlay_request(results_meta(cfg));
 }
 
 /// Attach computed metrics without replacing the model-produced result envelope.

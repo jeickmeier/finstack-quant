@@ -76,6 +76,17 @@ use super::{
     term_structures::CreditIndexData,
 };
 
+/// Outcome of [`MarketContext::convert_money`]: the converted amount and the
+/// FX rate it used, so callers can stamp the applied policy (including whether
+/// the rate was triangulated). `rate` is `None` when no conversion was needed.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ConvertedMoney {
+    /// The amount in the target currency.
+    pub amount: Money,
+    /// The rate lookup behind the conversion; `None` for a same-currency input.
+    pub rate: Option<crate::money::fx::FxRateResult>,
+}
+
 /// Reversible in-place bump token for scratch market-context workflows.
 ///
 /// This is intended for hot-path finite-difference calculations that need to
@@ -233,7 +244,8 @@ impl MarketContext {
     ///
     /// Centralizes the "same-ccy shortcut → FX matrix lookup → rate application"
     /// pattern used across valuations, portfolio, margin, and cashflow aggregation.
-    /// Returns the input unchanged when it is already denominated in `target_currency`.
+    /// Returns the input unchanged (with no rate) when it is already denominated
+    /// in `target_currency`.
     ///
     /// Callers that need a different error taxonomy (e.g. portfolio's
     /// `MissingMarketData` / `FxConversionFailed` split) should perform their own
@@ -257,13 +269,16 @@ impl MarketContext {
         amount: Money,
         target_currency: Currency,
         as_of: Date,
-    ) -> crate::Result<Money> {
+    ) -> crate::Result<ConvertedMoney> {
         if amount.currency() == target_currency {
-            return Ok(amount);
+            return Ok(ConvertedMoney { amount, rate: None });
         }
         let fx = self.fx_required()?;
         let rate = fx.rate(FxQuery::new(amount.currency(), target_currency, as_of))?;
-        amount.convert_at_rate(target_currency, rate.rate)
+        Ok(ConvertedMoney {
+            amount: amount.convert_at_rate(target_currency, rate.rate)?,
+            rate: Some(rate),
+        })
     }
 
     pub(crate) fn rebind_credit_index_data(
@@ -379,7 +394,8 @@ mod tests {
         let amount = Money::from((1_000_i64, Currency::USD));
         let out = ctx
             .convert_money(amount, Currency::USD, date!(2025 - 01 - 15))
-            .expect("same-ccy conversion should not consult FX");
+            .expect("same-ccy conversion should not consult FX")
+            .amount;
         assert_eq!(out, amount);
     }
 
@@ -393,7 +409,8 @@ mod tests {
         let eur = Money::from((1_000_i64, Currency::EUR));
         let usd = ctx
             .convert_money(eur, Currency::USD, date!(2025 - 01 - 15))
-            .expect("EUR->USD should succeed");
+            .expect("EUR->USD should succeed")
+            .amount;
         assert_eq!(usd.currency(), Currency::USD);
         assert!((usd.amount() - 1_100.0).abs() < 1e-9);
     }
@@ -412,7 +429,8 @@ mod tests {
 
         let usd = ctx
             .convert_money(eur, Currency::USD, date!(2025 - 01 - 15))
-            .expect("EUR->USD should succeed");
+            .expect("EUR->USD should succeed")
+            .amount;
         assert_eq!(
             usd.amount_decimal(),
             rust_decimal::Decimal::from_str("20000000000000000.2").expect("valid decimal")

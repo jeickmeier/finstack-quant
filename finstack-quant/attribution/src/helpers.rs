@@ -150,8 +150,12 @@ pub(crate) fn compute_pnl(
     market_t1: &MarketContext,
     as_of_t1: Date,
 ) -> Result<Money> {
-    let val_t0_converted = market_t1.convert_money(val_t0, target_currency, as_of_t1)?;
-    let val_t1_converted = market_t1.convert_money(val_t1, target_currency, as_of_t1)?;
+    let val_t0_converted = market_t1
+        .convert_money(val_t0, target_currency, as_of_t1)?
+        .amount;
+    let val_t1_converted = market_t1
+        .convert_money(val_t1, target_currency, as_of_t1)?
+        .amount;
 
     val_t1_converted.checked_sub(val_t0_converted)
 }
@@ -189,8 +193,12 @@ pub(crate) fn compute_pnl_with_fx(
     as_of_t0: Date,
     as_of_t1: Date,
 ) -> Result<Money> {
-    let val_t0_converted = market_fx_t0.convert_money(val_t0, target_currency, as_of_t0)?;
-    let val_t1_converted = market_fx_t1.convert_money(val_t1, target_currency, as_of_t1)?;
+    let val_t0_converted = market_fx_t0
+        .convert_money(val_t0, target_currency, as_of_t0)?
+        .amount;
+    let val_t1_converted = market_fx_t1
+        .convert_money(val_t1, target_currency, as_of_t1)?
+        .amount;
 
     val_t1_converted.checked_sub(val_t0_converted)
 }
