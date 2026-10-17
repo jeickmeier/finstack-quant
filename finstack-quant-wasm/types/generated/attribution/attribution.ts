@@ -4401,6 +4401,11 @@ export type CurveState =
        */
       knot_points: [unknown, unknown][];
       /**
+       * Hazard-rate cap the curve was built with, when it differs from the
+       * default of 10; absent for curves built with the default.
+       */
+      max_hazard_rate?: number | null;
+      /**
        * Par interpolation method
        */
       par_interp?: ParInterp;

@@ -53,6 +53,7 @@ impl HazardCurve {
             .recovery_rate(self.recovery_rate)
             .day_count(self.day_count)
             .par_interp(self.par_interp)
+            .max_hazard_rate(self.max_hazard_rate)
             .issuer_opt(self.issuer.clone())
             .seniority_opt(self.seniority)
             .currency_opt(self.currency)

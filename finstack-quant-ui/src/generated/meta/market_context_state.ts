@@ -1569,6 +1569,12 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/max_hazard_rate",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/max_hazard_rate",
+    "description": "Hazard-rate cap the curve was built with, when it differs from the\ndefault of 10; absent for curves built with the default.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/par_interp",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/par_interp",
     "default": "linear",

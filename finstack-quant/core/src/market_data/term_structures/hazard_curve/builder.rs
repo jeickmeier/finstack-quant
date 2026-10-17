@@ -31,7 +31,7 @@ pub struct HazardCurveBuilder {
     pub(super) day_count: DayCount,
     pub(super) par_points: Vec<(f64, f64)>, // (t, spread_bp)
     pub(super) par_interp: ParInterp,
-    /// Maximum allowed hazard rate (default 10.0).
+    /// Maximum allowed hazard rate (default [`DEFAULT_MAX_HAZARD_RATE`]).
     /// Rates above this trigger an error in `build()`.
     pub(super) max_hazard_rate: f64,
     pub(super) hazard_calibration:
@@ -280,6 +280,7 @@ impl HazardCurveBuilder {
             par_spreads_bp: p_spd.into_boxed_slice(),
             par_interp: self.par_interp,
             hazard_calibration: self.hazard_calibration,
+            max_hazard_rate: self.max_hazard_rate,
             interp,
             fx_policy: self.fx_policy,
         })

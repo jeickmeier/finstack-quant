@@ -565,7 +565,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "2a8db48574a88c1cc468d6c5bcc0e77ee6fe60ded2b554ffd3353d1296f94c8f",
+          "sha256": "dcbdd54befd63c778903b51efd42d7046cdc1e0c0de140241ff994a35a6f497d",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -579,7 +579,7 @@
           "uri": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "pointer": "#",
           "source": "finstack-quant/calibration/schemas/calibration/1/calibration.schema.json",
-          "sha256": "d4ec1cdeccfc628c6b2064bc2e63d73cebf07c53a6caaaa125256810d84497e6",
+          "sha256": "262f4f781f2e57028674b792f08fac8cfbfda3e934ba26bbd079dbbdf69fce0e",
           "description": "Canonical typed calibration request and result envelope."
         }
       ]
@@ -994,7 +994,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#/$defs/CurveState",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "22c96a48b430b36dfd0ab8a3c2427942d3b4c5ed723a47133b23bddd9e21668f",
+          "sha256": "8c31c58ae70ca4a9306c703af1999e4135c7f2df7cfe17ef708125c0bf806bdf",
           "description": "Serializable state representation for any curve type.\n\nProduced when persisting market data snapshots through serde."
         }
       ]
@@ -1189,7 +1189,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "2a8db48574a88c1cc468d6c5bcc0e77ee6fe60ded2b554ffd3353d1296f94c8f",
+          "sha256": "dcbdd54befd63c778903b51efd42d7046cdc1e0c0de140241ff994a35a6f497d",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]

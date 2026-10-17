@@ -10505,6 +10505,14 @@
               },
               "type": "array"
             },
+            "max_hazard_rate": {
+              "description": "Hazard-rate cap the curve was built with, when it differs from the\ndefault of 10; absent for curves built with the default.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
             "par_interp": {
               "$ref": "#/$defs/ParInterp",
               "default": "linear",

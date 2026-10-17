@@ -7070,6 +7070,12 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/2/properties/max_hazard_rate",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/2/properties/max_hazard_rate",
+    "description": "Hazard-rate cap the curve was built with, when it differs from the\ndefault of 10; absent for curves built with the default.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/2/properties/par_interp",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/2/properties/par_interp",
     "default": "linear",

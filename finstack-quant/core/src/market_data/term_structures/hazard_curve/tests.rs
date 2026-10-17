@@ -82,6 +82,34 @@ fn survival_at_dates_is_one_on_or_before_the_base_date() {
 }
 
 #[test]
+fn hazard_cap_round_trips_through_json_and_rebuilds() {
+    let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let capped = HazardCurve::builder("CAPPED")
+        .base_date(base)
+        .recovery_rate(0.4)
+        .knots([(1.0, 12.0), (5.0, 15.0)])
+        .max_hazard_rate(40.0)
+        .build()
+        .expect("cap admits lambda above 10");
+    let json = serde_json::to_string(&capped).expect("serialize");
+    assert!(json.contains("\"max_hazard_rate\":40.0"));
+    let restored: HazardCurve = serde_json::from_str(&json).expect("deserialize with cap");
+    assert_eq!(restored.max_hazard_rate(), 40.0);
+    assert!(capped.with_parallel_hazard_rate_bump_bp(10.0).is_ok());
+    assert!(capped.to_builder_with_id("AGAIN").build().is_ok());
+
+    let default_cap = HazardCurve::builder("DEFAULT")
+        .base_date(base)
+        .recovery_rate(0.4)
+        .knots([(1.0, 0.02)])
+        .build()
+        .expect("default cap");
+    assert!(!serde_json::to_string(&default_cap)
+        .expect("serialize")
+        .contains("max_hazard_rate"));
+}
+
+#[test]
 fn survival_interpolation_preserves_hazard_consistency() {
     let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let builder = || {
