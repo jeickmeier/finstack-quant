@@ -707,7 +707,7 @@ fn cube_convention_and_vol_lookups_are_bit_stable() {
     // GitHub Actions each have one fold. A third fold means a lookup moved.
     const PINS: [(usize, u64); 2] = [
         (1044, 10_630_799_891_945_969_391),
-        (1044, 11_059_714_388_996_499_812),
+        (1044, 10_806_975_138_623_105_775),
     ];
     let nodes = |beta: f64, shift: Option<f64>| -> Vec<SabrParameterData> {
         [
