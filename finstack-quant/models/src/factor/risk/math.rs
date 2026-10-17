@@ -1,20 +1,9 @@
 //! Shared numerical helpers for factor-model risk decomposition.
 //!
-//! These helpers live here (rather than in each decomposer) so that the
-//! parametric portfolio and position decomposers reuse canonical core
-//! normal distribution helpers and pivoted Cholesky covariance validation.
-
-/// Inverse standard-normal CDF (probit) delegated to `finstack_quant_core::math`.
-#[inline]
-pub(super) fn normal_quantile(probability: f64) -> f64 {
-    finstack_quant_core::math::standard_normal_inv_cdf(probability)
-}
-
-/// Standard-normal probability density function delegated to `finstack_quant_core::math`.
-#[inline]
-pub(super) fn normal_pdf(x: f64) -> f64 {
-    finstack_quant_core::math::norm_pdf(x)
-}
+//! Raw position covariances are validated here, through core's pivoted
+//! Cholesky factorization, so the parametric portfolio and position
+//! decomposers share one check. Normal quantiles and densities come straight
+//! from `finstack_quant_core::math`.
 
 /// Validate a raw position covariance using the shared core PSD factorization.
 ///
