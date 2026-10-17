@@ -148,7 +148,18 @@ fn expand_failure(
         }];
     }
 
-    let Some(best) = best_branch_failures(branches, &base, &error.instance, depth, resolve, build)
+    let candidates = match tagged_candidates(branches, &error.instance) {
+        None => branches.iter().collect::<Vec<_>>(),
+        Some(candidates) if candidates.is_empty() => {
+            return vec![
+                unknown_tag_failure(branches, &error.instance, &here.pointer).unwrap_or(here),
+            ];
+        }
+        Some(candidates) => candidates,
+    };
+
+    let Some(best) =
+        best_branch_failures(&candidates, &base, &error.instance, depth, resolve, build)
     else {
         return vec![here];
     };
@@ -163,6 +174,75 @@ fn expand_failure(
         .collect()
 }
 
+/// The `const` discriminators a union branch declares, as `(property, value)`.
+///
+/// A tagged union publishes each variant as an object whose tag property is a
+/// `const` (`{"type": {"const": "bond"}, "spec": ...}`).
+fn branch_tags(branch: &Value) -> Vec<(&str, &Value)> {
+    branch
+        .get("properties")
+        .and_then(Value::as_object)
+        .map(|properties| {
+            properties
+                .iter()
+                .filter_map(|(name, schema)| {
+                    schema.get("const").map(|value| (name.as_str(), value))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Narrow a union to the branches whose discriminators the instance carries.
+///
+/// Returns `None` for an untagged union (no branch declares a `const`
+/// property), where every branch has to be tried. Branches without tags are
+/// kept as candidates alongside the matching tagged ones. Reading the tag
+/// first means a 78-way instrument union compiles one branch, not all of them.
+fn tagged_candidates<'a>(branches: &'a [Value], instance: &Value) -> Option<Vec<&'a Value>> {
+    let tags: Vec<Vec<(&str, &Value)>> = branches.iter().map(branch_tags).collect();
+    if tags.iter().all(Vec::is_empty) {
+        return None;
+    }
+    Some(
+        branches
+            .iter()
+            .zip(&tags)
+            .filter(|(_, tags)| {
+                tags.iter()
+                    .all(|(name, value)| instance.get(*name) == Some(*value))
+            })
+            .map(|(branch, _)| branch)
+            .collect(),
+    )
+}
+
+/// One message for a tag no branch accepts, listing the accepted tags.
+///
+/// Only when every branch tags the same single property; otherwise the
+/// original union diagnostic stands.
+fn unknown_tag_failure(branches: &[Value], instance: &Value, pointer: &str) -> Option<Failure> {
+    let tags: Vec<Vec<(&str, &Value)>> = branches.iter().map(branch_tags).collect();
+    let name = tags
+        .first()
+        .and_then(|tags| tags.first())
+        .map(|(name, _)| *name)?;
+    let values = tags
+        .iter()
+        .map(|tags| match tags.as_slice() {
+            [(tag, value)] if *tag == name => Some(value.to_string()),
+            _ => None,
+        })
+        .collect::<Option<Vec<_>>>()?;
+    let actual = instance
+        .get(name)
+        .map_or_else(|| "missing".to_string(), Value::to_string);
+    Some(Failure {
+        pointer: format!("{pointer}/{name}"),
+        message: format!("{actual} is not one of [{}]", values.join(", ")),
+    })
+}
+
 /// Validate the instance against every branch and return the closest match's failures.
 ///
 /// "Closest" is fewest failures. For the tagged unions in this workspace the
@@ -170,7 +250,7 @@ fn expand_failure(
 /// discriminator outright and reports far more — so counting is enough without
 /// reading discriminators.
 fn best_branch_failures(
-    branches: &[Value],
+    branches: &[&Value],
     base: &Value,
     instance: &Value,
     depth: usize,
@@ -244,6 +324,67 @@ mod tests {
         assert_eq!(failures[0].pointer, "/leg/side");
         assert!(failures[0].message.contains("pay"));
         assert!(failures[0].message.contains("receive"));
+    }
+
+    #[test]
+    fn tagged_union_compiles_only_the_branch_the_tag_selects() {
+        let schema = json!({"oneOf":[
+            {"type":"object","additionalProperties":false,"required":["type","spec"],
+             "properties":{"type":{"const":"bond"},"spec":{"type":"object","required":["maturity"]}}},
+            {"type":"object","additionalProperties":false,"required":["type","spec"],
+             "properties":{"type":{"const":"swap"},"spec":{"type":"object","required":["tenor"]}}}
+        ]});
+        let validator = jsonschema::validator_for(&schema).expect("schema");
+        let calls = Cell::new(0);
+        let build = |schema: &Value| {
+            calls.set(calls.get() + 1);
+            jsonschema::validator_for(schema)
+                .map_err(|error| crate::Error::Validation(error.to_string()))
+        };
+        let failures = collect_failures(
+            &validator,
+            &schema,
+            &json!({"type":"swap","spec":{}}),
+            &|_| None,
+            &build,
+        );
+        assert_eq!(calls.get(), 1, "only the tagged branch is compiled");
+        assert_eq!(failures.len(), 1);
+        assert_eq!(failures[0].pointer, "/spec");
+        assert!(
+            failures[0].message.contains("tenor"),
+            "{}",
+            failures[0].message
+        );
+    }
+
+    #[test]
+    fn unknown_tag_lists_the_accepted_tags_without_compiling() {
+        let schema = json!({"oneOf":[
+            {"type":"object","properties":{"type":{"const":"bond"}}},
+            {"type":"object","properties":{"type":{"const":"swap"}}}
+        ]});
+        let validator = jsonschema::validator_for(&schema).expect("schema");
+        let calls = Cell::new(0);
+        let build = |schema: &Value| {
+            calls.set(calls.get() + 1);
+            jsonschema::validator_for(schema)
+                .map_err(|error| crate::Error::Validation(error.to_string()))
+        };
+        let failures = collect_failures(
+            &validator,
+            &schema,
+            &json!({"type":"not_real"}),
+            &|_| None,
+            &build,
+        );
+        assert_eq!(calls.get(), 0);
+        assert_eq!(failures.len(), 1);
+        assert_eq!(failures[0].pointer, "/type");
+        assert_eq!(
+            failures[0].message,
+            "\"not_real\" is not one of [\"bond\", \"swap\"]"
+        );
     }
 
     #[test]
