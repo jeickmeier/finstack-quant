@@ -188,37 +188,13 @@ impl CheyetteRoughVolParams {
                 "CheyetteRoughVol parameter rho must be in [-1, 1], got {rho}"
             )));
         }
-        if phi_points.is_empty() {
-            return Err(finstack_quant_core::Error::Validation(
-                "CheyetteRoughVol phi_points must have at least one point".to_string(),
-            ));
-        }
-
-        let mut phi_times = Vec::with_capacity(phi_points.len());
-        let mut phi_values = Vec::with_capacity(phi_points.len());
-
-        for (i, &(t, v)) in phi_points.iter().enumerate() {
-            if !t.is_finite() || t < 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CheyetteRoughVol phi_points time must be non-negative and finite, \
-                     got {t} at index {i}"
-                )));
-            }
-            if !v.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CheyetteRoughVol phi_points value must be finite, got {v} at index {i}"
-                )));
-            }
-            if i > 0 && t <= phi_times[i - 1] {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CheyetteRoughVol phi_points times must be strictly increasing, \
-                     got {t} after {} at index {i}",
-                    phi_times[i - 1]
-                )));
-            }
-            phi_times.push(t);
-            phi_values.push(v);
-        }
+        let (phi_times, phi_values): (Vec<f64>, Vec<f64>) = phi_points.iter().copied().unzip();
+        super::validate_piecewise_knots(
+            &phi_times,
+            &phi_values,
+            true,
+            "CheyetteRoughVol phi_points",
+        )?;
 
         if !hurst.is_rough() {
             tracing::warn!(

@@ -159,23 +159,7 @@ impl HullWhite1FParams {
         theta_curve: Vec<f64>,
         theta_times: Vec<f64>,
     ) -> Result<Self> {
-        if theta_curve.is_empty() || theta_curve.len() != theta_times.len() {
-            return Err(finstack_quant_core::Error::Validation(
-                "Hull-White theta curve and times must be non-empty and equally sized".into(),
-            ));
-        }
-        for (index, (&time, &theta)) in theta_times.iter().zip(&theta_curve).enumerate() {
-            if !time.is_finite() || time < 0.0 || !theta.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "invalid Hull-White theta knot at index {index}: time={time}, theta={theta}"
-                )));
-            }
-            if index > 0 && time <= theta_times[index - 1] {
-                return Err(finstack_quant_core::Error::Validation(
-                    "Hull-White theta times must increase strictly".into(),
-                ));
-            }
-        }
+        super::validate_piecewise_knots(&theta_times, &theta_curve, true, "Hull-White theta")?;
         Ok(Self {
             model,
             theta_curve,

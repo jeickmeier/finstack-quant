@@ -233,27 +233,7 @@ impl CirPlusPlusProcess {
         shift_curve: Vec<f64>,
         shift_times: Vec<f64>,
     ) -> finstack_quant_core::Result<Self> {
-        if shift_times.is_empty() || shift_curve.len() != shift_times.len() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "CIR++ shift curve and times must be non-empty and equally sized, got {} and {}",
-                shift_curve.len(),
-                shift_times.len()
-            )));
-        }
-        if shift_curve
-            .iter()
-            .chain(&shift_times)
-            .any(|value| !value.is_finite())
-        {
-            return Err(finstack_quant_core::Error::Validation(
-                "CIR++ shift values and times must be finite".to_string(),
-            ));
-        }
-        if shift_times.windows(2).any(|pair| pair[1] <= pair[0]) {
-            return Err(finstack_quant_core::Error::Validation(
-                "CIR++ shift times must increase strictly".to_string(),
-            ));
-        }
+        super::validate_piecewise_knots(&shift_times, &shift_curve, false, "CIR++ shift")?;
 
         Ok(Self {
             cir,
@@ -278,8 +258,7 @@ impl CirPlusPlusProcess {
 
     /// Get φ(t) at a given time.
     pub fn shift_at_time(&self, t: f64) -> f64 {
-        let index = self.shift_times.partition_point(|knot| *knot <= t);
-        self.shift_curve[index.saturating_sub(1)]
+        super::piecewise_constant_at(&self.shift_times, &self.shift_curve, t)
     }
 
     /// Get actual short rate r_t = x_t + φ(t).
