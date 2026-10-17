@@ -67,7 +67,13 @@ impl VarianceGammaCf {
     ///   larger values increase log-return tail thickness.
     /// * `theta` - Drift of the subordinated Brownian motion, in annual
     ///   log-return units; its sign controls skew.
-    pub fn new(r: f64, q: f64, sigma: f64, nu: f64, theta: f64) -> Result<Self, String> {
+    pub fn new(
+        r: f64,
+        q: f64,
+        sigma: f64,
+        nu: f64,
+        theta: f64,
+    ) -> finstack_quant_core::Result<Self> {
         let candidate = Self {
             r,
             q,
@@ -85,29 +91,37 @@ impl VarianceGammaCf {
     /// 1. `sigma > 0` and finite
     /// 2. `nu > 0` and finite
     /// 3. `1 - theta*nu - 0.5*sigma^2*nu > 0` (real-valued omega)
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
         if !self.r.is_finite() || !self.q.is_finite() {
-            return Err("VG rates and dividend yield must be finite".to_string());
-        }
-        if !self.sigma.is_finite() || self.sigma <= 0.0 {
-            return Err(format!(
-                "VG sigma must be > 0 and finite, got {}",
-                self.sigma
+            return Err(finstack_quant_core::Error::Validation(
+                "VG rates and dividend yield must be finite".to_string(),
             ));
         }
+        if !self.sigma.is_finite() || self.sigma <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "VG sigma must be > 0 and finite, got {}",
+                self.sigma
+            )));
+        }
         if !self.nu.is_finite() || self.nu <= 0.0 {
-            return Err(format!("VG nu must be > 0 and finite, got {}", self.nu));
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "VG nu must be > 0 and finite, got {}",
+                self.nu
+            )));
         }
         if !self.theta.is_finite() {
-            return Err(format!("VG theta must be finite, got {}", self.theta));
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "VG theta must be finite, got {}",
+                self.theta
+            )));
         }
         let omega_arg = 1.0 - self.theta * self.nu - 0.5 * self.sigma * self.sigma * self.nu;
         if !omega_arg.is_finite() || omega_arg <= 0.0 {
-            return Err(format!(
+            return Err(finstack_quant_core::Error::Validation(format!(
                 "VG martingale constraint violated: 1 - theta*nu - 0.5*sigma^2*nu = {} \
                  must be > 0 (sigma={}, nu={}, theta={})",
                 omega_arg, self.sigma, self.nu, self.theta
-            ));
+            )));
         }
         Ok(())
     }
@@ -171,7 +185,7 @@ mod tests {
         let err = VarianceGammaCf::new(0.05, 0.0, 0.5, 4.0, 0.2)
             .expect_err("martingale violation should be rejected");
         assert!(
-            err.contains("martingale"),
+            err.to_string().contains("martingale"),
             "expected constraint error: {err}"
         );
     }

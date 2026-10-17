@@ -120,8 +120,7 @@ pub fn bs_cos_price(market: CosMarketParams, vol: f64) -> Result<f64> {
 /// Returns an error for invalid market/process inputs, a zero term count, a
 /// degenerate truncation range, or non-finite model evaluations or prices.
 pub fn vg_cos_price(market: CosMarketParams, sigma: f64, theta: f64, nu: f64) -> Result<f64> {
-    let cf = VarianceGammaCf::new(market.rate, market.div_yield, sigma, nu, theta)
-        .map_err(invalid_input)?;
+    let cf = VarianceGammaCf::new(market.rate, market.div_yield, sigma, nu, theta)?;
     price_from_cf(&cf, market)
 }
 
@@ -161,7 +160,7 @@ pub fn merton_jump_cos_price(
         mu_j: mu_jump,
         sigma_j: sigma_jump,
     };
-    cf.validate().map_err(invalid_input)?;
+    cf.validate()?;
     price_from_cf(&cf, market)
 }
 

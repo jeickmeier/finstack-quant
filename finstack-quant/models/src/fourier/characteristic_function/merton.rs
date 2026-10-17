@@ -43,16 +43,18 @@ impl MertonJumpCf {
     ///
     /// # Errors
     ///
-    /// Returns a validation message for invalid parameters or an overflowing
+    /// Returns a validation error for invalid parameters or an overflowing
     /// risk-neutral jump compensator.
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
         for (name, value) in [
             ("rate", self.r),
             ("div_yield", self.q),
             ("mu_jump", self.mu_j),
         ] {
             if !value.is_finite() {
-                return Err(format!("Merton {name} must be finite, got {value}"));
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Merton {name} must be finite, got {value}"
+                )));
             }
         }
         for (name, value) in [
@@ -61,14 +63,16 @@ impl MertonJumpCf {
             ("sigma_jump", self.sigma_j),
         ] {
             if !value.is_finite() || value < 0.0 {
-                return Err(format!(
+                return Err(finstack_quant_core::Error::Validation(format!(
                     "Merton {name} must be finite and non-negative, got {value}"
-                ));
+                )));
             }
         }
         let compensator = self.lambda * (self.mu_j + 0.5 * self.sigma_j * self.sigma_j).exp_m1();
         if !compensator.is_finite() {
-            return Err("Merton risk-neutral jump compensator must be finite".to_string());
+            return Err(finstack_quant_core::Error::Validation(
+                "Merton risk-neutral jump compensator must be finite".to_string(),
+            ));
         }
         Ok(())
     }
