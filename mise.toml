@@ -783,7 +783,10 @@ run = [
     -p finstack-quant-statements --bin gen_statement_schemas \
     -p finstack-quant-valuations --bin gen_schemas \
     -p finstack-quant-portfolio --bin gen_materialization_schemas
-  target_dir="${CARGO_TARGET_DIR:-target}"
+  # Ask cargo: `.cargo/config.toml` can set `build.target-dir` (worktrees here
+  # share one), which a `${CARGO_TARGET_DIR:-target}` fallback does not see.
+  target_dir="$(cargo metadata --format-version 1 --no-deps \
+    | uv run --no-sync python -c 'import json, sys; print(json.load(sys.stdin)["target_directory"])')"
   for bin in \
     gen_core_schemas \
     gen_analytics_schemas \
@@ -854,7 +857,10 @@ cargo build \
   -p finstack-quant-statements --bin gen_statement_schemas \
   -p finstack-quant-valuations --bin gen_schemas \
   -p finstack-quant-portfolio --bin gen_materialization_schemas
-target_dir="${CARGO_TARGET_DIR:-target}"
+# Ask cargo: `.cargo/config.toml` can set `build.target-dir` (worktrees here
+# share one), which a `${CARGO_TARGET_DIR:-target}` fallback does not see.
+target_dir="$(cargo metadata --format-version 1 --no-deps \
+  | uv run --no-sync python -c 'import json, sys; print(json.load(sys.stdin)["target_directory"])')"
 for bin in \
   gen_core_schemas \
   gen_analytics_schemas \
