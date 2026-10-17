@@ -41,7 +41,7 @@ Full item documentation is in the rustdoc (`cargo doc -p finstack-quant-core
 | `money::Money` | Decimal-backed, currency-tagged amount. `checked_add`/`checked_sub` refuse to mix currencies. |
 | `money::FormatOpts` | Formatting options behind `Money::format` / `format_with`. |
 | `money::fx::FxProvider` | Conversion interface. |
-| `money::fx::{FxMatrix, SimpleFxProvider, BumpedFxProvider}` | Concrete providers; `FxMatrix` also carries `FxMatrixState` for serialization. |
+| `money::fx::{FxMatrix, SimpleFxProvider}` | Concrete providers; `FxMatrix` also carries `FxMatrixState` for serialization. |
 | `money::fx::{FxConfig, FxConversionPolicy, FxPolicyMeta, FxQuery, FxRateResult}` | Policy selection and the stamped result of a conversion. |
 | `decimal::{f64_to_decimal, decimal_to_f64}` | The only sanctioned `f64 ↔ Decimal` bridge; both return `Result` instead of collapsing non-finite input to zero. |
 
