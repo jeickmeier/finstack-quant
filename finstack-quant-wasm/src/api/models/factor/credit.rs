@@ -800,7 +800,7 @@ pub fn factor_covariance_rows(matrix: JsValue) -> Result<JsValue, JsValue> {
 }
 
 /// Validate a factor-model configuration: factor ordering, matching rules and the risk measure.
-/// @param config - `FactorModelConfig` object or JSON, as returned by `CreditFactorModel.config` or `factorModelAt`.
+/// @param config - `FactorModelConfig` object or JSON, as returned by the credit factor model `config` getter or `factorModelAt`.
 ///
 /// # Errors
 ///

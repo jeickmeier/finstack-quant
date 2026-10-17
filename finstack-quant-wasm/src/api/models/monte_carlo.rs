@@ -1054,7 +1054,7 @@ impl JsLsmcPricer {
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if an input is out of range, the basis name or currency code is unknown, or `pricing_seed` equals the training seed.
+    /// Throws a `validation` error if an input is out of range, the basis name or currency code is unknown, or `pricingSeed` equals the training seed.
     #[allow(clippy::too_many_arguments)]
     #[wasm_bindgen(js_name = priceAmericanUnbiased)]
     pub fn price_american_unbiased(
