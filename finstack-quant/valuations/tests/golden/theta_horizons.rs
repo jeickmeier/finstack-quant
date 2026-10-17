@@ -1,10 +1,17 @@
 //! Theta runs at 1D, 1M and 6M for every pricing golden and every registry
-//! example (UI pricing case).
+//! example (UI pricing case), one test per fixture family and horizon.
+//!
+//! The families follow the fixture directories, except that the
+//! structured-credit and CDS-tranche goldens, which dominate the run time, are
+//! carved out of `regression_goldens` into families of their own.
 //!
 //! Theta holds the market fixed and rolls the valuation date, so the rolled
 //! repricing crosses every index fixing inside the horizon. A fixture whose
 //! base valuation prices must also produce a finite theta at each horizon; the
 //! only exceptions are listed in [`EXPECTED_FAILURES`] with their reason.
+//!
+//! Set `THETA_SURVEY_OUT=<prefix>` to write each test's survey as
+//! `<prefix>.<family>.<horizon>`, one tab-separated line per run.
 
 use super::pricing_common::resolve_market;
 use super::schema::GoldenFixture;
@@ -14,6 +21,7 @@ use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::pricer::{parse_boxed_instrument_from_json, price_instrument};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 /// Theta horizons as `(label, metric_pricing_overrides.theta_period)`.
@@ -116,9 +124,25 @@ struct Case {
     model: String,
 }
 
-fn golden_cases() -> Vec<Case> {
-    collect_fixture_paths_under("pricing")
-        .expect("pricing fixtures")
+/// Fixture paths under `relative_dir` of `tests/golden/data`.
+fn golden_paths(relative_dir: &str) -> Vec<PathBuf> {
+    collect_fixture_paths_under(relative_dir).expect("pricing fixtures")
+}
+
+/// The `regression_goldens` fixtures other than the structured-credit and
+/// CDS-tranche families, which have tests of their own.
+fn other_regression_golden_paths() -> Vec<PathBuf> {
+    golden_paths("pricing/regression_goldens")
+        .into_iter()
+        .filter(|path| {
+            let path = path.to_string_lossy();
+            !path.contains("/structured_credit/") && !path.contains("/cds_tranche/")
+        })
+        .collect()
+}
+
+fn golden_cases(paths: Vec<PathBuf>) -> Vec<Case> {
+    paths
         .into_iter()
         .map(|path| {
             let raw = std::fs::read_to_string(&path).expect("read fixture");
@@ -180,44 +204,55 @@ fn price(case: &Case, metrics: &[String], overrides: Option<&str>) -> Result<Opt
     Ok(result.measures.get("theta").copied())
 }
 
-#[test]
-fn theta_is_finite_at_1d_1m_6m_for_every_fixture() {
+/// Theta survey of one fixture family at one horizon.
+///
+/// Returns `(report, unexpected)`: one tab-separated survey line per run, and
+/// the runs whose outcome contradicts [`EXPECTED_FAILURES`] (an unlisted
+/// failure, or a listed run that succeeded). A fixture whose base valuation
+/// fails is reported as `base-error` and not surveyed.
+fn survey(cases: &[Case], (label, period): (&str, &str)) -> (Vec<String>, Vec<String>) {
     let theta = ["theta".to_string()];
+    let overrides = format!(r#"{{"theta_period":{period}}}"#);
     let mut report = Vec::new();
     let mut unexpected = Vec::new();
-    for case in golden_cases().into_iter().chain(registry_cases()) {
-        if let Err(error) = price(&case, &[], None) {
+    for case in cases {
+        if let Err(error) = price(case, &[], None) {
             report.push(format!("{}\t-\tbase-error\t{error}", case.name));
             continue;
         }
-        for (label, period) in HORIZONS {
-            let overrides = format!(r#"{{"theta_period":{period}}}"#);
-            let outcome = match price(&case, &theta, Some(&overrides)) {
-                Ok(Some(value)) if value.is_finite() => Ok(value),
-                Ok(Some(value)) => Err(format!("non-finite theta {value}")),
-                Ok(None) => Err("theta missing from result".to_string()),
-                Err(error) => Err(error),
-            };
-            let expected = EXPECTED_FAILURES
-                .iter()
-                .any(|(name, horizons, _)| *name == case.name && horizons.contains(&label));
-            match &outcome {
-                Ok(value) => {
-                    report.push(format!("{}\t{label}\tok\t{value}", case.name));
-                    if expected {
-                        unexpected.push(format!("{} {label}: stale expected failure", case.name));
-                    }
+        let outcome = match price(case, &theta, Some(&overrides)) {
+            Ok(Some(value)) if value.is_finite() => Ok(value),
+            Ok(Some(value)) => Err(format!("non-finite theta {value}")),
+            Ok(None) => Err("theta missing from result".to_string()),
+            Err(error) => Err(error),
+        };
+        let expected = EXPECTED_FAILURES
+            .iter()
+            .any(|(name, horizons, _)| *name == case.name && horizons.contains(&label));
+        match &outcome {
+            Ok(value) => {
+                report.push(format!("{}\t{label}\tok\t{value}", case.name));
+                if expected {
+                    unexpected.push(format!("{} {label}: stale expected failure", case.name));
                 }
-                Err(error) => {
-                    report.push(format!("{}\t{label}\terror\t{error}", case.name));
-                    if !expected {
-                        unexpected.push(format!("{} {label}: {error}", case.name));
-                    }
+            }
+            Err(error) => {
+                report.push(format!("{}\t{label}\terror\t{error}", case.name));
+                if !expected {
+                    unexpected.push(format!("{} {label}: {error}", case.name));
                 }
             }
         }
     }
-    if let Ok(path) = std::env::var("THETA_SURVEY_OUT") {
+    (report, unexpected)
+}
+
+/// Runs the survey for one family at one horizon, writes the optional survey
+/// file and fails on any unexpected outcome.
+fn assert_theta_finite(family: &str, cases: &[Case], horizon: (&str, &str)) {
+    let (report, unexpected) = survey(cases, horizon);
+    if let Ok(prefix) = std::env::var("THETA_SURVEY_OUT") {
+        let path = format!("{prefix}.{family}.{}", horizon.0);
         std::fs::write(&path, report.join("\n") + "\n").expect("write theta survey");
     }
     assert!(
@@ -226,4 +261,85 @@ fn theta_is_finite_at_1d_1m_6m_for_every_fixture() {
         unexpected.len(),
         unexpected.join("\n")
     );
+}
+
+/// The golden families are a partition of every fixture under `pricing/`:
+/// a new fixture directory must be added to a family here, not silently
+/// skipped.
+#[test]
+fn golden_families_cover_every_pricing_fixture() {
+    let mut families: Vec<PathBuf> = [
+        golden_paths("pricing/bloomberg"),
+        golden_paths("pricing/quantlib"),
+        golden_paths("pricing/regression_goldens/structured_credit"),
+        golden_paths("pricing/regression_goldens/cds_tranche"),
+        other_regression_golden_paths(),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    families.sort();
+    assert_eq!(
+        families,
+        golden_paths("pricing"),
+        "theta families must cover every pricing fixture exactly once"
+    );
+}
+
+/// Case sources, one per fixture family; the function name is the family
+/// label in test names and survey files.
+fn bloomberg() -> Vec<Case> {
+    golden_cases(golden_paths("pricing/bloomberg"))
+}
+
+fn quantlib() -> Vec<Case> {
+    golden_cases(golden_paths("pricing/quantlib"))
+}
+
+fn structured_credit() -> Vec<Case> {
+    golden_cases(golden_paths("pricing/regression_goldens/structured_credit"))
+}
+
+fn cds_tranche() -> Vec<Case> {
+    golden_cases(golden_paths("pricing/regression_goldens/cds_tranche"))
+}
+
+fn other_regression() -> Vec<Case> {
+    golden_cases(other_regression_golden_paths())
+}
+
+fn registry() -> Vec<Case> {
+    registry_cases()
+}
+
+/// One `#[test]` per fixture family and horizon:
+/// `name => case source, index into [`HORIZONS`]`.
+macro_rules! theta_tests {
+    ($($test:ident => $family:ident, $horizon:expr;)*) => {$(
+        #[test]
+        fn $test() {
+            assert_theta_finite(stringify!($family), &$family(), HORIZONS[$horizon]);
+        }
+    )*};
+}
+
+theta_tests! {
+    theta_is_finite_1d_bloomberg_goldens => bloomberg, 0;
+    theta_is_finite_1m_bloomberg_goldens => bloomberg, 1;
+    theta_is_finite_6m_bloomberg_goldens => bloomberg, 2;
+    theta_is_finite_1d_quantlib_goldens => quantlib, 0;
+    theta_is_finite_1m_quantlib_goldens => quantlib, 1;
+    theta_is_finite_6m_quantlib_goldens => quantlib, 2;
+    theta_is_finite_1d_structured_credit_goldens => structured_credit, 0;
+    theta_is_finite_1m_structured_credit_goldens => structured_credit, 1;
+    theta_is_finite_6m_structured_credit_goldens => structured_credit, 2;
+    theta_is_finite_1d_cds_tranche_goldens => cds_tranche, 0;
+    theta_is_finite_1m_cds_tranche_goldens => cds_tranche, 1;
+    theta_is_finite_6m_cds_tranche_goldens => cds_tranche, 2;
+    theta_is_finite_1d_other_regression_goldens => other_regression, 0;
+    theta_is_finite_1m_other_regression_goldens => other_regression, 1;
+    theta_is_finite_6m_other_regression_goldens => other_regression, 2;
+    theta_is_finite_1d_registry_examples => registry, 0;
+    theta_is_finite_1m_registry_examples => registry, 1;
+    theta_is_finite_6m_registry_examples => registry, 2;
 }

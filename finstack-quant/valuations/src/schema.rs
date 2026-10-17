@@ -1281,30 +1281,38 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_cached_envelope_validation_keeps_its_verdicts() {
-        let valid = bond_example();
+    /// Validates `instance` through the cached envelope path twice and checks
+    /// the verdict and its stability across calls. One test per case: a
+    /// rejected envelope takes tens of seconds to validate, so the cases run
+    /// in parallel instead of back to back.
+    fn assert_envelope_verdict_is_stable(label: &str, instance: &Value, expect_ok: bool) {
+        let first = validate_instrument_envelope_json(instance);
+        assert_eq!(first.is_ok(), expect_ok, "{label}: unexpected verdict");
+        assert_eq!(
+            validate_instrument_envelope_json(instance),
+            first,
+            "{label}: cached envelope validation must be stable across calls"
+        );
+    }
 
+    #[test]
+    fn test_cached_envelope_validation_keeps_its_verdict_for_a_valid_example() {
+        assert_envelope_verdict_is_stable("valid", &bond_example(), true);
+    }
+
+    #[test]
+    fn test_cached_envelope_validation_keeps_its_verdict_for_an_unknown_field() {
         let mut unknown_field = bond_example();
         unknown_field["instrument"]["spec"]["not_a_real_field"] = serde_json::json!(1);
+        assert_envelope_verdict_is_stable("unknown field", &unknown_field, false);
+    }
 
+    #[test]
+    fn test_cached_envelope_validation_keeps_its_verdict_for_a_malformed_scalar() {
         let mut malformed_scalar = bond_example();
         malformed_scalar["instrument"]["spec"]["notional"]["amount"] =
             serde_json::json!("not-a-decimal");
-
-        for (label, instance, expect_ok) in [
-            ("valid", &valid, true),
-            ("unknown field", &unknown_field, false),
-            ("malformed scalar", &malformed_scalar, false),
-        ] {
-            let first = validate_instrument_envelope_json(instance);
-            assert_eq!(first.is_ok(), expect_ok, "{label}: unexpected verdict");
-            assert_eq!(
-                validate_instrument_envelope_json(instance),
-                first,
-                "{label}: cached envelope validation must be stable across calls"
-            );
-        }
+        assert_envelope_verdict_is_stable("malformed scalar", &malformed_scalar, false);
     }
 
     #[test]
