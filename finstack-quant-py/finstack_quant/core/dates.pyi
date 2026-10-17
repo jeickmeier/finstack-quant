@@ -386,9 +386,6 @@ class DayCount:
         start: datetime.date | str,
         end: datetime.date | str,
         ctx: Optional[DayCountContext] = None,
-        *,
-        frequency: Union[Tenor, str, None] = None,
-        calendar: Union[HolidayCalendar, str, None] = None,
     ) -> float:
         """
         Compute the year fraction between two dates.
@@ -401,14 +398,10 @@ class DayCount:
         end : datetime.date | str
             Accrual end (exclusive); must not precede *start*.
         ctx : DayCountContext | None
-            Full context object (calendar, frequency, coupon period, ...).
-            ``ACT_365L`` requires ``frequency`` and the enclosing contractual
-            ``coupon_period``; partial accrual retains that coupon's denominator.
-            Mutually exclusive with *frequency* / *calendar*.
-        frequency : Tenor | str | None
-            Coupon frequency for ``ACT_ACT_ISMA`` / ``ACT_365L`` (e.g. ``"6M"``).
-        calendar : HolidayCalendar | str | None
-            Holiday calendar (object or id) required by ``BUS_252``.
+            Context for conventions that need one: ``ACT_ACT_ISMA`` and
+            ``ACT_365L`` read ``frequency``, ``ACT_365L`` also the enclosing
+            contractual ``coupon_period`` (partial accrual retains that
+            coupon's denominator), ``BUS_252`` reads ``calendar_id``.
 
         Returns
         -------
@@ -418,18 +411,18 @@ class DayCount:
         Raises
         ------
         ValueError
-            If *start* > *end*, both *ctx* and keywords are given, or the
-            convention needs context that was not supplied. ACT/365L raises
+            If *start* > *end* or the convention needs context that was not
+            supplied. ACT/365L raises
             if frequency or enclosing coupon dates are missing, or the
             requested dates lie outside that coupon. ICMA raises if reference
             endpoints do not share an unadjusted nominal month grid.
         KeyError
-            If *calendar* names an unknown calendar.
+            If *ctx* names an unknown calendar.
 
         Examples
         --------
-        >>> from finstack_quant.core.dates import DayCount
-        >>> DayCount.ACT_ACT_ISMA.year_fraction("2025-01-15", "2025-07-15", frequency="6M")
+        >>> from finstack_quant.core.dates import DayCount, DayCountContext
+        >>> DayCount.ACT_ACT_ISMA.year_fraction("2025-01-15", "2025-07-15", DayCountContext(frequency="6M"))
         0.5
 
         """
@@ -440,9 +433,6 @@ class DayCount:
         start: datetime.date | str,
         end: datetime.date | str,
         ctx: Optional[DayCountContext] = None,
-        *,
-        frequency: Union[Tenor, str, None] = None,
-        calendar: Union[HolidayCalendar, str, None] = None,
     ) -> float:
         """
         Compute the signed year fraction (negative when start > end).
@@ -454,11 +444,7 @@ class DayCount:
         end : datetime.date | str
             End date; may precede *start*.
         ctx : DayCountContext | None
-            Full context object; mutually exclusive with the keywords.
-        frequency : Tenor | str | None
-            Coupon frequency for frequency-dependent conventions.
-        calendar : HolidayCalendar | str | None
-            Holiday calendar required by ``BUS_252``.
+            Context for conventions that need one (see ``year_fraction``).
 
         Returns
         -------
@@ -468,9 +454,9 @@ class DayCount:
         Raises
         ------
         ValueError
-            If required context is missing or both *ctx* and keywords are given.
+            If required context is missing.
         KeyError
-            If *calendar* names an unknown calendar.
+            If *ctx* names an unknown calendar.
 
         Examples
         --------
@@ -478,40 +464,6 @@ class DayCount:
         >>> DayCount.ACT_360.signed_year_fraction("2024-07-01", "2024-01-01")
         -0.5055555555555555
 
-        """
-        ...
-
-    @staticmethod
-    def calendar_days(start: datetime.date | str, end: datetime.date | str) -> int:
-        """
-        Count the calendar days between two dates.
-
-        Parameters
-        ----------
-        start : datetime.date | str
-            Start date.
-        end : datetime.date | str
-            End date.
-
-        Returns
-        -------
-        int
-            Signed number of calendar days (end - start).
-
-        Raises
-        ------
-        TypeError
-            If *start* or *end* is not date-like (``datetime.date``,
-            ``datetime.datetime``, or ``pandas.Timestamp``).
-        ValueError
-            If the year/month/day attributes do not form a valid calendar date.
-
-        Examples
-        --------
-        >>> import datetime
-        >>> from finstack_quant.core.dates import DayCount
-        >>> DayCount.calendar_days(datetime.date(2024, 1, 1), datetime.date(2024, 1, 31))
-        30
         """
         ...
 
@@ -958,33 +910,33 @@ class Tenor:
 
     """
 
-    def __init__(self, value: Union[str, int], unit: Union[TenorUnit, str, None] = None) -> None:
+    def __init__(self, count: int, unit: Union[TenorUnit, str]) -> None:
         """
-        Construct a tenor from a string, or from a count and unit.
+        Construct a tenor from a count and a unit; ``Tenor.parse`` reads strings.
 
         Parameters
         ----------
-        value : str | int
-            Tenor string such as ``"3M"`` (money-market aliases ``"ON"``,
-            ``"TN"``, ``"SN"`` give ``1D``), or the positive integer count
-            when *unit* is given.
-        unit : TenorUnit | str | None
-            Calendar unit for an integer *value*: a ``TenorUnit`` or the
-            one-letter designator ``"D"``/``"W"``/``"M"``/``"Y"``.
+        count : int
+            Positive integer count.
+        unit : TenorUnit | str
+            Calendar unit: a ``TenorUnit`` or the one-letter designator
+            ``"D"``/``"W"``/``"M"``/``"Y"``.
 
         Raises
         ------
         ValueError
-            If the string does not parse, *count* is zero, or the count
-            exceeds the supported range for *unit* (200 years).
+            If *count* is zero or exceeds the supported range for *unit*
+            (200 years).
         TypeError
-            If *value* is neither ``str`` nor ``int``, *unit* is given with a
-            string *value*, or *unit* is missing for an integer *value*.
+            If *count* is not an ``int`` or *unit* is neither a ``TenorUnit``
+            nor a unit letter.
+        OverflowError
+            If *count* is negative or exceeds the 32-bit range.
 
         Examples
         --------
         >>> from finstack_quant.core.dates import Tenor, TenorUnit
-        >>> Tenor("3M") == Tenor(3, "M") == Tenor(3, TenorUnit.MONTHS)
+        >>> Tenor.parse("3M") == Tenor(3, "M") == Tenor(3, TenorUnit.MONTHS)
         True
 
         """
@@ -1280,7 +1232,7 @@ class Tenor:
         Examples
         --------
         >>> from finstack_quant.core.dates import Tenor
-        >>> Tenor("3M").payments_per_year()
+        >>> Tenor.parse("3M").payments_per_year()
         4.0
         """
         ...
@@ -1324,7 +1276,7 @@ class Tenor:
         Examples
         --------
         >>> from finstack_quant.core.dates import Tenor
-        >>> Tenor("1M").add_to_date("2025-01-31")
+        >>> Tenor.parse("1M").add_to_date("2025-01-31")
         datetime.date(2025, 2, 28)
 
         """
@@ -1372,7 +1324,7 @@ class Tenor:
         Examples
         --------
         >>> from finstack_quant.core.dates import DayCount, Tenor
-        >>> Tenor("1Y").to_years_with_context("2025-01-15", day_count=DayCount.ACT_ACT)
+        >>> Tenor.parse("1Y").to_years_with_context("2025-01-15", day_count=DayCount.ACT_ACT)
         1.0
 
         """

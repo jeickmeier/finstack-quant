@@ -280,7 +280,7 @@ class TestDayCountParity:
         with pytest.raises(ValueError, match="frequency"):
             DayCount.ACT_365L.year_fraction(start, end)
         with pytest.raises(ValueError, match="coupon_period"):
-            DayCount.ACT_365L.year_fraction(start, end, frequency="6M")
+            DayCount.ACT_365L.year_fraction(start, end, DayCountContext(frequency="6M"))
 
     def test_icma_long_last_coupon_preserves_roll_day_after_february(self) -> None:
         start, end = date(2025, 1, 30), date(2025, 3, 15)
@@ -299,11 +299,6 @@ class TestDayCountParity:
         terminal = DayCount.THIRTY_E_360_ISDA.year_fraction(start, end, DayCountContext(end_is_termination_date=True))
         assert regular == pytest.approx(30.0 / 360.0)
         assert terminal == pytest.approx(28.0 / 360.0)
-
-    def test_calendar_days_static(self) -> None:
-        """calendar_days is a static method returning signed day count."""
-        start, end = date(2024, 1, 1), date(2024, 1, 31)
-        assert DayCount.calendar_days(start, end) == 30
 
     def test_same_date_zero_fraction(self) -> None:
         """Year fraction is zero when start == end."""

@@ -7,20 +7,18 @@
 use crate::utils::input::{js_bool, js_epoch_days, js_int, js_string, js_uint};
 use crate::utils::to_js_err;
 use finstack_quant_core::dates::{
-    self as rust_dates, create_date, days_since_epoch, Date, SifmaSettlementClass, TenorUnit,
+    self as rust_dates, days_since_epoch, Date, SifmaSettlementClass, TenorUnit,
     Thirty360Convention,
 };
 use finstack_quant_core::wire::{serde_label, serde_parse};
 use time::Month;
 use wasm_bindgen::prelude::*;
 
-/// Read a `(month, year)` argument pair, rejecting anything that is not a
-/// representable calendar month before a date rule runs on it.
+/// Read a `(month, year)` argument pair; the Rust date rule validates the year.
 fn month_year(month: &JsValue, year: &JsValue) -> Result<(Month, i32), JsValue> {
     let month: u8 = js_uint(month, "month")?;
     let year: i32 = js_int(year, "year")?;
     let month = Month::try_from(month).map_err(to_js_err)?;
-    create_date(year, month, 1).map_err(to_js_err)?;
     Ok((month, year))
 }
 
@@ -330,8 +328,7 @@ impl JsSifmaSettlementClass {
 /// @returns The published date as epoch days, or `undefined` when the month
 /// is outside the embedded SIFMA calendar (dates are never approximated).
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) if `month` is outside `1..=12` or `year` is outside the
-/// supported date range.
+/// `validation`) if `month` is outside `1..=12`.
 #[wasm_bindgen(js_name = sifmaSettlementDate)]
 pub fn sifma_settlement_date(month: JsValue, year: JsValue) -> Result<Option<i32>, JsValue> {
     let (month, year) = month_year(&month, &year)?;
@@ -350,8 +347,7 @@ pub fn sifma_settlement_date(month: JsValue, year: JsValue) -> Result<Option<i32
 /// @returns The published date as epoch days, or `undefined` when that month
 /// and class are outside the embedded SIFMA calendar.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) if `month` is outside `1..=12` or `year` is outside the
-/// supported date range.
+/// `validation`) if `month` is outside `1..=12`.
 #[wasm_bindgen(js_name = sifmaSettlementDateForClass)]
 pub fn sifma_settlement_date_for_class(
     month: JsValue,

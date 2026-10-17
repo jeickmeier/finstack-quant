@@ -443,26 +443,6 @@ impl JsDayCount {
             .map_err(to_js_err)
     }
 
-    /// Count the calendar days between two dates (epoch days), independent of
-    /// the convention (Rust associated fn `DayCount::calendar_days`).
-    /// @param start_epoch_days - Start date as days since 1970-01-01.
-    /// @param end_epoch_days - End date as days since 1970-01-01.
-    /// @returns Signed calendar-day count from start to end.
-    ///
-    /// # Errors
-    ///
-    /// Throws a JavaScript exception if either epoch-day value is non-finite, fractional, or outside the
-    /// representable date range.
-    #[wasm_bindgen(js_name = calendarDays)]
-    pub fn calendar_days(
-        start_epoch_days: JsValue,
-        end_epoch_days: JsValue,
-    ) -> Result<i64, JsValue> {
-        let start = js_epoch_days(&start_epoch_days, "startEpochDays")?;
-        let end = js_epoch_days(&end_epoch_days, "endEpochDays")?;
-        Ok(RustDayCount::calendar_days(start, end))
-    }
-
     /// Convention name.
     #[wasm_bindgen(js_name = toString)]
     #[allow(clippy::inherent_to_string)]

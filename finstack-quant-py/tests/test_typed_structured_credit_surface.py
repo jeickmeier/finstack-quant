@@ -585,7 +585,7 @@ def _date(value: str) -> datetime.date:
 
 def _tenor(value: dict) -> Tenor:
     unit = {"days": "D", "weeks": "W", "months": "M", "years": "Y"}[value["unit"]]
-    return Tenor(f"{value['count']}{unit}")
+    return Tenor(value["count"], unit)
 
 
 def _typed_deal_from_golden(spec: dict) -> StructuredCredit:

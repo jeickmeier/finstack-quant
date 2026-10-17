@@ -217,7 +217,6 @@ def test_dates_pickle_round_trips() -> None:
 
     from finstack_quant.core.dates import (
         DayCount,
-        DayCountContext,
         HolidayCalendar,
         Tenor,
         TenorUnit,
@@ -226,7 +225,7 @@ def test_dates_pickle_round_trips() -> None:
     )
 
     values = [
-        Tenor("3M"),
+        Tenor.parse("3M"),
         TenorUnit.MONTHS,
         DayCount.NL_365,
         PeriodId.parse("2025Q1"),
@@ -267,21 +266,23 @@ def test_period_plan_iteration_dataframe_and_ordering() -> None:
 def test_tenor_constructor_forms_and_context_helpers() -> None:
     from finstack_quant.core.dates import DayCount, HolidayCalendar, Tenor, TenorUnit
 
-    assert Tenor("3M") == Tenor(3, "M") == Tenor(3, TenorUnit.MONTHS)
-    assert Tenor("ON") == Tenor.daily()
-    assert Tenor("3M").payments_per_year() == 4.0
+    assert Tenor.parse("3M") == Tenor(3, "M") == Tenor(3, TenorUnit.MONTHS)
+    assert Tenor.parse("ON") == Tenor.daily()
+    assert Tenor.parse("3M").payments_per_year() == 4.0
     assert str(Tenor.from_years(0.5, "act_365f")) == "6M"
-    assert Tenor("1M").add_to_date("2025-01-31") == date(2025, 2, 28)
-    assert Tenor("1M").add_to_date("2025-01-31", calendar="usny", business_day_convention="F") == date(2025, 2, 28)
-    assert Tenor("1Y").to_years_with_context("2025-01-15", day_count=DayCount.ACT_ACT) == pytest.approx(1.0)
+    assert Tenor.parse("1M").add_to_date("2025-01-31") == date(2025, 2, 28)
+    assert Tenor.parse("1M").add_to_date("2025-01-31", calendar="usny", business_day_convention="F") == date(
+        2025, 2, 28
+    )
+    assert Tenor.parse("1Y").to_years_with_context("2025-01-15", day_count=DayCount.ACT_ACT) == pytest.approx(1.0)
     with pytest.raises(TypeError):
         Tenor(3)
 
     assert DayCount.from_name("ACT/ACT ICMA") == DayCount.ACT_ACT_ISMA
     assert DayCount.from_name("ACT/360") == DayCount.ACT_360
-    assert DayCount.ACT_ACT_ISMA.year_fraction("2025-01-15", "2025-07-15", frequency="6M") == pytest.approx(0.5)
-    with pytest.raises(ValueError, match="not both"):
-        DayCount.ACT_360.year_fraction("2025-01-15", "2025-07-15", DayCountContext(), frequency="6M")
+    assert DayCount.ACT_ACT_ISMA.year_fraction(
+        "2025-01-15", "2025-07-15", DayCountContext(frequency="6M")
+    ) == pytest.approx(0.5)
 
     joint = HolidayCalendar("GBLO + nyse")
     assert joint.code == "gblo+nyse"

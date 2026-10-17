@@ -8,7 +8,7 @@ use crate::api::core::periods::JsFiscalConfig;
 use crate::utils::input::{js_epoch_days, js_int, js_string};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::dates::{
-    canonical_calendar_id, days_since_epoch as rust_days_since_epoch,
+    calendar_by_id_strict, days_since_epoch as rust_days_since_epoch,
     resolve_calendar as rust_resolve_calendar, BusinessDayConvention, DateExt, HolidayCalendar,
 };
 use wasm_bindgen::prelude::*;
@@ -138,7 +138,7 @@ impl JsBusinessDayConvention {
 pub struct JsHolidayCalendar {
     /// Resolved registry calendar (built-in or interned union).
     calendar: &'static dyn HolidayCalendar,
-    /// Canonical id (Rust `canonical_calendar_id`).
+    /// Canonical id (Rust `HolidayCalendar::calendar_id`).
     code: String,
 }
 
@@ -159,8 +159,12 @@ impl JsHolidayCalendar {
     #[wasm_bindgen(constructor)]
     pub fn new(code: JsValue) -> Result<JsHolidayCalendar, JsValue> {
         let code = js_string(&code, "code")?;
-        let calendar = rust_resolve_calendar(Some(&code)).map_err(to_js_err)?;
-        let code = canonical_calendar_id(&code).map_err(to_js_err)?;
+        let calendar = calendar_by_id_strict(&code).map_err(to_js_err)?;
+        let code = calendar.calendar_id().ok_or_else(|| {
+            to_js_err(finstack_quant_core::Error::Validation(format!(
+                "calendar '{code}' has no canonical id"
+            )))
+        })?;
         Ok(Self { calendar, code })
     }
 

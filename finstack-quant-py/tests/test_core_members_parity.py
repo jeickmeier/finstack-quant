@@ -44,10 +44,12 @@ def test_day_count_and_tenor_values_match_wasm() -> None:
     tenor = Tenor.parse("3M")
     assert str(tenor.unit) == "M"
     assert tenor.to_days_approx() == 91
-    assert Tenor("1M").add_to_date(dt.date(2025, 1, 31)) == dt.date(2025, 2, 28)
+    assert Tenor.parse("1M").add_to_date(dt.date(2025, 1, 31)) == dt.date(2025, 2, 28)
     # No convention: the Rust default (modified following) applies with a calendar.
-    assert Tenor("1M").add_to_date(dt.date(2025, 5, 31), "nyse") == dt.date(2025, 6, 30)
-    assert Tenor("6M").to_years_with_context(dt.date(2025, 1, 15), day_count=DayCount.ACT_360) == 0.5027777777777778
+    assert Tenor.parse("1M").add_to_date(dt.date(2025, 5, 31), "nyse") == dt.date(2025, 6, 30)
+    assert (
+        Tenor.parse("6M").to_years_with_context(dt.date(2025, 1, 15), day_count=DayCount.ACT_360) == 0.5027777777777778
+    )
 
 
 def test_day_count_context_round_trips_like_wasm() -> None:

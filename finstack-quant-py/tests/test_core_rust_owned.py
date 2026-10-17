@@ -115,8 +115,9 @@ def test_year_fractions_with_and_without_context_match_wasm() -> None:
         DayCount.ACT_365L.year_fraction(start, end)
     with _raises_exactly("Validation error: ACT/365L requires coupon frequency in DayCountContext"):
         DayCount.ACT_365L.signed_year_fraction(end, start)
-    assert DayCount.BUS_252.year_fraction(start, end, calendar="nyse") == 0.503968253968254
-    assert DayCount.BUS_252.signed_year_fraction(end, start, calendar="nyse") == -0.503968253968254
+    nyse = DayCountContext(calendar_id="nyse")
+    assert DayCount.BUS_252.year_fraction(start, end, nyse) == 0.503968253968254
+    assert DayCount.BUS_252.signed_year_fraction(end, start, nyse) == -0.503968253968254
 
 
 def test_day_count_context_rejects_a_zero_bus_basis_in_rust() -> None:

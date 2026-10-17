@@ -2601,15 +2601,6 @@ export interface DayCountConstructor {
    */
   nl365(): DayCount;
   /**
-   * Count the calendar days between two dates (epoch days), independent of the
-   * convention (Rust associated fn `DayCount::calendar_days`).
-   * @param startEpochDays - Start date as days since 1970-01-01.
-   * @param endEpochDays - End date as days since 1970-01-01.
-   * @returns Signed calendar-day count from start to end.
-   * @throws Error - Throws a JavaScript exception if either epoch-day value is non-finite, fractional, or outside the representable date range.
-   */
-  calendarDays(startEpochDays: number, endEpochDays: number): bigint;
-  /**
    * Act/360 day-count convention.
    * @returns A `DayCount` handle for this convention.
    */
@@ -8611,7 +8602,7 @@ export interface CoreNamespace {
    * @param month - Settlement month number, `1` through `12`.
    * @param year - Settlement year.
    * @returns The published date as epoch days, or `undefined` when the month is outside the embedded SIFMA calendar (dates are never approximated).
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12` or `year` is outside the supported date range.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12`.
    */
   sifmaSettlementDate(month: number, year: number): number | undefined;
   /**
@@ -8622,7 +8613,7 @@ export interface CoreNamespace {
    * @param year - Settlement year.
    * @param settlementClass - Agency-MBS settlement class whose date is requested.
    * @returns The published date as epoch days, or `undefined` when that month and class are outside the embedded SIFMA calendar.
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12` or `year` is outside the supported date range.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12`.
    */
   sifmaSettlementDateForClass(
     month: number,

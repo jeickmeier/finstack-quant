@@ -252,9 +252,7 @@ def main() -> None:
     args = parser.parse_args()
     outputs = {
         "currency_generated.rs": render_currency(currency_rows(CRATE_ROOT / "data/iso_4217.csv")),
-        WASM_CURRENCY_STATICS: render_wasm_currency_factories(
-            currency_rows(CRATE_ROOT / "data/iso_4217.csv")
-        ),
+        WASM_CURRENCY_STATICS: render_wasm_currency_factories(currency_rows(CRATE_ROOT / "data/iso_4217.csv")),
         "cny_generated.rs": render_cny(date_rows(CRATE_ROOT / "data/chinese_new_year.csv")),
         "festivals_generated.rs": render_festivals({
             name: date_rows(CRATE_ROOT / "data" / f"{name}.csv") for name in FESTIVAL_TABLES

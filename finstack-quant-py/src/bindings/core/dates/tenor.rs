@@ -105,33 +105,33 @@ fn extract_tenor_unit(obj: &Bound<'_, PyAny>) -> PyResult<TenorUnit> {
 /// A tenor such as ``3M``, ``1Y``, or ``2W``.
 ///
 /// Immutable, hashable value type combining a positive count and a
-/// ``TenorUnit``. The constructor accepts either a tenor string
-/// (``Tenor("3M")``, money-market aliases ``"ON"``/``"TN"``/``"SN"`` map to
-/// ``1D``) or a count plus unit (``Tenor(3, "M")``,
-/// ``Tenor(3, TenorUnit.MONTHS)``).
+/// ``TenorUnit``. The constructor takes a count plus unit (``Tenor(3, "M")``,
+/// ``Tenor(3, TenorUnit.MONTHS)``); ``Tenor.parse`` reads tenor strings
+/// (``"3M"``; money-market aliases ``"ON"``/``"TN"``/``"SN"`` map to ``1D``).
 ///
 /// Parameters
 /// ----------
-/// value : str | int
-///     Tenor string such as ``"3M"`` (``unit`` must then be omitted), or the
-///     positive integer count when ``unit`` is given.
-/// unit : TenorUnit | str | None
-///     Calendar unit for an integer ``value``; ``TenorUnit`` or a one-letter
-///     designator ``"D"``/``"W"``/``"M"``/``"Y"``.
+/// count : int
+///     Positive integer count.
+/// unit : TenorUnit | str
+///     Calendar unit; a ``TenorUnit`` or a one-letter designator
+///     ``"D"``/``"W"``/``"M"``/``"Y"``.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If the string does not parse, the count is zero, or the count exceeds
-///     the supported range for its unit (200 years).
+///     If the count is zero or exceeds the supported range for its unit
+///     (200 years).
 /// TypeError
-///     If ``value`` is neither ``str`` nor ``int``, or ``unit`` is supplied
-///     with a string ``value``.
+///     If ``count`` is not an ``int`` or ``unit`` is neither a ``TenorUnit``
+///     nor a unit letter.
+/// OverflowError
+///     If ``count`` is negative or exceeds the 32-bit range.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.core.dates import Tenor, TenorUnit
-/// >>> Tenor("3M") == Tenor(3, "M") == Tenor(3, TenorUnit.MONTHS)
+/// >>> Tenor.parse("3M") == Tenor(3, "M") == Tenor(3, TenorUnit.MONTHS)
 /// True
 #[pyclass(
     name = "Tenor",
@@ -156,34 +156,12 @@ impl PyTenor {
 
 #[pymethods]
 impl PyTenor {
-    /// Construct a tenor from a string (``"3M"``) or a count and unit
-    /// (``Tenor(3, "M")`` / ``Tenor(3, TenorUnit.MONTHS)``).
+    /// Construct a tenor from a positive count and a unit
+    /// (``Tenor(3, "M")`` / ``Tenor(3, TenorUnit.MONTHS)``); ``Tenor.parse``
+    /// reads tenor strings such as ``"3M"``.
     #[new]
-    #[pyo3(signature = (value, unit=None), text_signature = "(value, unit=None)")]
-    fn new(value: &Bound<'_, PyAny>, unit: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
-        if let Ok(s) = value.extract::<String>() {
-            if unit.is_some() {
-                return Err(pyo3::exceptions::PyTypeError::new_err(
-                    "Tenor(value: str) takes no unit; pass Tenor(count: int, unit) instead",
-                ));
-            }
-            return Tenor::parse(&s).map(Self::from_inner).map_err(core_to_py);
-        }
-        let count: u32 = value.extract().map_err(|_| {
-            pyo3::exceptions::PyTypeError::new_err(format!(
-                "expected a tenor string like '3M' or a positive integer count, got {}",
-                value
-                    .get_type()
-                    .name()
-                    .map(|n| n.to_string())
-                    .unwrap_or_default()
-            ))
-        })?;
-        let unit = unit.ok_or_else(|| {
-            pyo3::exceptions::PyTypeError::new_err(
-                "Tenor(count: int) requires a unit (TenorUnit or 'D'/'W'/'M'/'Y')",
-            )
-        })?;
+    #[pyo3(text_signature = "(count, unit)")]
+    fn new(count: u32, unit: &Bound<'_, PyAny>) -> PyResult<Self> {
         Tenor::new(count, extract_tenor_unit(unit)?)
             .map(Self::from_inner)
             .map_err(core_to_py)
@@ -428,13 +406,14 @@ impl PyTenor {
             .map_err(core_to_py)
     }
 
-    /// Support ``pickle`` by reconstructing through ``Tenor("<count><unit>")``.
+    /// Support ``pickle`` by reconstructing through ``Tenor.parse``.
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        Ok((py.get_type::<Self>().into_any(), (self.inner.to_string(),)))
+        let parse = py.get_type::<Self>().getattr("parse")?;
+        Ok((parse, (self.inner.to_string(),)))
     }
 
     fn __repr__(&self) -> String {
-        format!("Tenor('{}')", self.inner)
+        format!("Tenor.parse('{}')", self.inner)
     }
 
     fn __str__(&self) -> String {

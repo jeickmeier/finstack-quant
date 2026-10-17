@@ -919,11 +919,8 @@ fn core_daycount_dts_exposes_context_for_context_dependent_conventions() {
         day_count_ctor,
         "thirty360It(): DayCount;"
     ));
-    // `calendarDays` is static, like Rust `DayCount::calendar_days`.
-    assert!(contains_signature(
-        day_count_ctor,
-        "calendarDays(startEpochDays: number, endEpochDays: number): bigint;"
-    ));
+    // `calendarDays` was a host-only static; hosts subtract dates natively.
+    assert!(!day_count_ctor.contains("calendarDays("));
     assert!(!day_count.contains("calendarDays("));
     assert!(contains_ignoring_ws(
         &dts,

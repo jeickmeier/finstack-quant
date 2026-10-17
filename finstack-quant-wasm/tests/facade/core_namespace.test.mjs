@@ -72,11 +72,9 @@ test('core date integer widths match generated runtime types', () => {
   const start = core.createDate(2025, 1, 1);
   const end = core.createDate(2025, 1, 3);
   assert.ok(core.dateFromEpochDays(start) instanceof Int32Array);
-  // `calendarDays` is a static, like Rust `DayCount::calendar_days` and Python.
-  assert.equal(typeof core.DayCount.calendarDays, 'function');
-  assert.equal('calendarDays' in core.DayCount.act360(), false);
-  assert.equal(typeof core.DayCount.calendarDays(start, end), 'bigint');
-  assert.equal(core.DayCount.calendarDays(start, end), 2n);
+  // Hosts subtract epoch days natively; there is no `calendarDays` static.
+  assert.equal('calendarDays' in core.DayCount, false);
+  assert.equal(end - start, 2);
 });
 
 test('core date inputs reject truncation, wrapping and non-finite epoch days', () => {
@@ -99,7 +97,6 @@ test('core date inputs reject truncation, wrapping and non-finite epoch days', (
       assert.throws(() => dayCount.yearFraction(start, value));
       assert.throws(() => dayCount.signedYearFraction(value, end));
       assert.throws(() => dayCount.yearFraction(start, value, context));
-      assert.throws(() => core.DayCount.calendarDays(value, end));
       assert.throws(() => new core.DayCountContext(undefined, undefined, undefined, [value, end]));
       assert.throws(
         () => new core.DayCountContext(undefined, undefined, undefined, [start, value])
@@ -120,7 +117,6 @@ test('core date inputs reject truncation, wrapping and non-finite epoch days', (
     assert.equal(validBasis.busBasis, 252);
     validBasis.free();
     assert.deepEqual([...core.dateFromEpochDays(start)], [2025, 1, 1]);
-    assert.equal(core.DayCount.calendarDays(start, end), 2n);
   } finally {
     context.free();
     dayCount.free();
