@@ -801,7 +801,17 @@ run = [
   done
   """,
   "uv run --no-sync python scripts/check_schema_generation.py",
+  # The schema-contract nextest run below is skipped when `CI` is set: it compiles
+  # the whole workspace in the test profile (14 min on a 4-core runner) to run
+  # 141 tests in 30 s, and the Test Rust job already runs every one of them in
+  # `rust-test-cov` (`--workspace --lib --test '*'`) in the same workflow.
+  # Locally it stays on so `mise run gen-check` is a complete schema gate.
   """
+  set -eu
+  if [ -n "${CI:-}" ]; then
+    echo "CI: skipping schema-contract nextest run (covered by rust-test-cov in the Test Rust job)"
+    exit 0
+  fi
   cargo nextest run --no-fail-fast -E '\
     (binary_id(finstack-quant-analytics::analytics) & test(/schema_contract::/)) | \
     (binary_id(finstack-quant-covenants::covenants) & test(/schema_contract::/)) | \
