@@ -74,8 +74,7 @@ Everything below is re-exported by `instruments/mod.rs`; the module paths under
   `OptionGreeksRequest`; `MarketDependencies`, `InstrumentCurves`,
   `RatesCurveKind`, `FxPair`, `VolatilityDependency`; `TrsEngine`,
   `TrsReturnModel`, `TotalReturnLegParams`; `TrsScheduleSpec`;
-  `fx_spot_date_for_pair`, `add_joint_business_days`, `adjust_joint_calendar`,
-  `ResolvedCalendarPair`; and the `parameters` subset listed in
+  `fx_spot_date_for_pair`; and the `parameters` subset listed in
   `instruments/mod.rs` (`FixedLegSpec`, `FloatLegSpec`,
   `PremiumLegSpec`, `ProtectionLegSpec`, `FinancingLegSpec`,
   `TotalReturnLegSpec`, `PayReceive`,

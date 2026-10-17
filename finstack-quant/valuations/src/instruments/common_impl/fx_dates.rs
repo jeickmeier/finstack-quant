@@ -2,12 +2,10 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::fx::fx_spot_date;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, Tenor};
-use finstack_quant_core::Result;
-
-pub use finstack_quant_core::dates::{
-    add_joint_business_days, adjust_joint_calendar, ResolvedCalendarPair,
+use finstack_quant_core::dates::{
+    adjust, resolve_joint_calendar, BusinessDayConvention, Date, DateExt, Tenor,
 };
+use finstack_quant_core::Result;
 
 /// Roll a trade date to spot under the pair's contractual spot lag.
 ///
@@ -86,5 +84,6 @@ pub fn add_fx_standard_tenor(
     if preserve_eom {
         maturity = maturity.end_of_month();
     }
-    adjust_joint_calendar(maturity, business_day_convention, base_cal_id, quote_cal_id)
+    let calendar = resolve_joint_calendar(base_cal_id, quote_cal_id)?;
+    adjust(maturity, business_day_convention, calendar)
 }
