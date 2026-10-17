@@ -19,6 +19,12 @@
 cargo.binstall_native = true
 
 [tools]
+# `github:` rather than `aqua:`: the aqua registry resolves wasm-pack to the
+# x86_64 asset on Apple Silicon, which fails with "Bad CPU type"; the github
+# backend picks the aarch64-apple-darwin asset. Listed before `rust` so this
+# binary precedes `$CARGO_HOME/bin` on PATH: a `cargo install`ed wasm-pack must
+# not shadow the pinned one, or local `wasm-test` runs a different version than CI.
+"github:wasm-bindgen/wasm-pack" = "0.15.0"
 # Pin the active toolchain to an exact rustup name. A bare channel can make
 # parallel `cargo:*` installs race to fetch and rename the same download.
 # Nightly is also installed because cargo-public-api (used by
@@ -32,7 +38,6 @@ rust = [
 # the supply-chain gate and the wheel builder, and a floating pin lets CI go
 # red with no code change. Bump deliberately, one tool at a time.
 node = "24"
-"aqua:rustwasm/wasm-pack" = "0.15.0"
 "cargo:cargo-nextest" = "0.9.143"
 "cargo:cargo-llvm-cov" = "0.9.0"
 "cargo:cargo-deny" = "0.20.2"
@@ -616,10 +621,12 @@ run = "wasm-pack build finstack-quant-wasm --target web"
 [tasks.wasm-test]
 description = "Run WASM package tests (wasm-bindgen + Node facade) and the facade JSDoc sync check"
 # Facade builds use profile.wasm-test (opt-level 1, no LTO). Published packages
-# stay on wasm-build / wasm-pkg. The npm `test` script forwards
-# `-- --profile wasm-test` to the `cargo test` that wasm-pack runs, so the
-# wasm-bindgen test build and the two facade builds below share one set of
-# wasm32 artifacts instead of compiling the test profile as well.
+# stay on wasm-build / wasm-pkg. The npm `test` script passes `--profile
+# wasm-test` to wasm-pack, which forwards options after its own to the
+# `cargo build --tests` and `cargo test` it runs, so the wasm-bindgen test build
+# and the two facade builds below share one set of wasm32 artifacts instead of
+# compiling the test profile as well. Do not write it after `--`: wasm-pack
+# 0.15 hands everything after `--` to the test harness, which rejects it.
 run = [
   "npm --prefix finstack-quant-wasm run test",
   "wasm-pack build finstack-quant-wasm --target web --profile wasm-test --no-opt --out-dir pkg",
