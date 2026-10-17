@@ -2,8 +2,9 @@
 
 use super::types::*;
 use crate::bindings::core::dates::daycount::PyDayCount;
+use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::pandas_utils::{int_values_to_series, table_to_dataframe, values_to_series};
+use crate::bindings::pandas_utils::{int_values_to_series, values_to_series};
 use crate::errors::analytics_to_py;
 use finstack_quant_analytics as fa;
 use finstack_quant_core::dates::{FiscalConfig, HolidayCalendar, PeriodKind};
@@ -1312,7 +1313,7 @@ impl PyPerformance {
         let table = py
             .detach(|| self.inner.summary(risk_free_rate, confidence))
             .map_err(analytics_to_py)?;
-        table_to_dataframe(py, &table)?.call_method1("set_index", ("ticker",))
+        envelope_to_pandas(py, &table)?.call_method1("set_index", ("ticker",))
     }
 
     /// Serialize authoritative engine inputs (dates, returns, spans, benchmark,

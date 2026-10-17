@@ -331,7 +331,7 @@ impl PySimmSensitivities {
     /// currency, in whatever convention the caller supplied — SIMM does not
     /// re-scale these on ingest. ``from_dataframe`` accepts this frame back.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::table_to_dataframe(
+        crate::bindings::core::table::envelope_to_pandas(
             py,
             &self.inner.to_table().map_err(core_to_py)?,
         )

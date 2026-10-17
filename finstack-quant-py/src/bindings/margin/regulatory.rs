@@ -6,11 +6,12 @@
 
 use super::frame::{opt_str, records, req_bool, req_date, req_f64, req_str, sensitivity_rows};
 use super::types::{extract_netting_set_id, PyNettingSetId};
+use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::module_utils::parse_currency;
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
-    serde_to_py, table_to_dataframe, ColumnSchema,
+    serde_to_py, ColumnSchema,
 };
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_margin::regulatory::{
@@ -502,7 +503,7 @@ impl PyFrtbSensitivities {
     /// RRAO rows are gross notionals. ``from_dataframe`` accepts this frame
     /// back, DRC rows included.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        table_to_dataframe(py, &self.inner.to_table().map_err(core_to_py)?)
+        envelope_to_pandas(py, &self.inner.to_table().map_err(core_to_py)?)
     }
 
     /// Summarise the container by populated bucket counts.

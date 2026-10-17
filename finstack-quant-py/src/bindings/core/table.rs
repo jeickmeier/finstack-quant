@@ -203,6 +203,37 @@ impl PyArrowTable {
     }
 }
 
+/// A core table envelope as a `pandas.DataFrame`, through Arrow.
+pub(crate) fn envelope_to_pandas<'py>(
+    py: Python<'py>,
+    table: &TableEnvelope,
+) -> PyResult<Bound<'py, PyAny>> {
+    let arrow = Bound::new(py, PyArrowTable::from_envelope(table)?)?;
+    PyArrowTable::to_pandas(&arrow, py)
+}
+
+/// The named columns of `table`, renamed to their targets, as a `pandas.DataFrame`.
+pub(crate) fn selected_envelope_to_pandas<'py>(
+    py: Python<'py>,
+    table: &TableEnvelope,
+    selected_columns: &[(&str, &str)],
+) -> PyResult<Bound<'py, PyAny>> {
+    let columns = selected_columns
+        .iter()
+        .map(|(source, target)| {
+            let column = table
+                .column(source)
+                .ok_or_else(|| value_error(format!("missing required table column '{source}'")))?;
+            Ok(finstack_quant_core::table::TableColumn::new(
+                *target,
+                column.data.clone(),
+            ))
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+    let projected = TableEnvelope::new(columns).map_err(crate::errors::core_to_py)?;
+    envelope_to_pandas(py, &projected)
+}
+
 /// Build the `finstack_quant.core.table` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "table")?;

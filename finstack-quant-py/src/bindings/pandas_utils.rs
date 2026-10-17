@@ -1,7 +1,6 @@
 //! Shared helpers for constructing pandas DataFrames and Series from Rust data.
 
 use crate::bindings::date_utils::date_to_py;
-use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
 use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
@@ -243,85 +242,6 @@ pub fn dates_to_datetime_index<'py>(
     py.import("pandas")?
         .getattr("DatetimeIndex")?
         .call1((dates,))
-}
-
-/// Convert a table column into a Python list suitable for pandas construction.
-pub fn table_column_to_pylist<'py>(
-    py: Python<'py>,
-    column: &TableColumn,
-) -> PyResult<Bound<'py, PyAny>> {
-    let obj: Bound<'py, PyAny> = match &column.data {
-        TableColumnData::String(values) => PyList::new(py, values.iter().cloned())?.into_any(),
-        TableColumnData::NullableString(values) => {
-            PyList::new(py, values.iter().cloned())?.into_any()
-        }
-        TableColumnData::Float64(values) => PyArray1::from_vec(py, values.clone()).into_any(),
-        TableColumnData::NullableFloat64(values) => PyArray1::from_vec(
-            py,
-            values
-                .iter()
-                .map(|value| value.unwrap_or(f64::NAN))
-                .collect(),
-        )
-        .into_any(),
-        TableColumnData::UInt32(values) => PyArray1::from_vec(py, values.clone()).into_any(),
-        TableColumnData::NullableUInt32(values) => {
-            PyList::new(py, values.iter().copied())?.into_any()
-        }
-        TableColumnData::Int64(values) => PyArray1::from_vec(py, values.clone()).into_any(),
-        TableColumnData::NullableInt64(values) => {
-            PyList::new(py, values.iter().copied())?.into_any()
-        }
-    };
-    Ok(obj)
-}
-
-/// Build a pandas DataFrame from every column in a table envelope.
-pub fn table_to_dataframe<'py>(
-    py: Python<'py>,
-    table: &TableEnvelope,
-) -> PyResult<Bound<'py, PyAny>> {
-    if table.row_count == 0 {
-        let schema: Vec<ColumnSchema<'_>> = table
-            .columns
-            .iter()
-            .map(|column| {
-                let dtype = match &column.data {
-                    TableColumnData::String(_) | TableColumnData::NullableString(_) => "str",
-                    TableColumnData::Float64(_) | TableColumnData::NullableFloat64(_) => "float64",
-                    TableColumnData::UInt32(_) => "uint32",
-                    TableColumnData::NullableUInt32(_) => "UInt32",
-                    TableColumnData::Int64(_) => "int64",
-                    TableColumnData::NullableInt64(_) => "Int64",
-                };
-                (column.name.as_str(), dtype)
-            })
-            .collect();
-        return empty_typed_frame(py, &schema);
-    }
-    let columns = PyDict::new(py);
-    for column in &table.columns {
-        columns.set_item(column.name.as_str(), table_column_to_pylist(py, column)?)?;
-    }
-    dict_to_dataframe(py, &columns, None)
-}
-
-/// Build a pandas DataFrame from a selected set of table columns.
-///
-/// Each tuple is `(source_column_name, pandas_column_name)`.
-pub fn selected_table_to_dataframe<'py>(
-    py: Python<'py>,
-    table: &TableEnvelope,
-    selected_columns: &[(&str, &str)],
-) -> PyResult<Bound<'py, PyAny>> {
-    let columns = PyDict::new(py);
-    for (source, target) in selected_columns {
-        let column = table.column(source).ok_or_else(|| {
-            crate::errors::value_error(format!("missing required table column '{source}'"))
-        })?;
-        columns.set_item(*target, table_column_to_pylist(py, column)?)?;
-    }
-    dict_to_dataframe(py, &columns, None)
 }
 
 /// Convert any `Serialize` value into a Python object via its canonical JSON

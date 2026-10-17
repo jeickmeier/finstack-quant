@@ -1,9 +1,8 @@
 //! Typed Python wrappers for statement-analysis configs and root results.
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::pandas_utils::{
-    serde_rows_to_dataframe_with_schema, table_to_dataframe, ColumnSchema,
-};
+use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::errors::{core_to_py, display_to_py, serde_json_to_py, statements_to_py};
 use finstack_quant_core::dates::PeriodId;
@@ -1178,7 +1177,7 @@ impl PyScenarioResults {
         metrics: Vec<String>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let table = self.comparison_table(&metrics)?;
-        table_to_dataframe(py, &table)
+        envelope_to_pandas(py, &table)
     }
 }
 

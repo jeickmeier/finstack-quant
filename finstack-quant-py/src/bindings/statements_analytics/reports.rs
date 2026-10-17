@@ -6,10 +6,9 @@
 //! that renders to text, a table envelope, or a pandas frame from one Rust
 //! implementation. The `*_text` twins remain for WASM parity.
 
+use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::extract::extract_results_ref;
-use crate::bindings::pandas_utils::{
-    serde_rows_to_dataframe_with_schema, table_to_dataframe, ColumnSchema,
-};
+use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::evaluator::StatementResult;
@@ -341,7 +340,7 @@ impl PyPLSummaryReport {
     /// the line-items-by-periods layout of the text report.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let table = self.report().to_table().map_err(core_to_py)?;
-        table_to_dataframe(py, &table)
+        envelope_to_pandas(py, &table)
     }
 
     fn __str__(&self) -> String {
