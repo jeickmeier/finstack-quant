@@ -31,7 +31,6 @@
 //! | Output | Implied volatility — lognormal (Black) for β>0, **normal (Bachelier)** for β≈0; see `SabrParameters::quote_convention` | Decimal (0.20 = 20%) / absolute rate units |
 
 mod calibration;
-mod expansion;
 mod model;
 mod parameters;
 mod smile;
