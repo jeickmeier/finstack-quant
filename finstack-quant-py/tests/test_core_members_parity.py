@@ -41,7 +41,7 @@ def test_rate_family_values_match_wasm() -> None:
 
 
 def test_day_count_and_tenor_values_match_wasm() -> None:
-    assert str(DayCount.parse("Act/Act ICMA")) == "act_act_isma"
+    assert str(DayCount.from_name("Act/Act ICMA")) == "act_act_isma"
     assert str(DayCount.NL_365) == "nl_365"
     tenor = Tenor.parse("3M")
     assert str(tenor.unit) == "M"

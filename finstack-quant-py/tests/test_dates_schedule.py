@@ -277,9 +277,8 @@ def test_tenor_constructor_forms_and_context_helpers() -> None:
     with pytest.raises(TypeError):
         Tenor(3)
 
-    assert DayCount.parse("ACT/ACT ICMA") == DayCount.ACT_ACT_ISMA
-    with pytest.raises(ValueError, match="act_360"):
-        DayCount.from_name("ACT/360")
+    assert DayCount.from_name("ACT/ACT ICMA") == DayCount.ACT_ACT_ISMA
+    assert DayCount.from_name("ACT/360") == DayCount.ACT_360
     assert DayCount.ACT_ACT_ISMA.year_fraction("2025-01-15", "2025-07-15", frequency="6M") == pytest.approx(0.5)
     with pytest.raises(ValueError, match="not both"):
         DayCount.ACT_360.year_fraction("2025-01-15", "2025-07-15", DayCountContext(), frequency="6M")

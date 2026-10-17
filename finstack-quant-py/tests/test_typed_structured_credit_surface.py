@@ -599,7 +599,7 @@ def _typed_deal_from_golden(spec: dict) -> StructuredCredit:
                 _money(row["balance"]),
                 row["rate"],
                 _date(row["maturity"]),
-                day_count=DayCount.parse(row["day_count"]),
+                day_count=DayCount.from_name(row["day_count"]),
                 spread_bp=row.get("spread_bp"),
                 forward_curve_id=row.get("forward_curve_id"),
                 rating=row.get("rating"),
@@ -648,7 +648,7 @@ def _typed_deal_from_golden(spec: dict) -> StructuredCredit:
             .deferred_interest(_money(row["deferred_interest"]))
             .maturity(_date(row["maturity"]))
             .frequency(_tenor(row["frequency"]))
-            .day_count(DayCount.parse(row["day_count"]))
+            .day_count(DayCount.from_name(row["day_count"]))
             .pik_enabled(row.get("pik_enabled", False))
             .attributes(row["attributes"])
         )

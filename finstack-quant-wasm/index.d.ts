@@ -2487,8 +2487,8 @@ export interface BpsConstructor {
  * - `30_360_it` (Italian) → `DayCount.thirty360It`
  * - `bus_252` → `DayCount.bus252`
  *
- * Term-sheet spellings such as `"ACT/360"` or `"30/360 ISDA"` go through the
- * lenient `DayCount.parse`.
+ * Term-sheet spellings such as `"ACT/360"` or `"30/360 ISDA"` are
+ * accepted by `fromName`.
  *
  * @example
  * ```javascript
@@ -2567,8 +2567,8 @@ export interface DayCount extends WasmOwned {
  * - `30_360_it` (Italian) → `DayCount.thirty360It`
  * - `bus_252` → `DayCount.bus252`
  *
- * Term-sheet spellings such as `"ACT/360"` or `"30/360 ISDA"` go through the
- * lenient `DayCount.parse`.
+ * Term-sheet spellings such as `"ACT/360"` or `"30/360 ISDA"` are
+ * accepted by `fromName`.
  *
  * @example
  * ```javascript
@@ -2583,7 +2583,7 @@ export interface DayCount extends WasmOwned {
  */
 export interface DayCountConstructor {
   /**
-   * JavaScript prototype of `DayCount`; instances come from `fromName`, `parse` and the named factories, not `new`.
+   * JavaScript prototype of `DayCount`; instances come from `fromName` and the named factories, not `new`.
    */
   readonly prototype: DayCount;
   /**
@@ -2592,23 +2592,9 @@ export interface DayCountConstructor {
    *
    * @param name - Canonical snake_case convention name, for example `"act_360"`, `"30_360"` or `"act_act"` (see the class list).
    * @returns The matching `DayCount`.
-   * @throws `TypeError` if `name` is not a string; `FinstackError` (kind `validation`) if it is not a canonical convention name. Use `DayCount.parse` for term-sheet spellings.
+   * @throws `TypeError` if `name` is not a string; `FinstackError` (kind `validation`) if no convention matches. Case, spaces, `/` and `-` are normalised, so term-sheet spellings such as `"ACT/360"` or `"Act/Act ICMA"` are accepted.
    */
   fromName(name: string): DayCount;
-  /**
-   * Parse a convention leniently (Rust `DayCount::parse`): case, spaces,
-   * `/` and `-` are normalised, so term-sheet spellings such as
-   * `"ACT/360"`, `"Act/Act ICMA"` or `"30E/360 ISDA"` are accepted.
-   *
-   * @example
-   * ```javascript
-   * core.DayCount.parse("Act/Act ICMA").toString();  // "act_act_isma"
-   * ```
-   * @param s - Convention text in canonical or term-sheet spelling.
-   * @returns The matching `DayCount`.
-   * @throws `TypeError` if `s` is not a string; `FinstackError` (kind `validation`) if no convention matches.
-   */
-  parse(s: string): DayCount;
   /**
    * No-Leap/365: actual days excluding February 29, over 365.
    * @returns A `DayCount` handle for this convention.

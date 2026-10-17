@@ -210,7 +210,7 @@ impl std::str::FromStr for StubKind {
     type Err = crate::Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match s.trim().to_ascii_lowercase().as_str() {
             "none" => Ok(StubKind::None),
             "short_front" => Ok(StubKind::ShortFront),
             "short_back" => Ok(StubKind::ShortBack),

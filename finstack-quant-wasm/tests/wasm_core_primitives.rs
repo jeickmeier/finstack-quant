@@ -61,9 +61,9 @@ fn thirty_e_360_isda_uses_termination_context() {
 fn daycount_from_string() {
     let day_count = JsDayCount::from_name(JsValue::from("act_360")).expect("valid");
     assert_eq!(day_count.to_string(), "act_360");
-    let lenient = JsDayCount::parse(JsValue::from("ACT/360")).expect("lenient");
+    let lenient = JsDayCount::from_name(JsValue::from("ACT/360")).expect("lenient");
     assert_eq!(lenient.to_string(), "act_360");
-    assert!(JsDayCount::from_name(JsValue::from("ACT/360")).is_err());
+    assert!(JsDayCount::from_name(JsValue::from("nope")).is_err());
 }
 
 #[wasm_bindgen_test]

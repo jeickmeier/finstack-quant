@@ -53,7 +53,7 @@ pub(crate) fn extract_day_count(obj: &Bound<'_, PyAny>) -> PyResult<DayCount> {
         return Ok(day_count.inner);
     }
     if let Ok(s) = obj.extract::<String>() {
-        return DayCount::parse(&s).map_err(core_to_py);
+        return s.parse::<DayCount>().map_err(core_to_py);
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
         "expected DayCount or str",
@@ -177,36 +177,15 @@ impl PyDayCount {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``name`` is not one of the canonical names; the message lists
-    ///     them. Use ``DayCount.parse`` for term-sheet spellings.
+    ///     If no spelling matches; the message lists the canonical names.
+    ///     Case, spaces, ``/`` and ``-`` are normalised, so term-sheet
+    ///     spellings such as ``"ACT/360"`` or ``"Act/Act ICMA"`` are accepted.
     #[classmethod]
     #[pyo3(text_signature = "(cls, name)")]
     fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
         name.parse::<DayCount>()
             .map(Self::from_inner)
             .map_err(core_to_py)
-    }
-
-    /// Leniently parse a day-count label as written on term sheets.
-    ///
-    /// Case-insensitive; ``/``, ``-`` and spaces are treated as ``_``, and
-    /// the market spellings ``"ACT/ACT ICMA"``, ``"ACT/ACT ISDA"``,
-    /// ``"ACT/365"``, ``"30/360"``, ``"30E/360 ISDA"`` are recognised.
-    ///
-    /// Parameters
-    /// ----------
-    /// s : str
-    ///     Day-count label (``"ACT/360"``, ``"Act/Act ICMA"``, or any
-    ///     canonical name).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If no spelling matches; the message lists the canonical names.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, s)")]
-    fn parse(_cls: &Bound<'_, PyType>, s: &str) -> PyResult<Self> {
-        DayCount::parse(s).map(Self::from_inner).map_err(core_to_py)
     }
 
     /// Compute the year fraction between two dates under this convention.

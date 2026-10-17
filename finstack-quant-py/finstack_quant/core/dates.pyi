@@ -359,7 +359,9 @@ class DayCount:
         -------
         DayCount
 
-            Day-count convention corresponding to the exact canonical lowercase name.
+            Day-count convention for the name; case, spaces, ``/`` and ``-`` are
+            normalised, so term-sheet spellings such as ``"ACT/360"`` or
+            ``"Act/Act ICMA"`` are accepted.
 
         Raises
         ------
@@ -374,41 +376,6 @@ class DayCount:
         >>> DayCount.from_name("act_act_afb") == DayCount.ACT_ACT_AFB
         True
         >>> DayCount.from_name("30_360_it") == DayCount.THIRTY_360_IT
-        True
-
-        """
-        ...
-
-    @classmethod
-    def parse(cls, s: str) -> DayCount:
-        """
-        Leniently parse a day-count label as written on term sheets.
-
-        Case-insensitive; ``/``, ``-`` and spaces are treated as ``_``, and
-        the market spellings ``"ACT/ACT ICMA"``, ``"ACT/ACT ISDA"``,
-        ``"ACT/365"``, ``"30/360"`` and ``"30E/360 ISDA"`` are recognised.
-        Use :meth:`from_name` for strict canonical names.
-
-        Parameters
-        ----------
-        s : str
-            Day-count label such as ``"ACT/360"``, ``"Act/Act ICMA"`` or
-            any canonical snake_case name.
-
-        Returns
-        -------
-        DayCount
-            The matching convention.
-
-        Raises
-        ------
-        ValueError
-            If no spelling matches; the message lists the canonical names.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.dates import DayCount
-        >>> DayCount.parse("ACT/ACT ICMA") == DayCount.ACT_ACT_ISMA
         True
 
         """

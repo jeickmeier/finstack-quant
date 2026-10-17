@@ -239,36 +239,13 @@ impl JsDayCount {
     ///
     /// @returns The matching `DayCount`.
     /// @throws `TypeError` if `name` is not a string; `FinstackError` (kind
-    /// `validation`) if it is not a canonical convention name. Use
-    /// `DayCount.parse` for term-sheet spellings.
+    /// `validation`) if no convention matches. Case, spaces, `/` and `-` are
+    /// normalised, so term-sheet spellings such as `"ACT/360"` or
+    /// `"Act/Act ICMA"` are accepted.
     #[wasm_bindgen(js_name = fromName)]
     pub fn from_name(name: JsValue) -> Result<JsDayCount, JsValue> {
         let name: &str = &js_string(&name, "name")?;
         name.parse::<RustDayCount>()
-            .map(|inner| JsDayCount { inner })
-            .map_err(to_js_err)
-    }
-
-    /// Parse a convention leniently (Rust `DayCount::parse`): case, spaces,
-    /// `/` and `-` are normalised, so term-sheet spellings such as
-    /// `"ACT/360"`, `"Act/Act ICMA"` or `"30E/360 ISDA"` are accepted.
-    ///
-    /// # Arguments
-    ///
-    /// * `s` - Convention text in canonical or term-sheet spelling.
-    ///
-    /// @returns The matching `DayCount`.
-    /// @throws `TypeError` if `s` is not a string; `FinstackError` (kind
-    /// `validation`) if no convention matches.
-    ///
-    /// @example
-    /// ```javascript
-    /// core.DayCount.parse("Act/Act ICMA").toString();  // "act_act_isma"
-    /// ```
-    #[wasm_bindgen(js_name = parse)]
-    pub fn parse(s: JsValue) -> Result<JsDayCount, JsValue> {
-        let s: &str = &js_string(&s, "s")?;
-        RustDayCount::parse(s)
             .map(|inner| JsDayCount { inner })
             .map_err(to_js_err)
     }
@@ -971,7 +948,7 @@ mod tests {
     fn daycount_nl365_factory_and_lenient_parse() {
         assert_eq!(JsDayCount::nl365().to_string(), "nl_365");
         assert_eq!(
-            RustDayCount::parse("Act/Act ICMA").expect("lenient"),
+            "Act/Act ICMA".parse::<RustDayCount>().expect("lenient"),
             RustDayCount::ActActIsma
         );
         assert!("ACT/360".parse::<RustDayCount>().is_err());
