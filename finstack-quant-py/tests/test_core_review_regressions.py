@@ -5,10 +5,10 @@ from decimal import Decimal
 
 import numpy as np
 import pytest
-from finstack_quant.models.volatility import get_surface_vol
 
 from finstack_quant.core.market_data import MarketContext, ScalarTimeSeries, VolSurface
 from finstack_quant.models.correlation import validate_correlation_matrix
+from finstack_quant.models.volatility import get_surface_vol
 
 
 def test_decimal_precision_cannot_bypass_exact_float_validation() -> None:

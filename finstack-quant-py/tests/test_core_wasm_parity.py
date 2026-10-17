@@ -40,8 +40,8 @@ from finstack_quant.core.market_data import (
     VolSurface,
 )
 from finstack_quant.core.math import linalg, special_functions, stats
-from finstack_quant.models import volatility
 from finstack_quant.core.money import Money
+from finstack_quant.models import volatility
 
 GOLDEN = Path(__file__).parent / "data" / "core_wasm_parity.json"
 
