@@ -616,7 +616,10 @@ run = "wasm-pack build finstack-quant-wasm --target web"
 [tasks.wasm-test]
 description = "Run WASM package tests (wasm-bindgen + Node facade) and the facade JSDoc sync check"
 # Facade builds use profile.wasm-test (opt-level 1, no LTO). Published packages
-# stay on wasm-build / wasm-pkg.
+# stay on wasm-build / wasm-pkg. The npm `test` script forwards
+# `-- --profile wasm-test` to the `cargo test` that wasm-pack runs, so the
+# wasm-bindgen test build and the two facade builds below share one set of
+# wasm32 artifacts instead of compiling the test profile as well.
 run = [
   "npm --prefix finstack-quant-wasm run test",
   "wasm-pack build finstack-quant-wasm --target web --profile wasm-test --no-opt --out-dir pkg",
