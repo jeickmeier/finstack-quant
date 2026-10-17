@@ -522,7 +522,7 @@ uv run python scripts/check_python_materialization_regressions.py compare \
 description = "Build dev Python bindings, then run fast Python tests"
 run = """
 mise run python-build
-uv run --no-sync pytest -v -m 'not slow'
+uv run --no-sync pytest -v -n auto -m 'not slow'
 """
 
 [tasks.python-test-file]
@@ -534,14 +534,14 @@ run = 'uv run --no-sync pytest -q "${usage_test?}"'
 description = "Build dev Python bindings, then run slow Python tests"
 run = """
 mise run python-build
-uv run --no-sync pytest -v -m slow
+uv run --no-sync pytest -v -n auto -m slow
 """
 
 [tasks.python-test-all]
 description = "Build dev Python bindings, then run the full Python test suite"
 run = """
 mise run python-build
-uv run --no-sync pytest -v
+uv run --no-sync pytest -v -n auto
 """
 
 [tasks.python-test-cov]
@@ -549,7 +549,7 @@ description = "Build dev Python bindings, then run Python tests with HTML and So
 run = """
 mkdir -p coverage/python
 mise run python-build
-uv run --no-sync pytest -v --cov=finstack-quant-py/finstack_quant --cov-report=term-missing --cov-report=html:target/python-cov --cov-report=xml:coverage/python/coverage.xml
+uv run --no-sync pytest -v -n auto --cov=finstack-quant-py/finstack_quant --cov-report=term-missing --cov-report=html:target/python-cov --cov-report=xml:coverage/python/coverage.xml
 echo "Cobertura report: coverage/python/coverage.xml"
 """
 
