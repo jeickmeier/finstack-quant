@@ -3,8 +3,8 @@
 Pure presentation — reads pre-computed ``*_var_decomposition`` /
 ``*_es_decomposition`` / ``evaluate_risk_budget`` results and lays them out.
 Risk shares come from the engine: ``relative_var`` on each
-``PositionRiskDecomposition.var_contributions`` row and ``pct_contribution`` on
-each ES contribution; no calculation here.
+``PositionRiskDecomposition.var_contributions`` row and ``relative_es`` on each
+``es_contributions`` row; no calculation here.
 
 Examples:
 --------
@@ -67,7 +67,7 @@ def _section_contributions(decomp: dict[str, Any], theme: Theme) -> Section | No
 
 
 def _section_es(es: dict[str, Any] | None) -> Section | None:
-    raw_contribs = (es or {}).get("es_contributions") or (es or {}).get("contributions") or []
+    raw_contribs = (es or {}).get("es_contributions") or []
     contribs = [c for c in raw_contribs if isinstance(c, dict)]
     if not contribs:
         return None
@@ -77,7 +77,7 @@ def _section_es(es: dict[str, Any] | None) -> Section | None:
         {
             "Position": c.get("position_id") or "·",
             "Component ES": fmt.money(c.get("component_es")),
-            "% of Total": _pct(c.get("relative_es") if c.get("relative_es") is not None else c.get("pct_contribution")),
+            "% of Total": _pct(c.get("relative_es")),
         }
         for c in contribs
     ]
@@ -127,7 +127,9 @@ def portfolio_risk_tearsheet(
         A ``parametric_/historical_var_decomposition`` result (typed, dict or
         JSON); its ``var_contributions`` feed the VaR-contributions section.
     es : dict | str, optional
-        A ``*_es_decomposition`` result; enables the ES-contributions section.
+        A ``PositionRiskDecomposition`` (typed, dict or JSON) whose
+        ``es_contributions`` feed the ES-contributions section; usually the
+        same object as ``decomposition``.
     budget : dict | str, optional
         An ``evaluate_risk_budget`` result; enables the risk-budget section.
     title : str, optional

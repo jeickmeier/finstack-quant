@@ -991,7 +991,7 @@ pub(super) fn solve_alpha_for_atm(
     let mut last_error = f64::INFINITY;
     for _ in 0..MAX_ITER {
         let params = SabrParameters::new(alpha, beta, nu, rho)?;
-        let model_vol = params.atm_volatility(forward, time_to_expiry)?;
+        let model_vol = params.implied_volatility(forward, forward, time_to_expiry)?;
 
         let error = model_vol - target_atm_vol;
         last_error = error;
@@ -1002,7 +1002,7 @@ pub(super) fn solve_alpha_for_atm(
         // Numerical derivative for Newton step
         let bump = alpha * 1e-6;
         let params_bumped = SabrParameters::new(alpha + bump, beta, nu, rho)?;
-        let vol_bumped = params_bumped.atm_volatility(forward, time_to_expiry)?;
+        let vol_bumped = params_bumped.implied_volatility(forward, forward, time_to_expiry)?;
 
         let d_vol_d_alpha = (vol_bumped - model_vol) / bump;
         if d_vol_d_alpha.abs() < 1e-14 {
@@ -1262,7 +1262,7 @@ mod acceptance_tests {
 
         let pinned_atm = pinned_first
             .parameters
-            .atm_volatility(forward, time_to_expiry)
+            .implied_volatility(forward, forward, time_to_expiry)
             .expect("pinned ATM volatility");
         assert!((pinned_atm - atm_vol).abs() <= calibrator.tolerance);
     }

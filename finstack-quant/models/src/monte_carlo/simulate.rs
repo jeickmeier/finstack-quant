@@ -463,7 +463,8 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
         )
     {
         return Err(Error::Validation(format!(
-            "fbm applies only to processes 'rough_bergomi' and 'cheyette_rough', which consume              fractional noise; process '{}' does not",
+            "fbm applies only to processes 'rough_bergomi' and 'cheyette_rough', which consume \
+             fractional noise; process '{}' does not",
             spec.process.tag()
         )));
     }
@@ -669,7 +670,8 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
                     .any(|(x, forward)| x.to_bits() != forward.to_bits())
             {
                 return Err(Error::Validation(format!(
-                    "process 'lmm' needs initial_state to equal the initial_forwards parameter                      {:?}, got {x0:?}",
+                    "process 'lmm' needs initial_state to equal the initial_forwards parameter \
+                     {:?}, got {x0:?}",
                     p.initial_forwards
                 )));
             }
@@ -706,7 +708,8 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
                 }
                 if variance.to_bits() != p.v0.to_bits() {
                     return Err(Error::Validation(format!(
-                        "process 'rough_heston' needs initial_state[1] to equal the v0                          parameter {}, got {variance}",
+                        "process 'rough_heston' needs initial_state[1] to equal the v0 \
+                         parameter {}, got {variance}",
                         p.v0
                     )));
                 }

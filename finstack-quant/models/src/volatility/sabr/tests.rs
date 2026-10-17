@@ -14,24 +14,53 @@ fn test_sabr_parameters_validation() {
 }
 
 #[test]
-fn test_sabr_atm_volatility() {
+fn test_sabr_atm_implied_volatility_matches_hagan_eq_2_18() {
+    let (alpha, beta, nu, rho) = (0.2, 0.5, 0.3, -0.1);
+    let model =
+        SabrParameters::new(alpha, beta, nu, rho).expect("SABR parameters should be valid in test");
+
+    let forward: f64 = 100.0;
+    let time_to_expiry = 1.0;
+
+    let f_beta = forward.powf(1.0 - beta);
+    let expected = alpha / f_beta
+        * (1.0
+            + time_to_expiry
+                * ((1.0 - beta).powi(2) / 24.0 * alpha * alpha / (f_beta * f_beta)
+                    + 0.25 * rho * beta * nu * alpha / f_beta
+                    + (2.0 - 3.0 * rho * rho) / 24.0 * nu * nu));
+
+    let atm_vol = model
+        .implied_volatility(forward, forward, time_to_expiry)
+        .expect("ATM volatility calculation should succeed in test");
+    assert!(
+        (atm_vol - expected).abs() < 1e-14,
+        "ATM vol {atm_vol} must equal Hagan eq. 2.18 {expected}"
+    );
+}
+
+#[test]
+fn test_sabr_validate_inputs_names_the_non_finite_input() {
     let model =
         SabrParameters::new(0.2, 0.5, 0.3, -0.1).expect("SABR parameters should be valid in test");
 
-    let forward = 100.0;
-    let time_to_expiry = 1.0;
+    let err = model
+        .implied_volatility(f64::NAN, 100.0, 1.0)
+        .expect_err("NaN forward must be rejected")
+        .to_string();
+    assert!(
+        err.contains("forward and strike must be finite") && !err.contains("time_to_expiry"),
+        "non-finite forward must be reported as such, got: {err}"
+    );
 
-    let atm_vol = model
-        .atm_volatility(forward, time_to_expiry)
-        .expect("ATM volatility calculation should succeed in test");
-
-    assert!(atm_vol > 0.0);
-
-    // For ATM, implied vol should match ATM vol
-    let implied_vol = model
-        .implied_volatility(forward, forward, time_to_expiry)
-        .expect("Volatility calculation should succeed in test");
-    assert!((implied_vol - atm_vol).abs() < 1e-10);
+    let err = model
+        .implied_volatility(100.0, 100.0, -1.0)
+        .expect_err("negative expiry must be rejected")
+        .to_string();
+    assert!(
+        err.contains("time_to_expiry must be positive"),
+        "bad expiry must be reported as such, got: {err}"
+    );
 }
 
 #[test]
@@ -718,7 +747,7 @@ fn test_sabr_implied_volatility_rejects_nonpositive_time_to_expiry() {
 ///
 /// Failure mode under test (the deleted `test_sabr_nu_zero_short_circuit_*`
 /// asserted the *opposite*, incorrect behavior): the old code short-circuited
-/// `implied_volatility` to `atm_volatility` for *every* strike whenever
+/// `implied_volatility` to the ATM vol for *every* strike whenever
 /// `nu.abs() < 1e-14`, fabricating a perfectly flat smile. For β≠1 the SABR/CEV
 /// smile is genuinely non-flat: `factor1 = α/(f_mid^(1-β)·correction)` depends
 /// on the strike through `f_mid`, and the z/χ(z) ratio is a well-defined limit
@@ -751,15 +780,6 @@ fn test_sabr_nu_zero_smile_is_non_flat_for_beta_half() {
     assert!(
         (vol_itm - vol_atm).abs() > 1e-4 && (vol_atm - vol_otm).abs() > 1e-4,
         "ν→0 smile must vary strike-to-strike: itm={vol_itm}, atm={vol_atm}, otm={vol_otm}"
-    );
-
-    // The ν→0 ATM point still coincides with `atm_volatility` (true ATM degeneracy).
-    let atm_direct = model
-        .atm_volatility(forward, expiry)
-        .expect("ATM vol should compute");
-    assert!(
-        (vol_atm - atm_direct).abs() < 1e-10,
-        "ATM strike should still match atm_volatility: {vol_atm} vs {atm_direct}"
     );
 }
 
@@ -805,23 +825,14 @@ fn test_sabr_beta_zero_time_correction_is_vol_of_vol_only() {
          (no α²/(24·f_mid²) leverage term): got {off_atm:.15}, expected 0.011934131358503"
     );
 
-    // ATM: locks the β=0 branch of `atm_volatility`.
+    // ATM: locks the β=0 branch at K = F.
     let atm = model
-        .atm_volatility(forward, expiry)
+        .implied_volatility(forward, forward, expiry)
         .expect("β=0 ATM vol should compute");
     assert!(
         (atm - 0.012_117_500_000_000).abs() < 1e-12,
         "β=0 ATM normal-SABR time correction is vol-of-vol only: \
          got {atm:.15}, expected 0.012117500000000"
-    );
-
-    // The off-ATM β=0 path and `atm_volatility` must agree at the ATM strike.
-    let at_strike = model
-        .implied_volatility(forward, forward, expiry)
-        .expect("β=0 ATM-strike vol should compute");
-    assert!(
-        (at_strike - atm).abs() < 1e-12,
-        "β=0 ATM-strike implied vol {at_strike} must match atm_volatility {atm}"
     );
 }
 
@@ -842,7 +853,7 @@ fn test_sabr_beta_zero_nu_zero_is_flat_bachelier_alpha() {
     for &forward in &[0.02_f64, 0.03, 0.05] {
         for &expiry in &[0.5_f64, 2.0, 10.0] {
             let atm = model
-                .atm_volatility(forward, expiry)
+                .implied_volatility(forward, forward, expiry)
                 .expect("β=0,ν=0 ATM vol should compute");
             assert!(
                 (atm - alpha).abs() < 1e-12,
@@ -875,7 +886,7 @@ fn test_solve_alpha_for_atm_round_trips_target_vol() {
 
     let original = SabrParameters::new(original_alpha, beta, nu, rho).expect("valid params");
     let target_atm = original
-        .atm_volatility(forward, time_to_expiry)
+        .implied_volatility(forward, forward, time_to_expiry)
         .expect("ATM vol should compute");
 
     let solved_alpha =
@@ -885,7 +896,7 @@ fn test_solve_alpha_for_atm_round_trips_target_vol() {
     let solved =
         SabrParameters::new(solved_alpha, beta, nu, rho).expect("solved params should be valid");
     let solved_atm = solved
-        .atm_volatility(forward, time_to_expiry)
+        .implied_volatility(forward, forward, time_to_expiry)
         .expect("ATM vol should compute");
 
     assert!((solved_alpha - original_alpha).abs() < 1e-8);
@@ -938,7 +949,7 @@ fn test_sabr_calibrate_with_atm_pinning_matches_synthetic_smile() {
         .expect("ATM strike should be present");
     let atm_market = market_vols[atm_idx];
     let calibrated_atm = prepared_model
-        .atm_volatility(forward, expiry)
+        .implied_volatility(forward, forward, expiry)
         .expect("ATM vol should compute");
     assert!((calibrated_atm - atm_market).abs() < 1e-8);
 
@@ -983,7 +994,7 @@ fn test_sabr_beta_zero_calibrates_negative_cross_zero_forward() {
 
     let atm_market = market_vols[2];
     let calibrated_atm = prepared_model
-        .atm_volatility(forward, expiry)
+        .implied_volatility(forward, forward, expiry)
         .expect("ATM normal vol should compute");
     assert!(
         (calibrated_atm - atm_market).abs() < 1e-8,
@@ -1048,7 +1059,7 @@ fn test_sabr_strike_from_delta_half_delta_is_delta_neutral_strike() {
     let forward = 100.0;
     let expiry = 1.0;
     let atm_vol = model
-        .atm_volatility(forward, expiry)
+        .implied_volatility(forward, forward, expiry)
         .expect("ATM vol should compute");
     let smile = SabrSmile::new(model, forward, expiry);
 
@@ -1078,7 +1089,7 @@ fn test_sabr_strike_from_delta_round_trip_at_25_delta() {
     let forward = 100.0;
     let expiry = 1.0;
     let atm_vol = model
-        .atm_volatility(forward, expiry)
+        .implied_volatility(forward, forward, expiry)
         .expect("ATM vol should compute");
     let smile = SabrSmile::new(model, forward, expiry);
 
@@ -1367,7 +1378,7 @@ fn fractional_beta_smile_matches_independent_hagan_obloj_reference() {
 fn atm_beta_snap_is_consistent_between_smile_and_atm_paths() {
     // A raw β inside the snap band below 1 (here 1−5e-5) is snapped to
     // exactly 1.0 by `implied_volatility` for every off-ATM strike. The
-    // ATM delegation to `atm_volatility` must classify the same raw β
+    // ATM limit branch must classify the same raw β
     // identically, otherwise the ATM point prices with prefactor
     // α/F^(1−β) while its immediate neighbours price with α — a
     // discontinuity of ~F^(−(1−β)) (several bp of vol level at F=100).
@@ -1389,7 +1400,7 @@ fn atm_beta_snap_is_consistent_between_smile_and_atm_paths() {
         "β in the snap band must ATM-price identically to β=1: got {atm_snapped} vs {atm_exact}"
     );
 
-    // Smile continuity: the exact-ATM point (atm_volatility path) and an
+    // Smile continuity: the exact-ATM point (ATM limit branch) and an
     // immediately adjacent strike (general branch, snapped β=1) must agree
     // to well under a basis point of vol.
     let near_atm = snapped

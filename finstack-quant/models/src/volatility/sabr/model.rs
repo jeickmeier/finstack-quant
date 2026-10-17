@@ -8,10 +8,7 @@ use finstack_quant_core::{Error, Result};
 ///
 /// Used by every code path that branches on "β = 0" (normal-SABR) or "β = 1"
 /// (lognormal-SABR) so that a raw parameter like `0.00005` lands on the same
-/// branch in both `implied_volatility` (smile pricing) and `atm_volatility`
-/// (ATM-only). Previously these two paths used 1e-4 vs 1e-12 respectively,
-/// which let raw β=5e-5 take the normal branch when smiling and the general
-/// branch when ATM-pricing the same parameter set.
+/// branch for smile pricing, the ATM limit, and the quoting convention.
 pub(crate) const BETA_SNAP_TOL: f64 = 1e-4;
 
 impl SabrParameters {
@@ -111,8 +108,8 @@ impl SabrParameters {
         let rho = self.rho;
 
         // Snap β to 0 or 1 with the same `BETA_SNAP_TOL` used by
-        // `atm_volatility` / `quote_convention`, so smile and ATM paths take the same
-        // branch for a given raw β.
+        // `implied_volatility` / `quote_convention`, so smile and ATM paths take
+        // the same branch for a given raw β.
         let raw_beta = self.beta;
         let beta_is_zero = raw_beta < BETA_SNAP_TOL;
         let beta_is_one = !beta_is_zero && (1.0 - raw_beta).abs() < BETA_SNAP_TOL;
@@ -179,42 +176,6 @@ impl SabrParameters {
         }
 
         Ok(volatility)
-    }
-
-    /// ATM implied volatility (Hagan et al. (2002) eq. 2.18).
-    #[inline]
-    pub(crate) fn atm_volatility(&self, forward: f64, time_to_expiry: f64) -> Result<f64> {
-        let alpha = self.alpha;
-        let nu = self.nu;
-        let rho = self.rho;
-        let raw_beta = self.beta;
-        let beta_is_zero = raw_beta < BETA_SNAP_TOL;
-        let beta_is_one = !beta_is_zero && (1.0 - raw_beta).abs() < BETA_SNAP_TOL;
-        let beta = if beta_is_zero {
-            0.0
-        } else if beta_is_one {
-            1.0
-        } else {
-            raw_beta
-        };
-
-        if alpha.abs() < 1e-14 {
-            return Ok(0.0);
-        }
-
-        if beta_is_zero {
-            let vol =
-                alpha * (1.0 + time_to_expiry * (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2));
-            if vol <= 0.0 || !vol.is_finite() {
-                return Err(Error::Validation(format!(
-                    "SABR ATM volatility calculation produced invalid result={:.6} for forward={:.6}, T={:.4}",
-                    vol, forward, time_to_expiry
-                )));
-            }
-            Ok(vol)
-        } else {
-            self.atm_lognormal(forward, time_to_expiry, beta)
-        }
     }
 
     /// Lognormal ATM implied volatility (Hagan et al. (2002) eq. 2.18).
@@ -327,11 +288,12 @@ impl SabrParameters {
     /// * `strike` - Unshifted strike in the same units as `forward`.
     /// * `time_to_expiry` - Expiry in years; must be strictly positive.
     pub fn validate_inputs(&self, forward: f64, strike: f64, time_to_expiry: f64) -> Result<()> {
-        if !forward.is_finite()
-            || !strike.is_finite()
-            || !time_to_expiry.is_finite()
-            || time_to_expiry <= 0.0
-        {
+        if !forward.is_finite() || !strike.is_finite() {
+            return Err(Error::Validation(format!(
+                "SABR forward and strike must be finite, got: forward={forward}, strike={strike}"
+            )));
+        }
+        if !time_to_expiry.is_finite() || time_to_expiry <= 0.0 {
             return Err(Error::Validation(format!(
                 "SABR time_to_expiry must be positive, got: {:.6}",
                 time_to_expiry

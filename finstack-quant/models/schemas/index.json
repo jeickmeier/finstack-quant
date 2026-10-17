@@ -605,7 +605,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/position_risk_decomposition.schema.json",
-      "bytes": 6832,
+      "bytes": 6905,
       "kind": "output",
       "path": "schemas/models/1/position_risk_decomposition.schema.json",
       "summary": "Complete position-level risk decomposition of a portfolio.",

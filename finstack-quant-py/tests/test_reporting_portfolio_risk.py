@@ -7,7 +7,6 @@ import pytest
 
 from finstack_quant.models.factor.risk import (
     historical_var_decomposition,
-    parametric_es_decomposition,
     parametric_var_decomposition,
 )
 from finstack_quant.reporting import portfolio_risk_tearsheet
@@ -21,7 +20,7 @@ _COV = [[0.04, 0.006, 0.001], [0.006, 0.0225, 0.0015], [0.001, 0.0015, 0.0025]]
 # ``PositionRiskDecomposition`` (``var_contributions`` / ``relative_var``).
 _DECOMP_TYPED = parametric_var_decomposition(_IDS, _WEIGHTS, _COV, confidence=0.95)
 _DECOMP = json.loads(_DECOMP_TYPED.to_json())
-_ES = json.loads(parametric_es_decomposition(_IDS, _WEIGHTS, _COV, confidence=0.95).to_json())
+_ES = _DECOMP
 _BUDGET = {
     "portfolio_var": 0.2040,
     "total_overbudget": 0.0519,

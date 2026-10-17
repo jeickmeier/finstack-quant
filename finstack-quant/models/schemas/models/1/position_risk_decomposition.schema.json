@@ -5,7 +5,7 @@
       "oneOf": [
         {
           "const": "parametric",
-          "description": "Covariance-based using normal distribution assumption.\n\nFast (O(n^2) in positions). Exact Euler property.\nRequires a position-level return covariance matrix.",
+          "description": "Covariance-based using normal distribution assumption.\n\nO(n^2) Euler allocation in positions, after an O(n^3) pivoted-Cholesky\nPSD check of the covariance. Exact Euler property.\nRequires a position-level return covariance matrix.",
           "type": "string"
         },
         {

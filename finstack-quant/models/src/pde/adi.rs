@@ -74,6 +74,8 @@ pub struct AdiWorkBuffers {
     y_line: Vec<f64>,
     line_out: Vec<f64>,
     rhs_buf: Vec<f64>,
+    /// Modified-diagonal scratch for the per-line Thomas solves.
+    thomas_scratch: Vec<f64>,
     /// Predictor `Y_0` (interior).
     y0: Vec<f64>,
     /// First x-sweep result `Y_1` (interior).
@@ -110,6 +112,7 @@ impl AdiWorkBuffers {
             y_line: vec![0.0; ny_int],
             line_out: vec![0.0; line_max],
             rhs_buf: vec![0.0; line_max],
+            thomas_scratch: vec![0.0; line_max],
             y0: vec![0.0; interior],
             y1: vec![0.0; interior],
             y2: vec![0.0; interior],
@@ -144,6 +147,9 @@ impl AdiWorkBuffers {
         }
         if self.rhs_buf.len() != line_max {
             self.rhs_buf.resize(line_max, 0.0);
+        }
+        if self.thomas_scratch.len() != line_max {
+            self.thomas_scratch.resize(line_max, 0.0);
         }
         if self.y0.len() != interior {
             self.y0.resize(interior, 0.0);
@@ -401,6 +407,7 @@ impl CraigSneydStepper {
             y_line,
             line_out,
             rhs_buf,
+            thomas_scratch,
             y0,
             y1,
             y2,
@@ -455,13 +462,31 @@ impl CraigSneydStepper {
         // Y_1 = Y_0 + theta*dt * (F_1(t_{n+1}, Y_1) - F_1(t_n, u^n))
         // <=> (I - theta*dt*A_x) Y_1 = Y_0 - theta*dt*ax_u  (+ implicit corr.)
         implicit_x_sweep(
-            ops_impl, alpha, y0, ax_u, nx_int, ny_int, rhs_buf, line_out, y1,
+            ops_impl,
+            alpha,
+            y0,
+            ax_u,
+            nx_int,
+            ny_int,
+            rhs_buf,
+            thomas_scratch,
+            line_out,
+            y1,
         )?;
 
         // --- CS corrector 2: implicit y-sweep ---
         // Y_2 = Y_1 + theta*dt * (F_2(t_{n+1}, Y_2) - F_2(t_n, u^n))
         implicit_y_sweep(
-            ops_impl, alpha, y1, ay_u, nx_int, ny_int, rhs_buf, line_out, y2,
+            ops_impl,
+            alpha,
+            y1,
+            ay_u,
+            nx_int,
+            ny_int,
+            rhs_buf,
+            thomas_scratch,
+            line_out,
+            y2,
         )?;
 
         if damping || !self.apply_mcs_corrector {
@@ -499,13 +524,31 @@ impl CraigSneydStepper {
         // --- MCS corrector 1: second implicit x-sweep ---
         // Ytld_1 = Ytld_0 + theta*dt * (F_1(t_{n+1},Ytld_1) - F_1(t_n,u^n))
         implicit_x_sweep(
-            ops_impl, alpha, ytld, ax_u, nx_int, ny_int, rhs_buf, line_out, y1,
+            ops_impl,
+            alpha,
+            ytld,
+            ax_u,
+            nx_int,
+            ny_int,
+            rhs_buf,
+            thomas_scratch,
+            line_out,
+            y1,
         )?;
 
         // --- MCS corrector 2: second implicit y-sweep ---
         // Ytld_2 = Ytld_1 + theta*dt * (F_2(t_{n+1},Ytld_2) - F_2(t_n,u^n))
         implicit_y_sweep(
-            ops_impl, alpha, y1, ay_u, nx_int, ny_int, rhs_buf, line_out, ytld,
+            ops_impl,
+            alpha,
+            y1,
+            ay_u,
+            nx_int,
+            ny_int,
+            rhs_buf,
+            thomas_scratch,
+            line_out,
+            ytld,
         )?;
 
         // u^{n+1} = Ytld_2.
@@ -566,7 +609,7 @@ fn apply_y_operator(
 ///
 /// `rhs` is the previous iterate (`Y_0` or `Ytld_0`), `ax_u` is `A_x` applied
 /// to the explicit-side solution `u^n`. Both are row-major interior vectors;
-/// `rhs_buf`/`line_out` (length `>= nx_int`) are scratch. Result into `out`.
+/// `rhs_buf`/`scratch`/`line_out` (length `>= nx_int`) are scratch. Result into `out`.
 ///
 /// Returns [`StepperError::ThomasFailure`] if any per-line tridiagonal solve
 /// hits a degenerate pivot.
@@ -579,6 +622,7 @@ fn implicit_x_sweep(
     nx_int: usize,
     ny_int: usize,
     rhs_buf: &mut [f64],
+    scratch: &mut [f64],
     line_out: &mut [f64],
     out: &mut [f64],
 ) -> Result<(), StepperError> {
@@ -587,7 +631,12 @@ fn implicit_x_sweep(
             rhs_buf[ii] = rhs[ii * ny_int + jj] - alpha * ax_u[ii * ny_int + jj];
         }
         ops.op_x[jj].add_implicit_corrections(alpha, &mut rhs_buf[..nx_int]);
-        ops.op_x[jj].solve_thomas_into(alpha, &rhs_buf[..nx_int], &mut line_out[..nx_int])?;
+        ops.op_x[jj].solve_thomas_into(
+            alpha,
+            &rhs_buf[..nx_int],
+            &mut line_out[..nx_int],
+            &mut scratch[..nx_int],
+        )?;
         for ii in 0..nx_int {
             out[ii * ny_int + jj] = line_out[ii];
         }
@@ -607,6 +656,7 @@ fn implicit_y_sweep(
     nx_int: usize,
     ny_int: usize,
     rhs_buf: &mut [f64],
+    scratch: &mut [f64],
     line_out: &mut [f64],
     out: &mut [f64],
 ) -> Result<(), StepperError> {
@@ -615,7 +665,12 @@ fn implicit_y_sweep(
             rhs_buf[jj] = rhs[ii * ny_int + jj] - alpha * ay_u[ii * ny_int + jj];
         }
         ops.op_y[ii].add_implicit_corrections(alpha, &mut rhs_buf[..ny_int]);
-        ops.op_y[ii].solve_thomas_into(alpha, &rhs_buf[..ny_int], &mut line_out[..ny_int])?;
+        ops.op_y[ii].solve_thomas_into(
+            alpha,
+            &rhs_buf[..ny_int],
+            &mut line_out[..ny_int],
+            &mut scratch[..ny_int],
+        )?;
         for jj in 0..ny_int {
             out[ii * ny_int + jj] = line_out[jj];
         }

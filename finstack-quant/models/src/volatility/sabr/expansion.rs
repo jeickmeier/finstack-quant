@@ -161,8 +161,10 @@ impl SabrParameters {
     ///
     /// # Errors
     ///
-    /// Returns [`InputError::Invalid`](finstack_quant_core::error::InputError::Invalid) when
-    /// the underlying expansion yields a non-finite volatility.
+    /// Returns a [`Validation`](finstack_quant_core::Error::Validation) error naming the
+    /// offending input when the shifted forward or strike is non-positive, the
+    /// expiry is not strictly positive, or the expansion yields a non-finite or
+    /// non-positive volatility.
     ///
     /// # Arguments
     ///
@@ -176,7 +178,6 @@ impl SabrParameters {
         t: f64,
     ) -> finstack_quant_core::Result<f64> {
         self.lognormal_expansion(f, k, t)
-            .map_err(|_| finstack_quant_core::error::InputError::Invalid.into())
     }
 
     /// Normal SABR implied volatility with checked error semantics.

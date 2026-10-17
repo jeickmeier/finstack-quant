@@ -269,36 +269,46 @@ impl TridiagOperator {
     /// guard such a pivot would yield a silent `inf` / `NaN` solution.
     pub fn solve_thomas(&self, alpha: f64, rhs: &[f64]) -> Result<Vec<f64>, ThomasError> {
         let mut x = vec![0.0; self.n];
-        self.solve_thomas_into(alpha, rhs, &mut x)?;
+        let mut scratch = vec![0.0; self.n];
+        self.solve_thomas_into(alpha, rhs, &mut x, &mut scratch)?;
         Ok(x)
     }
 
     /// Solve `(I - alpha * A) * x_new = rhs` using the Thomas algorithm,
     /// writing the result into `out`.
     ///
-    /// Like [`solve_thomas`](Self::solve_thomas) but avoids allocating the
-    /// output vector. Returns `ThomasError::DegeneratePivot` on a
-    /// degenerate pivot.
+    /// Like [`solve_thomas`](Self::solve_thomas) but allocation-free: `out`
+    /// holds the forward-eliminated right-hand side before back-substitution
+    /// and `scratch` holds the modified main diagonal. Returns
+    /// `ThomasError::DegeneratePivot` on a degenerate pivot.
+    ///
+    /// # Arguments
+    ///
+    /// * `alpha` — scalar multiplier (typically `theta * dt`)
+    /// * `rhs` — right-hand side vector (length `n`)
+    /// * `out` — solution buffer (length `n`), overwritten
+    /// * `scratch` — work buffer (length `n`), overwritten
     pub fn solve_thomas_into(
         &self,
         alpha: f64,
         rhs: &[f64],
         out: &mut [f64],
+        scratch: &mut [f64],
     ) -> Result<(), ThomasError> {
         debug_assert_eq!(rhs.len(), self.n);
         debug_assert_eq!(out.len(), self.n);
+        debug_assert_eq!(scratch.len(), self.n);
 
         if self.n == 0 {
             return Ok(());
         }
 
         let n = self.n;
-        let mut d = vec![0.0; n];
-        let mut r = vec![0.0; n];
+        let d = scratch;
 
         d[0] = 1.0 - alpha * self.main[0];
         check_pivot(d[0], 1.0, alpha * self.main[0], 0, n)?;
-        r[0] = rhs[0];
+        out[0] = rhs[0];
 
         for i in 1..n {
             let a_i = -alpha * self.lower[i];
@@ -308,13 +318,13 @@ impl TridiagOperator {
             let off = w * c_prev;
             d[i] = diag - off;
             check_pivot(d[i], diag, off, i, n)?;
-            r[i] = rhs[i] - w * r[i - 1];
+            out[i] = rhs[i] - w * out[i - 1];
         }
 
-        out[n - 1] = r[n - 1] / d[n - 1];
+        out[n - 1] /= d[n - 1];
         for i in (0..n - 1).rev() {
             let c_i = -alpha * self.upper[i];
-            out[i] = (r[i] - c_i * out[i + 1]) / d[i];
+            out[i] = (out[i] - c_i * out[i + 1]) / d[i];
         }
         Ok(())
     }
@@ -571,9 +581,10 @@ mod tests {
 
         // The buffer variant must reject it identically.
         let mut out = vec![0.0; 3];
+        let mut scratch = vec![0.0; 3];
         assert!(
             matches!(
-                op.solve_thomas_into(1.0, &rhs, &mut out),
+                op.solve_thomas_into(1.0, &rhs, &mut out, &mut scratch),
                 Err(ThomasError::DegeneratePivot { .. })
             ),
             "solve_thomas_into must also reject the degenerate pivot"

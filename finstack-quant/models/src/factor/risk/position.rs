@@ -31,7 +31,8 @@ use tracing::warn;
 pub enum DecompositionMethod {
     /// Covariance-based using normal distribution assumption.
     ///
-    /// Fast (O(n^2) in positions). Exact Euler property.
+    /// O(n^2) Euler allocation in positions, after an O(n^3) pivoted-Cholesky
+    /// PSD check of the covariance. Exact Euler property.
     /// Requires a position-level return covariance matrix.
     Parametric,
 
