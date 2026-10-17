@@ -29,7 +29,6 @@ import sys
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-TARGET_DOC_DIR = REPO_ROOT / os.environ.get("CARGO_TARGET_DIR", "target") / "doc"
 ARGUMENTS_HEADING_RE = re.compile(r"(?mi)^# Arguments\s*$")
 GENERIC_DESCRIPTION_RE = re.compile(
     r"^(?:(?:the )?(?:input|parameter|value)(?: (?:value|parameter|to use|for the operation))?"
@@ -248,7 +247,8 @@ def main(argv: list[str]) -> int:
     """Build selected rustdoc metadata, then report every input-doc contract violation."""
     args = parse_args(argv)
     try:
-        libraries = workspace_libraries(cargo_metadata(), args.packages)
+        metadata = cargo_metadata()
+        libraries = workspace_libraries(metadata, args.packages)
     except ValueError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
@@ -260,12 +260,15 @@ def main(argv: list[str]) -> int:
             print(f"error: {error}", file=sys.stderr)
             return 2
 
+    # cargo's resolved target directory honours `CARGO_TARGET_DIR` and a
+    # `build.target-dir` set in `.cargo/config.toml` (worktrees here share one).
+    target_doc_dir = Path(metadata["target_directory"]) / "doc"
     errors: list[DocumentationError] = []
     for package, rustdoc_stem in libraries:
         if not args.skip_build:
             print(f"checking public input documentation: {package}", file=sys.stderr)
             build_rustdoc_json(package)
-        rustdoc_path = TARGET_DOC_DIR / f"{rustdoc_stem}.json"
+        rustdoc_path = target_doc_dir / f"{rustdoc_stem}.json"
         if not rustdoc_path.exists():
             print(f"error: missing rustdoc JSON for {package}: {rustdoc_path}", file=sys.stderr)
             return 2

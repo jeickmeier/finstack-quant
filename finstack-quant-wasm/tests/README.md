@@ -68,7 +68,7 @@ numbers are compared against the same inputs the native tests use.
 Run:
 
 ```bash
-npm --prefix finstack-quant-wasm run test     # wasm-pack test --node -- --profile wasm-test
+npm --prefix finstack-quant-wasm run test     # wasm-pack test --node --profile wasm-test
 ```
 
 ## Layer 2 — host tests (`dts_contract.rs`, `return_shapes.rs`, `boundary_signatures.rs`)
