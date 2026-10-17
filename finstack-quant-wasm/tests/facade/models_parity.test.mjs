@@ -612,7 +612,7 @@ const CASES = {
   },
   'monte_carlo.asian': () => {
     const asian = new monteCarlo.PathDependentPricer(2000, 42, false);
-    return [money(asian.priceAsianCall(...GBM, 12)), money(asian.priceAsianPut(...GBM, 12))];
+    return [money(asian.priceAsian(...GBM, true, 12)), money(asian.priceAsian(...GBM, false, 12))];
   },
   'monte_carlo.lrm_greeks': () => {
     const asian = new monteCarlo.PathDependentPricer(2000, 42, false);
@@ -624,10 +624,10 @@ const CASES = {
   'monte_carlo.lsmc': () => {
     const lsmc = new monteCarlo.LsmcPricer(2000, 42, false, 20);
     return [
-      money(lsmc.priceAmericanPut(...GBM)),
-      money(lsmc.priceAmericanCall(...GBM, undefined, 10, 'polynomial', 2)),
-      money(lsmc.priceAmericanPutUnbiased(...GBM, 99)),
-      money(lsmc.priceAmericanCallUnbiased(...GBM, 99)),
+      money(lsmc.priceAmerican(...GBM, false)),
+      money(lsmc.priceAmerican(...GBM, true, undefined, 10, 'polynomial', 2)),
+      money(lsmc.priceAmericanUnbiased(...GBM, false, 99)),
+      money(lsmc.priceAmericanUnbiased(...GBM, true, 99)),
       lsmc.basis,
       lsmc.basisDegree,
     ];

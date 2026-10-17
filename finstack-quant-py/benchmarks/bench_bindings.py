@@ -651,13 +651,14 @@ class TestMonteCarloBenchmarks:
         pricer = LsmcPricer(num_paths=5_000, seed=42, num_steps=50)
 
         def _price():
-            return pricer.price_american_put(
+            return pricer.price_american(
                 spot=100.0,
                 strike=100.0,
                 rate=0.05,
                 div_yield=0.0,
                 vol=0.3,
                 expiry=1.0,
+                is_call=False,
             )
 
         benchmark.pedantic(_price, rounds=5, warmup_rounds=1)
@@ -682,7 +683,7 @@ class TestMonteCarloBenchmarks:
         pricer = PathDependentPricer(num_paths=5_000, seed=42)
 
         def _price():
-            return pricer.price_asian_call(
+            return pricer.price_asian(
                 spot=100.0,
                 strike=100.0,
                 rate=0.05,
@@ -690,6 +691,7 @@ class TestMonteCarloBenchmarks:
                 vol=0.2,
                 expiry=1.0,
                 num_steps=50,
+                is_call=True,
             )
 
         benchmark.pedantic(_price, rounds=5, warmup_rounds=1)

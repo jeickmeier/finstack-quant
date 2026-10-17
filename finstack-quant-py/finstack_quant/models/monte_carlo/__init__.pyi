@@ -1382,7 +1382,7 @@ class PathDependentPricer:
     Examples
     --------
     >>> from finstack_quant.models.monte_carlo import PathDependentPricer
-    >>> PathDependentPricer(600, 2).price_asian_call(100, 100, 0.05, 0.0, 0.2, 1.0).num_paths
+    >>> PathDependentPricer(600, 2).price_asian(100, 100, 0.05, 0.0, 0.2, 1.0, True).num_paths
     600
     """
 
@@ -1438,7 +1438,7 @@ class PathDependentPricer:
         """
         ...
 
-    def price_asian_call(
+    def price_asian(
         self,
         spot: float,
         strike: float,
@@ -1446,11 +1446,12 @@ class PathDependentPricer:
         div_yield: float,
         vol: float,
         expiry: float,
+        is_call: bool,
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
         """
-        Price an arithmetic Asian call (post-initial fixings at every step).
+        Price an arithmetic Asian option (post-initial fixings at every step).
 
         Parameters
         ----------
@@ -1466,6 +1467,8 @@ class PathDependentPricer:
             Volatility (decimal).
         expiry : float
             Maturity in years.
+        is_call : bool
+            ``True`` for a call on the arithmetic average, ``False`` for a put.
         num_steps : int, optional
             Steps. Defaults to the registry default. The default fixing
             schedule is steps ``1..=num_steps`` and excludes the initial spot
@@ -1481,67 +1484,11 @@ class PathDependentPricer:
         Examples
         --------
         >>> from finstack_quant.models.monte_carlo import PathDependentPricer
-        >>> PathDependentPricer(400, 0).price_asian_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=12).num_paths
+        >>> pricer = PathDependentPricer(400, 0)
+        >>> pricer.price_asian(100, 100, 0.05, 0.0, 0.2, 1.0, True, num_steps=12).num_paths
         400
-
-        Raises
-        ------
-        ValueError
-            If ``rate`` or ``div_yield`` is non-finite, ``vol`` is negative or non-finite,
-            ``expiry`` is non-finite or not strictly positive, ``num_steps`` is zero, the
-            configured path count is zero or exceeds ``10_000_000``,
-            ``currency`` is unknown, or discounting produces a non-finite value.
-        TypeError
-            If a non-``None`` ``currency`` is neither a string nor a ``Currency`` instance.
-
-        """
-        ...
-
-    def price_asian_put(
-        self,
-        spot: float,
-        strike: float,
-        rate: float,
-        div_yield: float,
-        vol: float,
-        expiry: float,
-        num_steps: int | None = None,
-        currency: str | None = None,
-    ) -> MoneyEstimate:
-        """
-        Price an arithmetic Asian put (post-initial fixings at every step).
-
-        Parameters
-        ----------
-        spot : float
-            Spot price.
-        strike : float
-            Strike price.
-        rate : float
-            Risk-free rate (continuously compounded decimal).
-        div_yield : float
-            Dividend yield (continuously compounded decimal).
-        vol : float
-            Volatility (decimal).
-        expiry : float
-            Maturity in years.
-        num_steps : int, optional
-            Steps. Defaults to the registry default. The default fixing
-            schedule is steps ``1..=num_steps`` and excludes the initial spot
-            at step ``0``.
-        currency : str, optional
-            ISO currency code. Defaults to USD.
-
-        Returns
-        -------
-        MoneyEstimate
-            Monte Carlo price with stderr and confidence bands.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.monte_carlo import PathDependentPricer
-        >>> PathDependentPricer(400, 0).price_asian_put(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=12).num_paths
-        400
+        >>> pricer.price_asian(100, 100, 0.05, 0.0, 0.2, 1.0, False, num_steps=12).mean.amount > 0
+        True
 
         Raises
         ------
@@ -1574,7 +1521,7 @@ class PathDependentPricer:
         The price, delta and vega come from one set of GBM paths: the Greeks
         weight each discounted payoff by the score of the path density
         (Glasserman 2003, section 7.3), so no bumped re-simulation is needed.
-        The payoff is the one :meth:`price_asian_call` / :meth:`price_asian_put`
+        The payoff is the one :meth:`price_asian`
         price: unit notional, fixings at steps ``1..=num_steps``.
 
         Parameters
@@ -1596,7 +1543,7 @@ class PathDependentPricer:
         num_steps : int, optional
             Time-grid steps, each an averaging date. Defaults to the registry
             value ``convenience.greeks.lrm_num_steps`` (32), not the 252 steps
-            of :meth:`price_asian_call`: every path is kept in memory, so
+            of :meth:`price_asian`: every path is kept in memory, so
             ``num_paths * (num_steps + 1)`` may not exceed ``4_000_000``. A
             default pricer (100,000 paths) therefore accepts at most 39 steps.
         currency : str, optional
@@ -1741,7 +1688,7 @@ class LsmcPricer:
     Examples
     --------
     >>> from finstack_quant.models.monte_carlo import LsmcPricer
-    >>> LsmcPricer(300, 0, num_steps=10).price_american_put(100, 100, 0.05, 0.0, 0.3, 1.0).num_paths
+    >>> LsmcPricer(300, 0, num_steps=10).price_american(100, 100, 0.05, 0.0, 0.3, 1.0, False).num_paths
     300
     """
 
@@ -1896,7 +1843,7 @@ class LsmcPricer:
         """
         ...
 
-    def price_american_put(
+    def price_american(
         self,
         spot: float,
         strike: float,
@@ -1904,13 +1851,14 @@ class LsmcPricer:
         div_yield: float,
         vol: float,
         expiry: float,
+        is_call: bool,
         currency: str | None = None,
         num_steps: int | None = None,
         basis: str | None = None,
         basis_degree: int | None = None,
     ) -> MoneyEstimate:
         """
-        Price a Bermudan put via LSMC on the grid ``1..=num_steps``.
+        Price a Bermudan option via LSMC on the grid ``1..=num_steps``.
 
         Immediate exercise at valuation floors the reported price at
         ``max(strike - spot, 0)``. If that floor binds, stderr and the 95%
@@ -1930,6 +1878,8 @@ class LsmcPricer:
             Volatility (decimal).
         expiry : float
             Maturity in years.
+        is_call : bool
+            ``True`` for a call, ``False`` for a put.
         currency : str, optional
             ISO currency code. Defaults to USD.
         num_steps : int, optional
@@ -1951,7 +1901,7 @@ class LsmcPricer:
         Examples
         --------
         >>> from finstack_quant.models.monte_carlo import LsmcPricer
-        >>> LsmcPricer(200, 0, num_steps=8).price_american_put(100, 100, 0.05, 0.0, 0.25, 1.0).num_paths
+        >>> LsmcPricer(200, 0, num_steps=8).price_american(100, 100, 0.05, 0.0, 0.25, 1.0, False).num_paths
         200
 
         Raises
@@ -1970,7 +1920,7 @@ class LsmcPricer:
         """
         ...
 
-    def price_american_call(
+    def price_american_unbiased(
         self,
         spot: float,
         strike: float,
@@ -1978,80 +1928,7 @@ class LsmcPricer:
         div_yield: float,
         vol: float,
         expiry: float,
-        currency: str | None = None,
-        num_steps: int | None = None,
-        basis: str | None = None,
-        basis_degree: int | None = None,
-    ) -> MoneyEstimate:
-        """
-        Price a Bermudan call via LSMC on the grid ``1..=num_steps``.
-
-        Immediate exercise at valuation floors the reported price at
-        ``max(spot - strike, 0)``. If that floor binds, stderr and the 95%
-        CI collapse to the intrinsic value.
-
-        Parameters
-        ----------
-        spot : float
-            Spot price.
-        strike : float
-            Strike price.
-        rate : float
-            Risk-free rate (continuously compounded decimal).
-        div_yield : float
-            Dividend yield (continuously compounded decimal).
-        vol : float
-            Volatility (decimal).
-        expiry : float
-            Maturity in years.
-        currency : str, optional
-            ISO currency code. Defaults to USD.
-        num_steps : int, optional
-            Per-call exercise-grid override in ``[1, 100_000]``; defaults to
-            the instance ``num_steps``. Subject to the retained-storage limit
-            described by :class:`LsmcPricer`.
-        basis : str, optional
-            Per-call override of the regression basis family; defaults to
-            the instance ``basis``.
-        basis_degree : int, optional
-            Per-call override of the basis degree; defaults to the instance
-            ``basis_degree``.
-
-        Returns
-        -------
-        MoneyEstimate
-            LSMC price with stderr and confidence bands.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.monte_carlo import LsmcPricer
-        >>> LsmcPricer(200, 0, num_steps=8).price_american_call(100, 100, 0.05, 0.0, 0.25, 1.0).num_paths
-        200
-
-        Raises
-        ------
-        ValueError
-            If ``strike`` is non-finite or non-positive, or is no greater than ``1e-14``
-            with the normalized-polynomial basis; ``rate`` or ``div_yield``
-            is non-finite; ``vol`` is negative or non-finite; ``expiry`` is
-            non-finite or not strictly positive;
-            the time-step or independent path count is outside the documented
-            range; retained spots exceed ``64_000_000`` values including time
-            zero and both rows of each antithetic pair; or ``currency`` is unknown.
-        TypeError
-            If a non-``None`` ``currency`` is neither a string nor a ``Currency`` instance.
-
-        """
-        ...
-
-    def price_american_put_unbiased(
-        self,
-        spot: float,
-        strike: float,
-        rate: float,
-        div_yield: float,
-        vol: float,
-        expiry: float,
+        is_call: bool,
         pricing_seed: int,
         currency: str | None = None,
         num_steps: int | None = None,
@@ -2059,7 +1936,7 @@ class LsmcPricer:
         basis_degree: int | None = None,
     ) -> MoneyEstimate:
         """
-        Two-pass unbiased American put price.
+        Two-pass unbiased American option price.
 
         Mitigates the in-sample upward bias of single-pass LSMC by fitting
         the regression on a training path set seeded by the pricer's ``seed``
@@ -2079,6 +1956,8 @@ class LsmcPricer:
             Volatility (decimal).
         expiry : float
             Maturity in years.
+        is_call : bool
+            ``True`` for a call, ``False`` for a put.
         pricing_seed : int
             Seed for the pricing pass; must differ from the pricer's training
             seed (passing the same value reintroduces the in-sample bias and
@@ -2108,83 +1987,7 @@ class LsmcPricer:
             or independent path count is outside the documented range; or each
             pass exceeds ``64_000_000`` retained spot values including time zero
             and both rows of each antithetic pair. The input validation errors
-            documented by :meth:`price_american_put` also apply.
-        """
-        ...
-
-    def price_american_call_unbiased(
-        self,
-        spot: float,
-        strike: float,
-        rate: float,
-        div_yield: float,
-        vol: float,
-        expiry: float,
-        pricing_seed: int,
-        currency: str | None = None,
-        num_steps: int | None = None,
-        basis: str | None = None,
-        basis_degree: int | None = None,
-    ) -> MoneyEstimate:
-        """
-        Two-pass unbiased American call price.
-
-        See :meth:`price_american_put_unbiased` for the bias-mitigation
-        rationale and the meaning of ``pricing_seed``.
-
-        Parameters
-        ----------
-        spot : float
-            Spot price.
-        strike : float
-            Strike price.
-        rate : float
-            Risk-free rate (continuously compounded decimal).
-        div_yield : float
-            Dividend yield (continuously compounded decimal).
-        vol : float
-            Volatility (decimal).
-        expiry : float
-            Maturity in years.
-        pricing_seed : int
-            Seed for the pricing pass; must differ from the pricer's training
-            seed.
-        num_steps : int, optional
-            Per-call exercise-grid override in ``[1, 100_000]``; defaults to
-            the instance ``num_steps``. Subject to the retained-storage limit
-            described by :class:`LsmcPricer`.
-        basis : str, optional
-            Per-call override of the regression basis family; defaults to
-            the instance ``basis``.
-        basis_degree : int, optional
-            Per-call override of the basis degree; defaults to the instance
-            ``basis_degree``.
-        currency : str, optional
-            ISO currency code. Defaults to USD.
-        num_steps : int, optional
-            Per-call exercise-grid override in ``[1, 100_000]``; defaults to
-            the instance ``num_steps``. Subject to the retained-storage limit
-            described by :class:`LsmcPricer`.
-        basis : str, optional
-            Per-call override of the regression basis family; defaults to
-            the instance ``basis``.
-        basis_degree : int, optional
-            Per-call override of the basis degree; defaults to the instance
-            ``basis_degree``.
-
-        Returns
-        -------
-        MoneyEstimate
-            Out-of-sample price with stderr and confidence bands.
-
-        Raises
-        ------
-        ValueError
-            If ``pricing_seed`` equals the pricer's training seed; the time-step
-            or independent path count is outside the documented range; or each
-            pass exceeds ``64_000_000`` retained spot values including time zero
-            and both rows of each antithetic pair. The input validation errors
-            documented by :meth:`price_american_put` also apply.
+            documented by :meth:`price_american` also apply.
         """
         ...
 

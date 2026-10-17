@@ -99,7 +99,7 @@ def test_monte_carlo_pricers_resolve_defaults_in_rust() -> None:
     with pytest.raises(ValueError, match="unknown basis"):
         monte_carlo.LsmcPricer(500, 7, False, 10, "nope")
     with pytest.raises(ValueError, match="unknown basis"):
-        lsmc.price_american_put(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, basis="nope")
+        lsmc.price_american(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, False, basis="nope")
 
     asian = monte_carlo.PathDependentPricer(500, 7, False, True)
     assert (asian.num_paths, asian.seed, asian.antithetic) == (500, 7, True)

@@ -8,8 +8,7 @@ as standalone Python types; the pricers take their parameters directly as
 numeric arguments.
 
 Greek estimators (``finite_diff_delta``, ``finite_diff_gamma``) and unbiased two-pass LSMC pricing
-(``LsmcPricer.price_american_put_unbiased`` /
-``price_american_call_unbiased``) wrap the Rust crate's variance-reduction
+(``LsmcPricer.price_american_unbiased``) wrap the Rust crate's variance-reduction
 machinery for hedge-ratio sizing and bias-mitigated American option
 valuation respectively.
 

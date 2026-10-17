@@ -38,7 +38,7 @@ The [Broadie–Glasserman–Kou correction](/references.html#broadie-glasserman-
 
 At an exercise date, compare immediate exercise with conditional expected continuation value. Least-squares Monte Carlo regresses realized discounted future values on basis functions of the current state, typically using relevant in-the-money paths. Backward induction fits an exercise policy on the chosen grid.
 
-Reusing those paths to value their fitted policy creates training optimism. `price_american_put_unbiased` evaluates that learned policy on independent pricing paths. Its name refers to the policy-evaluation sampling step; the policy can remain suboptimal and the grid finite. The true American put value is at least the corresponding European value because waiting to maturity remains feasible. A finite simulated estimate can lie below it because of sampling or policy error. A finite exercise grid is economically Bermudan. [Glasserman, chapter 8](/references.html#glasserman-2004-monte-carlo) provides the regression and policy-estimation framework.
+Reusing those paths to value their fitted policy creates training optimism. `price_american_unbiased` evaluates that learned policy on independent pricing paths. Its name refers to the policy-evaluation sampling step; the policy can remain suboptimal and the grid finite. The true American put value is at least the corresponding European value because waiting to maturity remains feasible. A finite simulated estimate can lie below it because of sampling or policy error. A finite exercise grid is economically Bermudan. [Glasserman, chapter 8](/references.html#glasserman-2004-monte-carlo) provides the regression and policy-estimation framework.
 
 The wrapper exposes prices, errors and path counts, but no exercise-boundary object. The computed spot-price plot compares held-out policy values with European and intrinsic values. A separate, explicitly illustrative policy schematic explains exercise and continuation regions without claiming to export an engine boundary. The executable path-count study changes training and independent pricing samples while keeping the grid fixed. A small interval around a weak learned policy does not certify an accurate American price.
 
@@ -85,7 +85,7 @@ args = (100.0, 100.0, 0.05, 0.0, 0.20, 1.0)
 vanilla = bs_price(*args, True)
 one_fixing = asian_option_price(*args, 1, "arithmetic", True)
 eu_one = EuropeanPricer(4096, 17, False).price_call(*args, num_steps=1)
-asian_one = PathDependentPricer(4096, 17, False, False).price_asian_call(*args, num_steps=1)
+asian_one = PathDependentPricer(4096, 17, False, False).price_asian(*args, num_steps=1, is_call=True)
 print(f"One-fixing analytical Asian={one_fixing:.8f}; BS={vanilla:.8f}")
 print(f"One-fixing MC Asian={asian_one.mean.amount:.8f}; European MC={eu_one.mean.amount:.8f}")
 
@@ -147,15 +147,15 @@ print("basis degree | in-sample | held-out seed | policy value | SE | gap to BS 
 european_put = bs_price(*put_args, False)
 for degree in (1, 3, 6):
     trained = LsmcPricer(2048, 17, False, 20, "polynomial", degree, True)
-    in_sample = trained.price_american_put(*put_args)
+    in_sample = trained.price_american(*put_args, is_call=False)
     for pricing_seed in (1017, 2017):
-        held_out = trained.price_american_put_unbiased(*put_args, pricing_seed=pricing_seed)
+        held_out = trained.price_american_unbiased(*put_args, pricing_seed=pricing_seed, is_call=False)
         print(f"{degree:12d} | {in_sample.mean.amount:.6f} | {pricing_seed:13d} | "
               f"{held_out.mean.amount:.6f} | {held_out.stderr:.6f} | "
               f"{held_out.mean.amount-european_put:.6f}")
 seed_reuse_error = None
 try:
-    trained.price_american_put_unbiased(*put_args, pricing_seed=17)
+    trained.price_american_unbiased(*put_args, pricing_seed=17, is_call=False)
 except ValueError as error:
     seed_reuse_error = str(error)
 print("Training-seed reuse rejected:", seed_reuse_error)
@@ -180,7 +180,7 @@ spot_grid=np.linspace(60.,140.,9)
 price_rows=[]
 for spot in spot_grid:
     pricer=LsmcPricer(4096,17,False,40,"polynomial",3,True)
-    estimate=pricer.price_american_put_unbiased(float(spot),100.,.05,0.,.30,1.,pricing_seed=1017)
+    estimate=pricer.price_american_unbiased(float(spot),100.,.05,0.,.30,1.,pricing_seed=1017, is_call=False)
     european=bs_price(float(spot),100.,.05,0.,.30,1.,False)
     intrinsic=max(100.-float(spot),0.)
     # Zero sampling error occurs only when the trained policy exercises at time zero.
@@ -253,7 +253,7 @@ path_count_rows=[]
 for pairs in (256,1024,4096):
     pricer=LsmcPricer(pairs,17,False,40,"polynomial",3,True)
     for pricing_seed in (1017,2017):
-        estimate=pricer.price_american_put_unbiased(100.,100.,.05,0.,.30,1.,pricing_seed=pricing_seed)
+        estimate=pricer.price_american_unbiased(100.,100.,.05,0.,.30,1.,pricing_seed=pricing_seed, is_call=False)
         path_count_rows.append((pairs,pricing_seed,estimate.mean.amount,estimate.stderr,estimate.num_simulated_paths))
 fig,ax=plt.subplots(figsize=(9,5.2))
 for pricing_seed,color in [(1017,"#0f766e"),(2017,"#c2410c")]:
@@ -382,8 +382,8 @@ for degree in (1, 6):
     observations = []
     for seed in range(8):
         fitted = LsmcPricer(96, seed, False, 20, "polynomial", degree, False)
-        training = fitted.price_american_put(100, 100, 0.05, 0, 0.3, 1)
-        testing = fitted.price_american_put_unbiased(100, 100, 0.05, 0, 0.3, 1, pricing_seed=1000+seed)
+        training = fitted.price_american(100, 100, 0.05, 0, 0.3, 1, is_call=False)
+        testing = fitted.price_american_unbiased(100, 100, 0.05, 0, 0.3, 1, pricing_seed=1000+seed, is_call=False)
         observations.append((training.mean.amount, testing.mean.amount))
     train_mean = statistics.mean(a for a, b in observations)
     test_mean = statistics.mean(b for a, b in observations)

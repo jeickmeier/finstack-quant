@@ -413,11 +413,11 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
   const gbm = [100, 100, 0.04, 0.01, 0.25, 1];
   const greeks = lrmPricer.priceWithLrmGreeks(...gbm, true, 12);
   assert.deepEqual(Object.keys(greeks).sort(), ['delta', 'price', 'vega']);
-  assert.equal(greeks.price.mean.amount, lrmPricer.priceAsianCall(...gbm, 12).mean.amount);
+  assert.equal(greeks.price.mean.amount, lrmPricer.priceAsian(...gbm, true, 12).mean.amount);
   assert.equal(greeks.delta.num_paths, 20000);
   const bumpDelta =
-    (lrmPricer.priceAsianCall(100.5, ...gbm.slice(1), 12).mean.amount -
-      lrmPricer.priceAsianCall(99.5, ...gbm.slice(1), 12).mean.amount) /
+    (lrmPricer.priceAsian(100.5, ...gbm.slice(1), true, 12).mean.amount -
+      lrmPricer.priceAsian(99.5, ...gbm.slice(1), true, 12).mean.amount) /
     1.0;
   assert.ok(Math.abs(greeks.delta.mean - bumpDelta) < 5 * greeks.delta.stderr);
   assert.ok(greeks.vega.stderr > 0);
@@ -449,7 +449,7 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
   assert.equal(lsmc.useParallel, false);
   assert.throws(() => new monteCarlo.LsmcPricer(500, 7, false, 10, 'nope'), kind('validation'));
   assert.throws(
-    () => lsmc.priceAmericanPut(100, 100, 0.05, 0, 0.2, 1, undefined, undefined, 'nope'),
+    () => lsmc.priceAmerican(100, 100, 0.05, 0, 0.2, 1, false, undefined, undefined, 'nope'),
     kind('validation')
   );
   const spec = {

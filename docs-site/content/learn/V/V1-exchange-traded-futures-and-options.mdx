@@ -285,8 +285,9 @@ from finstack_quant.models.monte_carlo import LsmcPricer
 # Under deterministic rates, the futures price is a martingale: use the GBM helper with r-q=0.
 # Here div_yield=r is a drift-matching parameter, not a dividend paid by the future.
 lsmc=LsmcPricer(num_paths=8192,num_steps=32,seed=20250115)
-american_mc=lsmc.price_american_call_unbiased(spot=5300.,strike=5300.,rate=r,div_yield=r,
-    vol=.20,expiry=T,pricing_seed=20250116,currency="USD")
+american_mc=lsmc.price_american_unbiased(spot=5300.,strike=5300.,rate=r,div_yield=r,
+    vol=.20,expiry=T,pricing_seed=20250116,currency="USD",
+    is_call=True)
 mc_position=american_mc.mean.amount*2*50
 mc_stderr=american_mc.stderr*2*50
 print({"native_American":american,"native_European":european,

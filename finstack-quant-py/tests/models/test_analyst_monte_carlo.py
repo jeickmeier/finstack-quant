@@ -78,7 +78,7 @@ def test_maturity_only_lsmc_counts_pairs_and_uses_pair_mean_standard_error() -> 
     for antithetic, count, payoffs in ((True, pairs, paired_payoffs), (False, 2 * pairs, plain_payoffs)):
         result = LsmcPricer(
             num_paths=count, seed=seed, use_parallel=False, num_steps=1, antithetic=antithetic
-        ).price_american_put(spot, strike, rate, 0.0, vol, expiry)
+        ).price_american(spot, strike, rate, 0.0, vol, expiry, False)
         assert result.num_paths == count
         assert result.num_simulated_paths == 2 * pairs
         assert result.mean.amount == pytest.approx(statistics.mean(payoffs), abs=1e-12)
@@ -154,7 +154,7 @@ def test_asian_exact_one_fixing_and_geometric_benchmark() -> None:
     for convention in ("arithmetic", "geometric"):
         assert asian_option_price(*args, 1, convention, True) == pytest.approx(vanilla, abs=1e-12)
     european = EuropeanPricer(4096, 17, False).price_call(*args, num_steps=1)
-    asian = PathDependentPricer(4096, 17, False, False).price_asian_call(*args, num_steps=1)
+    asian = PathDependentPricer(4096, 17, False, False).price_asian(*args, True, num_steps=1)
     assert asian.mean.amount == european.mean.amount
     # The two payoff reducers may round their sample variance one ulp apart.
     assert asian.stderr == pytest.approx(european.stderr, abs=1e-14)
@@ -174,9 +174,9 @@ def test_lsmc_holdout_seed_is_independent_and_replayable() -> None:
     args = (100.0, 100.0, 0.05, 0.0, 0.3, 1.0)
     pricer = LsmcPricer(2048, 17, False, 20, "polynomial", 3, True)
     with pytest.raises(ValueError, match="pricing_seed"):
-        pricer.price_american_put_unbiased(*args, pricing_seed=17)
-    first = pricer.price_american_put_unbiased(*args, pricing_seed=1017)
-    second = pricer.price_american_put_unbiased(*args, pricing_seed=1017)
+        pricer.price_american_unbiased(*args, False, pricing_seed=17)
+    first = pricer.price_american_unbiased(*args, False, pricing_seed=1017)
+    second = pricer.price_american_unbiased(*args, False, pricing_seed=1017)
     assert first.mean.amount == second.mean.amount
     assert first.stderr == second.stderr
     assert first.num_paths == 2048

@@ -11431,13 +11431,14 @@ export interface EuropeanPricerConstructor {
  */
 export interface LsmcPricer extends WasmOwned {
   /**
-   * Price an American call by Longstaff-Schwartz regression (in-sample exercise policy).
+   * Price an American option by Longstaff-Schwartz regression (in-sample exercise policy).
    * @param spot - Spot level at time 0.
    * @param strike - Exercise price in the same units as `spot`.
    * @param rate - Continuously compounded risk-free rate (decimal, annualized).
    * @param divYield - Continuous dividend yield (decimal, annualized).
    * @param vol - Annualized GBM volatility (decimal).
    * @param expiry - Time to expiry in years.
+   * @param isCall - `true` for a call payoff, `false` for a put.
    * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
    * @param numSteps - Optional exercise dates for this call; omitted keeps the pricer's value.
    * @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
@@ -11445,20 +11446,21 @@ export interface LsmcPricer extends WasmOwned {
    * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
    * @throws Error - Throws a `validation` error if an input is out of range, the basis name or currency code is unknown, or the regression is ill-conditioned.
    */
-  priceAmericanCall(
+  priceAmerican(
     spot: number,
     strike: number,
     rate: number,
     divYield: number,
     vol: number,
     expiry: number,
+    isCall: boolean,
     currency?: string,
     numSteps?: number,
     basis?: string,
     basisDegree?: number
   ): MoneyEstimate;
   /**
-   * Price an American call with an out-of-sample exercise policy: the
+   * Price an American option with an out-of-sample exercise policy: the
    * regression is fitted on the pricer's paths and applied to fresh paths
    * drawn from `pricingSeed`, removing the in-sample high bias.
    * @param spot - Spot level at time 0.
@@ -11467,6 +11469,7 @@ export interface LsmcPricer extends WasmOwned {
    * @param divYield - Continuous dividend yield (decimal, annualized).
    * @param vol - Annualized GBM volatility (decimal).
    * @param expiry - Time to expiry in years.
+   * @param isCall - `true` for a call payoff, `false` for a put.
    * @param pricingSeed - Seed of the independent pricing paths, as a safe integer or `bigint`; must differ from the pricer's seed.
    * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
    * @param numSteps - Optional exercise dates for this call; omitted keeps the pricer's value.
@@ -11475,71 +11478,14 @@ export interface LsmcPricer extends WasmOwned {
    * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
    * @throws Error - Throws a `validation` error if an input is out of range, the basis name or currency code is unknown, or `pricingSeed` equals the training seed.
    */
-  priceAmericanCallUnbiased(
+  priceAmericanUnbiased(
     spot: number,
     strike: number,
     rate: number,
     divYield: number,
     vol: number,
     expiry: number,
-    pricingSeed: number | bigint,
-    currency?: string,
-    numSteps?: number,
-    basis?: string,
-    basisDegree?: number
-  ): MoneyEstimate;
-  /**
-   * Price an American put by Longstaff-Schwartz regression (in-sample exercise policy).
-   * @param spot - Spot level at time 0.
-   * @param strike - Exercise price in the same units as `spot`.
-   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
-   * @param divYield - Continuous dividend yield (decimal, annualized).
-   * @param vol - Annualized GBM volatility (decimal).
-   * @param expiry - Time to expiry in years.
-   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
-   * @param numSteps - Optional exercise dates for this call; omitted keeps the pricer's value.
-   * @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
-   * @param basisDegree - Optional basis degree for this call; omitted keeps the pricer's degree.
-   * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-   * @throws Error - Throws a `validation` error if an input is out of range, the basis name or currency code is unknown, or the regression is ill-conditioned.
-   */
-  priceAmericanPut(
-    spot: number,
-    strike: number,
-    rate: number,
-    divYield: number,
-    vol: number,
-    expiry: number,
-    currency?: string,
-    numSteps?: number,
-    basis?: string,
-    basisDegree?: number
-  ): MoneyEstimate;
-  /**
-   * Price an American put with an out-of-sample exercise policy: the
-   * regression is fitted on the pricer's paths and applied to fresh paths
-   * drawn from `pricingSeed`, removing the in-sample high bias.
-   * @param spot - Spot level at time 0.
-   * @param strike - Exercise price in the same units as `spot`.
-   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
-   * @param divYield - Continuous dividend yield (decimal, annualized).
-   * @param vol - Annualized GBM volatility (decimal).
-   * @param expiry - Time to expiry in years.
-   * @param pricingSeed - Seed of the independent pricing paths, as a safe integer or `bigint`; must differ from the pricer's seed.
-   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
-   * @param numSteps - Optional exercise dates for this call; omitted keeps the pricer's value.
-   * @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
-   * @param basisDegree - Optional basis degree for this call; omitted keeps the pricer's degree.
-   * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-   * @throws Error - Throws a `validation` error if an input is out of range, the basis name or currency code is unknown, or `pricingSeed` equals the training seed.
-   */
-  priceAmericanPutUnbiased(
-    spot: number,
-    strike: number,
-    rate: number,
-    divYield: number,
-    vol: number,
-    expiry: number,
+    isCall: boolean,
     pricingSeed: number | bigint,
     currency?: string,
     numSteps?: number,
@@ -11579,7 +11525,7 @@ export interface LsmcPricer extends WasmOwned {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const pricer = new models.monteCarlo.LsmcPricer(10000, 42, false, 50);
- * const put = pricer.priceAmericanPut(100, 100, 0.05, 0.0, 0.2, 1.0);
+ * const put = pricer.priceAmerican(100, 100, 0.05, 0.0, 0.2, 1.0, false);
  * console.log(put.mean.amount, pricer.basis, pricer.basisDegree);
  * pricer.free();
  * ```
@@ -11617,55 +11563,34 @@ export interface LsmcPricerConstructor {
  */
 export interface PathDependentPricer extends WasmOwned {
   /**
-   * Price an arithmetic-average Asian call under GBM.
+   * Price an arithmetic-average Asian option under GBM.
    * @param spot - Spot level at time 0.
    * @param strike - Exercise price in the same units as `spot`.
    * @param rate - Continuously compounded risk-free rate (decimal, annualized).
    * @param divYield - Continuous dividend yield (decimal, annualized).
    * @param vol - Annualized GBM volatility (decimal).
    * @param expiry - Time to expiry in years.
+   * @param isCall - `true` for a call on the arithmetic average, `false` for a put.
    * @param numSteps - Optional number of averaging steps; omitted uses the registry default.
    * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
    * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
    * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
    */
-  priceAsianCall(
+  priceAsian(
     spot: number,
     strike: number,
     rate: number,
     divYield: number,
     vol: number,
     expiry: number,
-    numSteps?: number,
-    currency?: string
-  ): MoneyEstimate;
-  /**
-   * Price an arithmetic-average Asian put under GBM.
-   * @param spot - Spot level at time 0.
-   * @param strike - Exercise price in the same units as `spot`.
-   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
-   * @param divYield - Continuous dividend yield (decimal, annualized).
-   * @param vol - Annualized GBM volatility (decimal).
-   * @param expiry - Time to expiry in years.
-   * @param numSteps - Optional number of averaging steps; omitted uses the registry default.
-   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
-   * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
-   */
-  priceAsianPut(
-    spot: number,
-    strike: number,
-    rate: number,
-    divYield: number,
-    vol: number,
-    expiry: number,
+    isCall: boolean,
     numSteps?: number,
     currency?: string
   ): MoneyEstimate;
   /**
    * Price an arithmetic-average Asian option under GBM with likelihood-ratio delta and vega estimated from the same paths.
    *
-   * Every path is kept in memory, so `numPaths x (numSteps + 1)` may not exceed 4,000,000 and the default step count is 32, not the 252 steps of `priceAsianCall`.
+   * Every path is kept in memory, so `numPaths x (numSteps + 1)` may not exceed 4,000,000 and the default step count is 32, not the 252 steps of `priceAsian`.
    * @example
    * ```typescript
    * import init, { models } from "finstack-quant-wasm";
@@ -11732,7 +11657,7 @@ export interface PathDependentPricer extends WasmOwned {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const pricer = new models.monteCarlo.PathDependentPricer(10000, 42);
- * const call = pricer.priceAsianCall(100, 100, 0.05, 0.0, 0.2, 1.0, 12);
+ * const call = pricer.priceAsian(100, 100, 0.05, 0.0, 0.2, 1.0, true, 12);
  * console.log(call.mean.amount, pricer.antithetic);
  * pricer.free();
  * ```

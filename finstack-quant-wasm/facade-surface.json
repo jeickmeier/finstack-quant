@@ -3132,19 +3132,13 @@
   "models.monteCarlo.PathDependentPricer": {
     "kind": "class",
     "statics": [],
-    "methods": ["free", "priceAsianCall", "priceAsianPut", "priceWithLrmGreeks"],
+    "methods": ["free", "priceAsian", "priceWithLrmGreeks"],
     "getters": ["antithetic", "numPaths", "seed", "useBrownianBridge", "useParallel", "useSobol"]
   },
   "models.monteCarlo.LsmcPricer": {
     "kind": "class",
     "statics": [],
-    "methods": [
-      "free",
-      "priceAmericanCall",
-      "priceAmericanCallUnbiased",
-      "priceAmericanPut",
-      "priceAmericanPutUnbiased"
-    ],
+    "methods": ["free", "priceAmerican", "priceAmericanUnbiased"],
     "getters": ["antithetic", "basis", "basisDegree", "numPaths", "seed", "useParallel"]
   },
   "models.monteCarlo.priceHestonCall": {

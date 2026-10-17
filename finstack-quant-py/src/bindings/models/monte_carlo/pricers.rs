@@ -230,12 +230,25 @@ impl PyPathDependentPricer {
         .map_err(core_to_py)
     }
 
-    /// Price an Asian call under GBM dynamics.
+    /// Price an arithmetic Asian option under GBM dynamics.
     ///
     /// Releases the GIL during the Monte Carlo run.
+    ///
+    /// Parameters
+    /// ----------
+    /// spot, strike, rate, div_yield, vol, expiry : float
+    ///     GBM market inputs; ``rate`` / ``div_yield`` are continuously
+    ///     compounded decimals, ``vol`` is a positive decimal, ``expiry`` is in
+    ///     years.
+    /// is_call : bool
+    ///     ``True`` for a call on the arithmetic average, ``False`` for a put.
+    /// num_steps : int, optional
+    ///     Averaging steps ``1..=num_steps``; defaults to the registry value.
+    /// currency : Currency or str, optional
+    ///     Currency stamped on the estimate; defaults to the registry value.
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, num_steps=None, currency=None))]
-    fn price_asian_call(
+    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, num_steps=None, currency=None))]
+    fn price_asian(
         &self,
         py: Python<'_>,
         spot: f64,
@@ -244,6 +257,7 @@ impl PyPathDependentPricer {
         div_yield: f64,
         vol: f64,
         expiry: f64,
+        is_call: bool,
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMoneyEstimate> {
@@ -252,44 +266,7 @@ impl PyPathDependentPricer {
         let pricer = &self.inner;
         py.detach(|| {
             pricer.price_gbm_asian(
-                OptionType::Call,
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
-                num_steps,
-                ccy,
-            )
-        })
-        .map(PyMoneyEstimate::from_inner)
-        .map_err(core_to_py)
-    }
-
-    /// Price an Asian put under GBM dynamics.
-    ///
-    /// Releases the GIL during the Monte Carlo run.
-    #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, num_steps=None, currency=None))]
-    fn price_asian_put(
-        &self,
-        py: Python<'_>,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        num_steps: Option<usize>,
-        currency: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyMoneyEstimate> {
-        let ccy = resolve_currency(currency)?;
-        let num_steps = convenience::path_dependent_num_steps(num_steps).map_err(core_to_py)?;
-        let pricer = &self.inner;
-        py.detach(|| {
-            pricer.price_gbm_asian(
-                OptionType::Put,
+                OptionType::from(is_call),
                 spot,
                 strike,
                 rate,
@@ -327,7 +304,7 @@ impl PyPathDependentPricer {
     /// num_steps : int, optional
     ///     Time-grid steps, each an averaging date. Defaults to the registry
     ///     value ``convenience.greeks.lrm_num_steps`` (32), not the 252 steps
-    ///     of ``price_asian_call``: every path is kept in memory, so
+    ///     of ``price_asian``: every path is kept in memory, so
     ///     ``num_paths * (num_steps + 1)`` may not exceed ``4_000_000``.
     /// currency : Currency or str, optional
     ///     Currency stamped on the price estimate; defaults to the registry
@@ -531,7 +508,7 @@ impl PyLsmcPricer {
         self.inner.basis_degree()
     }
 
-    /// Price an American put under GBM dynamics.
+    /// Price an American option under GBM dynamics.
     ///
     /// Releases the GIL during the Monte Carlo run.
     ///
@@ -541,6 +518,8 @@ impl PyLsmcPricer {
     ///     GBM market inputs; ``rate`` / ``div_yield`` are continuously
     ///     compounded decimals, ``vol`` is a positive decimal, ``expiry`` is in
     ///     years.
+    /// is_call : bool
+    ///     ``True`` for a call, ``False`` for a put.
     /// currency : Currency or str, optional
     ///     Currency stamped on the estimate; defaults to the registry value.
     /// num_steps : int, optional
@@ -561,8 +540,8 @@ impl PyLsmcPricer {
     ///     and both rows of each antithetic pair; also raised for invalid market
     ///     inputs, currency, basis family, or basis degree.
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, currency=None, num_steps=None, basis=None, basis_degree=None))]
-    fn price_american_put(
+    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, currency=None, num_steps=None, basis=None, basis_degree=None))]
+    fn price_american(
         &self,
         py: Python<'_>,
         spot: f64,
@@ -571,6 +550,7 @@ impl PyLsmcPricer {
         div_yield: f64,
         vol: f64,
         expiry: f64,
+        is_call: bool,
         currency: Option<&Bound<'_, PyAny>>,
         num_steps: Option<usize>,
         basis: Option<&str>,
@@ -581,7 +561,7 @@ impl PyLsmcPricer {
             self.call_config(num_steps, basis, basis_degree)?;
         py.detach(|| {
             pricer.price_gbm_american(
-                OptionType::Put,
+                OptionType::from(is_call),
                 spot,
                 strike,
                 rate,
@@ -598,54 +578,7 @@ impl PyLsmcPricer {
         .map_err(core_to_py)
     }
 
-    /// Price an American call under GBM dynamics.
-    ///
-    /// Releases the GIL during the Monte Carlo run. Accepts the same per-call
-    /// ``num_steps`` / ``basis`` / ``basis_degree`` overrides as
-    /// ``price_american_put``.
-    ///
-    /// Raises ``ValueError`` for the same workload limits: at most ``100_000``
-    /// steps, ``10_000_000`` independent paths, and ``64_000_000`` retained spot
-    /// values including time zero and both rows of each antithetic pair.
-    #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, currency=None, num_steps=None, basis=None, basis_degree=None))]
-    fn price_american_call(
-        &self,
-        py: Python<'_>,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        currency: Option<&Bound<'_, PyAny>>,
-        num_steps: Option<usize>,
-        basis: Option<&str>,
-        basis_degree: Option<usize>,
-    ) -> PyResult<PyMoneyEstimate> {
-        let currency = resolve_currency(currency)?;
-        let (pricer, num_steps, basis, basis_degree) =
-            self.call_config(num_steps, basis, basis_degree)?;
-        py.detach(|| {
-            pricer.price_gbm_american(
-                OptionType::Call,
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
-                num_steps,
-                currency,
-                basis,
-                basis_degree,
-            )
-        })
-        .map(PyMoneyEstimate::from_inner)
-        .map_err(core_to_py)
-    }
-
-    /// Two-pass unbiased American put price (training fit + out-of-sample pricing).
+    /// Two-pass unbiased American option price (training fit + out-of-sample pricing).
     ///
     /// Mitigates the in-sample upward bias of single-pass LSMC: the regression
     /// is fit on a training path set seeded by the pricer's `seed`, and the
@@ -655,7 +588,7 @@ impl PyLsmcPricer {
     ///
     /// Releases the GIL during both Monte Carlo passes. Accepts the same
     /// per-call ``num_steps`` / ``basis`` / ``basis_degree`` overrides as
-    /// ``price_american_put``.
+    /// ``price_american``.
     ///
     /// Each pass applies the same workload limits and raises ``ValueError``
     /// above ``100_000`` steps, ``10_000_000`` independent paths, or
@@ -663,10 +596,10 @@ impl PyLsmcPricer {
     /// of each antithetic pair.
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
-        spot, strike, rate, div_yield, vol, expiry, pricing_seed, currency=None,
+        spot, strike, rate, div_yield, vol, expiry, is_call, pricing_seed, currency=None,
         num_steps=None, basis=None, basis_degree=None,
     ))]
-    fn price_american_put_unbiased(
+    fn price_american_unbiased(
         &self,
         py: Python<'_>,
         spot: f64,
@@ -675,6 +608,7 @@ impl PyLsmcPricer {
         div_yield: f64,
         vol: f64,
         expiry: f64,
+        is_call: bool,
         pricing_seed: u64,
         currency: Option<&Bound<'_, PyAny>>,
         num_steps: Option<usize>,
@@ -686,56 +620,7 @@ impl PyLsmcPricer {
             self.call_config(num_steps, basis, basis_degree)?;
         py.detach(|| {
             pricer.price_gbm_american_unbiased(
-                OptionType::Put,
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
-                num_steps,
-                currency,
-                basis,
-                basis_degree,
-                pricing_seed,
-            )
-        })
-        .map(PyMoneyEstimate::from_inner)
-        .map_err(core_to_py)
-    }
-
-    /// Two-pass unbiased American call price.
-    ///
-    /// See ``price_american_put_unbiased`` for the bias-mitigation rationale
-    /// and the meaning of ``pricing_seed``; the same per-call overrides apply.
-    /// Each pass raises ``ValueError`` for the same workload limits, including
-    /// ``64_000_000`` retained spot values with time zero and antithetic rows.
-    #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (
-        spot, strike, rate, div_yield, vol, expiry, pricing_seed, currency=None,
-        num_steps=None, basis=None, basis_degree=None,
-    ))]
-    fn price_american_call_unbiased(
-        &self,
-        py: Python<'_>,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        pricing_seed: u64,
-        currency: Option<&Bound<'_, PyAny>>,
-        num_steps: Option<usize>,
-        basis: Option<&str>,
-        basis_degree: Option<usize>,
-    ) -> PyResult<PyMoneyEstimate> {
-        let currency = resolve_currency(currency)?;
-        let (pricer, num_steps, basis, basis_degree) =
-            self.call_config(num_steps, basis, basis_degree)?;
-        py.detach(|| {
-            pricer.price_gbm_american_unbiased(
-                OptionType::Call,
+                OptionType::from(is_call),
                 spot,
                 strike,
                 rate,

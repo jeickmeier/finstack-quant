@@ -700,24 +700,30 @@ impl JsPathDependentPricer {
         self.inner.config().use_brownian_bridge
     }
 
-    /// Price an arithmetic-average Asian call under GBM.
-    /// @param spot - Spot level at time 0.
-    /// @param strike - Exercise price in the same units as `spot`.
-    /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-    /// @param div_yield - Continuous dividend yield (decimal, annualized).
-    /// @param vol - Annualized GBM volatility (decimal).
-    /// @param expiry - Time to expiry in years.
-    /// @param num_steps - Optional number of averaging steps; omitted uses the registry default.
-    /// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
-    /// @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+    /// Price an arithmetic-average Asian option under GBM.
+    ///
+    /// # Arguments
+    ///
+    /// * `spot` - Spot level at time 0.
+    /// * `strike` - Exercise price in the same units as `spot`.
+    /// * `rate` - Continuously compounded risk-free rate (decimal, annualized).
+    /// * `div_yield` - Continuous dividend yield (decimal, annualized).
+    /// * `vol` - Annualized GBM volatility (decimal).
+    /// * `expiry` - Time to expiry in years.
+    /// * `is_call` - `true` for a call on the arithmetic average, `false` for a put.
+    /// * `num_steps` - Optional number of averaging steps; omitted uses the registry default.
+    /// * `currency` - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
+    ///
+    /// # Returns
+    ///
+    /// The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if an input is non-finite or out of range or
-    /// the currency code is unknown.
+    /// Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
     #[allow(clippy::too_many_arguments)]
-    #[wasm_bindgen(js_name = priceAsianCall)]
-    pub fn price_asian_call(
+    #[wasm_bindgen(js_name = priceAsian)]
+    pub fn price_asian(
         &self,
         spot: JsValue,
         strike: JsValue,
@@ -725,10 +731,12 @@ impl JsPathDependentPricer {
         div_yield: JsValue,
         vol: JsValue,
         expiry: JsValue,
+        is_call: JsValue,
         num_steps: Option<JsValue>,
         currency: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let gbm = gbm_inputs(&spot, &strike, &rate, &div_yield, &vol, &expiry)?;
+        let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
         let num_steps =
             convenience::path_dependent_num_steps(js_opt_uint(num_steps.as_ref(), "numSteps")?)
                 .map_err(to_js_err)?;
@@ -736,57 +744,7 @@ impl JsPathDependentPricer {
         let estimate = self
             .inner
             .price_gbm_asian(
-                OptionType::Call,
-                gbm.spot,
-                gbm.strike,
-                gbm.rate,
-                gbm.div_yield,
-                gbm.vol,
-                gbm.expiry,
-                num_steps,
-                currency,
-            )
-            .map_err(to_js_err)?;
-        to_js_value(&estimate)
-    }
-
-    /// Price an arithmetic-average Asian put under GBM.
-    /// @param spot - Spot level at time 0.
-    /// @param strike - Exercise price in the same units as `spot`.
-    /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-    /// @param div_yield - Continuous dividend yield (decimal, annualized).
-    /// @param vol - Annualized GBM volatility (decimal).
-    /// @param expiry - Time to expiry in years.
-    /// @param num_steps - Optional number of averaging steps; omitted uses the registry default.
-    /// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
-    /// @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if an input is non-finite or out of range or
-    /// the currency code is unknown.
-    #[allow(clippy::too_many_arguments)]
-    #[wasm_bindgen(js_name = priceAsianPut)]
-    pub fn price_asian_put(
-        &self,
-        spot: JsValue,
-        strike: JsValue,
-        rate: JsValue,
-        div_yield: JsValue,
-        vol: JsValue,
-        expiry: JsValue,
-        num_steps: Option<JsValue>,
-        currency: Option<JsValue>,
-    ) -> Result<JsValue, JsValue> {
-        let gbm = gbm_inputs(&spot, &strike, &rate, &div_yield, &vol, &expiry)?;
-        let num_steps =
-            convenience::path_dependent_num_steps(js_opt_uint(num_steps.as_ref(), "numSteps")?)
-                .map_err(to_js_err)?;
-        let currency = js_currency(currency.as_ref())?;
-        let estimate = self
-            .inner
-            .price_gbm_asian(
-                OptionType::Put,
+                option_type,
                 gbm.spot,
                 gbm.strike,
                 gbm.rate,
@@ -805,7 +763,7 @@ impl JsPathDependentPricer {
     ///
     /// Every path is kept in memory, so `numPaths x (numSteps + 1)` may not
     /// exceed 4,000,000 and the default step count is 32, not the 252 steps
-    /// of `priceAsianCall`.
+    /// of `priceAsian`.
     /// @param spot - Finite, strictly positive spot level at time 0.
     /// @param strike - Exercise price in the same units as `spot`.
     /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
@@ -1000,26 +958,32 @@ impl JsLsmcPricer {
         self.inner.basis_degree()
     }
 
-    /// Price an American put by Longstaff-Schwartz regression (in-sample exercise policy).
-    /// @param spot - Spot level at time 0.
-    /// @param strike - Exercise price in the same units as `spot`.
-    /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-    /// @param div_yield - Continuous dividend yield (decimal, annualized).
-    /// @param vol - Annualized GBM volatility (decimal).
-    /// @param expiry - Time to expiry in years.
-    /// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
-    /// @param num_steps - Optional exercise dates for this call; omitted keeps the pricer's value.
-    /// @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
-    /// @param basis_degree - Optional basis degree for this call; omitted keeps the pricer's degree.
-    /// @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+    /// Price an American option by Longstaff-Schwartz regression (in-sample exercise policy).
+    ///
+    /// # Arguments
+    ///
+    /// * `spot` - Spot level at time 0.
+    /// * `strike` - Exercise price in the same units as `spot`.
+    /// * `rate` - Continuously compounded risk-free rate (decimal, annualized).
+    /// * `div_yield` - Continuous dividend yield (decimal, annualized).
+    /// * `vol` - Annualized GBM volatility (decimal).
+    /// * `expiry` - Time to expiry in years.
+    /// * `is_call` - `true` for a call payoff, `false` for a put.
+    /// * `currency` - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
+    /// * `num_steps` - Optional exercise dates for this call; omitted keeps the pricer's value.
+    /// * `basis` - Optional regression basis for this call; omitted keeps the pricer's basis.
+    /// * `basis_degree` - Optional basis degree for this call; omitted keeps the pricer's degree.
+    ///
+    /// # Returns
+    ///
+    /// The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if an input is out of range, the basis name
-    /// or currency code is unknown, or the regression is ill-conditioned.
+    /// Throws a `validation` error if an input is out of range, the basis name or currency code is unknown, or the regression is ill-conditioned.
     #[allow(clippy::too_many_arguments)]
-    #[wasm_bindgen(js_name = priceAmericanPut)]
-    pub fn price_american_put(
+    #[wasm_bindgen(js_name = priceAmerican)]
+    pub fn price_american(
         &self,
         spot: JsValue,
         strike: JsValue,
@@ -1027,11 +991,13 @@ impl JsLsmcPricer {
         div_yield: JsValue,
         vol: JsValue,
         expiry: JsValue,
+        is_call: JsValue,
         currency: Option<JsValue>,
         num_steps: Option<JsValue>,
         basis: Option<JsValue>,
         basis_degree: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
         let call = self.call(
             &spot,
             &strike,
@@ -1047,7 +1013,7 @@ impl JsLsmcPricer {
         let estimate = call
             .pricer
             .price_gbm_american(
-                OptionType::Put,
+                option_type,
                 call.gbm.spot,
                 call.gbm.strike,
                 call.gbm.rate,
@@ -1063,92 +1029,35 @@ impl JsLsmcPricer {
         to_js_value(&estimate)
     }
 
-    /// Price an American call by Longstaff-Schwartz regression (in-sample exercise policy).
-    /// @param spot - Spot level at time 0.
-    /// @param strike - Exercise price in the same units as `spot`.
-    /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-    /// @param div_yield - Continuous dividend yield (decimal, annualized).
-    /// @param vol - Annualized GBM volatility (decimal).
-    /// @param expiry - Time to expiry in years.
-    /// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
-    /// @param num_steps - Optional exercise dates for this call; omitted keeps the pricer's value.
-    /// @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
-    /// @param basis_degree - Optional basis degree for this call; omitted keeps the pricer's degree.
-    /// @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if an input is out of range, the basis name
-    /// or currency code is unknown, or the regression is ill-conditioned.
-    #[allow(clippy::too_many_arguments)]
-    #[wasm_bindgen(js_name = priceAmericanCall)]
-    pub fn price_american_call(
-        &self,
-        spot: JsValue,
-        strike: JsValue,
-        rate: JsValue,
-        div_yield: JsValue,
-        vol: JsValue,
-        expiry: JsValue,
-        currency: Option<JsValue>,
-        num_steps: Option<JsValue>,
-        basis: Option<JsValue>,
-        basis_degree: Option<JsValue>,
-    ) -> Result<JsValue, JsValue> {
-        let call = self.call(
-            &spot,
-            &strike,
-            &rate,
-            &div_yield,
-            &vol,
-            &expiry,
-            currency.as_ref(),
-            num_steps.as_ref(),
-            basis.as_ref(),
-            basis_degree.as_ref(),
-        )?;
-        let estimate = call
-            .pricer
-            .price_gbm_american(
-                OptionType::Call,
-                call.gbm.spot,
-                call.gbm.strike,
-                call.gbm.rate,
-                call.gbm.div_yield,
-                call.gbm.vol,
-                call.gbm.expiry,
-                call.num_steps,
-                call.currency,
-                call.basis,
-                call.basis_degree,
-            )
-            .map_err(to_js_err)?;
-        to_js_value(&estimate)
-    }
-
-    /// Price an American put with an out-of-sample exercise policy: the
+    /// Price an American option with an out-of-sample exercise policy: the
     /// regression is fitted on the pricer's paths and applied to fresh paths
-    /// drawn from `pricingSeed`, removing the in-sample high bias.
-    /// @param spot - Spot level at time 0.
-    /// @param strike - Exercise price in the same units as `spot`.
-    /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-    /// @param div_yield - Continuous dividend yield (decimal, annualized).
-    /// @param vol - Annualized GBM volatility (decimal).
-    /// @param expiry - Time to expiry in years.
-    /// @param pricing_seed - Seed of the independent pricing paths, as a safe integer or `bigint`; must differ from the pricer's seed.
-    /// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
-    /// @param num_steps - Optional exercise dates for this call; omitted keeps the pricer's value.
-    /// @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
-    /// @param basis_degree - Optional basis degree for this call; omitted keeps the pricer's degree.
-    /// @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+    /// drawn from `pricing_seed`, removing the in-sample high bias.
+    ///
+    /// # Arguments
+    ///
+    /// * `spot` - Spot level at time 0.
+    /// * `strike` - Exercise price in the same units as `spot`.
+    /// * `rate` - Continuously compounded risk-free rate (decimal, annualized).
+    /// * `div_yield` - Continuous dividend yield (decimal, annualized).
+    /// * `vol` - Annualized GBM volatility (decimal).
+    /// * `expiry` - Time to expiry in years.
+    /// * `is_call` - `true` for a call payoff, `false` for a put.
+    /// * `pricing_seed` - Seed of the independent pricing paths, as a safe integer or `bigint`; must differ from the pricer's seed.
+    /// * `currency` - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
+    /// * `num_steps` - Optional exercise dates for this call; omitted keeps the pricer's value.
+    /// * `basis` - Optional regression basis for this call; omitted keeps the pricer's basis.
+    /// * `basis_degree` - Optional basis degree for this call; omitted keeps the pricer's degree.
+    ///
+    /// # Returns
+    ///
+    /// The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if an input is out of range, the basis name
-    /// or currency code is unknown, or `pricingSeed` equals the training seed.
+    /// Throws a `validation` error if an input is out of range, the basis name or currency code is unknown, or `pricing_seed` equals the training seed.
     #[allow(clippy::too_many_arguments)]
-    #[wasm_bindgen(js_name = priceAmericanPutUnbiased)]
-    pub fn price_american_put_unbiased(
+    #[wasm_bindgen(js_name = priceAmericanUnbiased)]
+    pub fn price_american_unbiased(
         &self,
         spot: JsValue,
         strike: JsValue,
@@ -1156,12 +1065,14 @@ impl JsLsmcPricer {
         div_yield: JsValue,
         vol: JsValue,
         expiry: JsValue,
+        is_call: JsValue,
         pricing_seed: JsValue,
         currency: Option<JsValue>,
         num_steps: Option<JsValue>,
         basis: Option<JsValue>,
         basis_degree: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
         let pricing_seed = js_u64(&pricing_seed, "pricingSeed")?;
         let call = self.call(
             &spot,
@@ -1178,76 +1089,7 @@ impl JsLsmcPricer {
         let estimate = call
             .pricer
             .price_gbm_american_unbiased(
-                OptionType::Put,
-                call.gbm.spot,
-                call.gbm.strike,
-                call.gbm.rate,
-                call.gbm.div_yield,
-                call.gbm.vol,
-                call.gbm.expiry,
-                call.num_steps,
-                call.currency,
-                call.basis,
-                call.basis_degree,
-                pricing_seed,
-            )
-            .map_err(to_js_err)?;
-        to_js_value(&estimate)
-    }
-
-    /// Price an American call with an out-of-sample exercise policy: the
-    /// regression is fitted on the pricer's paths and applied to fresh paths
-    /// drawn from `pricingSeed`, removing the in-sample high bias.
-    /// @param spot - Spot level at time 0.
-    /// @param strike - Exercise price in the same units as `spot`.
-    /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-    /// @param div_yield - Continuous dividend yield (decimal, annualized).
-    /// @param vol - Annualized GBM volatility (decimal).
-    /// @param expiry - Time to expiry in years.
-    /// @param pricing_seed - Seed of the independent pricing paths, as a safe integer or `bigint`; must differ from the pricer's seed.
-    /// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
-    /// @param num_steps - Optional exercise dates for this call; omitted keeps the pricer's value.
-    /// @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
-    /// @param basis_degree - Optional basis degree for this call; omitted keeps the pricer's degree.
-    /// @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if an input is out of range, the basis name
-    /// or currency code is unknown, or `pricingSeed` equals the training seed.
-    #[allow(clippy::too_many_arguments)]
-    #[wasm_bindgen(js_name = priceAmericanCallUnbiased)]
-    pub fn price_american_call_unbiased(
-        &self,
-        spot: JsValue,
-        strike: JsValue,
-        rate: JsValue,
-        div_yield: JsValue,
-        vol: JsValue,
-        expiry: JsValue,
-        pricing_seed: JsValue,
-        currency: Option<JsValue>,
-        num_steps: Option<JsValue>,
-        basis: Option<JsValue>,
-        basis_degree: Option<JsValue>,
-    ) -> Result<JsValue, JsValue> {
-        let pricing_seed = js_u64(&pricing_seed, "pricingSeed")?;
-        let call = self.call(
-            &spot,
-            &strike,
-            &rate,
-            &div_yield,
-            &vol,
-            &expiry,
-            currency.as_ref(),
-            num_steps.as_ref(),
-            basis.as_ref(),
-            basis_degree.as_ref(),
-        )?;
-        let estimate = call
-            .pricer
-            .price_gbm_american_unbiased(
-                OptionType::Call,
+                option_type,
                 call.gbm.spot,
                 call.gbm.strike,
                 call.gbm.rate,

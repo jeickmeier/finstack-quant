@@ -487,9 +487,8 @@ via `max_event_step()` so grid mismatches are caught up front.
 - **WASM** — the `models.monteCarlo` namespace in
   [`exports/models/monteCarlo.js`](../../finstack-quant-wasm/exports/models/monteCarlo.js)
   exposes `simulatePaths` and the convenience pricers: `priceEuropeanCall/Put`,
-  `priceHestonCall/Put`, `priceAsianCall/Put`, `priceAmericanCall/Put`,
-  `priceAmericanCallUnbiased` / `priceAmericanExerciseUnbiased`, and
-  `blackScholesCall/Put`.
+  `priceHestonCall/Put`, `priceAsian`, `priceAmerican`,
+  `priceAmericanUnbiased`, and `blackScholesCall/Put`.
 
 Neither binding exposes the generic trait surface: `simulate_paths` selects among
 the built-in processes and schemes by spec, and custom processes, schemes, and
