@@ -286,16 +286,13 @@ fn parse_method(method: &str) -> PyResult<RealizedVarMethod> {
 /// Annualized realized variance of a close price series (mean of squared log
 /// returns, no mean subtraction, times ``annualization_factor``).
 ///
-/// ``method`` must be ``"close_to_close"``; the OHLC estimators require
-/// ``realized_variance_ohlc``. ``None`` arguments select the Rust defaults
-/// (close-to-close, 252 daily observations per year). Raises ``ValueError``
+/// The OHLC estimators live in ``realized_variance_ohlc``. ``None`` selects
+/// the Rust default of 252 daily observations per year. Raises ``ValueError``
 /// for non-positive or non-finite prices or annualization factor.
 ///
 /// # Arguments
 ///
 /// * `prices` - One-dimensional positive close prices in chronological order.
-/// * `method` - Canonical estimator label; this entry point requires `close_to_close`
-///   (the Rust default when `None`).
 /// * `annualization_factor` - Positive observations-per-year multiplier; `None`
 ///   selects the Rust default of 252 for daily bars.
 ///
@@ -303,17 +300,15 @@ fn parse_method(method: &str) -> PyResult<RealizedVarMethod> {
 ///
 /// Raises `TypeError` when a series is not one-dimensional or contains non-numeric values.
 #[pyfunction]
-#[pyo3(signature = (prices, method=None, annualization_factor=None))]
-#[pyo3(text_signature = "(prices, method=None, annualization_factor=None)")]
+#[pyo3(signature = (prices, annualization_factor=None))]
+#[pyo3(text_signature = "(prices, annualization_factor=None)")]
 fn realized_variance(
     py: Python<'_>,
     prices: &Bound<'_, PyAny>,
-    method: Option<&str>,
     annualization_factor: Option<f64>,
 ) -> PyResult<f64> {
     let prices = extract_series(prices)?;
-    let method = method.map(parse_method).transpose()?;
-    py.detach(|| stats::realized_variance(&prices, method, annualization_factor))
+    py.detach(|| stats::realized_variance(&prices, annualization_factor))
         .map_err(core_to_py)
 }
 

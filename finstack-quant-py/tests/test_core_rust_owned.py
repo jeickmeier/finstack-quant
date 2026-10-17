@@ -182,7 +182,7 @@ def test_fx_matrix_from_dict_uses_the_rust_currency_pair_parser() -> None:
 
 def test_realized_variance_defaults_are_rust_owned() -> None:
     prices = [100.0, 101.0, 100.5, 102.0]
-    assert stats.realized_variance(prices) == stats.realized_variance(prices, "close_to_close", 252.0)
+    assert stats.realized_variance(prices) == stats.realized_variance(prices, 252.0)
     o = [100.0, 101.5, 100.8, 102.0]
     h = [102.0, 103.0, 102.5, 103.5]
     lo = [99.0, 100.2, 99.9, 101.0]

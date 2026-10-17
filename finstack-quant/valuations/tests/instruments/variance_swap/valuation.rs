@@ -3,7 +3,7 @@
 use super::common::*;
 use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::stats::{realized_variance, RealizedVarMethod};
+use finstack_quant_core::math::stats::realized_variance;
 use finstack_quant_valuations::instruments::equity::variance_swap::PayReceive;
 use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
@@ -236,7 +236,6 @@ fn test_npv_at_maturity_recovers_realized_payoff() {
     // Assert
     let realized = realized_variance(
         &prices.iter().map(|(_, p)| *p).collect::<Vec<_>>(),
-        Some(RealizedVarMethod::CloseToClose),
         Some(252.0),
     )
     .expect("CloseToClose should succeed");

@@ -26,8 +26,8 @@ const OHLC = {
 
 test('realizedVariance and realizedVarianceOhlc take the Rust defaults', () => {
   assert.equal(core.realizedVariance(PRICES), 0.04341008921510013);
-  assert.equal(core.realizedVariance(PRICES, null, null), 0.04341008921510013);
-  assert.equal(core.realizedVariance(PRICES, 'close_to_close', 52), 0.008957637457084153);
+  assert.equal(core.realizedVariance(PRICES, null), 0.04341008921510013);
+  assert.equal(core.realizedVariance(PRICES, 52), 0.008957637457084153);
   const { open, high, low, close } = OHLC;
   // The OHLC default estimator is Yang-Zhang (RealizedVarMethod::OHLC_DEFAULT).
   assert.equal(core.realizedVarianceOhlc(open, high, low, close), 0.04489594471070698);
@@ -36,14 +36,6 @@ test('realizedVariance and realizedVarianceOhlc take the Rust defaults', () => {
     0.04489594471070698
   );
   assert.equal(core.realizedVarianceOhlc(open, high, low, close, 'parkinson'), 0.04439216444474536);
-  assert.throws(
-    () => core.realizedVariance(PRICES, 'parkinson'),
-    (error) => error.kind === 'validation'
-  );
-  assert.throws(
-    () => core.realizedVariance(PRICES, 'nope'),
-    (error) => error.kind === 'validation'
-  );
 });
 
 test('Rate and Bps: parse, getters, conversions and JSON', () => {

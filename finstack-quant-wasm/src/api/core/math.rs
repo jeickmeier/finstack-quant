@@ -160,26 +160,21 @@ pub fn covariance(x: JsValue, y: JsValue) -> Result<f64, JsValue> {
 /// # Arguments
 ///
 /// * `prices` - Close prices in time order; each must be finite and positive.
-/// * `method` - Estimator name; only `"close_to_close"` applies to closes
-///   (the OHLC estimators need `realizedVarianceOhlc`). Omitted selects the
-///   Rust default (`"close_to_close"`).
 /// * `annualization_factor` - Observations per year (for example `252` for
 ///   daily closes); omitted selects the Rust daily default (252).
 ///
 /// @returns Annualized realized variance (decimal, not volatility).
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) for an unknown or OHLC-only method, a non-positive or
-/// non-finite price, or a non-positive annualization factor.
+/// `validation`) for a non-positive or non-finite price or a non-positive
+/// annualization factor.
 #[wasm_bindgen(js_name = realizedVariance)]
 pub fn realized_variance(
     prices: JsValue,
-    method: Option<JsValue>,
     annualization_factor: Option<JsValue>,
 ) -> Result<f64, JsValue> {
     let prices: &[f64] = &js_f64_seq(&prices, "prices")?;
-    let method = realized_var_method(method)?;
     let annualization_factor = js_opt_f64(annualization_factor.as_ref(), "annualizationFactor")?;
-    stats::realized_variance(prices, method, annualization_factor).map_err(to_js_err)
+    stats::realized_variance(prices, annualization_factor).map_err(to_js_err)
 }
 
 /// Annualized realized variance from OHLC bars (Rust `stats::realized_variance_ohlc`).

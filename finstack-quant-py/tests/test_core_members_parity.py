@@ -25,11 +25,9 @@ CLOSE = [101.0, 99.5, 100.2, 100.6]
 
 def test_realized_variance_defaults_are_rust_owned() -> None:
     assert realized_variance(PRICES) == 0.04341008921510013
-    assert realized_variance(PRICES, "close_to_close", 52.0) == 0.008957637457084153
+    assert realized_variance(PRICES, 52.0) == 0.008957637457084153
     assert realized_variance_ohlc(OPEN, HIGH, LOW, CLOSE) == 0.04489594471070698
     assert realized_variance_ohlc(OPEN, HIGH, LOW, CLOSE, "parkinson") == 0.04439216444474536
-    with pytest.raises(ValueError, match="requires OHLC data"):
-        realized_variance(PRICES, "parkinson")
 
 
 def test_rate_family_values_match_wasm() -> None:

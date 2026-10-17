@@ -465,8 +465,6 @@ pub fn quantile(data: &mut [f64], p: f64) -> f64 {
 /// # Arguments
 /// * `prices` - Close price series ordered in time; every price must be finite
 ///   and strictly positive.
-/// * `method` - Estimator; must be `CloseToClose` (OHLC-only methods return an
-///   error). `None` selects [`RealizedVarMethod::default`] (`CloseToClose`).
 /// * `annualization_factor` - Observations per year used to annualize the
 ///   per-period variance (for example `252.0` for daily closes); must be
 ///   finite and positive. `None` selects the daily convention,
@@ -474,18 +472,12 @@ pub fn quantile(data: &mut [f64], p: f64) -> f64 {
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`](crate::Error::Validation) if `method` requires
-/// OHLC data, the annualization factor is not finite and positive, or a price
-/// is not finite and positive.
+/// Returns [`Error::Validation`](crate::Error::Validation) if the annualization
+/// factor is not finite and positive, or a price is not finite and positive.
 ///
 /// # Returns
 /// Annualized realized variance
-pub fn realized_variance(
-    prices: &[f64],
-    method: Option<RealizedVarMethod>,
-    annualization_factor: Option<f64>,
-) -> crate::Result<f64> {
-    let method = method.unwrap_or_default();
+pub fn realized_variance(prices: &[f64], annualization_factor: Option<f64>) -> crate::Result<f64> {
     let annualization_factor = annualization_factor.unwrap_or_else(default_annualization_factor);
     if !annualization_factor.is_finite() || annualization_factor <= 0.0 {
         return Err(crate::Error::Validation(format!(
@@ -504,27 +496,16 @@ pub fn realized_variance(
         return Ok(0.0);
     }
 
-    match method {
-        RealizedVarMethod::CloseToClose => {
-            let returns = log_returns(prices);
-            let var = returns.iter().map(|r| r * r).sum::<f64>() / returns.len() as f64
-                * annualization_factor;
-            if !var.is_finite() || var < 0.0 {
-                return Err(crate::Error::Validation(
-                    "realized_variance: non-positive or non-finite prices produce undefined log returns".into(),
-                ));
-            }
-            Ok(var)
-        }
-        RealizedVarMethod::Parkinson
-        | RealizedVarMethod::GarmanKlass
-        | RealizedVarMethod::RogersSatchell
-        | RealizedVarMethod::YangZhang => Err(crate::Error::Validation(format!(
-            "Realized variance method '{}' requires OHLC data. \
-             Use realized_variance_ohlc() with open, high, low, and close price series.",
-            method.label()
-        ))),
+    let returns = log_returns(prices);
+    let var =
+        returns.iter().map(|r| r * r).sum::<f64>() / returns.len() as f64 * annualization_factor;
+    if !var.is_finite() || var < 0.0 {
+        return Err(crate::Error::Validation(
+            "realized_variance: non-positive or non-finite prices produce undefined log returns"
+                .into(),
+        ));
     }
+    Ok(var)
 }
 
 /// Calculate realized variance from OHLC data using advanced estimators.
@@ -607,9 +588,7 @@ pub fn realized_variance_ohlc(
     }
 
     let result = match method {
-        RealizedVarMethod::CloseToClose => {
-            realized_variance(close, Some(method), Some(annualization_factor))
-        }
+        RealizedVarMethod::CloseToClose => realized_variance(close, Some(annualization_factor)),
         RealizedVarMethod::Parkinson => {
             // Parkinson (1980) high-low range estimator
             // More efficient than close-to-close, using intraday range information
@@ -1584,9 +1563,7 @@ mod tests {
             Some(f64::INFINITY),
         )
         .is_err());
-        assert!(
-            realized_variance(&close, Some(RealizedVarMethod::CloseToClose), Some(-1.0)).is_err()
-        );
+        assert!(realized_variance(&close, Some(-1.0)).is_err());
     }
 
     #[test]
@@ -1601,9 +1578,8 @@ mod tests {
         assert_eq!(daily, 252.0);
 
         assert_eq!(
-            realized_variance(&close, None, None).expect("defaults"),
-            realized_variance(&close, Some(RealizedVarMethod::CloseToClose), Some(daily))
-                .expect("explicit"),
+            realized_variance(&close, None).expect("defaults"),
+            realized_variance(&close, Some(daily)).expect("explicit"),
         );
         assert_eq!(
             RealizedVarMethod::OHLC_DEFAULT,

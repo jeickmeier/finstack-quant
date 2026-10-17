@@ -8167,16 +8167,11 @@ export interface CoreNamespace {
    * core.realizedVariance([100, 101, 99.5, 100.2]);  // close-to-close, 252/yr
    * ```
    * @param prices - Close prices in time order; each must be finite and positive.
-   * @param method - Estimator name; only `"close_to_close"` applies to closes (the OHLC estimators need `realizedVarianceOhlc`). Omitted selects the Rust default (`"close_to_close"`).
    * @param annualizationFactor - Observations per year (for example `252` for daily closes); omitted selects the Rust daily default (252).
    * @returns Annualized realized variance (decimal, not volatility).
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an unknown or OHLC-only method, a non-positive or non-finite price, or a non-positive annualization factor.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for a non-positive or non-finite price or a non-positive annualization factor.
    */
-  realizedVariance(
-    prices: NumericArray,
-    method?: string | null,
-    annualizationFactor?: number | null
-  ): number;
+  realizedVariance(prices: NumericArray, annualizationFactor?: number | null): number;
   /**
    * Annualized realized variance from OHLC bars (Rust `stats::realized_variance_ohlc`).
    *
