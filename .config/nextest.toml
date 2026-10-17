@@ -1,0 +1,6 @@
+[profile.default]
+# Report any test over 20 s as SLOW; the suite wall time is bounded by its
+# longest test, so a new one over this threshold should be split or looked at.
+slow-timeout = { period = "20s" }
+# Match the `--no-fail-fast` the mise rust-test-* tasks pass.
+fail-fast = false
