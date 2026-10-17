@@ -123,7 +123,6 @@ impl EquityOptionPdePricer {
             rate: r,
             dividend: q,
             strike: inst.strike,
-            maturity: t,
             is_call,
         };
 

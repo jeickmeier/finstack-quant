@@ -170,9 +170,9 @@ fn finite_diff_strike(surface: &VolSurface, strikes: &[f64], si: usize, expiry: 
     }
 
     if si == 0 {
-        // Forward differences
+        // Forward difference for first derivative, 3-point forward for second derivative
         let dk1 = strikes[1] - strikes[0];
-        let dk2 = strikes[2] - strikes[0];
+        let dk2 = strikes[2] - strikes[1];
         if dk1.abs() < 1e-14 || dk2.abs() < 1e-14 {
             return (0.0, 0.0);
         }
@@ -180,14 +180,13 @@ fn finite_diff_strike(surface: &VolSurface, strikes: &[f64], si: usize, expiry: 
         let w1 = total_var(1);
         let w2 = total_var(2);
         let dw_dk = (w1 - w0) / dk1;
-        let dk12 = strikes[2] - strikes[1];
-        let dk_avg = 0.5 * (dk1 + dk12);
-        let d2w_dk2 = (w2 / dk12 - w1 * (1.0 / dk12 + 1.0 / dk1) + w0 / dk1) / dk_avg;
+        let dk_avg = 0.5 * (dk1 + dk2);
+        let d2w_dk2 = (w2 / dk2 - w1 * (1.0 / dk2 + 1.0 / dk1) + w0 / dk1) / dk_avg;
         (dw_dk, d2w_dk2)
     } else if si == n - 1 {
-        // Backward differences
+        // Backward difference for first derivative, 3-point backward for second derivative
         let dk1 = strikes[n - 1] - strikes[n - 2];
-        let dk2 = strikes[n - 1] - strikes[n - 3];
+        let dk2 = strikes[n - 2] - strikes[n - 3];
         if dk1.abs() < 1e-14 || dk2.abs() < 1e-14 {
             return (0.0, 0.0);
         }
@@ -195,12 +194,11 @@ fn finite_diff_strike(surface: &VolSurface, strikes: &[f64], si: usize, expiry: 
         let w1 = total_var(n - 2);
         let w2 = total_var(n - 1);
         let dw_dk = (w2 - w1) / dk1;
-        let dk01 = strikes[n - 2] - strikes[n - 3];
-        let dk_avg = 0.5 * (dk01 + dk1);
-        let d2w_dk2 = (w2 / dk1 - w1 * (1.0 / dk1 + 1.0 / dk01) + w0 / dk01) / dk_avg;
+        let dk_avg = 0.5 * (dk1 + dk2);
+        let d2w_dk2 = (w2 / dk1 - w1 * (1.0 / dk1 + 1.0 / dk2) + w0 / dk2) / dk_avg;
         (dw_dk, d2w_dk2)
     } else {
-        // Central differences
+        // 3-point central differences (2nd-order Lagrange on non-uniform grids)
         let dk_minus = strikes[si] - strikes[si - 1];
         let dk_plus = strikes[si + 1] - strikes[si];
         if dk_minus.abs() < 1e-14 || dk_plus.abs() < 1e-14 {
@@ -210,8 +208,15 @@ fn finite_diff_strike(surface: &VolSurface, strikes: &[f64], si: usize, expiry: 
         let w_center = total_var(si);
         let w_plus = total_var(si + 1);
 
-        let dw_dk = (w_plus - w_minus) / (dk_minus + dk_plus);
-        let dk_avg = 0.5 * (dk_minus + dk_plus);
+        let dk_sum = dk_minus + dk_plus;
+        let dw_dk = if (dk_plus - dk_minus).abs() < 1e-14 {
+            (w_plus - w_minus) / dk_sum
+        } else {
+            -dk_plus / (dk_minus * dk_sum) * w_minus
+                + (dk_plus - dk_minus) / (dk_minus * dk_plus) * w_center
+                + dk_minus / (dk_plus * dk_sum) * w_plus
+        };
+        let dk_avg = 0.5 * dk_sum;
         let d2w_dk2 = (w_plus / dk_plus - w_center * (1.0 / dk_plus + 1.0 / dk_minus)
             + w_minus / dk_minus)
             / dk_avg;

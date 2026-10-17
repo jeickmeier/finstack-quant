@@ -199,7 +199,7 @@ fn bench_pv_by_period(c: &mut Criterion) {
     let mut group = c.benchmark_group("cashflow_pv_by_period");
     let base = base_date();
     let market = make_market(base);
-    let disc = market.get_discount("USD-OIS").unwrap();
+    let disc_id = finstack_quant_core::types::CurveId::from("USD-OIS");
 
     {
         let (years, label) = (5i32, "5y_40cf");
@@ -211,15 +211,13 @@ fn bench_pv_by_period(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
             b.iter(|| {
                 black_box(&schedule)
-                    .pv_by_period_with_discounting(
+                    .pv_by_period(
                         black_box(&periods),
-                        black_box(disc.as_ref()),
+                        black_box(&market),
+                        black_box(&disc_id),
                         None,
-                        DateContext::new(
-                            black_box(base),
-                            DayCount::Act365F,
-                            DayCountContext::default(),
-                        ),
+                        black_box(base),
+                        Some(DayCount::Act365F),
                     )
                     .unwrap()
             });
@@ -235,50 +233,50 @@ fn bench_pv_by_period_credit(c: &mut Criterion) {
     let mut group = c.benchmark_group("cashflow_pv_by_period_credit");
     let base = base_date();
     let market = make_market(base);
-    let disc = market.get_discount("USD-OIS").unwrap();
-    let hazard = market.get_hazard("USD-CREDIT").unwrap();
-
-    use finstack_quant_cashflows::aggregation::DateContext;
+    let hazard_zero = HazardCurve::builder("USD-CREDIT-ZERO-REC")
+        .base_date(base)
+        .recovery_rate(0.0)
+        .knots([(0.0, 0.015), (5.0, 0.015), (10.0, 0.015)])
+        .build()
+        .unwrap();
+    let market = market.insert(hazard_zero);
+    let disc_id = finstack_quant_core::types::CurveId::from("USD-OIS");
+    let credit_id = finstack_quant_core::types::CurveId::from("USD-CREDIT");
+    let credit_zero_id = finstack_quant_core::types::CurveId::from("USD-CREDIT-ZERO-REC");
 
     {
         let (years, label) = (5i32, "5y_40cf");
         let schedule = make_fixed_schedule(base, years, Tenor::quarterly());
         let n_quarters = (years * 4) as u32 + 4;
         let periods = make_quarterly_periods(base, n_quarters);
-        let date_ctx = DateContext::new(base, DayCount::Act365F, DayCountContext::default());
 
         group.throughput(Throughput::Elements(schedule.get_flows().len() as u64));
 
         group.bench_with_input(BenchmarkId::new("no_recovery", label), label, |b, _| {
             b.iter(|| {
-                let ctx = DateContext::new(base, DayCount::Act365F, DayCountContext::default());
                 black_box(&schedule)
-                    .pv_by_period_with_discounting(
+                    .pv_by_period(
                         black_box(&periods),
-                        black_box(disc.as_ref()),
-                        Some(finstack_quant_cashflows::builder::PvCreditAdjustment {
-                            hazard: Some(black_box(hazard.as_ref())),
-                            recovery_rate: None,
-                        }),
-                        black_box(ctx),
+                        black_box(&market),
+                        black_box(&disc_id),
+                        Some(black_box(&credit_zero_id)),
+                        black_box(base),
+                        Some(DayCount::Act365F),
                     )
                     .unwrap()
             });
         });
 
         group.bench_with_input(BenchmarkId::new("with_recovery", label), label, |b, _| {
-            let _ = date_ctx;
             b.iter(|| {
-                let ctx = DateContext::new(base, DayCount::Act365F, DayCountContext::default());
                 black_box(&schedule)
-                    .pv_by_period_with_discounting(
+                    .pv_by_period(
                         black_box(&periods),
-                        black_box(disc.as_ref()),
-                        Some(finstack_quant_cashflows::builder::PvCreditAdjustment {
-                            hazard: Some(black_box(hazard.as_ref())),
-                            recovery_rate: Some(0.40),
-                        }),
-                        black_box(ctx),
+                        black_box(&market),
+                        black_box(&disc_id),
+                        Some(black_box(&credit_id)),
+                        black_box(base),
+                        Some(DayCount::Act365F),
                     )
                     .unwrap()
             });

@@ -188,7 +188,7 @@ public = ["credit", "risk", "schema"]
 [crates.models.factor.modules]
 matching           = { python = "finstack_quant.models.factor.matching", status = "missing", note = "MatchingConfig typed host-language constructors deferred; JSON contracts remain Rust-owned. The crate-root matching re-exports (CascadeMatcher, HierarchicalMatcher, MappingTableMatcher, FactorMatcher trait family, MappingRule, AttributeFilter, DependencyFilter) are Rust-only." }
 credit             = { python = "finstack_quant.models.factor.credit", status = "exists", note = "Credit hierarchy artifacts, covariance forecasts, VolHorizon, and typed FactorCovarianceMatrix/FactorModelConfig forecast outputs are flattened into this namespace. CreditCalibrator accepts CreditCalibrationConfig / CreditCalibrationInputs as dicts or JSON strings (plus CreditCalibrator.from_dataframe for pandas panels, which converts the frames and calls Rust CreditCalibrationInputs::from_panel to anchor at the last panel date; the generic series is named by a required GenericFactorSpec dict/JSON); the config/input structs themselves (CreditCalibrationConfig, CreditCalibrationInputs, HistoryPanel, IssuerTagPanel, GenericFactorSeries, BucketSizeThresholds and the enum families PanelFrequency, PanelSpace, VolModelChoice, CovarianceStrategy, BetaShrinkage, BucketWeighting, IssuerBetaPolicy) are reached through those wire shapes and CreditFactorModel getters, not parallel constructors. Rust-only families: hierarchy internals (CreditHierarchySpec, HierarchyDimension, IssuerBetaRow, IssuerBetas, IssuerBetaMode, IssuerTags, FitQuality, LevelsAtAnchor, LevelAnchor, VolState, FactorVolModel, FactorHistories, FactorCorrelationMatrix, CalibrationDiagnostics, FoldUpRecord, DateRange, dimension_key; GenericFactorSpec is reached as a wire shape), the peel kernel (credit::peel), unit helpers (credit::units), DecompositionError (mapped to KeyError/ValueError/RuntimeError), and the calibration sub-pipeline (assemble, inventory, panel, peel_fit, statistics, validation)." }
-risk               = { python = "finstack_quant.models.factor.risk", status = "exists", note = "Pure factor and position decomposition, stress attribution, and risk-budget result types and functions. Both hosts return the canonical Rust results: parametric_var_decomposition / historical_var_decomposition return PositionRiskDecomposition and evaluate_risk_budget returns RiskBudgetResult (WASM returns the same serde shapes as plain objects); parametric_es_decomposition returns the ParametricEsDecompositionView reporting view in both. The three decomposition functions and build_stress_attribution are Rust free functions under the same names (finstack_quant_models::factor::risk); an omitted confidence is resolved there (DecompositionConfig::parametric_95() / historical_95()), not in the bindings, which only convert the matrix input and call them. Position P&L matrices are position-major (one row per position) in both hosts; Python additionally reads a labelled pandas.DataFrame (rows = scenarios) and NumPy arrays as host input conversions. Rust-only families: the config-taking engines (decompose_factors, decompose_positions, decompose_from_pnls, DecompositionMethod as a bare enum - hosts read DecompositionConfig.method), residual plumbing (apply_residual_contributions, ResidualContributionSource as a bare enum - hosts read source_kind/source_issuer_id), the ES view builder parametric_es_decomposition_view, the flat-matrix adapters flatten_square_matrix/flatten_position_pnls (the hosts call them on list input), evaluate_risk_budget_arrays (bound as evaluate_risk_budget), and risk::math kernels. Documented rename: position_component_var / positionComponentVar is the free-function form of the Rust method PositionRiskDecomposition::component_var in both hosts (the decomposition is a plain value there, not a handle)." }
+risk               = { python = "finstack_quant.models.factor.risk", status = "exists", note = "Pure factor and position decomposition, stress attribution, and risk-budget result types and functions. Both hosts return the canonical Rust results: parametric_var_decomposition, parametric_es_decomposition, and historical_var_decomposition return PositionRiskDecomposition and evaluate_risk_budget returns RiskBudgetResult (WASM returns the same serde shapes as plain objects). The three decomposition functions and build_stress_attribution are Rust free functions under the same names (finstack_quant_models::factor::risk); an omitted confidence defaults to 0.95 in Rust, not in the bindings, which only convert the matrix input and call them. Position P&L matrices are position-major (one row per position) in both hosts; Python additionally reads a labelled pandas.DataFrame (rows = scenarios) and NumPy arrays as host input conversions. Rust-only families: decompose_factors, DecompositionMethod as a bare enum (hosts read PositionRiskDecomposition.method), residual plumbing (apply_residual_contributions, ResidualContributionSource as a bare enum - hosts read source_kind/source_issuer_id), the flat-matrix adapters flatten_square_matrix/flatten_position_pnls (the hosts call them on list input), and risk::math kernels. Documented rename: position_component_var / positionComponentVar is the free-function form of the Rust method PositionRiskDecomposition::component_var in both hosts (the decomposition is a plain value there, not a handle)." }
 schema             = { python = "finstack_quant.models.factor.schema", status = "exists", note = "Compiled-in JSON Schema accessors; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 
 # The remaining crate-root `pub use` surface (BumpSizeConfig,
@@ -218,12 +218,9 @@ public = [
 python_package = "finstack_quant.models.factor.risk"
 public = [
     "DEFAULT_UTILIZATION_THRESHOLD",
-    "DecompositionConfig",
     "FactorContribution",
-    "ParametricEsDecompositionView",
     "PositionBudgetEntry",
     "PositionEsContribution",
-    "PositionEsContributionView",
     "PositionFactorContribution",
     "PositionResidualContribution",
     "PositionRiskDecomposition",
@@ -244,10 +241,6 @@ public = [
 [crates.models.factor.module_symbols.schema]
 python_package = "finstack_quant.models.factor.schema"
 public = [
-    "credit_calibration_config_schema",
-    "credit_calibration_inputs_schema",
-    "credit_factor_model_schema",
-    "factor_model_config_schema",
     "get",
     "index",
     "validate",
@@ -328,7 +321,7 @@ python_package = "finstack_quant.cashflows.builder"
 # OvernightObservationSlice, OvernightRateAccumulator, OvernightRateConstraints,
 # OvernightRateReplay} (pricer coupon-replay plumbing); SchedulePeriod;
 # project_floating_rate / FloatingRateParams (pricer plumbing);
-# CashflowRepresentation / PvCreditAdjustment (credit metadata carried inside
+# CashflowRepresentation (credit metadata carried inside
 # schedule JSON); evaluate_fee_tiers / FeeTier / DefaultCurve /
 # PrepaymentCurve (spec internals reachable through the spec types); and the
 # credit-rate helpers psa_cpr / PSA_RAMP_MONTHS / PSA_TERMINAL_CPR.
@@ -647,9 +640,9 @@ python_package = "finstack_quant.models.volatility"
 # (`d1` / `d1_d2` / `*_black76`), `vega_weight`,
 # `SabrParameters::quote_convention` (the hosts' `implied_vol` returns the
 # beta-dependent vol, documented on each method),
-# `SabrModel::effective_rates` (the shift is on `SabrParameters.shift`),
+# `SabrParameters::effective_rates` (the shift is on `SabrParameters.shift`),
 # `SabrParameters::{implied_vol_normal, implied_vol_lognormal}` (raw Hagan
-# expansions; hosts use `SabrModel.implied_vol`, which selects the branch),
+# expansions; hosts use `SabrParameters.implied_vol`, which selects the branch),
 # `SabrCalibrationOutcome` and the `*_with_diagnostics` / `*_with_derivatives`
 # / `*_with_atm_pinning` calibrator variants, `ArbitrageCheckConfig` /
 # `check_surface` on a `VolSurface`, and `SviParams::{validate, butterfly_violation}`
@@ -660,7 +653,6 @@ public = [
     "ArbitrageReport",
     "LocalVolSurface",
     "SabrCalibrator",
-    "SabrModel",
     "SabrParameters",
     "SabrSmile",
     "SviParams",
@@ -1091,9 +1083,9 @@ note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, 
 #     arguments of pit_to_ttc / ttc_to_pit)
 #   - lgd::SeniorityClass / SeniorityCalibration, lgd::CreditConversionFactor,
 #     lgd::DownturnMethod (string / float / `method` + `params` on the host side)
-#   - toggle_exercise::{ThresholdToggle, StochasticToggle, OptimalToggle}
+    #   - toggle_exercise::{ThresholdToggle, StochasticToggle, OptimalToggle}
 #     (reached through ToggleExerciseModel.kind / .params)
-#   - dynamic_recovery::RecoveryModel, endogenous_hazard::LeverageHazardMap
+#   - dynamic_recovery::DynamicRecoveryModel, endogenous_hazard::LeverageHazardMap
 #     (reached through DynamicRecoverySpec.kind / .model and
 #     EndogenousHazardSpec.kind / .leverage_hazard_map)
 #   - MigrationSimulator::simulate / empirical_matrix with a caller-supplied
@@ -2063,7 +2055,7 @@ types = { FactorCovarianceMatrix = "FactorCovarianceMatrix", FactorModelConfig =
 
 [parity.modules."finstack_quant.models.factor.risk"]
 js = "models.factor.risk"
-types = { FactorContribution = "FactorContribution", ParametricEsDecompositionView = "ParametricEsDecompositionView", PositionBudgetEntry = "PositionBudgetEntry", PositionEsContribution = "PositionEsContribution", PositionEsContributionView = "PositionEsContributionView", PositionFactorContribution = "PositionFactorContribution", PositionResidualContribution = "PositionResidualContribution", PositionRiskDecomposition = "PositionRiskDecomposition", PositionVarContribution = "PositionVarContribution", RiskBudgetResult = "RiskBudgetResult", RiskDecomposition = "RiskDecomposition", StressAttribution = "StressAttribution", StressPositionEntry = "StressPositionEntry", TailScenarioBreakdown = "TailScenarioBreakdown" }
+types = { FactorContribution = "FactorContribution", PositionBudgetEntry = "PositionBudgetEntry", PositionEsContribution = "PositionEsContribution", PositionFactorContribution = "PositionFactorContribution", PositionResidualContribution = "PositionResidualContribution", PositionRiskDecomposition = "PositionRiskDecomposition", PositionVarContribution = "PositionVarContribution", RiskBudgetResult = "RiskBudgetResult", RiskDecomposition = "RiskDecomposition", StressAttribution = "StressAttribution", StressPositionEntry = "StressPositionEntry", TailScenarioBreakdown = "TailScenarioBreakdown" }
 
 [parity.modules."finstack_quant.models.factor.schema"]
 js = "models.factor.schema"
@@ -2201,15 +2193,10 @@ cfKindIsInterestLike = "twin of Python CFKind.is_interest_like (Rust CFKind::is_
 cfKindIsPrincipalLike = "twin of Python CFKind.is_principal_like (Rust CFKind::is_principal_like); recorded as a member rename of finstack_quant.cashflows.primitives.CFKind"
 cfKindParse = "twin of Python CFKind.parse (Rust CFKind::from_str); recorded as a member rename of finstack_quant.cashflows.primitives.CFKind"
 defaultModelSpecCdr2pct = "twin of Python DefaultModelSpec.cdr_2pct (Rust DefaultModelSpec::cdr_2pct); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
-defaultModelSpecConstantCdr = "twin of Python DefaultModelSpec.constant_cdr (Rust DefaultModelSpec::constant_cdr); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
 defaultModelSpecCumulativeDefaultFraction = "twin of Python DefaultModelSpec.cumulative_default_fraction (Rust DefaultModelSpec::cumulative_default_fraction); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
-defaultModelSpecCumulativeLoss = "twin of Python DefaultModelSpec.cumulative_loss (Rust DefaultModelSpec::cumulative_loss); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
 defaultModelSpecMdr = "twin of Python DefaultModelSpec.mdr (Rust DefaultModelSpec::mdr); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
 defaultModelSpecMdrWithSurvival = "twin of Python DefaultModelSpec.mdr_with_survival (Rust DefaultModelSpec::mdr_with_survival); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
-defaultModelSpecSda = "twin of Python DefaultModelSpec.sda (Rust DefaultModelSpec::sda); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
-defaultModelSpecTiming = "twin of Python DefaultModelSpec.timing (Rust DefaultModelSpec::timing); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
 defaultModelSpecValidate = "twin of Python DefaultModelSpec.validate (Rust DefaultModelSpec::validate); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
-defaultModelSpecVector = "twin of Python DefaultModelSpec.vector (Rust DefaultModelSpec::vector); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
 exCouponRuleExDate = "twin of Python ExCouponRule.ex_date (Rust ExCouponRule::ex_date); recorded as a member rename of finstack_quant.cashflows.accrual.ExCouponRule"
 exCouponRuleIsExCoupon = "twin of Python ExCouponRule.is_ex_coupon (Rust ExCouponRule::is_ex_coupon); recorded as a member rename of finstack_quant.cashflows.accrual.ExCouponRule"
 feeSpecPeriodicBp = "twin of Python FeeSpec.periodic_bp (Rust FeeSpec::PeriodicBp); recorded as a member rename of finstack_quant.cashflows.builder.FeeSpec"
@@ -2220,18 +2207,11 @@ floatingRateSpecEuribor3m = "twin of Python FloatingRateSpec.euribor_3m (Rust Fl
 floatingRateSpecSofr = "twin of Python FloatingRateSpec.sofr (Rust FloatingRateSpec::sofr); recorded as a member rename of finstack_quant.cashflows.builder.FloatingRateSpec"
 floatingRateSpecSonia = "twin of Python FloatingRateSpec.sonia (Rust FloatingRateSpec::sonia); recorded as a member rename of finstack_quant.cashflows.builder.FloatingRateSpec"
 floatingRateSpecValidate = "twin of Python FloatingRateSpec.validate (Rust FloatingRateSpec::validate); recorded as a member rename of finstack_quant.cashflows.builder.FloatingRateSpec"
-notionalCurrency = "twin of Python Notional.currency (Rust Notional::currency); recorded as a member rename of finstack_quant.cashflows.builder.Notional"
 notionalPar = "twin of Python Notional.par (Rust Notional::par); recorded as a member rename of finstack_quant.cashflows.builder.Notional"
 notionalValidate = "twin of Python Notional.validate (Rust Notional::validate); recorded as a member rename of finstack_quant.cashflows.builder.Notional"
-periodAggregationGetAmount = "twin of Python PeriodAggregation.get_amount (Rust PeriodAggregation::get_amount); recorded as a member rename of finstack_quant.cashflows.aggregation.PeriodAggregation"
-prepaymentModelSpecAbs = "twin of Python PrepaymentModelSpec.abs (Rust PrepaymentModelSpec::abs); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
-prepaymentModelSpecCmbsWithLockout = "twin of Python PrepaymentModelSpec.cmbs_with_lockout (Rust PrepaymentModelSpec::cmbs_with_lockout); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
-prepaymentModelSpecConstantCpr = "twin of Python PrepaymentModelSpec.constant_cpr (Rust PrepaymentModelSpec::constant_cpr); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
-prepaymentModelSpecPsa = "twin of Python PrepaymentModelSpec.psa (Rust PrepaymentModelSpec::psa); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
 prepaymentModelSpecPsa100 = "twin of Python PrepaymentModelSpec.psa_100 (Rust PrepaymentModelSpec::psa_100); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
 prepaymentModelSpecSmm = "twin of Python PrepaymentModelSpec.smm (Rust PrepaymentModelSpec::smm); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
 prepaymentModelSpecValidate = "twin of Python PrepaymentModelSpec.validate (Rust PrepaymentModelSpec::validate); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
-prepaymentModelSpecVector = "twin of Python PrepaymentModelSpec.vector (Rust PrepaymentModelSpec::vector); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
 recoveryModelSpecRecoveryRate = "twin of Python RecoveryModelSpec.recovery_rate (Rust RecoveryModelSpec::recovery_rate); recorded as a member rename of finstack_quant.cashflows.builder.RecoveryModelSpec"
 recoveryModelSpecValidate = "twin of Python RecoveryModelSpec.validate (Rust RecoveryModelSpec::validate); recorded as a member rename of finstack_quant.cashflows.builder.RecoveryModelSpec"
 scheduleParamsAnnualActact = "twin of Python ScheduleParams.annual_actact (Rust ScheduleParams::annual_actact); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
@@ -2689,7 +2669,7 @@ wasm_only = { parse = "Rust Rate::from_str; twin of the Python Rate(text) constr
 renames = { ex_date = { js = "cashflows.exCouponRuleExDate", reason = "WASM ExCouponRule values are plain objects; the Rust ExCouponRule::ex_date function is a free function over the wire value" }, is_ex_coupon = { js = "cashflows.exCouponRuleIsExCoupon", reason = "WASM ExCouponRule values are plain objects; the Rust ExCouponRule::is_ex_coupon function is a free function over the wire value" } }
 
 [parity.members."finstack_quant.cashflows.aggregation.PeriodAggregation"]
-renames = { get_amount = { js = "cashflows.periodAggregationGetAmount", reason = "WASM PeriodAggregation values are plain objects; the Rust PeriodAggregation::get_amount function is a free function over the wire value" } }
+excluded = { get_amount = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.AmortizationSpec"]
 excluded = { custom_principal = "literal", linear_between = "literal", linear_to = "literal", percent_of_original_per_period = "literal", percent_of_remaining_per_period = "literal", step_remaining = "literal" }
@@ -2698,7 +2678,8 @@ excluded = { custom_principal = "literal", linear_between = "literal", linear_to
 excluded = { split = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.DefaultModelSpec"]
-renames = { cdr_2pct = { js = "cashflows.defaultModelSpecCdr2pct", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::cdr_2pct function is a free function over the wire value" }, constant_cdr = { js = "cashflows.defaultModelSpecConstantCdr", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::constant_cdr function is a free function over the wire value" }, cumulative_loss = { js = "cashflows.defaultModelSpecCumulativeLoss", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::cumulative_loss function is a free function over the wire value" }, mdr = { js = "cashflows.defaultModelSpecMdr", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::mdr function is a free function over the wire value" }, sda = { js = "cashflows.defaultModelSpecSda", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::sda function is a free function over the wire value" }, timing = { js = "cashflows.defaultModelSpecTiming", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::timing function is a free function over the wire value" }, validate = { js = "cashflows.defaultModelSpecValidate", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::validate function is a free function over the wire value" }, vector = { js = "cashflows.defaultModelSpecVector", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::vector function is a free function over the wire value" }, cumulative_default_fraction = { js = "cashflows.defaultModelSpecCumulativeDefaultFraction", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::cumulative_default_fraction function is a free function over the wire value" }, mdr_with_survival = { js = "cashflows.defaultModelSpecMdrWithSurvival", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::mdr_with_survival function is a free function over the wire value" } }
+renames = { cdr_2pct = { js = "cashflows.defaultModelSpecCdr2pct", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::cdr_2pct function is a free function over the wire value" }, mdr = { js = "cashflows.defaultModelSpecMdr", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::mdr function is a free function over the wire value" }, validate = { js = "cashflows.defaultModelSpecValidate", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::validate function is a free function over the wire value" }, cumulative_default_fraction = { js = "cashflows.defaultModelSpecCumulativeDefaultFraction", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::cumulative_default_fraction function is a free function over the wire value" }, mdr_with_survival = { js = "cashflows.defaultModelSpecMdrWithSurvival", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::mdr_with_survival function is a free function over the wire value" } }
+excluded = { constant_cdr = "literal", cumulative_loss = "literal", sda = "literal", timing = "literal", vector = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.FeeBase"]
 excluded = { undrawn = "literal" }
@@ -2718,10 +2699,12 @@ excluded = { fixed_rate = "literal" }
 renames = { euribor_3m = { js = "cashflows.floatingRateSpecEuribor3m", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::euribor_3m function is a free function over the wire value" }, sofr = { js = "cashflows.floatingRateSpecSofr", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::sofr function is a free function over the wire value" }, sonia = { js = "cashflows.floatingRateSpecSonia", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::sonia function is a free function over the wire value" }, validate = { js = "cashflows.floatingRateSpecValidate", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::validate function is a free function over the wire value" } }
 
 [parity.members."finstack_quant.cashflows.builder.Notional"]
-renames = { currency = { js = "cashflows.notionalCurrency", reason = "WASM Notional values are plain objects; the Rust Notional::currency function is a free function over the wire value" }, par = { js = "cashflows.notionalPar", reason = "WASM Notional values are plain objects; the Rust Notional::par function is a free function over the wire value" }, validate = { js = "cashflows.notionalValidate", reason = "WASM Notional values are plain objects; the Rust Notional::validate function is a free function over the wire value" } }
+renames = { par = { js = "cashflows.notionalPar", reason = "WASM Notional values are plain objects; the Rust Notional::par function is a free function over the wire value" }, validate = { js = "cashflows.notionalValidate", reason = "WASM Notional values are plain objects; the Rust Notional::validate function is a free function over the wire value" } }
+excluded = { currency = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.PrepaymentModelSpec"]
-renames = { abs = { js = "cashflows.prepaymentModelSpecAbs", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::abs function is a free function over the wire value" }, cmbs_with_lockout = { js = "cashflows.prepaymentModelSpecCmbsWithLockout", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::cmbs_with_lockout function is a free function over the wire value" }, constant_cpr = { js = "cashflows.prepaymentModelSpecConstantCpr", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::constant_cpr function is a free function over the wire value" }, psa = { js = "cashflows.prepaymentModelSpecPsa", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::psa function is a free function over the wire value" }, psa_100 = { js = "cashflows.prepaymentModelSpecPsa100", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::psa_100 function is a free function over the wire value" }, smm = { js = "cashflows.prepaymentModelSpecSmm", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::smm function is a free function over the wire value" }, validate = { js = "cashflows.prepaymentModelSpecValidate", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::validate function is a free function over the wire value" }, vector = { js = "cashflows.prepaymentModelSpecVector", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::vector function is a free function over the wire value" } }
+renames = { psa_100 = { js = "cashflows.prepaymentModelSpecPsa100", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::psa_100 function is a free function over the wire value" }, smm = { js = "cashflows.prepaymentModelSpecSmm", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::smm function is a free function over the wire value" }, validate = { js = "cashflows.prepaymentModelSpecValidate", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::validate function is a free function over the wire value" } }
+excluded = { abs = "literal", cmbs_with_lockout = "literal", constant_cpr = "literal", psa = "literal", vector = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.RecoveryModelSpec"]
 renames = { recovery_rate = { js = "cashflows.recoveryModelSpecRecoveryRate", reason = "WASM RecoveryModelSpec values are plain objects; the Rust RecoveryModelSpec::recovery_rate function is a free function over the wire value" }, validate = { js = "cashflows.recoveryModelSpecValidate", reason = "WASM RecoveryModelSpec values are plain objects; the Rust RecoveryModelSpec::validate function is a free function over the wire value" } }
@@ -2824,9 +2807,6 @@ n_factors = "literal"
 [parity.members."finstack_quant.models.factor.risk.PositionResidualContribution".excluded]
 source_issuer_id = "literal"
 source_kind = "literal"
-
-[parity.members."finstack_quant.models.factor.risk.RiskDecomposition".excluded]
-measure_json = "literal"
 
 [parity.members."finstack_quant.models.factor.risk.TailScenarioBreakdown".excluded]
 position_ids = "literal"

@@ -2,7 +2,6 @@ import * as wasm from '../../pkg/finstack_quant_wasm.js';
 
 export const volatility = {
   SabrCalibrator: wasm.SabrCalibrator,
-  SabrModel: wasm.SabrModel,
   SabrParameters: wasm.SabrParameters,
   SabrSmile: wasm.SabrSmile,
   calibrateSvi: wasm.calibrateSvi,

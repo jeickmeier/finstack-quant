@@ -94,6 +94,8 @@ pub struct AdiWorkBuffers {
     cross: Vec<f64>,
     /// `F_0(t_{n+1}, Y_2)`: cross-derivative term at `Y_2` (interior).
     cross_y2: Vec<f64>,
+    /// Cached 2D operators when `problem.is_time_homogeneous()` is `true`.
+    cached_ops: Option<Operators2D>,
 }
 
 impl AdiWorkBuffers {
@@ -118,6 +120,7 @@ impl AdiWorkBuffers {
             ay_y2: vec![0.0; interior],
             cross: vec![0.0; interior],
             cross_y2: vec![0.0; interior],
+            cached_ops: None,
         }
     }
 
@@ -127,6 +130,9 @@ impl AdiWorkBuffers {
         let ny_int = grid.ny_interior();
         let interior = nx_int * ny_int;
         let line_max = nx_int.max(ny_int);
+        if self.x_line.len() != nx_int || self.y_line.len() != ny_int {
+            self.cached_ops = None;
+        }
         if self.x_line.len() != nx_int {
             self.x_line.resize(nx_int, 0.0);
         }
@@ -280,8 +286,15 @@ impl CraigSneydStepper {
     /// Generate time levels from maturity backward to 0.
     pub fn time_levels(&self, maturity: f64) -> Vec<f64> {
         let n = self.n_steps;
+        if n == 0 {
+            return vec![maturity];
+        }
         let dt = maturity / n as f64;
-        (0..=n).map(|i| maturity - i as f64 * dt).collect()
+        let mut levels: Vec<f64> = (0..n)
+            .map(|i| (maturity - i as f64 * dt).max(0.0))
+            .collect();
+        levels.push(0.0);
+        levels
     }
 
     /// Execute one Modified Craig-Sneyd ADI step from `t_from` to `t_to`
@@ -398,18 +411,28 @@ impl CraigSneydStepper {
             ay_y2,
             cross,
             cross_y2,
+            cached_ops,
         } = buffers;
 
-        // Assemble operators at t_from (for the explicit evaluation of F at u^n).
-        let ops = Operators2D::assemble(problem, grid, t_from);
+        let ops_from_owned;
+        let ops_to_owned;
+        let (ops, ops_impl) = if problem.is_time_homogeneous() {
+            let cached =
+                cached_ops.get_or_insert_with(|| Operators2D::assemble(problem, grid, t_from));
+            (&*cached, &*cached)
+        } else {
+            ops_from_owned = Operators2D::assemble(problem, grid, t_from);
+            ops_to_owned = Operators2D::assemble(problem, grid, t_to);
+            (&ops_from_owned, &ops_to_owned)
+        };
 
         // F_0(t_n, u^n): the mixed (cross-derivative) term applied to u^n.
         apply_cross_derivative(cross, &ops.cross_deriv, u_full, grid);
 
         // F_1(t_n, u^n) = A_x * u^n  (for each y-line).
-        apply_x_operator(&ops, u_int, nx_int, ny_int, x_line, line_out, ax_u);
+        apply_x_operator(ops, u_int, nx_int, ny_int, x_line, line_out, ax_u);
         // F_2(t_n, u^n) = A_y * u^n  (for each x-line).
-        apply_y_operator(&ops, u_int, nx_int, ny_int, y_line, line_out, ay_u);
+        apply_y_operator(ops, u_int, nx_int, ny_int, y_line, line_out, ay_u);
 
         // --- Predictor: Y_0 = u^n + dt * F(t_n, u^n) ---
         // The reaction term c*u is split into the directional operators
@@ -426,26 +449,19 @@ impl CraigSneydStepper {
             y0[idx] = u_int[idx] + dt * (ax_u[idx] + ay_u[idx] + cross[idx]);
         }
 
-        // Operators for the implicit side (evaluated at t_{n+1} = t_to).
-        let ops_impl = if problem.is_time_homogeneous() {
-            ops
-        } else {
-            Operators2D::assemble(problem, grid, t_to)
-        };
-
         let alpha = theta * dt;
 
         // --- CS corrector 1: implicit x-sweep ---
         // Y_1 = Y_0 + theta*dt * (F_1(t_{n+1}, Y_1) - F_1(t_n, u^n))
         // <=> (I - theta*dt*A_x) Y_1 = Y_0 - theta*dt*ax_u  (+ implicit corr.)
         implicit_x_sweep(
-            &ops_impl, alpha, y0, ax_u, nx_int, ny_int, rhs_buf, line_out, y1,
+            ops_impl, alpha, y0, ax_u, nx_int, ny_int, rhs_buf, line_out, y1,
         )?;
 
         // --- CS corrector 2: implicit y-sweep ---
         // Y_2 = Y_1 + theta*dt * (F_2(t_{n+1}, Y_2) - F_2(t_n, u^n))
         implicit_y_sweep(
-            &ops_impl, alpha, y1, ay_u, nx_int, ny_int, rhs_buf, line_out, y2,
+            ops_impl, alpha, y1, ay_u, nx_int, ny_int, rhs_buf, line_out, y2,
         )?;
 
         if damping || !self.apply_mcs_corrector {
@@ -465,8 +481,8 @@ impl CraigSneydStepper {
         apply_cross_derivative(cross_y2, &ops_impl.cross_deriv, u_full, grid);
         // F_1(t_{n+1}, Y_2) = A_x * Y_2 and F_2(t_{n+1}, Y_2) = A_y * Y_2,
         // needed for the full-operator difference in the Ytld_0 line.
-        apply_x_operator(&ops_impl, y2, nx_int, ny_int, x_line, line_out, ax_y2);
-        apply_y_operator(&ops_impl, y2, nx_int, ny_int, y_line, line_out, ay_y2);
+        apply_x_operator(ops_impl, y2, nx_int, ny_int, x_line, line_out, ax_y2);
+        apply_y_operator(ops_impl, y2, nx_int, ny_int, y_line, line_out, ay_y2);
 
         // Yhat_0 = Y_0 + theta*dt * (F_0(t_{n+1},Y_2) - F_0(t_n,u^n))
         // Ytld_0 = Yhat_0 + (1/2 - theta)*dt * (F(t_{n+1},Y_2) - F(t_n,u^n))
@@ -483,13 +499,13 @@ impl CraigSneydStepper {
         // --- MCS corrector 1: second implicit x-sweep ---
         // Ytld_1 = Ytld_0 + theta*dt * (F_1(t_{n+1},Ytld_1) - F_1(t_n,u^n))
         implicit_x_sweep(
-            &ops_impl, alpha, ytld, ax_u, nx_int, ny_int, rhs_buf, line_out, y1,
+            ops_impl, alpha, ytld, ax_u, nx_int, ny_int, rhs_buf, line_out, y1,
         )?;
 
         // --- MCS corrector 2: second implicit y-sweep ---
         // Ytld_2 = Ytld_1 + theta*dt * (F_2(t_{n+1},Ytld_2) - F_2(t_n,u^n))
         implicit_y_sweep(
-            &ops_impl, alpha, y1, ay_u, nx_int, ny_int, rhs_buf, line_out, ytld,
+            ops_impl, alpha, y1, ay_u, nx_int, ny_int, rhs_buf, line_out, ytld,
         )?;
 
         // u^{n+1} = Ytld_2.

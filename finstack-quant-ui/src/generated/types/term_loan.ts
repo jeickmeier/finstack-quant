@@ -2764,7 +2764,7 @@ export interface DD760Eef55C5Bd7D5B1F6 {
  *
  * Models the relationship between the accreted notional and the recovery
  * rate in default. As PIK accrual increases the notional relative to the
- * original base, recovery declines according to the chosen [`RecoveryModel`].
+ * original base, recovery declines according to the chosen [`DynamicRecoveryModel`].
  * Deserialization enforces the same parameter invariants as the constructors.
  */
 export interface D_16451E0Bf3B6B78178D8 {

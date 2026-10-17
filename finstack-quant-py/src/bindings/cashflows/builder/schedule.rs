@@ -26,11 +26,7 @@ use crate::bindings::cashflows::fixings::PyProjectedFixing;
 /// Parse a schedule representation label (``"contractual"``, ``"projected"``,
 /// ``"placeholder"``, ``"no_residual"``).
 pub(crate) fn parse_representation(label: &str) -> PyResult<CashflowRepresentation> {
-    serde_json::from_value(serde_json::Value::String(label.to_string())).map_err(|_| {
-        crate::errors::value_error(format!(
-            "unknown cashflow representation '{label}'; expected one of: contractual, projected, placeholder, no_residual"
-        ))
-    })
+    label.parse::<CashflowRepresentation>().map_err(core_to_py)
 }
 
 /// Schedule-level metadata: representation, calendars, facility limit, horizon.

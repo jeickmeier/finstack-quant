@@ -103,7 +103,7 @@ impl NonFiniteFields for PositionBudgetEntry {
 /// ~1.0, numeric inputs are non-finite, a target fraction is outside `[0, 1]`,
 /// the threshold is non-positive, or non-zero component VaR is paired with
 /// zero portfolio VaR.
-pub fn evaluate_risk_budget_arrays(
+pub fn evaluate_risk_budget(
     position_ids: Vec<String>,
     actual_var: &[f64],
     target_var_pct: &[f64],
@@ -234,7 +234,7 @@ pub fn evaluate_risk_budget_arrays(
 #[cfg(test)]
 mod tests {
     use super::super::position::{
-        decompose_positions, DecompositionConfig, DecompositionMethod, PositionRiskDecomposition,
+        parametric_var_decomposition, DecompositionMethod, PositionRiskDecomposition,
         PositionVarContribution,
     };
     use super::*;
@@ -266,26 +266,17 @@ mod tests {
     fn risk_budget_rejects_invalid_numeric_inputs_instead_of_reporting_no_breach() {
         let ids = vec!["P".to_string()];
         for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-            assert!(
-                evaluate_risk_budget_arrays(ids.clone(), &[value], &[1.0], -100.0, 1.2).is_err()
-            );
-            assert!(
-                evaluate_risk_budget_arrays(ids.clone(), &[-100.0], &[1.0], value, 1.2).is_err()
-            );
-            assert!(
-                evaluate_risk_budget_arrays(ids.clone(), &[-100.0], &[value], -100.0, 1.2).is_err()
-            );
-            assert!(
-                evaluate_risk_budget_arrays(ids.clone(), &[-100.0], &[1.0], -100.0, value).is_err()
-            );
+            assert!(evaluate_risk_budget(ids.clone(), &[value], &[1.0], -100.0, 1.2).is_err());
+            assert!(evaluate_risk_budget(ids.clone(), &[-100.0], &[1.0], value, 1.2).is_err());
+            assert!(evaluate_risk_budget(ids.clone(), &[-100.0], &[value], -100.0, 1.2).is_err());
+            assert!(evaluate_risk_budget(ids.clone(), &[-100.0], &[1.0], -100.0, value).is_err());
         }
         for threshold in [0.0, -1.0] {
             assert!(
-                evaluate_risk_budget_arrays(ids.clone(), &[-100.0], &[1.0], -100.0, threshold)
-                    .is_err()
+                evaluate_risk_budget(ids.clone(), &[-100.0], &[1.0], -100.0, threshold).is_err()
             );
         }
-        assert!(evaluate_risk_budget_arrays(
+        assert!(evaluate_risk_budget(
             vec!["A".into(), "B".into()],
             &[-120.0, 20.0],
             &[-0.1, 1.1],
@@ -317,7 +308,7 @@ mod tests {
             .map(|c| c.component_var)
             .collect();
         let target_pct: Vec<f64> = targets.iter().map(|(_, pct)| *pct).collect();
-        evaluate_risk_budget_arrays(
+        evaluate_risk_budget(
             ids,
             &actual,
             &target_pct,
@@ -429,7 +420,7 @@ mod tests {
 
     #[test]
     fn risk_budget_handles_negative_loss_convention_components() -> TestResult {
-        let result = evaluate_risk_budget_arrays(
+        let result = evaluate_risk_budget(
             vec!["A".to_string(), "B".to_string()],
             &[-40.0, -60.0],
             &[0.20, 0.80],
@@ -459,8 +450,7 @@ mod tests {
         let weights = [1.0, 0.2];
         let covariance = [0.04, -0.03, -0.03, 0.09];
         let ids = [String::from("A"), String::from("B")];
-        let config = DecompositionConfig::parametric_95();
-        let decomp = decompose_positions(&weights, &covariance, &ids, &config)?;
+        let decomp = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.95), false)?;
 
         // B is a hedge: its component VaR carries the opposite sign of the
         // portfolio VaR.
@@ -546,8 +536,8 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_risk_budget_arrays_rejects_duplicate_position_ids() {
-        let err = evaluate_risk_budget_arrays(
+    fn evaluate_risk_budget_rejects_duplicate_position_ids() {
+        let err = evaluate_risk_budget(
             vec!["A".to_string(), "A".to_string()],
             &[40.0, 60.0],
             &[0.5, 0.5],
@@ -562,8 +552,8 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_risk_budget_arrays_rejects_length_mismatches() {
-        let err = evaluate_risk_budget_arrays(
+    fn evaluate_risk_budget_rejects_length_mismatches() {
+        let err = evaluate_risk_budget(
             vec!["A".to_string(), "B".to_string()],
             &[40.0],
             &[0.5, 0.5],
@@ -577,7 +567,7 @@ mod tests {
             "unexpected error: {err}"
         );
 
-        let err = evaluate_risk_budget_arrays(
+        let err = evaluate_risk_budget(
             vec!["A".to_string(), "B".to_string()],
             &[40.0, 60.0],
             &[1.0],
@@ -593,8 +583,8 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_risk_budget_arrays_flags_breach_over_threshold() -> TestResult {
-        let result = evaluate_risk_budget_arrays(
+    fn evaluate_risk_budget_flags_breach_over_threshold() -> TestResult {
+        let result = evaluate_risk_budget(
             vec!["A".to_string(), "B".to_string()],
             &[40.0, 60.0],
             &[0.2, 0.8],
@@ -620,9 +610,8 @@ mod tests {
         let weights = [0.4, 0.35, 0.25];
         let covariance = [0.04, 0.01, 0.005, 0.01, 0.09, 0.02, 0.005, 0.02, 0.0625];
         let ids = [String::from("A"), String::from("B"), String::from("C")];
-        let config = DecompositionConfig::parametric_95();
 
-        let decomp = decompose_positions(&weights, &covariance, &ids, &config)?;
+        let decomp = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.95), false)?;
 
         let targets = [("A", 0.33), ("B", 0.34), ("C", 0.33)];
 

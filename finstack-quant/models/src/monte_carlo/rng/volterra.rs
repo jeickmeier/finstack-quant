@@ -175,8 +175,11 @@ impl RiemannLiouvilleVolterra {
         }
         let l11 = schur.max(0.0).sqrt();
 
-        // Far-field weights g(b_m·Δt) = ((m + b_m)·Δt)^γ for lag m = 2..=n.
-        //   b_m = ((m^{γ+1} − (m−1)^{γ+1})/(γ+1))^{1/γ} − m   (BLP optimal point)
+        // Far-field weights g(b_m·Δt) = ((m + b_m)·Δt)^γ = raw · Δt^γ for lag m = 2..=n,
+        // where (m + b_m)^γ = (m^{γ+1} − (m−1)^{γ+1}) / (γ + 1) (BLP cell average).
+        // Evaluating `raw * dt.powf(gamma)` directly avoids the `raw.powf(1.0 / gamma)`
+        // round-trip that overflows as H → 0.5 (γ → 0).
+        let dt_pow_gamma = dt.powf(gamma);
         let mut far_weight = vec![0.0; num_steps + 1];
         for (m, w) in far_weight
             .iter_mut()
@@ -186,9 +189,7 @@ impl RiemannLiouvilleVolterra {
         {
             let mf = m as f64;
             let raw = (mf.powf(gamma + 1.0) - (mf - 1.0).powf(gamma + 1.0)) / (gamma + 1.0);
-            // raw > 0 for γ > −1; b_star ∈ (m−1, m) is the optimal point.
-            let b_star = raw.powf(1.0 / gamma) - mf;
-            *w = ((mf + b_star) * dt).powf(gamma);
+            *w = raw * dt_pow_gamma;
         }
 
         Ok(Self {

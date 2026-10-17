@@ -108,7 +108,7 @@ fn wasm_copula_stress_correlation_proxy_rfl_only() {
     // RFL λ_L is the mass at unit loading under the calibrated clipped-normal
     // loading distribution: finite, in [0, 1], and equal to the Rust model.
     let lambda = rfl.tail_dependence(JsValue::from(0.3)).unwrap();
-    let expected = Copula::tail_dependence(&RandomFactorLoadingCopula::new(0.2), 0.3);
+    let expected = Copula::tail_dependence(&RandomFactorLoadingCopula::new(0.2).unwrap(), 0.3);
     assert!((0.0..=1.0).contains(&lambda), "λ_L out of range: {lambda}");
     assert_eq!(lambda, expected);
     let proxy = rfl

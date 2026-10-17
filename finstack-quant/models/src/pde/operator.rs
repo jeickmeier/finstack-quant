@@ -268,45 +268,8 @@ impl TridiagOperator {
     /// dominance, e.g. via a boundary-condition modification). Without the
     /// guard such a pivot would yield a silent `inf` / `NaN` solution.
     pub fn solve_thomas(&self, alpha: f64, rhs: &[f64]) -> Result<Vec<f64>, ThomasError> {
-        debug_assert_eq!(rhs.len(), self.n);
-
-        if self.n == 0 {
-            return Ok(vec![]);
-        }
-
-        let n = self.n;
-        let mut x = vec![0.0; n];
-
-        // (I - alpha * A):
-        //   d[i] = 1 - alpha * main[i]
-        //   a[i] = -alpha * lower[i]
-        //   c[i] = -alpha * upper[i]
-        let mut d = vec![0.0; n]; // modified diagonal
-        let mut r = vec![0.0; n]; // modified RHS
-
-        d[0] = 1.0 - alpha * self.main[0];
-        // The first pivot is formed from `1` and `alpha * main[0]`.
-        check_pivot(d[0], 1.0, alpha * self.main[0], 0, n)?;
-        r[0] = rhs[0];
-
-        for i in 1..n {
-            let a_i = -alpha * self.lower[i];
-            let c_prev = -alpha * self.upper[i - 1];
-            let w = a_i / d[i - 1];
-            let diag = 1.0 - alpha * self.main[i];
-            let off = w * c_prev;
-            d[i] = diag - off;
-            check_pivot(d[i], diag, off, i, n)?;
-            r[i] = rhs[i] - w * r[i - 1];
-        }
-
-        // Back-substitution (every pivot has been verified non-degenerate).
-        x[n - 1] = r[n - 1] / d[n - 1];
-        for i in (0..n - 1).rev() {
-            let c_i = -alpha * self.upper[i];
-            x[i] = (r[i] - c_i * x[i + 1]) / d[i];
-        }
-
+        let mut x = vec![0.0; self.n];
+        self.solve_thomas_into(alpha, rhs, &mut x)?;
         Ok(x)
     }
 

@@ -85,7 +85,7 @@ pub enum Error {
         value: f64,
     },
     /// Random-factor-loading volatility is non-finite or outside its range.
-    #[error("Invalid RFL loading volatility {value}: must be finite and in [0, 0.5]")]
+    #[error("Invalid RFL loading_volatility {value}: must be finite and in [0, 0.5]")]
     InvalidLoadingVolatility {
         /// The offending loading standard deviation.
         value: f64,

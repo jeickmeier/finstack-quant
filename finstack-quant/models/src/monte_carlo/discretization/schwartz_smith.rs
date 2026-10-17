@@ -20,10 +20,8 @@ use super::super::traits::Discretization;
 ///
 /// Uses analytical solutions for both X (OU) and Y (arithmetic Brownian motion)
 /// with the analytical 2×2 Cholesky factor of the integrated covariance.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ExactSchwartzSmith {
-    /// Instantaneous correlation of the driving Brownian motions.
-    rho_xy: f64,
     /// Per-run cache of the `dt`-dependent X-leg constants, populated by
     /// [`Discretization::prepare`]. `None` until prepared (e.g. stepped
     /// directly without the engine), in which case constants are computed inline.
@@ -39,6 +37,7 @@ struct SsStepConstants {
     dt: f64,
     kappa: f64,
     sigma_x: f64,
+    rho_xy: f64,
     exp_kappa_dt: f64,
     one_minus_exp_over_kappa: f64,
     x_std: f64,
@@ -63,6 +62,7 @@ impl SsStepConstants {
             dt,
             kappa,
             sigma_x,
+            rho_xy,
             exp_kappa_dt,
             one_minus_exp_over_kappa,
             x_std: sigma_x * x_time_std,
@@ -75,48 +75,8 @@ impl SsStepConstants {
 
 impl ExactSchwartzSmith {
     /// Create a new exact Schwartz-Smith discretization.
-    ///
-    /// # Arguments
-    ///
-    /// * `rho_xy` - Instantaneous correlation between X and Y Brownian motions;
-    ///   must be finite and in `[-1, 1]`.
-    ///
-    /// The discretization stores the instantaneous Brownian correlation and
-    /// applies the exact Gaussian transition for the mean-reverting short-term
-    /// factor and long-term equilibrium factor. It does not own the economic
-    /// process parameters; supply those to [`Discretization::step`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an input error for non-finite or out-of-range correlation.
-    pub fn new(rho_xy: f64) -> finstack_quant_core::Result<Self> {
-        if !rho_xy.is_finite() || !(-1.0..=1.0).contains(&rho_xy) {
-            return Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::Invalid,
-            ));
-        }
-
-        Ok(Self {
-            rho_xy,
-            prepared: None,
-        })
-    }
-
-    /// Create from Schwartz-Smith process (convenience method).
-    ///
-    /// Uses the process's `rho_xy` and retains no reference to the process, so the
-    /// same discretization can be reused only with processes using compatible
-    /// two-factor shock conventions.
-    ///
-    /// # Arguments
-    ///
-    /// * `process` - Process supplying the instantaneous Brownian correlation.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same invalid-correlation error as [`Self::new`].
-    pub fn from_process(process: &SchwartzSmithProcess) -> finstack_quant_core::Result<Self> {
-        Self::new(process.params().rho_xy)
+    pub fn new() -> Self {
+        Self { prepared: None }
     }
 }
 
@@ -139,6 +99,7 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
         let lambda_x = params.lambda_x;
         let mu_y = params.mu_y;
         let sigma_y = params.sigma_y;
+        let rho_xy = params.rho_xy;
 
         // Reuse the prepared `dt`-dependent constants on an exact bit match;
         // otherwise compute inline for unprepared or non-uniform grids.
@@ -146,11 +107,12 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
             Some(c)
                 if c.dt.to_bits() == dt.to_bits()
                     && c.kappa.to_bits() == kappa.to_bits()
-                    && c.sigma_x.to_bits() == sigma_x.to_bits() =>
+                    && c.sigma_x.to_bits() == sigma_x.to_bits()
+                    && c.rho_xy.to_bits() == rho_xy.to_bits() =>
             {
                 c
             }
-            _ => SsStepConstants::compute(kappa, sigma_x, self.rho_xy, dt),
+            _ => SsStepConstants::compute(kappa, sigma_x, rho_xy, dt),
         };
         let x_mean = x[0] * consts.exp_kappa_dt - lambda_x * consts.one_minus_exp_over_kappa;
         x[0] = x_mean + consts.x_std * z[0];
@@ -171,7 +133,7 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
         self.prepared = Some(SsStepConstants::compute(
             params.kappa,
             params.sigma_x,
-            self.rho_xy,
+            params.rho_xy,
             time_grid.dt(0),
         ));
     }
@@ -191,20 +153,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_exact_schwartz_smith_creation() {
-        for rho_xy in [-1.0, -0.5, 0.0, 1.0] {
-            assert!(ExactSchwartzSmith::new(rho_xy).is_ok());
-        }
-        for rho_xy in [f64::NAN, f64::INFINITY, -1.01, 1.01] {
-            assert!(ExactSchwartzSmith::new(rho_xy).is_err());
-        }
-    }
-
-    #[test]
     fn test_exact_schwartz_smith_step() {
         let params = SchwartzSmithParams::new(2.0, 0.30, 0.02, 0.15, -0.5).unwrap();
         let process = SchwartzSmithProcess::new(params, 0.0, 4.5);
-        let disc = ExactSchwartzSmith::from_process(&process).expect("should succeed");
+        let disc = ExactSchwartzSmith::new();
 
         let mut x = [0.0, 4.5];
         let z = [0.0, 0.0]; // No shock
@@ -222,7 +174,7 @@ mod tests {
     fn test_exact_schwartz_smith_spot_computation() {
         let params = SchwartzSmithParams::new(2.0, 0.30, 0.02, 0.15, -0.5).unwrap();
         let process = SchwartzSmithProcess::new(params, 0.0, 4.5);
-        let disc = ExactSchwartzSmith::from_process(&process).expect("should succeed");
+        let disc = ExactSchwartzSmith::new();
 
         let mut x = [0.0, 4.5];
         let z = [0.0, 0.0];

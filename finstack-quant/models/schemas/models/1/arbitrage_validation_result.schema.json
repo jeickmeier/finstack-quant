@@ -1,6 +1,7 @@
 {
   "$defs": {
     "ButterflyViolation": {
+      "additionalProperties": false,
       "description": "A butterfly spread violation at a specific strike.",
       "properties": {
         "butterfly_value": {
@@ -27,6 +28,7 @@
       "type": "object"
     },
     "MonotonicityViolation": {
+      "additionalProperties": false,
       "description": "A monotonicity violation between two strikes.",
       "properties": {
         "price_high": {
@@ -61,6 +63,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/models/1/arbitrage_validation_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Result of arbitrage validation, containing any violations found.",
   "properties": {
     "arbitrage_free": {

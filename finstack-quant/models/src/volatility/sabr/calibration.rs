@@ -1,6 +1,6 @@
 //! SABR model, smile, parameter, and calibration support.
 //!
-use super::model::{SabrModel, BETA_SNAP_TOL};
+use super::model::BETA_SNAP_TOL;
 use super::parameters::SabrParameters;
 use crate::closed_form::{bachelier_vega, black_vega};
 use finstack_quant_core::math::solver_multi::{
@@ -19,7 +19,7 @@ use finstack_quant_core::{Error, Result};
 ///
 /// The vega convention must match the vol convention of the quotes being
 /// fitted, which follows the model's own β classification
-/// ([`SabrModel::implied_volatility`] returns normal vols for β≈0):
+/// ([`SabrParameters::implied_volatility`] returns normal vols for β≈0):
 ///
 /// - `beta ≈ 0` (within `BETA_SNAP_TOL`): the quotes are *normal*
 ///   (Bachelier) vols, so weight with Bachelier vega `√T·φ((F−K)/(σ_N√T))`.
@@ -39,14 +39,9 @@ use finstack_quant_core::{Error, Result};
 /// * `market_vol` - Market volatility in the convention implied by `beta`.
 /// * `time_to_expiry` - Time to expiry in years.
 /// * `beta` - SABR elasticity parameter in the closed interval `[0, 1]`.
+#[cfg(test)]
 #[inline]
-pub fn vega_weight(
-    forward: f64,
-    strike: f64,
-    market_vol: f64,
-    time_to_expiry: f64,
-    beta: f64,
-) -> f64 {
+fn vega_weight(forward: f64, strike: f64, market_vol: f64, time_to_expiry: f64, beta: f64) -> f64 {
     const MIN_VEGA: f64 = 1e-10;
     let vega = if beta.abs() < BETA_SNAP_TOL {
         bachelier_vega(forward, strike, market_vol, time_to_expiry)
@@ -71,10 +66,10 @@ fn normalized_quote_weights(
             "SABR requires aligned, finite positive volatility quotes".to_owned(),
         ));
     }
-    let model = SabrModel::new(SabrParameters::new(1.0, beta, 0.3, 0.0)?);
+    let params = SabrParameters::new(1.0, beta, 0.3, 0.0)?;
     let mut weights = Vec::with_capacity(strikes.len());
     for (&strike, &vol) in strikes.iter().zip(market_vols) {
-        model.validate_inputs(forward, strike, time_to_expiry)?;
+        params.validate_inputs(forward, strike, time_to_expiry)?;
         let weight = if beta < BETA_SNAP_TOL {
             bachelier_vega(forward, strike, vol, time_to_expiry)
         } else {
@@ -121,9 +116,8 @@ fn candidate_fits_quotes(
     let Ok(parameters) = SabrParameters::new(physical[0], beta, physical[1], physical[2]) else {
         return false;
     };
-    let model = SabrModel::new(parameters);
     strikes.iter().zip(market_vols).all(|(&strike, &quote)| {
-        model
+        parameters
             .implied_volatility(forward, strike, time_to_expiry)
             .is_ok_and(|vol| vol.is_finite() && (vol - quote).abs() <= tolerance * quote)
     })
@@ -137,12 +131,12 @@ fn validate_quote_fit(
     time_to_expiry: f64,
     tolerance: f64,
 ) -> Result<SabrCalibrationOutcome> {
-    let model = SabrModel::new(outcome.parameters.clone());
     outcome.quote_errors = strikes
         .iter()
         .zip(market_vols)
         .map(|(&strike, &market_vol)| {
-            model
+            outcome
+                .parameters
                 .implied_volatility(forward, strike, time_to_expiry)
                 .map(|v| v - market_vol)
         })
@@ -756,12 +750,11 @@ impl SabrCalibrator {
                         output.fill(1e6);
                         return;
                     };
-                    let model = SabrModel::new(parameters);
                     for (index, (&strike, &market_vol)) in
                         strikes.iter().zip(market_vols).enumerate()
                     {
                         let weight = weights[index];
-                        output[index] = model
+                        output[index] = parameters
                             .implied_volatility(forward, strike, time_to_expiry)
                             .map_or(1e6, |model_vol| weight * (model_vol - market_vol));
                     }
@@ -923,11 +916,10 @@ impl SabrCalibrator {
                         output.fill(1e6);
                         return;
                     };
-                    let model = SabrModel::new(parameters);
                     for (index, (&strike, &market_vol)) in
                         strikes.iter().zip(market_vols).enumerate()
                     {
-                        output[index] = model
+                        output[index] = parameters
                             .implied_volatility(forward, strike, time_to_expiry)
                             .map_or(1e6, |model_vol| weights[index] * (model_vol - market_vol));
                     }
@@ -999,8 +991,7 @@ pub(super) fn solve_alpha_for_atm(
     let mut last_error = f64::INFINITY;
     for _ in 0..MAX_ITER {
         let params = SabrParameters::new(alpha, beta, nu, rho)?;
-        let model = SabrModel::new(params);
-        let model_vol = model.atm_volatility(forward, time_to_expiry)?;
+        let model_vol = params.atm_volatility(forward, time_to_expiry)?;
 
         let error = model_vol - target_atm_vol;
         last_error = error;
@@ -1011,8 +1002,7 @@ pub(super) fn solve_alpha_for_atm(
         // Numerical derivative for Newton step
         let bump = alpha * 1e-6;
         let params_bumped = SabrParameters::new(alpha + bump, beta, nu, rho)?;
-        let model_bumped = SabrModel::new(params_bumped);
-        let vol_bumped = model_bumped.atm_volatility(forward, time_to_expiry)?;
+        let vol_bumped = params_bumped.atm_volatility(forward, time_to_expiry)?;
 
         let d_vol_d_alpha = (vol_bumped - model_vol) / bump;
         if d_vol_d_alpha.abs() < 1e-14 {
@@ -1054,7 +1044,6 @@ mod acceptance_tests {
     #[test]
     fn test_sabr_atm_pinning_interpolates_when_grid_lacks_forward() {
         let true_params = SabrParameters::new(0.20, 0.5, 0.30, -0.25).expect("valid params");
-        let true_model = SabrModel::new(true_params);
 
         let forward = 100.0_f64;
         let expiry = 1.0_f64;
@@ -1066,13 +1055,13 @@ mod acceptance_tests {
         let market_vols: Vec<f64> = strikes
             .iter()
             .map(|&k| {
-                true_model
+                true_params
                     .implied_volatility(forward, k, expiry)
                     .expect("synthetic vol should compute")
             })
             .collect();
 
-        let true_atm = true_model
+        let true_atm = true_params
             .implied_volatility(forward, forward, expiry)
             .expect("true ATM vol should compute");
 
@@ -1177,11 +1166,10 @@ mod acceptance_tests {
         let beta = 0.5;
         let source_parameters =
             SabrParameters::new(0.02, beta, 0.4, -0.3).expect("source parameters");
-        let source = SabrModel::new(source_parameters.clone());
         let market_vols: Vec<f64> = strikes
             .iter()
             .map(|&strike| {
-                source
+                source_parameters
                     .implied_volatility(forward, strike, time_to_expiry)
                     .expect("source volatility")
             })
@@ -1224,7 +1212,6 @@ mod acceptance_tests {
         assert_repeatable(&pinned_first, &pinned_second);
 
         let residual_norm = |outcome: &SabrCalibrationOutcome, pin_atm: bool| {
-            let model = SabrModel::new(outcome.parameters.clone());
             strikes
                 .iter()
                 .zip(&market_vols)
@@ -1235,7 +1222,8 @@ mod acceptance_tests {
                     } else {
                         let weight =
                             vega_weight(forward, strike, market_vol, time_to_expiry, beta).sqrt();
-                        let model_vol = model
+                        let model_vol = outcome
+                            .parameters
                             .implied_volatility(forward, strike, time_to_expiry)
                             .expect("fitted volatility");
                         weight * (model_vol - market_vol)
@@ -1272,7 +1260,8 @@ mod acceptance_tests {
             assert!((outcome.parameters.rho - source_parameters.rho).abs() <= 2.0e-4);
         }
 
-        let pinned_atm = SabrModel::new(pinned_first.parameters)
+        let pinned_atm = pinned_first
+            .parameters
             .atm_volatility(forward, time_to_expiry)
             .expect("pinned ATM volatility");
         assert!((pinned_atm - atm_vol).abs() <= calibrator.tolerance);

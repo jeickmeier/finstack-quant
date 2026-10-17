@@ -25,8 +25,7 @@
 
 use std::sync::Arc;
 
-use rand::{Rng, SeedableRng};
-use rand_pcg::Pcg64;
+use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -282,7 +281,7 @@ impl MigrationSimulator {
                 n_states,
             });
         }
-        let mut rng = Pcg64::seed_from_u64(seed);
+        let mut rng = Pcg64Rng::new(seed);
         let scale = Arc::new(self.generator.scale.clone());
         Ok((0..n_paths)
             .map(|_| {
@@ -321,7 +320,7 @@ impl MigrationSimulator {
         if n_paths_per_state == 0 {
             return Err(MigrationError::InvalidPathCount);
         }
-        let mut rng = Pcg64::seed_from_u64(seed);
+        let mut rng = Pcg64Rng::new(seed);
         let n = self.generator.n_states();
         // Flat row-major counts (index `from * n + to`) for cache-friendly
         // accumulation and a single allocation.
@@ -365,7 +364,7 @@ impl MigrationSimulator {
 ///
 /// `on_transition` receives each `(time, new_state)` transition. Both path
 /// recording and terminal-only simulation use this loop and RNG draw order.
-fn simulate_gillespie<R: Rng>(
+fn simulate_gillespie<R: RandomNumberGenerator + ?Sized>(
     gen: &GeneratorMatrix,
     initial_state: usize,
     horizon: f64,
@@ -377,7 +376,10 @@ fn simulate_gillespie<R: Rng>(
     let mut state = initial_state;
 
     loop {
-        let lambda = -gen.data[(state, state)]; // exit rate = -q_ss
+        let lambda: f64 = (0..n)
+            .filter(|&j| j != state)
+            .map(|j| gen.data[(state, j)].max(0.0))
+            .sum();
 
         // Absorbing state: stop.
         if lambda < 1e-15 {
@@ -385,7 +387,7 @@ fn simulate_gillespie<R: Rng>(
         }
 
         // Draw holding time from Exp(lambda).
-        let u1: f64 = rng.random();
+        let u1: f64 = rng.uniform();
         let holding = -u1.ln() / lambda;
 
         if t + holding > horizon {
@@ -395,7 +397,7 @@ fn simulate_gillespie<R: Rng>(
         t += holding;
 
         // Draw next state from Categorical(q_sj / lambda for j != s).
-        let u2: f64 = rng.random();
+        let u2: f64 = rng.uniform();
         let mut cumulative = 0.0;
         let mut next_state = state; // fallback — should always be reassigned below
 
@@ -403,7 +405,7 @@ fn simulate_gillespie<R: Rng>(
             if j == state {
                 continue;
             }
-            cumulative += gen.data[(state, j)] / lambda;
+            cumulative += gen.data[(state, j)].max(0.0) / lambda;
             if u2 < cumulative {
                 next_state = j;
                 break;
@@ -432,7 +434,7 @@ fn simulate_gillespie<R: Rng>(
 }
 
 /// Simulate a single rating path using Gillespie's competing exponentials.
-fn simulate_path<R: Rng>(
+fn simulate_path<R: RandomNumberGenerator + ?Sized>(
     gen: &GeneratorMatrix,
     scale: &Arc<RatingScale>,
     initial_state: usize,
@@ -453,7 +455,7 @@ fn simulate_path<R: Rng>(
 }
 
 /// Simulate one path without allocating a transition history.
-fn simulate_terminal_state<R: Rng>(
+fn simulate_terminal_state<R: RandomNumberGenerator + ?Sized>(
     gen: &GeneratorMatrix,
     initial_state: usize,
     horizon: f64,

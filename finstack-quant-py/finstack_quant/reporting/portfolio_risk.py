@@ -67,7 +67,8 @@ def _section_contributions(decomp: dict[str, Any], theme: Theme) -> Section | No
 
 
 def _section_es(es: dict[str, Any] | None) -> Section | None:
-    contribs = [c for c in (es or {}).get("contributions") or [] if isinstance(c, dict)]
+    raw_contribs = (es or {}).get("es_contributions") or (es or {}).get("contributions") or []
+    contribs = [c for c in raw_contribs if isinstance(c, dict)]
     if not contribs:
         return None
     # Loss convention: the largest ES contributor is the most negative value.
@@ -76,7 +77,7 @@ def _section_es(es: dict[str, Any] | None) -> Section | None:
         {
             "Position": c.get("position_id") or "·",
             "Component ES": fmt.money(c.get("component_es")),
-            "% of Total": _pct(c.get("pct_contribution")),
+            "% of Total": _pct(c.get("relative_es") if c.get("relative_es") is not None else c.get("pct_contribution")),
         }
         for c in contribs
     ]

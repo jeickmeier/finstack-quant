@@ -16,32 +16,29 @@ use crate::{
     correlation::CreditExposure, correlation::LatentFactorSpec, correlation::PortfolioLossConfig,
     correlation::PortfolioLossResult, correlation::RecoverySpec,
     correlation::TrancheLossStatistics, credit::lgd::DownturnLgd, credit::lgd::EadCalculator,
-    credit::lgd::SeniorityCalibration, credit::lgd::SeniorityRecovery, credit::lgd::WorkoutLgd,
-    credit::lgd::WorkoutLgdResult, credit::liability_management::ExchangeOfferAnalysis,
-    credit::liability_management::LmeAnalysis, credit::migration::MigrationSimulator,
-    credit::migration::RatingPath, credit::migration::TransitionMatrix, credit::pd::MasterScale,
-    credit::pd::MasterScaleResult, credit::pd::PdCycleParams, credit::pool::CorrelationStructure,
-    credit::pool::PoolGranularity, credit::pool::StochasticDefaultSpec,
-    credit::pool::StochasticPrepaySpec, credit::recovery_waterfall::RecoveryClaim,
-    credit::recovery_waterfall::RecoveryWaterfallResult, credit::scoring::AltmanZDoublePrimeInput,
-    credit::scoring::AltmanZPrimeInput, credit::scoring::AltmanZScoreInput,
-    credit::scoring::OhlsonOScoreInput, credit::scoring::ScoringResult,
-    credit::scoring::ZmijewskiInput, credit::CreditState, credit::DynamicRecoverySpec,
-    credit::EndogenousHazardSpec, credit::MertonModel, credit::RatingFactorTable,
-    credit::SimulatedPaths, credit::ToggleExerciseModel,
+    credit::lgd::SeniorityCalibration, credit::lgd::WorkoutLgd, credit::lgd::WorkoutLgdResult,
+    credit::liability_management::ExchangeOfferAnalysis, credit::liability_management::LmeAnalysis,
+    credit::migration::MigrationSimulator, credit::migration::RatingPath,
+    credit::migration::TransitionMatrix, credit::pd::MasterScale, credit::pd::MasterScaleResult,
+    credit::pd::PdCycleParams, credit::pool::CorrelationStructure, credit::pool::PoolGranularity,
+    credit::pool::StochasticDefaultSpec, credit::pool::StochasticPrepaySpec,
+    credit::recovery_waterfall::RecoveryClaim, credit::recovery_waterfall::RecoveryWaterfallResult,
+    credit::scoring::AltmanZDoublePrimeInput, credit::scoring::AltmanZPrimeInput,
+    credit::scoring::AltmanZScoreInput, credit::scoring::OhlsonOScoreInput,
+    credit::scoring::ScoringResult, credit::scoring::ZmijewskiInput, credit::CreditState,
+    credit::DynamicRecoverySpec, credit::EndogenousHazardSpec, credit::MertonModel,
+    credit::RatingFactorTable, credit::SimulatedPaths, credit::ToggleExerciseModel,
     factor::credit::decomposition::LevelsAtDate,
-    factor::credit::decomposition::PeriodDecomposition, factor::risk::DecompositionConfig,
-    factor::risk::ParametricEsDecompositionView, factor::risk::PositionRiskDecomposition,
+    factor::credit::decomposition::PeriodDecomposition, factor::risk::PositionRiskDecomposition,
     factor::risk::RiskBudgetResult, factor::risk::RiskDecomposition,
     factor::risk::StressAttribution, factor::MarketDependency,
     fourier::characteristic_function::BlackScholesCf,
     fourier::characteristic_function::MertonJumpCf,
     fourier::characteristic_function::VarianceGammaCf, fourier::CosConfig,
     liquidity::AlmgrenChrissModel, liquidity::ExecutionTrajectory, liquidity::ImpactEstimate,
-    liquidity::KyleLambdaModel, liquidity::LiquidityConfig, liquidity::LiquidityTier,
-    liquidity::LvarBangiaScalar, liquidity::TradeParams, monte_carlo::estimate::Estimate,
-    monte_carlo::greeks::lrm::LrmGreeks, monte_carlo::payoff::asian::AveragingMethod,
-    monte_carlo::payoff::barrier::OptionKind, monte_carlo::pricer::basis::BasisKind,
+    liquidity::KyleLambdaModel, liquidity::LiquidityTier, liquidity::LvarBangiaScalar,
+    liquidity::TradeParams, monte_carlo::estimate::Estimate, monte_carlo::greeks::lrm::LrmGreeks,
+    monte_carlo::payoff::asian::AveragingMethod, monte_carlo::pricer::basis::BasisKind,
     monte_carlo::process::cheyette_rough::CheyetteRoughVolParams,
     monte_carlo::process::cir::CirParams, monte_carlo::process::lmm::LmmParams,
     monte_carlo::process::local_vol::LocalVolParams, monte_carlo::process::ou::HullWhite1FParams,
@@ -188,13 +185,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "credit_state",
         Component,
         "Observable credit state at a point in time."
-    ),
-    finstack_quant_core::schema_artifact!(
-        DecompositionConfig,
-        "models",
-        "decomposition_config",
-        Input,
-        "Configuration for position-level VaR decomposition."
     ),
     finstack_quant_core::schema_artifact!(
         DieboldLi,
@@ -344,13 +334,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Snapshot of all hierarchy-level factor values at a single date, produced from observed issuer spreads."
     ),
     finstack_quant_core::schema_artifact!(
-        LiquidityConfig,
-        "models",
-        "liquidity_config",
-        Input,
-        "Configuration for liquidity calculations."
-    ),
-    finstack_quant_core::schema_artifact!(
         LiquidityTier,
         "models",
         "liquidity_tier",
@@ -463,25 +446,11 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Input for the Ohlson O-Score logistic model (1980)."
     ),
     finstack_quant_core::schema_artifact!(
-        OptionKind,
-        "models",
-        "option_kind",
-        Component,
-        "Vanilla option kind for barrier payoff evaluation."
-    ),
-    finstack_quant_core::schema_artifact!(
         OptionType,
         "models",
         "option_type",
         Component,
         "Option payoff direction used by analytical and numerical model engines."
-    ),
-    finstack_quant_core::schema_artifact!(
-        ParametricEsDecompositionView,
-        "models",
-        "parametric_es_decomposition_view",
-        Output,
-        "Serializable Expected Shortfall decomposition view."
     ),
     finstack_quant_core::schema_artifact!(
         PathSimulationSpec,
@@ -650,13 +619,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "seniority_calibration",
         Component,
         "Historical recovery calibration by seniority class."
-    ),
-    finstack_quant_core::schema_artifact!(
-        SeniorityRecovery,
-        "models",
-        "seniority_recovery",
-        Component,
-        "Recovery model driven by seniority-class Beta distributions."
     ),
     finstack_quant_core::schema_artifact!(
         SimulatedPaths,

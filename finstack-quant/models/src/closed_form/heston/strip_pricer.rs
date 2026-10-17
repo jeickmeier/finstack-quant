@@ -1,11 +1,42 @@
-use super::characteristic_fn::{heston_pj_characteristic_function, HestonCfStatus};
 use super::fourier_prices::validate_heston_inputs;
 use super::params::HESTON_TAIL_DIAGNOSTIC_THRESHOLD;
-use super::quadrature::{composite_gauss_legendre_grid, HESTON_TAIL_WINDOW_FRACTION};
 use super::{HestonFourierSettings, HestonPricingParams};
+use crate::volatility::heston::HestonCfStatus;
+use finstack_quant_core::math::gauss_legendre_grid;
 use finstack_quant_core::{Error, Result};
 use num_complex::Complex;
 use std::f64::consts::PI;
+
+pub(super) fn heston_pj_characteristic_function(
+    j: u8,
+    phi: f64,
+    time: f64,
+    log_spot: f64,
+    params: &HestonPricingParams,
+) -> (Complex<f64>, HestonCfStatus) {
+    crate::volatility::heston::heston_pj_characteristic_function(
+        j,
+        phi,
+        log_spot,
+        params.r,
+        params.q,
+        time,
+        &params.model,
+    )
+}
+
+fn composite_gauss_legendre_grid(
+    a: f64,
+    b: f64,
+    order: usize,
+    panels: usize,
+) -> Option<Vec<(f64, f64)>> {
+    gauss_legendre_grid(a, b, order, panels).ok()
+}
+
+/// Fraction of the upper integration range whose absolute integrand mass is
+/// used to estimate the truncated Gil-Pelaez tail.
+const HESTON_TAIL_WINDOW_FRACTION: f64 = 0.1;
 
 /// Cached Heston Fourier data for pricing multiple strikes with shared parameters.
 ///
@@ -35,7 +66,7 @@ pub(crate) struct HestonStripPricer {
 
 /// No overflow-corrupted characteristic-function node is acceptable. Legitimate
 /// tail underflow remains valid and does not count toward this threshold.
-pub(super) const HESTON_STRIP_MAX_CORRUPT_FRACTION: f64 = 0.0;
+const HESTON_STRIP_MAX_CORRUPT_FRACTION: f64 = 0.0;
 
 impl HestonStripPricer {
     /// Build a strip pricer with characteristic-function values cached on the
@@ -243,5 +274,95 @@ impl HestonStripPricer {
             .iter()
             .map(|&strike| self.price_call(strike))
             .collect()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy)]
+pub(super) struct HestonPjDiagnostics {
+    pub(super) probability: f64,
+    pub(super) raw_probability: f64,
+    pub(super) tail_estimate: f64,
+    pub(super) corrupted: bool,
+}
+
+#[cfg(test)]
+pub(super) fn heston_pj_with_diagnostics(
+    j: u8,
+    spot: f64,
+    strike: f64,
+    time: f64,
+    params: &HestonPricingParams,
+    settings: &HestonFourierSettings,
+) -> HestonPjDiagnostics {
+    let Some(grid) =
+        composite_gauss_legendre_grid(0.0, settings.u_max, settings.gl_order, settings.panels)
+    else {
+        return HestonPjDiagnostics {
+            probability: f64::NAN,
+            raw_probability: f64::NAN,
+            tail_estimate: f64::INFINITY,
+            corrupted: true,
+        };
+    };
+
+    heston_pj_on_grid(j, spot, strike, time, params, settings, &grid)
+}
+
+#[cfg(test)]
+pub(super) fn heston_pj_on_grid(
+    j: u8,
+    spot: f64,
+    strike: f64,
+    time: f64,
+    params: &HestonPricingParams,
+    settings: &HestonFourierSettings,
+    grid: &[(f64, f64)],
+) -> HestonPjDiagnostics {
+    let log_spot = spot.ln();
+    let log_strike = strike.ln();
+    let i = Complex::new(0.0, 1.0);
+    let tail_window_start = settings.u_max * (1.0 - HESTON_TAIL_WINDOW_FRACTION);
+
+    let mut integral = 0.0;
+    let mut tail_abs_mass = 0.0;
+    let mut interior_nodes = 0_usize;
+    let mut corrupted_nodes = 0_usize;
+    let mut ok_nodes = 0_usize;
+
+    for (phi, weight) in grid {
+        if phi.abs() < settings.phi_eps {
+            continue;
+        }
+        interior_nodes += 1;
+
+        let (psi, status) = heston_pj_characteristic_function(j, *phi, time, log_spot, params);
+        if status == HestonCfStatus::Overflow {
+            corrupted_nodes += 1;
+        }
+        if status == HestonCfStatus::Ok {
+            ok_nodes += 1;
+        }
+
+        let exp_term = (-i * *phi * log_strike).exp();
+        let value = (exp_term * psi / (i * *phi)).re;
+        if value.is_finite() {
+            integral += *weight * value;
+            if *phi >= tail_window_start {
+                tail_abs_mass += weight.abs() * value.abs();
+            }
+        }
+    }
+
+    let corrupted = interior_nodes > 0
+        && ((corrupted_nodes as f64) / (interior_nodes as f64) > HESTON_STRIP_MAX_CORRUPT_FRACTION
+            || ok_nodes == 0);
+
+    let raw_probability = 0.5 + integral / PI;
+    HestonPjDiagnostics {
+        probability: raw_probability.clamp(0.0, 1.0),
+        raw_probability,
+        tail_estimate: tail_abs_mass / PI,
+        corrupted,
     }
 }

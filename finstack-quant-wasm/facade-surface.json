@@ -427,15 +427,10 @@
       "datedFlows",
       "datedFlowsJson",
       "defaultModelSpecCdr2pct",
-      "defaultModelSpecConstantCdr",
       "defaultModelSpecCumulativeDefaultFraction",
-      "defaultModelSpecCumulativeLoss",
       "defaultModelSpecMdr",
       "defaultModelSpecMdrWithSurvival",
-      "defaultModelSpecSda",
-      "defaultModelSpecTiming",
       "defaultModelSpecValidate",
-      "defaultModelSpecVector",
       "exCouponRuleExDate",
       "exCouponRuleIsExCoupon",
       "feeSpecPeriodicBp",
@@ -449,18 +444,11 @@
       "materializeFixings",
       "mdrToCdr",
       "mergeCashflowSchedules",
-      "notionalCurrency",
       "notionalPar",
       "notionalValidate",
-      "periodAggregationGetAmount",
-      "prepaymentModelSpecAbs",
-      "prepaymentModelSpecCmbsWithLockout",
-      "prepaymentModelSpecConstantCpr",
-      "prepaymentModelSpecPsa",
       "prepaymentModelSpecPsa100",
       "prepaymentModelSpecSmm",
       "prepaymentModelSpecValidate",
-      "prepaymentModelSpecVector",
       "recoveryModelSpecRecoveryRate",
       "recoveryModelSpecValidate",
       "scheduleFromClassifiedFlows",
@@ -588,13 +576,7 @@
   "cashflows.defaultModelSpecCdr2pct": {
     "kind": "function"
   },
-  "cashflows.defaultModelSpecConstantCdr": {
-    "kind": "function"
-  },
   "cashflows.defaultModelSpecCumulativeDefaultFraction": {
-    "kind": "function"
-  },
-  "cashflows.defaultModelSpecCumulativeLoss": {
     "kind": "function"
   },
   "cashflows.defaultModelSpecMdr": {
@@ -603,16 +585,7 @@
   "cashflows.defaultModelSpecMdrWithSurvival": {
     "kind": "function"
   },
-  "cashflows.defaultModelSpecSda": {
-    "kind": "function"
-  },
-  "cashflows.defaultModelSpecTiming": {
-    "kind": "function"
-  },
   "cashflows.defaultModelSpecValidate": {
-    "kind": "function"
-  },
-  "cashflows.defaultModelSpecVector": {
     "kind": "function"
   },
   "cashflows.exCouponRuleExDate": {
@@ -654,28 +627,10 @@
   "cashflows.mergeCashflowSchedules": {
     "kind": "function"
   },
-  "cashflows.notionalCurrency": {
-    "kind": "function"
-  },
   "cashflows.notionalPar": {
     "kind": "function"
   },
   "cashflows.notionalValidate": {
-    "kind": "function"
-  },
-  "cashflows.periodAggregationGetAmount": {
-    "kind": "function"
-  },
-  "cashflows.prepaymentModelSpecAbs": {
-    "kind": "function"
-  },
-  "cashflows.prepaymentModelSpecCmbsWithLockout": {
-    "kind": "function"
-  },
-  "cashflows.prepaymentModelSpecConstantCpr": {
-    "kind": "function"
-  },
-  "cashflows.prepaymentModelSpecPsa": {
     "kind": "function"
   },
   "cashflows.prepaymentModelSpecPsa100": {
@@ -685,9 +640,6 @@
     "kind": "function"
   },
   "cashflows.prepaymentModelSpecValidate": {
-    "kind": "function"
-  },
-  "cashflows.prepaymentModelSpecVector": {
     "kind": "function"
   },
   "cashflows.recoveryModelSpecRecoveryRate": {
@@ -2789,7 +2741,7 @@
   "models.credit.WorkoutLgd": {
     "kind": "class",
     "statics": ["builder", "fromJson"],
-    "methods": ["evaluate", "free", "lgd", "netRecovery", "recoveryRate", "toJson"],
+    "methods": ["evaluate", "free", "netRecovery", "toJson"],
     "getters": ["collateral", "costs", "discountRate", "workoutYears"]
   },
   "models.credit.WorkoutLgdBuilder": {
@@ -3042,7 +2994,6 @@
   "models.factor.risk": {
     "kind": "namespace",
     "keys": [
-      "DecompositionConfig",
       "buildStressAttribution",
       "defaultUtilizationThreshold",
       "evaluateRiskBudget",
@@ -3051,19 +3002,6 @@
       "parametricVarDecomposition",
       "positionComponentVar"
     ]
-  },
-  "models.factor.risk.DecompositionConfig": {
-    "kind": "class",
-    "statics": [
-      "fromJson",
-      "historical",
-      "historical95",
-      "parametric",
-      "parametric95",
-      "parametric99"
-    ],
-    "methods": ["free", "toJson", "withIncremental"],
-    "getters": ["computeIncremental", "confidence", "method"]
   },
   "models.factor.risk.parametricVarDecomposition": {
     "kind": "function"
@@ -3088,15 +3026,7 @@
   },
   "models.factor.schema": {
     "kind": "namespace",
-    "keys": [
-      "creditCalibrationConfigSchema",
-      "creditCalibrationInputsSchema",
-      "creditFactorModelSchema",
-      "factorModelConfigSchema",
-      "get",
-      "index",
-      "validate"
-    ]
+    "keys": ["get", "index", "validate"]
   },
   "models.factor.schema.index": {
     "kind": "function"
@@ -3105,18 +3035,6 @@
     "kind": "function"
   },
   "models.factor.schema.validate": {
-    "kind": "function"
-  },
-  "models.factor.schema.creditCalibrationConfigSchema": {
-    "kind": "function"
-  },
-  "models.factor.schema.creditCalibrationInputsSchema": {
-    "kind": "function"
-  },
-  "models.factor.schema.creditFactorModelSchema": {
-    "kind": "function"
-  },
-  "models.factor.schema.factorModelConfigSchema": {
     "kind": "function"
   },
   "models.liquidity": {
@@ -3142,13 +3060,13 @@
     "kind": "class",
     "statics": ["fromJson", "fromProfile"],
     "methods": ["estimateCost", "free", "optimalTrajectory", "toJson"],
-    "getters": ["delta", "eta", "gamma", "modelName"]
+    "getters": ["delta", "eta", "gamma"]
   },
   "models.liquidity.KyleLambdaModel": {
     "kind": "class",
     "statics": ["fromAmihud", "fromJson"],
     "methods": ["estimateCost", "free", "optimalTrajectory", "toJson"],
-    "getters": ["lambda", "modelName"]
+    "getters": ["lambda"]
   },
   "models.liquidity.rollEffectiveSpread": {
     "kind": "function"
@@ -3329,7 +3247,6 @@
     "kind": "namespace",
     "keys": [
       "SabrCalibrator",
-      "SabrModel",
       "SabrParameters",
       "SabrSmile",
       "calibrateSvi",
@@ -3378,12 +3295,6 @@
     ],
     "getters": ["atmPinning", "maxIterations", "shift", "tolerance"]
   },
-  "models.volatility.SabrModel": {
-    "kind": "class",
-    "statics": [],
-    "methods": ["free", "impliedVol", "supportsNegativeRates"],
-    "getters": ["params"]
-  },
   "models.volatility.SabrParameters": {
     "kind": "class",
     "statics": [
@@ -3396,7 +3307,7 @@
       "shiftedLognormal",
       "shiftedNormal"
     ],
-    "methods": ["free", "isShifted", "toJson"],
+    "methods": ["free", "impliedVol", "isShifted", "supportsNegativeRates", "toJson"],
     "getters": ["alpha", "beta", "nu", "rho", "shift"]
   },
   "models.volatility.SabrSmile": {

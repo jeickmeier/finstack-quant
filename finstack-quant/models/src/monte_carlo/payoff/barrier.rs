@@ -21,21 +21,11 @@ use super::super::barriers::bridge::check_barrier_hit;
 use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::Payoff;
 use crate::monte_carlo::TimeGrid;
+pub use crate::types::OptionType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::BarrierDirection;
 pub use finstack_quant_core::types::BarrierType;
-
-/// Vanilla option kind for barrier payoff evaluation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum OptionKind {
-    /// Call option: max(S-K, 0)
-    Call,
-    /// Put option: max(K-S, 0)
-    Put,
-}
 
 /// Simulation-step representation of a barrier's monitoring contract.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,6 +43,32 @@ pub enum BarrierMonitoring {
 }
 
 impl BarrierMonitoring {
+    /// Construct a discrete monitoring schedule with sorted, deduplicated steps.
+    ///
+    /// # Arguments
+    ///
+    /// * `observation_steps` - Zero-based simulation steps at which the barrier
+    ///   or extremum is observed; sorted and deduplicated on construction.
+    #[must_use]
+    pub fn discrete(mut observation_steps: Vec<usize>) -> Self {
+        observation_steps.sort_unstable();
+        observation_steps.dedup();
+        Self::Discrete { observation_steps }
+    }
+
+    /// Return `self` with any discrete `observation_steps` sorted and deduplicated.
+    #[must_use]
+    pub fn normalized(mut self) -> Self {
+        if let Self::Discrete {
+            ref mut observation_steps,
+        } = self
+        {
+            observation_steps.sort_unstable();
+            observation_steps.dedup();
+        }
+        self
+    }
+
     /// Return whether the path is observed at simulation step `step`.
     ///
     /// # Arguments
@@ -63,7 +79,13 @@ impl BarrierMonitoring {
     pub fn observes(&self, step: usize) -> bool {
         match self {
             Self::Continuous { start_step } => step >= *start_step,
-            Self::Discrete { observation_steps } => observation_steps.binary_search(&step).is_ok(),
+            Self::Discrete { observation_steps } => {
+                if observation_steps.is_sorted() {
+                    observation_steps.binary_search(&step).is_ok()
+                } else {
+                    observation_steps.contains(&step)
+                }
+            }
         }
     }
 }
@@ -81,7 +103,7 @@ pub struct BarrierOptionPayoff {
     /// Barrier type
     pub barrier_type: BarrierType,
     /// Option type (Call/Put)
-    pub option_type: OptionKind,
+    pub option_type: OptionType,
     /// Rebate amount (paid at maturity if option deactivated/not-activated)
     pub rebate: Option<f64>,
     /// Notional
@@ -153,7 +175,7 @@ impl BarrierOptionPayoff {
         strike: f64,
         barrier: f64,
         barrier_type: BarrierType,
-        option_type: OptionKind,
+        option_type: OptionType,
         rebate: Option<f64>,
         notional: f64,
         maturity_step: usize,
@@ -163,6 +185,7 @@ impl BarrierOptionPayoff {
     ) -> Self {
         let step_dts: Vec<f64> = time_grid.dts().to_vec();
         let total_time: f64 = step_dts.iter().take(maturity_step).sum();
+        let monitoring = monitoring.normalized();
         Self {
             strike,
             barrier,
@@ -319,8 +342,8 @@ impl Payoff for BarrierOptionPayoff {
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
         if self.is_active() {
             let intrinsic = match self.option_type {
-                OptionKind::Call => (self.terminal_spot - self.strike).max(0.0),
-                OptionKind::Put => (self.strike - self.terminal_spot).max(0.0),
+                OptionType::Call => (self.terminal_spot - self.strike).max(0.0),
+                OptionType::Put => (self.strike - self.terminal_spot).max(0.0),
             };
             Money::new(intrinsic * self.notional, currency)
         } else {
@@ -369,7 +392,7 @@ mod tests {
             100.0,
             100.0,
             barrier_type,
-            OptionKind::Call,
+            OptionType::Call,
             None,
             1.0,
             1,
@@ -419,7 +442,7 @@ mod tests {
             100.0,
             120.0,
             BarrierType::UpAndOut,
-            OptionKind::Call,
+            OptionType::Call,
             Some(rebate),
             1.0,
             10,
@@ -452,7 +475,7 @@ mod tests {
             100.0,
             120.0,
             BarrierType::UpAndOut,
-            OptionKind::Call,
+            OptionType::Call,
             Some(rebate),
             1.0,
             10,
@@ -490,7 +513,7 @@ mod tests {
             100.0,
             120.0,
             BarrierType::UpAndIn,
-            OptionKind::Call,
+            OptionType::Call,
             Some(rebate),
             1.0,
             10,
@@ -519,7 +542,7 @@ mod tests {
             100.0,
             120.0,
             BarrierType::UpAndOut,
-            OptionKind::Put,
+            OptionType::Put,
             None,
             1.0,
             10,
@@ -549,7 +572,7 @@ mod tests {
             100.0,
             120.0,
             BarrierType::UpAndOut,
-            OptionKind::Call,
+            OptionType::Call,
             Some(rebate),
             1.0,
             10,
@@ -583,7 +606,7 @@ mod tests {
                 100.0,
                 120.0,
                 BarrierType::UpAndOut,
-                OptionKind::Call,
+                OptionType::Call,
                 None,
                 1.0,
                 4,
@@ -632,7 +655,7 @@ mod tests {
             100.0,
             120.0,
             BarrierType::UpAndOut,
-            OptionKind::Call,
+            OptionType::Call,
             None,
             1.0,
             1,
@@ -662,7 +685,7 @@ mod tests {
                 100.0,
                 120.0,
                 BarrierType::UpAndOut,
-                OptionKind::Call,
+                OptionType::Call,
                 None,
                 1.0,
                 4,
@@ -723,7 +746,7 @@ mod tests {
             110.0, // strike (put ITM at terminal spot 95)
             100.0, // true barrier
             BarrierType::DownAndOut,
-            OptionKind::Put,
+            OptionType::Put,
             None,
             1.0,
             4,
@@ -771,7 +794,7 @@ mod tests {
             80.0,
             100.0,
             BarrierType::UpAndOut,
-            OptionKind::Call,
+            OptionType::Call,
             None,
             1.0,
             2,
@@ -809,7 +832,7 @@ mod tests {
             80.0,
             100.0,
             BarrierType::UpAndOut,
-            OptionKind::Call,
+            OptionType::Call,
             None,
             1.0,
             2,

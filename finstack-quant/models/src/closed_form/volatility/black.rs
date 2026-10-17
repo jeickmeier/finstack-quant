@@ -48,12 +48,8 @@ fn black_state(forward: f64, strike: f64, sigma: f64, t: f64) -> Option<BlackSta
     }
 
     let st = sigma * t.sqrt();
-    let d1 = ((forward / strike).ln() + 0.5 * st * st) / st;
-    Some(BlackState {
-        st,
-        d1,
-        d2: d1 - st,
-    })
+    let (d1, d2) = crate::volatility::black::d1_d2_black76(forward, strike, sigma, t);
+    Some(BlackState { st, d1, d2 })
 }
 
 /// Black-76 lognormal call price with unit annuity.
@@ -218,23 +214,4 @@ pub fn black_gamma(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
         Some(state) => norm_pdf(state.d1) / (forward * state.st),
         None => 0.0,
     }
-}
-
-/// Shifted Black call price with unit annuity.
-///
-/// Applies [`black_call`] to `forward + shift` and `strike + shift`. The shifted
-/// forward and strike must be positive for the lognormal formula; otherwise the
-/// result is `NaN`, including at zero expiry or volatility.
-///
-/// # Arguments
-///
-/// * `forward` - Unshifted forward rate or price in the option's native units.
-/// * `strike` - Unshifted option strike in the same units as `forward`.
-/// * `sigma` - Annualized lognormal volatility as a decimal, for example `0.20`.
-/// * `t` - Time to expiry in years.
-/// * `shift` - Additive displacement applied to both forward and strike before
-///   Black-76 pricing.
-#[inline]
-pub fn black_shifted_call(forward: f64, strike: f64, sigma: f64, t: f64, shift: f64) -> f64 {
-    black_call(forward + shift, strike + shift, sigma, t)
 }

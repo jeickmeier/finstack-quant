@@ -41,8 +41,7 @@ use super::super::traits::{Discretization, StochasticProcess};
 /// (`v = max(v, 0)` in drift and diffusion) and the engine applies
 /// Cholesky to the declared factor correlation. Production Heston
 /// Europeans use [`crate::monte_carlo::discretization::QeHeston`] via
-/// [`crate::monte_carlo::pricer::heston::price_heston_call`] /
-/// [`crate::monte_carlo::pricer::heston::price_heston_put`].
+/// [`crate::monte_carlo::pricer::heston::price_heston`].
 #[derive(Debug, Clone, Default)]
 pub struct EulerMaruyama;
 

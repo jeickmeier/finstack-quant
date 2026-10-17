@@ -492,7 +492,6 @@ mod tests {
     fn public_helper_matches_exact_one_forward_displaced_black_premium() {
         use finstack_quant_core::dates::DayCount;
         use finstack_quant_core::math::interp::InterpStyle;
-        use finstack_quant_models::closed_form::volatility::black_shifted_call;
 
         // Ten-year expiry and one one-year forward reproduce the supported
         // low-rate case where the old instantaneous conversion overpriced by 7.7%.
@@ -539,12 +538,11 @@ mod tests {
         assert_eq!(params.tenors[0], 10.0);
         assert!((params.initial_forwards[0] - 0.005).abs() < 1e-14);
         assert!((params.displacements[0] - 0.005).abs() < 1e-14);
-        let model_premium = black_shifted_call(
-            params.initial_forwards[0],
-            params.initial_forwards[0],
+        let model_premium = black_call(
+            params.initial_forwards[0] + params.displacements[0],
+            params.initial_forwards[0] + params.displacements[0],
             base_vol,
             params.tenors[0],
-            params.displacements[0],
         );
         let market_premium = black_call(
             params.initial_forwards[0],

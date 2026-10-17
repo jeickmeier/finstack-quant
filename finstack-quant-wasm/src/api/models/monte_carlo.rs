@@ -190,17 +190,23 @@ fn price_heston(
         .as_deref()
         .map(|code| Currency::from_str(code).map_err(to_js_err))
         .transpose()?;
-    let est = if is_call {
-        canonical::price_heston_call(
-            spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, num_paths,
-            seed, num_steps, ccy,
-        )
-    } else {
-        canonical::price_heston_put(
-            spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, num_paths,
-            seed, num_steps, ccy,
-        )
-    }
+    let est = canonical::price_heston(
+        OptionType::from(is_call),
+        spot,
+        strike,
+        rate,
+        div_yield,
+        kappa,
+        theta,
+        vol_of_vol,
+        rho,
+        v0,
+        expiry,
+        num_paths,
+        seed,
+        num_steps,
+        ccy,
+    )
     .map_err(to_js_err)?;
     crate::utils::to_js_value(&est)
 }
@@ -551,7 +557,8 @@ impl JsEuropeanPricer {
         let currency = js_currency(currency.as_ref())?;
         let estimate = self
             .inner
-            .price_gbm_call(
+            .price_gbm(
+                OptionType::Call,
                 gbm.spot,
                 gbm.strike,
                 gbm.rate,
@@ -600,7 +607,8 @@ impl JsEuropeanPricer {
         let currency = js_currency(currency.as_ref())?;
         let estimate = self
             .inner
-            .price_gbm_put(
+            .price_gbm(
+                OptionType::Put,
                 gbm.spot,
                 gbm.strike,
                 gbm.rate,
@@ -727,7 +735,8 @@ impl JsPathDependentPricer {
         let currency = js_currency(currency.as_ref())?;
         let estimate = self
             .inner
-            .price_gbm_asian_call(
+            .price_gbm_asian(
+                OptionType::Call,
                 gbm.spot,
                 gbm.strike,
                 gbm.rate,
@@ -776,7 +785,8 @@ impl JsPathDependentPricer {
         let currency = js_currency(currency.as_ref())?;
         let estimate = self
             .inner
-            .price_gbm_asian_put(
+            .price_gbm_asian(
+                OptionType::Put,
                 gbm.spot,
                 gbm.strike,
                 gbm.rate,
@@ -1036,7 +1046,8 @@ impl JsLsmcPricer {
         )?;
         let estimate = call
             .pricer
-            .price_gbm_american_put(
+            .price_gbm_american(
+                OptionType::Put,
                 call.gbm.spot,
                 call.gbm.strike,
                 call.gbm.rate,
@@ -1098,7 +1109,8 @@ impl JsLsmcPricer {
         )?;
         let estimate = call
             .pricer
-            .price_gbm_american_call(
+            .price_gbm_american(
+                OptionType::Call,
                 call.gbm.spot,
                 call.gbm.strike,
                 call.gbm.rate,
@@ -1165,7 +1177,8 @@ impl JsLsmcPricer {
         )?;
         let estimate = call
             .pricer
-            .price_gbm_american_put_unbiased(
+            .price_gbm_american_unbiased(
+                OptionType::Put,
                 call.gbm.spot,
                 call.gbm.strike,
                 call.gbm.rate,
@@ -1233,7 +1246,8 @@ impl JsLsmcPricer {
         )?;
         let estimate = call
             .pricer
-            .price_gbm_american_call_unbiased(
+            .price_gbm_american_unbiased(
+                OptionType::Call,
                 call.gbm.spot,
                 call.gbm.strike,
                 call.gbm.rate,

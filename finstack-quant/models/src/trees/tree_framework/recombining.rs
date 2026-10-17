@@ -69,6 +69,13 @@ pub struct RecombiningInputs<'a, V: TreeValuator> {
 ///
 /// Present value of the instrument at time 0
 pub fn price_recombining_tree<V: TreeValuator>(inputs: RecombiningInputs<'_, V>) -> Result<f64> {
+    if inputs.steps == 0 || !inputs.time_to_maturity.is_finite() || inputs.time_to_maturity <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "price_recombining_tree requires steps > 0 and finite positive time_to_maturity \
+             (got steps={}, time_to_maturity={})",
+            inputs.steps, inputs.time_to_maturity
+        )));
+    }
     let dt = inputs.time_to_maturity / inputs.steps as f64;
 
     // Constant discount factor of the flat-rate spot lattice.

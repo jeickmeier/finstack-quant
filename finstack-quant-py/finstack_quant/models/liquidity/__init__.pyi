@@ -1240,23 +1240,6 @@ class AlmgrenChrissModel:
         """
         ...
 
-    @property
-    def model_name(self) -> str:
-        """
-        Stable label identifying the impact model behind this estimate.
-
-        Returns
-        -------
-        str
-            Short model name used in diagnostics and result metadata; it is
-            constant per model type and not user-configurable.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
     def estimate_cost(self, params: TradeParams) -> ImpactEstimate:
         """Expected execution cost of ``params`` under uniform execution.
 
@@ -1433,23 +1416,6 @@ class KyleLambdaModel:
         -------
         float
             Price move in native price units per unit of signed order flow; larger values mean a thinner, more impactful market. Named ``lambda_`` because ``lambda`` is a Python keyword.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def model_name(self) -> str:
-        """
-        Stable label identifying the impact model behind this estimate.
-
-        Returns
-        -------
-        str
-            Short model name used in diagnostics and result metadata; it is
-            constant per model type and not user-configurable.
 
         Notes
         -----

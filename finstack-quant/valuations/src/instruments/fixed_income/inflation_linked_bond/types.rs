@@ -409,11 +409,8 @@ impl InflationLinkedBond {
     /// Shared by the projected (PV) schedule and the real-yield schedule so
     /// both pay principal on the same date as the final coupon.
     fn principal_payment_date(&self) -> Result<Date> {
-        finstack_quant_cashflows::builder::adjust_date(
-            self.maturity,
-            self.business_day_convention,
-            self.schedule_calendar_id(),
-        )
+        let cal = finstack_quant_core::dates::calendar_by_id_strict(self.schedule_calendar_id())?;
+        finstack_quant_core::dates::adjust(self.maturity, self.business_day_convention, cal)
     }
 
     /// Real (unindexed) cashflow schedule: one coupon per period carrying its

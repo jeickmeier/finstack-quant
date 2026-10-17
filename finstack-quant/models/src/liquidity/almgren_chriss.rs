@@ -191,29 +191,9 @@ impl AlmgrenChrissModel {
         let temp_impact_per_period = self.eta * rate.abs().powf(self.delta);
         let temp_cost = temp_impact_per_period * q.abs();
 
-        let total_cost = perm_cost + temp_cost;
-
-        // Notional value (use the arrival / decision reference price when
-        // the caller supplies one; `profile.mid` is the default).
-        let reference_price = params.effective_reference_price();
-        let notional = q.abs() * reference_price;
-        let cost_bp = if notional > 0.0 {
-            total_cost / notional * 10_000.0
-        } else {
-            0.0
-        };
-
-        // Uniform execution holds inventory linearly from Q to 0, so
-        // integrated inventory variance contributes T / 3.
-        let execution_risk = params.daily_volatility * (t / 3.0).sqrt() * q.abs() * reference_price;
-
-        Ok(ImpactEstimate {
-            permanent_impact: perm_cost,
-            temporary_impact: temp_cost,
-            total_cost,
-            cost_bp,
-            execution_risk,
-        })
+        Ok(ImpactEstimate::from_components(
+            params, perm_cost, temp_cost,
+        ))
     }
 
     /// Compute the optimal execution trajectory.
@@ -260,13 +240,6 @@ impl AlmgrenChrissModel {
         }
         let sigma = params.daily_volatility * params.effective_reference_price();
 
-        // The closed-form `sinh` schedule used below is the optimal solution
-        // for *linear* temporary impact (delta = 1) only. For general `delta`
-        // the optimal trajectory requires solving a non-linear ODE; using the
-        // linear schedule as an approximation can produce sub-optimal plans
-        // (often by 10-20% for `delta` near 0.5). Reject the call so callers
-        // either change the model's `delta` or drop down to `estimate_cost`,
-        // which uses the true `delta` for cost reporting.
         if (self.delta - 1.0).abs() > 1e-12 {
             return Err(invalid_input(format!(
                 "Almgren-Chriss optimal_trajectory is only defined for delta = 1 \
@@ -277,79 +250,43 @@ impl AlmgrenChrissModel {
             )));
         }
 
-        // kappa = sqrt(risk_aversion * sigma^2 / eta)
-        // Optimal remaining: x_j = Q * sinh(kappa * (T - t_j)) / sinh(kappa * T)
         let kappa_sq = if self.eta > 0.0 {
             risk_aversion * sigma * sigma / self.eta
         } else {
             0.0
         };
         let kappa = kappa_sq.sqrt();
-
         let kappa_t = kappa * t;
 
-        let mut remaining = Vec::with_capacity(num_buckets + 1);
-        let mut time_points = Vec::with_capacity(num_buckets + 1);
-        let mut quantities = Vec::with_capacity(num_buckets);
-
-        remaining.push(q);
-        time_points.push(0.0);
-
-        if kappa_t.abs() < 1e-12 {
-            // When kappa ~ 0, uniform execution is optimal
-            let per_bucket = q / num_buckets as f64;
-            for j in 1..=num_buckets {
-                let t_j = j as f64 * dt;
-                time_points.push(t_j);
-                let rem = q - per_bucket * j as f64;
-                remaining.push(rem);
-                quantities.push(per_bucket);
-            }
+        let (quantities, remaining, time_points) = if kappa_t.abs() < 1e-12 {
+            ExecutionTrajectory::uniform_steps(q, t, num_buckets)
         } else {
+            let mut remaining = Vec::with_capacity(num_buckets + 1);
+            let mut time_points = Vec::with_capacity(num_buckets + 1);
+            remaining.push(q);
+            time_points.push(0.0);
             for j in 1..=num_buckets {
                 let t_j = j as f64 * dt;
                 time_points.push(t_j);
                 let rem = if j == num_buckets {
-                    0.0 // Ensure exact completion
+                    0.0
                 } else {
                     q * stable_sinh_ratio(kappa * (t - t_j), kappa_t)
                 };
                 remaining.push(rem);
             }
-            for j in 0..num_buckets {
-                quantities.push(remaining[j] - remaining[j + 1]);
-            }
-        }
+            let quantities = remaining.windows(2).map(|w| w[0] - w[1]).collect();
+            (quantities, remaining, time_points)
+        };
 
         let mut expected_cost = 0.0;
-        let mut cost_variance = 0.0;
-
         for j in 0..num_buckets {
             let trade_rate = quantities[j] / dt;
-
-            // Permanent impact cost contribution. Each trade `n_j` is filled
-            // against the price already depressed by prior fills plus half of
-            // its own impact, i.e. the average inventory across the bucket
-            // `(x_j + x_{j+1}) / 2`. This midpoint rule telescopes to the
-            // trajectory-independent `0.5 * gamma * Q^2`, matching the
-            // closed-form permanent cost used by `estimate_cost`. Using the
-            // pre-trade inventory `x_j` alone would over-count by
-            // `0.5 * gamma * sum(n_j^2)` (an O(1/num_buckets) bias).
             let avg_inventory = (remaining[j].abs() + remaining[j + 1].abs()) / 2.0;
             expected_cost += self.gamma * quantities[j].abs() * avg_inventory;
-
             expected_cost += self.eta * trade_rate.abs().powf(self.delta) * quantities[j].abs();
-
-            // Variance contribution: Almgren-Chriss (2001), eq. (7),
-            // Var = σ² ∫ x(t)² dt. Inventory is piecewise linear across the
-            // bucket, so the exact per-bucket integral is
-            // (a² + a·b + b²)/3 · dt. The former right-endpoint Riemann sum
-            // (σ²·b²·dt) dropped the final bucket entirely (remaining[n] ==
-            // 0): exactly 0 at n = 1, ~15% low at n = 5 for the uniform
-            // trajectory versus the closed form used by `estimate_cost`.
-            let (a, b) = (remaining[j], remaining[j + 1]);
-            cost_variance += sigma * sigma * (a * a + a * b + b * b) / 3.0 * dt;
         }
+        let cost_variance = ExecutionTrajectory::piecewise_linear_variance(&remaining, dt, sigma);
 
         Ok(ExecutionTrajectory {
             quantities,
@@ -358,12 +295,6 @@ impl AlmgrenChrissModel {
             cost_variance,
             time_points,
         })
-    }
-
-    /// Human-readable model name for reporting.
-    #[must_use]
-    pub fn model_name(&self) -> &'static str {
-        "Almgren-Chriss"
     }
 }
 

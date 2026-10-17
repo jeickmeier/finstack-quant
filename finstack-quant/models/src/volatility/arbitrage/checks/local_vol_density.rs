@@ -244,8 +244,8 @@ mod tests {
             (4, 0x797f_068f_cf44_9335),
             (5, 0x927f_0170_6cf3_7ef2),
             (7, 0xa13f_96de_6a06_612a),
-            (2, 0x1512_4344_8f8d_fbe4),
-            (2, 0x34a1_2370_010a_583f),
+            (2, 0x4b1f_a919_bef7_1130),
+            (2, 0x60b4_6cc5_569b_6981),
         ];
         assert_eq!(actual.as_slice(), expected, "actual = {actual:#x?}");
     }

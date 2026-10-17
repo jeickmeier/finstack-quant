@@ -2565,27 +2565,12 @@ export type PrepaymentModelSpec3 =
  */
 export type RecoverySpec =
   | {
-      /**
-       * Recovery rate ∈ [0, 1]
-       */
       rate: number;
       type: "constant";
     }
   | {
-      /**
-       * Correlation with the systematic factor. Under the canonical
-       * low-factor-stress convention this is typically POSITIVE: recovery
-       * falls when the factor falls, so defaults (high in stress) and
-       * recoveries co-move negatively.
-       */
       factor_correlation: number;
-      /**
-       * Mean recovery rate
-       */
       mean_recovery: number;
-      /**
-       * Recovery volatility (standard deviation)
-       */
       recovery_volatility: number;
       type: "market_correlated";
     };
@@ -15817,46 +15802,6 @@ export type D_6347B87Cc04573A369D9 = "hazard_rate" | "distance_to_default" | "le
  */
 export type D_69148Dfad1155676D8A6 = "days" | "weeks" | "months" | "years";
 /**
- * Recovery model specification.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_6c25a9bef63bd477f037".
- */
-export type D_6C25A9Bef63Bd477F037 =
-  | "constant"
-  | "inverse_linear"
-  | {
-      inverse_power: {
-        /**
-         * Power exponent (`alpha`).
-         */
-        exponent: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      floored_inverse: {
-        /**
-         * Minimum recovery rate floor.
-         */
-        floor: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      linear_decline: {
-        /**
-         * Minimum recovery rate floor.
-         */
-        floor: number;
-        /**
-         * Sensitivity of recovery to leverage increase (`beta`).
-         */
-        sensitivity: number;
-        [k: string]: unknown;
-      };
-    };
-/**
  * Barrier monitoring type for default determination.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -16449,6 +16394,46 @@ export type DefaultModelSpec3 =
        */
       cumulative_default_rate: number;
       curve: "timing";
+    };
+/**
+ * Recovery model specification.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "d_c428e03de1abac8e49c9".
+ */
+export type DC428E03De1Abac8E49C9 =
+  | "constant"
+  | "inverse_linear"
+  | {
+      inverse_power: {
+        /**
+         * Power exponent (`alpha`).
+         */
+        exponent: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      floored_inverse: {
+        /**
+         * Minimum recovery rate floor.
+         */
+        floor: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      linear_decline: {
+        /**
+         * Minimum recovery rate floor.
+         */
+        floor: number;
+        /**
+         * Sensitivity of recovery to leverage increase (`beta`).
+         */
+        sensitivity: number;
+        [k: string]: unknown;
+      };
     };
 /**
  * Barrier-crossing detection policy for first-passage default simulation.
@@ -17836,7 +17821,7 @@ export interface DD760Eef55C5Bd7D5B1F6 {
  *
  * Models the relationship between the accreted notional and the recovery
  * rate in default. As PIK accrual increases the notional relative to the
- * original base, recovery declines according to the chosen [`RecoveryModel`].
+ * original base, recovery declines according to the chosen [`DynamicRecoveryModel`].
  * Deserialization enforces the same parameter invariants as the constructors.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -58872,7 +58857,7 @@ export interface InstrumentPricingOverrides78 {
  * # Wire format
  *
  * Deserialization is routed through [`MertonModel::new_with_dynamics`] via
- * [`RawMertonModel`], so a model loaded from JSON satisfies exactly the same
+ * `RawMertonModel`, so a model loaded from JSON satisfies exactly the same
  * invariants as one built in Rust. The serialized field set is unchanged.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema

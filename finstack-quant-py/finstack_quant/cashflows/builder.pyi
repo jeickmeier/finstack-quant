@@ -1465,8 +1465,7 @@ class CashFlowSchedule:
 
         Notes
         -----
-        Binds Rust ``CashFlowSchedule::pv_by_period`` (market-resolved). The
-        borrowed-handle variant ``pv_by_period_with_discounting`` is Rust-only.
+        Binds Rust ``CashFlowSchedule::pv_by_period`` (market-resolved).
         """
         ...
 

@@ -104,9 +104,12 @@ impl ButterflyCheck {
                     continue;
                 }
 
-                let w_prime = (ws[i + 1] - ws[i - 1]) / (dk_plus + dk_minus);
+                let dk_sum = dk_plus + dk_minus;
+                let w_prime = -dk_plus / (dk_minus * dk_sum) * ws[i - 1]
+                    + (dk_plus - dk_minus) / (dk_minus * dk_plus) * ws[i]
+                    + dk_minus / (dk_plus * dk_sum) * ws[i + 1];
 
-                let dk_avg = 0.5 * (dk_minus + dk_plus);
+                let dk_avg = 0.5 * dk_sum;
                 let w_double_prime = (ws[i + 1] / dk_plus
                     - ws[i] * (1.0 / dk_plus + 1.0 / dk_minus)
                     + ws[i - 1] / dk_minus)

@@ -37,15 +37,29 @@ struct OptionValuator {
     strike: f64,
     option_type: OptionType,
     exercise_steps: Option<HashSet<usize>>,
-    remaining_dividend_values: Option<Vec<f64>>,
+    ex_dividend_values: Option<Vec<f64>>,
+    cum_dividend_values: Option<Vec<f64>>,
 }
 
 impl OptionValuator {
-    fn spot(&self, state: &NodeState) -> Result<f64> {
+    fn ex_spot(&self, state: &NodeState) -> Result<f64> {
         let spot = state
             .spot()
             .ok_or_else(|| Error::internal("option node state missing spot"))?;
-        match &self.remaining_dividend_values {
+        match &self.ex_dividend_values {
+            None => Ok(spot),
+            Some(remaining) => remaining
+                .get(state.step)
+                .map(|value| spot + value)
+                .ok_or_else(|| Error::internal("missing discrete-dividend tree step")),
+        }
+    }
+
+    fn cum_spot(&self, state: &NodeState) -> Result<f64> {
+        let spot = state
+            .spot()
+            .ok_or_else(|| Error::internal("option node state missing spot"))?;
+        match &self.cum_dividend_values {
             None => Ok(spot),
             Some(remaining) => remaining
                 .get(state.step)
@@ -57,7 +71,11 @@ impl OptionValuator {
 
 impl TreeValuator for OptionValuator {
     fn value_at_maturity(&self, state: &NodeState) -> Result<f64> {
-        Ok(intrinsic(self.option_type, self.spot(state)?, self.strike))
+        Ok(intrinsic(
+            self.option_type,
+            self.ex_spot(state)?,
+            self.strike,
+        ))
     }
 
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, _dt: f64) -> Result<f64> {
@@ -66,8 +84,9 @@ impl TreeValuator for OptionValuator {
             .as_ref()
             .is_some_and(|steps| steps.contains(&state.step))
         {
-            let exercise = intrinsic(self.option_type, self.spot(state)?, self.strike);
-            return Ok(continuation_value.max(exercise));
+            let ex_exercise = intrinsic(self.option_type, self.ex_spot(state)?, self.strike);
+            let cum_exercise = intrinsic(self.option_type, self.cum_spot(state)?, self.strike);
+            return Ok(continuation_value.max(ex_exercise).max(cum_exercise));
         }
         Ok(continuation_value)
     }
@@ -261,7 +280,8 @@ impl BinomialTree {
             strike: market_params.strike,
             option_type: market_params.option_type,
             exercise_steps: exercise_steps.map(|steps| steps.iter().copied().collect()),
-            remaining_dividend_values: None,
+            ex_dividend_values: None,
+            cum_dividend_values: None,
         };
 
         self.induct(
@@ -338,7 +358,19 @@ impl BinomialTree {
             market_params.time_to_expiry,
             market_params.dividend_yield,
         )?;
-        let remaining_dividend_values = (0..=self.steps)
+        let ex_dividend_values = (0..=self.steps)
+            .map(|step| {
+                let node_time = step as f64 * dt;
+                mapped_dividends
+                    .iter()
+                    .filter(|(dividend_step, _, _)| *dividend_step > step)
+                    .map(|(_, dividend_time, amount)| {
+                        amount * (-carry * (dividend_time - node_time).max(0.0)).exp()
+                    })
+                    .sum()
+            })
+            .collect();
+        let cum_dividend_values = (0..=self.steps)
             .map(|step| {
                 let node_time = step as f64 * dt;
                 mapped_dividends
@@ -354,7 +386,8 @@ impl BinomialTree {
             strike: market_params.strike,
             option_type: market_params.option_type,
             exercise_steps: exercise_steps.map(|steps| steps.iter().copied().collect()),
-            remaining_dividend_values: Some(remaining_dividend_values),
+            ex_dividend_values: Some(ex_dividend_values),
+            cum_dividend_values: Some(cum_dividend_values),
         };
         self.induct(
             factors,
@@ -841,5 +874,21 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn cash_dividend_at_maturity_is_ex_dividend_at_expiry() {
+        let tree = BinomialTree::crr(100);
+        let params = OptionMarketParams::new(100.0, 90.0, 0.05, 0.0, 1.0, 0.0, OptionType::Call);
+        let div_amount = 5.0;
+        let actual = tree
+            .price_bermudan_with_discrete_dividends(&params, &[], &[(1.0, div_amount)])
+            .expect("terminal cash dividend");
+        let terminal_spot = params.spot * params.rate.exp() - div_amount;
+        let expected = (terminal_spot - params.strike).max(0.0) * (-params.rate).exp();
+        assert!(
+            (actual - expected).abs() < 1e-10,
+            "terminal dividend must not be added back at expiry: got {actual}, expected {expected}"
+        );
     }
 }

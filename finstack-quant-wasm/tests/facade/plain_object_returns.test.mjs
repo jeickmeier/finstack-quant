@@ -132,11 +132,7 @@ test('SabrCalibrator surface: withTolerance, withShift, calibrate, params', () =
   const auto = calibrator.withShift('auto').calibrate(forward, strikes, vols, t, beta);
   assert.equal(auto.beta, beta);
   assert.equal(auto.shift, undefined, 'positive-rate smile needs no shift');
-
-  const model = new wasm.SabrModel(fitted);
-  const params = model.params;
-  assert.equal(params.beta, beta);
-  assert.equal(typeof params.alpha, 'number');
+  assert.ok(fitted.impliedVol(forward, forward, t) > 0);
 });
 
 test('withShift("auto") fits a negative-rate smile with a shift', () => {

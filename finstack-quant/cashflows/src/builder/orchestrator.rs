@@ -6,6 +6,7 @@
 
 use super::schedule::{finalize_flows, CashFlowSchedule};
 use crate::builder::{AmortizationSpec, Notional, PrincipalExchange};
+use crate::json::PrincipalEventSpec;
 use crate::primitives::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::decimal::f64_to_decimal;
@@ -44,37 +45,6 @@ pub(super) struct BuildState {
     pub(super) linear_between_installment: Option<Decimal>,
 }
 
-/// Principal event applied during schedule build (draws/repays).
-///
-/// `delta` adjusts outstanding (positive increases, negative decreases).
-/// `cash` represents the cash leg (e.g., net of OID/fees). If `delta` differs
-/// from `cash`, the difference is interpreted as non-cash adjustments.
-/// `kind` classifies the emitted cashflow. `CFKind::Amortization` emits a
-/// positive principal-repayment cashflow; notional-like events emit as negative
-/// borrower draw cashflows. In all cases, `delta` remains the source of truth
-/// for outstanding balance movement.
-///
-/// # Interest-base convention
-///
-/// Coupons accrue separately over each interval with a constant outstanding
-/// balance. Draws and repayments change interest from their event date,
-/// including events inside a coupon period. Scheduled amortization and PIK
-/// change the balance at the contractual accrual boundary, independently of
-/// adjusted cash payment dates. Term-index reset dates remain contractual.
-#[derive(Debug, Clone)]
-pub(super) struct PrincipalEvent {
-    /// Economic date on which outstanding principal changes.
-    pub(super) date: Date,
-    /// Cash settlement date, independent of the economic balance date.
-    pub(super) payment_date: Date,
-    /// Outstanding delta (positive = increases balance, negative = repays)
-    pub(super) delta: Money,
-    /// Cash leg paid/received (may differ from delta for OID/fees)
-    pub(super) cash: Money,
-    /// Classification for emitted cashflow
-    pub(super) kind: CFKind,
-}
-
 #[derive(Debug, Clone)]
 pub(super) struct AmortizationSetup {
     pub(super) amort_dates: finstack_quant_core::HashSet<Date>,
@@ -108,23 +78,24 @@ pub(super) enum PreparedAmortization {
 
 /// Apply an event's cash leg and checked economic balance movement.
 pub(super) fn apply_principal_event(
-    event: &PrincipalEvent,
+    event: &PrincipalEventSpec,
     outstanding: &mut Decimal,
     flows: &mut Vec<CashFlow>,
 ) -> finstack_quant_core::Result<()> {
-    if event.delta.amount() == 0.0 && event.cash.amount() == 0.0 {
+    let cash = event.resolved_cash();
+    if event.delta.amount() == 0.0 && cash.amount() == 0.0 {
         return Ok(());
     }
     let flow_amount = if event.kind == CFKind::Amortization {
-        event.cash.amount()
+        cash.amount()
     } else {
-        -event.cash.amount()
+        -cash.amount()
     };
     flows.push(
         CashFlow::new(
             event.payment_date,
             None,
-            Money::new(flow_amount, event.cash.currency())?,
+            Money::new(flow_amount, cash.currency())?,
             event.kind,
             0.0,
             None,
@@ -159,7 +130,7 @@ struct DateCollectionInputs<'a> {
     periodic_fees: &'a [PeriodicFee],
     fixed_fees: &'a [(Date, Money)],
     notional: &'a Notional,
-    principal_events: &'a [PrincipalEvent],
+    principal_events: &'a [PrincipalEventSpec],
 }
 
 fn validate_core_inputs(
@@ -325,7 +296,7 @@ fn initialize_build_state(
     accrual_start: Date,
     notional: &Notional,
     estimated_dates: usize,
-    principal_events: &[PrincipalEvent],
+    principal_events: &[PrincipalEventSpec],
     principal_exchange: PrincipalExchange,
 ) -> finstack_quant_core::Result<BuildState> {
     let estimated_flows = estimated_dates * 3;
@@ -355,7 +326,7 @@ fn initialize_build_state(
     outstanding_history.push((history_start, outstanding));
 
     for ev in principal_events.iter().filter(|ev| ev.date <= issue) {
-        if ev.delta.amount() != 0.0 || ev.cash.amount() != 0.0 {
+        if ev.delta.amount() != 0.0 || ev.resolved_cash().amount() != 0.0 {
             apply_principal_event(ev, &mut outstanding, &mut flows)?;
             match outstanding_history.last_mut() {
                 Some((last_date, balance)) if *last_date == ev.date => *balance = outstanding,
@@ -466,7 +437,7 @@ pub struct CashFlowBuilder {
     /// Fee specifications. SmallVec<4> avoids heap allocation for typical instruments
     /// with ≤4 fee specs (commitment fee, facility fee, usage fee, admin fee).
     pub(super) fees: SmallVec<[FeeSpec; 4]>,
-    pub(super) principal_events: Vec<PrincipalEvent>,
+    pub(super) principal_events: Vec<PrincipalEventSpec>,
     pub(super) coupon_program: Vec<CouponProgramPiece>,
     pub(super) payment_program: Vec<PaymentProgramPiece>,
     /// Whether to emit issue funding and maturity redemption notionals.
@@ -483,31 +454,31 @@ impl CashFlowBuilder {
 
     /// Issue date set through [`Self::principal`], if any.
     #[must_use]
-    pub fn issue_date(&self) -> Option<Date> {
+    pub fn get_issue_date(&self) -> Option<Date> {
         self.issue
     }
 
     /// Maturity date set through [`Self::principal`], if any.
     #[must_use]
-    pub fn maturity_date(&self) -> Option<Date> {
+    pub fn get_maturity_date(&self) -> Option<Date> {
         self.maturity
     }
 
     /// Number of coupon-program pieces (full-horizon legs and windows) added so far.
     #[must_use]
-    pub fn coupon_leg_count(&self) -> usize {
+    pub fn get_coupon_leg_count(&self) -> usize {
         self.coupon_program.len()
     }
 
     /// Number of fee specifications added so far.
     #[must_use]
-    pub fn fee_count(&self) -> usize {
+    pub fn get_fee_count(&self) -> usize {
         self.fees.len()
     }
 
     /// Number of explicit principal events added so far.
     #[must_use]
-    pub fn principal_event_count(&self) -> usize {
+    pub fn get_principal_event_count(&self) -> usize {
         self.principal_events.len()
     }
 }
@@ -538,7 +509,7 @@ pub(super) struct CompiledCashFlowPlan {
     pub(super) float_schedules: Vec<FloatSchedule>,
     pub(super) periodic_fees: Vec<PeriodicFee>,
     pub(super) fixed_fees: Vec<(Date, Money)>,
-    pub(super) principal_events: Vec<PrincipalEvent>,
+    pub(super) principal_events: Vec<PrincipalEventSpec>,
     pub(super) dates: Vec<Date>,
     pub(super) amort_setup: AmortizationSetup,
     pub(super) redemption_date: Date,

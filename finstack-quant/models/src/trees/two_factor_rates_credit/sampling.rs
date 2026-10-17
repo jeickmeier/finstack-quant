@@ -79,55 +79,18 @@ impl RatesCreditTree {
         antithetic: bool,
         output: &mut Vec<RatesCreditPathState>,
     ) -> Result<()> {
-        let dt = self.calibrated_dt()?;
-        let times = self.time_grid()?;
-        let mut rng = PhiloxRng::with_stream(seed, path_index);
-        let mut uniform = [0.0_f64; 1];
-        let mut rate_node = 0_usize;
-        let mut hazard_node = 0_usize;
-
-        output.clear();
-        output.reserve(self.config.steps + 1);
-        for (step, &time) in times.iter().enumerate() {
-            let short_rate = self.rate_at_node(step, rate_node)?;
-            let hazard_rate = Self::effective_hazard(self.hazard_at_node(step, hazard_node)?);
-            let (discount_to_next, survival_to_next, default_to_next) = if step < self.config.steps
-            {
-                let discount = (-short_rate * dt).exp();
-                let hazard_exponent = -hazard_rate * dt;
-                let survival = hazard_exponent.exp();
-                let default = -hazard_exponent.exp_m1();
-                (discount, survival, default)
-            } else {
-                (1.0, 1.0, 0.0)
-            };
-            output.push(RatesCreditPathState {
-                step,
-                time,
-                rate_node,
-                hazard_node,
-                short_rate,
-                hazard_rate,
-                discount_to_next,
-                survival_to_next,
-                default_to_next,
-            });
-
-            if step == self.config.steps {
-                break;
-            }
-            let probabilities = self.transition_probabilities(step, rate_node, hazard_node)?;
-            rng.fill_u01(&mut uniform);
-            let draw = if antithetic {
-                1.0 - uniform[0]
-            } else {
-                uniform[0]
-            };
-            let (rate_up, hazard_up) = Self::sampled_moves(probabilities, draw);
-            rate_node += usize::from(rate_up);
-            hazard_node += usize::from(hazard_up);
-        }
-        Ok(())
+        self.sample_path_segment_into(
+            seed,
+            path_index,
+            antithetic,
+            RatesCreditPathCheckpoint {
+                step: 0,
+                rate_node: 0,
+                hazard_node: 0,
+            },
+            self.config.steps,
+            output,
+        )
     }
 
     /// Resume a deterministic sampled factor path over one inclusive step range.

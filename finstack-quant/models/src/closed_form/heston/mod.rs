@@ -34,13 +34,13 @@
 //! - Carr & Madan (1999) - "Option valuation using the fast Fourier transform" `docs/REFERENCES.md#carr-madan-1999-fft`
 //! - Albrecher et al. (2007) - "The Little Heston Trap" `docs/REFERENCES.md#albrecher-2007-little-heston-trap`
 
-mod characteristic_fn;
 mod fourier_prices;
 mod params;
-mod quadrature;
 mod strip_pricer;
 
-pub use fourier_prices::{heston_call_price_fourier, heston_price, heston_put_price_fourier};
+#[cfg(test)]
+pub(crate) use fourier_prices::heston_put_price_fourier;
+pub use fourier_prices::{heston_call_price_fourier, heston_price};
 pub use params::{HestonFourierSettings, HestonPricingParams};
 pub(crate) use strip_pricer::HestonStripPricer;
 
@@ -48,13 +48,11 @@ pub(crate) use strip_pricer::HestonStripPricer;
 pub(crate) use fourier_prices::heston_call_prices_fourier;
 
 #[cfg(test)]
-use characteristic_fn::heston_pj_characteristic_function;
-#[cfg(test)]
 use fourier_prices::black_scholes_call;
 #[cfg(test)]
 use params::{HESTON_TAIL_DIAGNOSTIC_THRESHOLD, SUPPORTED_GL_ORDERS};
 #[cfg(test)]
-use quadrature::heston_pj_with_diagnostics;
+use strip_pricer::{heston_pj_characteristic_function, heston_pj_with_diagnostics};
 
 #[cfg(test)]
 mod tests;

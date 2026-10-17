@@ -20,7 +20,7 @@
 //!
 //! The matcher delegates the dependency-side gating to the existing
 //! [`DependencyFilter`]; it does not duplicate the tree-walking semantics of
-//! [`super::HierarchicalMatcher`]. Factor identities are computed
+//! `HierarchicalMatcher`. Factor identities are computed
 //! deterministically from the calibrated [`CreditHierarchySpec`] and issuer
 //! tags rather than enumerated as nodes in a tree.
 
@@ -144,7 +144,7 @@ struct PreparedIssuer {
 ///
 /// See the module-level docs for the semantics.
 #[derive(Debug, Clone)]
-pub struct CreditHierarchicalMatcher {
+pub(crate) struct CreditHierarchicalMatcher {
     config: CreditHierarchicalConfig,
     generic_id: FactorId,
     prepared: Vec<PreparedIssuer>,
@@ -153,19 +153,8 @@ pub struct CreditHierarchicalMatcher {
 
 impl CreditHierarchicalMatcher {
     /// Creates a matcher from a calibrated config.
-    ///
-    /// `issuer_betas` is re-sorted by `issuer_id` defensively: row lookup uses
-    /// binary search, and an unsorted vector (e.g. from a hand-assembled
-    /// config) would otherwise silently miss calibrated rows and substitute
-    /// β = 1.0 for every factor.
-    ///
-    /// # Arguments
-    ///
-    /// * `config` - Calibrated hierarchy, issuer beta rows, and dependency
-    ///   filter. Rows are sorted in place by issuer id before the matcher
-    ///   caches per-row factor identifiers.
     #[must_use]
-    pub fn new(mut config: CreditHierarchicalConfig) -> Self {
+    pub(crate) fn new(mut config: CreditHierarchicalConfig) -> Self {
         config
             .issuer_betas
             .sort_by(|a, b| a.issuer_id.as_str().cmp(b.issuer_id.as_str()));

@@ -21,7 +21,6 @@
 //! - `docs/REFERENCES.md#meucci-risk-and-asset-allocation`
 //! - `docs/REFERENCES.md#litterman-1996-hotspots`
 
-use super::views::{parametric_es_decomposition_view, ParametricEsDecompositionView};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
@@ -41,81 +40,6 @@ pub enum DecompositionMethod {
     /// Slow (O(n * scenarios)). Approximate Euler property.
     /// Handles non-normality and non-linear positions.
     Historical,
-}
-
-/// Configuration for position-level VaR decomposition.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct DecompositionConfig {
-    /// Confidence level for VaR and ES (e.g. 0.95, 0.99).
-    pub confidence: f64,
-
-    /// Decomposition method.
-    pub method: DecompositionMethod,
-
-    /// Whether to compute incremental VaR (expensive: one full repricing
-    /// per position).
-    pub compute_incremental: bool,
-}
-
-impl DecompositionConfig {
-    /// Parametric configuration at an arbitrary confidence level.
-    ///
-    /// The entry points [`parametric_var_decomposition`] and
-    /// [`parametric_es_decomposition`] accept the confidence directly rather
-    /// than mutating a preset.
-    ///
-    /// # Arguments
-    ///
-    /// * `confidence` - Tail confidence as a decimal probability (e.g. `0.95`).
-    pub fn parametric(confidence: f64) -> Self {
-        Self {
-            confidence,
-            method: DecompositionMethod::Parametric,
-            compute_incremental: false,
-        }
-    }
-
-    /// Standard 95% parametric configuration.
-    pub fn parametric_95() -> Self {
-        Self::parametric(0.95)
-    }
-
-    /// Standard 99% parametric configuration.
-    pub fn parametric_99() -> Self {
-        Self::parametric(0.99)
-    }
-
-    /// Historical simulation configuration with exact empirical-tail ES weights.
-    ///
-    /// # Arguments
-    ///
-    /// * `confidence` - VaR and ES confidence as a decimal probability, such
-    ///   as `0.99`. Decomposition validates that it is finite and in `(0.5, 1)`.
-    pub fn historical(confidence: f64) -> Self {
-        Self {
-            confidence,
-            method: DecompositionMethod::Historical,
-            compute_incremental: false,
-        }
-    }
-
-    /// Standard 95% historical-simulation configuration.
-    ///
-    /// [`historical_var_decomposition`] and [`build_stress_attribution`]
-    /// resolve an omitted `confidence` to this preset, as the parametric entry
-    /// points resolve theirs to [`Self::parametric_95`].
-    pub fn historical_95() -> Self {
-        Self::historical(0.95)
-    }
-
-    /// Enable incremental VaR computation.
-    #[must_use]
-    pub fn with_incremental(mut self) -> Self {
-        self.compute_incremental = true;
-        self
-    }
 }
 
 // Per-position result structs
@@ -379,7 +303,7 @@ pub struct TailScenarioBreakdown {
 /// `n_scenarios × position_ids.len()`: for scenario `s` and position `i`, the
 /// P&L is stored at `position_pnls[s * n_positions + i]`. Tail scenarios are
 /// selected using the same boundary convention as
-/// [`decompose_from_pnls`]: sort portfolio P&Ls
+/// [`historical_var_decomposition`]: sort portfolio P&Ls
 /// ascending, take the shared snapped-ceil tail count (see
 /// `super::tail_scenario_count`) of scenarios, and set
 /// `var_threshold` to the signed P&L of the least-bad tail scenario
@@ -400,15 +324,14 @@ pub struct TailScenarioBreakdown {
 ///   amounts.
 /// * `n_scenarios` - Number of scenario rows encoded in `position_pnls`.
 /// * `confidence` - Tail confidence level strictly between 0.5 and 1.0, such
-///   as `0.99` for a 99% stress-tail attribution. `None` uses the confidence
-///   of [`DecompositionConfig::historical_95`] (`0.95`).
+///   as `0.99` for a 99% stress-tail attribution. `None` defaults to `0.95`.
 pub fn build_stress_attribution(
     position_ids: &[String],
     position_pnls: &[f64],
     n_scenarios: usize,
     confidence: Option<f64>,
 ) -> finstack_quant_core::Result<StressAttribution> {
-    let confidence = confidence.unwrap_or_else(|| DecompositionConfig::historical_95().confidence);
+    let confidence = confidence.unwrap_or(0.95);
     let n_positions = position_ids.len();
 
     if n_positions == 0 || n_scenarios == 0 {
@@ -547,7 +470,7 @@ fn validate_decomposition_inputs(
     weights: &[f64],
     covariance: &[f64],
     position_ids: &[String],
-    config: &DecompositionConfig,
+    confidence: f64,
 ) -> finstack_quant_core::Result<()> {
     let n = weights.len();
 
@@ -568,10 +491,9 @@ fn validate_decomposition_inputs(
         )));
     }
 
-    if !config.confidence.is_finite() || config.confidence <= 0.5 || config.confidence >= 1.0 {
+    if !confidence.is_finite() || confidence <= 0.5 || confidence >= 1.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "confidence must be finite and in (0.5, 1), got {}",
-            config.confidence
+            "confidence must be finite and in (0.5, 1), got {confidence}"
         )));
     }
 
@@ -652,7 +574,8 @@ fn compute_incremental_var(
 
 // Parametric engine
 
-/// Decompose portfolio VaR and ES into per-position contributions using Euler allocation.
+/// Decompose portfolio VaR and ES into position contributions via parametric
+/// Euler allocation.
 ///
 /// Uses the multivariate normal assumption to decompose VaR and ES
 /// analytically via Euler allocation. Fast and exact under normality.
@@ -672,27 +595,33 @@ fn compute_incremental_var(
 ///
 /// # Arguments
 ///
-/// * `weights` - Position weights as fraction of portfolio value (length `n_positions`).
-/// * `covariance` - Position-return covariance matrix (n x n, row-major, symmetric PSD).
-/// * `position_ids` - Position identifiers, aligned with `weights`.
-/// * `config` - Decomposition parameters.
+/// * `position_ids` - Position identifiers aligned with `weights`.
+/// * `weights` - Position weights or exposures (length `n_positions`).
+/// * `covariance` - Position-return covariance matrix (`n x n`, row-major,
+///   symmetric positive semidefinite).
+/// * `confidence` - Tail confidence as a decimal probability strictly inside
+///   `(0.5, 1)`. `None` defaults to `0.95`.
+/// * `compute_incremental` - Whether to compute leave-one-out incremental VaR
+///   (one full repricing per position).
 ///
 /// # Errors
 ///
-/// Returns an error if dimensions are inconsistent, the covariance matrix is invalid, or
-/// the confidence level is out of bounds.
+/// Returns a validation error if dimensions are inconsistent, the covariance
+/// matrix is invalid, or the confidence level is out of bounds.
 ///
 /// # References
 ///
 /// - Litterman (1996): Hot Spots and Hedges. `docs/REFERENCES.md#litterman-1996-hotspots`
 /// - Tasche (2008): Capital allocation with Euler's method. `docs/REFERENCES.md#tasche-2008-capital-allocation`
-pub fn decompose_positions(
+pub fn parametric_var_decomposition(
+    position_ids: &[String],
     weights: &[f64],
     covariance: &[f64],
-    position_ids: &[String],
-    config: &DecompositionConfig,
+    confidence: Option<f64>,
+    compute_incremental: bool,
 ) -> finstack_quant_core::Result<PositionRiskDecomposition> {
-    validate_decomposition_inputs(weights, covariance, position_ids, config)?;
+    let confidence = confidence.unwrap_or(0.95);
+    validate_decomposition_inputs(weights, covariance, position_ids, confidence)?;
 
     let n = weights.len();
 
@@ -700,7 +629,7 @@ pub fn decompose_positions(
         return Ok(PositionRiskDecomposition {
             portfolio_var: 0.0,
             portfolio_es: 0.0,
-            confidence: config.confidence,
+            confidence,
             method: DecompositionMethod::Parametric,
             var_contributions: Vec::new(),
             es_contributions: Vec::new(),
@@ -709,9 +638,9 @@ pub fn decompose_positions(
         });
     }
 
-    let z_alpha = normal_quantile(config.confidence);
+    let z_alpha = normal_quantile(confidence);
     let phi_z = normal_pdf(z_alpha);
-    let es_multiplier = phi_z / (1.0 - config.confidence);
+    let es_multiplier = phi_z / (1.0 - confidence);
 
     // Sigma * w (matrix-vector product).
     let mut sigma_w = vec![0.0; n];
@@ -814,20 +743,20 @@ pub fn decompose_positions(
     }
 
     // Incremental VaR (expensive leave-one-out).
-    if config.compute_incremental && n > 1 {
+    if compute_incremental && n > 1 {
         let incremental = compute_incremental_var(
             weights,
             &sigma_w,
             covariance,
             variance,
             portfolio_var,
-            config.confidence,
+            confidence,
             n,
         );
         for (contribution, ivar) in var_contributions.iter_mut().zip(incremental) {
             contribution.incremental_var = Some(ivar);
         }
-    } else if config.compute_incremental && n == 1 {
+    } else if compute_incremental && n == 1 {
         // Single-position portfolio: incremental VaR equals portfolio VaR.
         var_contributions[0].incremental_var = Some(portfolio_var);
     }
@@ -840,7 +769,7 @@ pub fn decompose_positions(
     Ok(PositionRiskDecomposition {
         portfolio_var,
         portfolio_es,
-        confidence: config.confidence,
+        confidence,
         method: DecompositionMethod::Parametric,
         var_contributions,
         es_contributions,
@@ -849,10 +778,38 @@ pub fn decompose_positions(
     })
 }
 
+/// Decompose portfolio Expected Shortfall via parametric Euler allocation.
+///
+/// Runs [`parametric_var_decomposition`] (without incremental VaR) and returns
+/// the full [`PositionRiskDecomposition`], whose [`PositionRiskDecomposition::es_contributions`]
+/// and [`PositionRiskDecomposition::portfolio_es`] provide the Expected Shortfall attribution.
+///
+/// # Arguments
+///
+/// * `position_ids` - Position identifiers aligned with `weights`.
+/// * `weights` - Position weights or exposures (length `n_positions`).
+/// * `covariance` - Position-return covariance matrix (`n x n`, row-major,
+///   symmetric positive semidefinite).
+/// * `confidence` - ES tail confidence as a decimal probability strictly
+///   inside `(0.5, 1)`. `None` defaults to `0.95`.
+///
+/// # Errors
+///
+/// Returns a validation error if dimensions are inconsistent, the covariance
+/// matrix is invalid, or the confidence level is out of bounds.
+pub fn parametric_es_decomposition(
+    position_ids: &[String],
+    weights: &[f64],
+    covariance: &[f64],
+    confidence: Option<f64>,
+) -> finstack_quant_core::Result<PositionRiskDecomposition> {
+    parametric_var_decomposition(position_ids, weights, covariance, confidence, false)
+}
+
 // Historical simulation engine
 
-/// Decompose portfolio VaR and ES by historical simulation from pre-computed
-/// per-position scenario P&Ls.
+/// Decompose portfolio VaR and ES from per-position scenario P&Ls via
+/// historical simulation.
 ///
 /// Decomposes VaR and ES by attributing portfolio losses to individual
 /// positions within the exact empirical tail mass. Position ES contributions
@@ -869,28 +826,29 @@ pub fn decompose_positions(
 ///
 /// # Arguments
 ///
-/// * `position_pnls` - Matrix of per-position P&Ls, shape (n_scenarios, n_positions),
-///   stored row-major. `position_pnls[s * n_positions + i]` is position `i`'s
-///   P&L under scenario `s`.
 /// * `position_ids` - Position identifiers, length `n_positions`.
-/// * `n_scenarios` - Number of historical scenarios.
-/// * `config` - Decomposition parameters (only `confidence` is used;
-///   `method` is ignored since this is always historical).
+/// * `position_pnls` - Scenario-major flat P&L buffer:
+///   `position_pnls[s * n_positions + i]` is position `i`'s P&L under
+///   scenario `s` (losses negative).
+/// * `n_scenarios` - Number of scenario rows encoded in `position_pnls`.
+/// * `confidence` - Tail confidence as a decimal probability strictly inside
+///   `(0.5, 1)`. `None` defaults to `0.95`.
 ///
 /// # Errors
 ///
-/// Returns an error if dimensions are inconsistent, the number of
-/// scenarios is too small, or the confidence level is out of bounds.
+/// Returns a validation error if dimensions are inconsistent, too few
+/// scenarios resolve the tail, or the confidence level is out of bounds.
 ///
 /// # References
 ///
 /// - Hallerbach (2003): Decomposing portfolio Value-at-Risk. `docs/REFERENCES.md#hallerbach-2003-decomposing-var`
-pub fn decompose_from_pnls(
-    position_pnls: &[f64],
+pub fn historical_var_decomposition(
     position_ids: &[String],
+    position_pnls: &[f64],
     n_scenarios: usize,
-    config: &DecompositionConfig,
+    confidence: Option<f64>,
 ) -> finstack_quant_core::Result<PositionRiskDecomposition> {
+    let confidence = confidence.unwrap_or(0.95);
     let n = position_ids.len();
 
     if position_pnls.len() != n_scenarios * n {
@@ -902,10 +860,9 @@ pub fn decompose_from_pnls(
         )));
     }
 
-    if !config.confidence.is_finite() || config.confidence <= 0.5 || config.confidence >= 1.0 {
+    if !confidence.is_finite() || confidence <= 0.5 || confidence >= 1.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "confidence must be finite and in (0.5, 1), got {}",
-            config.confidence
+            "confidence must be finite and in (0.5, 1), got {confidence}"
         )));
     }
 
@@ -913,7 +870,7 @@ pub fn decompose_from_pnls(
         return Ok(PositionRiskDecomposition {
             portfolio_var: 0.0,
             portfolio_es: 0.0,
-            confidence: config.confidence,
+            confidence,
             method: DecompositionMethod::Historical,
             var_contributions: Vec::new(),
             es_contributions: Vec::new(),
@@ -926,20 +883,19 @@ pub fn decompose_from_pnls(
     // `super::tail_scenario_count`). Require at least two tail observations:
     // a one-scenario tail collapses VaR and ES onto a single extreme
     // observation and cannot support a VaR/ES split.
-    let n_tail = super::tail_scenario_count(config.confidence, n_scenarios);
+    let n_tail = super::tail_scenario_count(confidence, n_scenarios);
     if n_tail < 2 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "historical decomposition requires at least two tail scenarios for confidence {} \
+            "historical decomposition requires at least two tail scenarios for confidence {confidence} \
              (got {n_tail} from {n_scenarios} scenarios); increase n_scenarios or lower \
-             the confidence level",
-            config.confidence
+             the confidence level"
         )));
     }
     if n_tail < 30 {
         warn!(
             n_tail,
             n_scenarios,
-            confidence = config.confidence,
+            confidence,
             "Tail sample size is small; historical VaR/ES decomposition may lack statistical reliability"
         );
     }
@@ -984,7 +940,7 @@ pub fn decompose_from_pnls(
     // ES integrates exactly (1-confidence) of the empirical probability
     // mass. Including an entire fractional boundary observation changes
     // the risk measure when the same empirical sample is duplicated.
-    let raw_tail_mass = (1.0 - config.confidence) * n_scenarios as f64;
+    let raw_tail_mass = (1.0 - confidence) * n_scenarios as f64;
     let tail_mass =
         if (raw_tail_mass - raw_tail_mass.round()).abs() < super::TAIL_COUNT_SNAP_TOLERANCE {
             raw_tail_mass.round()
@@ -1083,7 +1039,7 @@ pub fn decompose_from_pnls(
     Ok(PositionRiskDecomposition {
         portfolio_var,
         portfolio_es,
-        confidence: config.confidence,
+        confidence,
         method: DecompositionMethod::Historical,
         var_contributions,
         es_contributions,
@@ -1092,109 +1048,82 @@ pub fn decompose_from_pnls(
     })
 }
 
-// Host entry points
-
-/// Decompose portfolio VaR and ES into position contributions via parametric
-/// Euler allocation.
-///
-/// This is the entry point both host bindings call: it resolves the
-/// confidence default, applies the incremental-VaR switch and runs
-/// [`decompose_positions`].
-///
-/// # Arguments
-///
-/// * `position_ids` - Position identifiers aligned with `weights`.
-/// * `weights` - Position weights or exposures (length `n_positions`).
-/// * `covariance` - Position-return covariance matrix (`n x n`, row-major,
-///   symmetric positive semidefinite).
-/// * `confidence` - Tail confidence as a decimal probability strictly inside
-///   `(0.5, 1)`. `None` uses [`DecompositionConfig::parametric_95`] (`0.95`).
-/// * `compute_incremental` - Whether to compute leave-one-out incremental VaR
-///   (one full repricing per position).
+/// Flatten a row-major nested matrix after validating squareness against `n`.
 ///
 /// # Errors
 ///
-/// Returns a validation error if dimensions are inconsistent, the covariance
-/// matrix is invalid, or the confidence level is out of bounds.
-pub fn parametric_var_decomposition(
-    position_ids: &[String],
-    weights: &[f64],
-    covariance: &[f64],
-    confidence: Option<f64>,
-    compute_incremental: bool,
-) -> finstack_quant_core::Result<PositionRiskDecomposition> {
-    let mut config = confidence.map_or_else(
-        DecompositionConfig::parametric_95,
-        DecompositionConfig::parametric,
-    );
-    if compute_incremental {
-        config = config.with_incremental();
+/// Returns [`finstack_quant_core::Error::Validation`] when the matrix has the
+/// wrong number of rows or any row has the wrong number of columns.
+///
+/// # Arguments
+///
+/// * `matrix` - Row-major nested vector with one inner vector per row.
+/// * `n` - Expected square dimension.
+/// * `label` - Caller-provided label included in validation messages.
+pub fn flatten_square_matrix(
+    matrix: Vec<Vec<f64>>,
+    n: usize,
+    label: &str,
+) -> finstack_quant_core::Result<Vec<f64>> {
+    if matrix.len() != n {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{label} must have {n} rows, got {}",
+            matrix.len()
+        )));
     }
-    decompose_positions(weights, covariance, position_ids, &config)
+    let mut flat = Vec::with_capacity(n * n);
+    for (index, row) in matrix.into_iter().enumerate() {
+        if row.len() != n {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{label} row {index} must have {n} columns, got {}",
+                row.len()
+            )));
+        }
+        flat.extend(row);
+    }
+    Ok(flat)
 }
 
-/// Decompose portfolio Expected Shortfall via parametric Euler allocation and
-/// return the ES reporting view.
-///
-/// Runs the same engine as [`parametric_var_decomposition`] (without
-/// incremental VaR) and projects the result with
-/// [`parametric_es_decomposition_view`].
-///
-/// # Arguments
-///
-/// * `position_ids` - Position identifiers aligned with `weights`.
-/// * `weights` - Position weights or exposures (length `n_positions`).
-/// * `covariance` - Position-return covariance matrix (`n x n`, row-major,
-///   symmetric positive semidefinite).
-/// * `confidence` - ES tail confidence as a decimal probability strictly
-///   inside `(0.5, 1)`. `None` uses [`DecompositionConfig::parametric_95`]
-///   (`0.95`).
+/// Flatten per-position scenario P&Ls into a scenario-major buffer.
 ///
 /// # Errors
 ///
-/// Returns a validation error if dimensions are inconsistent, the covariance
-/// matrix is invalid, or the confidence level is out of bounds.
-pub fn parametric_es_decomposition(
-    position_ids: &[String],
-    weights: &[f64],
-    covariance: &[f64],
-    confidence: Option<f64>,
-) -> finstack_quant_core::Result<ParametricEsDecompositionView> {
-    parametric_var_decomposition(position_ids, weights, covariance, confidence, false)
-        .map(|decomposition| parametric_es_decomposition_view(&decomposition))
-}
-
-/// Decompose portfolio VaR and ES from per-position scenario P&Ls via
-/// historical simulation.
-///
-/// This is the entry point both host bindings call: it resolves the
-/// confidence default and runs [`decompose_from_pnls`].
+/// Returns [`finstack_quant_core::Error::Validation`] when the number of rows
+/// does not equal `n_positions` or rows have inconsistent scenario counts.
 ///
 /// # Arguments
 ///
-/// * `position_ids` - Position identifiers, length `n_positions`.
-/// * `position_pnls` - Scenario-major flat P&L buffer:
-///   `position_pnls[s * n_positions + i]` is position `i`'s P&L under
-///   scenario `s` (losses negative).
-/// * `n_scenarios` - Number of scenario rows encoded in `position_pnls`.
-/// * `confidence` - Tail confidence as a decimal probability strictly inside
-///   `(0.5, 1)`. `None` uses [`DecompositionConfig::historical_95`] (`0.95`).
-///
-/// # Errors
-///
-/// Returns a validation error if dimensions are inconsistent, too few
-/// scenarios resolve the tail, or the confidence level is out of bounds.
-pub fn historical_var_decomposition(
-    position_ids: &[String],
-    position_pnls: &[f64],
-    n_scenarios: usize,
-    confidence: Option<f64>,
-) -> finstack_quant_core::Result<PositionRiskDecomposition> {
-    let config = confidence.map_or_else(
-        DecompositionConfig::historical_95,
-        DecompositionConfig::historical,
-    );
-    decompose_from_pnls(position_pnls, position_ids, n_scenarios, &config)
+/// * `position_pnls` - Position-major P&L matrix with one row per position.
+/// * `n_positions` - Expected number of position rows.
+pub fn flatten_position_pnls(
+    position_pnls: Vec<Vec<f64>>,
+    n_positions: usize,
+) -> finstack_quant_core::Result<(Vec<f64>, usize)> {
+    if position_pnls.len() != n_positions {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "position_pnls must have {n_positions} rows, got {}",
+            position_pnls.len()
+        )));
+    }
+    if n_positions == 0 {
+        return Ok((Vec::new(), 0));
+    }
+    let n_scenarios = position_pnls[0].len();
+    for (index, row) in position_pnls.iter().enumerate() {
+        if row.len() != n_scenarios {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "position_pnls row {index} has {} scenarios, expected {n_scenarios}",
+                row.len()
+            )));
+        }
+    }
+    let mut flat = Vec::with_capacity(n_scenarios * n_positions);
+    for scenario in 0..n_scenarios {
+        for row in &position_pnls {
+            flat.push(row[scenario]);
+        }
+    }
+    Ok((flat, n_scenarios))
 }
 
 #[cfg(test)]
@@ -1202,6 +1131,17 @@ mod tests {
     use super::*;
 
     type TestResult = finstack_quant_core::Result<()>;
+
+    #[test]
+    fn flatten_square_matrix_validates_shape() {
+        let flat = flatten_square_matrix(vec![vec![1.0, 2.0], vec![3.0, 4.0]], 2, "cov")
+            .expect("valid matrix");
+        assert_eq!(flat, vec![1.0, 2.0, 3.0, 4.0]);
+        assert!(flatten_square_matrix(vec![vec![1.0, 2.0]], 2, "cov").is_err());
+        assert!(
+            flatten_square_matrix(vec![vec![1.0, 2.0, 3.0], vec![1.0, 2.0]], 2, "cov").is_err()
+        );
+    }
 
     fn entry_point_inputs() -> (Vec<String>, Vec<f64>, Vec<f64>, Vec<f64>, usize) {
         let ids: Vec<String> = vec!["A".into(), "B".into(), "C".into()];
@@ -1255,120 +1195,120 @@ mod tests {
                 None,
                 false,
                 &[
-                    0xbfcf9860819c15b4,
-                    0xbfd3cf9356c74d4e,
+                    0xbfcf986082320d16,
+                    0xbfd3cf9355c8e4ff,
                     0x3fee666666666666,
-                    0xbfbffcf164c17e1c,
+                    0xbfbffcf1655952d4,
                     0x3fe032ed5b656650,
-                    0xbfcffcf164c17e1c,
+                    0xbfcffcf1655952d4,
                     0x0000000000000000,
-                    0xbfbcca0c7447be4b,
+                    0xbfbcca0c74d06424,
                     0x3fdd28780ae9b829,
-                    0xbfd7fdb50b911e95,
+                    0xbfd7fdb50c02fe1f,
                     0x0000000000000000,
-                    0xbf834e1951777820,
+                    0xbf834e1951d319bd,
                     0x3fa38d69f25bd9d0,
-                    0xbfa8219fa5d55627,
+                    0xbfa8219fa647e02b,
                     0x0000000000000000,
-                    0xbfc40ea1e7171486,
+                    0xbfc40ea1e6158273,
                     0x3fe032ed5b656650,
-                    0xbfd40ea1e7171486,
-                    0xbfc20d2b4ffb2c11,
-                    0x3fdd28780ae9b828,
-                    0xbfde15f2daa29ec8,
-                    0xbf88359767c5a069,
+                    0xbfd40ea1e6158273,
+                    0xbfc20d2b4f135bcd,
+                    0x3fdd28780ae9b829,
+                    0xbfde15f2d92043ac,
+                    0xbf883597668ebbff,
                     0x3fa38d69f25bd9d0,
-                    0xbfae42fd41b70881,
+                    0xbfae42fd40326afd,
                 ],
             ),
             (
                 None,
                 true,
                 &[
-                    0xbfcf9860819c15b4,
-                    0xbfd3cf9356c74d4e,
+                    0xbfcf986082320d16,
+                    0xbfd3cf9355c8e4ff,
                     0x3fee666666666666,
-                    0xbfbffcf164c17e1c,
+                    0xbfbffcf1655952d4,
                     0x3fe032ed5b656650,
-                    0xbfcffcf164c17e1c,
-                    0xbfb5ad0757a96154,
-                    0xbfbcca0c7447be4b,
+                    0xbfcffcf1655952d4,
+                    0xbfb5ad07581043ba,
+                    0xbfbcca0c74d06424,
                     0x3fdd28780ae9b829,
-                    0xbfd7fdb50b911e95,
-                    0xbfb4df46d926c5ba,
-                    0xbf834e1951777820,
+                    0xbfd7fdb50c02fe1f,
+                    0xbfb4df46d989d786,
+                    0xbf834e1951d319bd,
                     0x3fa38d69f25bd9d0,
-                    0xbfa8219fa5d55627,
-                    0xbf7293edb7e95de0,
-                    0xbfc40ea1e7171486,
+                    0xbfa8219fa647e02b,
+                    0xbf7293edb8418bc0,
+                    0xbfc40ea1e6158273,
                     0x3fe032ed5b656650,
-                    0xbfd40ea1e7171486,
-                    0xbfc20d2b4ffb2c11,
-                    0x3fdd28780ae9b828,
-                    0xbfde15f2daa29ec8,
-                    0xbf88359767c5a069,
+                    0xbfd40ea1e6158273,
+                    0xbfc20d2b4f135bcd,
+                    0x3fdd28780ae9b829,
+                    0xbfde15f2d92043ac,
+                    0xbf883597668ebbff,
                     0x3fa38d69f25bd9d0,
-                    0xbfae42fd41b70881,
+                    0xbfae42fd40326afd,
                 ],
             ),
             (
                 Some(0.99),
                 false,
                 &[
-                    0xbfd657c5e0f6a616,
-                    0xbfd998f0e17c915d,
+                    0xbfd657c5e0e853ca,
+                    0xbfd998f0e1d55d36,
                     0x3fefae147ae147ae,
-                    0xbfc69ee39f198b83,
+                    0xbfc69ee39f0b0ba1,
                     0x3fe032ed5b656650,
-                    0xbfd69ee39f198b83,
+                    0xbfd69ee39f0b0ba1,
                     0x0000000000000000,
-                    0xbfc45bccdbfd63f5,
-                    0x3fdd28780ae9b829,
-                    0xbfe0f72ab75328a2,
-                    0x0000000000000000,
-                    0xbf8b4db46d65cb6d,
-                    0x3fa38d69f25bd9d0,
-                    0xbfb11090c45f9f23,
-                    0x0000000000000000,
-                    0xbfc9ea6a8de555cb,
-                    0x3fe032ed5b656650,
-                    0xbfd9ea6a8de555cb,
-                    0xbfc752f97fb4cd35,
+                    0xbfc45bccdbf05743,
                     0x3fdd28780ae9b828,
-                    0xbfe36fcfea6c0058,
-                    0xbf8f47db55effbc4,
+                    0xbfe0f72ab74848b9,
+                    0x0000000000000000,
+                    0xbf8b4db46d544b1f,
                     0x3fa38d69f25bd9d0,
-                    0xbfb38ce915b5fd5a,
+                    0xbfb11090c454aef2,
+                    0x0000000000000000,
+                    0xbfc9ea6a8e3f3c46,
+                    0x3fe032ed5b656650,
+                    0xbfd9ea6a8e3f3c46,
+                    0xbfc752f98005b63e,
+                    0x3fdd28780ae9b829,
+                    0xbfe36fcfeaaf6d34,
+                    0xbf8f47db565c7ea6,
+                    0x3fa38d69f25bd9d0,
+                    0xbfb38ce915f9cf27,
                 ],
             ),
             (
                 Some(0.99),
                 true,
                 &[
-                    0xbfd657c5e0f6a616,
-                    0xbfd998f0e17c915d,
+                    0xbfd657c5e0e853ca,
+                    0xbfd998f0e1d55d36,
                     0x3fefae147ae147ae,
-                    0xbfc69ee39f198b83,
+                    0xbfc69ee39f0b0ba1,
                     0x3fe032ed5b656650,
-                    0xbfd69ee39f198b83,
-                    0xbfbea818e006cbbe,
-                    0xbfc45bccdbfd63f5,
-                    0x3fdd28780ae9b829,
-                    0xbfe0f72ab75328a2,
-                    0xbfbd8519294c374a,
-                    0xbf8b4db46d65cb6d,
-                    0x3fa38d69f25bd9d0,
-                    0xbfb11090c45f9f23,
-                    0xbf7a46668bb3a000,
-                    0xbfc9ea6a8de555cb,
-                    0x3fe032ed5b656650,
-                    0xbfd9ea6a8de555cb,
-                    0xbfc752f97fb4cd35,
+                    0xbfd69ee39f0b0ba1,
+                    0xbfbea818dff32538,
+                    0xbfc45bccdbf05743,
                     0x3fdd28780ae9b828,
-                    0xbfe36fcfea6c0058,
-                    0xbf8f47db55effbc4,
+                    0xbfe0f72ab74848b9,
+                    0xbfbd851929394b4c,
+                    0xbf8b4db46d544b1f,
                     0x3fa38d69f25bd9d0,
-                    0xbfb38ce915b5fd5a,
+                    0xbfb11090c454aef2,
+                    0xbf7a46668ba2c880,
+                    0xbfc9ea6a8e3f3c46,
+                    0x3fe032ed5b656650,
+                    0xbfd9ea6a8e3f3c46,
+                    0xbfc752f98005b63e,
+                    0x3fdd28780ae9b829,
+                    0xbfe36fcfeaaf6d34,
+                    0xbf8f47db565c7ea6,
+                    0x3fa38d69f25bd9d0,
+                    0xbfb38ce915f9cf27,
                 ],
             ),
         ];
@@ -1385,20 +1325,20 @@ mod tests {
         let es_cases: [(Option<f64>, u64, [u64; 3]); 2] = [
             (
                 None,
-                0xbfd3cf9356c74d4e,
-                [0xbfc40ea1e7171486, 0xbfc20d2b4ffb2c11, 0xbf88359767c5a069],
+                0xbfd3cf9355c8e4ff,
+                [0xbfc40ea1e6158273, 0xbfc20d2b4f135bcd, 0xbf883597668ebbff],
             ),
             (
                 Some(0.99),
-                0xbfd998f0e17c915d,
-                [0xbfc9ea6a8de555cb, 0xbfc752f97fb4cd35, 0xbf8f47db55effbc4],
+                0xbfd998f0e1d55d36,
+                [0xbfc9ea6a8e3f3c46, 0xbfc752f98005b63e, 0xbf8f47db565c7ea6],
             ),
         ];
         for (confidence, portfolio_es, components) in es_cases {
             let view = parametric_es_decomposition(&ids, &weights, &covariance, confidence)?;
             assert_eq!(view.portfolio_es.to_bits(), portfolio_es);
             let bits: Vec<u64> = view
-                .contributions
+                .es_contributions
                 .iter()
                 .map(|c| c.component_es.to_bits())
                 .collect();
@@ -1499,12 +1439,8 @@ mod tests {
         pnls[..3].copy_from_slice(&[-100.0, -50.0, -10.0]);
         let doubled: Vec<f64> = pnls.iter().flat_map(|&pnl| [pnl, pnl]).collect();
         for sample in [&pnls, &doubled] {
-            let result = decompose_from_pnls(
-                sample,
-                &["P".into()],
-                sample.len(),
-                &DecompositionConfig::historical(0.99),
-            )?;
+            let result =
+                historical_var_decomposition(&["P".into()], sample, sample.len(), Some(0.99))?;
             // The exact 1% tail is 2.5 observations: -100, -50, half of -10.
             assert!((result.portfolio_es + 62.0).abs() < 1e-12);
             assert!((result.es_contributions[0].component_es + 62.0).abs() < 1e-12);
@@ -1523,12 +1459,8 @@ mod tests {
         let mut reordered = pnls.clone();
         reordered[2..6].copy_from_slice(&[0.0, -50.0, -50.0, 0.0]);
         for sample in [&pnls, &reordered] {
-            let result = decompose_from_pnls(
-                sample,
-                &["A".into(), "B".into()],
-                250,
-                &DecompositionConfig::historical(0.99),
-            )?;
+            let result =
+                historical_var_decomposition(&["A".into(), "B".into()], sample, 250, Some(0.99))?;
             assert!((result.portfolio_es + 70.0).abs() < 1e-12);
             assert!((result.es_contributions[0].component_es + 55.0).abs() < 1e-12);
             assert!((result.es_contributions[1].component_es + 15.0).abs() < 1e-12);
@@ -1539,27 +1471,14 @@ mod tests {
     // Parametric tests
 
     #[test]
-    fn presets_are_ninety_five_percent() {
-        let historical = DecompositionConfig::historical_95();
-        assert_eq!(historical, DecompositionConfig::historical(0.95));
-        assert_eq!(historical.method, DecompositionMethod::Historical);
-        assert!(!historical.compute_incremental);
-        assert_eq!(
-            DecompositionConfig::parametric_95().method,
-            DecompositionMethod::Parametric
-        );
-    }
-
-    #[test]
     fn euler_exhaustion_two_position_portfolio() -> TestResult {
         // Two uncorrelated assets: sigma1 = 0.20, sigma2 = 0.30.
         // Weights: 0.6, 0.4.
         let weights = [0.6, 0.4];
         let covariance = [0.04, 0.0, 0.0, 0.09];
         let ids = [String::from("A"), String::from("B")];
-        let config = DecompositionConfig::parametric_99();
 
-        let result = decompose_positions(&weights, &covariance, &ids, &config)?;
+        let result = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.99), false)?;
 
         let sum_cvar: f64 = result
             .var_contributions
@@ -1600,9 +1519,8 @@ mod tests {
         let weights = [0.6, 0.4];
         let covariance = [0.04, 0.0, 0.0, 0.09];
         let ids = [String::from("A"), String::from("B")];
-        let config = DecompositionConfig::parametric_99();
 
-        let result = decompose_positions(&weights, &covariance, &ids, &config)?;
+        let result = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.99), false)?;
 
         // sigma_p = sqrt(0.36*0.04 + 0.16*0.09) = sqrt(0.0288)
         let sigma_p = 0.0288_f64.sqrt();
@@ -1641,13 +1559,8 @@ mod tests {
         let n_scenarios = 200;
         let pnls: Vec<f64> = (0..n_scenarios).map(|s| s as f64 - 50.0).collect();
         let ids = [String::from("A")];
-        let config = DecompositionConfig {
-            confidence: 0.99,
-            method: DecompositionMethod::Historical,
-            compute_incremental: false,
-        };
 
-        let result = decompose_from_pnls(&pnls, &ids, n_scenarios, &config)?;
+        let result = historical_var_decomposition(&ids, &pnls, n_scenarios, Some(0.99))?;
 
         // 1% tail of 200 scenarios = 2 scenarios (-50, -49): VaR is the
         // boundary P&L, ES the tail mean.
@@ -1680,9 +1593,8 @@ mod tests {
         let weights = [0.5, 0.5];
         let covariance = [0.25, 0.25, 0.25, 0.25];
         let ids = [String::from("A"), String::from("A2")];
-        let config = DecompositionConfig::parametric_99();
 
-        let result = decompose_positions(&weights, &covariance, &ids, &config)?;
+        let result = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.99), false)?;
 
         // sigma_p = sqrt(0.25*0.25 + 2*0.25*0.25 + 0.25*0.25) = 0.5;
         // losses-negative convention: VaR = -sigma_p * z.
@@ -1713,9 +1625,8 @@ mod tests {
             covariance[i * n + i] = var;
         }
         let ids: Vec<String> = (0..n).map(|i| format!("P{i}")).collect();
-        let config = DecompositionConfig::parametric_95();
 
-        let result = decompose_positions(&weights, &covariance, &ids, &config)?;
+        let result = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.95), false)?;
 
         let first_cvar = result.var_contributions[0].component_var;
         for c in &result.var_contributions {
@@ -1742,9 +1653,8 @@ mod tests {
         let weights = [1.0];
         let covariance = [0.04]; // sigma = 0.20
         let ids = [String::from("SOLO")];
-        let config = DecompositionConfig::parametric_95().with_incremental();
 
-        let result = decompose_positions(&weights, &covariance, &ids, &config)?;
+        let result = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.95), true)?;
 
         assert!((result.var_contributions[0].component_var - result.portfolio_var).abs() < 1e-12);
 
@@ -1773,9 +1683,8 @@ mod tests {
         let weights = [1.0, 0.0];
         let covariance = [0.04, 0.01, 0.01, 0.09];
         let ids = [String::from("A"), String::from("ZERO")];
-        let config = DecompositionConfig::parametric_95();
 
-        let result = decompose_positions(&weights, &covariance, &ids, &config)?;
+        let result = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.95), false)?;
 
         let zero_pos = &result.var_contributions[1];
         assert!(
@@ -1800,9 +1709,8 @@ mod tests {
         let weights = [0.4, 0.3, 0.3];
         let covariance = [0.04, 0.01, 0.005, 0.01, 0.09, 0.02, 0.005, 0.02, 0.0625];
         let ids = [String::from("A"), String::from("B"), String::from("C")];
-        let config = DecompositionConfig::parametric_99();
 
-        let result = decompose_positions(&weights, &covariance, &ids, &config)?;
+        let result = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.99), false)?;
 
         assert!(
             result.portfolio_es <= result.portfolio_var,
@@ -1840,9 +1748,8 @@ mod tests {
         // cov(1,2) = rho * sigma1 * sigma2 = -0.8 * 0.04 = -0.032
         let covariance = [0.04, -0.032, -0.032, 0.04];
         let ids = [String::from("A"), String::from("B")];
-        let config = DecompositionConfig::parametric_95();
 
-        let result = decompose_positions(&weights, &covariance, &ids, &config)?;
+        let result = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.95), false)?;
 
         // Diversification: the portfolio loses less than the sum of
         // standalone losses, so the signed portfolio VaR sits above the
@@ -1907,9 +1814,8 @@ mod tests {
         }
 
         let ids: Vec<String> = (0..n).map(|i| format!("P{i}")).collect();
-        let config = DecompositionConfig::parametric_99();
 
-        let result = decompose_positions(&weights, &covariance, &ids, &config)?;
+        let result = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.99), false)?;
 
         let sum_cvar: f64 = result
             .var_contributions
@@ -1934,7 +1840,7 @@ mod tests {
 
     #[test]
     fn empty_portfolio_returns_zero() -> TestResult {
-        let result = decompose_positions(&[], &[], &[], &DecompositionConfig::parametric_95())?;
+        let result = parametric_var_decomposition(&[], &[], &[], Some(0.95), false)?;
 
         assert!(result.portfolio_var.abs() < 1e-12);
         assert!(result.portfolio_es.abs() < 1e-12);
@@ -1948,30 +1854,33 @@ mod tests {
     #[test]
     fn rejects_mismatched_dimensions() {
         // Weights longer than position_ids.
-        let result = decompose_positions(
+        let result = parametric_var_decomposition(
+            &[String::from("A")],
             &[0.5, 0.5],
             &[0.04, 0.0, 0.0, 0.04],
-            &[String::from("A")],
-            &DecompositionConfig::parametric_95(),
+            Some(0.95),
+            false,
         );
         assert!(result.is_err());
     }
 
     #[test]
     fn rejects_invalid_confidence() {
-        let mut config = DecompositionConfig::parametric_95();
-        config.confidence = 1.5;
-
-        let result = decompose_positions(&[1.0], &[0.04], &[String::from("A")], &config);
+        let result =
+            parametric_var_decomposition(&[String::from("A")], &[1.0], &[0.04], Some(1.5), false);
         assert!(result.is_err());
     }
 
     #[test]
     fn minor22_23_rejects_sub_median_and_nan_confidence() {
         for confidence in [0.5, f64::NAN] {
-            let mut config = DecompositionConfig::parametric_95();
-            config.confidence = confidence;
-            let result = decompose_positions(&[1.0], &[0.04], &[String::from("A")], &config);
+            let result = parametric_var_decomposition(
+                &[String::from("A")],
+                &[1.0],
+                &[0.04],
+                Some(confidence),
+                false,
+            );
             assert!(
                 result.is_err(),
                 "minor 22/23: confidence {confidence:?} must fail"
@@ -1979,9 +1888,12 @@ mod tests {
         }
 
         for confidence in [0.5, f64::NAN] {
-            let mut config = DecompositionConfig::historical(0.95);
-            config.confidence = confidence;
-            let result = decompose_from_pnls(&[-1.0, -2.0], &[String::from("A")], 2, &config);
+            let result = historical_var_decomposition(
+                &[String::from("A")],
+                &[-1.0, -2.0],
+                2,
+                Some(confidence),
+            );
             assert!(
                 result.is_err(),
                 "minor 22/23: historical confidence {confidence:?} must fail"
@@ -1994,9 +1906,8 @@ mod tests {
         let weights = [0.4, 0.35, 0.25];
         let covariance = [0.04, 0.01, 0.005, 0.01, 0.09, 0.02, 0.005, 0.02, 0.0625];
         let ids = [String::from("A"), String::from("B"), String::from("C")];
-        let config = DecompositionConfig::parametric_99().with_incremental();
 
-        let result = decompose_positions(&weights, &covariance, &ids, &config)?;
+        let result = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.99), true)?;
 
         for c in &result.var_contributions {
             assert!(
@@ -2051,9 +1962,8 @@ mod tests {
         }
 
         let ids = [String::from("A"), String::from("B")];
-        let config = DecompositionConfig::historical(0.95);
 
-        let result = decompose_from_pnls(&pnls, &ids, n_scenarios, &config)?;
+        let result = historical_var_decomposition(&ids, &pnls, n_scenarios, Some(0.95))?;
 
         assert!(
             result.portfolio_var < 0.0,
@@ -2071,18 +1981,18 @@ mod tests {
 
     #[test]
     fn historical_rejects_dimension_mismatch() {
-        let result = decompose_from_pnls(
-            &[1.0, 2.0, 3.0], // 3 values, but 2 scenarios x 2 positions = 4.
+        let result = historical_var_decomposition(
             &[String::from("A"), String::from("B")],
+            &[1.0, 2.0, 3.0], // 3 values, but 2 scenarios x 2 positions = 4.
             2,
-            &DecompositionConfig::historical(0.95),
+            Some(0.95),
         );
         assert!(result.is_err());
     }
 
     #[test]
     fn historical_empty_returns_zero() -> TestResult {
-        let result = decompose_from_pnls(&[], &[], 0, &DecompositionConfig::historical(0.95))?;
+        let result = historical_var_decomposition(&[], &[], 0, Some(0.95))?;
 
         assert!(result.portfolio_var.abs() < 1e-12);
         assert_eq!(result.n_positions, 0);
@@ -2208,9 +2118,8 @@ mod tests {
         }
 
         let ids = [String::from("X")];
-        let config = DecompositionConfig::historical(0.95);
 
-        let result = decompose_from_pnls(&pnls, &ids, n_scenarios, &config)?;
+        let result = historical_var_decomposition(&ids, &pnls, n_scenarios, Some(0.95))?;
 
         // n_tail = 5, var_idx = 4, sorted pnl[4] = 4/100 - 0.5 = -0.46.
         // Losses-negative convention: portfolio VaR = -0.46.
@@ -2231,9 +2140,8 @@ mod tests {
         let n = 1;
         let pnls = vec![0.0; n_scenarios * n];
         let ids = [String::from("X")];
-        let config = DecompositionConfig::historical(0.99);
 
-        let result = decompose_from_pnls(&pnls, &ids, n_scenarios, &config);
+        let result = historical_var_decomposition(&ids, &pnls, n_scenarios, Some(0.99));
         assert!(
             result.is_err(),
             "expected rejection when (1 - conf) * n_scenarios < 1"
@@ -2253,9 +2161,8 @@ mod tests {
             pnls.push(if s < 10 { -0.10 } else { 0.005 });
         }
         let ids = [String::from("A"), String::from("B")];
-        let config = DecompositionConfig::historical(0.95);
 
-        let result = decompose_from_pnls(&pnls, &ids, n_scenarios, &config)?;
+        let result = historical_var_decomposition(&ids, &pnls, n_scenarios, Some(0.95))?;
 
         assert!(
             result.euler_residual.is_none(),
@@ -2288,9 +2195,8 @@ mod tests {
         let weights = [0.4, 0.35, 0.25];
         let covariance = [0.04, 0.01, 0.005, 0.01, 0.09, 0.02, 0.005, 0.02, 0.0625];
         let ids = [String::from("A"), String::from("B"), String::from("C")];
-        let config = DecompositionConfig::parametric_99().with_incremental();
 
-        let result = decompose_positions(&weights, &covariance, &ids, &config)?;
+        let result = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.99), true)?;
 
         for c in &result.var_contributions {
             let ivar = c
@@ -2323,9 +2229,8 @@ mod tests {
         let weights = [0.6, 0.4];
         let covariance = [0.04, 0.0, 0.0, 0.09];
         let ids = [String::from("A"), String::from("B")];
-        let config = DecompositionConfig::parametric_95();
 
-        let result = decompose_positions(&weights, &covariance, &ids, &config)?;
+        let result = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.95), false)?;
 
         assert!(
             result.euler_residual.is_some(),
@@ -2368,10 +2273,8 @@ mod tests {
             }
         }
         let ids: Vec<String> = (0..n).map(|i| format!("P{i}")).collect();
-        let mut config = DecompositionConfig::historical(confidence);
-        config.confidence = confidence;
 
-        let result = decompose_from_pnls(&pnls, &ids, n_scenarios, &config)?;
+        let result = historical_var_decomposition(&ids, &pnls, n_scenarios, Some(confidence))?;
 
         // Serial reference: replicate the inner accumulation directly so we
         // know exactly which order was used.
@@ -2420,9 +2323,8 @@ mod tests {
         let n_scenarios = 1000;
         let pnls: Vec<f64> = (0..n_scenarios).map(|s| s as f64 - 500.0).collect();
         let ids = [String::from("A")];
-        let config = DecompositionConfig::historical(0.90);
 
-        let result = decompose_from_pnls(&pnls, &ids, n_scenarios, &config)?;
+        let result = historical_var_decomposition(&ids, &pnls, n_scenarios, Some(0.90))?;
 
         // Tail = worst 100 scenarios [-500, -401]; VaR = boundary index 99.
         assert!(
@@ -2446,9 +2348,8 @@ mod tests {
         let n_scenarios = 100;
         let pnls: Vec<f64> = (0..n_scenarios).map(|s| s as f64 - 50.0).collect();
         let ids = [String::from("A")];
-        let config = DecompositionConfig::historical(0.99);
 
-        let result = decompose_from_pnls(&pnls, &ids, n_scenarios, &config);
+        let result = historical_var_decomposition(&ids, &pnls, n_scenarios, Some(0.99));
         assert!(
             result.is_err(),
             "single-observation tail must be rejected, got {result:?}"
@@ -2479,9 +2380,8 @@ mod tests {
         let weights = [1.0, -2.5e-5];
         let covariance = [1e-12, 1e-6, 1e-6, 0.04];
         let ids = [String::from("A"), String::from("B")];
-        let config = DecompositionConfig::parametric_95();
 
-        let result = decompose_positions(&weights, &covariance, &ids, &config);
+        let result = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.95), false);
         assert!(
             result.is_err(),
             "negative portfolio variance must error, got {result:?}"
@@ -2499,9 +2399,8 @@ mod tests {
         let n_scenarios = 200;
         let pnls: Vec<f64> = (0..n_scenarios).map(|s| 1.0 + s as f64).collect();
         let ids = [String::from("A")];
-        let config = DecompositionConfig::historical(0.95);
 
-        let result = decompose_from_pnls(&pnls, &ids, n_scenarios, &config)?;
+        let result = historical_var_decomposition(&ids, &pnls, n_scenarios, Some(0.95))?;
 
         assert_eq!(result.portfolio_var, 0.0);
         assert_eq!(result.portfolio_es, 0.0);

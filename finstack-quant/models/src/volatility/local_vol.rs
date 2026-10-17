@@ -378,51 +378,23 @@ impl LocalVolSurface {
     /// Local volatility `σ_loc(T, K)` as an annualized decimal; `NaN` if
     /// either coordinate is `NaN`.
     pub fn value(&self, expiry: f64, strike: f64) -> f64 {
-        let n_exp = self.expiries.len();
-        let n_str = self.strikes.len();
-
-        // Both axes are non-empty by construction.
-        let t = expiry.clamp(self.expiries[0], self.expiries[n_exp - 1]);
-        let k = strike.clamp(self.strikes[0], self.strikes[n_str - 1]);
-
-        let ei = find_segment(&self.expiries, t);
-        let si = find_segment(&self.strikes, k);
-
-        // Handle exact hits — intentional exact comparison against grid values.
-        #[allow(clippy::float_cmp)]
-        let exact_e = self.expiries[ei] == t;
-        #[allow(clippy::float_cmp)]
-        let exact_s = self.strikes[si] == k;
-
-        if exact_e && exact_s {
-            return self.local_vols[ei * n_str + si];
+        if expiry.is_nan() || strike.is_nan() {
+            return f64::NAN;
         }
-
-        let ei1 = if exact_e { ei } else { (ei + 1).min(n_exp - 1) };
-        let si1 = if exact_s { si } else { (si + 1).min(n_str - 1) };
-
-        let e0 = self.expiries[ei];
-        let e1 = self.expiries[ei1];
-        let s0 = self.strikes[si];
-        let s1 = self.strikes[si1];
-
-        let q11 = self.local_vols[ei * n_str + si];
-        let q21 = self.local_vols[ei1 * n_str + si];
-        let q12 = self.local_vols[ei * n_str + si1];
-        let q22 = self.local_vols[ei1 * n_str + si1];
-
-        let u = if exact_e || (e1 - e0).abs() < 1e-14 {
-            0.0
-        } else {
-            (t - e0) / (e1 - e0)
-        };
-        let v = if exact_s || (s1 - s0).abs() < 1e-14 {
-            0.0
-        } else {
-            (k - s0) / (s1 - s0)
-        };
-
-        (1.0 - u) * (1.0 - v) * q11 + u * (1.0 - v) * q21 + (1.0 - u) * v * q12 + u * v * q22
+        let n_str = self.strikes.len();
+        let (e0, e1, u) = super::source::segment_clamped(&self.expiries, expiry);
+        let (s0, s1, v) = super::source::segment_clamped(&self.strikes, strike);
+        if e0 == e1 && s0 == s1 {
+            return self.local_vols[e0 * n_str + s0];
+        }
+        super::source::bilinear(
+            self.local_vols[e0 * n_str + s0],
+            self.local_vols[e1 * n_str + s0],
+            self.local_vols[e0 * n_str + s1],
+            self.local_vols[e1 * n_str + s1],
+            u,
+            v,
+        )
     }
 
     /// Returns the expiry axis in years.
@@ -446,23 +418,6 @@ impl LocalVolSurface {
     pub fn grid_shape(&self) -> (usize, usize) {
         (self.expiries.len(), self.strikes.len())
     }
-}
-
-/// Find the segment index for a value in a sorted array.
-/// Returns i such that arr[i] <= x < arr[i+1], or 0 / len-2 at boundaries.
-fn find_segment(arr: &[f64], x: f64) -> usize {
-    if arr.len() <= 1 {
-        return 0;
-    }
-    if x <= arr[0] {
-        return 0;
-    }
-    if x >= arr[arr.len() - 1] {
-        return arr.len() - 2;
-    }
-    // Binary search: find largest i such that arr[i] <= x
-    let pos = arr.partition_point(|&v| v <= x);
-    pos.saturating_sub(1).min(arr.len() - 2)
 }
 
 /// An arbitrage-free implied surface with a term structure of skew, shared by

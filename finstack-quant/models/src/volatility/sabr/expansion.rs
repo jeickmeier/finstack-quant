@@ -60,102 +60,6 @@
 use super::{model::chi, SabrParameters};
 
 impl SabrParameters {
-    const LOGNORMAL_ATM_LOG_MONEYNESS_THRESHOLD: f64 = 1e-8;
-
-    /// Lognormal (Black-76) implied volatility using Hagan's approximation.
-    ///
-    /// Hagan et al. (2002) Black-76 implied volatility for a given forward, strike, and expiry.
-    ///
-    /// # Arguments
-    ///
-    /// * `f` - Forward rate
-    /// * `k` - Strike rate
-    /// * `t` - Time to expiry in years
-    ///
-    /// # Returns
-    ///
-    /// Black-76 implied volatility (lognormal). Returns `alpha` for the ATM case.
-    ///
-    /// Returns `f64::NAN` for degenerate inputs (non-positive forward/strike,
-    /// non-positive expiry, or a χ(z) breakdown). Callers on pricing/risk paths
-    /// must guard the result with `is_finite()`, or use the fallible
-    /// [`implied_vol_lognormal`](Self::implied_vol_lognormal), since a
-    /// silent NaN poisons Black-76 pricing and compensated summations downstream.
-    ///
-    /// # Special Cases
-    ///
-    /// - ATM (`f ≈ k`): Uses the simplified ATM formula for numerical stability
-    /// - β = 0: Degenerates to normal SABR; lognormal vol is approximated
-    /// - β = 1: Standard lognormal SABR formula
-    fn implied_vol_lognormal_unchecked(&self, f: f64, k: f64, t: f64) -> f64 {
-        let alpha = self.alpha;
-        let beta = self.beta;
-        let rho = self.rho;
-        let nu = self.nu;
-
-        let (f, k) = if let Some(s) = self.shift {
-            (f + s, k + s)
-        } else {
-            (f, k)
-        };
-
-        // Guard: both forward and strike must be positive for lognormal model
-        if f <= 0.0 || k <= 0.0 || t <= 0.0 {
-            return f64::NAN;
-        }
-
-        // No special-case for ν → 0: the general Hagan expansion is continuous
-        // in ν. z = (ν/α)(FK)^((1-β)/2) ln(F/K) → 0 and z/χ(z) → 1 (handled by
-        // the small-z Taylor branch in `chi`), while the (1 + [...]T) correction
-        // smoothly degenerates to the pure CEV correction. A hard ν threshold
-        // with a corrections-free CEV formula introduced a vol discontinuity.
-
-        let fk = f * k;
-        let one_minus_beta = 1.0 - beta;
-        let log_fk = (f / k).ln();
-
-        // ATM case: use the stable formula once log-moneyness is tiny, including
-        // low-rate environments where a purely relative |f-k| threshold becomes ineffective.
-        if log_fk.abs() <= Self::LOGNORMAL_ATM_LOG_MONEYNESS_THRESHOLD {
-            return self.atm_vol_lognormal(f, t);
-        }
-
-        // z = (ν/α) * (FK)^((1-β)/2) * ln(F/K)
-        let fk_mid = fk.powf(one_minus_beta / 2.0);
-        let z = (nu / alpha) * fk_mid * log_fk;
-
-        // χ(z) = log[(√(1 - 2ρz + z²) + z - ρ) / (1 - ρ)]
-        let chi_z = chi(z, rho).unwrap_or(f64::NAN);
-
-        let numerator = alpha;
-
-        // Denominator: (FK)^((1-β)/2) * [1 + (1-β)²/24 * log²(F/K) + (1-β)⁴/1920 * log⁴(F/K)]
-        let log_fk_sq = log_fk * log_fk;
-        let omb2 = one_minus_beta * one_minus_beta;
-        let denominator =
-            fk_mid * (1.0 + omb2 / 24.0 * log_fk_sq + omb2 * omb2 / 1920.0 * log_fk_sq * log_fk_sq);
-
-        // First-order correction factor
-        // 1 + [ (1-β)²/24 * α² / (FK)^(1-β)
-        //      + ¼ * ρβνα / (FK)^((1-β)/2)
-        //      + (2-3ρ²)/24 * ν² ] * T
-        let fk_omb = fk.powf(one_minus_beta);
-        let correction = 1.0
-            + (omb2 / 24.0 * alpha * alpha / fk_omb
-                + 0.25 * rho * beta * nu * alpha / fk_mid
-                + (2.0 - 3.0 * rho * rho) / 24.0 * nu * nu)
-                * t;
-
-        // σ_B(K) = (z / χ(z)) × (α / denominator) × correction
-        let z_over_chi = if chi_z.abs() < 1e-14 {
-            1.0 // L'Hôpital at z=0
-        } else {
-            z / chi_z
-        };
-
-        numerator / denominator * z_over_chi * correction
-    }
-
     /// Normal (Bachelier) implied volatility using Hagan's approximation.
     ///
     /// Returns the normal/Bachelier implied volatility. This is useful for
@@ -223,7 +127,7 @@ impl SabrParameters {
         let z = (nu / alpha) * fk_mid * log_fk;
         let chi_z = chi(z, rho).unwrap_or(f64::NAN);
 
-        let z_over_chi = if chi_z.abs() < 1e-14 { 1.0 } else { z / chi_z };
+        let z_over_chi = self.z_over_chi(z, chi_z).unwrap_or(f64::NAN);
 
         // Normal vol (Hagan 2002, eq. 2.17b):
         //   σ_N = α·(FK)^(β/2) · [numerator series] / [denominator series]
@@ -271,12 +175,8 @@ impl SabrParameters {
         k: f64,
         t: f64,
     ) -> finstack_quant_core::Result<f64> {
-        let v = self.implied_vol_lognormal_unchecked(f, k, t);
-        if v.is_finite() && v >= 0.0 {
-            Ok(v)
-        } else {
-            Err(finstack_quant_core::error::InputError::Invalid.into())
-        }
+        self.lognormal_expansion(f, k, t)
+            .map_err(|_| finstack_quant_core::error::InputError::Invalid.into())
     }
 
     /// Normal SABR implied volatility with checked error semantics.
@@ -298,12 +198,12 @@ impl SabrParameters {
     pub fn implied_vol_normal(&self, f: f64, k: f64, t: f64) -> finstack_quant_core::Result<f64> {
         let shift = self.shift.unwrap_or(0.0);
         let (sf, sk) = (f + shift, k + shift);
-        if sf * sk <= 0.0
+        if (sf <= 0.0 || sk <= 0.0)
             && self.beta >= super::model::BETA_SNAP_TOL
             && (sf - sk).abs() > 1e-12 * sf.abs().max(1e-10)
         {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "SABR implied_vol_normal: forward*strike <= 0 (F={sf}, K={sk} after shift) with \
+                "SABR implied_vol_normal: forward or strike <= 0 (F={sf}, K={sk} after shift) with \
                  beta = {} > 0. The CEV backbone is not shift-invariant; configure an explicit \
                  shift via SabrParameters::with_shift for negative/cross-zero rates.",
                 self.beta
@@ -315,32 +215,6 @@ impl SabrParameters {
         } else {
             Err(finstack_quant_core::error::InputError::Invalid.into())
         }
-    }
-
-    /// ATM lognormal volatility (simplified formula when F ≈ K).
-    ///
-    /// ```text
-    /// σ_ATM = α / F^(1-β) * [1 + ((1-β)²/24 * α²/F^(2(1-β)) + ¼ρβνα/F^(1-β) + (2-3ρ²)/24 * ν²) * T]
-    /// ```
-    fn atm_vol_lognormal(&self, f: f64, t: f64) -> f64 {
-        let alpha = self.alpha;
-        let beta = self.beta;
-        let rho = self.rho;
-        let nu = self.nu;
-
-        let omb = 1.0 - beta;
-        let f_safe = f.max(1e-10);
-        let f_omb = f_safe.powf(omb);
-
-        let base = alpha / f_omb;
-
-        let correction = 1.0
-            + (omb * omb / 24.0 * alpha * alpha / (f_omb * f_omb)
-                + 0.25 * rho * beta * nu * alpha / f_omb
-                + (2.0 - 3.0 * rho * rho) / 24.0 * nu * nu)
-                * t;
-
-        base * correction
     }
 
     /// ATM normal volatility (simplified formula when F ≈ K).

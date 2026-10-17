@@ -8,12 +8,9 @@ use crate::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Period};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use std::sync::Arc;
 
 use super::compiler::{FixedSchedule, FloatSchedule};
 
@@ -221,6 +218,28 @@ impl CashflowRepresentation {
             Self::Projected => "projected",
             Self::Placeholder => "placeholder",
             Self::NoResidual => "no_residual",
+        }
+    }
+}
+
+impl std::fmt::Display for CashflowRepresentation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl std::str::FromStr for CashflowRepresentation {
+    type Err = finstack_quant_core::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "contractual" => Ok(Self::Contractual),
+            "projected" => Ok(Self::Projected),
+            "placeholder" => Ok(Self::Placeholder),
+            "no_residual" => Ok(Self::NoResidual),
+            _ => Err(finstack_quant_core::Error::Validation(format!(
+                "invalid cashflow representation {s:?}; expected contractual, projected, placeholder, or no_residual"
+            ))),
         }
     }
 }
@@ -1287,105 +1306,14 @@ fn apply_flow_to_outstanding(
     Ok(())
 }
 
-/// Credit-adjustment inputs for periodized PV aggregation.
-#[derive(Clone, Copy)]
-pub struct PvCreditAdjustment<'a> {
-    /// Optional hazard curve used to survival-adjust cashflows.
-    pub hazard: Option<&'a HazardCurve>,
-    /// Optional recovery rate applied to principal-like flows.
-    pub recovery_rate: Option<f64>,
-}
-
 impl CashFlowSchedule {
-    /// Compute periodized PVs from resolved discount handles.
+    /// Periodized PVs from a market context using the default day-count context.
     ///
     /// Cashflows are grouped into the supplied reporting periods using
     /// half-open period boundaries. Plain discounting uses `amount * df(t)`.
-    /// Credit-adjusted discounting additionally survival-adjusts flows and can
-    /// apply recovery assumptions to principal-like cashflows.
-    ///
-    /// # Arguments
-    ///
-    /// * `periods` - Reporting periods that define the output buckets.
-    /// * `disc` - Resolved discount curve; relative factors are calculated
-    ///   from the valuation date in `date_ctx` to each payment date.
-    /// * `credit` - Optional survival curve and decimal recovery rate in
-    ///   `[0, 1]`; absent hazard inputs select plain discounting.
-    /// * `date_ctx` - Base date for relative discounting and conditional survival;
-    ///   the day-count convention and context apply to survival curves without a date origin.
-    ///
-    /// # Returns
-    ///
-    /// [`crate::aggregation::PeriodAggregation`] mapping `PeriodId` to
-    /// per-currency present-value totals. Empty periods are omitted.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if curve lookup fails, day-count conversion fails, or
-    /// credit-adjusted inputs are internally inconsistent.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use finstack_quant_cashflows::aggregation::DateContext;
-    /// use finstack_quant_cashflows::builder::CashFlowSchedule;
-    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Period};
-    /// use finstack_quant_core::market_data::traits::Discounting;
-    ///
-    /// fn schedule_pv_by_period(
-    ///     schedule: &CashFlowSchedule,
-    ///     periods: &[Period],
-    ///     disc: &dyn Discounting,
-    ///     base: Date,
-    /// ) -> finstack_quant_core::Result<()> {
-    ///     let pv = schedule.pv_by_period_with_discounting(
-    ///         periods,
-    ///         disc,
-    ///         None,
-    ///         DateContext::new(base, DayCount::Act365F, DayCountContext::default()),
-    ///     )?;
-    ///
-    ///     let _ = pv;
-    ///     Ok(())
-    /// }
-    /// ```
-    pub fn pv_by_period_with_discounting(
-        &self,
-        periods: &[Period],
-        disc: &dyn Discounting,
-        credit: Option<PvCreditAdjustment<'_>>,
-        date_ctx: crate::aggregation::DateContext<'_>,
-    ) -> finstack_quant_core::Result<crate::aggregation::PeriodAggregation> {
-        if self.flows.is_empty() || periods.is_empty() {
-            return Ok(crate::aggregation::PeriodAggregation::default());
-        }
-
-        if let Some(PvCreditAdjustment {
-            hazard: Some(hazard_curve),
-            recovery_rate,
-        }) = credit
-        {
-            crate::aggregation::pv_by_period_credit_adjusted(
-                &self.flows,
-                periods,
-                disc,
-                Some(hazard_curve),
-                recovery_rate,
-                date_ctx,
-            )
-        } else {
-            crate::aggregation::pv_by_period_cashflows_sorted_checked(
-                &self.flows,
-                periods,
-                disc,
-                date_ctx,
-            )
-        }
-    }
-
-    /// Periodized PVs from a market context using the default day-count context.
-    ///
-    /// When `day_count` is omitted, discount times use Act/365F.
+    /// Credit-adjusted discounting additionally survival-adjusts flows and
+    /// applies the hazard curve's recovery assumption to principal-like
+    /// cashflows. When `day_count` is omitted, discount times use Act/365F.
     ///
     /// # Arguments
     ///
@@ -1395,6 +1323,11 @@ impl CashFlowSchedule {
     /// * `credit_curve_id` - Optional hazard curve identifier for credit-adjusted PV.
     /// * `base` - Valuation date used as the day-count origin for discount times.
     /// * `day_count` - Day-count for discount times; `None` selects Act/365F.
+    ///
+    /// # Returns
+    ///
+    /// [`crate::aggregation::PeriodAggregation`] mapping `PeriodId` to
+    /// per-currency present-value totals. Empty periods are omitted.
     ///
     /// # Errors
     ///
@@ -1409,20 +1342,37 @@ impl CashFlowSchedule {
         base: Date,
         day_count: Option<DayCount>,
     ) -> finstack_quant_core::Result<crate::aggregation::PeriodAggregation> {
-        let curves = resolve_credit_curves(market, disc_curve_id, credit_curve_id)?;
-        self.pv_by_period_with_discounting(
-            periods,
-            curves.discounting(),
-            Some(PvCreditAdjustment {
-                hazard: curves.hazard_survival(),
-                recovery_rate: curves.recovery_rate(),
-            }),
-            crate::aggregation::DateContext::new(
-                base,
-                day_count.unwrap_or(DayCount::Act365F),
-                DayCountContext::default(),
-            ),
-        )
+        let discount = market.get_discount(disc_curve_id.as_str())?;
+        let hazard = if let Some(hazard_id) = credit_curve_id {
+            Some(market.get_hazard(hazard_id.as_str())?)
+        } else {
+            None
+        };
+        if self.flows.is_empty() || periods.is_empty() {
+            return Ok(crate::aggregation::PeriodAggregation::default());
+        }
+        let date_ctx = crate::aggregation::DateContext::new(
+            base,
+            day_count.unwrap_or(DayCount::Act365F),
+            DayCountContext::default(),
+        );
+        if let Some(hazard_curve) = hazard.as_deref() {
+            crate::aggregation::pv_by_period_credit_adjusted(
+                &self.flows,
+                periods,
+                discount.as_ref(),
+                Some(hazard_curve),
+                Some(hazard_curve.recovery_rate()),
+                date_ctx,
+            )
+        } else {
+            crate::aggregation::pv_by_period_cashflows_sorted_checked(
+                &self.flows,
+                periods,
+                discount.as_ref(),
+                date_ctx,
+            )
+        }
     }
 
     /// Calendar-year ladder of this schedule's flows against caller-supplied PVs.
@@ -1501,39 +1451,6 @@ impl CashFlowSchedule {
                 .map(|(flow, &pv)| (flow.date, Ok(flow.kind), flow.amount.amount(), pv)),
         )
     }
-}
-
-pub(crate) struct CreditCurveHandles {
-    discount: Arc<DiscountCurve>,
-    hazard: Option<Arc<HazardCurve>>,
-}
-
-impl CreditCurveHandles {
-    pub(crate) fn discounting(&self) -> &dyn Discounting {
-        self.discount.as_ref()
-    }
-
-    pub(crate) fn hazard_survival(&self) -> Option<&HazardCurve> {
-        self.hazard.as_deref()
-    }
-
-    pub(crate) fn recovery_rate(&self) -> Option<f64> {
-        self.hazard.as_ref().map(|h| h.recovery_rate())
-    }
-}
-
-pub(crate) fn resolve_credit_curves(
-    market: &MarketContext,
-    disc_curve_id: &CurveId,
-    credit_curve_id: Option<&CurveId>,
-) -> finstack_quant_core::Result<CreditCurveHandles> {
-    let discount = market.get_discount(disc_curve_id.as_str())?;
-    let hazard = if let Some(hazard_id) = credit_curve_id {
-        Some(market.get_hazard(hazard_id.as_str())?)
-    } else {
-        None
-    };
-    Ok(CreditCurveHandles { discount, hazard })
 }
 
 impl IntoIterator for CashFlowSchedule {

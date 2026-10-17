@@ -388,7 +388,7 @@ gamma (`u_xx = u_x`). The PDE degenerates at `v → 0`, and the option value is
 insensitive at `v → ∞`.
 
 The documented anchor is against
-[`closed_form::heston::heston_call_price_fourier`](../closed_form/README.md):
+[`closed_form::heston::heston_price`](../closed_form/README.md):
 
 | Test | Runs by default | Configuration | Tolerance |
 |------|-----------------|---------------|-----------|

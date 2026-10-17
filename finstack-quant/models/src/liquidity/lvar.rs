@@ -36,6 +36,7 @@ fn validate_lvar_confidence(confidence: f64) -> Result<()> {
 /// `LiquidityProfile`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct LvarBangiaScalar {
     /// Input VaR (non-positive loss number), echoed back for convenience.
     pub var: f64,

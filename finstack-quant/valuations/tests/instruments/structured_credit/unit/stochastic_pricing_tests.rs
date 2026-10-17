@@ -203,7 +203,7 @@ fn correlation_constructor_rejects_invalid_matrix() {
     let err =
         CorrelationStructure::matrix(vec![1.0, 0.2, 0.2], vec!["A".to_string(), "B".to_string()])
             .expect_err("wrong-sized correlation matrix must fail");
-    assert!(err.to_string().contains("size mismatch"));
+    assert!(err.to_string().contains("Invalid matrix size"));
 }
 
 #[test]

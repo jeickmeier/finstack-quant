@@ -16,7 +16,6 @@ import pytest
 
 from finstack_quant.models.correlation import PortfolioLossResult
 from finstack_quant.models.factor.risk import (
-    DecompositionConfig,
     build_stress_attribution,
     evaluate_risk_budget,
     historical_var_decomposition,
@@ -27,7 +26,7 @@ from finstack_quant.models.factor.risk import (
 VAR_IDS = ["A", "B"]
 VAR_WEIGHTS = [0.6, 0.4]
 VAR_COVARIANCE = [[0.04, 0.01], [0.01, 0.09]]
-PARAMETRIC_VAR_95 = -0.3015066497719077
+PARAMETRIC_VAR_95 = -0.30150665010511113
 DECOMPOSITION_KEYS = [
     "confidence",
     "es_contributions",
@@ -59,7 +58,7 @@ def test_parametric_var_decomposition_wire_shape_matches_wasm() -> None:
         "relative_var",
     ]
     assert sorted(doc["es_contributions"][0]) == ["component_es", "marginal_es", "position_id", "relative_es"]
-    # Omitted confidence resolves to the Rust `parametric_95()` preset.
+    # Omitted confidence defaults to 0.95.
     assert doc["confidence"] == 0.95
     assert doc["method"] == "parametric"
     assert doc["portfolio_var"] == pytest.approx(PARAMETRIC_VAR_95, abs=1e-12)
@@ -70,17 +69,17 @@ def test_parametric_var_decomposition_wire_shape_matches_wasm() -> None:
     assert explicit.var_contributions[0].incremental_var is not None
 
 
-def test_parametric_es_decomposition_is_the_es_view() -> None:
-    view = parametric_es_decomposition(VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE)
-    doc = json.loads(view.to_json())
-    assert sorted(doc) == ["confidence", "contributions", "n_positions", "portfolio_es", "portfolio_var"]
+def test_parametric_es_decomposition_returns_position_risk_decomposition() -> None:
+    result = parametric_es_decomposition(VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE)
+    doc = json.loads(result.to_json())
+    assert sorted(doc) == DECOMPOSITION_KEYS
     assert doc["confidence"] == 0.95
 
 
 def test_decompositions_no_longer_take_a_config_keyword() -> None:
     with pytest.raises(TypeError):
         parametric_var_decomposition(  # type: ignore[call-arg]
-            VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE, config=DecompositionConfig.parametric_95()
+            VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE, config={"confidence": 0.95}
         )
 
 
@@ -94,7 +93,7 @@ def test_historical_decomposition_has_es_rows_and_rust_default_confidence() -> N
     assert doc["euler_residual"] is None
     # Two tail scenarios at 95% need at least 40 scenarios.
     longer = _scenario_pnls(40)
-    assert historical_var_decomposition(VAR_IDS, longer).confidence == DecompositionConfig.historical_95().confidence
+    assert historical_var_decomposition(VAR_IDS, longer).confidence == 0.95
 
 
 def test_scenario_major_pnls_are_rejected_like_wasm() -> None:

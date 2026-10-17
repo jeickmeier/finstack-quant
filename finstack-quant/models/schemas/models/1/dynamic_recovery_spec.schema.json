@@ -1,6 +1,6 @@
 {
   "$defs": {
-    "RecoveryModel": {
+    "DynamicRecoveryModel": {
       "description": "Recovery model specification.",
       "oneOf": [
         {
@@ -107,7 +107,7 @@
       "type": "number"
     },
     "model": {
-      "$ref": "#/$defs/RecoveryModel",
+      "$ref": "#/$defs/DynamicRecoveryModel",
       "description": "Recovery model governing the notional-to-recovery mapping."
     }
   },

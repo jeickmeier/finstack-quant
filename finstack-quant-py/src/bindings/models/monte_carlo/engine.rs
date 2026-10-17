@@ -144,20 +144,27 @@ fn price_heston(
     currency: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyMoneyEstimate> {
     use finstack_quant_models::monte_carlo::pricer::heston as canonical;
+    use finstack_quant_models::OptionType;
 
     let ccy = extract_optional_currency(currency)?;
     py.detach(|| {
-        if is_call {
-            canonical::price_heston_call(
-                spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry,
-                num_paths, seed, num_steps, ccy,
-            )
-        } else {
-            canonical::price_heston_put(
-                spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry,
-                num_paths, seed, num_steps, ccy,
-            )
-        }
+        canonical::price_heston(
+            OptionType::from(is_call),
+            spot,
+            strike,
+            rate,
+            div_yield,
+            kappa,
+            theta,
+            vol_of_vol,
+            rho,
+            v0,
+            expiry,
+            num_paths,
+            seed,
+            num_steps,
+            ccy,
+        )
     })
     .map(PyMoneyEstimate::from_inner)
     .map_err(core_to_py)

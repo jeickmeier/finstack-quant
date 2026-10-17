@@ -22,7 +22,7 @@ pub mod rough_heston;
 pub mod schwartz_smith;
 
 pub use euler::EulerMaruyama;
-pub use exact::{ExactGbm, ExactMultiGbmCorrelated};
+pub use exact::{ExactGbm, ExactMultiGbm};
 pub use exact_hw1f::ExactHullWhite1F;
 pub use qe_cir::QeCir;
 pub use qe_heston::QeHeston;
@@ -64,7 +64,7 @@ mod work_size_contract {
             )
             .expect("valid cheyette"),
         );
-        assert_eq!(CheyetteRoughEuler::new(hurst).work_size(&cheyette), 1);
+        assert_eq!(CheyetteRoughEuler::new().work_size(&cheyette), 1);
 
         let bergomi = RoughBergomiProcess::new(
             RoughBergomiParams::new(
@@ -77,7 +77,7 @@ mod work_size_contract {
             )
             .expect("valid bergomi"),
         );
-        assert_eq!(RoughBergomiEuler::new(hurst).work_size(&bergomi), 1);
+        assert_eq!(RoughBergomiEuler::new().work_size(&bergomi), 1);
 
         let lmm = LmmProcess::new(
             LmmParams {

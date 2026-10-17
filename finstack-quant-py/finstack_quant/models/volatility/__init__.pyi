@@ -25,7 +25,6 @@ __all__ = [
     "ArbitrageReport",
     "LocalVolSurface",
     "SabrCalibrator",
-    "SabrModel",
     "SabrParameters",
     "SabrSmile",
     "SviParams",
@@ -431,6 +430,57 @@ class SabrParameters:
         """
         ...
 
+    def implied_vol(self, forward: float, strike: float, t: float) -> float:
+        """
+        Normal or Black implied volatility under the Hagan-2002 expansion.
+
+        Parameters
+        ----------
+        forward : float
+            Forward price at expiry.
+        strike : float
+            Strike price.
+        t : float
+            Time to expiry in years.
+
+        Returns
+        -------
+        float
+            Normal decimal rate per square-root year when beta is below 1e-4;
+            otherwise dimensionless annual Black volatility.
+
+        Raises
+        ------
+        ValueError
+            If an input is non-finite, ``t`` is non-positive, unshifted
+            non-normal SABR receives a non-positive forward or strike, shifted
+            SABR has a non-positive effective forward or strike, or the
+            calculation produces an invalid volatility.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.volatility import SabrParameters
+        >>> round(SabrParameters.rates_default().implied_vol(0.02, 0.02, 1.0), 6)
+        0.142511
+        """
+        ...
+
+    def supports_negative_rates(self) -> bool:
+        """
+        Return ``True`` for beta approximately zero or a positive shift.
+
+        Returns
+        -------
+        bool
+            ``True`` if beta is below 1e-4 (normal dynamics) or a positive
+            displacement enables negative-rate smiles.
+
+        Notes
+        -----
+        This method does not raise; it returns ``True`` or ``False``.
+        """
+        ...
+
     def to_json(self) -> str:
         """
         Serialize to the Rust ``SabrParameters`` JSON wire form.
@@ -476,100 +526,6 @@ class SabrParameters:
 
     def __eq__(self, other: object) -> bool: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
-
-class SabrModel:
-    """
-    Hagan-2002 SABR stochastic-volatility smile model.
-
-    Sources
-    -------
-    - Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr
-
-    Examples
-    --------
-    >>> from finstack_quant.models.volatility import SabrModel, SabrParameters
-    >>> model = SabrModel(SabrParameters.rates_default())
-    >>> (round(model.implied_vol(0.02, 0.02, 1.0), 6), model.supports_negative_rates())
-    (0.142511, False)
-
-    """
-
-    def __init__(self, params: SabrParameters) -> None:
-        """
-        Create a SABR model from validated parameters.
-
-        Parameters
-        ----------
-        params : SabrParameters
-            SABR parameter set (alpha, beta, nu, rho, optional shift).
-
-        Raises
-        ------
-        ValueError
-            If parameters violate SABR constraints.
-        """
-        ...
-
-    def implied_vol(self, forward: float, strike: float, t: float) -> float:
-        """
-        Normal or Black implied volatility under the Hagan-2002 expansion.
-
-        Parameters
-        ----------
-        forward : float
-            Forward price at expiry.
-        strike : float
-            Strike price.
-        t : float
-            Time to expiry in years.
-
-        Returns
-        -------
-        float
-            Normal decimal rate per square-root year when beta is below 1e-4;
-            otherwise dimensionless annual Black volatility.
-
-        Raises
-        ------
-        ValueError
-            If an input is non-finite, ``t`` is non-positive, unshifted
-            non-normal SABR receives a non-positive forward or strike, shifted
-            SABR has a non-positive effective forward or strike, or the
-            calculation produces an invalid volatility.
-        """
-        ...
-
-    @property
-    def params(self) -> SabrParameters:
-        """
-        Parameters used by this model.
-
-        Returns
-        -------
-        SabrParameters
-            The SABR parameter set.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    def supports_negative_rates(self) -> bool:
-        """
-        Return ``True`` for beta approximately zero or a positive shift.
-
-        Returns
-        -------
-        bool
-            ``True`` if beta is below 1e-4 (normal dynamics) or a positive
-            displacement enables negative-rate smiles.
-
-        Notes
-        -----
-        This method does not raise; it returns ``True`` or ``False``.
-        """
-        ...
 
 class SabrSmile:
     """
@@ -1230,7 +1186,7 @@ def implied_vol_black(price: float, forward: float, strike: float, t: float, is_
     --------
     >>> from finstack_quant.models import black76_price
     >>> from finstack_quant.models.volatility import implied_vol_black
-    >>> price = black76_price(100.0, 105.0, 1.0, 1.0, 0.25, True)
+    >>> price = black76_price(100.0, 105.0, 1.0, 0.25, 1.0, True)
     >>> round(implied_vol_black(price, 100.0, 105.0, 1.0, True), 10)
     0.25
 

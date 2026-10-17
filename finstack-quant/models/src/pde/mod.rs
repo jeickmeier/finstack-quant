@@ -27,7 +27,7 @@
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let pde = BlackScholesPde {
 //!     sigma: 0.2, rate: 0.05, dividend: 0.0,
-//!     strike: 100.0, maturity: 1.0, is_call: true,
+//!     strike: 100.0, is_call: true,
 //! };
 //!
 //! let grid = Grid1D::sinh_concentrated(-5.0, 5.0, 200, 0.0, 0.1)?;
@@ -70,7 +70,7 @@ mod stepper;
 
 pub use adi::CraigSneydStepper;
 pub use boundary::BoundaryCondition;
-pub use bridge::{BlackScholesPde, LocalVolPde};
+pub use bridge::BlackScholesPde;
 pub use bridge2d::HestonPde;
 pub use exercise::ExerciseError;
 pub use grid::{Grid1D, PdeGridError};

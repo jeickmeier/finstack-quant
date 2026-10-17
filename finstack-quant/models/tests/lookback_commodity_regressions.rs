@@ -101,7 +101,7 @@ fn schwartz_smith_joint_moments_match_futures_for_any_step_partition() {
                 .unwrap();
             let process = SchwartzSmithProcess::new(params, 0.1, 4.5);
             for steps in [vec![1.0], vec![1.0 / 12.0; 12], vec![0.01, 0.19, 0.8]] {
-                let mut disc = ExactSchwartzSmith::from_process(&process).unwrap();
+                let mut disc = ExactSchwartzSmith::new();
                 let grid = finstack_quant_models::monte_carlo::TimeGrid::uniform(1.0, 12).unwrap();
                 disc.prepare(&process, &grid);
                 let mut mean = process.initial_state();

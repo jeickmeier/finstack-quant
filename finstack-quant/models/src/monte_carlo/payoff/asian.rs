@@ -329,8 +329,12 @@ impl Payoff for Asian {
                     self.kahan_add(spot * total_multiplier);
                 }
                 AveragingMethod::Geometric => {
-                    // Store as log-sum for numerical stability
-                    self.product_spots += spot.ln() * count as f64 + log_multiplier;
+                    if spot <= 0.0 {
+                        self.product_spots = f64::NEG_INFINITY;
+                    } else {
+                        // Store as log-sum for numerical stability
+                        self.product_spots += spot.ln() * count as f64 + log_multiplier;
+                    }
                 }
             }
             self.num_fixings_seen += count;

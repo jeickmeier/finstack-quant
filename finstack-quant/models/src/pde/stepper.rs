@@ -145,6 +145,11 @@ impl ThetaStepper {
     ///   conditionally stable and are CFL-checked on every step.
     /// * `n_steps` - Number of uniform time steps between maturity and `t = 0`.
     pub fn custom(theta: f64, n_steps: usize) -> Self {
+        let theta = if theta.is_finite() {
+            theta.clamp(0.0, 1.0)
+        } else {
+            theta
+        };
         Self {
             implicit_steps: 0,
             theta,
@@ -204,12 +209,24 @@ impl ThetaStepper {
         t_to: f64,
         step_index: usize,
     ) -> Result<(), StepperError> {
+        self.step_with_cached_op(problem, grid, u, (t_from, t_to), step_index, None)
+    }
+
+    pub(crate) fn step_with_cached_op(
+        &self,
+        problem: &dyn PdeProblem1D,
+        grid: &Grid1D,
+        u: &mut [f64],
+        (t_from, t_to): (f64, f64),
+        step_index: usize,
+        cached_op: Option<&TridiagOperator>,
+    ) -> Result<(), StepperError> {
         let theta = if step_index < self.implicit_steps {
             1.0
         } else {
             self.theta
         };
-        theta_step(problem, grid, u, t_from, t_to, theta)
+        theta_step(problem, grid, u, t_from, t_to, theta, cached_op)
     }
 
     /// Total number of time steps.
@@ -229,8 +246,15 @@ impl ThetaStepper {
     ///   intervals.
     pub fn time_levels(&self, maturity: f64) -> Vec<f64> {
         let n = self.n_steps;
+        if n == 0 {
+            return vec![maturity];
+        }
         let dt = maturity / n as f64;
-        (0..=n).map(|i| maturity - i as f64 * dt).collect()
+        let mut levels: Vec<f64> = (0..n)
+            .map(|i| (maturity - i as f64 * dt).max(0.0))
+            .collect();
+        levels.push(0.0);
+        levels
     }
 }
 
@@ -329,12 +353,13 @@ fn theta_step(
     t_from: f64,
     t_to: f64,
     theta: f64,
+    cached_op: Option<&TridiagOperator>,
 ) -> Result<(), StepperError> {
     let dt = t_from - t_to;
     // A non-positive or non-finite dt would otherwise propagate as silent
     // NaN / inf in release builds (the previous `debug_assert` was compiled
     // out). The `is_finite` check also rejects a NaN dt.
-    if !dt.is_finite() || dt <= 0.0 {
+    if !dt.is_finite() || dt <= 0.0 || !theta.is_finite() {
         return Err(StepperError::NonPositiveStep { dt, t_from, t_to });
     }
 
@@ -356,16 +381,24 @@ fn theta_step(
 
     let is_homogeneous = problem.is_time_homogeneous();
 
-    let op_from = TridiagOperator::assemble(problem, grid, t_from);
+    let op_from_owned;
+    let op_from = if let Some(op) = cached_op {
+        op
+    } else {
+        op_from_owned = TridiagOperator::assemble(problem, grid, t_from);
+        &op_from_owned
+    };
 
     // Explicit part: y = (I + (1-theta)*dt * A_from) * u + (1-theta)*dt*(source + bc)
     let beta = (1.0 - theta) * dt;
     let mut rhs = op_from.apply_explicit(beta, u);
 
+    let op_to_owned;
     let op_to = if is_homogeneous {
         op_from
     } else {
-        TridiagOperator::assemble(problem, grid, t_to)
+        op_to_owned = TridiagOperator::assemble(problem, grid, t_to);
+        &op_to_owned
     };
 
     // Implicit-side source and boundary corrections: theta * dt * (source_to + bc_to)

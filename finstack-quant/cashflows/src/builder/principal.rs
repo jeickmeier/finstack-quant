@@ -3,8 +3,9 @@
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 
-use crate::builder::orchestrator::{CashFlowBuilder, PrincipalEvent};
+use crate::builder::orchestrator::CashFlowBuilder;
 use crate::builder::{AmortizationSpec, PrincipalExchange};
+use crate::json::PrincipalEventSpec;
 use crate::primitives::CFKind;
 
 impl CashFlowBuilder {
@@ -160,10 +161,14 @@ impl CashFlowBuilder {
             }
             _ => {}
         }
-        let cash_leg = cash.unwrap_or(match kind {
-            CFKind::Amortization => delta.checked_neg(),
-            _ => delta,
-        });
+        let spec = PrincipalEventSpec {
+            date,
+            payment_date,
+            delta,
+            cash,
+            kind,
+        };
+        let cash_leg = spec.resolved_cash();
         if cash_leg.currency() != delta.currency() {
             self.pending_error = Some(finstack_quant_core::Error::CurrencyMismatch {
                 expected: delta.currency(),
@@ -171,13 +176,7 @@ impl CashFlowBuilder {
             });
             return self;
         }
-        self.principal_events.push(PrincipalEvent {
-            date,
-            payment_date,
-            delta,
-            cash: cash_leg,
-            kind,
-        });
+        self.principal_events.push(spec);
         self
     }
 }

@@ -3,9 +3,7 @@
 use finstack_quant_cashflows::primitives::CashFlow;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
-use finstack_quant_core::{Error as CoreError, Result as CoreResult};
 use finstack_quant_models::correlation::copula::{Copula, CopulaSpec};
-use std::sync::OnceLock;
 
 // Pricing Model Constants
 //
@@ -90,47 +88,17 @@ pub(super) const PAR_SPREAD_TOLERANCE: f64 = 1e-6;
 /// copulas selected through [`CopulaSpec`]. Recovery is the index (or
 /// per-issuer) recovery rate.
 ///
-/// The copula instance is constructed lazily and cached for the pricer's
-/// lifetime. Gaussian, RFL, and multi-factor expected losses use adaptive
-/// integration over every conditioning factor with explicit tail and
-/// convergence budgets. Student-t uses the copula's product Gauss rule.
+/// The copula instance is constructed and validated at pricer creation and
+/// reused for the pricer's lifetime. Gaussian, RFL, and multi-factor expected
+/// losses use adaptive integration over every conditioning factor with explicit
+/// tail and convergence budgets. Student-t uses the copula's product Gauss rule.
 ///
 /// Default settings follow ISDA standard model conventions: mid-period
 /// protection timing, accrual-on-default in the premium leg, T+1 settlement
 /// for index tranches and T+3 for bespoke tranches.
-///
-/// The copula specification is validated by [`CdsTranchePricer::with_copula`]
-/// and remains immutable for the pricer's lifetime, so the cached copula
-/// cannot drift from the specification used by uncached calculations.
 pub struct CdsTranchePricer {
     pub(super) copula_spec: CopulaSpec,
-    pub(super) copula_cache: OnceLock<Box<dyn Copula + Send + Sync>>,
-}
-
-/// Validate a copula specification before constructing a pricer.
-///
-/// # Errors
-///
-/// Returns [`finstack_quant_core::Error::Validation`] when the Student-t
-/// degrees of freedom or the random-factor-loading volatility are outside
-/// their documented ranges.
-pub(super) fn validate_copula_spec(spec: &CopulaSpec) -> CoreResult<()> {
-    match spec {
-        CopulaSpec::Gaussian | CopulaSpec::MultiFactor => Ok(()),
-        CopulaSpec::StudentT { degrees_of_freedom } => CopulaSpec::student_t(*degrees_of_freedom)
-            .map(|_| ())
-            .map_err(|error| CoreError::Validation(error.to_string())),
-        CopulaSpec::RandomFactorLoading { loading_volatility } => {
-            let value = *loading_volatility;
-            if value.is_finite() && (0.0..=0.5).contains(&value) {
-                Ok(())
-            } else {
-                Err(CoreError::Validation(format!(
-                    "copula_spec.loading_volatility must be finite and in [0, 0.5], got {value}"
-                )))
-            }
-        }
-    }
+    pub(super) copula: Box<dyn Copula>,
 }
 
 /// Which per-name exposure a capped pool expectation integrates over.

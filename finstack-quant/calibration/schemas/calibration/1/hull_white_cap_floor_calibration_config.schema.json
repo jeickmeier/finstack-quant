@@ -1,6 +1,7 @@
 {
   "$defs": {
     "HullWhiteCalibrationParams": {
+      "additionalProperties": false,
       "description": "Validated constant-parameter Hull-White one-factor model.\n\n# Examples\n\n```rust\nuse finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;\n\nlet params = HullWhiteCalibrationParams::new(0.05, 0.01).unwrap();\nassert!(!params.is_uncalibrated_default());\n```",
       "properties": {
         "kappa": {

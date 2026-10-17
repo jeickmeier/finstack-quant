@@ -3,7 +3,7 @@
 Covers:
 - B1: `bs_price`, `bs_greeks`, `bs_implied_vol`, `black76_implied_vol`.
 - B2: `finstack_quant.models.correlation.nearest_correlation`.
-- B3: `SabrParameters` / `SabrModel` / `SabrSmile` / `SabrCalibrator`.
+- B3: `SabrParameters` / `SabrSmile` / `SabrCalibrator`.
 - B5: `barrier_call`, `asian_option_price`, `lookback_option_price`,
       `quanto_option_price`.
 """
@@ -34,7 +34,7 @@ from finstack_quant.models import (
     vanilla_expiry_payoff,
 )
 from finstack_quant.models.correlation import nearest_correlation
-from finstack_quant.models.volatility import SabrCalibrator, SabrModel, SabrParameters, SabrSmile
+from finstack_quant.models.volatility import SabrCalibrator, SabrParameters, SabrSmile
 
 # B1 — Black-Scholes / Black-76 primitives
 
@@ -76,8 +76,8 @@ def test_bs_implied_vol_rejects_expired_option() -> None:
 
 
 def test_new_closed_form_bindings_run() -> None:
-    assert abs(black76_price(100.0, 100.0, 0.95, 1.0, 0.2, True) - 7.5673) < 1e-3
-    assert 0.5 < black76_greeks(100.0, 100.0, 1.0, 0.2, True).delta < 0.6
+    assert abs(black76_price(100.0, 100.0, 0.95, 0.2, 1.0, True) - 7.5673) < 1e-3
+    assert 0.5 < black76_greeks(100.0, 100.0, 0.2, 1.0, True).delta < 0.6
     assert bachelier_price(0.03, 0.03, 0.0075, 1.0, True) > 0.0
     assert abs(bachelier_greeks(0.03, 0.03, 0.0075, 1.0, True).delta - 0.5) < 1e-9
     assert black_shifted_price(-0.005, -0.005, 0.25, 1.0, 0.03, True) > 0.0
@@ -123,8 +123,7 @@ def test_nearest_correlation_rejects_bad_diagonal() -> None:
 def test_sabr_equity_default_and_model_implied_vol() -> None:
     p = SabrParameters.equity_default()
     assert p.alpha == pytest.approx(0.20)
-    model = SabrModel(p)
-    vol = model.implied_vol(100.0, 100.0, 1.0)
+    vol = p.implied_vol(100.0, 100.0, 1.0)
     assert vol > 0.0
 
 

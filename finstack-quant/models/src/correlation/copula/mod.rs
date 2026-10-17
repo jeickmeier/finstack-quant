@@ -503,19 +503,41 @@ impl CopulaSpec {
         Ok(match self {
             CopulaSpec::Gaussian => Box::new(GaussianCopula::new()),
             CopulaSpec::StudentT { degrees_of_freedom } => {
-                validate_student_t_degrees_of_freedom(*degrees_of_freedom)?;
-                Box::new(StudentTCopula::new(*degrees_of_freedom))
+                Box::new(StudentTCopula::new(*degrees_of_freedom)?)
             }
             CopulaSpec::RandomFactorLoading { loading_volatility } => {
-                if !loading_volatility.is_finite() || !(0.0..=0.5).contains(loading_volatility) {
-                    return Err(Error::InvalidLoadingVolatility {
-                        value: *loading_volatility,
-                    });
-                }
-                Box::new(RandomFactorLoadingCopula::new(*loading_volatility))
+                Box::new(RandomFactorLoadingCopula::new(*loading_volatility)?)
             }
             CopulaSpec::MultiFactor => Box::new(MultiFactorCopula::new()),
         })
+    }
+
+    /// Compute the default barrier (`Φ⁻¹(pd)` or `t_ν⁻¹(pd)`) for marginal default probability `pd`.
+    ///
+    /// Gaussian, RFL, and Multi-factor copulas invert the standard normal CDF;
+    /// the Student-t copula validates `degrees_of_freedom > 2` and inverts `t_ν`.
+    ///
+    /// # Arguments
+    /// * `pd` - Marginal default probability in `[0, 1]`.
+    ///
+    /// # Returns
+    ///
+    /// Default threshold `c` such that `P(Aᵢ ≤ c) = pd`.
+    ///
+    /// # Errors
+    /// Returns [`finstack_quant_core::Error::Validation`] if `pd` is non-finite or outside
+    /// `[0, 1]`, or if a Student-t specification has invalid degrees of freedom.
+    pub fn default_threshold(&self, pd: f64) -> finstack_quant_core::Result<f64> {
+        finstack_quant_core::validation::validate_f64_unit_interval(pd, "default_probability")?;
+        match self {
+            CopulaSpec::StudentT { degrees_of_freedom } => {
+                validate_student_t_degrees_of_freedom(*degrees_of_freedom)?;
+                finstack_quant_core::math::student_t_inv_cdf(pd, *degrees_of_freedom)
+            }
+            CopulaSpec::Gaussian
+            | CopulaSpec::RandomFactorLoading { .. }
+            | CopulaSpec::MultiFactor => Ok(finstack_quant_core::math::standard_normal_inv_cdf(pd)),
+        }
     }
 
     /// Check if this is a Gaussian copula specification.
@@ -596,8 +618,8 @@ mod tests {
     fn mixing_draws_reject_invalid_uniforms_for_every_sampling_family() {
         let copulas: [Box<dyn Copula>; 3] = [
             Box::new(GaussianCopula::new()),
-            Box::new(StudentTCopula::new(5.0)),
-            Box::new(RandomFactorLoadingCopula::new(0.1)),
+            Box::new(StudentTCopula::new(5.0).expect("valid df")),
+            Box::new(RandomFactorLoadingCopula::new(0.1).expect("valid loading vol")),
         ];
         for copula in copulas {
             for u in [0.0, 1.0, -0.1, 1.1, f64::NAN, f64::INFINITY] {

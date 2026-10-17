@@ -138,32 +138,30 @@ impl StudentTCopula {
     ///
     /// A Student-t copula using the default quadrature order.
     ///
-    /// # Panics
-    /// Panics if `df` is not finite or is at most 2.
+    /// # Errors
+    /// Returns [`crate::correlation::Error::InvalidStudentTDegreesOfFreedom`] if `df` is not finite or is at most 2.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use finstack_quant_models::correlation::{Copula, StudentTCopula};
     ///
-    /// let copula = StudentTCopula::new(5.0);
+    /// let copula = StudentTCopula::new(5.0).expect("valid df");
     /// let lambda = copula.tail_dependence(0.50);
     ///
     /// assert!(lambda > 0.0);
     /// ```
-    #[must_use]
-    pub fn new(df: f64) -> Self {
-        assert!(
-            df.is_finite() && df > 2.0,
-            "Student-t df must be > 2 and finite for finite variance"
-        );
+    pub fn new(df: f64) -> crate::correlation::Result<Self> {
+        if !df.is_finite() || df <= 2.0 {
+            return Err(crate::correlation::Error::InvalidStudentTDegreesOfFreedom { value: df });
+        }
         let order = DEFAULT_QUADRATURE_ORDER;
-        Self {
+        Ok(Self {
             degrees_of_freedom: df,
             quadrature_order: order,
             inner_quadrature: default_quadrature(),
             gamma_quadrature: Self::compute_gamma_quadrature(df, order as usize),
-        }
+        })
     }
 
     /// Compute quadrature for W ~ Gamma(ν/2, ν/2) integration.
@@ -466,12 +464,15 @@ mod tests {
 
     #[test]
     fn tail_dependence_of_nan_is_nan() {
-        assert!(StudentTCopula::new(5.0).tail_dependence(f64::NAN).is_nan());
+        assert!(StudentTCopula::new(5.0)
+            .expect("valid df")
+            .tail_dependence(f64::NAN)
+            .is_nan());
     }
 
     #[test]
     fn mixing_lower_tail_is_positive_and_inversion_failures_propagate() {
-        let mut copula = StudentTCopula::new(2.00001);
+        let mut copula = StudentTCopula::new(2.00001).expect("valid df");
         for u in [1e-15, 1e-12, 1e-6, 0.5, 1.0 - 1e-12] {
             let mixing = copula.sample_mixing(u).expect("resolvable mixing tail");
             assert!(mixing.is_finite() && mixing > 0.0);
@@ -488,7 +489,7 @@ mod tests {
 
     #[test]
     fn latent_and_conditional_mixing_preserve_small_values_and_reject_invalid_values() {
-        let copula = StudentTCopula::new(5.0);
+        let copula = StudentTCopula::new(5.0).expect("valid df");
         let latent = copula.latent_variable(0.0, 1.0, 1e-20, 0.0);
         assert!((latent / 1e10 - 1.0).abs() < 1e-12);
         for mixing in [0.0, -1.0, f64::NAN, f64::INFINITY] {
@@ -501,7 +502,7 @@ mod tests {
 
     #[test]
     fn test_student_t_creation() {
-        let copula = StudentTCopula::new(5.0);
+        let copula = StudentTCopula::new(5.0).expect("valid df");
         // [Z, W]: the quadrature engine must integrate over both the Gaussian
         // systematic factor and the shared mixing variable.
         assert_eq!(copula.num_factors(), 2);
@@ -510,14 +511,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Student-t df must be > 2")]
     fn test_student_t_invalid_df() {
-        let _ = StudentTCopula::new(2.0);
+        assert!(StudentTCopula::new(2.0).is_err());
+        assert!(StudentTCopula::new(f64::NAN).is_err());
+        assert!(StudentTCopula::new(f64::INFINITY).is_err());
     }
 
     #[test]
     fn test_tail_dependence_positive() {
-        let copula = StudentTCopula::new(5.0);
+        let copula = StudentTCopula::new(5.0).expect("valid df");
         let lambda = copula.tail_dependence(0.5);
 
         assert!(lambda > 0.0, "Tail dependence should be positive");
@@ -526,7 +528,7 @@ mod tests {
 
     #[test]
     fn test_tail_dependence_increases_with_correlation() {
-        let copula = StudentTCopula::new(5.0);
+        let copula = StudentTCopula::new(5.0).expect("valid df");
 
         let lambda_low = copula.tail_dependence(0.2);
         let lambda_mid = copula.tail_dependence(0.5);
@@ -544,8 +546,8 @@ mod tests {
 
     #[test]
     fn test_tail_dependence_decreases_with_df() {
-        let copula_low_df = StudentTCopula::new(4.0);
-        let copula_high_df = StudentTCopula::new(20.0);
+        let copula_low_df = StudentTCopula::new(4.0).expect("valid df");
+        let copula_high_df = StudentTCopula::new(20.0).expect("valid df");
 
         let lambda_low_df = copula_low_df.tail_dependence(0.5);
         let lambda_high_df = copula_high_df.tail_dependence(0.5);
@@ -558,7 +560,7 @@ mod tests {
 
     #[test]
     fn test_converges_to_gaussian_for_high_df() {
-        let copula_high_df = StudentTCopula::new(100.0);
+        let copula_high_df = StudentTCopula::new(100.0).expect("valid df");
         let lambda = copula_high_df.tail_dependence(0.5);
 
         assert!(
@@ -569,7 +571,7 @@ mod tests {
 
     #[test]
     fn test_conditional_prob_sensitive_to_factor() {
-        let copula = StudentTCopula::new(5.0);
+        let copula = StudentTCopula::new(5.0).expect("valid df");
         let threshold = student_t_inv_cdf(0.05, 5.0).expect("valid Student-t inputs");
         let correlation = 0.3;
 
@@ -586,7 +588,7 @@ mod tests {
         // Verify the conditional formula from Demarta & McNeil (2005):
         //   P(default | M=m) = t_{ν+1}((c − √ρ·m)/√(1−ρ) · √((ν+1)/(ν+m²)))
         // Every interior correlation uses the same exact conditional formula.
-        let copula = StudentTCopula::new(5.0);
+        let copula = StudentTCopula::new(5.0).expect("valid df");
         let nu: f64 = 5.0;
         let rho: f64 = 0.30;
         let sqrt_rho = rho.sqrt();
@@ -614,7 +616,7 @@ mod tests {
         //   P(default | M=m) → 1{m ≤ c}
         // because Aᵢ = M. The previous implementation dropped the 1/√(1−ρ)
         // factor and produced an overly smooth CDF.
-        let copula = StudentTCopula::new(5.0);
+        let copula = StudentTCopula::new(5.0).expect("valid df");
         let threshold: f64 = -1.25;
 
         // m well below threshold ⇒ default virtually certain.
@@ -636,7 +638,7 @@ mod tests {
     fn test_integration_recovers_unconditional() {
         // Critical self-consistency test: E[P(default|M)] must equal PD
         for &df in &[4.0, 5.0, 10.0, 30.0] {
-            let copula = StudentTCopula::new(df);
+            let copula = StudentTCopula::new(df).expect("valid df");
             let pd = 0.05;
             let threshold = student_t_inv_cdf(pd, df).expect("valid Student-t inputs");
             let correlation = 0.30;
@@ -657,7 +659,7 @@ mod tests {
 
     #[test]
     fn test_integration_recovers_unconditional_various_pd() {
-        let copula = StudentTCopula::new(5.0);
+        let copula = StudentTCopula::new(5.0).expect("valid df");
 
         for &pd in &[0.01, 0.05, 0.10, 0.20] {
             let threshold = student_t_inv_cdf(pd, 5.0).expect("valid Student-t inputs");
@@ -681,7 +683,7 @@ mod tests {
         let test_cases = [(4.0, 0.5), (5.0, 0.5), (10.0, 0.5)];
 
         for (df, rho) in test_cases {
-            let copula = StudentTCopula::new(df);
+            let copula = StudentTCopula::new(df).expect("valid df");
             let lambda = copula.tail_dependence(rho);
 
             assert!(
@@ -701,8 +703,8 @@ mod tests {
             );
         }
 
-        let copula_4 = StudentTCopula::new(4.0);
-        let copula_10 = StudentTCopula::new(10.0);
+        let copula_4 = StudentTCopula::new(4.0).expect("valid df");
+        let copula_10 = StudentTCopula::new(10.0).expect("valid df");
         assert!(
             copula_4.tail_dependence(0.5) > copula_10.tail_dependence(0.5),
             "Lower df should give higher tail dependence"
@@ -750,7 +752,7 @@ mod tests {
     #[test]
     fn test_gamma_quadrature_properties() {
         for df in [2.01, 4.0, 5.0, 10.0, 20.0, 200.0, 500.0, 1000.0, 1e8] {
-            let copula = StudentTCopula::new(df);
+            let copula = StudentTCopula::new(df).expect("valid df");
             let points = &copula.gamma_quadrature;
 
             for &(x, w) in points {
@@ -800,7 +802,7 @@ mod tests {
                 .powi(2)
         });
         for df in [200.0, 500.0, 1000.0, 10_000.0] {
-            let copula = StudentTCopula::new(df);
+            let copula = StudentTCopula::new(df).expect("valid df");
             let threshold = student_t_inv_cdf(pd, df).expect("valid Student-t inputs");
             let marginal = copula
                 .integrate_fn(&|factors| copula.conditional_default_prob(threshold, factors, rho));
@@ -824,7 +826,7 @@ mod tests {
 
     #[test]
     fn conditional_and_latent_kernels_preserve_every_correlation() {
-        let copula = StudentTCopula::new(5.0);
+        let copula = StudentTCopula::new(5.0).expect("valid df");
         for rho in [0.0_f64, 0.001, 0.01, 0.010_001, 0.3, 0.99, 0.999_999, 1.0] {
             for (threshold, z, mixing) in [(0.0_f64, 3.0_f64, 1.0_f64), (-0.7, -0.5, 0.4)] {
                 let expected = if rho == 1.0 {
@@ -858,7 +860,7 @@ mod tests {
     #[test]
     fn test_factor_length_mismatch_contract() {
         let df = 5.0;
-        let copula = StudentTCopula::new(df);
+        let copula = StudentTCopula::new(df).expect("valid df");
         let pd = 0.05;
         let threshold = student_t_inv_cdf(pd, df).expect("valid Student-t inputs");
         let correlation = 0.30;
@@ -904,7 +906,7 @@ mod tests {
         use finstack_quant_models::monte_carlo::traits::RandomStream;
 
         let nu = 5.0;
-        let copula = StudentTCopula::new(nu);
+        let copula = StudentTCopula::new(nu).expect("valid df");
         let pd = 0.05;
         let threshold = student_t_inv_cdf(pd, nu).expect("valid Student-t inputs");
         let rho = 0.30;
@@ -949,7 +951,7 @@ mod tests {
         use finstack_quant_models::monte_carlo::traits::RandomStream;
 
         let nu = 6.0;
-        let copula = StudentTCopula::new(nu);
+        let copula = StudentTCopula::new(nu).expect("valid df");
         let pd = 0.05;
         let threshold = student_t_inv_cdf(pd, nu).expect("valid Student-t inputs");
         let rho = 0.30;
@@ -986,7 +988,7 @@ mod tests {
         use finstack_quant_core::math::norm_cdf;
 
         let df = 50.0;
-        let copula = StudentTCopula::new(df);
+        let copula = StudentTCopula::new(df).expect("valid df");
         let pd = 0.05;
         let threshold = student_t_inv_cdf(pd, df).expect("valid Student-t inputs");
         let correlation = 0.30;
@@ -1015,12 +1017,12 @@ mod tests {
         let correlation = 0.30;
 
         // Default-order copula (20 generalized Laguerre nodes).
-        let copula_default = StudentTCopula::new(nu);
+        let copula_default = StudentTCopula::new(nu).expect("valid df");
 
         // High-order reference: 64-node Gamma mixing rule (MAX_LAGUERRE_ORDER).
         let copula_ref = StudentTCopula {
             gamma_quadrature: StudentTCopula::compute_gamma_quadrature(nu, 64),
-            ..StudentTCopula::new(nu)
+            ..StudentTCopula::new(nu).expect("valid df")
         };
 
         let integrate = |c: &StudentTCopula| {

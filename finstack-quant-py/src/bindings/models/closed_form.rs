@@ -173,7 +173,7 @@ const FORWARD_GREEK_LABELS: [&str; 3] = ["delta", "gamma", "vega"];
 /// Examples
 /// --------
 /// >>> from finstack_quant.models import black76_greeks
-/// >>> g = black76_greeks(100.0, 100.0, 1.0, 0.2, True)
+/// >>> g = black76_greeks(100.0, 100.0, 0.2, 1.0, True)
 /// >>> round(g.delta, 4)
 /// 0.5398
 /// >>> g.to_series().index.tolist()
@@ -574,10 +574,10 @@ fn black76_implied_vol_wrapper(
 /// df : float
 ///     Discount factor from valuation date to expiry; a finite decimal
 ///     strictly greater than zero (the domain ``black76_implied_vol`` accepts).
-/// expiry : float
-///     Time to expiry in years; non-negative.
 /// vol : float
 ///     Annualized lognormal (Black) volatility, decimal; non-negative.
+/// expiry : float
+///     Time to expiry in years; non-negative.
 /// is_call : bool
 ///     ``True`` for a call, ``False`` for a put.
 ///
@@ -595,23 +595,23 @@ fn black76_implied_vol_wrapper(
 /// Examples
 /// --------
 /// >>> from finstack_quant.models import black76_price
-/// >>> round(black76_price(100.0, 100.0, 0.95, 1.0, 0.2, True), 4)
+/// >>> round(black76_price(100.0, 100.0, 0.95, 0.2, 1.0, True), 4)
 /// 7.5673
 ///
 /// Sources
 /// -------
 /// - Black (1976): see docs/REFERENCES.md#black-1976
 #[pyfunction(name = "black76_price")]
-#[pyo3(signature = (forward, strike, df, expiry, vol, is_call))]
+#[pyo3(signature = (forward, strike, df, vol, expiry, is_call))]
 fn black76_price_wrapper(
     forward: f64,
     strike: f64,
     df: f64,
-    expiry: f64,
     vol: f64,
+    expiry: f64,
     is_call: bool,
 ) -> PyResult<f64> {
-    black76_price(forward, strike, df, expiry, vol, OptionType::from(is_call)).map_err(core_to_py)
+    black76_price(forward, strike, df, vol, expiry, OptionType::from(is_call)).map_err(core_to_py)
 }
 
 /// Black-76 forward Greeks (undiscounted) as a :class:`ForwardGreeks`.
@@ -626,10 +626,10 @@ fn black76_price_wrapper(
 ///     Forward price or rate ``F`` at expiry.
 /// strike : float
 ///     Strike ``K`` in the same units as ``forward``.
-/// expiry : float
-///     Time to expiry in years; non-negative.
 /// vol : float
 ///     Annualized lognormal (Black) volatility, decimal; non-negative.
+/// expiry : float
+///     Time to expiry in years; non-negative.
 /// is_call : bool
 ///     ``True`` for a call, ``False`` for a put (only ``delta`` differs).
 ///
@@ -647,7 +647,7 @@ fn black76_price_wrapper(
 /// Examples
 /// --------
 /// >>> from finstack_quant.models import black76_greeks
-/// >>> g = black76_greeks(100.0, 100.0, 1.0, 0.2, True)
+/// >>> g = black76_greeks(100.0, 100.0, 0.2, 1.0, True)
 /// >>> round(g.delta, 4)
 /// 0.5398
 ///
@@ -655,15 +655,15 @@ fn black76_price_wrapper(
 /// -------
 /// - Black (1976): see docs/REFERENCES.md#black-1976
 #[pyfunction(name = "black76_greeks")]
-#[pyo3(signature = (forward, strike, expiry, vol, is_call))]
+#[pyo3(signature = (forward, strike, vol, expiry, is_call))]
 fn black76_greeks_wrapper(
     forward: f64,
     strike: f64,
-    expiry: f64,
     vol: f64,
+    expiry: f64,
     is_call: bool,
 ) -> PyResult<PyForwardGreeks> {
-    black76_greeks(forward, strike, expiry, vol, OptionType::from(is_call))
+    black76_greeks(forward, strike, vol, expiry, OptionType::from(is_call))
         .map(|inner| PyForwardGreeks { inner })
         .map_err(core_to_py)
 }

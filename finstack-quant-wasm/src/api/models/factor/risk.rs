@@ -9,7 +9,7 @@ use crate::utils::input::{
 };
 use crate::utils::{to_js_err, to_js_value};
 
-use finstack_quant_models::factor::risk::{DecompositionConfig, PositionRiskDecomposition};
+use finstack_quant_models::factor::risk::PositionRiskDecomposition;
 use wasm_bindgen::prelude::*;
 
 // Position-level VaR / ES decomposition and risk budgeting
@@ -24,7 +24,7 @@ use wasm_bindgen::prelude::*;
 /// @param position_ids - Position identifiers, one per weight.
 /// @param weights - Position weights or exposures in portfolio currency.
 /// @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).
-/// @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::parametric_95()` preset (0.95).
+/// @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.
 /// @param compute_incremental - Optional; when `true`, also computes
 ///   incremental VaR (one full repricing per position). Defaults to `false`.
 ///
@@ -67,15 +67,14 @@ pub fn parametric_var_decomposition(
 /// Decompose portfolio Expected Shortfall into position contributions via
 /// parametric Euler allocation.
 ///
-/// Returns the `ParametricEsDecompositionView` reporting view (the object
-/// Python's `parametric_es_decomposition` returns): a top-level
-/// `{portfolio_var, portfolio_es, confidence, n_positions, contributions}`
-/// object whose `contributions` entries are
-/// `{position_id, component_es, marginal_es, pct_contribution}`.
+/// Returns the canonical `PositionRiskDecomposition` (the object Python's
+/// `parametric_es_decomposition` returns): portfolio VaR/ES (losses
+/// negative), `method`, and per-position `var_contributions` and
+/// `es_contributions` rows.
 /// @param position_ids - Position identifiers, one per weight.
 /// @param weights - Position weights or exposures in portfolio currency.
 /// @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).
-/// @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::parametric_95()` preset (0.95).
+/// @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.
 ///
 /// # Errors
 ///
@@ -111,7 +110,7 @@ pub fn parametric_es_decomposition(
 /// `null`).
 /// @param position_ids - Position identifiers, one per P&L row.
 /// @param position_pnls - Position-major P&L matrix: one row per position, one column per scenario (losses negative).
-/// @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::historical_95()` preset (0.95).
+/// @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.
 ///
 /// # Errors
 ///
@@ -145,7 +144,7 @@ pub fn historical_var_decomposition(
 /// `evaluate_risk_budget` returns): per-position `positions` rows,
 /// `total_overbudget` and `has_breach`. Validation (array-length agreement,
 /// duplicate position-id rejection) and the default `utilizationThreshold`
-/// live in the canonical Rust `evaluate_risk_budget_arrays` /
+/// live in the canonical Rust `evaluate_risk_budget` /
 /// `DEFAULT_UTILIZATION_THRESHOLD` path shared with the Python binding.
 /// @param position_ids - Position identifiers, one per budget row.
 /// @param actual_var - Actual component VaR per position, in portfolio currency (loss-signed as the engine reports it).
@@ -173,16 +172,15 @@ pub fn evaluate_risk_budget(
     let portfolio_var = js_f64(&portfolio_var, "portfolioVar")?;
     let utilization_threshold = js_opt_f64(utilization_threshold.as_ref(), "utilizationThreshold")?;
     use finstack_quant_models::factor::risk::{
-        evaluate_risk_budget_arrays, DEFAULT_UTILIZATION_THRESHOLD,
+        evaluate_risk_budget as eval_risk_budget, DEFAULT_UTILIZATION_THRESHOLD,
     };
     let ids = js_string_seq(&position_ids, "positionIds")?;
     let actual_var = js_f64_seq(&actual_var, "actualVar")?;
     let target_var_pct = js_f64_seq(&target_var_pct, "targetVarPct")?;
     let threshold = utilization_threshold.unwrap_or(DEFAULT_UTILIZATION_THRESHOLD);
 
-    let result =
-        evaluate_risk_budget_arrays(ids, &actual_var, &target_var_pct, portfolio_var, threshold)
-            .map_err(to_js_err)?;
+    let result = eval_risk_budget(ids, &actual_var, &target_var_pct, portfolio_var, threshold)
+        .map_err(to_js_err)?;
     let js = crate::utils::to_js_value(&result)?;
     let positions = js_sys::Reflect::get(&js, &JsValue::from("positions"))?;
     crate::utils::restore_non_finite_rows::<
@@ -191,100 +189,7 @@ pub fn evaluate_risk_budget(
     Ok(js)
 }
 
-// Position-risk configuration, stress attribution and lookups
-
-/// Configuration of position-level VaR / ES decomposition.
-#[wasm_bindgen(js_name = DecompositionConfig)]
-pub struct JsDecompositionConfig {
-    pub(crate) inner: DecompositionConfig,
-}
-
-json_round_trip!(JsDecompositionConfig, DecompositionConfig);
-
-#[wasm_bindgen(js_class = DecompositionConfig)]
-impl JsDecompositionConfig {
-    /// Parametric (delta-normal) decomposition at a confidence level.
-    /// @param confidence - Tail confidence as a decimal probability in `(0.5, 1)`, such as 0.99.
-    /// @returns The parametric configuration.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` if `confidence` is not a number; the range is
-    /// checked when the configuration is used.
-    pub fn parametric(confidence: JsValue) -> Result<JsDecompositionConfig, JsValue> {
-        Ok(Self {
-            inner: DecompositionConfig::parametric(js_f64(&confidence, "confidence")?),
-        })
-    }
-
-    /// Parametric decomposition at 95% confidence.
-    /// @returns The parametric 95% preset.
-    #[wasm_bindgen(js_name = parametric95)]
-    pub fn parametric_95() -> JsDecompositionConfig {
-        Self {
-            inner: DecompositionConfig::parametric_95(),
-        }
-    }
-
-    /// Parametric decomposition at 99% confidence.
-    /// @returns The parametric 99% preset.
-    #[wasm_bindgen(js_name = parametric99)]
-    pub fn parametric_99() -> JsDecompositionConfig {
-        Self {
-            inner: DecompositionConfig::parametric_99(),
-        }
-    }
-
-    /// Historical-simulation decomposition at a confidence level.
-    /// @param confidence - Tail confidence as a decimal probability in `(0.5, 1)`, such as 0.99.
-    /// @returns The historical configuration.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` if `confidence` is not a number; the range is
-    /// checked when the configuration is used.
-    pub fn historical(confidence: JsValue) -> Result<JsDecompositionConfig, JsValue> {
-        Ok(Self {
-            inner: DecompositionConfig::historical(js_f64(&confidence, "confidence")?),
-        })
-    }
-
-    /// Historical-simulation decomposition at 95% confidence.
-    /// @returns The historical 95% preset.
-    #[wasm_bindgen(js_name = historical95)]
-    pub fn historical_95() -> JsDecompositionConfig {
-        Self {
-            inner: DecompositionConfig::historical_95(),
-        }
-    }
-
-    /// Copy of this configuration that also computes incremental VaR (one full repricing per position).
-    /// @returns The configuration with `computeIncremental` set.
-    #[wasm_bindgen(js_name = withIncremental)]
-    pub fn with_incremental(&self) -> JsDecompositionConfig {
-        Self {
-            inner: self.inner.clone().with_incremental(),
-        }
-    }
-
-    /// Tail confidence as a decimal probability.
-    #[wasm_bindgen(getter)]
-    pub fn confidence(&self) -> f64 {
-        self.inner.confidence
-    }
-
-    /// Decomposition method: `"parametric"` or `"historical"`.
-    #[wasm_bindgen(getter)]
-    pub fn method(&self) -> Result<String, JsValue> {
-        finstack_quant_core::wire::serde_label(&self.inner.method).map_err(to_js_err)
-    }
-
-    /// Whether leave-one-out incremental VaR is computed.
-    #[wasm_bindgen(getter, js_name = computeIncremental)]
-    pub fn compute_incremental(&self) -> bool {
-        self.inner.compute_incremental
-    }
-}
+// Stress attribution and lookups
 
 /// Default utilization threshold of `evaluateRiskBudget`. Twin of the Rust and
 /// Python constant `DEFAULT_UTILIZATION_THRESHOLD`.
@@ -301,7 +206,7 @@ pub fn default_utilization_threshold() -> f64 {
 /// and each position's average tail P&L and share of the tail loss.
 /// @param position_ids - Position identifiers, one per row of `positionPnls`.
 /// @param position_pnls - Position-major P&L matrix as nested rows: one row per position, one column per scenario, in reporting-currency amounts.
-/// @param confidence - Optional tail confidence in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::historical_95()` preset (0.95).
+/// @param confidence - Optional tail confidence in `(0.5, 1)`; omitted or `null` defaults to 0.95.
 /// @returns The `StressAttribution` object.
 ///
 /// # Errors

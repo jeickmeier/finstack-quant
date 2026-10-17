@@ -7,7 +7,7 @@
 //! here: constructors return the canonical wire value, and methods take it as
 //! their first argument.
 
-use crate::utils::input::{js_f64, js_f64_seq, js_uint};
+use crate::utils::input::{js_f64, js_uint};
 use crate::utils::wire::{js_decimal, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::{
@@ -132,18 +132,6 @@ pub fn notional_par(amount: JsValue, currency: JsValue) -> Result<JsValue, JsVal
     to_js_value(&notional)
 }
 
-/// Currency of a notional's initial balance.
-///
-/// @param notional - `Notional` wire object.
-/// @returns ISO-4217 currency code.
-/// @throws If `notional` is not a `Notional` (kind `validation`).
-#[wasm_bindgen(js_name = notionalCurrency)]
-pub fn notional_currency(notional: JsValue) -> Result<String, JsValue> {
-    Ok(js_wire::<Notional>(&notional, "notional")?
-        .currency()
-        .to_string())
-}
-
 /// Check a notional and its amortization rule for consistency.
 ///
 /// @param notional - `Notional` wire object.
@@ -157,86 +145,13 @@ pub fn notional_validate(notional: JsValue) -> Result<(), JsValue> {
 
 // --- DefaultModelSpec ------------------------------------------------------------
 
-/// Constant annual default rate.
-///
-/// @param cdr - Annual constant default rate as a decimal (`0.02` = 2% CDR).
-/// @returns `DefaultModelSpec` wire object with no seasoning curve.
-/// @throws If `cdr` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = defaultModelSpecConstantCdr)]
-pub fn default_model_spec_constant_cdr(cdr: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&DefaultModelSpec::constant_cdr(js_f64(&cdr, "cdr")?))
-}
-
-/// PSA/BMA Standard Default Assumption curve.
-///
-/// Annual CDR ramps 0.02% per month to a 0.60% peak at month 30, is flat to
-/// month 60, declines to 0.03% at month 120 and stays there.
-///
-/// @param speed_multiplier - SDA speed, where `1.0` means 100% SDA and `2.0` means 200% SDA.
-/// @returns `DefaultModelSpec` wire object using the SDA curve.
-/// @throws If `speedMultiplier` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = defaultModelSpecSda)]
-pub fn default_model_spec_sda(speed_multiplier: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&DefaultModelSpec::sda(js_f64(
-        &speed_multiplier,
-        "speedMultiplier",
-    )?))
-}
-
 /// Constant 2% CDR baseline.
 ///
-/// @returns `DefaultModelSpec` wire object equal to `defaultModelSpecConstantCdr(0.02)`.
+/// @returns `DefaultModelSpec` wire object `{ curve: "constant", cdr: 0.02 }`.
 /// @throws If the model cannot be serialized.
 #[wasm_bindgen(js_name = defaultModelSpecCdr2pct)]
 pub fn default_model_spec_cdr_2pct() -> Result<JsValue, JsValue> {
     to_js_value(&DefaultModelSpec::cdr_2pct())
-}
-
-/// Explicit annual CDR for each month of seasoning.
-///
-/// @param monthly_cdr - Annual CDR per seasoning month as decimals in `[0, 1]`, month 1 first; the last value is held. Must be non-empty.
-/// @returns `DefaultModelSpec` wire object using the vector curve.
-/// @throws If `monthlyCdr` is not an array of numbers (kind `invalid_type`).
-#[wasm_bindgen(js_name = defaultModelSpecVector)]
-pub fn default_model_spec_vector(monthly_cdr: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&DefaultModelSpec::vector(js_f64_seq(
-        &monthly_cdr,
-        "monthlyCdr",
-    )?))
-}
-
-/// Cumulative net-loss curve with a constant severity.
-///
-/// @param cumulative_net_loss_pct - Cumulative net loss in percent of the original balance per seasoning month (`1.5` = 1.5%), non-decreasing, month 1 first; the last value is held.
-/// @param severity - Loss severity as a decimal fraction of defaulted par in `(0, 1]`; defaults are loss divided by severity.
-/// @returns `DefaultModelSpec` wire object using the cumulative-loss curve.
-/// @throws If an argument is not a number or array of numbers (kind `invalid_type`).
-#[wasm_bindgen(js_name = defaultModelSpecCumulativeLoss)]
-pub fn default_model_spec_cumulative_loss(
-    cumulative_net_loss_pct: JsValue,
-    severity: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(&DefaultModelSpec::cumulative_loss(
-        js_f64_seq(&cumulative_net_loss_pct, "cumulativeNetLossPct")?,
-        js_f64(&severity, "severity")?,
-    ))
-}
-
-/// Rating-agency default timing over a lifetime cumulative default rate.
-///
-/// @param cumulative_default_rate - Lifetime defaults as a decimal fraction of the original balance in `[0, 1]`.
-/// @param annual_pct - Share of lifetime defaults in each year of seasoning, in percent (for example `[15, 30, 30, 15, 10]`), summing to 100.
-/// @returns `DefaultModelSpec` wire object using the timing curve.
-/// @throws If an argument is not a number or array of numbers (kind `invalid_type`).
-#[wasm_bindgen(js_name = defaultModelSpecTiming)]
-pub fn default_model_spec_timing(
-    cumulative_default_rate: JsValue,
-    annual_pct: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(&DefaultModelSpec::timing(
-        js_f64(&cumulative_default_rate, "cumulativeDefaultRate")?,
-        js_f64_seq(&annual_pct, "annualPct")?,
-    ))
 }
 
 /// Check a default model's curve parameters.
@@ -308,79 +223,13 @@ pub fn default_model_spec_cumulative_default_fraction(
 
 // --- PrepaymentModelSpec ---------------------------------------------------------
 
-/// Constant annual prepayment rate.
-///
-/// @param cpr - Annual constant prepayment rate as a decimal (`0.06` = 6% CPR).
-/// @returns `PrepaymentModelSpec` wire object with no seasoning curve.
-/// @throws If `cpr` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = prepaymentModelSpecConstantCpr)]
-pub fn prepayment_model_spec_constant_cpr(cpr: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&PrepaymentModelSpec::constant_cpr(js_f64(&cpr, "cpr")?))
-}
-
-/// PSA prepayment curve: a 30-month ramp to a 6% annual CPR, then flat.
-///
-/// @param speed_multiplier - PSA speed, where `1.0` means 100% PSA and `1.5` means 150% PSA.
-/// @returns `PrepaymentModelSpec` wire object using the PSA curve.
-/// @throws If `speedMultiplier` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = prepaymentModelSpecPsa)]
-pub fn prepayment_model_spec_psa(speed_multiplier: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&PrepaymentModelSpec::psa(js_f64(
-        &speed_multiplier,
-        "speedMultiplier",
-    )?))
-}
-
 /// 100% PSA, the standard prepayment assumption.
 ///
-/// @returns `PrepaymentModelSpec` wire object equal to `prepaymentModelSpecPsa(1.0)`.
+/// @returns `PrepaymentModelSpec` wire object `{ curve: "psa", speed_multiplier: 1.0 }`.
 /// @throws If the model cannot be serialized.
 #[wasm_bindgen(js_name = prepaymentModelSpecPsa100)]
 pub fn prepayment_model_spec_psa_100() -> Result<JsValue, JsValue> {
     to_js_value(&PrepaymentModelSpec::psa_100())
-}
-
-/// CMBS-style lockout: no prepayment during the lockout, then a constant CPR.
-///
-/// @param lockout_months - Months with zero prepayment (non-negative integer; for example `60` for five years).
-/// @param post_lockout_cpr - Annual CPR after the lockout as a decimal (`0.10` = 10%).
-/// @returns `PrepaymentModelSpec` wire object using the lockout curve.
-/// @throws If `lockoutMonths` is not a non-negative integer or `postLockoutCpr` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = prepaymentModelSpecCmbsWithLockout)]
-pub fn prepayment_model_spec_cmbs_with_lockout(
-    lockout_months: JsValue,
-    post_lockout_cpr: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(&PrepaymentModelSpec::cmbs_with_lockout(
-        js_uint(&lockout_months, "lockoutMonths")?,
-        js_f64(&post_lockout_cpr, "postLockoutCpr")?,
-    ))
-}
-
-/// ABS speed curve (auto-loan and consumer ABS convention).
-///
-/// Each month the same share of the original balance prepays, so
-/// `SMM_t = speed / (1 − speed·(t − 1))`.
-///
-/// @param speed - Monthly prepayment as a decimal fraction of the original balance (`0.015` = 1.5% ABS), in `[0, 1]`.
-/// @returns `PrepaymentModelSpec` wire object using the ABS curve.
-/// @throws If `speed` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = prepaymentModelSpecAbs)]
-pub fn prepayment_model_spec_abs(speed: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&PrepaymentModelSpec::abs(js_f64(&speed, "speed")?))
-}
-
-/// Explicit annual CPR for each month of seasoning.
-///
-/// @param monthly_cpr - Annual CPR per seasoning month as decimals in `[0, 1]`, month 1 first; the last value is held. Must be non-empty.
-/// @returns `PrepaymentModelSpec` wire object using the vector curve.
-/// @throws If `monthlyCpr` is not an array of numbers (kind `invalid_type`).
-#[wasm_bindgen(js_name = prepaymentModelSpecVector)]
-pub fn prepayment_model_spec_vector(monthly_cpr: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&PrepaymentModelSpec::vector(js_f64_seq(
-        &monthly_cpr,
-        "monthlyCpr",
-    )?))
 }
 
 /// Check a prepayment model's curve parameters.

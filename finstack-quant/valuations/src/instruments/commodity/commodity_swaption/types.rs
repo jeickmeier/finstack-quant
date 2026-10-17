@@ -610,12 +610,13 @@ impl CommoditySwaption {
             return Ok(Some(intrinsic * inputs.annuity * self.quantity));
         }
 
-        let d1 = finstack_quant_models::d1_black76(
+        let d1 = finstack_quant_models::d1_d2_black76(
             inputs.forward,
             self.fixed_price,
             inputs.sigma,
             inputs.time,
-        );
+        )
+        .0;
         let nd1 = norm_cdf(d1);
 
         let delta_unit = match self.option_type {
@@ -696,12 +697,13 @@ impl CommoditySwaption {
             return Ok(Some(0.0));
         }
 
-        let d1 = finstack_quant_models::d1_black76(
+        let d1 = finstack_quant_models::d1_d2_black76(
             inputs.forward,
             self.fixed_price,
             inputs.sigma,
             inputs.time,
-        );
+        )
+        .0;
         // Vega = annuity * F * N'(d1) * sqrt(T) * 0.01 (per vol point)
         let vega_abs = inputs.annuity * inputs.forward * norm_pdf(d1) * inputs.time.sqrt();
         Ok(Some(vega_abs * 0.01 * self.quantity))

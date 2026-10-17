@@ -14,7 +14,6 @@ _volatility = _models.volatility
 ArbitrageReport = _volatility.ArbitrageReport
 LocalVolSurface = _volatility.LocalVolSurface
 SabrCalibrator = _volatility.SabrCalibrator
-SabrModel = _volatility.SabrModel
 SabrParameters = _volatility.SabrParameters
 SabrSmile = _volatility.SabrSmile
 SviParams = _volatility.SviParams
@@ -49,7 +48,6 @@ __all__ = [
     "ArbitrageReport",
     "LocalVolSurface",
     "SabrCalibrator",
-    "SabrModel",
     "SabrParameters",
     "SabrSmile",
     "SviParams",

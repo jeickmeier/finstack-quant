@@ -150,8 +150,8 @@
 //!
 //! - Monte Carlo pricing for exact arithmetic average pricing
 
+use super::volatility::{black_call, black_put};
 use crate::types::OptionType;
-use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_core::Result;
 
@@ -285,10 +285,15 @@ fn geometric_asian_core(
         rate - (rate - div_yield - 0.5 * vol * vol) * drift_factor - var_half
     };
 
-    match option_type {
-        OptionType::Call => vanilla_call_bs(spot, strike, time, rate, div_yield_adj, vol_adj),
-        OptionType::Put => vanilla_put_bs(spot, strike, time, rate, div_yield_adj, vol_adj),
-    }
+    super::vanilla::bs_price_unchecked(
+        spot,
+        strike,
+        rate,
+        div_yield_adj,
+        vol_adj,
+        time,
+        option_type,
+    )
 }
 
 /// Price a geometric average Asian put option (closed-form).
@@ -467,23 +472,13 @@ fn arithmetic_asian_tw_core(
     }
 
     let sigma_star = var.sqrt();
-    let mu_star = m1.ln() - 0.5 * var;
-
-    // Lognormal d-parameters:
-    // d1 = (μ* - ln(K) + σ*²) / σ*
-    // d2 = d1 - σ*
-    //
-    // Note: The correct formula uses +σ*² (not +0.5*σ*²) because we're working
-    // with the log-average distribution directly, not the standard BS form.
-    let d1 = (mu_star - strike.ln() + var) / sigma_star;
-    let d2 = d1 - sigma_star;
-
-    // Call = df * (m1 * N(d1) - K * N(d2)), put = df * (K * N(-d2) - m1 * N(-d1)),
-    // floored at 0 and capped at the upper bound.
     let price = match option_type {
-        OptionType::Call => df * (m1 * norm_cdf(d1) - strike * norm_cdf(d2)),
-        OptionType::Put => df * (strike * norm_cdf(-d2) - m1 * norm_cdf(-d1)),
+        OptionType::Call => df * black_call(m1, strike, sigma_star, 1.0),
+        OptionType::Put => df * black_put(m1, strike, sigma_star, 1.0),
     };
+    if !price.is_finite() {
+        return f64::NAN;
+    }
 
     price.max(0.0).min(upper_bound)
 }
@@ -532,6 +527,39 @@ pub fn arithmetic_asian_put_tw(
 // near expiry, seasoned remainders, business-day calendars) are generally NOT
 // equally spaced; the equal-spacing wrappers above remain for callers that
 // genuinely have a uniform grid.
+
+/// Validate scalar domain inputs for the general fixing-time Asian pricers.
+fn validate_asian_times_inputs(
+    spot: f64,
+    strike: f64,
+    t_expiry: f64,
+    div_yield: f64,
+    vol: f64,
+) -> Result<()> {
+    for (name, value) in [("spot", spot), ("strike", strike)] {
+        if !value.is_finite() || value <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Asian {name} must be finite and positive, got {value}"
+            )));
+        }
+    }
+    if !t_expiry.is_finite() || t_expiry < 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Asian t_expiry must be finite and non-negative, got {t_expiry}"
+        )));
+    }
+    if !div_yield.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Asian div_yield must be finite, got {div_yield}"
+        )));
+    }
+    if !vol.is_finite() || vol < 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Asian vol must be finite and non-negative, got {vol}"
+        )));
+    }
+    Ok(())
+}
 
 /// Validate a general fixing-time schedule: non-empty, finite, strictly
 /// positive and non-decreasing.
@@ -600,7 +628,8 @@ pub fn geometric_asian_price_times(
     fixing_times: &[f64],
     is_call: bool,
 ) -> Result<f64> {
-    if t_expiry <= 0.0 {
+    validate_asian_times_inputs(spot, strike, t_expiry, div_yield, vol)?;
+    if t_expiry == 0.0 {
         let intrinsic = if is_call {
             spot - strike
         } else {
@@ -634,19 +663,21 @@ pub fn geometric_asian_price_times(
     if var_ln_g <= 0.0 {
         let g = mu.exp();
         let intrinsic = if is_call { g - strike } else { strike - g };
-        return Ok(df * intrinsic.max(0.0));
+        return super::vanilla::checked_closed_form_value(
+            df * intrinsic.max(0.0),
+            "geometric Asian price",
+        );
     }
 
     let std = var_ln_g.sqrt();
     let expected_g = (mu + 0.5 * var_ln_g).exp();
-    let d1 = (mu + var_ln_g - strike.ln()) / std;
-    let d2 = d1 - std;
     let price = if is_call {
-        expected_g * norm_cdf(d1) - strike * norm_cdf(d2)
+        black_call(expected_g, strike, std, 1.0)
     } else {
-        strike * norm_cdf(-d2) - expected_g * norm_cdf(-d1)
+        black_put(expected_g, strike, std, 1.0)
     };
-    Ok(df * price.max(0.0))
+    super::vanilla::checked_closed_form_value(df * price, "geometric Asian price")
+        .map(|p| p.max(0.0))
 }
 
 /// Turnbull-Wakeman arithmetic-average Asian option on an arbitrary fixing
@@ -689,7 +720,8 @@ pub fn arithmetic_asian_tw_price_times(
     fixing_times: &[f64],
     is_call: bool,
 ) -> Result<f64> {
-    if t_expiry <= 0.0 {
+    validate_asian_times_inputs(spot, strike, t_expiry, div_yield, vol)?;
+    if t_expiry == 0.0 {
         let intrinsic = if is_call {
             spot - strike
         } else {
@@ -702,6 +734,7 @@ pub fn arithmetic_asian_tw_price_times(
     let rate = -df.ln() / t_expiry;
 
     let m1 = arithmetic_mean_first_moment_times(spot, rate, div_yield, fixing_times);
+    super::vanilla::checked_closed_form_value(m1, "arithmetic Asian first moment")?;
     let upper_bound = if is_call { df * m1 } else { df * strike };
     let degenerate = |m1: f64| -> f64 {
         let intrinsic = if is_call { m1 - strike } else { strike - m1 };
@@ -713,6 +746,7 @@ pub fn arithmetic_asian_tw_price_times(
     }
 
     let m2 = arithmetic_mean_second_moment_times(spot, rate, div_yield, vol, fixing_times);
+    super::vanilla::checked_closed_form_value(m2, "arithmetic Asian second moment")?;
     if m2 <= m1 * m1 {
         return Ok(degenerate(m1));
     }
@@ -722,15 +756,13 @@ pub fn arithmetic_asian_tw_price_times(
     }
 
     let sigma_star = var.sqrt();
-    let mu_star = m1.ln() - 0.5 * var;
-    let d1 = (mu_star - strike.ln() + var) / sigma_star;
-    let d2 = d1 - sigma_star;
     let price = if is_call {
-        df * (m1 * norm_cdf(d1) - strike * norm_cdf(d2))
+        df * black_call(m1, strike, sigma_star, 1.0)
     } else {
-        df * (strike * norm_cdf(-d2) - m1 * norm_cdf(-d1))
+        df * black_put(m1, strike, sigma_star, 1.0)
     };
-    Ok(price.max(0.0).min(upper_bound))
+    super::vanilla::checked_closed_form_value(price, "arithmetic Asian price")
+        .map(|p| p.max(0.0).min(upper_bound))
 }
 
 /// `E[A]` for an arithmetic average on arbitrary fixing times.
@@ -882,22 +914,6 @@ fn compute_arithmetic_mean_second_moment(
     spot * spot * (diag_acc.total() + 2.0 * upper_acc.total()) / (n * n)
 }
 
-/// Helper: vanilla call under Black-Scholes.
-#[inline]
-fn vanilla_call_bs(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64, vol: f64) -> f64 {
-    use crate::closed_form::vanilla::bs_price_unchecked;
-    use crate::types::OptionType;
-    bs_price_unchecked(spot, strike, rate, div_yield, vol, time, OptionType::Call)
-}
-
-/// Helper: vanilla put under Black-Scholes.
-#[inline]
-fn vanilla_put_bs(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64, vol: f64) -> f64 {
-    use crate::closed_form::vanilla::bs_price_unchecked;
-    use crate::types::OptionType;
-    bs_price_unchecked(spot, strike, rate, div_yield, vol, time, OptionType::Put)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -921,7 +937,15 @@ mod tests {
         let vol = 0.2;
 
         let geo_asian = geometric_asian_call(spot, strike, time, rate, div_yield, vol, 12);
-        let vanilla = vanilla_call_bs(spot, strike, time, rate, div_yield, vol);
+        let vanilla = crate::closed_form::vanilla::bs_price_unchecked(
+            spot,
+            strike,
+            rate,
+            div_yield,
+            vol,
+            time,
+            OptionType::Call,
+        );
 
         assert!(
             geo_asian <= vanilla + 0.01,
@@ -1451,7 +1475,7 @@ mod tests {
     #[test]
     fn equal_spacing_asian_prices_are_bit_stable() {
         // FNV-1a style fold of the 128 price bit patterns.
-        const EXPECTED: u64 = 16_960_386_220_788_001_146;
+        const EXPECTED: u64 = 679_332_864_601_229_261;
         let mut actual = 0xcbf2_9ce4_8422_2325_u64;
         for &(spot, strike, time, rate, div_yield, vol) in &[
             (100.0, 100.0, 1.0, 0.05, 0.02, 0.2),

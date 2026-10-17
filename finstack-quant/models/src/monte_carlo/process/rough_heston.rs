@@ -241,6 +241,10 @@ impl StochasticProcess for RoughHestonProcess {
         out[1] = self.params.sigma_v * v.sqrt();
     }
 
+    fn dedicated_scheme(&self) -> Option<&'static str> {
+        Some("rough_heston_hybrid")
+    }
+
     fn populate_path_state(&self, x: &[f64], state: &mut PathState) {
         state.set_key(StateKey::Spot, x[0]);
         state.set_key(StateKey::Variance, x[1]);

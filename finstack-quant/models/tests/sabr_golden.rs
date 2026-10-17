@@ -1,6 +1,6 @@
 //! SABR volatility-model golden tests and fixture validation.
 
-use finstack_quant_models::{SabrModel, SabrParameters};
+use finstack_quant_models::SabrParameters;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -139,10 +139,9 @@ fn run_fixture(fixture: &SabrFixture) -> Result<Vec<String>, String> {
         SabrParameters::new(fixture.alpha, fixture.beta, fixture.nu, fixture.rho)
     }
     .map_err(|error| format!("build SABR parameters: {error}"))?;
-    let model = SabrModel::new(params);
     let mut failures = Vec::new();
     for strike in &fixture.strikes {
-        let actual = model
+        let actual = params
             .implied_volatility(fixture.forward, strike.strike, fixture.time_to_expiry)
             .map_err(|error| format!("price strike '{}': {error}", strike.key))?;
         let expected = fixture.expected[&strike.key];

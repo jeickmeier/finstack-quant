@@ -23,17 +23,17 @@ const kind = (expected, pattern) => (error) => {
 test('black76Price rejects a non-positive df like its inverse', () => {
   for (const df of [0, -0.95]) {
     assert.throws(
-      () => models.black76Price(100, 100, df, 1, 0.2, true),
+      () => models.black76Price(100, 100, df, 0.2, 1, true),
       kind('validation', /Black-76 df must be positive/)
     );
     assert.throws(() => models.black76ImpliedVol(100, 100, df, 1, 7.5, true), kind('validation'));
   }
-  assert.ok(Math.abs(models.black76Price(100, 100, 0.95, 1, 0.2, true) - 7.5673) < 1e-4);
+  assert.ok(Math.abs(models.black76Price(100, 100, 0.95, 0.2, 1, true) - 7.5673) < 1e-4);
 });
 
 test('forward kernels reject out-of-domain inputs in Rust', () => {
   assert.throws(
-    () => models.black76Price(100, 100, 0.95, 1, -0.2, true),
+    () => models.black76Price(100, 100, 0.95, -0.2, 1, true),
     kind('validation', /Black-76 vol must be non-negative/)
   );
   assert.throws(
@@ -51,7 +51,7 @@ test('forward kernels reject out-of-domain inputs in Rust', () => {
 });
 
 test('forward Greeks are the Rust ForwardGreeks object', () => {
-  const g = models.black76Greeks(100, 100, 1, 0.2, false);
+  const g = models.black76Greeks(100, 100, 0.2, 1, false);
   assert.deepEqual(Object.keys(g).sort(), ['delta', 'gamma', 'vega']);
   assert.ok(g.delta > -0.5 && g.delta < -0.4);
   assert.ok(Math.abs(models.bachelierGreeks(0.03, 0.03, 0.0075, 1, true).delta - 0.5) < 1e-12);

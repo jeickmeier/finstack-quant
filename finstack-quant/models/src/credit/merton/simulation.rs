@@ -6,6 +6,7 @@ use super::{AssetDynamics, MertonModel};
 /// Results from Monte Carlo path simulation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "RawSimulatedPaths")]
 pub struct SimulatedPaths {
     /// Time grid from 0 to T.
     pub times: Vec<f64>,
@@ -15,6 +16,48 @@ pub struct SimulatedPaths {
     pub num_paths: usize,
     /// Number of time steps.
     pub num_steps: usize,
+}
+
+#[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct RawSimulatedPaths {
+    times: Vec<f64>,
+    asset_values: Vec<f64>,
+    num_paths: usize,
+    num_steps: usize,
+}
+
+impl TryFrom<RawSimulatedPaths> for SimulatedPaths {
+    type Error = Error;
+
+    fn try_from(raw: RawSimulatedPaths) -> Result<Self> {
+        let per_path = raw
+            .num_steps
+            .checked_add(1)
+            .ok_or_else(|| Error::Validation("num_steps overflow in SimulatedPaths".to_string()))?;
+        if raw.times.len() != per_path {
+            return Err(Error::Validation(format!(
+                "SimulatedPaths times length ({}) must equal num_steps + 1 ({per_path})",
+                raw.times.len()
+            )));
+        }
+        let expected_values = raw.num_paths.checked_mul(per_path).ok_or_else(|| {
+            Error::Validation("num_paths * (num_steps + 1) overflow in SimulatedPaths".to_string())
+        })?;
+        if raw.asset_values.len() != expected_values {
+            return Err(Error::Validation(format!(
+                "SimulatedPaths asset_values length ({}) must equal num_paths * (num_steps + 1) ({expected_values})",
+                raw.asset_values.len()
+            )));
+        }
+        Ok(Self {
+            times: raw.times,
+            asset_values: raw.asset_values,
+            num_paths: raw.num_paths,
+            num_steps: raw.num_steps,
+        })
+    }
 }
 
 impl SimulatedPaths {

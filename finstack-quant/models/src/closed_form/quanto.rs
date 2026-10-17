@@ -47,8 +47,7 @@ use finstack_quant_core::math::special_functions::norm_cdf;
 ///
 /// This adjustment is **subtracted** from the foreign risk-free rate in the BS formula.
 #[inline]
-#[must_use]
-pub fn quanto_drift_adjustment(correlation: f64, vol_asset: f64, vol_fx: f64) -> f64 {
+fn quanto_drift_adjustment(correlation: f64, vol_asset: f64, vol_fx: f64) -> f64 {
     -correlation * vol_asset * vol_fx
 }
 
@@ -91,6 +90,18 @@ pub fn quanto_call(
     vol_fx: f64,
     correlation: f64,
 ) -> f64 {
+    if !spot.is_finite()
+        || !strike.is_finite()
+        || !time.is_finite()
+        || !rate_domestic.is_finite()
+        || !rate_foreign.is_finite()
+        || !div_yield.is_finite()
+        || !vol_asset.is_finite()
+        || !vol_fx.is_finite()
+        || !correlation.is_finite()
+    {
+        return f64::NAN;
+    }
     if time <= 0.0 {
         return (spot - strike).max(0.0);
     }
@@ -100,7 +111,12 @@ pub fn quanto_call(
                 + quanto_drift_adjustment(correlation, vol_asset, vol_fx))
                 * time)
                 .exp();
-        return ((forward_adj - strike) * (-rate_domestic * time).exp()).max(0.0);
+        let price = (forward_adj - strike) * (-rate_domestic * time).exp();
+        return if price.is_finite() {
+            price.max(0.0)
+        } else {
+            f64::NAN
+        };
     }
 
     let sqrt_t = time.sqrt();
@@ -121,7 +137,12 @@ pub fn quanto_call(
     // Discount at domestic rate
     let discount = (-rate_domestic * time).exp();
 
-    discount * (forward_adj * norm_cdf(d1) - strike * norm_cdf(d2))
+    let price = discount * (forward_adj * norm_cdf(d1) - strike * norm_cdf(d2));
+    if price.is_finite() {
+        price.max(0.0)
+    } else {
+        f64::NAN
+    }
 }
 
 /// Price a quanto put option (closed-form).
@@ -158,6 +179,18 @@ pub fn quanto_put(
     vol_fx: f64,
     correlation: f64,
 ) -> f64 {
+    if !spot.is_finite()
+        || !strike.is_finite()
+        || !time.is_finite()
+        || !rate_domestic.is_finite()
+        || !rate_foreign.is_finite()
+        || !div_yield.is_finite()
+        || !vol_asset.is_finite()
+        || !vol_fx.is_finite()
+        || !correlation.is_finite()
+    {
+        return f64::NAN;
+    }
     if time <= 0.0 {
         return (strike - spot).max(0.0);
     }
@@ -167,7 +200,12 @@ pub fn quanto_put(
                 + quanto_drift_adjustment(correlation, vol_asset, vol_fx))
                 * time)
                 .exp();
-        return ((strike - forward_adj) * (-rate_domestic * time).exp()).max(0.0);
+        let price = (strike - forward_adj) * (-rate_domestic * time).exp();
+        return if price.is_finite() {
+            price.max(0.0)
+        } else {
+            f64::NAN
+        };
     }
 
     let sqrt_t = time.sqrt();
@@ -182,7 +220,12 @@ pub fn quanto_put(
     let forward_adj = spot * (drift_adj * time).exp();
     let discount = (-rate_domestic * time).exp();
 
-    discount * (strike * norm_cdf(-d2) - forward_adj * norm_cdf(-d1))
+    let price = discount * (strike * norm_cdf(-d2) - forward_adj * norm_cdf(-d1));
+    if price.is_finite() {
+        price.max(0.0)
+    } else {
+        f64::NAN
+    }
 }
 
 #[cfg(test)]

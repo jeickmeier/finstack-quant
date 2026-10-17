@@ -14,7 +14,7 @@ use finstack_quant_core::money::Money;
 
 use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
-use finstack_quant_models::monte_carlo::payoff::barrier::{BarrierOptionPayoff, OptionKind};
+use finstack_quant_models::monte_carlo::payoff::barrier::BarrierOptionPayoff;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
 use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
@@ -36,13 +36,6 @@ impl BarrierOptionHestonMcPricer {
         Self {
             num_paths: 100_000,
             steps_per_year: 252.0,
-        }
-    }
-
-    fn convert_option_kind(option_type: crate::instruments::OptionType) -> OptionKind {
-        match option_type {
-            crate::instruments::OptionType::Call => OptionKind::Call,
-            crate::instruments::OptionType::Put => OptionKind::Put,
         }
     }
 
@@ -122,7 +115,7 @@ impl BarrierOptionHestonMcPricer {
             inst.strike,
             inst.barrier,
             inst.barrier_type,
-            Self::convert_option_kind(inst.option_type),
+            inst.option_type,
             inst.rebate.map(|m| m.amount() / inst.quantity),
             inst.quantity,
             maturity_step,

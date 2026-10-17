@@ -26,12 +26,13 @@ fn sabr_model_computes_atm_vol() {
 }
 
 #[wasm_bindgen_test]
-fn sabr_model_exposes_params_getter() {
+fn sabr_parameters_computes_implied_vol() {
     let p = sabr(0.2, 0.5, 0.3, -0.2);
-    let model = JsSabrModel::new(&p);
-    let roundtrip = model.params();
-    assert!((roundtrip.alpha() - 0.2).abs() < 1e-12);
-    assert!((roundtrip.beta() - 0.5).abs() < 1e-12);
+    let vol = p
+        .implied_vol(JsValue::from(0.03), JsValue::from(0.03), JsValue::from(1.0))
+        .expect("implied_vol");
+    assert!(vol > 0.0 && vol < 5.0);
+    assert!(!p.supports_negative_rates());
 }
 
 #[wasm_bindgen_test]

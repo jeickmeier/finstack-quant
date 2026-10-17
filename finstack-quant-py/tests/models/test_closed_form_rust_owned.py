@@ -28,14 +28,14 @@ from finstack_quant.models.volatility import SabrCalibrator, SabrParameters, Sab
 @pytest.mark.parametrize("df", [0.0, -0.95])
 def test_black76_price_rejects_non_positive_df_like_its_inverse(df: float) -> None:
     with pytest.raises(ValueError, match="Black-76 df must be positive"):
-        black76_price(100.0, 100.0, df, 1.0, 0.2, True)
+        black76_price(100.0, 100.0, df, 0.2, 1.0, True)
     with pytest.raises(ValueError, match="implied vol requires positive forward, strike, df"):
         black76_implied_vol(100.0, 100.0, df, 1.0, 7.5, True)
 
 
 def test_forward_kernels_reject_out_of_domain_inputs() -> None:
     with pytest.raises(ValueError, match="Black-76 vol must be non-negative"):
-        black76_price(100.0, 100.0, 0.95, 1.0, -0.2, True)
+        black76_price(100.0, 100.0, 0.95, -0.2, 1.0, True)
     with pytest.raises(ValueError, match="Bachelier normal_vol must be non-negative"):
         bachelier_price(0.03, 0.03, -0.0075, 1.0, True)
     with pytest.raises(ValueError, match=r"shifted Black strike \+ shift must be positive"):
@@ -45,7 +45,7 @@ def test_forward_kernels_reject_out_of_domain_inputs() -> None:
 
 
 def test_forward_greeks_is_typed_with_pandas_exits() -> None:
-    g = black76_greeks(100.0, 100.0, 1.0, 0.2, False)
+    g = black76_greeks(100.0, 100.0, 0.2, 1.0, False)
     assert isinstance(g, ForwardGreeks)
     assert -0.5 < g.delta < -0.4
     assert g.to_series().index.tolist() == ["delta", "gamma", "vega"]

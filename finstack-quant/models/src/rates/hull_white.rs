@@ -5,7 +5,6 @@
 //! crate; fitted-input resolution and instrument pricing live in valuations.
 
 use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
-use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::{Error, Result};
 
 /// Market-scalar keys for swaption-calibrated HW1F mean reversion and volatility.
@@ -67,6 +66,7 @@ pub struct HullWhiteCalibrationParams {
 
 #[derive(serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 struct RawHullWhiteCalibrationParams {
     kappa: f64,
     sigma: f64,
@@ -143,6 +143,7 @@ pub struct HullWhiteParams {
 
 #[derive(serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 struct RawHullWhiteParams {
     kappa: f64,
     volatility: PiecewiseConstantCurve,
@@ -461,6 +462,17 @@ pub fn hw1f_zcb_option_price(
     bond_vol: f64,
     is_call: bool,
 ) -> f64 {
+    if !p0_expiry.is_finite()
+        || !p0_maturity.is_finite()
+        || !strike.is_finite()
+        || !bond_vol.is_finite()
+        || p0_expiry <= 0.0
+        || p0_maturity <= 0.0
+        || strike <= 0.0
+        || bond_vol < 0.0
+    {
+        return f64::NAN;
+    }
     if bond_vol < 1e-15 {
         return if is_call {
             (p0_maturity - strike * p0_expiry).max(0.0)
@@ -468,17 +480,16 @@ pub fn hw1f_zcb_option_price(
             (strike * p0_expiry - p0_maturity).max(0.0)
         };
     }
-    let d1 = (p0_maturity / (strike * p0_expiry)).ln() / bond_vol + 0.5 * bond_vol;
-    let d2 = d1 - bond_vol;
+    let strike_pv = strike * p0_expiry;
     let value = if is_call {
-        p0_maturity * norm_cdf(d1) - strike * p0_expiry * norm_cdf(d2)
+        crate::closed_form::black_call(p0_maturity, strike_pv, bond_vol, 1.0)
     } else {
-        strike * p0_expiry * norm_cdf(-d2) - p0_maturity * norm_cdf(-d1)
+        crate::closed_form::black_put(p0_maturity, strike_pv, bond_vol, 1.0)
     };
-    if value < 0.0 {
-        0.0
+    if value.is_finite() {
+        value.max(0.0)
     } else {
-        value
+        f64::NAN
     }
 }
 
@@ -501,8 +512,7 @@ pub fn hw1f_zcb_option_price(
 /// * `strike` - Caplet or floorlet strike as a decimal rate.
 /// * `is_cap` - `true` for a caplet and `false` for a floorlet.
 #[allow(clippy::too_many_arguments)]
-#[must_use]
-pub fn hw1f_caplet_price_from_dfs(
+fn hw1f_caplet_price_from_dfs(
     kappa: f64,
     sigma: f64,
     pf_fix: f64,
@@ -515,7 +525,17 @@ pub fn hw1f_caplet_price_from_dfs(
     is_cap: bool,
 ) -> f64 {
     let valid_df = |value: f64| value.is_finite() && value > 0.0;
-    if !valid_df(pf_fix) || !valid_df(pf_pay) || !valid_df(pd_pay) {
+    if !valid_df(pf_fix)
+        || !valid_df(pf_pay)
+        || !valid_df(pd_pay)
+        || !t_fix.is_finite()
+        || !t_pay.is_finite()
+        || !accrual.is_finite()
+        || !strike.is_finite()
+        || t_fix < 0.0
+        || t_pay <= t_fix
+        || accrual <= 0.0
+    {
         return f64::NAN;
     }
     let basis = pd_pay / pf_pay;
@@ -615,12 +635,10 @@ pub fn hw1f_term_caplet_price_from_dfs_with_model(
         };
         return Ok(pd_pay * intrinsic);
     }
-    let d1 = (ratio_forward / ratio_strike).ln() / ratio_vol + 0.5 * ratio_vol;
-    let d2 = d1 - ratio_vol;
     let option = if is_cap {
-        ratio_forward * norm_cdf(d1) - ratio_strike * norm_cdf(d2)
+        crate::closed_form::black_call(ratio_forward, ratio_strike, ratio_vol, 1.0)
     } else {
-        ratio_strike * norm_cdf(-d2) - ratio_forward * norm_cdf(-d1)
+        crate::closed_form::black_put(ratio_forward, ratio_strike, ratio_vol, 1.0)
     };
     Ok(pd_pay * option.max(0.0))
 }
@@ -774,6 +792,7 @@ pub fn fd_instantaneous_forward(df: &dyn Fn(f64) -> f64, t: f64) -> Option<f64> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::math::special_functions::norm_cdf;
 
     #[test]
     fn scalar_and_scheduled_variance_agree() {

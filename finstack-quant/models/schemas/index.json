@@ -92,7 +92,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/arbitrage_validation_result.schema.json",
-      "bytes": 2630,
+      "bytes": 2737,
       "kind": "output",
       "path": "schemas/models/1/arbitrage_validation_result.schema.json",
       "summary": "Result of arbitrage validation, containing any violations found.",
@@ -199,15 +199,6 @@
       "type_name": "CreditState"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/models/1/decomposition_config.schema.json",
-      "bytes": 1543,
-      "kind": "input",
-      "path": "schemas/models/1/decomposition_config.schema.json",
-      "summary": "Configuration for position-level VaR decomposition.",
-      "title": "DecompositionConfig",
-      "type_name": "DecompositionConfig"
-    },
-    {
       "$id": "https://finstack_quant.dev/schemas/models/1/diebold_li.schema.json",
       "bytes": 4959,
       "kind": "component",
@@ -227,7 +218,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/dynamic_recovery_spec.schema.json",
-      "bytes": 3514,
+      "bytes": 3528,
       "kind": "input",
       "path": "schemas/models/1/dynamic_recovery_spec.schema.json",
       "summary": "Specification for dynamic (notional-dependent) recovery rate.",
@@ -272,7 +263,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/execution_trajectory.schema.json",
-      "bytes": 1292,
+      "bytes": 1325,
       "kind": "component",
       "path": "schemas/models/1/execution_trajectory.schema.json",
       "summary": "Optimal execution schedule for a trade.",
@@ -344,7 +335,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/hull_white_calibration_params.schema.json",
-      "bytes": 511,
+      "bytes": 544,
       "kind": "input",
       "path": "schemas/models/1/hull_white_calibration_params.schema.json",
       "summary": "Validated constant-parameter Hull-White one-factor model.",
@@ -353,7 +344,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/hull_white_params.schema.json",
-      "bytes": 1095,
+      "bytes": 1128,
       "kind": "input",
       "path": "schemas/models/1/hull_white_params.schema.json",
       "summary": "Hull-White parameters with piecewise-constant short-rate volatility.",
@@ -362,7 +353,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/impact_estimate.schema.json",
-      "bytes": 1443,
+      "bytes": 1476,
       "kind": "output",
       "path": "schemas/models/1/impact_estimate.schema.json",
       "summary": "Estimated market-impact execution *costs* from a trade.",
@@ -395,15 +386,6 @@
       "summary": "Snapshot of all hierarchy-level factor values at a single date, produced from observed issuer spreads.",
       "title": "LevelsAtDate",
       "type_name": "LevelsAtDate"
-    },
-    {
-      "$id": "https://finstack_quant.dev/schemas/models/1/liquidity_config.schema.json",
-      "bytes": 722,
-      "kind": "input",
-      "path": "schemas/models/1/liquidity_config.schema.json",
-      "summary": "Configuration for liquidity calculations.",
-      "title": "LiquidityConfig",
-      "type_name": "LiquidityConfig"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/liquidity_tier.schema.json",
@@ -461,7 +443,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/lvar_bangia_scalar.schema.json",
-      "bytes": 1052,
+      "bytes": 1085,
       "kind": "component",
       "path": "schemas/models/1/lvar_bangia_scalar.schema.json",
       "summary": "Scalar Bangia LVaR outputs for an isolated position where relative spread statistics are already known.",
@@ -550,15 +532,6 @@
       "type_name": "OhlsonOScoreInput"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/models/1/option_kind.schema.json",
-      "bytes": 471,
-      "kind": "component",
-      "path": "schemas/models/1/option_kind.schema.json",
-      "summary": "Vanilla option kind for barrier payoff evaluation.",
-      "title": "OptionKind",
-      "type_name": "OptionKind"
-    },
-    {
       "$id": "https://finstack_quant.dev/schemas/models/1/option_type.schema.json",
       "bytes": 468,
       "kind": "component",
@@ -566,15 +539,6 @@
       "summary": "Option payoff direction used by analytical and numerical model engines.",
       "title": "OptionType",
       "type_name": "OptionType"
-    },
-    {
-      "$id": "https://finstack_quant.dev/schemas/models/1/parametric_es_decomposition_view.schema.json",
-      "bytes": 2151,
-      "kind": "output",
-      "path": "schemas/models/1/parametric_es_decomposition_view.schema.json",
-      "summary": "Serializable Expected Shortfall decomposition view.",
-      "title": "ParametricEsDecompositionView",
-      "type_name": "ParametricEsDecompositionView"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/path_simulation_spec.schema.json",
@@ -686,7 +650,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/recovery_spec.schema.json",
-      "bytes": 2037,
+      "bytes": 1237,
       "kind": "input",
       "path": "schemas/models/1/recovery_spec.schema.json",
       "summary": "Recovery model specification for configuration and serialization.",
@@ -793,17 +757,8 @@
       "type_name": "SeniorityCalibration"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/models/1/seniority_recovery.schema.json",
-      "bytes": 3094,
-      "kind": "component",
-      "path": "schemas/models/1/seniority_recovery.schema.json",
-      "summary": "Recovery model driven by seniority-class Beta distributions.",
-      "title": "SeniorityRecovery",
-      "type_name": "SeniorityRecovery"
-    },
-    {
       "$id": "https://finstack_quant.dev/schemas/models/1/simulated_paths.schema.json",
-      "bytes": 1051,
+      "bytes": 842,
       "kind": "component",
       "path": "schemas/models/1/simulated_paths.schema.json",
       "summary": "Results from Monte Carlo path simulation.",

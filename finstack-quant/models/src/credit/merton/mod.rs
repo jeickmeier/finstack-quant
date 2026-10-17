@@ -58,5 +58,5 @@ mod simulation;
 mod spreads;
 
 pub use dynamics::{AssetDynamics, MertonBarrierType};
-pub use model::{MertonModel, RawMertonModel};
+pub use model::MertonModel;
 pub use simulation::SimulatedPaths;

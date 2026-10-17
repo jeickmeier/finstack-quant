@@ -57,7 +57,7 @@ pub(crate) mod rate_helpers;
 pub(crate) mod schedule;
 pub(crate) mod specs;
 
-pub use calendar::{adjust_date, WEEKENDS_ONLY_ID};
+pub use calendar::WEEKENDS_ONLY_ID;
 pub use credit_rates::{
     abs_to_smm, cdr_to_mdr, cpr_to_smm, mdr_to_cdr, psa_cpr, smm_to_cpr, PSA_RAMP_MONTHS,
     PSA_TERMINAL_CPR,
@@ -80,7 +80,7 @@ pub use rate_helpers::{
 };
 pub use schedule::{
     merge_cashflow_schedules, weighted_average_life_from_principal, CashFlowMeta, CashFlowSchedule,
-    CashflowRepresentation, PvCreditAdjustment,
+    CashflowRepresentation,
 };
 pub use specs::{
     evaluate_fee_tiers, AmortizationSpec, CouponType, DefaultModelSpec, FeeAccrualBasis, FeeBase,

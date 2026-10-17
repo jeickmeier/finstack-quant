@@ -94,6 +94,7 @@ pub(crate) fn peel_single_observation(params: PeelSingleObservation<'_>) -> Sing
     #[allow(clippy::needless_range_loop)]
     for k in 0..num_levels {
         let mut sums: BTreeMap<&str, (f64, f64)> = BTreeMap::new();
+        let mut fallback_sums: BTreeMap<&str, (f64, usize)> = BTreeMap::new();
         for issuer in observed_spreads.keys() {
             if is_folded(folded, issuer, k) {
                 continue;
@@ -107,6 +108,9 @@ pub(crate) fn peel_single_observation(params: PeelSingleObservation<'_>) -> Sing
             let Some(residual) = residuals.get(issuer).copied() else {
                 continue;
             };
+            let fb = fallback_sums.entry(path.as_str()).or_insert((0.0, 0));
+            fb.0 += residual;
+            fb.1 += 1;
             let Some(weight) = weights.get(issuer).copied() else {
                 continue;
             };
@@ -118,12 +122,17 @@ pub(crate) fn peel_single_observation(params: PeelSingleObservation<'_>) -> Sing
             entry.1 += weight;
         }
 
-        let values: BTreeMap<String, f64> = sums
+        let mut values: BTreeMap<String, f64> = sums
             .into_iter()
             .filter_map(|(bucket, (sum, wsum))| {
                 (wsum > 0.0).then_some((bucket.to_owned(), sum / wsum))
             })
             .collect();
+        for (bucket, (sum, count)) in fallback_sums {
+            if count > 0 && !values.contains_key(bucket) {
+                values.insert(bucket.to_owned(), sum / count as f64);
+            }
+        }
 
         for issuer in observed_spreads.keys() {
             if is_folded(folded, issuer, k) {

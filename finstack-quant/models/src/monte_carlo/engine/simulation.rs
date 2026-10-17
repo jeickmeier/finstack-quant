@@ -41,7 +41,7 @@ pub(crate) enum NoiseHook<'a> {
 
 /// Fill `z` with the shocks chosen by `hook` for time step `step`.
 #[inline]
-fn fill_shocks<R: RandomStream>(
+pub(crate) fn fill_shocks<R: RandomStream>(
     rng: &mut R,
     z: &mut [f64],
     z_raw: &mut [f64],

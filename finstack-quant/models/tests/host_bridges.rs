@@ -12,7 +12,7 @@ use finstack_quant_models::credit::pd::{MasterScale, MasterScaleGrade, PdCalibra
 use finstack_quant_models::credit::scoring::CreditScoringError;
 use finstack_quant_models::factor::credit::hierarchy::{dimension_key, HierarchyDimension};
 use finstack_quant_models::factor::credit::VolHorizon;
-use finstack_quant_models::factor::risk::{decompose_positions, DecompositionConfig};
+use finstack_quant_models::factor::risk::parametric_var_decomposition;
 use finstack_quant_models::factor::FactorCovarianceMatrix;
 use finstack_quant_models::factor::FactorId;
 
@@ -181,11 +181,12 @@ fn factor_covariance_rows_follow_factor_order() {
 #[test]
 fn component_var_lookup_fails_with_not_found_for_an_unknown_position() {
     let ids = vec!["A".to_string(), "B".to_string()];
-    let decomposition = decompose_positions(
+    let decomposition = parametric_var_decomposition(
+        &ids,
         &[1.0, 2.0],
         &[0.04, 0.01, 0.01, 0.09],
-        &ids,
-        &DecompositionConfig::parametric_95(),
+        Some(0.95),
+        false,
     )
     .expect("valid inputs");
 

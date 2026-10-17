@@ -53,6 +53,48 @@ pub const DEFAULT_ASIAN_AVERAGING: &str = "arithmetic";
 /// [`lookback_option_price`]: `"fixed"`.
 pub const DEFAULT_LOOKBACK_STRIKE_TYPE: &str = "fixed";
 
+/// Validate positive finite price-like input (`spot`, `strike`, `barrier`, `extremum`).
+fn validate_positive_finite(prefix: &str, name: &str, value: f64) -> Result<()> {
+    if !value.is_finite() || value <= 0.0 {
+        return Err(Error::Validation(format!(
+            "{prefix} {name} must be finite and positive, got {value}"
+        )));
+    }
+    Ok(())
+}
+
+/// Validate common Black-Scholes exotic domain inputs.
+fn validate_exotic_common(
+    prefix: &str,
+    spot: f64,
+    rate: f64,
+    div_yield: f64,
+    vol: f64,
+    expiry: f64,
+) -> Result<()> {
+    validate_positive_finite(prefix, "spot", spot)?;
+    for (name, value) in [("rate", rate), ("div_yield", div_yield)] {
+        if !value.is_finite() {
+            return Err(Error::Validation(format!(
+                "{prefix} {name} must be finite, got {value}"
+            )));
+        }
+    }
+    if !expiry.is_finite() || expiry < 0.0 {
+        return Err(Error::Validation(format!(
+            "{prefix} expiry must be finite and non-negative, got {expiry}"
+        )));
+    }
+    if !vol.is_finite() || vol < 0.0 {
+        return Err(Error::Validation(format!(
+            "{prefix} volatility must be finite and non-negative, got {vol}"
+        )));
+    }
+    checked_closed_form_value(spot * (-div_yield * expiry).exp(), "discounted spot")?;
+    checked_closed_form_value((-rate * expiry).exp(), "discount factor")?;
+    Ok(())
+}
+
 /// Parse a `(direction, knock)` string pair into a [`BarrierType`].
 fn parse_barrier_type(direction: &str, knock: &str) -> Result<BarrierType> {
     match (direction, knock) {
@@ -87,7 +129,8 @@ fn parse_barrier_type(direction: &str, knock: &str) -> Result<BarrierType> {
 /// # Errors
 ///
 /// Returns `Error::Validation` if `(direction, knock)` is not a supported
-/// pair, or if the resulting barrier price is non-finite.
+/// pair, if any input is outside its valid domain, or if the resulting
+/// barrier price is non-finite.
 #[allow(clippy::too_many_arguments)]
 pub fn barrier_call(
     spot: f64,
@@ -100,12 +143,12 @@ pub fn barrier_call(
     direction: &str,
     knock: &str,
 ) -> Result<f64> {
+    let barrier_type = parse_barrier_type(direction, knock)?;
+    validate_exotic_common("barrier", spot, rate, div_yield, vol, expiry)?;
+    validate_positive_finite("barrier", "strike", strike)?;
+    validate_positive_finite("barrier", "barrier", barrier)?;
     let params = BarrierParams::new(spot, strike, barrier, expiry, rate, div_yield, vol);
-    let value = barrier_price(
-        &params,
-        parse_barrier_type(direction, knock)?,
-        OptionType::Call,
-    );
+    let value = barrier_price(&params, barrier_type, OptionType::Call);
     checked_closed_form_value(value, "barrier price")
 }
 
@@ -129,7 +172,8 @@ pub fn barrier_call(
 /// # Errors
 ///
 /// Returns `Error::Validation` if `(direction, knock)` is not a supported
-/// pair, or if the resulting barrier price is non-finite.
+/// pair, if any input is outside its valid domain, or if the resulting
+/// barrier price is non-finite.
 #[allow(clippy::too_many_arguments)]
 pub fn barrier_put(
     spot: f64,
@@ -142,12 +186,12 @@ pub fn barrier_put(
     direction: &str,
     knock: &str,
 ) -> Result<f64> {
+    let barrier_type = parse_barrier_type(direction, knock)?;
+    validate_exotic_common("barrier", spot, rate, div_yield, vol, expiry)?;
+    validate_positive_finite("barrier", "strike", strike)?;
+    validate_positive_finite("barrier", "barrier", barrier)?;
     let params = BarrierParams::new(spot, strike, barrier, expiry, rate, div_yield, vol);
-    let value = barrier_price(
-        &params,
-        parse_barrier_type(direction, knock)?,
-        OptionType::Put,
-    );
+    let value = barrier_price(&params, barrier_type, OptionType::Put);
     checked_closed_form_value(value, "barrier price")
 }
 
@@ -173,7 +217,8 @@ pub fn barrier_put(
 /// # Errors
 ///
 /// Returns `Error::Validation` if `num_fixings` is zero, `averaging` is not a
-/// supported convention, or the resulting option price is non-finite.
+/// supported convention, any input is outside its valid domain, or the
+/// resulting option price is non-finite.
 #[allow(clippy::too_many_arguments)]
 pub fn asian_option_price(
     spot: f64,
@@ -191,6 +236,8 @@ pub fn asian_option_price(
             "asian option num_fixings must be positive".to_string(),
         ));
     }
+    validate_exotic_common("asian option", spot, rate, div_yield, vol, expiry)?;
+    validate_positive_finite("asian option", "strike", strike)?;
     let value = match (averaging, option_type) {
         ("arithmetic", OptionType::Call) => {
             arithmetic_asian_call_tw(spot, strike, expiry, rate, div_yield, vol, num_fixings)
@@ -234,7 +281,8 @@ pub fn asian_option_price(
 /// # Errors
 ///
 /// Returns `Error::Validation` if `strike_type` is not a supported
-/// convention, or if the resulting option price is non-finite.
+/// convention, any input is outside its valid domain, or the resulting
+/// option price is non-finite.
 #[allow(clippy::too_many_arguments)]
 pub fn lookback_option_price(
     spot: f64,
@@ -247,6 +295,20 @@ pub fn lookback_option_price(
     strike_type: &str,
     option_type: OptionType,
 ) -> Result<f64> {
+    if !matches!(strike_type, "fixed" | "floating") {
+        return Err(Error::Validation(format!(
+            "unknown strike_type '{strike_type}'; expected 'fixed' or 'floating'"
+        )));
+    }
+    validate_exotic_common("lookback option", spot, rate, div_yield, vol, expiry)?;
+    validate_positive_finite("lookback option", "extremum", extremum)?;
+    if strike_type == "fixed" {
+        validate_positive_finite("lookback option", "strike", strike)?;
+    } else if !strike.is_finite() {
+        return Err(Error::Validation(format!(
+            "lookback option strike must be finite, got {strike}"
+        )));
+    }
     let value = match (strike_type, option_type) {
         ("fixed", OptionType::Call) => {
             fixed_strike_lookback_call(spot, strike, expiry, rate, div_yield, vol, extremum)
@@ -289,7 +351,8 @@ pub fn lookback_option_price(
 ///
 /// # Errors
 ///
-/// Returns `Error::Validation` if the resulting option price is non-finite.
+/// Returns `Error::Validation` if any input is outside its valid domain or
+/// if the resulting option price is non-finite.
 #[allow(clippy::too_many_arguments)]
 pub fn quanto_option_price(
     spot: f64,
@@ -303,6 +366,30 @@ pub fn quanto_option_price(
     correlation: f64,
     option_type: OptionType,
 ) -> Result<f64> {
+    validate_exotic_common(
+        "quanto option",
+        spot,
+        rate_domestic,
+        div_yield,
+        vol_asset,
+        expiry,
+    )?;
+    validate_positive_finite("quanto option", "strike", strike)?;
+    if !rate_foreign.is_finite() {
+        return Err(Error::Validation(format!(
+            "quanto option rate_foreign must be finite, got {rate_foreign}"
+        )));
+    }
+    if !vol_fx.is_finite() || vol_fx < 0.0 {
+        return Err(Error::Validation(format!(
+            "quanto option vol_fx must be finite and non-negative, got {vol_fx}"
+        )));
+    }
+    if !correlation.is_finite() || !(-1.0..=1.0).contains(&correlation) {
+        return Err(Error::Validation(format!(
+            "quanto option correlation must be in [-1, 1], got {correlation}"
+        )));
+    }
     let value = match option_type {
         OptionType::Call => quanto_call(
             spot,

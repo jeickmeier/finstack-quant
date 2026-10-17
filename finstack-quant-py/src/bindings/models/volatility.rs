@@ -6,11 +6,11 @@
 //! the forward's rate units. Normal (Bachelier) vols are absolute, in the
 //! forward's units; Black vols are decimals.
 //!
-//! Exposes four classes from `finstack_quant_models::volatility::sabr`:
+//! Exposes three classes from `finstack_quant_models::volatility::sabr`:
 //!
 //! * [`SabrParameters`] — the four canonical parameters `(alpha, beta, nu, rho)`
-//!   plus an optional `shift` for negative-rate environments.
-//! * [`SabrModel`] — wraps `SabrParameters` with an `implied_vol(forward, strike, t)` method.
+//!   plus an optional `shift` for negative-rate environments, with
+//!   `implied_vol(forward, strike, t)`.
 //! * [`SabrSmile`] — fixes a forward and expiry, provides `implied_vol(strike)`, bulk
 //!   smile generation, and optional no-arbitrage diagnostics.
 //! * [`SabrCalibrator`] — Levenberg-Marquardt calibration to market vols with
@@ -19,7 +19,7 @@
 //! # Naming note
 //!
 //! Rust and Python use the canonical PascalCase forms (`SabrParameters`,
-//! `SabrModel`, `SabrSmile`, `SabrCalibrator`).
+//! `SabrSmile`, `SabrCalibrator`).
 
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use std::sync::Arc;
@@ -35,7 +35,7 @@ use crate::errors::core_to_py;
 use finstack_quant_models::volatility as vol;
 use finstack_quant_models::volatility::local_vol::LocalVolSurface;
 use finstack_quant_models::volatility::sabr::{
-    SabrCalibrator, SabrModel, SabrParameters, SabrShift, SabrSmile,
+    SabrCalibrator, SabrParameters, SabrShift, SabrSmile,
 };
 use finstack_quant_models::volatility::svi::{calibrate_svi as rust_calibrate_svi, SviParams};
 use finstack_quant_models::volatility::VolatilityConvention;
@@ -193,51 +193,9 @@ impl PySabrParameters {
         self.inner.is_shifted()
     }
 
-    /// Exact equality of all parameters (Rust ``PartialEq``).
-    fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
-        other
-            .extract::<PyRef<'_, PySabrParameters>>()
-            .map(|rhs| self.inner == rhs.inner)
-            .unwrap_or(false)
-    }
-
-    fn __repr__(&self) -> String {
-        let shift_repr = match self.inner.shift {
-            Some(s) => format!(", shift={s}"),
-            None => String::new(),
-        };
-        format!(
-            "SabrParameters(alpha={}, beta={}, nu={}, rho={}{})",
-            self.inner.alpha, self.inner.beta, self.inner.nu, self.inner.rho, shift_repr
-        )
-    }
-}
-
-wire_methods!(PySabrParameters, SabrParameters, "SabrParameters");
-
-/// Hagan-2002 SABR model wrapping a :class:`SabrParameters` instance.
-///
-/// Sources
-/// -------
-/// - Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr
-#[pyclass(name = "SabrModel", module = "finstack_quant.models.volatility")]
-pub struct PySabrModel {
-    pub(crate) inner: SabrModel,
-}
-
-#[pymethods]
-impl PySabrModel {
-    /// Construct a new SABR model.
-    ///
-    /// Parameters
-    /// ----------
-    /// params : SabrParameters
-    ///     Calibrated SABR parameter set.
-    #[new]
-    fn new(params: PySabrParameters) -> Self {
-        Self {
-            inner: SabrModel::new(params.inner),
-        }
+    /// ``True`` for normal beta=0 dynamics or a configured displacement.
+    fn supports_negative_rates(&self) -> bool {
+        self.inner.supports_negative_rates()
     }
 
     /// Hagan-2002 implied volatility.
@@ -268,31 +226,27 @@ impl PySabrModel {
             .map_err(core_to_py)
     }
 
-    /// Parameters used by this model.
-    #[getter]
-    fn params(&self) -> PySabrParameters {
-        PySabrParameters {
-            inner: self.inner.parameters().clone(),
-        }
-    }
-
-    /// ``True`` for normal beta=0 dynamics or a configured displacement.
-    fn supports_negative_rates(&self) -> bool {
-        self.inner.supports_negative_rates()
+    /// Exact equality of all parameters (Rust ``PartialEq``).
+    fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
+        other
+            .extract::<PyRef<'_, PySabrParameters>>()
+            .map(|rhs| self.inner == rhs.inner)
+            .unwrap_or(false)
     }
 
     fn __repr__(&self) -> String {
-        let p = self.inner.parameters();
-        let shift_repr = match p.shift {
+        let shift_repr = match self.inner.shift {
             Some(s) => format!(", shift={s}"),
             None => String::new(),
         };
         format!(
-            "SabrModel(alpha={}, beta={}, nu={}, rho={}{})",
-            p.alpha, p.beta, p.nu, p.rho, shift_repr
+            "SabrParameters(alpha={}, beta={}, nu={}, rho={}{})",
+            self.inner.alpha, self.inner.beta, self.inner.nu, self.inner.rho, shift_repr
         )
     }
 }
+
+wire_methods!(PySabrParameters, SabrParameters, "SabrParameters");
 
 /// Volatility smile generator for a fixed ``(forward, t)`` pair.
 ///
@@ -318,9 +272,8 @@ impl PySabrSmile {
     ///     Time to expiry in years.
     #[new]
     fn new(params: PySabrParameters, forward: f64, t: f64) -> Self {
-        let model = SabrModel::new(params.inner);
         Self {
-            inner: SabrSmile::new(model, forward, t),
+            inner: SabrSmile::new(params.inner, forward, t),
         }
     }
 
@@ -491,7 +444,7 @@ impl PySabrSmile {
     }
 
     fn __repr__(&self) -> String {
-        let p = self.inner.model().parameters();
+        let p = self.inner.parameters();
         let shift_repr = match p.shift {
             Some(s) => format!(", shift={s}"),
             None => String::new(),
@@ -932,6 +885,36 @@ fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
     vol::strike_to_delta(strike, forward, vol, expiry)
 }
 
+fn grid_to_dataframe<'py>(
+    py: Python<'py>,
+    expiries: &[f64],
+    strikes: &[f64],
+    vols: &[f64],
+) -> PyResult<Bound<'py, PyAny>> {
+    if vols.len() != expiries.len() * strikes.len() {
+        return Err(crate::errors::value_error(format!(
+            "vol surface grid has {} values but {} expiries x {} strikes",
+            vols.len(),
+            expiries.len(),
+            strikes.len()
+        )));
+    }
+    let data = PyDict::new(py);
+    for (j, strike) in strikes.iter().enumerate() {
+        let column: Vec<f64> = (0..expiries.len())
+            .map(|i| vols[i * strikes.len() + j])
+            .collect();
+        data.set_item(*strike, column)?;
+    }
+    let kwargs = PyDict::new(py);
+    kwargs.set_item("name", "expiry")?;
+    let index = py
+        .import("pandas")?
+        .getattr("Index")?
+        .call((expiries.to_vec(),), Some(&kwargs))?;
+    dict_to_dataframe(py, &data, Some(index))
+}
+
 /// Tabulate a core ``VolSurface`` grid as a ``pandas.DataFrame``.
 ///
 /// Parameters
@@ -964,31 +947,12 @@ fn surface_to_dataframe<'py>(
     py: Python<'py>,
     surface: &PyVolSurface,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let expiries = surface.inner.expiries();
-    let strikes = surface.inner.strikes();
-    let vols = surface.inner.vols();
-    if vols.len() != expiries.len() * strikes.len() {
-        return Err(crate::errors::value_error(format!(
-            "vol surface grid has {} values but {} expiries x {} strikes",
-            vols.len(),
-            expiries.len(),
-            strikes.len()
-        )));
-    }
-    let data = PyDict::new(py);
-    for (j, strike) in strikes.iter().enumerate() {
-        let column: Vec<f64> = (0..expiries.len())
-            .map(|i| vols[i * strikes.len() + j])
-            .collect();
-        data.set_item(*strike, column)?;
-    }
-    let kwargs = PyDict::new(py);
-    kwargs.set_item("name", "expiry")?;
-    let index = py
-        .import("pandas")?
-        .getattr("Index")?
-        .call((expiries.to_vec(),), Some(&kwargs))?;
-    dict_to_dataframe(py, &data, Some(index))
+    grid_to_dataframe(
+        py,
+        surface.inner.expiries(),
+        surface.inner.strikes(),
+        surface.inner.vols(),
+    )
 }
 
 /// Convert an ATM volatility quote between normal, lognormal and shifted-lognormal conventions.
@@ -1365,23 +1329,12 @@ impl PyLocalVolSurface {
     /// float64 column per strike, the layout of ``surface_to_dataframe`` for
     /// an implied surface.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let expiries = self.inner.expiries();
-        let strikes = self.inner.strikes();
-        let vols = self.inner.local_vols();
-        let data = PyDict::new(py);
-        for (j, strike) in strikes.iter().enumerate() {
-            let column: Vec<f64> = (0..expiries.len())
-                .map(|i| vols[i * strikes.len() + j])
-                .collect();
-            data.set_item(*strike, column)?;
-        }
-        let kwargs = PyDict::new(py);
-        kwargs.set_item("name", "expiry")?;
-        let index = py
-            .import("pandas")?
-            .getattr("Index")?
-            .call((expiries.to_vec(),), Some(&kwargs))?;
-        dict_to_dataframe(py, &data, Some(index))
+        grid_to_dataframe(
+            py,
+            self.inner.expiries(),
+            self.inner.strikes(),
+            self.inner.local_vols(),
+        )
     }
 
     fn __repr__(&self) -> String {
@@ -1454,7 +1407,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "Product-independent volatility models, evaluators, fitting, and convention conversion.",
     )?;
     m.add_class::<PySabrParameters>()?;
-    m.add_class::<PySabrModel>()?;
     m.add_class::<PySabrSmile>()?;
     m.add_class::<PySabrCalibrator>()?;
     m.add_class::<PySviParams>()?;
@@ -1490,7 +1442,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "ArbitrageReport",
                 "LocalVolSurface",
                 "SabrCalibrator",
-                "SabrModel",
                 "SabrParameters",
                 "SabrSmile",
                 "SviParams",

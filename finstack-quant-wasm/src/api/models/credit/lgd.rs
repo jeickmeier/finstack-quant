@@ -236,17 +236,6 @@ impl JsWorkoutLgd {
         to_js_value(&result)
     }
 
-    /// Loss given default for an exposure, as a fraction of EAD in `[0, 1]`.
-    /// @param ead - Exposure at default in monetary units; positive.
-    /// @returns The workout LGD.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if `ead` is not positive and finite.
-    pub fn lgd(&self, ead: JsValue) -> Result<f64, JsValue> {
-        self.inner.lgd(js_f64(&ead, "ead")?).map_err(to_js_err)
-    }
-
     /// Discounted net recovery after costs, in monetary units.
     /// @param ead - Exposure at default in monetary units; positive.
     /// @returns The net recovery amount.
@@ -258,20 +247,6 @@ impl JsWorkoutLgd {
     pub fn net_recovery(&self, ead: JsValue) -> Result<f64, JsValue> {
         self.inner
             .net_recovery(js_f64(&ead, "ead")?)
-            .map_err(to_js_err)
-    }
-
-    /// Net recovery as a fraction of EAD.
-    /// @param ead - Exposure at default in monetary units; positive.
-    /// @returns The recovery rate in `[0, 1]`.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if `ead` is not positive and finite.
-    #[wasm_bindgen(js_name = recoveryRate)]
-    pub fn recovery_rate(&self, ead: JsValue) -> Result<f64, JsValue> {
-        self.inner
-            .recovery_rate(js_f64(&ead, "ead")?)
             .map_err(to_js_err)
     }
 

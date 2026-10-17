@@ -732,13 +732,14 @@ fn validate_recovery(
                 "estimated principal recovery requires a hazard curve".into(),
             ));
         }
-        if cashflows
-            .iter()
-            .any(|cf| cf.kind == CFKind::DefaultedNotional)
+        if rate > 0.0
+            && cashflows
+                .iter()
+                .any(|cf| cf.kind == CFKind::DefaultedNotional)
         {
             return Err(finstack_quant_core::Error::Validation(
                 "schedule contains explicit DefaultedNotional flows; pass recovery_rate=None \
-                 to avoid double-counting recovery from explicit events and the hazard curve"
+                 (or 0.0) to avoid double-counting recovery from explicit events and the hazard curve"
                     .into(),
             ));
         }

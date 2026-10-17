@@ -98,7 +98,17 @@ impl PyEuropeanPricer {
         let num_steps = convenience::european_num_steps(num_steps).map_err(core_to_py)?;
         let pricer = &self.inner;
         py.detach(|| {
-            pricer.price_gbm_call(spot, strike, rate, div_yield, vol, expiry, num_steps, ccy)
+            pricer.price_gbm(
+                OptionType::Call,
+                spot,
+                strike,
+                rate,
+                div_yield,
+                vol,
+                expiry,
+                num_steps,
+                ccy,
+            )
         })
         .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
@@ -126,7 +136,17 @@ impl PyEuropeanPricer {
         let num_steps = convenience::european_num_steps(num_steps).map_err(core_to_py)?;
         let pricer = &self.inner;
         py.detach(|| {
-            pricer.price_gbm_put(spot, strike, rate, div_yield, vol, expiry, num_steps, ccy)
+            pricer.price_gbm(
+                OptionType::Put,
+                spot,
+                strike,
+                rate,
+                div_yield,
+                vol,
+                expiry,
+                num_steps,
+                ccy,
+            )
         })
         .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
@@ -231,7 +251,17 @@ impl PyPathDependentPricer {
         let num_steps = convenience::path_dependent_num_steps(num_steps).map_err(core_to_py)?;
         let pricer = &self.inner;
         py.detach(|| {
-            pricer.price_gbm_asian_call(spot, strike, rate, div_yield, vol, expiry, num_steps, ccy)
+            pricer.price_gbm_asian(
+                OptionType::Call,
+                spot,
+                strike,
+                rate,
+                div_yield,
+                vol,
+                expiry,
+                num_steps,
+                ccy,
+            )
         })
         .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
@@ -258,7 +288,17 @@ impl PyPathDependentPricer {
         let num_steps = convenience::path_dependent_num_steps(num_steps).map_err(core_to_py)?;
         let pricer = &self.inner;
         py.detach(|| {
-            pricer.price_gbm_asian_put(spot, strike, rate, div_yield, vol, expiry, num_steps, ccy)
+            pricer.price_gbm_asian(
+                OptionType::Put,
+                spot,
+                strike,
+                rate,
+                div_yield,
+                vol,
+                expiry,
+                num_steps,
+                ccy,
+            )
         })
         .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
@@ -540,7 +580,8 @@ impl PyLsmcPricer {
         let (pricer, num_steps, basis, basis_degree) =
             self.call_config(num_steps, basis, basis_degree)?;
         py.detach(|| {
-            pricer.price_gbm_american_put(
+            pricer.price_gbm_american(
+                OptionType::Put,
                 spot,
                 strike,
                 rate,
@@ -586,7 +627,8 @@ impl PyLsmcPricer {
         let (pricer, num_steps, basis, basis_degree) =
             self.call_config(num_steps, basis, basis_degree)?;
         py.detach(|| {
-            pricer.price_gbm_american_call(
+            pricer.price_gbm_american(
+                OptionType::Call,
                 spot,
                 strike,
                 rate,
@@ -643,7 +685,8 @@ impl PyLsmcPricer {
         let (pricer, num_steps, basis, basis_degree) =
             self.call_config(num_steps, basis, basis_degree)?;
         py.detach(|| {
-            pricer.price_gbm_american_put_unbiased(
+            pricer.price_gbm_american_unbiased(
+                OptionType::Put,
                 spot,
                 strike,
                 rate,
@@ -691,7 +734,8 @@ impl PyLsmcPricer {
         let (pricer, num_steps, basis, basis_degree) =
             self.call_config(num_steps, basis, basis_degree)?;
         py.detach(|| {
-            pricer.price_gbm_american_call_unbiased(
+            pricer.price_gbm_american_unbiased(
+                OptionType::Call,
                 spot,
                 strike,
                 rate,

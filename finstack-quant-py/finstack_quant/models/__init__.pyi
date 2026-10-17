@@ -257,7 +257,7 @@ class ForwardGreeks:
     Examples
     --------
     >>> from finstack_quant.models import black76_greeks
-    >>> g = black76_greeks(100.0, 100.0, 1.0, 0.2, True)
+    >>> g = black76_greeks(100.0, 100.0, 0.2, 1.0, True)
     >>> round(g.delta, 4)
     0.5398
     >>> g.to_series().index.tolist()
@@ -646,8 +646,8 @@ def black76_price(
     forward: float,
     strike: float,
     df: float,
-    expiry: float,
     vol: float,
+    expiry: float,
     is_call: bool,
 ) -> float:
     """
@@ -666,10 +666,10 @@ def black76_price(
         Discount factor from valuation date to expiry; a finite decimal
         strictly greater than zero (the domain :func:`black76_implied_vol`
         accepts).
-    expiry : float
-        Time to expiry in years; non-negative.
     vol : float
         Annualized lognormal (Black) volatility, decimal; non-negative.
+    expiry : float
+        Time to expiry in years; non-negative.
     is_call : bool
         ``True`` for a call, ``False`` for a put.
 
@@ -688,7 +688,7 @@ def black76_price(
     Examples
     --------
     >>> from finstack_quant.models import black76_price
-    >>> round(black76_price(100.0, 100.0, 0.95, 1.0, 0.2, True), 4)
+    >>> round(black76_price(100.0, 100.0, 0.95, 0.2, 1.0, True), 4)
     7.5673
 
     Sources
@@ -700,8 +700,8 @@ def black76_price(
 def black76_greeks(
     forward: float,
     strike: float,
-    expiry: float,
     vol: float,
+    expiry: float,
     is_call: bool,
 ) -> ForwardGreeks:
     """
@@ -717,10 +717,10 @@ def black76_greeks(
         Forward price or rate at expiry.
     strike : float
         Strike in the same units as ``forward``.
-    expiry : float
-        Time to expiry in years; non-negative.
     vol : float
         Annualized lognormal (Black) volatility, decimal; non-negative.
+    expiry : float
+        Time to expiry in years; non-negative.
     is_call : bool
         ``True`` for a call, ``False`` for a put (only ``delta`` differs).
 
@@ -738,7 +738,7 @@ def black76_greeks(
     Examples
     --------
     >>> from finstack_quant.models import black76_greeks
-    >>> round(black76_greeks(100.0, 100.0, 1.0, 0.2, True).delta, 4)
+    >>> round(black76_greeks(100.0, 100.0, 0.2, 1.0, True).delta, 4)
     0.5398
 
     Sources

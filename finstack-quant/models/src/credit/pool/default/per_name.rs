@@ -31,7 +31,6 @@
 use crate::correlation::copula::{Copula, CopulaSpec};
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::RandomStream;
-use finstack_quant_core::math::{standard_normal_inv_cdf, student_t_inv_cdf};
 use finstack_quant_core::Result;
 
 /// AssetPool-granularity policy for the structured-credit default engine.
@@ -55,45 +54,6 @@ pub enum PoolGranularity {
     LargeHomogeneous,
 }
 
-/// Threshold transform for the per-name default barrier.
-///
-/// Gaussian/RFL/Multi-factor copulas invert the standard normal CDF;
-/// the Student-t copula inverts `t_ν`.
-#[derive(Debug, Clone, Copy)]
-enum ThresholdKind {
-    /// `c = Φ⁻¹(PD)`.
-    Gaussian,
-    /// `c = t_ν⁻¹(PD)`.
-    StudentT { degrees_of_freedom: f64 },
-}
-
-impl ThresholdKind {
-    fn from_spec(spec: &CopulaSpec) -> Self {
-        match spec {
-            CopulaSpec::StudentT { degrees_of_freedom } => ThresholdKind::StudentT {
-                degrees_of_freedom: *degrees_of_freedom,
-            },
-            _ => ThresholdKind::Gaussian,
-        }
-    }
-
-    /// Default barrier `c` for a per-period marginal default probability `pd`.
-    fn threshold(&self, pd: f64) -> f64 {
-        let p = pd.clamp(1e-10, 1.0 - 1e-10);
-        match self {
-            ThresholdKind::Gaussian => standard_normal_inv_cdf(p),
-            ThresholdKind::StudentT { degrees_of_freedom } => {
-                // `dof > 2` is enforced at construction, so failure here is
-                // unreachable in practice; fall back to the Gaussian barrier
-                // rather than letting NaN silently poison the default
-                // indicator for every name on the path.
-                student_t_inv_cdf(p, *degrees_of_freedom)
-                    .unwrap_or_else(|_| standard_normal_inv_cdf(p))
-            }
-        }
-    }
-}
-
 /// Finite-pool per-name copula default simulator.
 ///
 /// Holds the copula kernel and asset correlation. One instance is shared
@@ -105,8 +65,8 @@ pub struct PerNameCopulaDefault {
     copula: Box<dyn Copula>,
     /// Asset correlation `ρ`.
     correlation: f64,
-    /// Threshold transform (`Φ⁻¹` vs `t_ν⁻¹`).
-    threshold_kind: ThresholdKind,
+    /// Validated copula specification used for threshold inversion.
+    copula_spec: CopulaSpec,
 }
 
 impl PerNameCopulaDefault {
@@ -156,8 +116,13 @@ impl PerNameCopulaDefault {
                 ))
             })?,
             correlation,
-            threshold_kind: ThresholdKind::from_spec(copula_spec),
+            copula_spec: copula_spec.clone(),
         })
+    }
+
+    fn threshold(&self, pd: f64) -> Result<f64> {
+        self.copula_spec
+            .default_threshold(pd.clamp(1e-10, 1.0 - 1e-10))
     }
 
     /// Realize per-name default indicators for one payment period.
@@ -211,7 +176,7 @@ impl PerNameCopulaDefault {
         let mixing = self.copula.sample_mixing(rng.next_u01())?;
 
         for &pd in marginal_pd {
-            let threshold = self.threshold_kind.threshold(pd);
+            let threshold = self.threshold(pd)?;
             let raw = rng.next_std_normal();
             // Antithetic partner negates the idiosyncratic Gaussian draw so
             // its latent variable is the antithetic variate of its pair.
@@ -263,7 +228,7 @@ impl PerNameCopulaDefault {
         out.reserve(marginal_pd.len());
         let mixing = self.copula.sample_mixing(rng.next_u01())?;
         for &pd in marginal_pd {
-            let threshold = self.threshold_kind.threshold(pd);
+            let threshold = self.threshold(pd)?;
             let conditional = self
                 .copula
                 .conditional_default_prob_given_systematic_and_mixing(
@@ -314,7 +279,7 @@ impl PerNameCopulaDefault {
         marginal_pd: f64,
         rng: &mut PhiloxRng,
     ) -> Result<f64> {
-        let threshold = self.threshold_kind.threshold(marginal_pd);
+        let threshold = self.threshold(marginal_pd)?;
         // One shared mixing draw per period — identical to `simulate_period`
         // (1.0 for Gaussian). Conditioning the LHP limit on this same `W`
         // makes it the genuine `N → ∞` limit of the per-name model.
@@ -422,7 +387,7 @@ mod tests {
         let sim = PerNameCopulaDefault {
             copula: Box::new(FailingMixingCopula),
             correlation: 0.3,
-            threshold_kind: ThresholdKind::Gaussian,
+            copula_spec: CopulaSpec::Gaussian,
         };
         let mut rng = PhiloxRng::new(42);
         let mut indicators = Vec::new();
@@ -470,7 +435,7 @@ mod tests {
             .expect("valid copula simulation");
         assert_eq!(out.len(), marginals.len());
         for (pd, cond) in marginals.iter().zip(&out) {
-            let threshold = standard_normal_inv_cdf(*pd);
+            let threshold = finstack_quant_core::math::standard_normal_inv_cdf(*pd);
             let expected = finstack_quant_core::math::norm_cdf(
                 (threshold - rho.sqrt() * z) / (1.0 - rho).sqrt(),
             );

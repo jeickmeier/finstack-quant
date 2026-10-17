@@ -5,7 +5,7 @@
 //! explicit validation and deterministic solver behavior.
 
 use super::conventions::{validate_forward_for_convention, VolatilityConvention};
-use crate::closed_form::volatility::{bachelier_call, black_call, black_shifted_call};
+use crate::closed_form::volatility::{bachelier_call, black_call};
 use finstack_quant_core::error::InputError;
 use finstack_quant_core::math::BrentSolver;
 use finstack_quant_core::Result;
@@ -122,7 +122,9 @@ pub fn convert_atm_volatility(
     let price_from = match from_convention {
         VolatilityConvention::Normal => bachelier_call(f, f, vol, t),
         VolatilityConvention::Lognormal => black_call(f, f, vol, t),
-        VolatilityConvention::ShiftedLognormal { shift } => black_shifted_call(f, f, vol, t, shift),
+        VolatilityConvention::ShiftedLognormal { shift } => {
+            black_call(f + shift, f + shift, vol, t)
+        }
     };
 
     let guess = compute_initial_guess(vol, from_convention, to_convention, f);
@@ -137,7 +139,7 @@ pub fn convert_atm_volatility(
             VolatilityConvention::Normal => bachelier_call(f, f, sigma_safe, t),
             VolatilityConvention::Lognormal => black_call(f, f, sigma_safe, t),
             VolatilityConvention::ShiftedLognormal { shift } => {
-                black_shifted_call(f, f, sigma_safe, t, shift)
+                black_call(f + shift, f + shift, sigma_safe, t)
             }
         };
         p - price_from
@@ -237,14 +239,14 @@ fn compute_initial_guess(
 mod tests {
     use super::VolatilityConvention;
     use super::*;
-    use crate::closed_form::volatility::{bachelier_call, black_call, black_shifted_call};
+    use crate::closed_form::volatility::{bachelier_call, black_call};
 
     fn atm_price(convention: VolatilityConvention, forward: f64, vol: f64, t: f64) -> f64 {
         match convention {
             VolatilityConvention::Normal => bachelier_call(forward, forward, vol, t),
             VolatilityConvention::Lognormal => black_call(forward, forward, vol, t),
             VolatilityConvention::ShiftedLognormal { shift } => {
-                black_shifted_call(forward, forward, vol, t, shift)
+                black_call(forward + shift, forward + shift, vol, t)
             }
         }
     }

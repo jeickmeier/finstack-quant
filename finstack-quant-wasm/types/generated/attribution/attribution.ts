@@ -444,7 +444,7 @@ export type BondQuoteInput =
 /**
  * Recovery model specification.
  */
-export type RecoveryModel =
+export type DynamicRecoveryModel =
   | "constant"
   | "inverse_linear"
   | {
@@ -2155,27 +2155,12 @@ export type StochasticPrepaySpec =
  */
 export type RecoverySpec =
   | {
-      /**
-       * Recovery rate ∈ [0, 1]
-       */
       rate: number;
       type: "constant";
     }
   | {
-      /**
-       * Correlation with the systematic factor. Under the canonical
-       * low-factor-stress convention this is typically POSITIVE: recovery
-       * falls when the factor falls, so defaults (high in stress) and
-       * recoveries co-move negatively.
-       */
       factor_correlation: number;
-      /**
-       * Mean recovery rate
-       */
       mean_recovery: number;
-      /**
-       * Recovery volatility (standard deviation)
-       */
       recovery_volatility: number;
       type: "market_correlated";
     };
@@ -5865,7 +5850,7 @@ export interface MertonMcCalibrationSpec {
  *
  * Models the relationship between the accreted notional and the recovery
  * rate in default. As PIK accrual increases the notional relative to the
- * original base, recovery declines according to the chosen [`RecoveryModel`].
+ * original base, recovery declines according to the chosen [`DynamicRecoveryModel`].
  * Deserialization enforces the same parameter invariants as the constructors.
  */
 export interface DynamicRecoverySpec {
@@ -5880,7 +5865,7 @@ export interface DynamicRecoverySpec {
   /**
    * Recovery model governing the notional-to-recovery mapping.
    */
-  model: RecoveryModel;
+  model: DynamicRecoveryModel;
 }
 /**
  * Specification for endogenous (leverage-dependent) hazard rate.
@@ -5924,7 +5909,7 @@ export interface EndogenousHazardSpec {
  * # Wire format
  *
  * Deserialization is routed through [`MertonModel::new_with_dynamics`] via
- * [`RawMertonModel`], so a model loaded from JSON satisfies exactly the same
+ * `RawMertonModel`, so a model loaded from JSON satisfies exactly the same
  * invariants as one built in Rust. The serialized field set is unchanged.
  */
 export interface MertonModel {

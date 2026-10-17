@@ -64,7 +64,7 @@ fn credit_workflow_maps_migration_and_loss_modules_together() {
         .costs(WorkoutCosts::new(0.04, 0.03).unwrap())
         .build()
         .unwrap();
-    let base_lgd = workout.lgd(ead).unwrap();
+    let base_lgd = workout.evaluate(ead).unwrap().lgd;
     let downturn_lgd = DownturnLgd::regulatory_floor(0.08, 0.25)
         .unwrap()
         .adjust(base_lgd)

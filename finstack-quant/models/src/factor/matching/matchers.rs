@@ -2,11 +2,11 @@
 //!
 //! Three matchers are provided:
 //! - [`MappingTableMatcher`]: flat rule-table lookup, first match wins.
-//! - [`HierarchicalMatcher`]: tree traversal, deepest match wins.
-//! - [`CascadeMatcher`]: ordered fallback chain over other matchers.
+//! - `HierarchicalMatcher`: tree traversal, deepest match wins.
+//! - `CascadeMatcher`: ordered fallback chain over other matchers.
 //!
-//! A fourth matcher, [`CreditHierarchicalMatcher`], is only constructed
-//! through [`MatchingConfig::CreditHierarchical`] and lives in
+//! A fourth matcher, `CreditHierarchicalMatcher`, is only constructed
+//! through [`super::MatchingConfig::CreditHierarchical`] and lives in
 //! [`super::credit`].
 
 use super::filter::{AttributeFilter, DependencyFilter};
@@ -20,8 +20,7 @@ use std::borrow::Cow;
 /// One factor match decorated with a beta loading.
 ///
 /// For most matchers this collapses to `(factor_id, 1.0)` — one entry per
-/// dependency, beta = 1. The credit hierarchy matcher (
-/// [`super::credit::CreditHierarchicalMatcher`]) emits multiple entries with
+/// dependency, beta = 1. The credit hierarchy matcher emits multiple entries with
 /// calibrated betas read from a [`crate::factor::credit::hierarchy::IssuerBetaRow`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct FactorMatchEntry {
@@ -250,36 +249,16 @@ pub struct FactorNode {
 }
 
 /// Tree-based matcher where the deepest matching factor assignment wins.
-///
-/// # Tie-breaking
-///
-/// Depth is compared **globally across the whole tree**, not per branch: a
-/// depth-2 node under one subtree beats a depth-1 node under a sibling
-/// subtree even when the two encode unrelated classification axes. When two
-/// matches occur at **equal depth** in different sibling subtrees, the one
-/// found first in child declaration order wins — reordering `children` in
-/// the config can therefore change factor assignment for attribute sets
-/// that match multiple subtrees at the same depth. Configs that rely on a
-/// specific winner should encode it as depth (more specific = deeper), not
-/// as declaration order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HierarchicalMatcher {
+pub(crate) struct HierarchicalMatcher {
     dependency_filter: DependencyFilter,
     root: FactorNode,
 }
 
 impl HierarchicalMatcher {
     /// Creates a matcher scoped to dependencies satisfying the provided filter.
-    ///
-    /// # Arguments
-    ///
-    /// * `dependency_filter` - Dependency class, curve type and id constraints a
-    ///   market dependency must satisfy before the tree is consulted;
-    ///   `DependencyFilter::default()` accepts every dependency.
-    /// * `root` - Root of the attribute-filter tree whose deepest matching node
-    ///   supplies the factor id.
     #[must_use]
-    pub fn new(dependency_filter: DependencyFilter, root: FactorNode) -> Self {
+    pub(crate) fn new(dependency_filter: DependencyFilter, root: FactorNode) -> Self {
         Self {
             dependency_filter,
             root,
@@ -328,25 +307,14 @@ impl FactorMatcher for HierarchicalMatcher {
 }
 
 /// Ordered matcher chain that returns the first successful factor match.
-///
-/// # Error semantics
-///
-/// A member matcher **error** (e.g. a credit matcher's
-/// [`FactorMatchError::MissingRequiredTag`]) is terminal: it propagates
-/// immediately and later members are *not* consulted. This is deliberate
-/// fail-closed behavior — an error means the dependency *should* have been
-/// handled by that member but its inputs are inconsistent, and falling
-/// through to a coarser matcher would silently mis-map risk that was meant
-/// to be mapped precisely. Only a clean non-match (`Ok(None)`) falls
-/// through to the next member.
-pub struct CascadeMatcher {
+pub(crate) struct CascadeMatcher {
     matchers: Vec<Box<dyn FactorMatcher>>,
 }
 
 impl CascadeMatcher {
     /// Creates a cascade from matchers tried in priority order.
     #[must_use]
-    pub fn new(matchers: Vec<Box<dyn FactorMatcher>>) -> Self {
+    pub(crate) fn new(matchers: Vec<Box<dyn FactorMatcher>>) -> Self {
         Self { matchers }
     }
 }

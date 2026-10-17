@@ -18,11 +18,12 @@ use rust_decimal::Decimal;
 use tracing::{info, warn};
 
 use crate::builder::overnight::{OvernightObservationSchedule, OvernightRateConstraints};
-use crate::builder::rate_helpers::{calculate_floating_rate, ResolvedFloatingRateFallback};
+use crate::builder::rate_helpers::calculate_floating_rate;
 use crate::builder::{
-    CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod, FloatingRateObservation,
-    SchedulePeriod,
+    CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod, FloatingRateFallback,
+    FloatingRateObservation, SchedulePeriod,
 };
+use rust_decimal::prelude::ToPrimitive;
 
 use super::super::compiler::{FixedSchedule, FloatSchedule};
 use super::f64_to_decimal;
@@ -209,11 +210,11 @@ fn resolve_floating_rate_fallback(
     error: finstack_quant_core::Error,
     reset_date: Date,
     spread_bp: f64,
-    fallback: &ResolvedFloatingRateFallback,
+    fallback: &FloatingRateFallback,
 ) -> finstack_quant_core::Result<f64> {
     match fallback {
-        ResolvedFloatingRateFallback::Error => Err(error),
-        ResolvedFloatingRateFallback::SpreadOnly => {
+        FloatingRateFallback::Error => Err(error),
+        FloatingRateFallback::SpreadOnly => {
             warn!(
                 reset_date = %reset_date,
                 spread_bp = %spread_bp,
@@ -222,7 +223,10 @@ fn resolve_floating_rate_fallback(
             );
             Ok(0.0)
         }
-        ResolvedFloatingRateFallback::FixedRate(index_rate) => {
+        FloatingRateFallback::FixedRate(rate) => {
+            let index_rate = rate.to_f64().ok_or(finstack_quant_core::Error::Input(
+                InputError::ConversionOverflow,
+            ))?;
             info!(
                 reset_date = %reset_date,
                 fixed_rate = %index_rate,
@@ -234,7 +238,7 @@ fn resolve_floating_rate_fallback(
                     "floating-rate fallback did not provide a finite index rate".into(),
                 ));
             }
-            Ok(*index_rate)
+            Ok(index_rate)
         }
     }
 }
@@ -550,7 +554,7 @@ fn project_segment_indices(
             }
 
             let final_index_rate = accumulator.result()?.constrained_rate;
-            let params = &schedule.runtime_spec.params;
+            let params = &schedule.rate_params;
             let mut affine_params = params.clone();
             affine_params.index_floor_bp = None;
             affine_params.index_cap_bp = None;
@@ -634,8 +638,7 @@ pub(crate) fn emit_float_coupons_on(
                 spec.schedule.business_day_convention,
                 schedule.fixing_calendar,
             )?;
-            let runtime_spec = &schedule.runtime_spec;
-            let params = &runtime_spec.params;
+            let params = &schedule.rate_params;
             let observation = if let Some(method) = spec
                 .rate_spec
                 .compounding
@@ -667,7 +670,7 @@ pub(crate) fn emit_float_coupons_on(
                     )));
                 }
                 let mut constraints = OvernightRateConstraints {
-                    application: runtime_spec.overnight_index_constraints,
+                    application: spec.rate_spec.overnight_index_constraints,
                     index_floor_bp: params.index_floor_bp,
                     index_cap_bp: params.index_cap_bp,
                 };
@@ -747,7 +750,7 @@ pub(crate) fn emit_float_coupons_on(
                         error,
                         reset_date,
                         params.spread_bp,
-                        &runtime_spec.fallback,
+                        &spec.rate_spec.fallback,
                     )?;
                     let constrained_index = calculate_floating_rate(
                         index_rate,

@@ -1,7 +1,7 @@
 //! Production audit regressions against explicit quote conventions and formulas.
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface};
 use finstack_quant_models::volatility::{
-    sabr::{SabrCalibrator, SabrModel, SabrParameters},
+    sabr::{SabrCalibrator, SabrParameters},
     VolSource,
 };
 use std::sync::Arc;
@@ -124,9 +124,7 @@ fn b4_normal_sabr_smile_is_translation_invariant_across_zero() {
     let expected = alpha * z / x * (1.0 + (2.0 - 3.0 * rho * rho) / 24.0 * nu * nu * t);
     let params = SabrParameters::new(alpha, 0.0, nu, rho).expect("params");
     for (f, k) in [(-0.02, -0.015), (-0.002, 0.003), (0.01, 0.015)] {
-        let model = SabrModel::new(params.clone())
-            .implied_volatility(f, k, t)
-            .expect("model");
+        let model = params.implied_volatility(f, k, t).expect("model");
         let expansion = params.implied_vol_normal(f, k, t).expect("expansion");
         assert!(
             (model - expected).abs() < 1e-12,
@@ -147,15 +145,13 @@ fn b5_default_sabr_calibration_controls_relative_quote_error() {
             .map(|x| x * scale)
             .to_vec();
         let params = SabrParameters::new(0.004 * scale, 0.0, 0.7, -0.4).expect("params");
-        let model = SabrModel::new(params);
         let quotes: Vec<_> = strikes
             .iter()
-            .map(|&k| model.implied_volatility(forward, k, 2.0).expect("quote"))
+            .map(|&k| params.implied_volatility(forward, k, 2.0).expect("quote"))
             .collect();
         let fitted = SabrCalibrator::new()
             .calibrate(forward, &strikes, &quotes, 2.0, 0.0)
             .expect("fit");
-        let fitted = SabrModel::new(fitted);
         let max_relative = strikes
             .iter()
             .zip(&quotes)
@@ -218,8 +214,8 @@ fn b4_normal_cube_uses_canonical_beta_snap() {
         source.get_convention(1.0, 5.0).expect("convention"),
         VolatilityConvention::Normal
     );
-    let model = SabrModel::new(SabrParameters::new(0.008, 0.00005, 0.3, -0.2).expect("parameters"));
-    let expected = model
+    let params = SabrParameters::new(0.008, 0.00005, 0.3, -0.2).expect("parameters");
+    let expected = params
         .implied_volatility(-0.01, 0.001, 1.0)
         .expect("normal quote");
     assert!(

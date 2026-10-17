@@ -511,7 +511,7 @@ fn test_market_context_stats_includes_vol_cubes() {
 // Normal (Bachelier) vol quoting tests
 
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
-use finstack_quant_models::closed_form::volatility::{black_call, black_shifted_call};
+use finstack_quant_models::closed_form::volatility::black_call;
 use finstack_quant_models::volatility::implied_vol_bachelier;
 
 /// Positive-rates consistency: the Hagan normal vol from the cube must agree
@@ -568,7 +568,7 @@ fn test_vol_cube_vol_normal_negative_rates_with_shift() {
     // Lognormal quote applies to the shifted model: price with shifted Black.
     let sigma_ln =
         finstack_quant_models::volatility::get_cube_vol(&cube, 1.0, 5.0, strike).unwrap();
-    let price = black_shifted_call(fwd, strike, sigma_ln, t, shift);
+    let price = black_call(fwd + shift, strike + shift, sigma_ln, t);
     let sigma_n_exact = implied_vol_bachelier(price, fwd, strike, t, true).unwrap();
 
     let rel = (sigma_n - sigma_n_exact).abs() / sigma_n_exact;
@@ -706,7 +706,7 @@ fn cube_convention_and_vol_lookups_are_bit_stable() {
     // SABR evaluation calls platform libm, so macOS and the Linux libm on
     // GitHub Actions each have one fold. A third fold means a lookup moved.
     const PINS: [(usize, u64); 2] = [
-        (1044, 5_268_942_217_510_307_716),
+        (1044, 10_630_799_891_945_969_391),
         (1044, 11_059_714_388_996_499_812),
     ];
     let nodes = |beta: f64, shift: Option<f64>| -> Vec<SabrParameterData> {

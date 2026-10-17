@@ -29,11 +29,11 @@
 //! use finstack_quant_models::OptionType;
 //! use finstack_quant_models::closed_form::{black76_greeks, black76_price};
 //!
-//! let price = black76_price(100.0, 100.0, 0.95, 1.0, 0.2, OptionType::Call)?;
+//! let price = black76_price(100.0, 100.0, 0.95, 0.2, 1.0, OptionType::Call)?;
 //! assert!((price - 7.5673).abs() < 1e-4);
-//! let greeks = black76_greeks(100.0, 100.0, 1.0, 0.2, OptionType::Call)?;
+//! let greeks = black76_greeks(100.0, 100.0, 0.2, 1.0, OptionType::Call)?;
 //! assert!((greeks.delta - 0.5398).abs() < 1e-4);
-//! assert!(black76_price(100.0, 100.0, -0.95, 1.0, 0.2, OptionType::Call).is_err());
+//! assert!(black76_price(100.0, 100.0, -0.95, 0.2, 1.0, OptionType::Call).is_err());
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 
@@ -188,9 +188,9 @@ fn validate_black_shifted(
 /// * `df` - Discount factor from valuation to expiry (or settlement), a finite
 ///   decimal strictly greater than zero; values above 1 (negative rates) are
 ///   accepted. Same domain as [`super::implied_vol::black76_implied_vol`].
-/// * `expiry` - Time to expiry in years; finite and non-negative.
 /// * `vol` - Annualized lognormal (Black) volatility as a decimal; finite and
 ///   non-negative.
+/// * `expiry` - Time to expiry in years; finite and non-negative.
 /// * `option_type` - Call or put payoff.
 ///
 /// # Returns
@@ -206,8 +206,8 @@ pub fn black76_price(
     forward: f64,
     strike: f64,
     df: f64,
-    expiry: f64,
     vol: f64,
+    expiry: f64,
     option_type: OptionType,
 ) -> Result<f64> {
     validate_black76(forward, strike, vol, expiry)?;
@@ -226,9 +226,9 @@ pub fn black76_price(
 ///
 /// * `forward` - Forward price or rate at expiry; finite and strictly positive.
 /// * `strike` - Strike in the same units as `forward`; finite and strictly positive.
-/// * `expiry` - Time to expiry in years; finite and non-negative.
 /// * `vol` - Annualized lognormal (Black) volatility as a decimal; finite and
 ///   non-negative. `vega` is per unit (1.0) change in this vol.
+/// * `expiry` - Time to expiry in years; finite and non-negative.
 /// * `option_type` - Call or put; only `delta` differs between the two.
 ///
 /// # Returns
@@ -244,8 +244,8 @@ pub fn black76_price(
 pub fn black76_greeks(
     forward: f64,
     strike: f64,
-    expiry: f64,
     vol: f64,
+    expiry: f64,
     option_type: OptionType,
 ) -> Result<ForwardGreeks> {
     validate_black76(forward, strike, vol, expiry)?;
@@ -264,7 +264,7 @@ pub fn black76_greeks(
 /// Undiscounted Bachelier (normal-model) price on a unit annuity.
 ///
 /// The canonical unit-annuity twin of
-/// [`crate::volatility::normal::bachelier_price_with_annuity`]; multiply by the
+/// [`super::volatility::bachelier_price_with_annuity`]; multiply by the
 /// discount factor or annuity for present value.
 ///
 /// # Arguments
@@ -429,11 +429,11 @@ mod tests {
     fn black76_price_matches_discounted_leaf_formula() {
         let (f, k, df, t, vol) = (100.0, 95.0, 0.97, 1.5, 0.25);
         assert_eq!(
-            black76_price(f, k, df, t, vol, OptionType::Call).unwrap(),
+            black76_price(f, k, df, vol, t, OptionType::Call).unwrap(),
             df * black_call(f, k, vol, t)
         );
         assert_eq!(
-            black76_price(f, k, df, t, vol, OptionType::Put).unwrap(),
+            black76_price(f, k, df, vol, t, OptionType::Put).unwrap(),
             df * black_put(f, k, vol, t)
         );
     }
@@ -441,7 +441,7 @@ mod tests {
     #[test]
     fn black76_price_rejects_non_positive_df_like_its_inverse() {
         for df in [0.0, -0.95, f64::NAN, f64::INFINITY] {
-            let err = black76_price(100.0, 100.0, df, 1.0, 0.2, OptionType::Call).unwrap_err();
+            let err = black76_price(100.0, 100.0, df, 0.2, 1.0, OptionType::Call).unwrap_err();
             assert!(matches!(err, Error::Validation(_)), "df={df}: {err:?}");
             assert!(
                 black76_implied_vol(100.0, 100.0, df, 1.0, 7.5, OptionType::Call).is_err(),
@@ -449,7 +449,7 @@ mod tests {
             );
         }
         // df > 1 (negative rates) is accepted by both directions.
-        let price = black76_price(100.0, 100.0, 1.01, 1.0, 0.2, OptionType::Call).unwrap();
+        let price = black76_price(100.0, 100.0, 1.01, 0.2, 1.0, OptionType::Call).unwrap();
         let vol = black76_implied_vol(100.0, 100.0, 1.01, 1.0, price, OptionType::Call).unwrap();
         assert!((vol - 0.2).abs() < 1e-10);
     }
@@ -457,7 +457,7 @@ mod tests {
     #[test]
     fn black76_price_round_trips_through_implied_vol() {
         for option_type in [OptionType::Call, OptionType::Put] {
-            let price = black76_price(100.0, 110.0, 0.95, 0.75, 0.3, option_type).unwrap();
+            let price = black76_price(100.0, 110.0, 0.95, 0.3, 0.75, option_type).unwrap();
             let vol = black76_implied_vol(100.0, 110.0, 0.95, 0.75, price, option_type).unwrap();
             assert!((vol - 0.3).abs() < 1e-10, "{option_type:?}: {vol}");
         }
@@ -465,18 +465,18 @@ mod tests {
 
     #[test]
     fn black76_rejects_negative_vol_and_expiry_and_non_positive_forward() {
-        assert!(black76_price(100.0, 100.0, 0.95, 1.0, -0.2, OptionType::Call).is_err());
-        assert!(black76_price(100.0, 100.0, 0.95, -1.0, 0.2, OptionType::Call).is_err());
-        assert!(black76_price(0.0, 100.0, 0.95, 1.0, 0.2, OptionType::Call).is_err());
-        assert!(black76_greeks(100.0, -1.0, 1.0, 0.2, OptionType::Put).is_err());
+        assert!(black76_price(100.0, 100.0, 0.95, -0.2, 1.0, OptionType::Call).is_err());
+        assert!(black76_price(100.0, 100.0, 0.95, 0.2, -1.0, OptionType::Call).is_err());
+        assert!(black76_price(0.0, 100.0, 0.95, 0.2, 1.0, OptionType::Call).is_err());
+        assert!(black76_greeks(100.0, -1.0, 0.2, 1.0, OptionType::Put).is_err());
         // Zero vol and zero expiry are the discounted intrinsic value.
-        let intrinsic = black76_price(110.0, 100.0, 0.9, 0.0, 0.2, OptionType::Call).unwrap();
+        let intrinsic = black76_price(110.0, 100.0, 0.9, 0.2, 0.0, OptionType::Call).unwrap();
         assert!((intrinsic - 9.0).abs() < 1e-12);
     }
 
     #[test]
     fn forward_greeks_match_leaf_formulas() {
-        let g = black76_greeks(100.0, 100.0, 1.0, 0.2, OptionType::Put).unwrap();
+        let g = black76_greeks(100.0, 100.0, 0.2, 1.0, OptionType::Put).unwrap();
         assert_eq!(g.delta, black_delta_put(100.0, 100.0, 0.2, 1.0));
         assert_eq!(g.gamma, black_gamma(100.0, 100.0, 0.2, 1.0));
         assert_eq!(g.vega, black_vega(100.0, 100.0, 0.2, 1.0));
@@ -489,7 +489,7 @@ mod tests {
     #[test]
     fn bachelier_price_is_unit_annuity_twin_and_checks_domain() {
         let unit = bachelier_price(0.03, 0.025, 0.005, 2.0, OptionType::Put).unwrap();
-        let annuity = crate::volatility::normal::bachelier_price_with_annuity(
+        let annuity = crate::closed_form::volatility::bachelier_price_with_annuity(
             OptionType::Put,
             0.03,
             0.025,
@@ -518,12 +518,12 @@ mod tests {
             for vol in [0.0, 0.2] {
                 for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
                     assert!(
-                        black76_price(invalid, 100.0, 1.0, expiry, vol, OptionType::Call).is_err()
+                        black76_price(invalid, 100.0, 1.0, vol, expiry, OptionType::Call).is_err()
                     );
                     assert!(
-                        black76_price(100.0, invalid, 1.0, expiry, vol, OptionType::Call).is_err()
+                        black76_price(100.0, invalid, 1.0, vol, expiry, OptionType::Call).is_err()
                     );
-                    assert!(black76_greeks(invalid, 100.0, expiry, vol, OptionType::Call).is_err());
+                    assert!(black76_greeks(invalid, 100.0, vol, expiry, OptionType::Call).is_err());
                     assert!(
                         bachelier_price(invalid, 100.0, vol, expiry, OptionType::Call).is_err()
                     );
@@ -543,9 +543,9 @@ mod tests {
                 }
             }
         }
-        assert!(black76_price(100.0, 100.0, -1.0, 1.0, 0.2, OptionType::Call).is_err());
-        assert!(black76_price(-0.01, 0.01, 1.0, 1.0, 0.2, OptionType::Put).is_err());
-        assert!(black76_greeks(100.0, 100.0, 1.0, -0.2, OptionType::Call).is_err());
+        assert!(black76_price(100.0, 100.0, -1.0, 0.2, 1.0, OptionType::Call).is_err());
+        assert!(black76_price(-0.01, 0.01, 1.0, 0.2, 1.0, OptionType::Put).is_err());
+        assert!(black76_greeks(100.0, 100.0, -0.2, 1.0, OptionType::Call).is_err());
         assert!(bachelier_price(0.03, 0.03, -0.01, 1.0, OptionType::Call).is_err());
         assert!(bachelier_greeks(0.03, 0.03, 0.01, -1.0, OptionType::Call).is_err());
         assert!(black_shifted_price(-0.04, -0.02, 0.0, 0.0, 0.03, OptionType::Call).is_err());
@@ -555,17 +555,17 @@ mod tests {
     #[test]
     fn checked_forward_models_preserve_valid_boundaries_and_negative_normal_rates() {
         assert_eq!(
-            black76_price(110.0, 100.0, 0.95, 1.0, 0.0, OptionType::Call).unwrap(),
+            black76_price(110.0, 100.0, 0.95, 0.0, 1.0, OptionType::Call).unwrap(),
             9.5
         );
         assert_eq!(
-            black76_price(110.0, 100.0, 0.95, 0.0, 0.2, OptionType::Put).unwrap(),
+            black76_price(110.0, 100.0, 0.95, 0.2, 0.0, OptionType::Put).unwrap(),
             0.0
         );
         let call = bachelier_price(-0.02, -0.03, 0.01, 2.0, OptionType::Call).unwrap();
         let put = bachelier_price(-0.02, -0.03, 0.01, 2.0, OptionType::Put).unwrap();
         assert!((call - put - 0.01).abs() < 1e-14);
-        let greeks = black76_greeks(110.0, 100.0, 0.0, 0.2, OptionType::Call).unwrap();
+        let greeks = black76_greeks(110.0, 100.0, 0.2, 0.0, OptionType::Call).unwrap();
         assert_eq!(
             greeks,
             ForwardGreeks {

@@ -328,9 +328,9 @@ const cases = {
     return {
       by_period: aggregation,
       get_amount: [
-        cashflows.periodAggregationGetAmount(aggregation, '2026Q1', 'EUR') ?? null,
-        cashflows.periodAggregationGetAmount(aggregation, '2025Q1', 'EUR') ?? null,
-        cashflows.periodAggregationGetAmount(aggregation, 'nope', 'USD') ?? null,
+        aggregation['2026Q1']?.['EUR'] ?? null,
+        aggregation['2025Q1']?.['EUR'] ?? null,
+        aggregation['nope']?.['USD'] ?? null,
       ],
       checked: cashflows.aggregateCashflowsChecked(flows.slice(0, 2), 'USD'),
       ladder: cashflows.calendarYearLadder(
@@ -416,16 +416,16 @@ const cases = {
   ],
   'specs.notional': () => [
     cashflows.notionalPar(1_000_000.005, 'USD'),
-    cashflows.notionalCurrency(cashflows.notionalPar(5, 'JPY')),
+    cashflows.notionalPar(5, 'JPY').initial.currency,
   ],
   'specs.default_model': () => {
     const models = [
-      cashflows.defaultModelSpecConstantCdr(0.03),
-      cashflows.defaultModelSpecSda(1.5),
+      { curve: 'constant', cdr: 0.03 },
+      { curve: 'sda', speed_multiplier: 1.5 },
       cashflows.defaultModelSpecCdr2pct(),
-      cashflows.defaultModelSpecVector([0.01, 0.02, 0.04]),
-      cashflows.defaultModelSpecCumulativeLoss([0.5, 1.5, 2.0], 0.4),
-      cashflows.defaultModelSpecTiming(0.1, [15, 30, 30, 15, 10]),
+      { curve: 'vector', monthly_cdr: [0.01, 0.02, 0.04] },
+      { curve: 'cumulative_loss', cumulative_net_loss_pct: [0.5, 1.5, 2.0], severity: 0.4 },
+      { curve: 'timing', cumulative_default_rate: 0.1, annual_pct: [15, 30, 30, 15, 10] },
     ];
     return {
       models,
@@ -436,12 +436,12 @@ const cases = {
   },
   'specs.prepayment_model': () => {
     const models = [
-      cashflows.prepaymentModelSpecConstantCpr(0.06),
-      cashflows.prepaymentModelSpecPsa(1.5),
+      { curve: 'constant', cpr: 0.06 },
+      { curve: 'psa', speed_multiplier: 1.5 },
       cashflows.prepaymentModelSpecPsa100(),
-      cashflows.prepaymentModelSpecCmbsWithLockout(60, 0.1),
-      cashflows.prepaymentModelSpecAbs(0.015),
-      cashflows.prepaymentModelSpecVector([0.02, 0.05, 0.08]),
+      { curve: 'cmbs_lockout', lockout_months: 60, post_lockout_cpr: 0.1 },
+      { curve: 'abs', speed: 0.015 },
+      { curve: 'vector', monthly_cpr: [0.02, 0.05, 0.08] },
     ];
     return {
       models,
@@ -632,9 +632,12 @@ test('spec functions validate through Rust and reject wrong host types', () => {
       }),
     kind('validation', /cannot exceed initial notional/)
   );
-  assert.equal(cashflows.defaultModelSpecValidate(cashflows.defaultModelSpecSda(1)), undefined);
+  assert.equal(
+    cashflows.defaultModelSpecValidate({ curve: 'sda', speed_multiplier: 1 }),
+    undefined
+  );
   assert.throws(
-    () => cashflows.defaultModelSpecValidate(cashflows.defaultModelSpecConstantCdr(-0.1)),
+    () => cashflows.defaultModelSpecValidate({ curve: 'constant', cdr: -0.1 }),
     kind('validation', /must be a decimal in \[0,1\]; got -0\.1/)
   );
   assert.equal(
@@ -642,7 +645,7 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     undefined
   );
   assert.throws(
-    () => cashflows.prepaymentModelSpecValidate(cashflows.prepaymentModelSpecAbs(1.5)),
+    () => cashflows.prepaymentModelSpecValidate({ curve: 'abs', speed: 1.5 }),
     kind('validation', /abs|speed/i)
   );
   assert.equal(cashflows.recoveryModelSpecValidate({ rate: 0.4, recovery_lag: 0 }), undefined);
@@ -764,7 +767,7 @@ test('CFCC-010: compounding presets and default-model survival helpers come from
   assert.equal(cashflows.floatingLegCompoundingIsOvernight('simple_average'), true);
   assert.equal(cashflows.floatingLegCompoundingIsOvernight(inArrears), true);
 
-  const timing = cashflows.defaultModelSpecTiming(0.1, [50, 50]);
+  const timing = { curve: 'timing', cumulative_default_rate: 0.1, annual_pct: [50, 50] };
   assert.ok(
     Math.abs(cashflows.defaultModelSpecCumulativeDefaultFraction(timing, 12) - 0.05) < 1e-12
   );

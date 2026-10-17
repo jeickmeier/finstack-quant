@@ -251,6 +251,10 @@ impl StochasticProcess for RoughBergomiProcess {
         true
     }
 
+    fn dedicated_scheme(&self) -> Option<&'static str> {
+        Some("rough_bergomi_euler")
+    }
+
     /// Formal no-op: actual drift is applied by the rBergomi discretization.
     fn drift(&self, _t: f64, _x: &[f64], out: &mut [f64]) {
         out[0] = 0.0;

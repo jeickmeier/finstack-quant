@@ -83,6 +83,7 @@ impl TradeParams {
 /// `*_impact` spelling for wire stability.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct ImpactEstimate {
     /// Permanent-impact component of the expected execution cost, in
     /// currency units (information leakage, irreversible). Despite the
@@ -105,9 +106,37 @@ pub struct ImpactEstimate {
     pub execution_risk: f64,
 }
 
+impl ImpactEstimate {
+    pub(crate) fn from_components(
+        params: &TradeParams,
+        permanent_impact: f64,
+        temporary_impact: f64,
+    ) -> Self {
+        let total_cost = permanent_impact + temporary_impact;
+        let q_abs = params.quantity.abs();
+        let reference_price = params.effective_reference_price();
+        let notional = q_abs * reference_price;
+        let cost_bp = if notional > 0.0 {
+            total_cost / notional * 10_000.0
+        } else {
+            0.0
+        };
+        let execution_risk =
+            params.daily_volatility * (params.horizon_days / 3.0).sqrt() * q_abs * reference_price;
+        Self {
+            permanent_impact,
+            temporary_impact,
+            total_cost,
+            cost_bp,
+            execution_risk,
+        }
+    }
+}
+
 /// Optimal execution schedule for a trade.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct ExecutionTrajectory {
     /// Quantity to trade in each time bucket.
     pub quantities: Vec<f64>,
@@ -123,4 +152,42 @@ pub struct ExecutionTrajectory {
 
     /// Time points (in trading days) for each bucket boundary.
     pub time_points: Vec<f64>,
+}
+
+impl ExecutionTrajectory {
+    pub(crate) fn uniform_steps(
+        quantity: f64,
+        horizon_days: f64,
+        num_buckets: usize,
+    ) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+        let dt = horizon_days / num_buckets as f64;
+        let per_bucket = quantity / num_buckets as f64;
+        let mut quantities = Vec::with_capacity(num_buckets);
+        let mut remaining = Vec::with_capacity(num_buckets + 1);
+        let mut time_points = Vec::with_capacity(num_buckets + 1);
+        remaining.push(quantity);
+        time_points.push(0.0);
+        for j in 1..=num_buckets {
+            quantities.push(per_bucket);
+            let rem = if j == num_buckets {
+                0.0
+            } else {
+                quantity - per_bucket * j as f64
+            };
+            remaining.push(rem);
+            time_points.push(j as f64 * dt);
+        }
+        (quantities, remaining, time_points)
+    }
+
+    pub(crate) fn piecewise_linear_variance(remaining: &[f64], dt: f64, sigma: f64) -> f64 {
+        let sigma_sq = sigma * sigma;
+        remaining
+            .windows(2)
+            .map(|w| {
+                let (a, b) = (w[0], w[1]);
+                sigma_sq * (a * a + a * b + b * b) / 3.0 * dt
+            })
+            .sum()
+    }
 }

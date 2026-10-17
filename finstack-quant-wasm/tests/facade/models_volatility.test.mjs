@@ -16,14 +16,12 @@ await facade.default({ module_or_path: readFileSync(wasmPath) });
 
 test('volatility engines are exposed only under models.volatility', () => {
   assert.equal('SabrParameters' in facade.models, false);
-  assert.equal('SabrModel' in facade.models, false);
   assert.equal('SabrSmile' in facade.models, false);
   assert.equal('SabrCalibrator' in facade.models, false);
 
   const volatility = facade.models.volatility;
   for (const name of [
     'SabrParameters',
-    'SabrModel',
     'SabrSmile',
     'SabrCalibrator',
     'getCubeVol',
@@ -65,13 +63,12 @@ test('models.volatility evaluates core data artifacts', () => {
 });
 
 test('normal SABR beta zero uses arithmetic moneyness across zero', () => {
-  const { SabrParameters, SabrModel } = facade.models.volatility;
+  const { SabrParameters } = facade.models.volatility;
   const alpha = 0.008,
     nu = 0.7,
     rho = -0.35,
     expiry = 2;
   const params = new SabrParameters(alpha, 0, nu, rho);
-  const model = new SabrModel(params);
   for (const [forward, strike] of [
     [-0.01, -0.006],
     [-0.002, 0.002],
@@ -80,9 +77,8 @@ test('normal SABR beta zero uses arithmetic moneyness across zero', () => {
     const z = (nu * (forward - strike)) / alpha;
     const chi = Math.log((Math.sqrt(1 - 2 * rho * z + z * z) + z - rho) / (1 - rho));
     const expected = ((alpha * z) / chi) * (1 + ((2 - 3 * rho * rho) * nu * nu * expiry) / 24);
-    assert.ok(Math.abs(model.impliedVol(forward, strike, expiry) - expected) < 1e-14);
+    assert.ok(Math.abs(params.impliedVol(forward, strike, expiry) - expected) < 1e-14);
   }
-  model.free();
   params.free();
 });
 
@@ -216,7 +212,7 @@ test('implied vol solvers invert Bachelier and undiscounted Black prices', () =>
     const price = facade.models.bachelierPrice(forward, strike, 0.006, 1, isCall);
     assert.ok(Math.abs(impliedVolBachelier(price, forward, strike, 1, isCall) - 0.006) < 1e-12);
   }
-  const price = facade.models.black76Price(100, 105, 1, 1, 0.25, true);
+  const price = facade.models.black76Price(100, 105, 1, 0.25, 1, true);
   assert.ok(Math.abs(impliedVolBlack(price, 100, 105, 1, true) - 0.25) < 1e-12);
   assert.throws(() => impliedVolBlack(0.001, -0.002, -0.001, 1, true), { kind: 'validation' });
 });

@@ -226,14 +226,12 @@ impl HullWhite1FParams {
 
     /// Get θ(t) at a given time.
     pub fn theta_at_time(&self, t: f64) -> f64 {
-        // Piecewise-constant interpolation.
-        for i in (0..self.theta_times.len()).rev() {
-            if t >= self.theta_times[i] {
-                return self.theta_curve[i];
-            }
+        let index = self.theta_times.partition_point(|knot| *knot <= t);
+        if self.theta_times[0] > 0.0 {
+            self.theta_curve[index.min(self.theta_curve.len() - 1)]
+        } else {
+            self.theta_curve[index.saturating_sub(1)]
         }
-
-        self.theta_curve[0]
     }
 
     /// Time-average of the piecewise-constant θ over `[t, t + dt]`.
@@ -579,14 +577,17 @@ fn fit_theta_levels(
 ) -> Result<Vec<f64>> {
     let mut boundaries = Vec::with_capacity(theta_times.len() + 1);
     boundaries.push(0.0);
-    boundaries.extend_from_slice(&theta_times[1..]);
-    let last = boundaries[boundaries.len() - 1];
-    let last_width = match boundaries.len() {
-        1 if theta_times[0] > 0.0 => theta_times[0],
-        1 => 1.0,
-        n => last - boundaries[n - 2],
-    };
-    boundaries.push(last + last_width);
+    if theta_times[0] > 0.0 {
+        boundaries.extend_from_slice(theta_times);
+    } else {
+        boundaries.extend_from_slice(&theta_times[1..]);
+        let last = boundaries[boundaries.len() - 1];
+        let last_width = match boundaries.len() {
+            1 => 1.0,
+            n => last - boundaries[n - 2],
+        };
+        boundaries.push(last + last_width);
+    }
 
     let mut alpha_start = alpha(0.0)?;
     boundaries
@@ -962,6 +963,49 @@ mod tests {
         assert_eq!(scheduled.theta_times(), scalar.theta_times());
         for (actual, expected) in scheduled.theta_values().iter().zip(scalar.theta_values()) {
             assert!((actual - expected).abs() < 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn calibrate_theta_preserves_positive_first_knot() {
+        use super::super::super::discretization::exact_hw1f::ExactHullWhite1F;
+        use super::super::super::traits::Discretization;
+
+        let kappa = 0.05;
+        let sigma = 0.01;
+        let kinked = |t: f64| {
+            let integral =
+                0.02 * t.min(0.5) + 0.05 * (t.min(1.0) - 0.5).max(0.0) + 0.03 * (t - 1.0).max(0.0);
+            (-integral).exp()
+        };
+        let knots = [0.5, 1.0, 2.0, 5.0];
+        let params = calibrate_theta_from_curve(kappa, sigma, kinked, &knots)
+            .expect("positive first knot calibration");
+        let process = HullWhite1FProcess::new(params);
+        let disc = ExactHullWhite1F::new();
+        let mut work = vec![0.0_f64; disc.work_size(&process)];
+        let mut rate = vec![instantaneous_forward(&kinked, 0.0)];
+
+        let grid = [0.0, 0.5, 1.0, 2.0, 5.0];
+        for pair in grid.windows(2) {
+            disc.step(
+                &process,
+                pair[0],
+                pair[1] - pair[0],
+                &mut rate,
+                &[0.0],
+                &mut work,
+            );
+            let decay = 1.0 - (-kappa * pair[1]).exp();
+            let expected = instantaneous_forward(&kinked, pair[1])
+                + sigma * sigma / (2.0 * kappa * kappa) * decay * decay;
+            assert!(
+                (rate[0] - expected).abs() < 1e-12,
+                "mean short rate {} at t={} should match curve shift {}",
+                rate[0],
+                pair[1],
+                expected
+            );
         }
     }
 }

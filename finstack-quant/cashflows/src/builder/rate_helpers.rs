@@ -55,28 +55,6 @@ pub struct FloatingRateParams {
     pub all_in_cap_bp: Option<f64>,
 }
 
-/// Runtime-resolved fallback policy for floating-rate projection.
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) enum ResolvedFloatingRateFallback {
-    /// Propagate the original error.
-    Error,
-    /// Use the spread-only fallback implied by the projection params.
-    SpreadOnly,
-    /// Use a fixed index rate, already converted to `f64`.
-    FixedRate(f64),
-}
-
-/// Validated runtime floating-rate configuration used by coupon emission.
-#[derive(Debug, Clone)]
-pub(crate) struct ResolvedFloatingRateSpec {
-    /// Projection parameters consumed by the numerical helpers.
-    pub params: FloatingRateParams,
-    /// Runtime-resolved fallback policy.
-    pub fallback: ResolvedFloatingRateFallback,
-    /// Index floor/cap policy for overnight daily sampling.
-    pub overnight_index_constraints: super::specs::OvernightIndexConstraintApplication,
-}
-
 impl Default for FloatingRateParams {
     fn default() -> Self {
         Self {
@@ -195,6 +173,11 @@ impl TryFrom<&crate::builder::specs::FloatingRateSpec> for FloatingRateParams {
             .ok_or(finstack_quant_core::Error::Input(
                 InputError::ConversionOverflow,
             ))?;
+        if let crate::builder::specs::FloatingRateFallback::FixedRate(rate) = &spec.fallback {
+            let _ = rate.to_f64().ok_or(finstack_quant_core::Error::Input(
+                InputError::ConversionOverflow,
+            ))?;
+        }
 
         let params = FloatingRateParams {
             spread_bp,
@@ -207,32 +190,6 @@ impl TryFrom<&crate::builder::specs::FloatingRateSpec> for FloatingRateParams {
         };
         params.validate()?;
         Ok(params)
-    }
-}
-
-impl TryFrom<&crate::builder::specs::FloatingRateSpec> for ResolvedFloatingRateSpec {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(spec: &crate::builder::specs::FloatingRateSpec) -> Result<Self> {
-        use crate::builder::specs::FloatingRateFallback;
-        use finstack_quant_core::InputError;
-
-        let params = FloatingRateParams::try_from(spec)?;
-        let fallback = match &spec.fallback {
-            FloatingRateFallback::Error => ResolvedFloatingRateFallback::Error,
-            FloatingRateFallback::SpreadOnly => ResolvedFloatingRateFallback::SpreadOnly,
-            FloatingRateFallback::FixedRate(rate) => {
-                ResolvedFloatingRateFallback::FixedRate(rate.to_f64().ok_or(
-                    finstack_quant_core::Error::Input(InputError::ConversionOverflow),
-                )?)
-            }
-        };
-
-        Ok(Self {
-            params,
-            fallback,
-            overnight_index_constraints: spec.overnight_index_constraints,
-        })
     }
 }
 

@@ -10,27 +10,21 @@ mod parametric;
 mod position;
 mod residual;
 mod types;
-mod views;
 
 pub use budget::{
-    evaluate_risk_budget_arrays, PositionBudgetEntry, RiskBudgetResult,
-    DEFAULT_UTILIZATION_THRESHOLD,
+    evaluate_risk_budget, PositionBudgetEntry, RiskBudgetResult, DEFAULT_UTILIZATION_THRESHOLD,
 };
 pub use parametric::decompose_factors;
 pub use position::{
-    build_stress_attribution, decompose_from_pnls, decompose_positions,
+    build_stress_attribution, flatten_position_pnls, flatten_square_matrix,
     historical_var_decomposition, parametric_es_decomposition, parametric_var_decomposition,
-    DecompositionConfig, DecompositionMethod, PositionEsContribution, PositionRiskDecomposition,
+    DecompositionMethod, PositionEsContribution, PositionRiskDecomposition,
     PositionVarContribution, StressAttribution, StressPositionEntry, TailScenarioBreakdown,
 };
 pub use residual::apply_residual_contributions;
 pub use types::{
     FactorContribution, PositionFactorContribution, PositionResidualContribution,
     ResidualContributionSource, RiskDecomposition,
-};
-pub use views::{
-    flatten_position_pnls, flatten_square_matrix, parametric_es_decomposition_view,
-    ParametricEsDecompositionView, PositionEsContributionView,
 };
 
 /// Snap tolerance used when deciding whether a floating-point tail-size

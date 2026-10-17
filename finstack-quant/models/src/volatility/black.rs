@@ -32,34 +32,6 @@
 //! `t > 0` before calling these functions, or handling the ATM case separately
 //! based on your exercise convention.
 
-/// Calculate d1 for Black–Scholes (general form with dividends/carry)
-///
-/// Full Black-Scholes-Merton d1 calculation:
-/// d1 = [ln(S/K) + (r - q + σ²/2)T] / (σ√T)
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's price units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `r` - Continuously compounded domestic risk-free rate as a decimal.
-/// * `sigma` - Annualized lognormal volatility as a decimal, such as `0.20`.
-/// * `t` - Remaining time to expiry in years.
-/// * `q` - Continuously compounded dividend yield or foreign-rate carry as a
-///   decimal annual rate.
-///
-/// # Edge Cases
-/// - At expiration (t ≤ 0) or zero volatility: returns appropriate limit
-///   based on intrinsic value (±∞ for ITM/OTM, 0 for ATM)
-/// - See module-level documentation for details on ATM-at-expiry behavior
-///
-/// # Performance
-/// If you need both d1 and d2, use [`d1_d2`] instead to avoid redundant work.
-#[inline]
-#[must_use]
-pub fn d1(spot: f64, strike: f64, r: f64, sigma: f64, t: f64, q: f64) -> f64 {
-    d1_d2(spot, strike, r, sigma, t, q).0
-}
-
 /// Calculate both d1 and d2 for Black–Scholes in a single pass.
 ///
 /// # Arguments
@@ -119,32 +91,6 @@ fn moneyness_limit(difference: f64) -> f64 {
     } else {
         0.0
     }
-}
-
-/// Calculate d1 for Black76 model (forward-based, no drift)
-///
-/// Black76 d1 calculation for rates/commodities:
-/// d1 = [ln(F/K) + σ²T/2] / (σ√T)
-///
-/// This is equivalent to Black-Scholes with r=q=0.
-/// Used for swaptions, caps/floors, and commodity options.
-///
-/// # Arguments
-///
-/// * `forward` - Forward price or rate at option expiry.
-/// * `strike` - Exercise price or rate in the same units as `forward`.
-/// * `sigma` - Annualized lognormal volatility as a decimal.
-/// * `t` - Remaining time to expiry in years.
-///
-/// # Edge Cases
-/// - At expiration (t ≤ 0) or zero volatility: returns appropriate limit
-///
-/// # Performance
-/// If you need both d1 and d2, use [`d1_d2_black76`] instead.
-#[inline]
-#[must_use]
-pub fn d1_black76(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
-    d1_d2_black76(forward, strike, sigma, t).0
 }
 
 /// Calculate both d1 and d2 for Black76 model in a single pass.

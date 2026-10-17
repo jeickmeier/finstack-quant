@@ -11,7 +11,6 @@
 
 use finstack_quant_core::error::InputError;
 use finstack_quant_core::math::random::Pcg64Rng;
-use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::Result;
 
 /// Debt seniority classification for recovery rate modeling.
@@ -249,11 +248,6 @@ impl BetaRecovery {
         Ok(dist.inverse_cdf(p))
     }
 
-    /// Expected recovery rate (same as mean).
-    pub fn expected(&self) -> f64 {
-        self.mean
-    }
-
     /// LGD = 1 - recovery. Returns mean LGD.
     pub fn mean_lgd(&self) -> f64 {
         1.0 - self.mean
@@ -333,83 +327,6 @@ impl SeniorityCalibration {
             .iter()
             .find(|(c, _)| *c == class)
             .map(|(_, b)| b)
-    }
-}
-
-/// Recovery model driven by seniority-class Beta distributions.
-///
-/// Wraps a `BetaRecovery` to provide seniority-aware recovery estimation.
-/// Can be used directly or plugged into portfolio default simulation.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct SeniorityRecovery {
-    class: SeniorityClass,
-    dist: BetaRecovery,
-}
-
-impl SeniorityRecovery {
-    /// Create from a seniority class and calibration.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `class` is not found in `calibration`.
-    pub fn from_calibration(
-        class: SeniorityClass,
-        calibration: &SeniorityCalibration,
-    ) -> Result<Self> {
-        let dist = calibration.get(class).ok_or(InputError::Invalid)?;
-        Ok(Self { class, dist: *dist })
-    }
-
-    /// Create directly from a BetaRecovery.
-    pub fn new(class: SeniorityClass, dist: BetaRecovery) -> Self {
-        Self { class, dist }
-    }
-
-    /// The seniority class.
-    pub fn seniority(&self) -> SeniorityClass {
-        self.class
-    }
-
-    /// The underlying Beta distribution.
-    pub fn distribution(&self) -> &BetaRecovery {
-        &self.dist
-    }
-
-    /// Expected (mean) recovery rate.
-    pub fn expected_recovery(&self) -> f64 {
-        self.dist.mean()
-    }
-
-    /// Recovery volatility (standard deviation).
-    pub fn recovery_volatility(&self) -> f64 {
-        self.dist.std_dev()
-    }
-
-    /// Conditional recovery given a standard-normal market factor Z.
-    ///
-    /// Maps the market factor through the Beta quantile function:
-    /// R(Z) = Beta_inv(Phi(Z))
-    ///
-    /// This creates systematic variation while preserving the marginal
-    /// Beta distribution.
-    ///
-    /// # Errors
-    ///
-    /// Propagates quantile errors (see [`BetaRecovery::quantile`]).
-    pub fn conditional_recovery(&self, market_factor: f64) -> Result<f64> {
-        let p = norm_cdf(market_factor).clamp(1e-10, 1.0 - 1e-10);
-        self.dist.quantile(p)
-    }
-
-    /// Mean LGD = 1 - expected recovery.
-    pub fn lgd(&self) -> f64 {
-        1.0 - self.dist.mean()
-    }
-
-    /// Model name string.
-    pub fn model_name(&self) -> &'static str {
-        "Seniority-Based Beta Recovery"
     }
 }
 
@@ -614,66 +531,5 @@ mod tests {
             sub
         );
         assert!(sub > junior, "subordinated {} > junior {}", sub, junior);
-    }
-
-    #[test]
-    fn seniority_recovery_from_calibration() {
-        let cal = SeniorityCalibration::moodys_historical().expect("valid calibration");
-        let sr = SeniorityRecovery::from_calibration(SeniorityClass::SeniorSecured, &cal)
-            .expect("found");
-        assert_eq!(sr.seniority(), SeniorityClass::SeniorSecured);
-        assert!((sr.expected_recovery() - 0.52).abs() < 1e-12);
-    }
-
-    #[test]
-    fn seniority_recovery_conditional_varies() {
-        let br = BetaRecovery::new(0.45, 0.20).expect("valid params");
-        let sr = SeniorityRecovery::new(SeniorityClass::SeniorUnsecured, br);
-
-        // Stress scenario (negative market factor) should give lower recovery
-        let r_stress = sr.conditional_recovery(-3.0).expect("conditional");
-        let r_base = sr.conditional_recovery(0.0).expect("conditional");
-        let r_boom = sr.conditional_recovery(3.0).expect("conditional");
-
-        assert!(
-            r_stress < r_base,
-            "stress {} should be < base {}",
-            r_stress,
-            r_base
-        );
-        assert!(
-            r_base < r_boom,
-            "base {} should be < boom {}",
-            r_base,
-            r_boom
-        );
-    }
-
-    #[test]
-    fn seniority_recovery_conditional_at_zero_near_median() {
-        let br = BetaRecovery::new(0.45, 0.20).expect("valid params");
-        let sr = SeniorityRecovery::new(SeniorityClass::SeniorUnsecured, br);
-
-        // At market_factor = 0, Phi(0) = 0.5, so conditional = Beta median
-        let r0 = sr.conditional_recovery(0.0).expect("conditional");
-        let median = br.quantile(0.5).expect("quantile");
-        assert!(
-            (r0 - median).abs() < 1e-6,
-            "conditional at 0 = {}, median = {}",
-            r0,
-            median
-        );
-    }
-
-    #[test]
-    fn seniority_recovery_serialization_roundtrip() {
-        let br = BetaRecovery::new(0.45, 0.20).expect("valid params");
-        let sr = SeniorityRecovery::new(SeniorityClass::SeniorUnsecured, br);
-
-        let json = serde_json::to_string(&sr).expect("serialize");
-        let sr2: SeniorityRecovery = serde_json::from_str(&json).expect("deserialize");
-
-        assert!((sr2.expected_recovery() - sr.expected_recovery()).abs() < 1e-12);
-        assert_eq!(sr2.seniority(), sr.seniority());
     }
 }

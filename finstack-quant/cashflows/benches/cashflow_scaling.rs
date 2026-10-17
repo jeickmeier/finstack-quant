@@ -15,7 +15,6 @@
 mod fixtures;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use finstack_quant_cashflows::aggregation::DateContext;
 use finstack_quant_cashflows::builder::{
     AmortizationSpec, CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
 };
@@ -292,7 +291,7 @@ fn bench_pv_by_period_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_pv_by_period");
     let base = fixtures::base_date();
     let market = fixtures::make_discount_market(base);
-    let disc = market.get_discount("USD-OIS").unwrap();
+    let disc_id = finstack_quant_core::types::CurveId::from("USD-OIS");
 
     for years in [5i32, 10, 20, 40] {
         let n = (years * 12) as u64;
@@ -302,11 +301,13 @@ fn bench_pv_by_period_scaling(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
             b.iter(|| {
                 black_box(&schedule)
-                    .pv_by_period_with_discounting(
+                    .pv_by_period(
                         black_box(&periods),
-                        black_box(disc.as_ref()),
+                        black_box(&market),
+                        black_box(&disc_id),
                         None,
-                        DateContext::new(base, DayCount::Act365F, DayCountContext::default()),
+                        base,
+                        Some(DayCount::Act365F),
                     )
                     .unwrap()
             });

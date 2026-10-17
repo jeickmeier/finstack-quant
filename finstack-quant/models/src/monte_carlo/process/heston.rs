@@ -162,8 +162,7 @@ pub fn heston_satisfies_feller(kappa: f64, theta: f64, sigma_v: f64) -> bool {
 /// (`v = max(v, 0)`) and the engine applies Cholesky to
 /// [`StochasticProcess::factor_correlation`]. Production Heston Europeans
 /// use [`crate::monte_carlo::discretization::QeHeston`] via
-/// [`crate::monte_carlo::pricer::heston::price_heston_call`] /
-/// [`crate::monte_carlo::pricer::heston::price_heston_put`].
+/// [`crate::monte_carlo::pricer::heston::price_heston`].
 #[derive(Debug, Clone)]
 pub struct HestonProcess {
     params: HestonPricingParams,

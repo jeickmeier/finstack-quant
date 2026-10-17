@@ -13,16 +13,13 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::BarrierType;
 use finstack_quant_models::monte_carlo::discretization::lmm_predictor_corrector::LmmPredictorCorrector;
 use finstack_quant_models::monte_carlo::discretization::{
-    EulerMaruyama, ExactGbm, ExactHullWhite1F, ExactMultiGbmCorrelated, ExactSchwartzSmith, QeCir,
-    QeHeston,
+    EulerMaruyama, ExactGbm, ExactHullWhite1F, ExactMultiGbm, ExactSchwartzSmith, QeCir, QeHeston,
 };
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig, PathCaptureConfig};
 use finstack_quant_models::monte_carlo::payoff::asian::{
     default_fixing_steps, Asian, AveragingMethod,
 };
-use finstack_quant_models::monte_carlo::payoff::barrier::{
-    BarrierMonitoring, BarrierOptionPayoff, OptionKind,
-};
+use finstack_quant_models::monte_carlo::payoff::barrier::{BarrierMonitoring, BarrierOptionPayoff};
 use finstack_quant_models::monte_carlo::payoff::lookback::Lookback;
 use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
@@ -97,7 +94,7 @@ pub fn barrier_up_out(num_steps: usize) -> BarrierOptionPayoff {
         STRIKE,
         120.0,
         BarrierType::UpAndOut,
-        OptionKind::Call,
+        OptionType::Call,
         None,
         1.0,
         num_steps,
@@ -161,7 +158,7 @@ pub fn discount() -> f64 {
 }
 
 /// Equicorrelated multi-asset GBM with exact correlated log steps.
-pub fn multi_gbm(num_assets: usize) -> (MultiGbmProcess, ExactMultiGbmCorrelated, Vec<f64>) {
+pub fn multi_gbm(num_assets: usize) -> (MultiGbmProcess, ExactMultiGbm, Vec<f64>) {
     let params = (0..num_assets)
         .map(|i| {
             let vol = VOL + 0.01 * i as f64;
@@ -174,8 +171,8 @@ pub fn multi_gbm(num_assets: usize) -> (MultiGbmProcess, ExactMultiGbmCorrelated
             corr[i * num_assets + j] = if i == j { 1.0 } else { 0.30 };
         }
     }
-    let process = MultiGbmProcess::new(params, Some(corr.clone())).expect("valid multi-GBM");
-    let disc = ExactMultiGbmCorrelated::new(&corr, num_assets).expect("valid correlation");
+    let process = MultiGbmProcess::new(params, Some(corr)).expect("valid multi-GBM");
+    let disc = ExactMultiGbm::new();
     let spots = vec![SPOT; num_assets];
     (process, disc, spots)
 }
@@ -266,8 +263,8 @@ pub fn euler() -> EulerMaruyama {
     EulerMaruyama::new()
 }
 
-pub fn exact_ss(rho: f64) -> ExactSchwartzSmith {
-    ExactSchwartzSmith::new(rho).expect("valid SS scheme")
+pub fn exact_ss(_rho: f64) -> ExactSchwartzSmith {
+    ExactSchwartzSmith::new()
 }
 
 pub fn lmm_scheme() -> LmmPredictorCorrector {

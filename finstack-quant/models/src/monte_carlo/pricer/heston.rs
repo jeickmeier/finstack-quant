@@ -38,10 +38,11 @@ use finstack_quant_core::cashflow::flat_discount_factor;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::Result;
 
-/// Price a European call under Heston stochastic volatility by Monte Carlo.
+/// Price a European option under Heston stochastic volatility by Monte Carlo.
 ///
 /// # Arguments
 ///
+/// * `option_type` - Call or put payoff direction
 /// * `spot` - Current underlying price
 /// * `strike` - Exercise price in the same units as `spot`
 /// * `rate` - Continuously compounded risk-free rate (decimal, annualized)
@@ -73,9 +74,11 @@ use finstack_quant_core::Result;
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_models::monte_carlo::pricer::heston::price_heston_call;
+/// use finstack_quant_models::monte_carlo::pricer::heston::price_heston;
+/// use finstack_quant_models::OptionType;
 ///
-/// let estimate = price_heston_call(
+/// let estimate = price_heston(
+///     OptionType::Call,
 ///     100.0, 100.0, 0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0,
 ///     Some(2_000), Some(42), Some(16), None,
 /// )
@@ -83,82 +86,8 @@ use finstack_quant_core::Result;
 /// assert!(estimate.mean.amount() > 0.0);
 /// ```
 #[allow(clippy::too_many_arguments)]
-pub fn price_heston_call(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    kappa: f64,
-    theta: f64,
-    vol_of_vol: f64,
-    rho: f64,
-    v0: f64,
-    expiry: f64,
-    num_paths: Option<usize>,
-    seed: Option<u64>,
-    num_steps: Option<usize>,
-    currency: Option<Currency>,
-) -> Result<MoneyEstimate> {
-    price_heston_european(
-        true, spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, num_paths,
-        seed, num_steps, currency,
-    )
-}
-
-/// Price a European put under Heston stochastic volatility by Monte Carlo.
-///
-/// Identical machinery to [`price_heston_call`] — QE discretization, same
-/// registry-backed defaults, same determinism guarantee — with a put payoff.
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying price
-/// * `strike` - Exercise price in the same units as `spot`
-/// * `rate` - Continuously compounded risk-free rate (decimal, annualized)
-/// * `div_yield` - Continuous dividend yield (decimal, annualized)
-/// * `kappa` - Mean-reversion speed of the variance process
-/// * `theta` - Long-run variance level (variance, not volatility)
-/// * `vol_of_vol` - Volatility of variance
-/// * `rho` - Spot/variance correlation in `[-1, 1]`
-/// * `v0` - Initial instantaneous variance
-/// * `expiry` - Time to expiry in years
-/// * `num_paths` - Independent path estimators in `2..=10_000_000`; each
-///   antithetic pair counts once. `None` uses the registry binding default.
-/// * `seed` - RNG seed; `None` uses the registry binding default
-/// * `num_steps` - Time steps per path; `None` uses the registry binding default
-/// * `currency` - Currency stamped on the result; `None` uses the registry
-///   binding default currency
-///
-/// # Errors
-///
-/// Same failure modes as [`price_heston_call`].
-#[allow(clippy::too_many_arguments)]
-pub fn price_heston_put(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    kappa: f64,
-    theta: f64,
-    vol_of_vol: f64,
-    rho: f64,
-    v0: f64,
-    expiry: f64,
-    num_paths: Option<usize>,
-    seed: Option<u64>,
-    num_steps: Option<usize>,
-    currency: Option<Currency>,
-) -> Result<MoneyEstimate> {
-    price_heston_european(
-        false, spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, num_paths,
-        seed, num_steps, currency,
-    )
-}
-
-/// Shared call/put composition behind the public Heston entry points.
-#[allow(clippy::too_many_arguments)]
-fn price_heston_european(
-    is_call: bool,
+pub fn price_heston(
+    option_type: crate::types::OptionType,
     spot: f64,
     strike: f64,
     rate: f64,
@@ -195,37 +124,42 @@ fn price_heston_european(
     let initial_state = [spot, v0];
     let discount_factor = flat_discount_factor(rate, expiry)?;
 
-    if is_call {
-        let payoff = EuropeanCall::new(strike, 1.0, num_steps);
-        engine.price(
-            &rng,
-            &process,
-            &disc,
-            &initial_state,
-            &payoff,
-            currency,
-            discount_factor,
-        )
-    } else {
-        let payoff = EuropeanPut::new(strike, 1.0, num_steps);
-        engine.price(
-            &rng,
-            &process,
-            &disc,
-            &initial_state,
-            &payoff,
-            currency,
-            discount_factor,
-        )
+    match option_type {
+        crate::types::OptionType::Call => {
+            let payoff = EuropeanCall::new(strike, 1.0, num_steps);
+            engine.price(
+                &rng,
+                &process,
+                &disc,
+                &initial_state,
+                &payoff,
+                currency,
+                discount_factor,
+            )
+        }
+        crate::types::OptionType::Put => {
+            let payoff = EuropeanPut::new(strike, 1.0, num_steps);
+            engine.price(
+                &rng,
+                &process,
+                &disc,
+                &initial_state,
+                &payoff,
+                currency,
+                discount_factor,
+            )
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::OptionType;
 
     fn atm_call(seed: u64) -> MoneyEstimate {
-        price_heston_call(
+        price_heston(
+            OptionType::Call,
             100.0,
             100.0,
             0.03,
@@ -267,7 +201,8 @@ mod tests {
     #[test]
     fn heston_put_call_have_distinct_values() {
         let call = atm_call(42);
-        let put = price_heston_put(
+        let put = price_heston(
+            OptionType::Put,
             100.0,
             100.0,
             0.03,

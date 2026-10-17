@@ -9,7 +9,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_models::closed_form::{
     bachelier_delta_call, bachelier_delta_put, bachelier_gamma, bachelier_vega,
 };
-use finstack_quant_models::volatility::normal::bachelier_price_with_annuity;
+use finstack_quant_models::volatility::bachelier_price_with_annuity;
 
 /// Price a caplet/floorlet using Bachelier's normal model.
 pub(crate) fn price_caplet_floorlet(

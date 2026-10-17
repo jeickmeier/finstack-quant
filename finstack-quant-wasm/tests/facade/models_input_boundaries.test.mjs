@@ -22,8 +22,8 @@ const invalidCount = (name) => (error) => {
 test('forward option APIs validate input domains before intrinsic branches', () => {
   for (const invalid of [NaN, Infinity, -Infinity]) {
     for (const expiry of [0, 1]) {
-      assert.throws(() => models.black76Price(invalid, 100, 0.95, expiry, 0.2, true));
-      assert.throws(() => models.black76Greeks(invalid, 100, expiry, 0.2, true));
+      assert.throws(() => models.black76Price(invalid, 100, 0.95, 0.2, expiry, true));
+      assert.throws(() => models.black76Greeks(invalid, 100, 0.2, expiry, true));
       assert.throws(() => models.bachelierPrice(invalid, 100, 0.2, expiry, true));
       assert.throws(() => models.bachelierGreeks(invalid, 100, 0.2, expiry, true));
       assert.throws(() => models.blackShiftedPrice(-0.01, -0.01, 0.2, expiry, invalid, true));
@@ -31,20 +31,20 @@ test('forward option APIs validate input domains before intrinsic branches', () 
     }
   }
   for (const df of [0, -0.95, NaN, Infinity]) {
-    assert.throws(() => models.black76Price(100, 100, df, 1, 0.2, true));
+    assert.throws(() => models.black76Price(100, 100, df, 0.2, 1, true));
   }
   for (const [vol, expiry] of [
     [-0.2, 1],
     [0.2, -1],
   ]) {
-    assert.throws(() => models.black76Price(100, 100, 0.95, expiry, vol, true));
-    assert.throws(() => models.black76Greeks(100, 100, expiry, vol, true));
+    assert.throws(() => models.black76Price(100, 100, 0.95, vol, expiry, true));
+    assert.throws(() => models.black76Greeks(100, 100, vol, expiry, true));
     assert.throws(() => models.bachelierPrice(100, 100, vol, expiry, true));
     assert.throws(() => models.bachelierGreeks(100, 100, vol, expiry, true));
     assert.throws(() => models.blackShiftedPrice(-0.01, -0.01, vol, expiry, 0.02, true));
     assert.throws(() => models.blackShiftedVega(-0.01, -0.01, vol, expiry, 0.02));
   }
-  assert.equal(models.black76Price(110, 100, 0.95, 1, 0, true), 9.5);
+  assert.equal(models.black76Price(110, 100, 0.95, 0, 1, true), 9.5);
   assert.equal(models.bachelierPrice(-0.01, -0.02, 0, 1, true), 0.01);
   assert.ok(Math.abs(models.blackShiftedPrice(-0.01, -0.02, 0, 1, 0.03, true) - 0.01) < 1e-15);
 });

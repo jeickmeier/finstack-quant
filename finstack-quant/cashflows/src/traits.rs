@@ -153,6 +153,17 @@ pub trait CashflowProvider: CashflowScheduleSource {
 
 impl<T> CashflowProvider for T where T: CashflowScheduleSource + ?Sized {}
 
+fn resolve_schedule_notional(
+    notional_hint: Option<Money>,
+    fallback_currency: Option<Currency>,
+) -> Notional {
+    let currency = fallback_currency.unwrap_or(Currency::USD);
+    Notional {
+        initial: notional_hint.unwrap_or_else(|| Money::from((0_i64, currency))),
+        amort: crate::builder::AmortizationSpec::None,
+    }
+}
+
 /// Build a [`CashFlowSchedule`] from instrument-signed `(Date, Money)` flows.
 ///
 /// Schedule metadata and an optional notional hint are configured through
@@ -195,11 +206,17 @@ pub fn schedule_from_dated_flows(
     day_count: DayCount,
     opts: ScheduleBuildOpts,
 ) -> CashFlowSchedule {
+    let first_currency = flows.first().map(|(_, amount)| amount.currency());
     let classified = flows
         .into_iter()
         .map(|(date, amount)| CashFlow::new(date, None, amount, kind, 0.0, None))
         .collect();
-    schedule_from_classified_flows(classified, day_count, opts)
+    CashFlowSchedule::from_parts(
+        classified,
+        resolve_schedule_notional(opts.notional_hint, first_currency),
+        day_count,
+        opts.meta,
+    )
 }
 
 /// Build a [`CashFlowSchedule`] from pre-classified [`CashFlow`] values.
@@ -257,17 +274,13 @@ pub fn schedule_from_classified_flows(
     day_count: DayCount,
     opts: ScheduleBuildOpts,
 ) -> CashFlowSchedule {
-    let fallback_currency = flows
-        .first()
-        .map(|cf| cf.amount.currency())
-        .unwrap_or(Currency::USD);
-    let notional = Notional {
-        initial: opts
-            .notional_hint
-            .unwrap_or_else(|| Money::from((0_i64, fallback_currency))),
-        amort: crate::builder::AmortizationSpec::None,
-    };
-    CashFlowSchedule::from_parts(flows, notional, day_count, opts.meta)
+    let first_currency = flows.first().map(|cf| cf.amount.currency());
+    CashFlowSchedule::from_parts(
+        flows,
+        resolve_schedule_notional(opts.notional_hint, first_currency),
+        day_count,
+        opts.meta,
+    )
 }
 
 #[cfg(test)]

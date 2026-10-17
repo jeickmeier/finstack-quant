@@ -32,7 +32,7 @@ use super::date_generation::{
     build_schedule_period, compile_periods, effective_frequency, effective_stub,
     generate_periods_with_adjustment, validate_accrual_grid, CompiledPeriod,
 };
-use super::rate_helpers::ResolvedFloatingRateSpec;
+use super::rate_helpers::FloatingRateParams;
 use super::specs::{
     CouponType, FeeAccrualBasis, FeeBase, FeeSpec, FixedCouponSpec, FloatingCouponSpec,
     FloatingRateSpec, ScheduleParams,
@@ -188,7 +188,7 @@ pub(crate) struct FloatSchedule {
     pub(crate) spec: FloatingCouponSpec,
     pub(crate) calendar: &'static dyn HolidayCalendar,
     pub(crate) fixing_calendar: &'static dyn HolidayCalendar,
-    pub(crate) runtime_spec: ResolvedFloatingRateSpec,
+    pub(crate) rate_params: FloatingRateParams,
     pub(crate) periods: Vec<CompiledPeriod>,
     /// Terminal accrual end.
     pub(crate) terminal_accrual_end: Option<Date>,
@@ -304,6 +304,7 @@ pub(super) struct CouponProgramPiece {
     pub(super) window: ProgramWindow,
     pub(super) schedule: ScheduleParams,
     pub(super) coupon: CouponSpec,
+    pub(super) split: CouponType,
 }
 
 #[derive(Debug, Clone)]
@@ -418,6 +419,7 @@ fn select_payment_split(
     pieces: &[ResolvedPaymentPiece<'_>],
     start: Date,
     end: Date,
+    default_split: CouponType,
 ) -> finstack_quant_core::Result<CouponType> {
     let mut chosen: Option<&ResolvedPaymentPiece<'_>> = None;
 
@@ -444,7 +446,7 @@ fn select_payment_split(
 
     Ok(chosen
         .map(|piece| piece.piece.split)
-        .unwrap_or(CouponType::Cash))
+        .unwrap_or(default_split))
 }
 
 pub(super) fn compute_coupon_schedules(
@@ -525,7 +527,7 @@ pub(super) fn compute_coupon_schedules(
         }
 
         let chosen_coupon = select_coupon_piece(&coupon_pieces, s, e)?;
-        let split = select_payment_split(&payment_pieces, s, e)?;
+        let split = select_payment_split(&payment_pieces, s, e, chosen_coupon.split)?;
         let mut schedule = chosen_coupon.schedule.clone();
         schedule.frequency = effective_frequency(schedule.frequency, schedule.roll_rule);
         schedule.stub = effective_stub(schedule.stub, schedule.roll_rule);
@@ -576,7 +578,7 @@ pub(super) fn compute_coupon_schedules(
                     coupon_type: split,
                     schedule: schedule.clone(),
                 };
-                let runtime_spec = ResolvedFloatingRateSpec::try_from(&spec.rate_spec)?;
+                let rate_params = FloatingRateParams::try_from(&spec.rate_spec)?;
                 let calendar = calendar_by_id_strict(&spec.schedule.calendar_id)?;
                 let fixing_calendar_id = spec
                     .rate_spec
@@ -589,7 +591,7 @@ pub(super) fn compute_coupon_schedules(
                     spec,
                     calendar,
                     fixing_calendar,
-                    runtime_spec,
+                    rate_params,
                     periods,
                     terminal_accrual_end: terminal,
                 });

@@ -11,13 +11,14 @@
 //!
 //! ```
 //! use finstack_quant_models::monte_carlo::convenience;
+//! use finstack_quant_models::OptionType;
 //!
 //! let pricer = convenience::european_pricer(Some(1_000), Some(7), Some(false))
 //!     .expect("valid path count");
 //! let steps = convenience::european_num_steps(None).expect("registry default");
 //! let currency = convenience::resolve_currency(None).expect("registry default");
 //! let estimate = pricer
-//!     .price_gbm_call(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, steps, currency)
+//!     .price_gbm(OptionType::Call, 100.0, 100.0, 0.05, 0.0, 0.2, 1.0, steps, currency)
 //!     .expect("valid inputs");
 //! assert!(estimate.mean.amount() > 0.0);
 //! ```
@@ -304,15 +305,22 @@ impl LsmcConvenience {
         basis: Option<&str>,
         basis_degree: Option<usize>,
     ) -> Result<(LsmcPricer, usize, BasisKind, usize)> {
-        let config = self.pricer.config();
-        let num_steps = num_steps.unwrap_or(self.num_steps);
-        let pricer = LsmcPricer::gbm_american(
-            config.num_paths,
-            num_steps,
-            config.seed,
-            config.use_parallel,
-            config.antithetic,
-        )?;
+        let (pricer, num_steps) = match num_steps {
+            Some(steps) => {
+                let config = self.pricer.config();
+                (
+                    LsmcPricer::gbm_american(
+                        config.num_paths,
+                        steps,
+                        config.seed,
+                        config.use_parallel,
+                        config.antithetic,
+                    )?,
+                    steps,
+                )
+            }
+            None => (self.pricer.clone(), self.num_steps),
+        };
         let basis = match basis {
             Some(name) => parse_basis(name)?,
             None => self.basis,

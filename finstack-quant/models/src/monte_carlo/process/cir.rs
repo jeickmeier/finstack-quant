@@ -278,14 +278,8 @@ impl CirPlusPlusProcess {
 
     /// Get φ(t) at a given time.
     pub fn shift_at_time(&self, t: f64) -> f64 {
-        // Piecewise-constant interpolation
-        for i in (0..self.shift_times.len()).rev() {
-            if t >= self.shift_times[i] {
-                return self.shift_curve[i];
-            }
-        }
-
-        self.shift_curve[0]
+        let index = self.shift_times.partition_point(|knot| *knot <= t);
+        self.shift_curve[index.saturating_sub(1)]
     }
 
     /// Get actual short rate r_t = x_t + φ(t).

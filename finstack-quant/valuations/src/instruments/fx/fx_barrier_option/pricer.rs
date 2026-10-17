@@ -17,9 +17,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PayoutTiming;
 
 // MC-specific imports
-use finstack_quant_models::monte_carlo::payoff::barrier::{
-    BarrierOptionPayoff, OptionKind as McOptionKind,
-};
+use finstack_quant_models::monte_carlo::payoff::barrier::BarrierOptionPayoff;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
 };
@@ -124,10 +122,6 @@ impl FxBarrierOptionMcPricer {
         // Standard FX barrier: the GBM drift `r_dom - r_for` (set above via
         // `GbmParams`) fully describes the dynamics. Quanto barriers are not
         // supported by this 1D MC payoff — see `BarrierOptionPayoff` docs.
-        let mc_option_kind = match inst.option_type {
-            crate::instruments::OptionType::Call => McOptionKind::Call,
-            crate::instruments::OptionType::Put => McOptionKind::Put,
-        };
         use finstack_quant_models::monte_carlo::seed;
 
         let seed = if let Some(scenario) = &inst
@@ -152,7 +146,7 @@ impl FxBarrierOptionMcPricer {
             inst.strike,
             inst.barrier,
             inst.barrier_type,
-            mc_option_kind,
+            inst.option_type,
             inst.rebate_per_unit(),
             inst.notional.amount(),
             time_grid.num_steps(),

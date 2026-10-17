@@ -9,7 +9,7 @@
 use std::collections::HashSet;
 
 use super::{Copula, CopulaSpec, RecoveryModel, RecoverySpec};
-use finstack_quant_core::math::{standard_normal_inv_cdf, student_t_inv_cdf, NeumaierAccumulator};
+use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_core::validation::{validate_f64_non_negative, validate_f64_unit_interval};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
@@ -477,18 +477,22 @@ impl ValidatedSimulation {
         let factor_count = exposures
             .first()
             .map_or(0, |exposure| exposure.factor_loadings.len());
-        if uses_recovery_model && factor_count != 1 && !exposures.is_empty() {
-            return Err(validation_error(
-                "recovery-model portfolio loss simulation requires exactly one systematic factor",
-            ));
-        }
+        let _ = uses_recovery_model;
 
-        let (is_student_t, student_t_df) = match &config.copula {
-            CopulaSpec::Gaussian => (false, None),
-            CopulaSpec::StudentT { degrees_of_freedom } => (true, Some(*degrees_of_freedom)),
-            _ => {
+        let is_student_t = match &config.copula {
+            CopulaSpec::Gaussian => false,
+            CopulaSpec::MultiFactor => {
+                if !exposures.is_empty() && factor_count != 2 {
+                    return Err(validation_error(format!(
+                        "Multi-Factor copula portfolio loss simulation requires 2 factor loadings per exposure, got {factor_count}"
+                    )));
+                }
+                false
+            }
+            CopulaSpec::StudentT { .. } => true,
+            CopulaSpec::RandomFactorLoading { .. } => {
                 return Err(validation_error(
-                    "portfolio loss simulation supports Gaussian and Student-t copulas only",
+                    "portfolio loss simulation supports Gaussian, Student-t, and Multi-Factor copulas only",
                 ));
             }
         };
@@ -506,10 +510,9 @@ impl ValidatedSimulation {
                 ))
             })?;
         for exposure in exposures {
-            let threshold = match student_t_df {
-                Some(df) => student_t_inv_cdf(exposure.default_probability, df),
-                None => Ok(standard_normal_inv_cdf(exposure.default_probability)),
-            }?;
+            let threshold = config
+                .copula
+                .default_threshold(exposure.default_probability)?;
             thresholds.push(threshold);
         }
 
@@ -571,8 +574,13 @@ impl ValidatedSimulation {
                 ));
             }
             if latent <= *threshold {
+                let recovery_factor = if rho > 0.0 {
+                    systematic
+                } else {
+                    factors.first().copied().unwrap_or(0.0)
+                };
                 let lgd = recovery
-                    .map(|model| model.conditional_lgd(factors[0]))
+                    .map(|model| model.conditional_lgd(recovery_factor))
                     .unwrap_or(exposure.lgd);
                 let contribution = exposure.notional * lgd;
                 let next_loss = total_loss + contribution;

@@ -339,15 +339,15 @@ impl PyCashFlowBuilder {
             || "None".to_string(),
             |n| format!("{} {}", n.amount(), n.currency()),
         );
-        let horizon = match (self.inner.issue_date(), self.inner.maturity_date()) {
+        let horizon = match (self.inner.get_issue_date(), self.inner.get_maturity_date()) {
             (Some(issue), Some(maturity)) => format!("'{issue}'..'{maturity}'"),
             _ => "None".to_string(),
         };
         format!(
             "CashFlowBuilder(principal={principal}, horizon={horizon}, coupon_legs={}, fees={}, principal_events={})",
-            self.inner.coupon_leg_count(),
-            self.inner.fee_count(),
-            self.inner.principal_event_count(),
+            self.inner.get_coupon_leg_count(),
+            self.inner.get_fee_count(),
+            self.inner.get_principal_event_count(),
         )
     }
 }

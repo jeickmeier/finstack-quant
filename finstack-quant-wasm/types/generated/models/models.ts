@@ -815,7 +815,7 @@ export type DownturnMethod =
 /**
  * Recovery model specification.
  */
-export type RecoveryModel =
+export type DynamicRecoveryModel =
   | "constant"
   | "inverse_linear"
   | {
@@ -1105,10 +1105,6 @@ export type NonFiniteSentinel = "inf" | "-inf" | "nan";
  * Finite JSON number greater than or equal to zero.
  */
 export type NonNegativeF64Wire = number;
-/**
- * Vanilla option kind for barrier payoff evaluation.
- */
-export type OptionKind = "call" | "put";
 /**
  * Option payoff direction used by analytical and numerical model engines.
  */
@@ -1510,27 +1506,12 @@ export type PrepaymentModelSpec =
  */
 export type RecoverySpec =
   | {
-      /**
-       * Recovery rate ∈ [0, 1]
-       */
       rate: number;
       type: "constant";
     }
   | {
-      /**
-       * Correlation with the systematic factor. Under the canonical
-       * low-factor-stress convention this is typically POSITIVE: recovery
-       * falls when the factor falls, so defaults (high in stress) and
-       * recoveries co-move negatively.
-       */
       factor_correlation: number;
-      /**
-       * Mean recovery rate
-       */
       mean_recovery: number;
-      /**
-       * Recovery volatility (standard deviation)
-       */
       recovery_volatility: number;
       type: "market_correlated";
     };
@@ -2054,7 +2035,6 @@ export interface ArbitrageValidationResult {
    * Pairs of strikes where call prices increase (monotonicity violation)
    */
   monotonicity_violations: MonotonicityViolation[];
-  [k: string]: unknown;
 }
 /**
  * A butterfly spread violation at a specific strike.
@@ -2072,7 +2052,6 @@ export interface ButterflyViolation {
    * Strike at which the violation occurs
    */
   strike: number;
-  [k: string]: unknown;
 }
 /**
  * A monotonicity violation between two strikes.
@@ -2094,7 +2073,6 @@ export interface MonotonicityViolation {
    * Lower strike
    */
   strike_low: number;
-  [k: string]: unknown;
 }
 /**
  * Filters on instrument metadata.
@@ -3240,24 +3218,6 @@ export interface CreditState {
   [k: string]: unknown;
 }
 /**
- * Configuration for position-level VaR decomposition.
- */
-export interface DecompositionConfig {
-  /**
-   * Whether to compute incremental VaR (expensive: one full repricing
-   * per position).
-   */
-  compute_incremental: boolean;
-  /**
-   * Confidence level for VaR and ES (e.g. 0.95, 0.99).
-   */
-  confidence: number;
-  /**
-   * Decomposition method.
-   */
-  method: DecompositionMethod;
-}
-/**
  * Diebold-Li (2006) dynamic Nelson-Siegel model.
  */
 export interface DieboldLi {
@@ -3353,7 +3313,7 @@ export interface DynamicRecoverySpec {
   /**
    * Recovery model governing the notional-to-recovery mapping.
    */
-  model: RecoveryModel;
+  model: DynamicRecoveryModel;
 }
 /**
  * Exposure at Default calculator.
@@ -3522,7 +3482,6 @@ export interface ExecutionTrajectory {
    * Time points (in trading days) for each bucket boundary.
    */
   time_points: number[];
-  [k: string]: unknown;
 }
 /**
  * Contribution of a single factor to portfolio risk.
@@ -3725,7 +3684,6 @@ export interface PiecewiseConstantCurve {
 export interface HullWhiteCalibrationParams {
   kappa: number;
   sigma: number;
-  [k: string]: unknown;
 }
 /**
  * Hull-White parameters with piecewise-constant short-rate volatility.
@@ -3733,7 +3691,6 @@ export interface HullWhiteCalibrationParams {
 export interface HullWhiteParams {
   kappa: number;
   volatility: PiecewiseConstantCurve;
-  [k: string]: unknown;
 }
 /**
  * Estimated market-impact execution *costs* from a trade.
@@ -3764,7 +3721,6 @@ export interface ImpactEstimate {
    * units.
    */
   total_cost: number;
-  [k: string]: unknown;
 }
 /**
  * Kyle (1985) price impact model.
@@ -3875,21 +3831,6 @@ export interface LeverageImpact {
    */
   pre_total_debt: number;
   [k: string]: unknown;
-}
-/**
- * Configuration for liquidity calculations.
- */
-export interface LiquidityConfig {
-  /**
-   * Days-to-liquidate thresholds for tier boundaries.
-   *
-   * Array of 4 thresholds: \[tier1_max, tier2_max, tier3_max, tier4_max\].
-   * Default: \[1.0, 5.0, 20.0, 60.0\].
-   *
-   * @minItems 4
-   * @maxItems 4
-   */
-  tier_thresholds: [number, number, number, number];
 }
 /**
  * Market microstructure data for a single instrument.
@@ -4210,7 +4151,6 @@ export interface LvarBangiaScalar {
    * Input VaR (non-positive loss number), echoed back for convenience.
    */
   var: number;
-  [k: string]: unknown;
 }
 /**
  * A master scale mapping continuous PDs to discrete rating grades.
@@ -4655,54 +4595,6 @@ export interface OptimalToggle {
    * Risk-free rate (continuous) used as drift in the nested simulation.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
-}
-/**
- * Serializable Expected Shortfall decomposition view.
- */
-export interface ParametricEsDecompositionView {
-  /**
-   * Confidence level used for ES.
-   */
-  confidence: number;
-  /**
-   * Per-position ES contributions.
-   */
-  contributions: PositionEsContributionView[];
-  /**
-   * Number of positions in the decomposition.
-   */
-  n_positions: number;
-  /**
-   * Total portfolio Expected Shortfall.
-   */
-  portfolio_es: number;
-  /**
-   * Total portfolio VaR.
-   */
-  portfolio_var: number;
-  [k: string]: unknown;
-}
-/**
- * Serializable Expected Shortfall contribution row.
- */
-export interface PositionEsContributionView {
-  /**
-   * Component Expected Shortfall allocated to the position.
-   */
-  component_es: number;
-  /**
-   * Marginal Expected Shortfall, when available.
-   */
-  marginal_es?: number | null;
-  /**
-   * Fraction of total ES contributed by this position.
-   */
-  pct_contribution: number;
-  /**
-   * Position identifier.
-   */
-  position_id: string;
   [k: string]: unknown;
 }
 /**
@@ -5492,34 +5384,13 @@ export interface SeniorityCalibration {
   [k: string]: unknown;
 }
 /**
- * Recovery model driven by seniority-class Beta distributions.
- */
-export interface SeniorityRecovery {
-  class: SeniorityClass;
-  dist: BetaRecovery;
-  [k: string]: unknown;
-}
-/**
  * Results from Monte Carlo path simulation.
  */
 export interface SimulatedPaths {
-  /**
-   * Asset values in row-major order: `path_idx * (num_steps + 1) + time_idx`.
-   */
   asset_values: number[];
-  /**
-   * Number of paths simulated.
-   */
   num_paths: number;
-  /**
-   * Number of time steps.
-   */
   num_steps: number;
-  /**
-   * Time grid from 0 to T.
-   */
   times: number[];
-  [k: string]: unknown;
 }
 /**
  * Stochastic (sigmoid) toggle configuration.

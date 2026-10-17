@@ -49,7 +49,6 @@ test('every serde handle round-trips its canonical JSON', () => {
     [credit.MigrationSimulator, new credit.MigrationSimulator(generator(), 5)],
     [correlation.CopulaSpec, correlation.CopulaSpec.studentT(5)],
     [correlation.RecoverySpec, correlation.RecoverySpec.constant(0.4)],
-    [factorRisk.DecompositionConfig, factorRisk.DecompositionConfig.historical(0.9)],
     [liquidity.AlmgrenChrissModel, new liquidity.AlmgrenChrissModel(1e-7, 1e-6, 1)],
     [liquidity.KyleLambdaModel, new liquidity.KyleLambdaModel(2e-7)],
     [
@@ -168,7 +167,7 @@ test('the workout builder is consumed by each call and validates collateral', ()
     kind('validation')
   );
   assert.throws(() => credit.WorkoutLgd.builder().collateralPieces('not json'), kind('validation'));
-  assert.throws(() => workout.lgd(-1), kind('validation'));
+  assert.throws(() => workout.evaluate(-1), kind('validation'));
 });
 
 test('LGD, EAD and PD handles expose their accessors and reject bad input', () => {
@@ -358,8 +357,6 @@ test('factor handles and helpers follow the Rust accessors', () => {
     ]
   );
   assert.throws(() => factorRisk.positionComponentVar(decomposition, 'missing'), kind('not_found'));
-  assert.equal(factorRisk.DecompositionConfig.parametric99().confidence, 0.99);
-  assert.equal(factorRisk.DecompositionConfig.parametric95().computeIncremental, false);
   assert.throws(
     () => factorRisk.buildStressAttribution(['A', 'B'], [[1, 2, 3]], 0.9),
     kind('validation')

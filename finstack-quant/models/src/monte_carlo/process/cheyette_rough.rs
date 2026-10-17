@@ -373,6 +373,10 @@ impl StochasticProcess for CheyetteRoughVolProcess {
         true
     }
 
+    fn dedicated_scheme(&self) -> Option<&'static str> {
+        Some("cheyette_rough_euler")
+    }
+
     /// Formal no-op: actual drift is applied by the Cheyette rough vol discretization.
     fn drift(&self, _t: f64, _x: &[f64], out: &mut [f64]) {
         out[0] = 0.0;

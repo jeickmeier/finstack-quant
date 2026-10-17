@@ -1,8 +1,8 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
 use super::config::{
-    validate_copula_spec, CdsTranchePricer, DiscountAt, EffectiveStructure, ProjectedDiscountedRow,
-    ProjectionInputs, BESPOKE_SETTLEMENT_DAYS, INDEX_SETTLEMENT_DAYS, PROBABILITY_CLIP,
+    CdsTranchePricer, DiscountAt, EffectiveStructure, ProjectedDiscountedRow, ProjectionInputs,
+    BESPOKE_SETTLEMENT_DAYS, INDEX_SETTLEMENT_DAYS, PROBABILITY_CLIP,
 };
 use crate::constants::BASIS_POINTS_PER_UNIT;
 use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
@@ -12,44 +12,20 @@ use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::dates::{calendar_by_id, Date, DateExt, HolidayCalendar};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::math::{standard_normal_inv_cdf, student_t_inv_cdf};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
-use finstack_quant_models::correlation::copula::{
-    Copula, CopulaSpec, GaussianCopula, MultiFactorCopula, RandomFactorLoadingCopula,
-    StudentTCopula,
-};
+use finstack_quant_core::{Error as CoreError, Result};
+use finstack_quant_models::correlation::copula::{Copula, CopulaSpec, GaussianCopula};
 
 impl CdsTranchePricer {
-    /// Return the cached copula instance, building it on first call.
-    ///
-    /// The copula is determined entirely by `self.copula_spec` at
-    /// pricer-construction time, so a single instance can be reused across
-    /// every EL/integrand evaluation for the lifetime of this pricer.
+    /// Return the copula instance constructed for this pricer.
     pub(super) fn copula(&self) -> &dyn Copula {
-        self.copula_cache
-            .get_or_init(|| match &self.copula_spec {
-                CopulaSpec::Gaussian => Box::new(GaussianCopula::new()),
-                CopulaSpec::StudentT { degrees_of_freedom } => {
-                    Box::new(StudentTCopula::new(*degrees_of_freedom))
-                }
-                CopulaSpec::RandomFactorLoading { loading_volatility } => {
-                    Box::new(RandomFactorLoadingCopula::new(*loading_volatility))
-                }
-                CopulaSpec::MultiFactor => Box::new(MultiFactorCopula::new()),
-            })
-            .as_ref()
+        self.copula.as_ref()
     }
 
     pub(super) fn default_threshold_for_copula(&self, default_prob: f64) -> f64 {
         let eps = PROBABILITY_CLIP;
         let p = default_prob.max(eps).min(1.0 - eps);
-        match &self.copula_spec {
-            CopulaSpec::StudentT { degrees_of_freedom } => {
-                student_t_inv_cdf(p, *degrees_of_freedom).unwrap_or(f64::NAN)
-            }
-            _ => standard_normal_inv_cdf(p),
-        }
+        self.copula_spec.default_threshold(p).unwrap_or(f64::NAN)
     }
 
     pub(super) fn conditional_default_prob_copula(
@@ -67,7 +43,7 @@ impl CdsTranchePricer {
     pub fn new() -> Self {
         Self {
             copula_spec: CopulaSpec::Gaussian,
-            copula_cache: std::sync::OnceLock::new(),
+            copula: Box::new(GaussianCopula::new()),
         }
     }
 
@@ -82,7 +58,7 @@ impl CdsTranchePricer {
     ///
     /// # Returns
     ///
-    /// A pricer with an immutable validated copula and an empty copula cache.
+    /// A pricer with an immutable validated copula.
     ///
     /// # Errors
     ///
@@ -90,10 +66,12 @@ impl CdsTranchePricer {
     /// degrees of freedom or the loading volatility are outside their
     /// documented ranges.
     pub fn with_copula(copula_spec: CopulaSpec) -> Result<Self> {
-        validate_copula_spec(&copula_spec)?;
+        let copula = copula_spec
+            .build()
+            .map_err(|error| CoreError::Validation(error.to_string()))?;
         Ok(Self {
             copula_spec,
-            copula_cache: std::sync::OnceLock::new(),
+            copula,
         })
     }
 

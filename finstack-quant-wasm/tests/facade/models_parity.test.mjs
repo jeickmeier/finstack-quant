@@ -393,9 +393,7 @@ const CASES = {
       .build();
     return [
       workout.evaluate(1_000_000.0),
-      workout.lgd(1_000_000.0),
       workout.netRecovery(1_000_000.0),
-      workout.recoveryRate(1_000_000.0),
       credit.workoutLgd(1_000_000.0, [['real_estate', 800_000.0, 0.3]], 0.05, 0.03, 2.0, 0.05),
       credit.WorkoutCosts.standard().totalRate,
     ];
@@ -578,14 +576,6 @@ const CASES = {
       model.config.factors.length,
     ];
   },
-  'factor.decomposition_config': () => [
-    json(factorRisk.DecompositionConfig.parametric(0.975).withIncremental()),
-    json(factorRisk.DecompositionConfig.parametric95()),
-    json(factorRisk.DecompositionConfig.parametric99()),
-    json(factorRisk.DecompositionConfig.historical(0.9)),
-    json(factorRisk.DecompositionConfig.historical95()),
-    factorRisk.DecompositionConfig.historical95().method,
-  ],
   'factor.stress_attribution': () => factorRisk.buildStressAttribution(['A', 'B'], PNLS, 0.8),
   'factor.position_component_var': () => [
     factorRisk.positionComponentVar(
@@ -609,17 +599,11 @@ const CASES = {
       almgren.estimateCost(TRADE),
       almgren.optimalTrajectory(TRADE, 5),
       [calibrated.gamma, calibrated.eta, calibrated.delta],
-      almgren.modelName,
     ];
   },
   'liquidity.kyle': () => {
     const kyle = liquidity.KyleLambdaModel.fromAmihud(1e-9, 100.0);
-    return [
-      kyle.lambda,
-      kyle.estimateCost(TRADE),
-      kyle.optimalTrajectory(TRADE, 4),
-      new liquidity.KyleLambdaModel(2e-7).modelName,
-    ];
+    return [kyle.lambda, kyle.estimateCost(TRADE), kyle.optimalTrajectory(TRADE, 4)];
   },
 
   'monte_carlo.european': () => {
@@ -801,8 +785,8 @@ const CASES = {
 
   // Closed-form, COS and SVI kernels (audit finding F128).
   'closed_form.forward_greeks': () => [
-    models.black76Greeks(0.03, 0.035, 2.0, 0.25, true),
-    models.black76Greeks(0.03, 0.035, 2.0, 0.25, false),
+    models.black76Greeks(0.03, 0.035, 0.25, 2.0, true),
+    models.black76Greeks(0.03, 0.035, 0.25, 2.0, false),
     models.bachelierGreeks(0.03, 0.035, 0.0075, 2.0, true),
     models.bachelierGreeks(-0.002, 0.001, 0.0075, 2.0, false),
     models.blackShiftedVega(-0.002, 0.001, 0.3, 2.0, 0.03),

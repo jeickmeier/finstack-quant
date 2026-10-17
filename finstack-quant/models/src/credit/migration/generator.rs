@@ -132,8 +132,17 @@ impl GeneratorMatrix {
                 actual: data.len(),
             });
         }
-        let matrix = DMatrix::from_row_slice(n, n, data);
+        let mut matrix = DMatrix::from_row_slice(n, n, data);
         validate_generator(&matrix, &scale)?;
+        for i in 0..n {
+            for j in 0..n {
+                if i == j {
+                    matrix[(i, j)] = matrix[(i, j)].min(0.0);
+                } else {
+                    matrix[(i, j)] = matrix[(i, j)].max(0.0);
+                }
+            }
+        }
         Ok(Self {
             data: matrix,
             scale,

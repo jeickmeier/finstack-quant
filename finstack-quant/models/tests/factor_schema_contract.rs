@@ -1,9 +1,6 @@
 //! JSON Schema contract tests for factor-model configuration envelopes.
 
-use finstack_quant_models::factor::schema::{
-    credit_calibration_config_schema, credit_calibration_inputs_schema, credit_factor_model_schema,
-    factor_model_config_schema, ARTIFACTS,
-};
+use finstack_quant_models::factor::schema::ARTIFACTS;
 use finstack_quant_models::factor::FactorModelConfigEnvelope;
 use serde_json::{json, Value};
 
@@ -173,8 +170,7 @@ fn checked_in_schema_matches_generated_type_and_metadata() {
 
 #[test]
 fn credit_factor_model_schema_uses_explicit_date_wire_schema() {
-    let credit_model =
-        credit_factor_model_schema().expect("embedded credit factor model schema parses");
+    let credit_model = registry_schema(CREDIT_FACTOR_MODEL_SCHEMA_FILENAME);
 
     assert_eq!(
         credit_model.pointer("/$defs/DateWire/format"),
@@ -220,26 +216,22 @@ fn checked_in_schema_keeps_meaningful_nested_validation() {
 
 #[test]
 fn credit_factor_model_schema_rejects_malformed_nested_config() {
-    let schema = credit_factor_model_schema().expect("embedded credit factor model schema parses");
+    let schema = registry_schema(CREDIT_FACTOR_MODEL_SCHEMA_FILENAME);
     let mut fixture: Value =
         serde_json::from_str(include_str!("data/canonical/credit_factor_model.json"))
             .expect("canonical credit factor model fixture parses");
     fixture["config"]["covariance"]["data"] = json!("not-a-matrix");
 
     assert!(
-        validate(schema, &fixture).is_err(),
+        validate(&schema, &fixture).is_err(),
         "credit factor model schema must reject malformed nested factor-model config"
     );
 }
 
 #[test]
 fn credit_factor_model_schema_matches_generated_type_and_metadata() {
-    let schema = credit_factor_model_schema().expect("embedded credit factor model schema");
+    let schema = registry_schema(CREDIT_FACTOR_MODEL_SCHEMA_FILENAME);
 
-    assert_eq!(
-        schema,
-        &registry_schema(CREDIT_FACTOR_MODEL_SCHEMA_FILENAME)
-    );
     assert_eq!(
         schema["$id"],
         registry_artifact(CREDIT_FACTOR_MODEL_SCHEMA_FILENAME).id
@@ -267,7 +259,7 @@ fn credit_factor_model_schema_validates_canonical_fixture() {
             .expect("canonical credit factor model fixture parses");
 
     validate(
-        credit_factor_model_schema().expect("embedded credit factor model schema"),
+        &registry_schema(CREDIT_FACTOR_MODEL_SCHEMA_FILENAME),
         &fixture,
     )
     .unwrap_or_else(|errors| panic!("canonical credit factor model failed: {errors:#?}"));
@@ -275,40 +267,30 @@ fn credit_factor_model_schema_validates_canonical_fixture() {
 
 #[test]
 fn credit_factor_model_schema_matches_nested_serde_strictness() {
-    let schema = credit_factor_model_schema().expect("embedded credit factor model schema");
+    let schema = registry_schema(CREDIT_FACTOR_MODEL_SCHEMA_FILENAME);
     let fixture: Value =
         serde_json::from_str(include_str!("data/canonical/credit_factor_model.json"))
             .expect("canonical credit factor model fixture parses");
 
     let mut wrong_version = fixture.clone();
     wrong_version["schema"] = json!("finstack_quant.credit_factor_model/999");
-    assert!(validate(schema, &wrong_version).is_err());
+    assert!(validate(&schema, &wrong_version).is_err());
 
     let mut closed_nested = fixture.clone();
     closed_nested["calibration_window"]["unexpected"] = json!(true);
-    assert!(validate(schema, &closed_nested).is_err());
+    assert!(validate(&schema, &closed_nested).is_err());
 
     let mut open_diagnostics = fixture;
     open_diagnostics["diagnostics"]["future_metric"] = json!({"value": 1});
-    validate(schema, &open_diagnostics)
+    validate(&schema, &open_diagnostics)
         .unwrap_or_else(|errors| panic!("open diagnostics extension failed: {errors:#?}"));
 }
 
 #[test]
 fn credit_calibration_schemas_match_generated_types_and_embedded_apis() {
-    let config =
-        credit_calibration_config_schema().expect("embedded credit calibration config schema");
-    let inputs =
-        credit_calibration_inputs_schema().expect("embedded credit calibration inputs schema");
+    let config = registry_schema(CREDIT_CALIBRATION_CONFIG_SCHEMA_FILENAME);
+    let inputs = registry_schema(CREDIT_CALIBRATION_INPUTS_SCHEMA_FILENAME);
 
-    assert_eq!(
-        config,
-        &registry_schema(CREDIT_CALIBRATION_CONFIG_SCHEMA_FILENAME)
-    );
-    assert_eq!(
-        inputs,
-        &registry_schema(CREDIT_CALIBRATION_INPUTS_SCHEMA_FILENAME)
-    );
     assert_eq!(
         config["$id"],
         registry_artifact(CREDIT_CALIBRATION_CONFIG_SCHEMA_FILENAME).id
@@ -319,27 +301,19 @@ fn credit_calibration_schemas_match_generated_types_and_embedded_apis() {
     );
     assert_eq!(config["additionalProperties"], false);
     assert_eq!(inputs["additionalProperties"], false);
-    assert_eq!(
-        factor_model_config_schema().expect("embedded factor-model config schema"),
-        &checked_in_schema()
-    );
+    assert_eq!(&generated_schema(), &checked_in_schema());
 }
 
 #[test]
 fn credit_calibration_schemas_reject_malformed_nested_fixtures() {
+    let schema_config = registry_schema(CREDIT_CALIBRATION_CONFIG_SCHEMA_FILENAME);
+    let schema_inputs = registry_schema(CREDIT_CALIBRATION_INPUTS_SCHEMA_FILENAME);
     let mut config = credit_calibration_config_fixture();
-    validate(
-        credit_calibration_config_schema().expect("embedded credit calibration config schema"),
-        &config,
-    )
-    .unwrap_or_else(|errors| panic!("valid calibration config failed: {errors:#?}"));
+    validate(&schema_config, &config)
+        .unwrap_or_else(|errors| panic!("valid calibration config failed: {errors:#?}"));
     config["hierarchy"]["unexpected"] = json!(true);
     assert!(
-        validate(
-            credit_calibration_config_schema().expect("embedded credit calibration config schema"),
-            &config,
-        )
-        .is_err(),
+        validate(&schema_config, &config).is_err(),
         "closed nested calibration config must reject unknown fields"
     );
 
@@ -357,26 +331,18 @@ fn credit_calibration_schemas_reject_malformed_nested_fixtures() {
         "as_of_spreads": {"ISSUER-A": 100.0},
         "idiosyncratic_overrides": {}
     });
-    validate(
-        credit_calibration_inputs_schema().expect("embedded credit calibration inputs schema"),
-        &inputs,
-    )
-    .unwrap_or_else(|errors| panic!("valid calibration inputs failed: {errors:#?}"));
+    validate(&schema_inputs, &inputs)
+        .unwrap_or_else(|errors| panic!("valid calibration inputs failed: {errors:#?}"));
     inputs["history_panel"]["spreads"]["ISSUER-A"] = json!("not-a-series");
     assert!(
-        validate(
-            credit_calibration_inputs_schema().expect("embedded credit calibration inputs schema"),
-            &inputs,
-        )
-        .is_err(),
+        validate(&schema_inputs, &inputs).is_err(),
         "malformed nested spread series must be rejected"
     );
 }
 
 #[test]
 fn credit_calibration_schema_rejects_runtime_invalid_numeric_bounds() {
-    let schema =
-        credit_calibration_config_schema().expect("embedded credit calibration config schema");
+    let schema = registry_schema(CREDIT_CALIBRATION_CONFIG_SCHEMA_FILENAME);
     let cases = [
         (
             "ewma lambda zero",
@@ -421,7 +387,7 @@ fn credit_calibration_schema_rejects_runtime_invalid_numeric_bounds() {
             .pointer_mut(pointer)
             .expect("fixture pointer exists") = invalid;
         assert!(
-            validate(schema, &fixture).is_err(),
+            validate(&schema, &fixture).is_err(),
             "{name} must be rejected by the published schema"
         );
     }
@@ -429,7 +395,7 @@ fn credit_calibration_schema_rejects_runtime_invalid_numeric_bounds() {
 
 #[test]
 fn factor_model_schema_rejects_runtime_invalid_risk_confidence() {
-    let schema = factor_model_config_schema().expect("embedded factor-model config schema");
+    let schema = generated_schema();
     let base: Value = serde_json::from_str(include_str!("data/canonical/factor_model_config.json"))
         .expect("canonical factor-model fixture parses");
 
@@ -442,20 +408,20 @@ fn factor_model_schema_rejects_runtime_invalid_risk_confidence() {
         let mut fixture = base.clone();
         fixture["config"]["risk_measure"] = risk_measure;
         assert!(
-            validate(schema, &fixture).is_err(),
+            validate(&schema, &fixture).is_err(),
             "runtime-invalid confidence must be rejected"
         );
     }
 
     let mut valid = base;
     valid["config"]["risk_measure"] = json!({"var": {"confidence": 0.500_001}});
-    validate(schema, &valid)
+    validate(&schema, &valid)
         .unwrap_or_else(|errors| panic!("valid open-bound confidence failed: {errors:#?}"));
 }
 
 #[test]
 fn factor_model_schema_rejects_noncanonical_unmatched_policy_values() {
-    let schema = factor_model_config_schema().expect("embedded factor-model config schema");
+    let schema = generated_schema();
     let base: Value = serde_json::from_str(include_str!("data/canonical/factor_model_config.json"))
         .expect("canonical factor-model fixture parses");
 
@@ -463,7 +429,7 @@ fn factor_model_schema_rejects_noncanonical_unmatched_policy_values() {
         let mut fixture = base.clone();
         fixture["config"]["unmatched_policy"] = json!(alias);
         assert!(
-            validate(schema, &fixture).is_err(),
+            validate(&schema, &fixture).is_err(),
             "noncanonical value {alias} must be rejected"
         );
         assert!(

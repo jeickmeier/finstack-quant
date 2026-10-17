@@ -1276,31 +1276,6 @@ wire_methods!(
     validate
 );
 
-/// Vol-forecast view over a calibrated ``CreditFactorModel``.
-///
-/// Every method takes a ``horizon`` that is either a ``VolHorizon`` instance
-/// or a descriptor string:
-///
-/// - ``"one_step"`` — calibrated annualized variance unchanged.
-/// - ``"unconditional"`` — long-run variance (identical to ``"one_step"``
-///   for the ``Sample`` and ``Ewma`` vol models).
-/// - ``'{"n_steps": N}'`` — variance scaled by ``N`` model periods.
-/// - ``'{"years": Y}'`` — variance scaled by a fractional year.
-///
-/// Example:
-///     >>> from finstack_quant.models.factor.credit import CreditCalibrator, FactorCovarianceForecast, VolHorizon
-///     >>> config = {"hierarchy": {"levels": []}, "covariance_strategy": "diagonal",
-///     ...           "bucket_weighting": "equal"}
-///     >>> inputs = {"history_panel": {"dates": ["2024-01-01", "2024-02-01"],
-///     ...                             "spreads": {"A": [0.010, 0.0101]}},
-///     ...           "issuer_tags": {"tags": {"A": {}}},
-///     ...           "generic_factor": {"spec": {"name": "G", "series_id": "G"},
-///     ...                              "values": [0.010, 0.0101]},
-///     ...           "as_of": "2024-02-01", "as_of_spreads": {"A": 0.0101},
-///     ...           "idiosyncratic_overrides": {}}
-///     >>> model = CreditCalibrator(config).calibrate(inputs)
-///     >>> forecast = FactorCovarianceForecast(model)
-///     >>> forecast.covariance_at(VolHorizon.one_step()).factor_ids
 /// Extract a [`VolHorizon`] from either a `VolHorizon` instance or a
 /// descriptor string (`"one_step"`, `"unconditional"`, `'{"n_steps": N}'`,
 /// `'{"years": Y}'`).
@@ -1452,6 +1427,31 @@ impl PyVolHorizon {
     }
 }
 
+/// Vol-forecast view over a calibrated ``CreditFactorModel``.
+///
+/// Every method takes a ``horizon`` that is either a ``VolHorizon`` instance
+/// or a descriptor string:
+///
+/// - ``"one_step"`` — calibrated annualized variance unchanged.
+/// - ``"unconditional"`` — long-run variance (identical to ``"one_step"``
+///   for the ``Sample`` and ``Ewma`` vol models).
+/// - ``'{"n_steps": N}'`` — variance scaled by ``N`` model periods.
+/// - ``'{"years": Y}'`` — variance scaled by a fractional year.
+///
+/// Example:
+///     >>> from finstack_quant.models.factor.credit import CreditCalibrator, FactorCovarianceForecast, VolHorizon
+///     >>> config = {"hierarchy": {"levels": []}, "covariance_strategy": "diagonal",
+///     ...           "bucket_weighting": "equal"}
+///     >>> inputs = {"history_panel": {"dates": ["2024-01-01", "2024-02-01"],
+///     ...                             "spreads": {"A": [0.010, 0.0101]}},
+///     ...           "issuer_tags": {"tags": {"A": {}}},
+///     ...           "generic_factor": {"spec": {"name": "G", "series_id": "G"},
+///     ...                              "values": [0.010, 0.0101]},
+///     ...           "as_of": "2024-02-01", "as_of_spreads": {"A": 0.0101},
+///     ...           "idiosyncratic_overrides": {}}
+///     >>> model = CreditCalibrator(config).calibrate(inputs)
+///     >>> forecast = FactorCovarianceForecast(model)
+///     >>> forecast.covariance_at(VolHorizon.one_step()).factor_ids
 ///     ['credit::generic']
 #[pyclass(
     name = "FactorCovarianceForecast",

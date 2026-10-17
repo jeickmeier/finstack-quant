@@ -2000,8 +2000,13 @@ fn calibration_config_round_trips_through_json() {
 /// `credit_calibration_config.schema.json`.
 #[test]
 fn calibration_config_serialization_matches_schema() {
-    let schema = finstack_quant_models::factor::schema::credit_calibration_config_schema()
-        .expect("embedded schema must be valid JSON");
+    let schema = finstack_quant_core::schema::find_schema_artifact(
+        finstack_quant_models::factor::schema::ARTIFACTS,
+        "credit_calibration_config.schema.json",
+    )
+    .expect("CreditCalibrationConfig schema artifact must exist")
+    .generate()
+    .expect("embedded schema must be valid JSON");
 
     // Use a non-trivial config so validation exercises required fields.
     let cfg = CreditCalibrationConfig {
@@ -2022,7 +2027,7 @@ fn calibration_config_serialization_matches_schema() {
         serde_json::from_str(&serde_json::to_string(&cfg).expect("serialize config"))
             .expect("re-parse as Value");
 
-    let validator = jsonschema::validator_for(schema).expect("schema must compile");
+    let validator = jsonschema::validator_for(&schema).expect("schema must compile");
     let errors: Vec<String> = validator
         .iter_errors(&instance)
         .map(|e| {

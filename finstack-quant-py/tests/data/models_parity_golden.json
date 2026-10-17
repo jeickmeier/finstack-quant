@@ -328,36 +328,8 @@
     9,
     9
   ],
-  "factor.decomposition_config": [
-    {
-      "compute_incremental": true,
-      "confidence": 0.975,
-      "method": "parametric"
-    },
-    {
-      "compute_incremental": false,
-      "confidence": 0.95,
-      "method": "parametric"
-    },
-    {
-      "compute_incremental": false,
-      "confidence": 0.99,
-      "method": "parametric"
-    },
-    {
-      "compute_incremental": false,
-      "confidence": 0.9,
-      "method": "historical"
-    },
-    {
-      "compute_incremental": false,
-      "confidence": 0.95,
-      "method": "historical"
-    },
-    "historical"
-  ],
   "factor.position_component_var": [
-    -0.1487826084443011,
+    -0.14878260860872491,
     1.2
   ],
   "factor.stress_attribution": {
@@ -484,9 +456,7 @@
       "net_recovery": 480725.6235827664,
       "recovery_rate": 0.4807256235827664
     },
-    0.5192743764172336,
     480725.6235827664,
-    0.4807256235827664,
     {
       "lgd": 0.564625850340136,
       "net_recovery": 435374.1496598639,
@@ -534,8 +504,7 @@
       4.999999999999716e-08,
       0.002,
       0.5
-    ],
-    "Almgren-Chriss"
+    ]
   ],
   "liquidity.kyle": [
     1.0000000000000001e-07,
@@ -569,8 +538,7 @@
         3.75,
         5.0
       ]
-    },
-    "Kyle-Lambda"
+    }
   ],
   "merton.credit_grades": 0.1764545062601821,
   "merton.default_probabilities": [

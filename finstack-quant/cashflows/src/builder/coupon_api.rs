@@ -34,9 +34,8 @@ impl CashFlowBuilder {
             window,
             schedule,
             coupon,
+            split,
         });
-        self.payment_program
-            .push(PaymentProgramPiece { window, split });
         self
     }
 

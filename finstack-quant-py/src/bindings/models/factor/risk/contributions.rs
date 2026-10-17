@@ -337,7 +337,7 @@ impl PyRiskDecomposition {
     /// Returns
     /// -------
     /// float
-    ///     Value in the units of :attr:`measure_json` (variance units for
+    ///     Value in the units of :attr:`measure` (variance units for
     ///     ``"variance"``, return units for ``"volatility"``/VaR/ES). Sign
     ///     follows the measure's convention.
     #[getter]
@@ -352,12 +352,6 @@ impl PyRiskDecomposition {
     #[getter]
     fn measure<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.measure)
-    }
-
-    /// Risk measure used for aggregation (serialized as a JSON string).
-    #[getter]
-    fn measure_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner.measure)
     }
 
     /// Unattributed (idiosyncratic) risk left after factor aggregation, in the

@@ -790,7 +790,7 @@ fn portfolio_dts_pins_python_parity_optional_parameters() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "parametricEsDecomposition(positionIds: string[], weights: NumericArray, covariance: NumericArray[], confidence?: number | null): ParametricEsDecompositionView;",
+        "parametricEsDecomposition(positionIds: string[], weights: NumericArray, covariance: NumericArray[], confidence?: number | null): PositionRiskDecomposition;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
@@ -1712,7 +1712,6 @@ fn result_types_use_rust_names_from_the_generated_contract() {
         "MoneyEstimate",
         "RiskDecomposition",
         "PositionRiskDecomposition",
-        "ParametricEsDecompositionView",
         "RiskBudgetResult",
         "StatementResult",
         "Explanation",
@@ -1857,7 +1856,6 @@ fn typed_cashflows_and_covenants_surface_is_declared() {
         "fixedToFloat(switchDate: string, fixed: generated.cashflows.FixedCouponSpec, floating: generated.cashflows.FloatingCouponSpec): CashFlowBuilder;",
         "accruedInterestAmount(schedule: CashFlowSchedule, asOf: string, config?: generated.cashflows.AccrualConfig | null): MoneyValue;",
         "accruedAt(asOf: string): MoneyValue;",
-        "periodAggregationGetAmount(aggregation: generated.cashflows.PeriodAggregation, period: string, currency: generated.core.Currency): MoneyValue | undefined;",
         "mergeCashflowSchedules(schedules: readonly (CashFlowSchedule | JsonInput)[], notional: generated.cashflows.Notional, dayCount: generated.core.DayCount): CashFlowSchedule;",
         "materializeFixings(market: MarketContext, schedules: readonly (CashFlowSchedule | JsonInput)[], oldDate: string, newDate: string): MarketContext;",
         "cashFlowGetBalanceDate(flow: generated.cashflows.CashFlow): generated.core.DateWire;",

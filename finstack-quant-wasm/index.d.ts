@@ -172,9 +172,7 @@ import type {
   LmeAnalysis,
   LvarBangiaScalar,
   MoneyEstimate,
-  ParametricEsDecompositionView,
   PositionEsContribution,
-  PositionEsContributionView,
   PositionFactorContribution,
   PositionRiskDecomposition,
   PositionVarContribution,
@@ -414,9 +412,7 @@ export type {
   LmeAnalysis,
   LvarBangiaScalar,
   MoneyEstimate,
-  ParametricEsDecompositionView,
   PositionEsContribution,
-  PositionEsContributionView,
   PositionFactorContribution,
   PositionRiskDecomposition,
   PositionVarContribution,
@@ -7798,12 +7794,12 @@ export interface CashflowsSchemaNamespace {
 }
 
 /**
- * Registry and named accessors of the factor-model JSON Schemas.
+ * Registry of the factor-model JSON Schemas.
  * @example
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const document = models.factor.schema.factorModelConfigSchema();
+ * const document = models.factor.schema.get("factor_model_config.schema.json");
  * console.log(document.title);
  * ```
  */
@@ -7833,30 +7829,6 @@ export interface FactorSchemaNamespace {
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and a `TypeError` (kind `invalid_type`) if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
    */
   validate(selector: string, payload: string | object): SchemaValidationFailure[];
-  /**
-   * JSON Schema of a versioned factor-model configuration (`FactorModelConfig`).
-   * @returns JSON Schema document.
-   * @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
-   */
-  factorModelConfigSchema(): Record<string, unknown>;
-  /**
-   * JSON Schema of a serialized `CreditFactorModel`.
-   * @returns JSON Schema document.
-   * @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
-   */
-  creditFactorModelSchema(): Record<string, unknown>;
-  /**
-   * JSON Schema of a serialized `CreditCalibrationConfig`.
-   * @returns JSON Schema document.
-   * @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
-   */
-  creditCalibrationConfigSchema(): Record<string, unknown>;
-  /**
-   * JSON Schema of a serialized `CreditCalibrationInputs`.
-   * @returns JSON Schema document.
-   * @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
-   */
-  creditCalibrationInputsSchema(): Record<string, unknown>;
 }
 
 /**
@@ -10054,100 +10026,11 @@ export interface FactorModelCreditNamespace {
 }
 
 /**
- * Configuration of position-level VaR / ES decomposition.
- */
-export interface DecompositionConfig extends WasmOwned {
-  /**
-   * Serialize to the canonical JSON wire form accepted by `fromJson`
-   * and by Python `from_json`.
-   * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
-   */
-  toJson(): string;
-  /**
-   * Copy of this configuration that also computes incremental VaR (one full repricing per position).
-   * @returns The configuration with `computeIncremental` set.
-   */
-  withIncremental(): DecompositionConfig;
-  /**
-   * Whether leave-one-out incremental VaR is computed.
-   */
-  readonly computeIncremental: boolean;
-  /**
-   * Tail confidence as a decimal probability.
-   */
-  readonly confidence: number;
-  /**
-   * Decomposition method: `"parametric"` or `"historical"`.
-   */
-  readonly method: string;
-}
-
-/**
- * Factories and presets of the decomposition configuration.
- * @example
- * ```typescript
- * import init, { models } from "finstack-quant-wasm";
- * await init();
- * const config = models.factor.risk.DecompositionConfig.parametric(0.975).withIncremental();
- * console.log(config.confidence, config.method, config.computeIncremental);
- * config.free();
- * ```
- */
-export interface DecompositionConfigConstructor {
-  /**
-   * JavaScript prototype of `DecompositionConfig`; instances come from the static factories, not `new`.
-   */
-  readonly prototype: DecompositionConfig;
-  /**
-   * Load a handle from its canonical JSON wire form, the same form
-   * Python `from_json` reads.
-   *
-   * Unknown fields are rejected where the Rust type denies them and
-   * the Rust validation rules are applied again.
-   * @param json - Canonical JSON for this type, as JSON text or a plain object.
-   * @returns The validated handle.
-   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
-   */
-  fromJson(json: JsonInput): DecompositionConfig;
-  /**
-   * Historical-simulation decomposition at a confidence level.
-   * @param confidence - Tail confidence as a decimal probability in `(0.5, 1)`, such as 0.99.
-   * @returns The historical configuration.
-   * @throws Error - Throws a `TypeError` if `confidence` is not a number; the range is checked when the configuration is used.
-   */
-  historical(confidence: number): DecompositionConfig;
-  /**
-   * Historical-simulation decomposition at 95% confidence.
-   * @returns The historical 95% preset.
-   */
-  historical95(): DecompositionConfig;
-  /**
-   * Parametric (delta-normal) decomposition at a confidence level.
-   * @param confidence - Tail confidence as a decimal probability in `(0.5, 1)`, such as 0.99.
-   * @returns The parametric configuration.
-   * @throws Error - Throws a `TypeError` if `confidence` is not a number; the range is checked when the configuration is used.
-   */
-  parametric(confidence: number): DecompositionConfig;
-  /**
-   * Parametric decomposition at 95% confidence.
-   * @returns The parametric 95% preset.
-   */
-  parametric95(): DecompositionConfig;
-  /**
-   * Parametric decomposition at 99% confidence.
-   * @returns The parametric 99% preset.
-   */
-  parametric99(): DecompositionConfig;
-}
-
-/**
  * Product-independent factor and position risk decomposition kernels.
  *
- * The VaR and risk-budget functions return the canonical Rust result types
+ * The VaR, ES, and risk-budget functions return the canonical Rust result types
  * (`PositionRiskDecomposition`, `RiskBudgetResult`), the same objects the
- * Python functions return; `parametricEsDecomposition` returns the
- * `ParametricEsDecompositionView` reporting view, as in Python.
+ * Python functions return.
  * @example
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
@@ -10173,7 +10056,7 @@ export interface FactorRiskNamespace {
    * @param positionIds - Position identifiers, one per weight.
    * @param weights - Position weights or exposures in portfolio currency.
    * @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).
-   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::parametric_95()` preset (0.95).
+   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.
    * @param computeIncremental - Optional; when `true`, also computes incremental VaR (one full repricing per position). Defaults to `false`.
    * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if identifier, weight, or covariance dimensions disagree; the covariance matrix is not finite, symmetric, and positive semidefinite; or `confidence` is not finite and in `(0.5, 1)`.
    */
@@ -10188,13 +10071,15 @@ export interface FactorRiskNamespace {
    * Decompose portfolio Expected Shortfall into position contributions via
    * parametric Euler allocation.
    *
-   * Returns the `ParametricEsDecompositionView` reporting view (the object
-   * Python's `parametric_es_decomposition` returns).
-   * @returns The `ParametricEsDecompositionView` with per-position ES rows.
+   * Returns the canonical `PositionRiskDecomposition` (the object Python's
+   * `parametric_es_decomposition` returns): portfolio VaR/ES (losses
+   * negative), `method`, and per-position `var_contributions` and
+   * `es_contributions` rows.
+   * @returns The canonical `PositionRiskDecomposition` with VaR and ES contributions.
    * @param positionIds - Position identifiers, one per weight.
    * @param weights - Position weights or exposures in portfolio currency.
    * @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).
-   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::parametric_95()` preset (0.95).
+   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.
    * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if identifier, weight, or covariance dimensions disagree; the covariance matrix is not finite, symmetric, and positive semidefinite; or `confidence` is not finite and in `(0.5, 1)`.
    */
   parametricEsDecomposition(
@@ -10202,7 +10087,7 @@ export interface FactorRiskNamespace {
     weights: NumericArray,
     covariance: NumericArray[],
     confidence?: number | null
-  ): ParametricEsDecompositionView;
+  ): PositionRiskDecomposition;
   /**
    * Decompose portfolio VaR and Expected Shortfall from per-position scenario
    * profit-and-loss series using historical simulation.
@@ -10212,7 +10097,7 @@ export interface FactorRiskNamespace {
    * @returns The canonical `PositionRiskDecomposition`, including the historical `es_contributions` rows.
    * @param positionIds - Position identifiers, one per P&L row.
    * @param positionPnls - Position-major P&L matrix: one row per position, one column per scenario (losses negative).
-   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::historical_95()` preset (0.95).
+   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.
    * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if the matrix does not have one row per position or its rows have different scenario counts, `confidence` is not finite and in `(0.5, 1)`, too few scenarios resolve the requested tail, or a P&L value is non-finite.
    */
   historicalVarDecomposition(
@@ -10238,10 +10123,6 @@ export interface FactorRiskNamespace {
     utilizationThreshold?: number | null
   ): RiskBudgetResult;
   /**
-   * Configuration of position-level VaR / ES decomposition.
-   */
-  DecompositionConfig: DecompositionConfigConstructor;
-  /**
    * Attribute the portfolio loss in tail scenarios to positions.
    *
    * Returns the canonical `StressAttribution` (the object Python's
@@ -10249,7 +10130,7 @@ export interface FactorRiskNamespace {
    * and each position's average tail P&L and share of the tail loss.
    * @param positionIds - Position identifiers, one per row of `positionPnls`.
    * @param positionPnls - Position-major P&L matrix as nested rows: one row per position, one column per scenario, in reporting-currency amounts.
-   * @param confidence - Optional tail confidence in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::historical_95()` preset (0.95).
+   * @param confidence - Optional tail confidence in `(0.5, 1)`; omitted or `null` defaults to 0.95.
    * @returns The `StressAttribution` object.
    * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if the dimensions disagree, a P&L is non-finite, `confidence` is outside `(0.5, 1)`, or the tail holds no scenario.
    */
@@ -14667,24 +14548,6 @@ export interface CashflowsNamespace {
   ): CalendarYearLadderRow[];
 
   /**
-   * Amount aggregated for one period and currency.
-   *
-   * Mirrors Rust `PeriodAggregation::get_amount`; on a plain object this is
-   * `aggregation[period]?.[currency]`.
-   *
-   * @param aggregation - `PeriodAggregation` wire object, as returned by `aggregateByPeriod` or `CashFlowSchedule.pvByPeriod`.
-   * @param period - Period code exactly as the aggregation spells it, for example `"2025Q1"`.
-   * @param currency - ISO-4217 currency code of the bucket to read.
-   * @returns `Money` wire object, or `undefined` when the period has no flows in that currency.
-   * @throws If `aggregation` is not a `PeriodAggregation` or `currency` is not an ISO-4217 code (kind `validation`), or `period` is not a string (kind `invalid_type`).
-   */
-  periodAggregationGetAmount(
-    aggregation: generated.cashflows.PeriodAggregation,
-    period: string,
-    currency: generated.core.Currency
-  ): MoneyValue | undefined;
-
-  /**
    * Materialize the reset observations crossed by a realized-forward market roll.
    *
    * Every projected fixing recorded in the schedules' metadata with a date in
@@ -14855,15 +14718,6 @@ export interface CashflowsNamespace {
   notionalPar(amount: number, currency: generated.core.Currency): generated.cashflows.Notional;
 
   /**
-   * Currency of a notional's initial balance.
-   *
-   * @param notional - `Notional` wire object.
-   * @returns ISO-4217 currency code.
-   * @throws If `notional` is not a `Notional` (kind `validation`).
-   */
-  notionalCurrency(notional: generated.cashflows.Notional): generated.core.Currency;
-
-  /**
    * Check a notional and its amortization rule for consistency.
    *
    * @param notional - `Notional` wire object.
@@ -14872,68 +14726,12 @@ export interface CashflowsNamespace {
   notionalValidate(notional: generated.cashflows.Notional): void;
 
   /**
-   * Constant annual default rate.
-   *
-   * @param cdr - Annual constant default rate as a decimal (`0.02` = 2% CDR).
-   * @returns `DefaultModelSpec` wire object with no seasoning curve.
-   * @throws If `cdr` is not a number (kind `invalid_type`).
-   */
-  defaultModelSpecConstantCdr(cdr: number): generated.cashflows.DefaultModelSpec;
-
-  /**
-   * PSA/BMA Standard Default Assumption curve.
-   *
-   * Annual CDR ramps 0.02% per month to a 0.60% peak at month 30, is flat to
-   * month 60, declines to 0.03% at month 120 and stays there.
-   *
-   * @param speedMultiplier - SDA speed, where `1.0` means 100% SDA and `2.0` means 200% SDA.
-   * @returns `DefaultModelSpec` wire object using the SDA curve.
-   * @throws If `speedMultiplier` is not a number (kind `invalid_type`).
-   */
-  defaultModelSpecSda(speedMultiplier: number): generated.cashflows.DefaultModelSpec;
-
-  /**
    * Constant 2% CDR baseline.
    *
-   * @returns `DefaultModelSpec` wire object equal to `defaultModelSpecConstantCdr(0.02)`.
+   * @returns `DefaultModelSpec` wire object `{ curve: "constant", cdr: 0.02 }`.
    * @throws If the model cannot be serialized.
    */
   defaultModelSpecCdr2pct(): generated.cashflows.DefaultModelSpec;
-
-  /**
-   * Explicit annual CDR for each month of seasoning.
-   *
-   * @param monthlyCdr - Annual CDR per seasoning month as decimals in `[0, 1]`, month 1 first; the last value is held. Must be non-empty.
-   * @returns `DefaultModelSpec` wire object using the vector curve.
-   * @throws If `monthlyCdr` is not an array of numbers (kind `invalid_type`).
-   */
-  defaultModelSpecVector(monthlyCdr: number[] | Float64Array): generated.cashflows.DefaultModelSpec;
-
-  /**
-   * Cumulative net-loss curve with a constant severity.
-   *
-   * @param cumulativeNetLossPct - Cumulative net loss in percent of the original balance per seasoning month (`1.5` = 1.5%), non-decreasing, month 1 first; the last value is held.
-   * @param severity - Loss severity as a decimal fraction of defaulted par in `(0, 1]`; defaults are loss divided by severity.
-   * @returns `DefaultModelSpec` wire object using the cumulative-loss curve.
-   * @throws If an argument is not a number or array of numbers (kind `invalid_type`).
-   */
-  defaultModelSpecCumulativeLoss(
-    cumulativeNetLossPct: number[] | Float64Array,
-    severity: number
-  ): generated.cashflows.DefaultModelSpec;
-
-  /**
-   * Rating-agency default timing over a lifetime cumulative default rate.
-   *
-   * @param cumulativeDefaultRate - Lifetime defaults as a decimal fraction of the original balance in `[0, 1]`.
-   * @param annualPct - Share of lifetime defaults in each year of seasoning, in percent (for example `[15, 30, 30, 15, 10]`), summing to 100.
-   * @returns `DefaultModelSpec` wire object using the timing curve.
-   * @throws If an argument is not a number or array of numbers (kind `invalid_type`).
-   */
-  defaultModelSpecTiming(
-    cumulativeDefaultRate: number,
-    annualPct: number[] | Float64Array
-  ): generated.cashflows.DefaultModelSpec;
 
   /**
    * Check a default model's curve parameters.
@@ -14988,66 +14786,12 @@ export interface CashflowsNamespace {
   ): number | undefined;
 
   /**
-   * Constant annual prepayment rate.
-   *
-   * @param cpr - Annual constant prepayment rate as a decimal (`0.06` = 6% CPR).
-   * @returns `PrepaymentModelSpec` wire object with no seasoning curve.
-   * @throws If `cpr` is not a number (kind `invalid_type`).
-   */
-  prepaymentModelSpecConstantCpr(cpr: number): generated.cashflows.PrepaymentModelSpec;
-
-  /**
-   * PSA prepayment curve: a 30-month ramp to a 6% annual CPR, then flat.
-   *
-   * @param speedMultiplier - PSA speed, where `1.0` means 100% PSA and `1.5` means 150% PSA.
-   * @returns `PrepaymentModelSpec` wire object using the PSA curve.
-   * @throws If `speedMultiplier` is not a number (kind `invalid_type`).
-   */
-  prepaymentModelSpecPsa(speedMultiplier: number): generated.cashflows.PrepaymentModelSpec;
-
-  /**
    * 100% PSA, the standard prepayment assumption.
    *
-   * @returns `PrepaymentModelSpec` wire object equal to `prepaymentModelSpecPsa(1.0)`.
+   * @returns `PrepaymentModelSpec` wire object `{ curve: "psa", speed_multiplier: 1.0 }`.
    * @throws If the model cannot be serialized.
    */
   prepaymentModelSpecPsa100(): generated.cashflows.PrepaymentModelSpec;
-
-  /**
-   * CMBS-style lockout: no prepayment during the lockout, then a constant CPR.
-   *
-   * @param lockoutMonths - Months with zero prepayment (non-negative integer; for example `60` for five years).
-   * @param postLockoutCpr - Annual CPR after the lockout as a decimal (`0.10` = 10%).
-   * @returns `PrepaymentModelSpec` wire object using the lockout curve.
-   * @throws If `lockoutMonths` is not a non-negative integer or `postLockoutCpr` is not a number (kind `invalid_type`).
-   */
-  prepaymentModelSpecCmbsWithLockout(
-    lockoutMonths: number,
-    postLockoutCpr: number
-  ): generated.cashflows.PrepaymentModelSpec;
-
-  /**
-   * ABS speed curve (auto-loan and consumer ABS convention).
-   *
-   * Each month the same share of the original balance prepays, so
-   * `SMM_t = speed / (1 − speed·(t − 1))`.
-   *
-   * @param speed - Monthly prepayment as a decimal fraction of the original balance (`0.015` = 1.5% ABS), in `[0, 1]`.
-   * @returns `PrepaymentModelSpec` wire object using the ABS curve.
-   * @throws If `speed` is not a number (kind `invalid_type`).
-   */
-  prepaymentModelSpecAbs(speed: number): generated.cashflows.PrepaymentModelSpec;
-
-  /**
-   * Explicit annual CPR for each month of seasoning.
-   *
-   * @param monthlyCpr - Annual CPR per seasoning month as decimals in `[0, 1]`, month 1 first; the last value is held. Must be non-empty.
-   * @returns `PrepaymentModelSpec` wire object using the vector curve.
-   * @throws If `monthlyCpr` is not an array of numbers (kind `invalid_type`).
-   */
-  prepaymentModelSpecVector(
-    monthlyCpr: number[] | Float64Array
-  ): generated.cashflows.PrepaymentModelSpec;
 
   /**
    * Check a prepayment model's curve parameters.
@@ -25397,6 +25141,20 @@ export interface SabrParameters extends WasmOwned {
    */
   isShifted(): boolean;
   /**
+   * Implied volatility for the given strike: normal (Bachelier) vol in absolute rate units when beta < 1e-4, Black decimal vol otherwise.
+   * @returns Hagan-2002 implied volatility: normal vol in absolute rate units when beta < 1e-4, Black decimal volatility otherwise.
+   * @param forward - Forward price or rate in the same quote convention as the strike.
+   * @param strike - Option strike price in the same price units as the underlying.
+   * @param t - Time from the curve base date in years.
+   * @throws Error - Throws a JavaScript exception if `t` is not positive, the forward or strike lies outside the selected shifted or unshifted SABR domain, or the Hagan expansion produces an undefined or non-finite volatility.
+   */
+  impliedVol(forward: number, strike: number, t: number): number;
+  /**
+   * Whether the parameterization admits negative forwards.
+   * @returns `true` when the SABR parameterization admits negative forwards.
+   */
+  supportsNegativeRates(): boolean;
+  /**
    * Serialize to the Rust `SabrParameters` JSON wire form.
    * @returns Compact canonical JSON text.
    * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
@@ -25413,7 +25171,7 @@ export interface SabrParameters extends WasmOwned {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const params = new models.volatility.SabrParameters(0.2, 1.0, 0.3, -0.2);
- * console.log(params.alpha, params.rho);
+ * console.log(params.alpha, params.rho, params.impliedVol(100, 105, 1));
  * params.free();
  * ```
  */
@@ -25493,56 +25251,6 @@ export interface SabrParametersConstructor {
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
    */
   fromJson(json: JsonInput): SabrParameters;
-}
-
-/**
- * Hagan-2002 SABR volatility model.
- *
- * Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr.
- */
-export interface SabrModel extends WasmOwned {
-  /**
-   * Implied volatility for the given strike: normal (Bachelier) vol in absolute rate units when beta < 1e-4, Black decimal vol otherwise.
-   * @returns Hagan-2002 implied volatility: normal vol in absolute rate units when beta < 1e-4, Black decimal volatility otherwise.
-   * @param forward - Forward price or rate in the same quote convention as the strike.
-   * @param strike - Option strike price in the same price units as the underlying.
-   * @param t - Time from the curve base date in years.
-   * @throws Error - Throws a JavaScript exception if `t` is not positive, the forward or strike lies outside the selected shifted or unshifted SABR domain, or the Hagan expansion produces an undefined or non-finite volatility.
-   */
-  impliedVol(forward: number, strike: number, t: number): number;
-  /**
-   * Parameters used by this model.
-   */
-  readonly params: SabrParameters;
-  /**
-   * Whether the parameterization admits negative forwards.
-   * @returns `true` when the SABR parameterization admits negative forwards.
-   */
-  supportsNegativeRates(): boolean;
-}
-
-/**
- * Hagan-2002 SABR volatility model.
- *
- * Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr.
- * @example
- * ```typescript
- * import init, { models } from "finstack-quant-wasm";
- * await init();
- * const params = models.volatility.SabrParameters.equityDefault();
- * const model = new models.volatility.SabrModel(params);
- * console.log(model.impliedVol(100, 105, 1));
- * model.free();
- * params.free();
- * ```
- */
-export interface SabrModelConstructor {
-  /**
-   * Create a Hagan-2002 SABR model from the supplied parameters.
-   * @returns A `SabrModel` handle.
-   * @param params - SABR parameter object containing alpha, beta, nu, rho, and optional shift.
-   */
-  new (params: SabrParameters): SabrModel;
 }
 
 /**
@@ -26033,7 +25741,7 @@ export interface DynamicRecoverySpec extends WasmOwned {
    * Notional-to-recovery mapping in canonical JSON form: a tag string for
    * the parameterless models, or a single-key object carrying the parameters.
    */
-  readonly model: generated.models.RecoveryModel;
+  readonly model: generated.models.DynamicRecoveryModel;
 }
 
 /**
@@ -27670,26 +27378,12 @@ export interface WorkoutLgd extends WasmOwned {
    */
   evaluate(ead: number): generated.models.WorkoutLgdResult;
   /**
-   * Loss given default for an exposure, as a fraction of EAD in `[0, 1]`.
-   * @param ead - Exposure at default in monetary units; positive.
-   * @returns The workout LGD.
-   * @throws Error - Throws a `validation` error if `ead` is not positive and finite.
-   */
-  lgd(ead: number): number;
-  /**
    * Discounted net recovery after costs, in monetary units.
    * @param ead - Exposure at default in monetary units; positive.
    * @returns The net recovery amount.
    * @throws Error - Throws a `validation` error if `ead` is not positive and finite.
    */
   netRecovery(ead: number): number;
-  /**
-   * Net recovery as a fraction of EAD.
-   * @param ead - Exposure at default in monetary units; positive.
-   * @returns The recovery rate in `[0, 1]`.
-   * @throws Error - Throws a `validation` error if `ead` is not positive and finite.
-   */
-  recoveryRate(ead: number): number;
   /**
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
@@ -27727,7 +27421,7 @@ export interface WorkoutLgd extends WasmOwned {
  *   .discountRate(0.05)
  *   .costs(new models.credit.WorkoutCosts(0.05, 0.03))
  *   .build();
- * console.log(workout.lgd(1000000), workout.evaluate(1000000).recovery_rate);
+ * console.log(workout.evaluate(1000000).lgd, workout.evaluate(1000000).recovery_rate);
  * workout.free();
  * ```
  */
@@ -29085,10 +28779,6 @@ export interface VolatilityNamespace {
    */
   SabrParameters: SabrParametersConstructor;
   /**
-   * Hagan-2002 SABR volatility model.
-   */
-  SabrModel: SabrModelConstructor;
-  /**
    * SABR smile at a fixed forward and expiry.
    */
   SabrSmile: SabrSmileConstructor;
@@ -29589,10 +29279,6 @@ export interface AlmgrenChrissModel extends WasmOwned {
    * Permanent-impact coefficient.
    */
   readonly gamma: number;
-  /**
-   * Model name for diagnostics.
-   */
-  readonly modelName: string;
 }
 
 /**
@@ -29682,10 +29368,6 @@ export interface KyleLambdaModel extends WasmOwned {
    * Kyle's lambda: price change per unit of signed order flow (Python `lambda_`).
    */
   readonly lambda: number;
-  /**
-   * Model name for diagnostics.
-   */
-  readonly modelName: string;
 }
 
 /**
@@ -29695,7 +29377,7 @@ export interface KyleLambdaModel extends WasmOwned {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const model = models.liquidity.KyleLambdaModel.fromAmihud(1e-9, 100);
- * console.log(model.lambda, model.modelName);
+ * console.log(model.lambda);
  * model.free();
  * ```
  */
@@ -30178,8 +29860,8 @@ export interface ModelsNamespace {
    * @param forward - Forward price or rate at expiry.
    * @param strike - Strike in the same units as `forward`.
    * @param df - Discount factor from valuation to expiry; a finite decimal strictly greater than zero (the same domain `black76ImpliedVol` accepts).
-   * @param expiry - Time to expiry in years; non-negative.
    * @param vol - Annualized lognormal (Black) volatility, decimal; non-negative.
+   * @param expiry - Time to expiry in years; non-negative.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
    * @throws Error - Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite, `forward`, `strike` or `df` is not positive, `vol` or `expiry` is negative, or the price is non-finite.
    */
@@ -30198,8 +29880,8 @@ export interface ModelsNamespace {
    * Black (1976): see docs/REFERENCES.md#black-1976.
    * @param forward - Forward price or rate at expiry.
    * @param strike - Strike in the same units as `forward`.
-   * @param expiry - Time to expiry in years; non-negative.
    * @param vol - Annualized lognormal (Black) volatility, decimal; non-negative.
+   * @param expiry - Time to expiry in years; non-negative.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
    * @returns The Rust `ForwardGreeks` object `{ delta, gamma, vega }`.
    * @throws Error - Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite, `forward` or `strike` is not positive, `vol` or `expiry` is negative, or a Greek is non-finite.

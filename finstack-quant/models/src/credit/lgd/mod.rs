@@ -21,7 +21,7 @@ pub mod workout;
 
 pub use downturn::{DownturnLgd, DownturnMethod};
 pub use ead::{CreditConversionFactor, EadCalculator};
-pub use seniority::{BetaRecovery, SeniorityCalibration, SeniorityClass, SeniorityRecovery};
+pub use seniority::{BetaRecovery, SeniorityCalibration, SeniorityClass};
 pub use workout::{
     CollateralPiece, WorkoutCollateralType, WorkoutCosts, WorkoutLgd, WorkoutLgdBuilder,
     WorkoutLgdResult,

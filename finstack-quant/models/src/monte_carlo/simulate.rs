@@ -68,7 +68,9 @@ use crate::monte_carlo::discretization::milstein::Milstein;
 use crate::monte_carlo::discretization::rough_bergomi::RoughBergomiEuler;
 use crate::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
 use crate::monte_carlo::discretization::{ExactHullWhite1F, ExactSchwartzSmith, QeCir, QeHeston};
-use crate::monte_carlo::engine::{build_correlation_factor, McEngine, MAX_CAPTURED_PATHS};
+use crate::monte_carlo::engine::{
+    build_correlation_factor, fill_shocks, McEngine, NoiseHook, MAX_CAPTURED_PATHS,
+};
 use crate::monte_carlo::process::brownian::{BrownianProcess, MultiBrownianProcess};
 use crate::monte_carlo::process::cheyette_rough::{
     CheyetteRoughVolParams, CheyetteRoughVolProcess,
@@ -641,8 +643,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             );
             match spec.scheme {
                 SchemeSpec::Default => {
-                    let scheme = ExactSchwartzSmith::from_process(&process)?;
-                    simulate(&process, &scheme, spec, x0, parallel)
+                    simulate(&process, &ExactSchwartzSmith::new(), spec, x0, parallel)
                 }
                 SchemeSpec::Euler => simulate(&process, &EulerMaruyama, spec, x0, parallel),
                 _ => unsupported(),
@@ -686,7 +687,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             match spec.scheme {
                 SchemeSpec::Default => simulate_with_noise(
                     &process,
-                    &RoughBergomiEuler::new(p.hurst),
+                    &RoughBergomiEuler::new(),
                     spec,
                     x0,
                     parallel,
@@ -739,7 +740,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             let mut summary = match spec.scheme {
                 SchemeSpec::Default => simulate_with_noise(
                     &process,
-                    &CheyetteRoughEuler::new(p.hurst),
+                    &CheyetteRoughEuler::new(),
                     spec,
                     x0,
                     parallel,
@@ -968,17 +969,10 @@ where
             path_rng.fill_std_normals(&mut s.fbm_normals);
             noise.generate(&s.fbm_normals, &mut s.fbm_increments);
         }
+        let hook = NoiseHook::Correlation(correlation.as_ref());
         for step in 0..num_steps {
             let (t, dt) = (time_grid.time(step), time_grid.dt(step));
-            match &correlation {
-                Some(factor) => {
-                    path_rng.fill_std_normals(&mut s.z_raw);
-                    factor.apply(&s.z_raw, &mut s.z).map_err(|error| {
-                        Error::Validation(format!("failed to correlate shocks: {error}"))
-                    })?;
-                }
-                None => path_rng.fill_std_normals(&mut s.z),
-            }
+            fill_shocks(&mut path_rng, &mut s.z, &mut s.z_raw, step, &hook);
             if let Some(noise) = noise {
                 s.z[FBM_Z_INDEX] = s.fbm_increments[step];
                 s.z[DRIVE_Z_INDEX] = noise.driving_normal(&s.fbm_normals, step);

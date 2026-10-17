@@ -299,8 +299,8 @@ pub fn black76_implied_vol(
 /// @param strike - Strike in the same units as `forward`.
 /// @param df - Discount factor from valuation to expiry; a finite decimal
 /// strictly greater than zero (the same domain `black76ImpliedVol` accepts).
-/// @param expiry - Time to expiry in years; non-negative.
 /// @param vol - Annualized lognormal (Black) volatility, decimal; non-negative.
+/// @param expiry - Time to expiry in years; non-negative.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
 ///
 /// # Errors
@@ -313,17 +313,17 @@ pub fn black76_price(
     forward: JsValue,
     strike: JsValue,
     df: JsValue,
-    expiry: JsValue,
     vol: JsValue,
+    expiry: JsValue,
     is_call: JsValue,
 ) -> Result<f64, JsValue> {
     let forward = js_f64(&forward, "forward")?;
     let strike = js_f64(&strike, "strike")?;
     let df = js_f64(&df, "df")?;
-    let expiry = js_f64(&expiry, "expiry")?;
     let vol = js_f64(&vol, "vol")?;
+    let expiry = js_f64(&expiry, "expiry")?;
     let is_call = js_bool(&is_call, "isCall")?;
-    black76_price_core(forward, strike, df, expiry, vol, OptionType::from(is_call))
+    black76_price_core(forward, strike, df, vol, expiry, OptionType::from(is_call))
         .map_err(to_js_err)
 }
 
@@ -334,8 +334,8 @@ pub fn black76_price(
 /// sensitivities. Black (1976): see docs/REFERENCES.md#black-1976.
 /// @param forward - Forward price or rate at expiry.
 /// @param strike - Strike in the same units as `forward`.
-/// @param expiry - Time to expiry in years; non-negative.
 /// @param vol - Annualized lognormal (Black) volatility, decimal; non-negative.
+/// @param expiry - Time to expiry in years; non-negative.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
 /// @returns The Rust `ForwardGreeks` object `{ delta, gamma, vega }`.
 ///
@@ -348,16 +348,16 @@ pub fn black76_price(
 pub fn black76_greeks(
     forward: JsValue,
     strike: JsValue,
-    expiry: JsValue,
     vol: JsValue,
+    expiry: JsValue,
     is_call: JsValue,
 ) -> Result<JsValue, JsValue> {
     let forward = js_f64(&forward, "forward")?;
     let strike = js_f64(&strike, "strike")?;
-    let expiry = js_f64(&expiry, "expiry")?;
     let vol = js_f64(&vol, "vol")?;
+    let expiry = js_f64(&expiry, "expiry")?;
     let is_call = js_bool(&is_call, "isCall")?;
-    let greeks = black76_greeks_core(forward, strike, expiry, vol, OptionType::from(is_call))
+    let greeks = black76_greeks_core(forward, strike, vol, expiry, OptionType::from(is_call))
         .map_err(to_js_err)?;
     crate::utils::to_js_value(&greeks)
 }

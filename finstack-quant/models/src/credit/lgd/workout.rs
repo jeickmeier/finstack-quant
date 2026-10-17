@@ -359,21 +359,6 @@ impl WorkoutLgd {
         })
     }
 
-    /// Compute LGD for a given exposure at default.
-    ///
-    /// # Arguments
-    ///
-    /// * `ead` - Exposure at default (must be > 0).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `ead` is non-finite or `ead <= 0`.
-    pub fn lgd(&self, ead: f64) -> Result<f64> {
-        let net_recovery = self.net_recovery(ead)?;
-
-        Ok((1.0 - net_recovery / ead).clamp(0.0, 1.0))
-    }
-
     /// Net recovery amount after collateral cap, discounting, and workout costs.
     ///
     /// # Errors
@@ -400,20 +385,6 @@ impl WorkoutLgd {
         let net_recovery = ((gross_recovery - total_costs) * df).max(0.0);
 
         Ok(net_recovery)
-    }
-
-    /// Recovery rate = 1 - LGD.
-    ///
-    /// # Arguments
-    ///
-    /// * `ead` - Exposure at default in collateral monetary units; must be
-    ///   finite and strictly positive.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `ead` is non-finite or `ead <= 0`.
-    pub fn recovery_rate(&self, ead: f64) -> Result<f64> {
-        Ok(1.0 - self.lgd(ead)?)
     }
 
     /// Ordered collateral waterfall, highest priority first.
@@ -540,8 +511,8 @@ mod tests {
             serde_json::from_str(&serde_json::to_string(&model).expect("serialize"))
                 .expect("valid replay");
         assert_eq!(
-            replay.lgd(100.0).expect("ead"),
-            model.lgd(100.0).expect("ead")
+            replay.evaluate(100.0).expect("ead").lgd,
+            model.evaluate(100.0).expect("ead").lgd
         );
     }
 
@@ -616,7 +587,7 @@ mod tests {
             .expect("valid model");
 
         let ead = 100.0;
-        let lgd = model.lgd(ead).expect("valid ead");
+        let lgd = model.evaluate(ead).expect("valid ead").lgd;
 
         // gross_recovery = 80 * 0.70 = 56.0 (capped at 100)
         // df = (1.05)^-2 = 0.907029...
@@ -645,7 +616,7 @@ mod tests {
             .build()
             .expect("valid model");
 
-        let lgd = model.lgd(100.0).expect("valid ead");
+        let lgd = model.evaluate(100.0).expect("valid ead").lgd;
         assert!(
             (lgd - 1.0).abs() < 1e-12,
             "LGD with no collateral should be 1.0, got {}",
@@ -667,7 +638,7 @@ mod tests {
             .build()
             .expect("valid model");
 
-        let lgd = model.lgd(100.0).expect("valid ead");
+        let lgd = model.evaluate(100.0).expect("valid ead").lgd;
         assert!(
             (lgd - 0.0).abs() < 1e-12,
             "LGD should be 0 when collateral exceeds EAD, got {}",
@@ -678,10 +649,10 @@ mod tests {
     #[test]
     fn workout_lgd_ead_validation() {
         let model = WorkoutLgd::builder().build().expect("valid model");
-        assert!(model.lgd(0.0).is_err());
-        assert!(model.lgd(-1.0).is_err());
-        assert!(model.lgd(f64::NAN).is_err());
-        assert!(model.lgd(f64::INFINITY).is_err());
+        assert!(model.evaluate(0.0).is_err());
+        assert!(model.evaluate(-1.0).is_err());
+        assert!(model.evaluate(f64::NAN).is_err());
+        assert!(model.evaluate(f64::INFINITY).is_err());
     }
 
     #[test]
@@ -716,7 +687,7 @@ mod tests {
             .expect("valid model");
 
         let ead = 100.0;
-        let lgd = model.lgd(ead).expect("valid ead");
+        let lgd = model.evaluate(ead).expect("valid ead").lgd;
 
         // gross = 20*1.0 + 60*0.75 = 20 + 45 = 65
         // df = 1.05^-1 = 0.9523809...
@@ -742,9 +713,8 @@ mod tests {
             .build()
             .expect("valid model");
 
-        let lgd = model.lgd(100.0).expect("valid");
-        let rr = model.recovery_rate(100.0).expect("valid");
-        assert!((lgd + rr - 1.0).abs() < 1e-12);
+        let eval = model.evaluate(100.0).expect("valid");
+        assert!((eval.lgd + eval.recovery_rate - 1.0).abs() < 1e-12);
     }
 
     #[test]
@@ -759,6 +729,10 @@ mod tests {
         let json = serde_json::to_string(&model).expect("serialize");
         let model2: WorkoutLgd = serde_json::from_str(&json).expect("deserialize");
 
-        assert!((model.lgd(100.0).expect("ok") - model2.lgd(100.0).expect("ok")).abs() < 1e-12);
+        assert!(
+            (model.evaluate(100.0).expect("ok").lgd - model2.evaluate(100.0).expect("ok").lgd)
+                .abs()
+                < 1e-12
+        );
     }
 }

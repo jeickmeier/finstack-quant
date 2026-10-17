@@ -296,9 +296,9 @@ fn check_calendar_spread_grid<'py>(
 ///
 /// Notes
 /// -----
-/// The underlying Rust check takes a single forward. When per-expiry forwards
-/// are supplied, the check is run once per expiry with that expiry's forward
-/// and only the corresponding expiry's violations are kept.
+/// Evaluates the Dupire local-variance denominator across adjacent expiries
+/// using each expiry's forward price to convert strikes to forward
+/// log-moneyness.
 #[pyfunction]
 #[pyo3(signature = (strikes, expiries, vols, forward_prices))]
 fn check_local_vol_density_grid<'py>(

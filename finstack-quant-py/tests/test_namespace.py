@@ -314,7 +314,7 @@ class TestPortfolioNamespace:
         """Pure factor-risk kernels should live under models.factor.risk."""
         from finstack_quant import portfolio
         from finstack_quant.models.factor.risk import (  # noqa: F401
-            DecompositionConfig,
+            PositionRiskDecomposition,
             RiskDecomposition,
             StressAttribution,
             build_stress_attribution,
@@ -448,7 +448,7 @@ class TestValuationsNamespace:
     def test_valuations_do_not_export_model_engines(self) -> None:
         from finstack_quant import valuations
 
-        for name in ("bs_price", "bs_cos_price", "SabrModel", "correlation", "models"):
+        for name in ("bs_price", "bs_cos_price", "SabrParameters", "correlation", "models"):
             assert name not in valuations.__all__
             assert not hasattr(valuations, name)
 

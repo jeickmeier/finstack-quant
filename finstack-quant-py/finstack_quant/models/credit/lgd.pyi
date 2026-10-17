@@ -836,7 +836,7 @@ class WorkoutLgd:
     ...     .costs(lgd.WorkoutCosts.zero())
     ...     .build()
     ... )
-    >>> model.lgd(100.0)
+    >>> model.evaluate(100.0).lgd
     0.5
 
     """
@@ -884,27 +884,6 @@ class WorkoutLgd:
         """
         ...
 
-    def lgd(self, ead: float) -> float:
-        """
-        Loss given default at ``ead``.
-
-        Parameters
-        ----------
-        ead : float
-            Exposure at default (> 0).
-
-        Returns
-        -------
-        float
-            LGD as a decimal in ``[0, 1]``.
-
-        Raises
-        ------
-        ValueError
-            If ``ead`` is non-finite or non-positive.
-        """
-        ...
-
     def net_recovery(self, ead: float) -> float:
         """
         Net recovery amount at ``ead``.
@@ -918,27 +897,6 @@ class WorkoutLgd:
         -------
         float
             Post-cost, discounted recovery amount (floored at zero).
-
-        Raises
-        ------
-        ValueError
-            If ``ead`` is non-finite or non-positive.
-        """
-        ...
-
-    def recovery_rate(self, ead: float) -> float:
-        """
-        Recovery rate ``1 - lgd`` at ``ead``.
-
-        Parameters
-        ----------
-        ead : float
-            Exposure at default (> 0).
-
-        Returns
-        -------
-        float
-            Recovery rate as a decimal in ``[0, 1]``.
 
         Raises
         ------

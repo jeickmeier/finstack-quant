@@ -158,38 +158,12 @@ impl KyleLambdaModel {
 
         // Kyle model: total price impact = lambda * |Q|
         // Cost = lambda * Q^2 / 2 (integrated impact over linear execution)
-        let total_cost = self.lambda * q * q * 0.5;
-        let total_cost_abs = total_cost.abs();
-
-        // Kyle's linear model has a single, fully-permanent impact term —
-        // there is no separate transient component to recover from. We
-        // therefore report the full cost as `permanent_impact` and zero
-        // `temporary_impact` rather than splitting heuristically. Callers who
-        // need a permanent/temporary decomposition should use the
-        // Almgren-Chriss model, which separates the two by construction.
-        let permanent_impact = total_cost_abs;
-        let temporary_impact = 0.0;
-
-        let reference_price = params.effective_reference_price();
-        let notional = q.abs() * reference_price;
-        let cost_bp = if notional > 0.0 {
-            total_cost_abs / notional * 10_000.0
-        } else {
-            0.0
-        };
-
-        let execution_risk = params.daily_volatility
-            * (params.horizon_days / 3.0).sqrt()
-            * q.abs()
-            * reference_price;
-
-        Ok(ImpactEstimate {
+        let permanent_impact = (self.lambda * q * q * 0.5).abs();
+        Ok(ImpactEstimate::from_components(
+            params,
             permanent_impact,
-            temporary_impact,
-            total_cost: total_cost_abs,
-            cost_bp,
-            execution_risk,
-        })
+            0.0,
+        ))
     }
 
     /// Compute the optimal execution trajectory.
@@ -222,61 +196,19 @@ impl KyleLambdaModel {
         let q = params.quantity;
         let t = params.horizon_days;
         let dt = t / num_buckets as f64;
-
-        // For the Kyle linear model, the optimal trajectory is uniform
-        // (constant trading rate) when there's no risk aversion on timing,
-        // because the impact is purely a function of total quantity.
-        let per_bucket = q / num_buckets as f64;
-
-        let mut quantities = Vec::with_capacity(num_buckets);
-        let mut remaining = Vec::with_capacity(num_buckets + 1);
-        let mut time_points = Vec::with_capacity(num_buckets + 1);
-
-        remaining.push(q);
-        time_points.push(0.0);
-
-        for j in 1..=num_buckets {
-            quantities.push(per_bucket);
-            let rem = if j == num_buckets {
-                0.0
-            } else {
-                q - per_bucket * j as f64
-            };
-            remaining.push(rem);
-            time_points.push(j as f64 * dt);
-        }
-
-        let expected_cost = self.lambda * q * q * 0.5;
-        let expected_cost_abs = expected_cost.abs();
-
-        // Variance of cost: Almgren-Chriss (2001), eq. (7), Var = σ² ∫ x(t)² dt.
-        // Inventory is piecewise linear between bucket boundaries, so each
-        // bucket's contribution is the exact integral
-        // ∫₀^dt (a + (b − a)·s/dt)² ds = (a² + a·b + b²)/3 · dt.
-        // A right-endpoint Riemann sum (σ²·b²·dt) is *not* an acceptable
-        // approximation here: with remaining[n] == 0 the final bucket
-        // contributes zero, making the variance exactly 0 at n = 1 and ~15%
-        // low at n = 5 versus the closed form used by `estimate_cost`.
+        let (quantities, remaining, time_points) =
+            ExecutionTrajectory::uniform_steps(q, t, num_buckets);
+        let expected_cost = (self.lambda * q * q * 0.5).abs();
         let sigma = params.daily_volatility * params.effective_reference_price();
-        let mut cost_variance = 0.0;
-        for j in 0..num_buckets {
-            let (a, b) = (remaining[j], remaining[j + 1]);
-            cost_variance += sigma * sigma * (a * a + a * b + b * b) / 3.0 * dt;
-        }
+        let cost_variance = ExecutionTrajectory::piecewise_linear_variance(&remaining, dt, sigma);
 
         Ok(ExecutionTrajectory {
             quantities,
             remaining,
-            expected_cost: expected_cost_abs,
+            expected_cost,
             cost_variance,
             time_points,
         })
-    }
-
-    /// Human-readable model name for reporting.
-    #[must_use]
-    pub fn model_name(&self) -> &'static str {
-        "Kyle-Lambda"
     }
 }
 

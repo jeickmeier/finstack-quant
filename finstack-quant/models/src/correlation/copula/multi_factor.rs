@@ -123,7 +123,7 @@ impl MultiFactorCopula {
     }
 
     fn decompose_correlation(&self, total_correlation: f64) -> (f64, f64) {
-        let rho = total_correlation.clamp(0.0, 0.99);
+        let rho = total_correlation.clamp(0.0, 1.0);
         let global_sq = rho * (1.0 - self.sector_fraction);
         let sector_sq = rho * self.sector_fraction;
         (global_sq.sqrt(), sector_sq.sqrt())
@@ -151,6 +151,13 @@ impl Copula for MultiFactorCopula {
             );
             return norm_cdf(default_threshold);
         }
+        if !default_threshold.is_finite()
+            || factor_realization.iter().any(|z| !z.is_finite())
+            || !correlation.is_finite()
+            || !(0.0..=1.0).contains(&correlation)
+        {
+            return f64::NAN;
+        }
 
         let (global_loading, sector_loading) = self.decompose_correlation(correlation);
         let z_global = factor_realization.first().copied().unwrap_or(0.0);
@@ -159,7 +166,7 @@ impl Copula for MultiFactorCopula {
 
         if gamma < 1e-10 {
             let systematic = global_loading * z_global + sector_loading * z_sector;
-            return norm_cdf(default_threshold - systematic);
+            return f64::from(systematic <= default_threshold);
         }
 
         let systematic = global_loading * z_global + sector_loading * z_sector;
@@ -183,10 +190,17 @@ impl Copula for MultiFactorCopula {
         // factor realizations must not simulate this copula name-by-name
         // (see `PerNameCopulaDefault::new`, which rejects multi-factor specs).
         let _ = mixing;
+        if !default_threshold.is_finite()
+            || !systematic.is_finite()
+            || !correlation.is_finite()
+            || !(0.0..=1.0).contains(&correlation)
+        {
+            return f64::NAN;
+        }
         let (global_loading, _) = self.decompose_correlation(correlation);
         let residual_sd = (1.0 - global_loading * global_loading).max(0.0).sqrt();
         if residual_sd < 1e-10 {
-            return norm_cdf(default_threshold - global_loading * systematic);
+            return f64::from(global_loading * systematic <= default_threshold);
         }
         let conditional_threshold = (default_threshold - global_loading * systematic) / residual_sd;
         norm_cdf(conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP))

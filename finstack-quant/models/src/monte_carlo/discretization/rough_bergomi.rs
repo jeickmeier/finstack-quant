@@ -57,8 +57,6 @@
 
 use super::super::process::rough_bergomi::RoughBergomiProcess;
 use super::super::traits::Discretization;
-use finstack_quant_core::math::fractional::HurstExponent;
-
 /// Euler discretization for the rBergomi process.
 ///
 /// This scheme reconstructs the variance from the forward variance curve and
@@ -69,25 +67,13 @@ use finstack_quant_core::math::fractional::HurstExponent;
 ///
 /// See the [module-level documentation](self) for details on noise layout,
 /// correlation handling, and the work buffer.
-#[derive(Debug, Clone)]
-pub struct RoughBergomiEuler {
-    /// Hurst exponent of the Riemann-Liouville Volterra driver.
-    hurst: HurstExponent,
-}
+#[derive(Debug, Clone, Default)]
+pub struct RoughBergomiEuler;
 
 impl RoughBergomiEuler {
     /// Create a new rBergomi Euler discretization.
-    ///
-    /// # Arguments
-    ///
-    /// * `hurst` - Validated Hurst exponent, must match the process.
-    pub fn new(hurst: HurstExponent) -> Self {
-        Self { hurst }
-    }
-
-    /// Return the stored Hurst exponent.
-    pub fn hurst(&self) -> HurstExponent {
-        self.hurst
+    pub fn new() -> Self {
+        Self
     }
 }
 
@@ -151,6 +137,14 @@ impl Discretization<RoughBergomiProcess> for RoughBergomiEuler {
     fn work_size(&self, _process: &RoughBergomiProcess) -> usize {
         1 // work[0] = accumulated RL Volterra process Ỹ(t)
     }
+
+    fn applies_correlation_internally(&self) -> bool {
+        true
+    }
+
+    fn scheme_id(&self) -> &'static str {
+        "rough_bergomi_euler"
+    }
 }
 
 #[cfg(test)]
@@ -170,7 +164,7 @@ mod tests {
     #[test]
     fn test_single_step_zero_shocks() {
         let process = make_process();
-        let disc = RoughBergomiEuler::new(HurstExponent::new(0.1).expect("valid hurst"));
+        let disc = RoughBergomiEuler::new();
 
         let mut x = vec![100.0];
         let z = vec![0.0, 0.0, 0.0]; // No shocks: indep, ΔỸ, driving normal
@@ -190,7 +184,7 @@ mod tests {
     #[test]
     fn test_single_step_deterministic() {
         let process = make_process();
-        let disc = RoughBergomiEuler::new(HurstExponent::new(0.1).expect("valid hurst"));
+        let disc = RoughBergomiEuler::new();
         let params = process.params();
 
         let s0 = 100.0;
@@ -270,7 +264,7 @@ mod tests {
     #[test]
     fn test_work_buffer_reset_across_paths() {
         let process = make_process();
-        let disc = RoughBergomiEuler::new(HurstExponent::new(0.1).expect("valid hurst"));
+        let disc = RoughBergomiEuler::new();
 
         let mut x = vec![100.0];
         let z = vec![0.0, 0.05, 0.0]; // Non-zero RL Volterra increment ΔỸ
@@ -303,7 +297,7 @@ mod tests {
     #[test]
     fn test_spot_stays_positive_under_large_shocks() {
         let process = make_process();
-        let disc = RoughBergomiEuler::new(HurstExponent::new(0.1).expect("valid hurst"));
+        let disc = RoughBergomiEuler::new();
 
         for &z_val in &[-3.0, -2.0, 2.0, 3.0] {
             let mut x = vec![100.0];
@@ -354,7 +348,7 @@ mod tests {
             let params =
                 RoughBergomiParams::new(0.0, 0.0, hurst, eta, rho, xi).expect("valid params");
             let process = RoughBergomiProcess::new(params);
-            let disc = RoughBergomiEuler::new(hurst);
+            let disc = RoughBergomiEuler::new();
 
             let gen = RiemannLiouvilleVolterra::new(t_end, n, h).expect("valid generator");
             let dt = gen.dt();
@@ -509,7 +503,7 @@ mod tests {
         // r = q = 0 and ρ = 0: with ρ = 0 the η→0 limit is exactly BS(√ξ₀).
         let params = RoughBergomiParams::new(0.0, 0.0, hurst, eta, 0.0, xi).expect("valid params");
         let process = RoughBergomiProcess::new(params);
-        let disc = RoughBergomiEuler::new(hurst);
+        let disc = RoughBergomiEuler::new();
 
         let gen = RiemannLiouvilleVolterra::new(t_end, n, h).expect("valid generator");
         let dt = gen.dt();

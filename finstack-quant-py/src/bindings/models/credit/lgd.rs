@@ -426,28 +426,12 @@ impl PyWorkoutLgd {
             .map_err(core_to_py)
     }
 
-    /// Loss given default at ``ead`` as a decimal in [0, 1].
-    ///
-    /// Raises ``ValueError`` when ``ead`` is non-finite or non-positive.
-    #[pyo3(text_signature = "($self, ead)")]
-    fn lgd(&self, ead: f64) -> PyResult<f64> {
-        self.inner.lgd(ead).map_err(core_to_py)
-    }
-
     /// Net recovery amount at ``ead``.
     ///
     /// Raises ``ValueError`` when ``ead`` is non-finite or non-positive.
     #[pyo3(text_signature = "($self, ead)")]
     fn net_recovery(&self, ead: f64) -> PyResult<f64> {
         self.inner.net_recovery(ead).map_err(core_to_py)
-    }
-
-    /// Recovery rate ``1 - lgd`` at ``ead``.
-    ///
-    /// Raises ``ValueError`` when ``ead`` is non-finite or non-positive.
-    #[pyo3(text_signature = "($self, ead)")]
-    fn recovery_rate(&self, ead: f64) -> PyResult<f64> {
-        self.inner.recovery_rate(ead).map_err(core_to_py)
     }
 
     /// Ordered collateral waterfall, highest priority first.

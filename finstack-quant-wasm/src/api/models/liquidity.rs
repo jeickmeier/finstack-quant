@@ -456,12 +456,6 @@ impl JsAlmgrenChrissModel {
         self.inner.delta()
     }
 
-    /// Model name for diagnostics.
-    #[wasm_bindgen(getter, js_name = modelName)]
-    pub fn model_name(&self) -> String {
-        self.inner.model_name().to_string()
-    }
-
     /// Expected cost and risk of executing a trade at a uniform rate.
     /// @param params - `TradeParams` object or JSON: `quantity` (signed, in units), `horizon_days`, `daily_volatility`, `profile` (a `LiquidityProfile`), and optional `risk_aversion` and `reference_price`.
     /// @returns The `ImpactEstimate` object (`permanent_impact`, `temporary_impact`, `total_cost`, `cost_bp`, `execution_risk`).
@@ -547,12 +541,6 @@ impl JsKyleLambdaModel {
     #[wasm_bindgen(getter)]
     pub fn lambda(&self) -> f64 {
         self.inner.lambda()
-    }
-
-    /// Model name for diagnostics.
-    #[wasm_bindgen(getter, js_name = modelName)]
-    pub fn model_name(&self) -> String {
-        self.inner.model_name().to_string()
     }
 
     /// Expected cost and risk of executing a trade at a uniform rate.

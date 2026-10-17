@@ -20,7 +20,7 @@ use super::{AssetDynamics, MertonBarrierType};
 /// # Wire format
 ///
 /// Deserialization is routed through [`MertonModel::new_with_dynamics`] via
-/// [`RawMertonModel`], so a model loaded from JSON satisfies exactly the same
+/// `RawMertonModel`, so a model loaded from JSON satisfies exactly the same
 /// invariants as one built in Rust. The serialized field set is unchanged.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -55,26 +55,26 @@ pub struct MertonModel {
 #[derive(Debug, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "json-schema", schemars(rename = "MertonModel"))]
-pub struct RawMertonModel {
+struct RawMertonModel {
     /// Current firm asset value `V_0`, in the issuer's reporting currency.
     /// Strictly positive.
-    pub asset_value: f64,
+    asset_value: f64,
     /// Asset volatility `sigma_V`, annualized and expressed as a decimal
     /// fraction (`0.25` is 25%). Strictly positive.
-    pub asset_vol: f64,
+    asset_vol: f64,
     /// Default barrier `B`, the debt face value the asset value is compared
     /// against. Strictly positive and in the same currency as `asset_value`.
-    pub debt_barrier: f64,
+    debt_barrier: f64,
     /// Continuously compounded risk-free rate `r`, as a decimal fraction.
-    pub risk_free_rate: f64,
+    risk_free_rate: f64,
     /// Continuous payout (dividend) rate on assets, as a decimal fraction.
     /// Reduces the drift of the asset process under the risk-neutral measure.
-    pub payout_rate: f64,
+    payout_rate: f64,
     /// Whether default is tested only at maturity or continuously over the
     /// life of the debt.
-    pub barrier_type: MertonBarrierType,
+    barrier_type: MertonBarrierType,
     /// Stochastic process governing the asset value.
-    pub dynamics: AssetDynamics,
+    dynamics: AssetDynamics,
 }
 
 impl TryFrom<RawMertonModel> for MertonModel {

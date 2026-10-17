@@ -28,6 +28,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/models/1/hull_white_params.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Hull-White parameters with piecewise-constant short-rate volatility.",
   "properties": {
     "kappa": {

@@ -42,6 +42,18 @@ impl EvolutionParams {
         dividend_yield: f64,
         dt: f64,
     ) -> finstack_quant_core::Result<Self> {
+        if !volatility.is_finite()
+            || volatility < 0.0
+            || !risk_free_rate.is_finite()
+            || !dividend_yield.is_finite()
+            || !dt.is_finite()
+            || dt <= 0.0
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CRR evolution requires finite inputs with volatility >= 0 and dt > 0 \
+                 (got vol={volatility}, r={risk_free_rate}, q={dividend_yield}, dt={dt})"
+            )));
+        }
         let u = (volatility * dt.sqrt()).exp();
         let d = 1.0 / u;
         let spread = u - d;
@@ -103,6 +115,18 @@ impl EvolutionParams {
         dividend_yield: f64,
         dt: f64,
     ) -> finstack_quant_core::Result<Self> {
+        if !volatility.is_finite()
+            || volatility <= 0.0
+            || !risk_free_rate.is_finite()
+            || !dividend_yield.is_finite()
+            || !dt.is_finite()
+            || dt <= 0.0
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Trinomial evolution requires finite inputs with volatility > 0 and dt > 0 \
+                 (got vol={volatility}, r={risk_free_rate}, q={dividend_yield}, dt={dt})"
+            )));
+        }
         let u = (volatility * (2.0 * dt).sqrt()).exp();
         let d = 1.0 / u;
         let m = 1.0;

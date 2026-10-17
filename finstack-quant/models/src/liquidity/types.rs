@@ -164,6 +164,11 @@ impl LiquidityProfile {
                 "crossed market: bid ({bid}) > ask ({ask})"
             )));
         }
+        if mid < bid || mid > ask {
+            return Err(invalid_input(format!(
+                "mid ({mid}) must lie within [bid ({bid}), ask ({ask})]"
+            )));
+        }
         if !avg_daily_volume.is_finite() || avg_daily_volume < 0.0 {
             return Err(invalid_input(
                 "avg_daily_volume must be finite and non-negative",
@@ -266,7 +271,7 @@ impl LiquidityProfile {
 /// Tiers follow a common industry convention where Tier 1 is the most
 /// liquid (intraday liquidation) and Tier 5 is the least liquid
 /// (months to unwind). The thresholds are configurable via
-/// [`LiquidityConfig`].
+/// [`liquidity_tier`].
 ///
 /// # References
 ///
@@ -313,106 +318,26 @@ impl LiquidityTier {
     }
 }
 
-/// Configuration for liquidity calculations.
-///
-/// Holds the tier-classification thresholds consumed by [`liquidity_tier`].
-/// All thresholds use trading days (not calendar days).
-///
-/// Historical note (breaking wire change, 2026-08): the former
-/// `participation_rate`, `risk_aversion`, `holding_period`,
-/// `confidence_level` and `endogenous_spread_coef` fields were validated and
-/// serde-required but consumed by nothing — their docs referenced a
-/// `lvar_bangia(profile, config, ...)` entry point that does not exist — so
-/// they were removed. Inbound payloads still carrying those keys now fail
-/// closed under `deny_unknown_fields`. Per-call knobs live where they are
-/// used instead: participation is an explicit argument to
-/// [`days_to_liquidate`], risk aversion rides on
-/// [`crate::liquidity::TradeParams::risk_aversion`], and the VaR confidence
-/// is an explicit argument to [`crate::liquidity::lvar_bangia`].
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct LiquidityConfig {
-    /// Days-to-liquidate thresholds for tier boundaries.
-    ///
-    /// Array of 4 thresholds: \[tier1_max, tier2_max, tier3_max, tier4_max\].
-    /// Default: \[1.0, 5.0, 20.0, 60.0\].
-    pub tier_thresholds: [f64; 4],
-}
+/// Default days-to-liquidate thresholds `[tier1_max, tier2_max, tier3_max, tier4_max]` in trading days.
+pub const DEFAULT_HORIZON_GRID_DAYS: [f64; 4] = [1.0, 5.0, 20.0, 60.0];
 
-impl Default for LiquidityConfig {
-    #[allow(clippy::expect_used)] // Embedded liquidity defaults are a compile-time asset.
-    fn default() -> Self {
-        super::registry::embedded_liquidity_defaults()
-            .expect("embedded models liquidity defaults are compile-time assets")
-            .default_config
-            .clone()
-    }
-}
-
-impl LiquidityConfig {
-    /// Build a configuration from explicit tier thresholds, validated by
-    /// [`Self::validate`].
-    ///
-    /// # Arguments
-    ///
-    /// * `tier_thresholds` - Upper days-to-liquidate bounds of Tiers 1-4,
-    ///   `[tier1_max, tier2_max, tier3_max, tier4_max]`, in trading days.
-    ///   Each must be finite and positive, and the four must be strictly
-    ///   ascending.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`finstack_quant_core::Error::Validation`] when a threshold is
-    /// non-finite or not positive, or the thresholds are not strictly
-    /// ascending.
-    pub fn try_new(tier_thresholds: [f64; 4]) -> Result<Self> {
-        let config = Self { tier_thresholds };
-        config.validate()?;
-        Ok(config)
-    }
-
-    /// Check that every tier threshold is finite and positive and that the
-    /// thresholds are strictly ascending.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`finstack_quant_core::Error::Validation`] naming the first
-    /// offending threshold.
-    pub fn validate(&self) -> Result<()> {
-        let mut prev = 0.0;
-        for (idx, threshold) in self.tier_thresholds.iter().copied().enumerate() {
-            if !(threshold.is_finite() && threshold > 0.0) {
-                return Err(invalid_input(format!(
-                    "liquidity tier_thresholds[{idx}] must be finite and positive, got {threshold}"
-                )));
-            }
-            if threshold <= prev {
-                return Err(invalid_input(format!(
-                    "liquidity tier_thresholds[{idx}] ({threshold}) must be greater than the \
-                     prior threshold ({prev})"
-                )));
-            }
-            prev = threshold;
+fn validate_tier_thresholds(tier_thresholds: [f64; 4]) -> Result<[f64; 4]> {
+    let mut prev = 0.0;
+    for (idx, threshold) in tier_thresholds.iter().copied().enumerate() {
+        if !(threshold.is_finite() && threshold > 0.0) {
+            return Err(invalid_input(format!(
+                "liquidity tier_thresholds[{idx}] must be finite and positive, got {threshold}"
+            )));
         }
-        Ok(())
-    }
-
-    /// Classify a days-to-liquidate horizon against these thresholds.
-    fn tier(&self, days_to_liquidate: f64) -> LiquidityTier {
-        let [t1, t2, t3, t4] = self.tier_thresholds;
-        if days_to_liquidate < t1 {
-            LiquidityTier::Tier1
-        } else if days_to_liquidate < t2 {
-            LiquidityTier::Tier2
-        } else if days_to_liquidate < t3 {
-            LiquidityTier::Tier3
-        } else if days_to_liquidate < t4 {
-            LiquidityTier::Tier4
-        } else {
-            LiquidityTier::Tier5
+        if threshold <= prev {
+            return Err(invalid_input(format!(
+                "liquidity tier_thresholds[{idx}] ({threshold}) must be greater than the \
+                 prior threshold ({prev})"
+            )));
         }
+        prev = threshold;
     }
+    Ok(tier_thresholds)
 }
 
 /// Classify a position into a liquidity tier based on days-to-liquidate.
@@ -425,23 +350,39 @@ impl LiquidityConfig {
 /// * `days_to_liquidate` - Estimated trading days needed to liquidate the
 ///   position under the selected participation assumption.
 /// * `thresholds` - Optional upper bounds of Tiers 1-4 in trading days,
-///   `[tier1_max, tier2_max, tier3_max, tier4_max]`, validated by
-///   [`LiquidityConfig::try_new`]. `None` uses the registry default
-///   [`LiquidityConfig::default`] (`[1, 5, 20, 60]`).
+///   `[tier1_max, tier2_max, tier3_max, tier4_max]`. `None` uses
+///   `DEFAULT_HORIZON_GRID_DAYS` (`[1, 5, 20, 60]`).
 ///
 /// # Errors
 ///
-/// Returns [`finstack_quant_core::Error::Validation`] when supplied
-/// thresholds are non-finite, not positive, or not strictly ascending.
+/// Returns [`finstack_quant_core::Error::Validation`] when `days_to_liquidate`
+/// is `NaN` or negative, or when supplied thresholds are non-finite, not
+/// positive, or not strictly ascending.
 pub fn liquidity_tier(
     days_to_liquidate: f64,
     thresholds: Option<[f64; 4]>,
 ) -> Result<LiquidityTier> {
-    let config = match thresholds {
-        Some(tier_thresholds) => LiquidityConfig::try_new(tier_thresholds)?,
-        None => LiquidityConfig::default(),
+    if days_to_liquidate.is_nan() || days_to_liquidate < 0.0 {
+        return Err(invalid_input(format!(
+            "days_to_liquidate must be non-negative and not NaN, got {days_to_liquidate}"
+        )));
+    }
+    let [t1, t2, t3, t4] = match thresholds {
+        Some(tier_thresholds) => validate_tier_thresholds(tier_thresholds)?,
+        None => DEFAULT_HORIZON_GRID_DAYS,
     };
-    Ok(config.tier(days_to_liquidate))
+    let tier = if days_to_liquidate < t1 {
+        LiquidityTier::Tier1
+    } else if days_to_liquidate < t2 {
+        LiquidityTier::Tier2
+    } else if days_to_liquidate < t3 {
+        LiquidityTier::Tier3
+    } else if days_to_liquidate < t4 {
+        LiquidityTier::Tier4
+    } else {
+        LiquidityTier::Tier5
+    };
+    Ok(tier)
 }
 
 /// Compute the number of trading days required to liquidate a position
@@ -456,13 +397,23 @@ pub fn liquidity_tier(
 /// # Returns
 ///
 /// Days to fully liquidate. Returns `f64::INFINITY` if ADV or participation
-/// rate is zero.
+/// rate is zero or negative, and `f64::NAN` if any input is non-finite.
 pub fn days_to_liquidate(position_quantity: f64, adv: f64, participation_rate: f64) -> f64 {
+    if !position_quantity.is_finite() || !adv.is_finite() || !participation_rate.is_finite() {
+        return f64::NAN;
+    }
+    if adv < 0.0 || participation_rate < 0.0 {
+        return f64::INFINITY;
+    }
+    let qty = position_quantity.abs();
+    if qty == 0.0 {
+        return 0.0;
+    }
     let daily_capacity = participation_rate * adv;
     if daily_capacity <= 0.0 {
         return f64::INFINITY;
     }
-    position_quantity.abs() / daily_capacity
+    qty / daily_capacity
 }
 
 #[cfg(test)]
@@ -550,16 +501,10 @@ mod tests {
             [1.0, 2.0, 3.0, f64::INFINITY],
         ] {
             assert!(
-                LiquidityConfig::try_new(bad).is_err(),
-                "{bad:?} must be rejected"
-            );
-            assert!(
                 liquidity_tier(3.0, Some(bad)).is_err(),
                 "{bad:?} must be rejected"
             );
         }
-        assert!(LiquidityConfig::try_new([1.0, 5.0, 20.0, 60.0]).is_ok());
-        assert!(LiquidityConfig::default().validate().is_ok());
     }
 
     #[test]
@@ -585,12 +530,6 @@ mod tests {
     #[test]
     fn days_to_liquidate_zero_participation() {
         assert!(super::days_to_liquidate(100.0, 1000.0, 0.0).is_infinite());
-    }
-
-    #[test]
-    fn default_config() {
-        let c = LiquidityConfig::default();
-        assert_eq!(c.tier_thresholds, [1.0, 5.0, 20.0, 60.0]);
     }
 
     #[test]
@@ -645,48 +584,6 @@ mod tests {
         let json = serde_json::to_string(&tier)?;
         let t2: LiquidityTier = serde_json::from_str(&json)?;
         assert_eq!(tier, t2);
-        Ok(())
-    }
-
-    /// BREAKING wire change (audit fix 8): `participation_rate`,
-    /// `risk_aversion`, `holding_period`, `confidence_level` and
-    /// `endogenous_spread_coef` were validated, documented and
-    /// serde-required but consumed by nothing in the workspace (the docs
-    /// referenced a nonexistent `lvar_bangia(profile, config, ...)`), so
-    /// they were deleted. `tier_thresholds` — the only consumed field —
-    /// remains, and any legacy payload still carrying a removed key now
-    /// fails closed under `deny_unknown_fields`.
-    #[test]
-    fn liquidity_config_is_tier_thresholds_only() {
-        let json = r#"{"tier_thresholds": [1.0, 5.0, 20.0, 60.0]}"#;
-        let config: LiquidityConfig =
-            serde_json::from_str(json).expect("tier-thresholds-only payload must parse");
-        assert_eq!(config.tier_thresholds, [1.0, 5.0, 20.0, 60.0]);
-
-        for legacy in [
-            "participation_rate",
-            "risk_aversion",
-            "holding_period",
-            "confidence_level",
-            "endogenous_spread_coef",
-        ] {
-            let payload =
-                format!(r#"{{"tier_thresholds": [1.0, 5.0, 20.0, 60.0], "{legacy}": 0.5}}"#);
-            let err = serde_json::from_str::<LiquidityConfig>(&payload)
-                .expect_err("removed legacy fields must fail closed");
-            assert!(
-                err.to_string().contains("unknown field"),
-                "{legacy}: unexpected error: {err}"
-            );
-        }
-    }
-
-    #[test]
-    fn serde_round_trip_config() -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let c = LiquidityConfig::default();
-        let json = serde_json::to_string(&c)?;
-        let c2: LiquidityConfig = serde_json::from_str(&json)?;
-        assert_eq!(c, c2);
         Ok(())
     }
 }

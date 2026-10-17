@@ -118,16 +118,16 @@ impl RandomFactorLoadingCopula {
     /// Create a Random Factor Loading copula.
     ///
     /// # Arguments
-    /// * `loading_vol` - Volatility of factor loading, clamped to [0.0, 0.5].
+    /// * `loading_vol` - Volatility of factor loading in `[0.0, 0.5]`.
     ///   Typical values: 0.05-0.20. Higher values increase correlation uncertainty.
     ///
     /// # Returns
     ///
     /// An RFL copula using the default quadrature order.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if `loading_vol` is not finite.
+    /// Returns [`crate::correlation::Error::InvalidLoadingVolatility`] if `loading_vol` is not finite or outside `[0.0, 0.5]`.
     ///
     /// # Examples
     ///
@@ -135,26 +135,24 @@ impl RandomFactorLoadingCopula {
     /// use finstack_quant_models::correlation::{Copula, RandomFactorLoadingCopula};
     /// use finstack_quant_core::math::standard_normal_inv_cdf;
     ///
-    /// let copula = RandomFactorLoadingCopula::new(0.15);
+    /// let copula = RandomFactorLoadingCopula::new(0.15).expect("valid loading vol");
     /// let threshold = standard_normal_inv_cdf(0.05);
     /// let cond_pd = copula.conditional_default_prob(threshold, &[0.0, 1.0], 0.30);
     ///
     /// assert!(cond_pd > 0.0 && cond_pd < 1.0);
     /// ```
-    #[must_use]
-    pub fn new(loading_vol: f64) -> Self {
-        assert!(
-            loading_vol.is_finite(),
-            "RFL loading volatility must be finite"
-        );
+    pub fn new(loading_vol: f64) -> crate::correlation::Result<Self> {
+        if !loading_vol.is_finite() || !(0.0..=0.5).contains(&loading_vol) {
+            return Err(crate::correlation::Error::InvalidLoadingVolatility { value: loading_vol });
+        }
         let order = DEFAULT_QUADRATURE_ORDER;
-        Self {
-            loading_volatility: loading_vol.clamp(0.0, 0.5),
+        Ok(Self {
+            loading_volatility: loading_vol,
             quadrature_order: order,
             outer_quadrature: select_quadrature(order),
             inner_quadrature: select_quadrature(order),
             location_cache: Mutex::new(None),
-        }
+        })
     }
 
     /// Stress-correlation proxy: a heuristic gauge of how much extra
@@ -429,24 +427,23 @@ mod tests {
 
     #[test]
     fn test_rfl_creation() {
-        let copula = RandomFactorLoadingCopula::new(0.15);
+        let copula = RandomFactorLoadingCopula::new(0.15).expect("valid loading vol");
         assert_eq!(copula.num_factors(), 2);
         assert!((copula.loading_volatility - 0.15).abs() < 1e-10);
         assert_eq!(copula.model_name(), "Random Factor Loading Copula");
     }
 
     #[test]
-    fn test_rfl_loading_volatility_clamped() {
-        let copula_high = RandomFactorLoadingCopula::new(1.0);
-        assert!(copula_high.loading_volatility <= 0.5);
-
-        let copula_neg = RandomFactorLoadingCopula::new(-0.1);
-        assert!(copula_neg.loading_volatility >= 0.0);
+    fn test_rfl_loading_volatility_rejected_outside_bounds() {
+        assert!(RandomFactorLoadingCopula::new(1.0).is_err());
+        assert!(RandomFactorLoadingCopula::new(-0.1).is_err());
+        assert!(RandomFactorLoadingCopula::new(f64::NAN).is_err());
+        assert!(RandomFactorLoadingCopula::new(f64::INFINITY).is_err());
     }
 
     #[test]
     fn test_effective_loading_bounds() {
-        let copula = RandomFactorLoadingCopula::new(0.15);
+        let copula = RandomFactorLoadingCopula::new(0.15).expect("valid loading vol");
 
         // Even with extreme shocks, loading should stay bounded
         let loading_extreme_neg = copula.effective_loading(0.5, -10.0);
@@ -458,7 +455,7 @@ mod tests {
 
     #[test]
     fn test_conditional_prob_varies_with_loading_shock() {
-        let copula = RandomFactorLoadingCopula::new(0.15);
+        let copula = RandomFactorLoadingCopula::new(0.15).expect("valid loading vol");
         let threshold = standard_normal_inv_cdf(0.05);
         let correlation = 0.30;
 
@@ -488,7 +485,7 @@ mod tests {
 
     #[test]
     fn test_integration_recovers_unconditional() {
-        let copula = RandomFactorLoadingCopula::new(0.15);
+        let copula = RandomFactorLoadingCopula::new(0.15).expect("valid loading vol");
         let pd = 0.05;
         let threshold = standard_normal_inv_cdf(pd);
         let correlation = 0.30;
@@ -508,7 +505,7 @@ mod tests {
 
     #[test]
     fn test_stress_proxy_small_but_positive() {
-        let copula = RandomFactorLoadingCopula::new(0.15);
+        let copula = RandomFactorLoadingCopula::new(0.15).expect("valid loading vol");
         let lambda = copula.stress_correlation_proxy(0.5);
 
         // RFL stress proxy is small and non-negative.
@@ -518,7 +515,7 @@ mod tests {
 
     #[test]
     fn test_stress_proxy_zero_loading_vol_is_gaussian_limit() {
-        let copula = RandomFactorLoadingCopula::new(0.0);
+        let copula = RandomFactorLoadingCopula::new(0.0).expect("valid loading vol");
         assert_eq!(copula.stress_correlation_proxy(0.0), 0.0);
         assert_eq!(copula.stress_correlation_proxy(0.5), 0.0);
         assert_eq!(copula.stress_correlation_proxy(0.99), 0.0);
@@ -526,7 +523,7 @@ mod tests {
 
     #[test]
     fn tail_dependence_tracks_the_perfect_loading_atom() {
-        let copula = RandomFactorLoadingCopula::new(0.5);
+        let copula = RandomFactorLoadingCopula::new(0.5).expect("valid loading vol");
         assert_eq!(copula.tail_dependence(0.0), 0.0);
         assert_eq!(copula.tail_dependence(1.0), 1.0);
         let rho = 0.9;
@@ -539,14 +536,14 @@ mod tests {
         assert!(copula.latent_variable(1.0, 0.0, eta_at_perfect_loading - 1e-8, rho) < 1.0);
         assert!((copula.tail_dependence(rho) - norm_cdf(-eta_at_perfect_loading)).abs() < 1e-14);
 
-        let zero_vol = RandomFactorLoadingCopula::new(0.0);
+        let zero_vol = RandomFactorLoadingCopula::new(0.0).expect("valid loading vol");
         assert_eq!(zero_vol.tail_dependence(0.5), 0.0);
         assert_eq!(zero_vol.tail_dependence(1.0), 1.0);
     }
 
     #[test]
     fn loading_calibration_preserves_correlations_below_the_loading_variance() {
-        let copula = RandomFactorLoadingCopula::new(0.5);
+        let copula = RandomFactorLoadingCopula::new(0.5).expect("valid loading vol");
         for rho in [1e-10, 1e-6, 0.001, 0.01, 0.04] {
             let second_moment = copula.clipped_second_moment(copula.loading_location(rho));
             assert!((second_moment - rho).abs() < 1e-12);
@@ -561,7 +558,7 @@ mod tests {
     /// emitted and `η` silently defaulted to `0.0`, providing no test-time signal.
     #[test]
     fn test_factor_length_mismatch_panics_in_debug() {
-        let copula = RandomFactorLoadingCopula::new(0.15);
+        let copula = RandomFactorLoadingCopula::new(0.15).expect("valid loading vol");
         let threshold = standard_normal_inv_cdf(0.05);
         let correlation = 0.30;
 
@@ -593,7 +590,7 @@ mod tests {
         // Integrate the loading that the production latent-variable kernel
         // actually uses, independently of its analytic calibration objective.
         for sigma in [0.0, 0.15, 0.5] {
-            let copula = RandomFactorLoadingCopula::new(sigma);
+            let copula = RandomFactorLoadingCopula::new(sigma).expect("valid loading vol");
             for rho in [0.0, 0.01, 0.04, 0.30, 0.90, 0.999, 1.0] {
                 let realized = adaptive_simpson(
                     |eta| copula.latent_variable(1.0, 0.0, eta, rho).powi(2) * norm_pdf(eta),
@@ -615,7 +612,7 @@ mod tests {
 
     #[test]
     fn conditional_default_prob_matches_latent_loading_including_atoms() {
-        let copula = RandomFactorLoadingCopula::new(0.5);
+        let copula = RandomFactorLoadingCopula::new(0.5).expect("valid loading vol");
         let threshold = -0.5;
         let z = -0.25;
         for rho in [0.0, 0.01, 0.3, 0.9, 1.0] {
@@ -636,7 +633,7 @@ mod tests {
 
     #[test]
     fn test_zero_volatility_equals_gaussian() {
-        let rfl_copula = RandomFactorLoadingCopula::new(0.0);
+        let rfl_copula = RandomFactorLoadingCopula::new(0.0).expect("valid loading vol");
         let gaussian_copula = GaussianCopula::new();
 
         let threshold = standard_normal_inv_cdf(0.05);

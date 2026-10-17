@@ -381,9 +381,7 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
         // (Bayer-Friz-Gatheral 2016) — not true fBM — so the noise driver is the
         // Bennedsen-Lunde-Pakkanen hybrid-scheme generator.
         let disc =
-            finstack_quant_models::monte_carlo::discretization::rough_bergomi::RoughBergomiEuler::new(
-                hurst_exp,
-            );
+            finstack_quant_models::monte_carlo::discretization::rough_bergomi::RoughBergomiEuler::new();
         let fbm_gen =
             finstack_quant_models::monte_carlo::rng::volterra::RiemannLiouvilleVolterra::new(
                 t,

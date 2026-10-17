@@ -14,7 +14,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
 use finstack_quant_core::Result;
-use finstack_quant_models::{SabrCalibrator, SabrModel, SabrParameters, SabrShift};
+use finstack_quant_models::{SabrCalibrator, SabrParameters, SabrShift};
 use std::collections::BTreeMap;
 
 use crate::constants::OrderedF64;
@@ -341,7 +341,7 @@ impl VolSurfaceTarget {
                                     slice_params: &SabrParameters|
          -> Result<f64> {
             let forward = forward_fn(slice_expiry)?;
-            let sigma = SabrModel::new(slice_params.clone())
+            let sigma = slice_params
                 .implied_volatility(forward, target_strike, slice_expiry)
                 .map_err(|e| finstack_quant_core::Error::Calibration {
                     message: format!(
@@ -392,8 +392,7 @@ mod tests {
     }
 
     fn slice_vol(p: &SabrParameters, forward: f64, strike: f64, expiry: f64) -> f64 {
-        SabrModel::new(p.clone())
-            .implied_volatility(forward, strike, expiry)
+        p.implied_volatility(forward, strike, expiry)
             .expect("SABR vol")
     }
 

@@ -234,48 +234,6 @@ pub fn cashflows_schema_resources() -> Result<JsValue, JsValue> {
     to_js_value(&documents)
 }
 
-/// JSON Schema of a versioned factor-model configuration (`FactorModelConfig`).
-/// @returns JSON Schema document.
-/// @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
-#[wasm_bindgen(js_name = factorModelConfigSchema)]
-pub fn factor_model_config_schema() -> Result<JsValue, JsValue> {
-    to_js_value(
-        finstack_quant_models::factor::schema::factor_model_config_schema().map_err(to_js_err)?,
-    )
-}
-
-/// JSON Schema of a serialized `CreditFactorModel`.
-/// @returns JSON Schema document.
-/// @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
-#[wasm_bindgen(js_name = creditFactorModelSchema)]
-pub fn credit_factor_model_schema() -> Result<JsValue, JsValue> {
-    to_js_value(
-        finstack_quant_models::factor::schema::credit_factor_model_schema().map_err(to_js_err)?,
-    )
-}
-
-/// JSON Schema of a serialized `CreditCalibrationConfig`.
-/// @returns JSON Schema document.
-/// @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
-#[wasm_bindgen(js_name = creditCalibrationConfigSchema)]
-pub fn credit_calibration_config_schema() -> Result<JsValue, JsValue> {
-    to_js_value(
-        finstack_quant_models::factor::schema::credit_calibration_config_schema()
-            .map_err(to_js_err)?,
-    )
-}
-
-/// JSON Schema of a serialized `CreditCalibrationInputs`.
-/// @returns JSON Schema document.
-/// @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
-#[wasm_bindgen(js_name = creditCalibrationInputsSchema)]
-pub fn credit_calibration_inputs_schema() -> Result<JsValue, JsValue> {
-    to_js_value(
-        finstack_quant_models::factor::schema::credit_calibration_inputs_schema()
-            .map_err(to_js_err)?,
-    )
-}
-
 /// JSON Schema of a serialized `FinancialModelSpec`.
 /// @returns JSON Schema document.
 /// @throws Error - Throws with kind `validation` if the schema cannot be built (does not occur for a released build).

@@ -296,12 +296,46 @@ impl LatentFactorSpec {
             LatentFactorSpec::SingleFactor {
                 volatility,
                 mean_reversion,
-            } => LatentFactorKind::Single(LatentSingleFactor::new(*volatility, *mean_reversion)),
+            } => {
+                if !volatility.is_finite() || *volatility < 0.0 {
+                    return Err(Error::InvalidVolatility {
+                        index: 0,
+                        value: *volatility,
+                    });
+                }
+                if !mean_reversion.is_finite() || *mean_reversion < 0.0 {
+                    return Err(Error::InvalidVolatility {
+                        index: 0,
+                        value: *mean_reversion,
+                    });
+                }
+                LatentFactorKind::Single(LatentSingleFactor::new(*volatility, *mean_reversion))
+            }
             LatentFactorSpec::TwoFactor {
                 prepay_vol,
                 credit_vol,
                 correlation,
             } => {
+                if !prepay_vol.is_finite() || *prepay_vol < 0.0 {
+                    return Err(Error::InvalidVolatility {
+                        index: 0,
+                        value: *prepay_vol,
+                    });
+                }
+                if !credit_vol.is_finite() || *credit_vol < 0.0 {
+                    return Err(Error::InvalidVolatility {
+                        index: 1,
+                        value: *credit_vol,
+                    });
+                }
+                if !correlation.is_finite() || !(-1.0..=1.0).contains(correlation) {
+                    return Err(finstack_quant_analytics::correlation::Error::OutOfBounds {
+                        i: 0,
+                        j: 1,
+                        value: *correlation,
+                    }
+                    .into());
+                }
                 LatentFactorKind::Two(LatentTwoFactor::new(*prepay_vol, *credit_vol, *correlation))
             }
             LatentFactorSpec::MultiFactor {
@@ -364,10 +398,19 @@ impl LatentSingleFactor {
     /// ```
     #[must_use]
     pub fn new(volatility: f64, mean_reversion: f64) -> Self {
-        let vol = volatility.clamp(0.01, 2.0);
+        let vol = if volatility.is_finite() {
+            volatility.clamp(0.01, 2.0)
+        } else {
+            0.20
+        };
+        let mr = if mean_reversion.is_finite() {
+            mean_reversion.clamp(0.0, 10.0)
+        } else {
+            0.0
+        };
         Self {
             volatility: vol,
-            mean_reversion: mean_reversion.clamp(0.0, 10.0),
+            mean_reversion: mr,
             correlation_matrix: vec![1.0],
             volatilities: vec![vol],
         }
@@ -431,9 +474,21 @@ impl LatentTwoFactor {
     /// A two-factor prepayment/credit model.
     #[must_use]
     pub fn new(prepay_vol: f64, credit_vol: f64, correlation: f64) -> Self {
-        let corr = correlation.clamp(-0.99, 0.99);
-        let pv = prepay_vol.clamp(0.01, 2.0);
-        let cv = credit_vol.clamp(0.01, 2.0);
+        let corr = if correlation.is_finite() {
+            correlation.clamp(-0.99, 0.99)
+        } else {
+            0.0
+        };
+        let pv = if prepay_vol.is_finite() {
+            prepay_vol.clamp(0.01, 2.0)
+        } else {
+            0.20
+        };
+        let cv = if credit_vol.is_finite() {
+            credit_vol.clamp(0.01, 2.0)
+        } else {
+            0.25
+        };
 
         // Cholesky decomposition of correlation matrix [[1, ρ], [ρ, 1]]
         // L = [[1, 0], [ρ, √(1-ρ²)]]

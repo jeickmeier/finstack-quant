@@ -31,11 +31,19 @@ impl Grid1D {
         if n < 3 {
             return Err(PdeGridError::TooFewPoints { n, min: 3 });
         }
-        if x_min >= x_max {
+        if !x_min.is_finite() || !x_max.is_finite() || x_min >= x_max {
             return Err(PdeGridError::InvalidBounds { x_min, x_max });
         }
         let dx = (x_max - x_min) / (n - 1) as f64;
-        let points: Vec<f64> = (0..n).map(|i| x_min + i as f64 * dx).collect();
+        let mut points: Vec<f64> = (0..n).map(|i| x_min + i as f64 * dx).collect();
+        points[0] = x_min;
+        points[n - 1] = x_max;
+        if !points
+            .windows(2)
+            .all(|w| w[0].is_finite() && w[1].is_finite() && w[1] > w[0])
+        {
+            return Err(PdeGridError::NotMonotonic);
+        }
         Ok(Self { points })
     }
 
@@ -65,10 +73,17 @@ impl Grid1D {
         if n < 3 {
             return Err(PdeGridError::TooFewPoints { n, min: 3 });
         }
-        if x_min >= x_max {
+        if !x_min.is_finite() || !x_max.is_finite() || x_min >= x_max {
             return Err(PdeGridError::InvalidBounds { x_min, x_max });
         }
-        if intensity <= 0.0 {
+        if !center.is_finite() {
+            return Err(PdeGridError::InvalidParameter {
+                name: "center",
+                value: center,
+                reason: "must be finite",
+            });
+        }
+        if !intensity.is_finite() || intensity <= 0.0 {
             return Err(PdeGridError::InvalidParameter {
                 name: "intensity",
                 value: intensity,
@@ -87,7 +102,7 @@ impl Grid1D {
         let a_max = ((x_max - center) / d).asinh();
         let a_range = a_max - a_min;
 
-        if a_range.abs() < 1e-15 {
+        if !a_range.is_finite() || a_range.abs() < 1e-15 {
             // Degenerate: the sinh parameter range has collapsed, so the
             // mapping is effectively linear and the requested concentration
             // near `center` is lost. This happens when `intensity` is so
@@ -114,6 +129,18 @@ impl Grid1D {
         points[0] = x_min;
         points[n - 1] = x_max;
 
+        if !points
+            .windows(2)
+            .all(|w| w[0].is_finite() && w[1].is_finite() && w[1] > w[0])
+        {
+            return Err(PdeGridError::DegenerateConcentration {
+                intensity,
+                center,
+                x_min,
+                x_max,
+            });
+        }
+
         Ok(Self { points })
     }
 
@@ -127,8 +154,11 @@ impl Grid1D {
                 min: 3,
             });
         }
+        if !points[0].is_finite() {
+            return Err(PdeGridError::NotMonotonic);
+        }
         for i in 1..points.len() {
-            if points[i] <= points[i - 1] {
+            if !points[i].is_finite() || points[i] <= points[i - 1] {
                 return Err(PdeGridError::NotMonotonic);
             }
         }

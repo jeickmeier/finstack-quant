@@ -179,14 +179,23 @@ impl Solver1D {
         }
 
         let mut exercise_boundary: Vec<(f64, f64)> = Vec::new();
+        let cached_op = problem
+            .is_time_homogeneous()
+            .then(|| super::operator::TridiagOperator::assemble(problem, &self.grid, levels[0]));
 
         for i in 0..n_steps {
             let t_from = levels[i];
             let t_to = levels[i + 1];
             let dt = t_from - t_to;
 
-            self.stepper
-                .step(problem, &self.grid, &mut u, t_from, t_to, i)?;
+            self.stepper.step_with_cached_op(
+                problem,
+                &self.grid,
+                &mut u,
+                (t_from, t_to),
+                i,
+                cached_op.as_ref(),
+            )?;
 
             // Apply the obstacle on eligible time levels. American exercise
             // is approximated by exercising at every time level; the penalty
@@ -311,38 +320,7 @@ impl PdeSolution {
     /// second-order non-uniform central stencil is used; at the first/last
     /// node a one-sided difference is used.
     pub fn delta(&self, x: f64) -> f64 {
-        let pts = self.grid.points();
-        let n = pts.len();
-
-        if n < 2 {
-            return 0.0;
-        }
-
-        let i = find_nearest(pts, x);
-
-        if i == 0 {
-            let h = pts[1] - pts[0];
-            if h.abs() < 1e-30 {
-                return 0.0;
-            }
-            (self.values[1] - self.values[0]) / h
-        } else if i >= n - 1 {
-            let h = pts[n - 1] - pts[n - 2];
-            if h.abs() < 1e-30 {
-                return 0.0;
-            }
-            (self.values[n - 1] - self.values[n - 2]) / h
-        } else {
-            let h_m = pts[i] - pts[i - 1];
-            let h_p = pts[i + 1] - pts[i];
-            let h_sum = h_m + h_p;
-            if h_m.abs() < 1e-30 || h_p.abs() < 1e-30 {
-                return 0.0;
-            }
-            -h_p / (h_m * h_sum) * self.values[i - 1]
-                + (h_p - h_m) / (h_m * h_p) * self.values[i]
-                + h_m / (h_p * h_sum) * self.values[i + 1]
-        }
+        delta_1d(self.grid.points(), x, |i| self.values[i])
     }
 
     /// Compute gamma (second derivative) at point `x` via finite differences.
@@ -353,29 +331,60 @@ impl PdeSolution {
     /// half a grid cell of `x`; a left-anchored stencil can sit a full cell
     /// away and misstate a peaked gamma on a strike-concentrated grid.
     pub fn gamma(&self, x: f64) -> f64 {
-        let pts = self.grid.points();
-        let n = pts.len();
+        gamma_1d(self.grid.points(), x, |i| self.values[i])
+    }
+}
 
-        if n < 3 {
+/// First-derivative finite-difference stencil centred on the node nearest `x`.
+pub(super) fn delta_1d(pts: &[f64], x: f64, value_at: impl Fn(usize) -> f64) -> f64 {
+    let n = pts.len();
+    if n < 2 {
+        return 0.0;
+    }
+
+    let i = find_nearest(pts, x);
+    if i == 0 {
+        let h = pts[1] - pts[0];
+        if h.abs() < 1e-30 {
             return 0.0;
         }
-
-        // Centre the three-point stencil on the node nearest x, clamped so the
-        // stencil stays within the interior.
-        let i = find_nearest(pts, x).clamp(1, n - 2);
-
+        (value_at(1) - value_at(0)) / h
+    } else if i >= n - 1 {
+        let h = pts[n - 1] - pts[n - 2];
+        if h.abs() < 1e-30 {
+            return 0.0;
+        }
+        (value_at(n - 1) - value_at(n - 2)) / h
+    } else {
         let h_m = pts[i] - pts[i - 1];
         let h_p = pts[i + 1] - pts[i];
         let h_sum = h_m + h_p;
-
-        if h_sum.abs() < 1e-30 {
+        if h_m.abs() < 1e-30 || h_p.abs() < 1e-30 {
             return 0.0;
         }
-
-        2.0 * (self.values[i + 1] / h_p - self.values[i] * (1.0 / h_m + 1.0 / h_p)
-            + self.values[i - 1] / h_m)
-            / h_sum
+        -h_p / (h_m * h_sum) * value_at(i - 1)
+            + (h_p - h_m) / (h_m * h_p) * value_at(i)
+            + h_m / (h_p * h_sum) * value_at(i + 1)
     }
+}
+
+/// Second-derivative finite-difference stencil centred on the interior node nearest `x`.
+pub(super) fn gamma_1d(pts: &[f64], x: f64, value_at: impl Fn(usize) -> f64) -> f64 {
+    let n = pts.len();
+    if n < 3 {
+        return 0.0;
+    }
+
+    let i = find_nearest(pts, x).clamp(1, n - 2);
+    let h_m = pts[i] - pts[i - 1];
+    let h_p = pts[i + 1] - pts[i];
+    let h_sum = h_m + h_p;
+    if h_sum.abs() < 1e-30 {
+        return 0.0;
+    }
+
+    2.0 * (value_at(i + 1) / h_p - value_at(i) * (1.0 / h_m + 1.0 / h_p) + value_at(i - 1) / h_m)
+        / h_sum
 }
 
 /// Errors during solver construction or execution.
@@ -495,7 +504,6 @@ mod tests {
                 rate: 0.05,
                 dividend: 0.03,
                 strike: 100.0,
-                maturity,
                 is_call,
             };
             let payoff: Vec<f64> = grid.points()[1..grid.n() - 1]
@@ -693,7 +701,6 @@ mod tests {
             rate: 0.05,
             dividend: 0.1,
             strike: 100.0,
-            maturity: 1.0,
             is_call: true,
         };
         let solution = Solver1D::builder()
@@ -753,7 +760,6 @@ mod tests {
             rate,
             dividend: 0.0,
             strike,
-            maturity,
             is_call: false,
         };
 

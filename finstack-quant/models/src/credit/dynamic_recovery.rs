@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
-pub enum RecoveryModel {
+pub enum DynamicRecoveryModel {
     /// Constant recovery (ignores notional changes).
     Constant,
     /// `R(t) = R_0 * (N_0 / N(t))` -- direct proportional dilution.
@@ -49,7 +49,7 @@ pub enum RecoveryModel {
 ///
 /// Models the relationship between the accreted notional and the recovery
 /// rate in default. As PIK accrual increases the notional relative to the
-/// original base, recovery declines according to the chosen [`RecoveryModel`].
+/// original base, recovery declines according to the chosen [`DynamicRecoveryModel`].
 /// Deserialization enforces the same parameter invariants as the constructors.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -63,7 +63,7 @@ pub struct DynamicRecoverySpec {
     /// Base (reference) notional `N_0`.
     base_notional: f64,
     /// Recovery model governing the notional-to-recovery mapping.
-    model: RecoveryModel,
+    model: DynamicRecoveryModel,
 }
 
 /// Unvalidated wire representation of a [`DynamicRecoverySpec`].
@@ -81,7 +81,7 @@ struct RawDynamicRecoverySpec {
     /// Base (reference) notional `N_0`.
     base_notional: f64,
     /// Recovery model governing the notional-to-recovery mapping.
-    model: RecoveryModel,
+    model: DynamicRecoveryModel,
 }
 
 impl TryFrom<RawDynamicRecoverySpec> for DynamicRecoverySpec {
@@ -91,7 +91,7 @@ impl TryFrom<RawDynamicRecoverySpec> for DynamicRecoverySpec {
         let spec = Self::new(raw.base_recovery, raw.base_notional, raw.model)?;
         // Only a constant spec fixes a field itself (`base_notional = 1.0`);
         // reject a payload that carries any other value rather than drop it.
-        if matches!(raw.model, RecoveryModel::Constant)
+        if matches!(raw.model, DynamicRecoveryModel::Constant)
             && spec != Self::constant(raw.base_recovery)?
         {
             return Err(Error::Validation(format!(
@@ -104,7 +104,7 @@ impl TryFrom<RawDynamicRecoverySpec> for DynamicRecoverySpec {
 }
 
 impl DynamicRecoverySpec {
-    fn new(base_recovery: f64, base_notional: f64, model: RecoveryModel) -> Result<Self> {
+    fn new(base_recovery: f64, base_notional: f64, model: DynamicRecoveryModel) -> Result<Self> {
         if !(0.0..=1.0).contains(&base_recovery) {
             return Err(InputError::Invalid.into());
         }
@@ -112,14 +112,14 @@ impl DynamicRecoverySpec {
             return Err(InputError::NonPositiveValue.into());
         }
         match model {
-            RecoveryModel::InversePower { exponent }
+            DynamicRecoveryModel::InversePower { exponent }
                 if !exponent.is_finite() || exponent <= 0.0 || exponent > 1.0 =>
             {
                 return Err(Error::Validation(
                     "inverse-power recovery exponent must be finite and in (0, 1]".into(),
                 ));
             }
-            RecoveryModel::LinearDecline { sensitivity, .. }
+            DynamicRecoveryModel::LinearDecline { sensitivity, .. }
                 if !sensitivity.is_finite() || sensitivity < 0.0 =>
             {
                 return Err(Error::Validation(
@@ -128,8 +128,8 @@ impl DynamicRecoverySpec {
             }
             _ => {}
         }
-        if let RecoveryModel::FlooredInverse { floor }
-        | RecoveryModel::LinearDecline { floor, .. } = model
+        if let DynamicRecoveryModel::FlooredInverse { floor }
+        | DynamicRecoveryModel::LinearDecline { floor, .. } = model
         {
             if !floor.is_finite() || !(0.0..=base_recovery).contains(&floor) {
                 return Err(Error::Validation(format!(
@@ -157,7 +157,7 @@ impl DynamicRecoverySpec {
     ///
     /// Returns an error if `recovery` is outside `[0, 1]`.
     pub fn constant(recovery: f64) -> Result<Self> {
-        Self::new(recovery, 1.0, RecoveryModel::Constant)
+        Self::new(recovery, 1.0, DynamicRecoveryModel::Constant)
     }
 
     /// Create an inverse-linear recovery spec.
@@ -176,7 +176,11 @@ impl DynamicRecoverySpec {
     /// Returns an error if `base_recovery` is outside `[0, 1]` or
     /// `base_notional` is non-finite or non-positive.
     pub fn inverse_linear(base_recovery: f64, base_notional: f64) -> Result<Self> {
-        Self::new(base_recovery, base_notional, RecoveryModel::InverseLinear)
+        Self::new(
+            base_recovery,
+            base_notional,
+            DynamicRecoveryModel::InverseLinear,
+        )
     }
 
     /// Create an inverse-power recovery spec.
@@ -200,7 +204,7 @@ impl DynamicRecoverySpec {
         Self::new(
             base_recovery,
             base_notional,
-            RecoveryModel::InversePower { exponent },
+            DynamicRecoveryModel::InversePower { exponent },
         )
     }
 
@@ -224,7 +228,7 @@ impl DynamicRecoverySpec {
         Self::new(
             base_recovery,
             base_notional,
-            RecoveryModel::FlooredInverse { floor },
+            DynamicRecoveryModel::FlooredInverse { floor },
         )
     }
 
@@ -255,7 +259,7 @@ impl DynamicRecoverySpec {
         Self::new(
             base_recovery,
             base_notional,
-            RecoveryModel::LinearDecline { sensitivity, floor },
+            DynamicRecoveryModel::LinearDecline { sensitivity, floor },
         )
     }
 
@@ -275,18 +279,18 @@ impl DynamicRecoverySpec {
             return self.base_recovery;
         }
         let raw = match self.model {
-            RecoveryModel::Constant => self.base_recovery,
-            RecoveryModel::InverseLinear => {
+            DynamicRecoveryModel::Constant => self.base_recovery,
+            DynamicRecoveryModel::InverseLinear => {
                 self.base_recovery * (self.base_notional / current_notional)
             }
-            RecoveryModel::InversePower { exponent } => {
+            DynamicRecoveryModel::InversePower { exponent } => {
                 self.base_recovery * (self.base_notional / current_notional).powf(exponent)
             }
-            RecoveryModel::FlooredInverse { floor } => {
+            DynamicRecoveryModel::FlooredInverse { floor } => {
                 let inv = self.base_recovery * (self.base_notional / current_notional);
                 inv.max(floor)
             }
-            RecoveryModel::LinearDecline { sensitivity, floor } => {
+            DynamicRecoveryModel::LinearDecline { sensitivity, floor } => {
                 if sensitivity == 0.0 {
                     return self.base_recovery;
                 }
@@ -309,7 +313,7 @@ impl DynamicRecoverySpec {
     }
 
     /// Returns a reference to the recovery model.
-    pub fn model(&self) -> &RecoveryModel {
+    pub fn model(&self) -> &DynamicRecoveryModel {
         &self.model
     }
 }

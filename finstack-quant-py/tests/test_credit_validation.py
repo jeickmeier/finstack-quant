@@ -49,7 +49,7 @@ def test_lgd_typed_surface() -> None:
     )
     assert model.evaluate(100.0) == result
     assert model.collateral[0].liquidation_value == pytest.approx(56.0)
-    assert credit.lgd.WorkoutLgd.from_json(model.to_json()).lgd(100.0) == pytest.approx(result.lgd)
+    assert credit.lgd.WorkoutLgd.from_json(model.to_json()).evaluate(100.0).lgd == pytest.approx(result.lgd)
     with pytest.raises(ValueError, match="unknown collateral type"):
         credit.lgd.CollateralPiece("real-estate", 1.0, 0.0)
 

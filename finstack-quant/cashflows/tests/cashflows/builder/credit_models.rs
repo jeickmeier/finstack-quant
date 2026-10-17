@@ -561,7 +561,7 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
     use finstack_quant_cashflows::builder::Notional;
     use finstack_quant_core::cashflow::{CFKind, CashFlow};
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Period, PeriodId};
+    use finstack_quant_core::dates::{Date, DayCount, Period, PeriodId};
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
@@ -621,43 +621,45 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
         .knots([(1.0, 0.50)])
         .build()
         .unwrap();
+    let market_with_recovery = finstack_quant_core::market_data::context::MarketContext::new()
+        .insert(disc.clone())
+        .insert(hazard);
 
-    // Combining DefaultedNotional flows with recovery_rate is now rejected
+    // Combining DefaultedNotional flows with recovery_rate > 0 is rejected
     // to prevent double-counting recovery from both explicit flows and the
     // hazard-curve adjustment.
-    let err_result = schedule.pv_by_period_with_discounting(
+    let err_result = schedule.pv_by_period(
         &periods,
-        &disc,
-        Some(finstack_quant_cashflows::builder::PvCreditAdjustment {
-            hazard: Some(&hazard),
-            recovery_rate: Some(0.40),
-        }),
-        finstack_quant_cashflows::aggregation::DateContext::new(
-            base,
-            DayCount::Act365F,
-            DayCountContext::default(),
-        ),
+        &market_with_recovery,
+        &"USD-OIS".into(),
+        Some(&"USD-HZD".into()),
+        base,
+        Some(DayCount::Act365F),
     );
     assert!(
         err_result.is_err(),
         "should reject DefaultedNotional + recovery_rate combination"
     );
 
-    // When recovery_rate is None, the call succeeds and the explicit
+    // When hazard recovery_rate is 0.0, the call succeeds and the explicit
     // Recovery flow is discounted normally.
+    let hazard_zero_recovery = HazardCurve::builder("USD-HZD")
+        .base_date(base)
+        .recovery_rate(0.0)
+        .knots([(1.0, 0.50)])
+        .build()
+        .unwrap();
+    let market_no_recovery = finstack_quant_core::market_data::context::MarketContext::new()
+        .insert(disc)
+        .insert(hazard_zero_recovery);
     let pv_map = schedule
-        .pv_by_period_with_discounting(
+        .pv_by_period(
             &periods,
-            &disc,
-            Some(finstack_quant_cashflows::builder::PvCreditAdjustment {
-                hazard: Some(&hazard),
-                recovery_rate: None,
-            }),
-            finstack_quant_cashflows::aggregation::DateContext::new(
-                base,
-                DayCount::Act365F,
-                DayCountContext::default(),
-            ),
+            &market_no_recovery,
+            &"USD-OIS".into(),
+            Some(&"USD-HZD".into()),
+            base,
+            Some(DayCount::Act365F),
         )
         .unwrap();
 

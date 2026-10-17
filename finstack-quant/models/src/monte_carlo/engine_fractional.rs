@@ -27,13 +27,13 @@
 //! )?;
 //! ```
 
-use crate::monte_carlo::engine::{run_path_loop, NoiseHook};
+use crate::monte_carlo::engine::{run_path_loop, McEngine, NoiseHook};
 #[cfg(test)]
 use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::{Discretization, Payoff, RandomStream, StochasticProcess};
 use crate::monte_carlo::TimeGrid;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::Result;
+use finstack_quant_core::{Error, Result};
 
 /// Simulate a single Monte Carlo path with fractional noise injection.
 ///
@@ -64,7 +64,8 @@ use finstack_quant_core::Result;
 ///
 /// # Errors
 ///
-/// Returns an error if the payoff value computation fails.
+/// Returns an error if the scheme pairing, grid step count, buffer dimensions,
+/// or payoff value computation fails.
 #[allow(clippy::too_many_arguments)]
 pub fn simulate_path_fractional<R, P, D, F>(
     rng: &mut R,
@@ -87,6 +88,54 @@ where
     D: Discretization<P>,
     F: Payoff,
 {
+    McEngine::validate_scheme_pairing(process, disc)?;
+    let num_steps = time_grid.num_steps();
+    if let Some(expected) = disc.expected_num_steps() {
+        if expected != num_steps {
+            return Err(Error::Validation(format!(
+                "discretization '{}' was precomputed for {expected} steps but time_grid has {num_steps} steps",
+                disc.scheme_id()
+            )));
+        }
+    }
+    let dim = process.dim();
+    if initial_state.len() != dim || state.len() != dim {
+        return Err(Error::Validation(format!(
+            "state buffer lengths (initial_state={}, state={}) must equal process.dim() ({dim})",
+            initial_state.len(),
+            state.len()
+        )));
+    }
+    let num_factors = process.num_factors();
+    if z.len() < num_factors || fbm_z_index >= z.len() {
+        return Err(Error::Validation(format!(
+            "z buffer (len={}) must have at least {num_factors} factors and contain fbm_z_index={fbm_z_index}",
+            z.len()
+        )));
+    }
+    if fbm_increments.len() < num_steps {
+        return Err(Error::Validation(format!(
+            "fbm_increments length ({}) must be at least time_grid.num_steps() ({num_steps})",
+            fbm_increments.len()
+        )));
+    }
+    if let Some((aux_index, aux_values)) = aux {
+        if aux_index >= z.len() || aux_values.len() < num_steps {
+            return Err(Error::Validation(format!(
+                "aux buffer (index={aux_index}, len={}) out of bounds for z_len={} or num_steps={num_steps}",
+                aux_values.len(),
+                z.len()
+            )));
+        }
+    }
+    let req_work = disc.work_size(process);
+    if work.len() < req_work {
+        return Err(Error::Validation(format!(
+            "work buffer length ({}) must be at least disc.work_size() ({req_work})",
+            work.len()
+        )));
+    }
+
     // No engine-side correlation: rough-vol schemes apply factor structure inside `disc.step`.
     // `z_raw` is unused in the InjectFbm path, so a zero-length slice suffices.
     let mut z_raw: [f64; 0] = [];

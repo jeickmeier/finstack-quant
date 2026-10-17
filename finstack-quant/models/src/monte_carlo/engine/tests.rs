@@ -1472,7 +1472,7 @@ fn test_engine_antithetic_records_simulated_path_count() {
 /// (see [`crate::monte_carlo::traits::Discretization::applies_correlation_internally`]).
 mod correlation_regression {
     use super::*;
-    use crate::monte_carlo::discretization::{EulerMaruyama, ExactMultiGbmCorrelated, QeHeston};
+    use crate::monte_carlo::discretization::{EulerMaruyama, QeHeston};
     use crate::monte_carlo::payoff::EuropeanCall;
     use crate::monte_carlo::process::gbm::{GbmParams, MultiGbmProcess};
     use crate::monte_carlo::process::heston::HestonProcess;
@@ -1688,11 +1688,8 @@ mod correlation_regression {
         );
 
         // Sanity check that the EulerMaruyama (engine Cholesky) result
-        // agrees with the specialized correlated scheme that applies
-        // correlation internally. The exact scheme is unbiased per step,
-        // so we use a generous 5 SE tolerance.
-        let disc_exact =
-            ExactMultiGbmCorrelated::new(&[1.0, -0.5, -0.5, 1.0], 2).expect("valid chol");
+        // agrees with ExactMultiGbm (also using engine Cholesky).
+        let disc_exact = crate::monte_carlo::discretization::exact::ExactMultiGbm::new();
         let v_exact_low = engine
             .price(
                 &rng,
@@ -1707,7 +1704,7 @@ mod correlation_regression {
         let tol = 5.0 * v_low.stderr.max(v_exact_low.stderr);
         assert!(
             (v_low.mean.amount() - v_exact_low.mean.amount()).abs() < tol,
-            "Euler ({}) vs ExactMultiGbmCorrelated ({}) differ by > 5 SE ({})",
+            "Euler ({}) vs ExactMultiGbm ({}) differ by > 5 SE ({})",
             v_low.mean.amount(),
             v_exact_low.mean.amount(),
             tol

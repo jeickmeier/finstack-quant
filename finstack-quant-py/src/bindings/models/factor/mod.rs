@@ -57,12 +57,9 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         py,
         [
             "DEFAULT_UTILIZATION_THRESHOLD",
-            "DecompositionConfig",
             "FactorContribution",
-            "ParametricEsDecompositionView",
             "PositionBudgetEntry",
             "PositionEsContribution",
-            "PositionEsContributionView",
             "PositionFactorContribution",
             "PositionResidualContribution",
             "PositionRiskDecomposition",

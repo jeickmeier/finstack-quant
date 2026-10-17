@@ -552,7 +552,7 @@ impl CommoditySpotOption {
 
         let initial_spot = self.required_spot(market)?;
 
-        let mut process = SchwartzSmithProcess::from_spot(ss_params, initial_spot, None);
+        let mut process = SchwartzSmithProcess::from_spot(ss_params, initial_spot, None)?;
 
         // Pin the simulated forward to the market: the closed-form
         // futures curve F_model(0,T) (Schwartz-Smith 2000, eq. 9) is
@@ -574,9 +574,9 @@ impl CommoditySpotOption {
                 p.rho_xy,
             )?
             .with_lambda_x(p.lambda_x)?;
-            process = SchwartzSmithProcess::from_spot(pinned_params, initial_spot, None);
+            process = SchwartzSmithProcess::from_spot(pinned_params, initial_spot, None)?;
         }
-        let disc_scheme = ExactSchwartzSmith::from_process(&process)?;
+        let disc_scheme = ExactSchwartzSmith::new();
 
         // Discount factor
         let disc_curve = market.get_discount(self.discount_curve_id.as_str())?;
@@ -965,7 +965,7 @@ impl CommoditySpotOption {
             return Ok(Some(intrinsic_delta * df * self.quantity * self.multiplier));
         }
 
-        let d1 = finstack_quant_models::d1_black76(forward, self.strike, sigma, t);
+        let d1 = finstack_quant_models::d1_d2_black76(forward, self.strike, sigma, t).0;
         let nd1 = norm_cdf(d1);
 
         let delta_unit = match self.option_type {
@@ -1114,7 +1114,7 @@ impl CommoditySpotOption {
         let forward = self.forward_price(market, as_of)?;
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let df = disc.df_between_dates(as_of, self.expiry)?;
-        let d1 = finstack_quant_models::d1_black76(forward, self.strike, sigma, t);
+        let d1 = finstack_quant_models::d1_d2_black76(forward, self.strike, sigma, t).0;
         let vega_abs = df * forward * norm_pdf(d1) * t.sqrt();
         Ok(Some(vega_abs * 0.01 * self.quantity * self.multiplier))
     }

@@ -1,5 +1,5 @@
-use finstack_quant_core::math::norm_cdf;
 use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::math::{norm_cdf, standard_normal_inv_cdf};
 use finstack_quant_core::{Error, InputError, Result};
 
 use super::{AssetDynamics, MertonBarrierType, MertonModel};
@@ -142,11 +142,20 @@ impl MertonModel {
         payout_rate: f64,
         maturity: f64,
     ) -> Result<Self> {
-        if equity_value <= 0.0 || total_debt <= 0.0 || maturity <= 0.0 {
-            return Err(InputError::NonPositiveValue.into());
+        if !equity_value.is_finite()
+            || !equity_vol.is_finite()
+            || !total_debt.is_finite()
+            || !risk_free_rate.is_finite()
+            || !payout_rate.is_finite()
+            || !maturity.is_finite()
+        {
+            return Err(InputError::Invalid.into());
         }
         if equity_vol < 0.0 {
             return Err(InputError::NegativeValue.into());
+        }
+        if equity_value <= 0.0 || equity_vol <= 0.0 || total_debt <= 0.0 || maturity <= 0.0 {
+            return Err(InputError::NonPositiveValue.into());
         }
         // A near-zero equity value makes the KMV volatility inversion
         // `sigma_V = sigma_E * E / (N(d1) * exp(-qT) * V)` ill-conditioned and
@@ -300,6 +309,15 @@ impl MertonModel {
         asset_value: f64,
         payout_rate: f64,
     ) -> Result<Self> {
+        if !total_debt.is_finite()
+            || !maturity.is_finite()
+            || !asset_value.is_finite()
+            || !risk_free_rate.is_finite()
+            || !payout_rate.is_finite()
+            || !recovery.is_finite()
+        {
+            return Err(InputError::Invalid.into());
+        }
         if total_debt <= 0.0 || maturity <= 0.0 || asset_value <= 0.0 {
             return Err(InputError::NonPositiveValue.into());
         }
@@ -432,10 +450,9 @@ impl MertonModel {
     /// Calibrate the debt barrier to match a target cumulative default
     /// probability over the given maturity.
     ///
-    /// Uses terminal-barrier (classic Merton) `PD = N(-DD)` and Brent's
-    /// method to find the barrier B such that `default_probability(maturity)
-    /// == target_pd`. PD is strictly increasing in the barrier, so the root
-    /// is unique.
+    /// Uses terminal-barrier (classic Merton) `PD = N(-DD)` and exact
+    /// normal-quantile inversion to compute the unique barrier `B` such that
+    /// `default_probability(maturity) == target_pd`.
     ///
     /// # Measure
     ///
@@ -465,9 +482,8 @@ impl MertonModel {
     /// # Errors
     ///
     /// Returns [`InputError::NonPositiveValue`] if `asset_value`,
-    /// `asset_vol`, or `maturity` is non-positive, [`InputError::Invalid`] if
-    /// `target_pd` is outside `(0, 1)`, and a solver error if no barrier in
-    /// `[0.001 V, 0.999 V]` attains the target.
+    /// `asset_vol`, or `maturity` is non-positive, and [`InputError::Invalid`]
+    /// if any input is non-finite or `target_pd` is outside `(0, 1)`.
     pub fn from_target_pd(
         asset_value: f64,
         asset_vol: f64,
@@ -476,6 +492,15 @@ impl MertonModel {
         target_pd: f64,
         maturity: f64,
     ) -> Result<Self> {
+        if !asset_value.is_finite()
+            || !asset_vol.is_finite()
+            || !risk_free_rate.is_finite()
+            || !payout_rate.is_finite()
+            || !target_pd.is_finite()
+            || !maturity.is_finite()
+        {
+            return Err(InputError::Invalid.into());
+        }
         if asset_value <= 0.0 || asset_vol <= 0.0 || maturity <= 0.0 {
             return Err(InputError::NonPositiveValue.into());
         }
@@ -483,20 +508,12 @@ impl MertonModel {
             return Err(InputError::Invalid.into());
         }
 
-        let solver = BrentSolver::new()
-            .tolerance(1e-10)
-            .bracket_bounds(0.001 * asset_value, 0.999 * asset_value);
-
-        let barrier = solver.solve(
-            |b| {
-                let sigma = asset_vol;
-                let mu = risk_free_rate - payout_rate - 0.5 * sigma * sigma;
-                let sqrt_t = maturity.sqrt();
-                let dd = ((asset_value / b).ln() + mu * maturity) / (sigma * sqrt_t);
-                norm_cdf(-dd) - target_pd
-            },
-            0.5 * asset_value,
-        )?;
+        let d2 = -standard_normal_inv_cdf(target_pd);
+        let mu = risk_free_rate - payout_rate - 0.5 * asset_vol * asset_vol;
+        let barrier = asset_value * (mu * maturity - d2 * asset_vol * maturity.sqrt()).exp();
+        if !barrier.is_finite() || barrier <= 0.0 {
+            return Err(InputError::Invalid.into());
+        }
 
         Self::new_with_dynamics(
             asset_value,
@@ -554,7 +571,7 @@ impl MertonModel {
     ///
     /// Returns [`InputError::NonPositiveValue`] or [`InputError::NegativeValue`]
     /// for out-of-domain equity and debt inputs, and [`Error::Validation`] if
-    /// `mean_recovery` is outside `[0, 1]` or `barrier_uncertainty` is
+    /// `mean_recovery` is outside `(0, 1]` or `barrier_uncertainty` is
     /// negative or non-finite.
     pub fn credit_grades(
         equity_value: f64,
@@ -564,15 +581,23 @@ impl MertonModel {
         barrier_uncertainty: f64,
         mean_recovery: f64,
     ) -> Result<Self> {
+        if !equity_value.is_finite()
+            || !equity_vol.is_finite()
+            || !total_debt.is_finite()
+            || !risk_free_rate.is_finite()
+            || !mean_recovery.is_finite()
+        {
+            return Err(InputError::Invalid.into());
+        }
         if equity_value <= 0.0 || total_debt <= 0.0 {
             return Err(InputError::NonPositiveValue.into());
         }
         if equity_vol < 0.0 {
             return Err(InputError::NegativeValue.into());
         }
-        if !(0.0..=1.0).contains(&mean_recovery) {
+        if !(0.0 < mean_recovery && mean_recovery <= 1.0) {
             return Err(Error::Validation(format!(
-                "credit_grades: mean_recovery must be in [0, 1], got {mean_recovery}"
+                "credit_grades: mean_recovery must be in (0, 1], got {mean_recovery}"
             )));
         }
         if !(barrier_uncertainty.is_finite() && barrier_uncertainty >= 0.0) {

@@ -242,6 +242,20 @@ pub struct PrincipalEventSpec {
     pub kind: CFKind,
 }
 
+impl PrincipalEventSpec {
+    /// Settlement amount before classification-dependent sign handling.
+    ///
+    /// When `cash` is omitted, amortization repayments use `-delta` and all
+    /// other kinds use `delta`.
+    #[must_use]
+    pub(crate) fn resolved_cash(&self) -> Money {
+        self.cash.unwrap_or(match self.kind {
+            CFKind::Amortization => self.delta.checked_neg(),
+            _ => self.delta,
+        })
+    }
+}
+
 /// JSON-friendly dated flow item.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]

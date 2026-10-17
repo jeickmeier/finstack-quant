@@ -64,9 +64,7 @@ pub use trees::{
     ShortRateTreeConfig, TreeDiscounting, TreeValuator,
 };
 pub use types::{ExerciseStyle, OptionType};
-pub use volatility::{
-    d1, d1_black76, d1_d2_black76, SabrCalibrator, SabrModel, SabrParameters, SabrShift,
-};
+pub use volatility::{d1_d2, d1_d2_black76, SabrCalibrator, SabrParameters, SabrShift};
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 #[cfg(doctest)]

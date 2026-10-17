@@ -39,7 +39,7 @@ impl ShortRateTree {
                 } else {
                     oas_shift * 10_000.0
                 },
-                interest_rate: Some(rate + oas_shift),
+                interest_rate: Some(rate),
                 ..NodeState::default()
             }
         };
@@ -170,48 +170,35 @@ impl ShortRateTree {
             return self.price_bk_trinomial(lattice, oas_bp, oas_compounding, valuator);
         }
 
-        // Clone rates (cheap Arc clone) to avoid lifetime issues with closures
-        let rates_clone = std::sync::Arc::clone(&self.rates);
-        let state_gen: Box<dyn Fn(usize, usize) -> f64> =
-            Box::new(move |step: usize, node: usize| -> f64 {
-                if step < rates_clone.len() && node < rates_clone[step].len() {
-                    rates_clone[step][node]
-                } else {
-                    0.0
-                }
-            });
-
-        let rates_clone2 = std::sync::Arc::clone(&self.rates);
+        let rates = self.rates.as_slice();
         let compounding = self.config.compounding;
         let dt_pricing = self.time_steps[1] - self.time_steps[0];
-        let rate_gen: Box<dyn Fn(usize, usize) -> f64> =
-            Box::new(move |step: usize, node: usize| -> f64 {
-                let r = if step < rates_clone2.len() && node < rates_clone2[step].len() {
-                    rates_clone2[step][node]
-                } else {
-                    return 0.0;
-                };
-                let continuous = compounding.tree_to_continuous(r, dt_pricing);
-                continuous + oas_compounding.continuous_spread_shift(continuous, oas_bp / 10_000.0)
-            });
-        let rates_clone3 = std::sync::Arc::clone(&self.rates);
-        let node_oas_bp: Box<dyn Fn(usize, usize) -> f64> =
-            Box::new(move |step: usize, node: usize| -> f64 {
-                let r = if step < rates_clone3.len() && node < rates_clone3[step].len() {
-                    rates_clone3[step][node]
-                } else {
-                    return oas_bp;
-                };
-                // A continuous spread is the same at every node; hand the
-                // quoted value through unchanged rather than round-tripping it.
-                if oas_compounding == Compounding::Continuous {
-                    return oas_bp;
-                }
-                oas_compounding.continuous_spread_shift(
-                    compounding.tree_to_continuous(r, dt_pricing),
-                    oas_bp / 10_000.0,
-                ) * 10_000.0
-            });
+        let oas = oas_bp / 10_000.0;
+        let state_gen = |step: usize, node: usize| -> f64 {
+            rates
+                .get(step)
+                .and_then(|row| row.get(node))
+                .copied()
+                .unwrap_or(0.0)
+        };
+        let rate_gen = |step: usize, node: usize| -> f64 {
+            let Some(&r) = rates.get(step).and_then(|row| row.get(node)) else {
+                return 0.0;
+            };
+            let continuous = compounding.tree_to_continuous(r, dt_pricing);
+            continuous + oas_compounding.continuous_spread_shift(continuous, oas)
+        };
+        let node_oas_bp = |step: usize, node: usize| -> f64 {
+            let Some(&r) = rates.get(step).and_then(|row| row.get(node)) else {
+                return oas_bp;
+            };
+            if oas_compounding == Compounding::Continuous {
+                return oas_bp;
+            }
+            oas_compounding
+                .continuous_spread_shift(compounding.tree_to_continuous(r, dt_pricing), oas)
+                * 10_000.0
+        };
 
         // Ho-Lee and binomial BDT lattices are calibrated with equal
         // up/down probabilities; the drift lives in the calibrated node rates.
@@ -222,9 +209,9 @@ impl ShortRateTree {
             prob_up: 0.5,
             prob_down: 0.5,
             lattice: RecombiningLattice::ShortRate {
-                node_rate: &*state_gen,
-                discount_rate: &*rate_gen,
-                oas_bp: &*node_oas_bp,
+                node_rate: &state_gen,
+                discount_rate: &rate_gen,
+                oas_bp: &node_oas_bp,
             },
         })
     }

@@ -23,7 +23,6 @@
 use super::super::clamped_cdr_to_mdr;
 use super::traits::StochasticDefault;
 use crate::correlation::copula::{Copula, CopulaSpec};
-use finstack_quant_core::math::{standard_normal_inv_cdf, student_t_inv_cdf};
 
 /// Copula-based stochastic default model.
 ///
@@ -39,6 +38,8 @@ pub(crate) struct CopulaBasedDefault {
     copula_spec: CopulaSpec,
     /// Asset correlation
     correlation: f64,
+    /// Precomputed default threshold for `base_cdr`
+    default_threshold: f64,
     /// Copula instance
     copula: Box<dyn Copula>,
 }
@@ -75,40 +76,26 @@ impl CopulaBasedDefault {
                 "copula construction failed for {copula_spec:?}: {e}"
             ))
         })?;
+        let base_cdr = base_cdr.clamp(0.0, 1.0);
+        let base_mdr = clamped_cdr_to_mdr(base_cdr);
+        let default_threshold =
+            copula_spec.default_threshold(base_mdr.clamp(1e-10, 1.0 - 1e-10))?;
 
         Ok(Self {
-            base_cdr: base_cdr.clamp(0.0, 1.0),
+            base_cdr,
             copula_spec,
             correlation: correlation.clamp(0.0, 0.99),
+            default_threshold,
             copula,
         })
-    }
-
-    /// Compute the default threshold appropriate for the copula type.
-    ///
-    /// - Gaussian/RFL/Multi-factor: Φ⁻¹(PD)
-    /// - Student-t: t_ν⁻¹(PD)
-    fn default_threshold(&self, pd: f64) -> f64 {
-        let p = pd.clamp(1e-10, 1.0 - 1e-10);
-        match &self.copula_spec {
-            CopulaSpec::StudentT { degrees_of_freedom } => {
-                student_t_inv_cdf(p, *degrees_of_freedom).unwrap_or(f64::NAN)
-            }
-            _ => standard_normal_inv_cdf(p),
-        }
     }
 }
 
 impl StochasticDefault for CopulaBasedDefault {
     fn conditional_mdr(&self, _seasoning: u32, factors: &[f64]) -> f64 {
-        let threshold = self.default_threshold(self.base_cdr);
-
-        let annual_cond_pd =
-            self.copula
-                .conditional_default_prob(threshold, factors, self.correlation);
-
-        // Convert conditional annual PD to monthly MDR
-        clamped_cdr_to_mdr(annual_cond_pd)
+        self.copula
+            .conditional_default_prob(self.default_threshold, factors, self.correlation)
+            .clamp(0.0, 1.0)
     }
 
     fn correlation(&self) -> f64 {

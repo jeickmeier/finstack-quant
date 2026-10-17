@@ -226,7 +226,7 @@ pub(crate) fn heston_call_prices_fourier(
 /// # Formula
 ///
 /// Uses put-call parity: P = C - S*exp(-qT) + K*exp(-rT)
-pub fn heston_put_price_fourier(
+pub(crate) fn heston_put_price_fourier(
     spot: f64,
     strike: f64,
     time: f64,
@@ -251,7 +251,7 @@ pub fn heston_put_price_fourier(
 
 /// Price a European call or put under the Heston model using Fourier inversion.
 ///
-/// Routes to [`heston_call_price_fourier`] or [`heston_put_price_fourier`] from
+/// Routes to `heston_call_price_fourier` or `heston_put_price_fourier` from
 /// `option_type`, so host bindings share one call/put branch.
 ///
 /// # Arguments

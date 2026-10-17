@@ -93,8 +93,11 @@ impl TransitionMatrix {
                 actual: data.len(),
             });
         }
-        let matrix = DMatrix::from_row_slice(n, n, data);
+        let mut matrix = DMatrix::from_row_slice(n, n, data);
         validate_transition_matrix(&matrix, &scale)?;
+        for v in matrix.iter_mut() {
+            *v = v.clamp(0.0, 1.0);
+        }
         Ok(Self {
             data: matrix,
             horizon,

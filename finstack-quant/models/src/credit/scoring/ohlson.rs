@@ -218,7 +218,7 @@ pub fn ohlson_o_score(input: &OhlsonOScoreInput) -> Result<ScoringResult, Credit
 /// Standard logistic function: 1 / (1 + exp(-x)).
 ///
 /// Numerically stable for large |x|.
-fn logistic(x: f64) -> f64 {
+pub(crate) fn logistic(x: f64) -> f64 {
     if x >= 0.0 {
         let e = (-x).exp();
         1.0 / (1.0 + e)

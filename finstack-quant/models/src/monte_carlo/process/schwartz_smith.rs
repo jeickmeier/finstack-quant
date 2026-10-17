@@ -175,16 +175,31 @@ impl SchwartzSmithProcess {
     /// # Arguments
     ///
     /// * `params` - Process parameters
-    /// * `initial_spot` - Initial spot price S_0
+    /// * `initial_spot` - Initial spot price S_0 (must be finite and positive)
     /// * `initial_x` - Initial short-term deviation (default 0.0 if None)
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] if `initial_spot <= 0.0`,
+    /// `initial_spot` is non-finite, or `initial_x` is non-finite.
     pub fn from_spot(
         params: SchwartzSmithParams,
         initial_spot: f64,
         initial_x: Option<f64>,
-    ) -> Self {
+    ) -> finstack_quant_core::Result<Self> {
+        if !initial_spot.is_finite() || initial_spot <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "SchwartzSmithProcess::from_spot requires finite positive initial_spot, got {initial_spot}"
+            )));
+        }
         let x_0 = initial_x.unwrap_or(0.0);
+        if !x_0.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "SchwartzSmithProcess::from_spot requires finite initial_x, got {x_0}"
+            )));
+        }
         let y_0 = initial_spot.ln() - x_0; // Ensure S_0 = exp(X_0 + Y_0)
-        Self::new(params, x_0, y_0)
+        Ok(Self::new(params, x_0, y_0))
     }
 
     /// Get parameters.
@@ -198,8 +213,14 @@ impl SchwartzSmithProcess {
     }
 
     /// Compute spot price from state [X, Y].
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - State slice `[X, Y]` of length 2. Returns `f64::NAN` if `state.len() != 2`.
     pub fn spot_from_state(&self, state: &[f64]) -> f64 {
-        assert_eq!(state.len(), 2, "State must have dimension 2");
+        if state.len() != 2 {
+            return f64::NAN;
+        }
         (state[0] + state[1]).exp()
     }
 
@@ -339,8 +360,8 @@ mod tests {
             .unwrap()
             .with_lambda_x(0.05)
             .unwrap();
-        let process = SchwartzSmithProcess::from_spot(params, 90.0, Some(0.1));
-        let disc = ExactSchwartzSmith::from_process(&process).expect("disc");
+        let process = SchwartzSmithProcess::from_spot(params, 90.0, Some(0.1)).unwrap();
+        let disc = ExactSchwartzSmith::new();
 
         let t = 1.0;
         let steps = 12usize;
@@ -385,7 +406,7 @@ mod tests {
     fn test_schwartz_smith_from_spot() {
         let params = SchwartzSmithParams::new(2.0, 0.30, 0.02, 0.15, -0.5).unwrap();
         let spot_0 = 90.0;
-        let process = SchwartzSmithProcess::from_spot(params, spot_0, None);
+        let process = SchwartzSmithProcess::from_spot(params, spot_0, None).unwrap();
 
         let state = process.initial_state();
         let computed_spot = process.spot_from_state(&state);

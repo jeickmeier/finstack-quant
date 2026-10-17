@@ -214,7 +214,7 @@ pub fn bs_price_unchecked(
     if expiry <= 0.0 {
         return vanilla_expiry_payoff_unchecked(spot, strike, option_type);
     }
-    if vol == 0.0 {
+    if vol <= 0.0 {
         let discounted_spot = spot * (-div_yield * expiry).exp();
         let discounted_strike = strike * (-rate * expiry).exp();
         return match option_type {
@@ -379,15 +379,16 @@ pub fn bs_greeks_unchecked(
     option_type: OptionType,
     theta_days_per_year: f64,
 ) -> BsGreeks {
-    // Theta divides by this basis; a non-positive value would yield inf/NaN.
-    // All in-tree callers pass 252/365; a hard assert keeps a degenerate
-    // caller from silently producing inf theta in release builds. Bindings
-    // validate user-supplied values and return a proper error before reaching
-    // this point.
-    assert!(
-        theta_days_per_year > 0.0,
-        "theta_days_per_year must be positive, got {theta_days_per_year}"
-    );
+    if !theta_days_per_year.is_finite() || theta_days_per_year <= 0.0 {
+        return BsGreeks {
+            delta: f64::NAN,
+            gamma: f64::NAN,
+            vega: f64::NAN,
+            theta: f64::NAN,
+            rho_r: f64::NAN,
+            rho_q: f64::NAN,
+        };
+    }
 
     // At expiry the option is pure intrinsic: delta is the exercise
     // indicator and every other sensitivity is zero. Mirrors

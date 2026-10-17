@@ -572,9 +572,13 @@ pub fn decompose_levels(
             durations.insert((*issuer).clone(), row.spread_duration);
         }
     }
+    let weighted_issuers: Vec<&IssuerId> = match model.bucket_weighting {
+        super::calibration::BucketWeighting::Equal => observed_spreads.keys().collect(),
+        super::calibration::BucketWeighting::Dts => durations.keys().collect(),
+    };
     let weights = super::peel::issuer_bucket_weights(
         model.bucket_weighting,
-        observed_spreads.keys(),
+        weighted_issuers.into_iter(),
         &durations,
         observed_spreads,
     )

@@ -56,4 +56,4 @@ pub use path_capture::{PathCaptureConfig, PathCaptureMode};
 pub use pricing::McEngine;
 
 pub(crate) use pricing::{build_correlation_factor, validate_discounted_payoff};
-pub(crate) use simulation::{run_path_loop, NoiseHook};
+pub(crate) use simulation::{fill_shocks, run_path_loop, NoiseHook};

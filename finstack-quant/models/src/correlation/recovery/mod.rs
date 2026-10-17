@@ -129,7 +129,7 @@ pub trait RecoveryModel: Send + Sync + std::fmt::Debug {
 /// Allows recovery model selection without constructing the full model.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "type", rename_all = "snake_case", try_from = "RawRecoverySpec")]
 pub enum RecoverySpec {
     /// Constant recovery rate (current default behavior).
     Constant {
@@ -153,6 +153,41 @@ pub enum RecoverySpec {
         /// recoveries co-move negatively.
         factor_correlation: f64,
     },
+}
+
+#[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+enum RawRecoverySpec {
+    Constant {
+        rate: f64,
+    },
+    MarketCorrelated {
+        mean_recovery: f64,
+        recovery_volatility: f64,
+        factor_correlation: f64,
+    },
+}
+
+impl TryFrom<RawRecoverySpec> for RecoverySpec {
+    type Error = Error;
+
+    fn try_from(raw: RawRecoverySpec) -> Result<Self> {
+        let spec = match raw {
+            RawRecoverySpec::Constant { rate } => RecoverySpec::Constant { rate },
+            RawRecoverySpec::MarketCorrelated {
+                mean_recovery,
+                recovery_volatility,
+                factor_correlation,
+            } => RecoverySpec::MarketCorrelated {
+                mean_recovery,
+                recovery_volatility,
+                factor_correlation,
+            },
+        };
+        spec.validate()?;
+        Ok(spec)
+    }
 }
 
 impl Default for RecoverySpec {

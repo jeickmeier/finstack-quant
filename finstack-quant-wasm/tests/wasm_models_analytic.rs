@@ -43,8 +43,8 @@ fn black76_and_bachelier_prices_are_positive() {
             JsValue::from(100.0),
             JsValue::from(100.0),
             JsValue::from(0.95),
-            JsValue::from(1.0),
             JsValue::from(0.2),
+            JsValue::from(1.0),
             JsValue::from(true)
         )
         .expect("price")
@@ -92,8 +92,8 @@ fn black76_price_rejects_non_positive_df() {
         JsValue::from(100.0),
         JsValue::from(100.0),
         JsValue::from(-0.95),
-        JsValue::from(1.0),
         JsValue::from(0.2),
+        JsValue::from(1.0),
         JsValue::from(true)
     )
     .is_err());
@@ -101,8 +101,8 @@ fn black76_price_rejects_non_positive_df() {
         JsValue::from(100.0),
         JsValue::from(100.0),
         JsValue::from(0.0),
-        JsValue::from(1.0),
         JsValue::from(0.2),
+        JsValue::from(1.0),
         JsValue::from(true)
     )
     .is_err());

@@ -2,9 +2,9 @@
 
 Examples
 --------
->>> from finstack_quant.models.factor.risk import DecompositionConfig
->>> DecompositionConfig.parametric_95().confidence
-0.95
+>>> from finstack_quant.models.factor.risk import DEFAULT_UTILIZATION_THRESHOLD
+>>> DEFAULT_UTILIZATION_THRESHOLD
+1.2
 """
 
 from __future__ import annotations
@@ -18,12 +18,9 @@ import pandas as pd
 
 __all__ = [
     "DEFAULT_UTILIZATION_THRESHOLD",
-    "DecompositionConfig",
     "FactorContribution",
-    "ParametricEsDecompositionView",
     "PositionBudgetEntry",
     "PositionEsContribution",
-    "PositionEsContributionView",
     "PositionFactorContribution",
     "PositionResidualContribution",
     "PositionRiskDecomposition",
@@ -66,9 +63,8 @@ def parametric_var_decomposition(
         Square covariance matrix aligned with ``position_ids``. C-contiguous
         ``float64`` arrays use the direct buffer path.
     confidence : float | None
-        VaR confidence strictly inside ``(0.5, 1)``. ``None`` uses the Rust
-        :meth:`DecompositionConfig.parametric_95` preset (``0.95``), as the
-        WASM ``parametricVarDecomposition`` does.
+        VaR confidence strictly inside ``(0.5, 1)``. ``None`` uses ``0.95``,
+        as the WASM ``parametricVarDecomposition`` does.
     compute_incremental : bool, default False
         Whether to calculate leave-one-out incremental VaR (one full repricing
         per position).
@@ -98,13 +94,9 @@ def parametric_es_decomposition(
     weights: list[float],
     covariance: list[list[float]] | npt.NDArray[np.float64] | pd.DataFrame,
     confidence: float | None = None,
-) -> ParametricEsDecompositionView:
+) -> PositionRiskDecomposition:
     """
     Decompose portfolio parametric expected shortfall across positions.
-
-    The ES twin of :func:`parametric_var_decomposition`: runs the same engine
-    and returns the ES reporting view (``portfolio_es`` plus per-position
-    ``component_es`` / ``pct_contribution`` rows).
 
     Parameters
     ----------
@@ -116,14 +108,13 @@ def parametric_es_decomposition(
     covariance : list[list[float]] | numpy.ndarray | pd.DataFrame
         Square covariance matrix aligned with ``position_ids``.
     confidence : float | None
-        ES confidence strictly inside ``(0.5, 1)``. ``None`` uses the Rust
-        :meth:`DecompositionConfig.parametric_95` preset (``0.95``).
+        ES confidence strictly inside ``(0.5, 1)``. ``None`` uses ``0.95``.
 
     Returns
     -------
-    ParametricEsDecompositionView
+    PositionRiskDecomposition
         ``portfolio_var``, ``portfolio_es`` (losses negative) and per-position
-        ES rows.
+        VaR and ES rows.
 
     Raises
     ------
@@ -160,7 +151,7 @@ def historical_var_decomposition(
         the layout the WASM ``historicalVarDecomposition`` also takes.
     confidence : float | None
         Historical VaR confidence strictly inside ``(0.5, 1)``. ``None`` uses
-        the Rust :meth:`DecompositionConfig.historical_95` preset (``0.95``).
+        ``0.95``.
 
     Returns
     -------
@@ -698,8 +689,8 @@ class RiskDecomposition:
         --------
         >>> from finstack_quant.models.factor.risk import RiskDecomposition
         >>> doc = '{"total_risk":1.0,"measure":"variance","factor_contributions":[],"residual_risk":1.0,"position_factor_contributions":[],"position_residual_contributions":[]}'
-        >>> RiskDecomposition.from_json(doc).measure_json
-        '"variance"'
+        >>> RiskDecomposition.from_json(doc).measure
+        'variance'
         """
         ...
 
@@ -749,22 +740,6 @@ class RiskDecomposition:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def measure_json(self) -> str:
-        """
-        Risk measure specification as JSON.
-
-        Returns
-        -------
-        str
-            Risk measure specification as JSON.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
         """
         ...
 
@@ -2257,589 +2232,6 @@ class StressAttribution:
         """
         ...
 
-class DecompositionConfig:
-    """
-    Configuration for position-level VaR / ES decomposition.
-
-    Holds the tail ``confidence`` (decimal probability in ``(0.5, 1)``), the
-    ``method`` (``"parametric"`` or ``"historical"``) and whether leave-one-out
-    incremental VaR is computed. The decomposition functions take
-    ``confidence`` / ``compute_incremental`` directly and resolve an omitted
-    confidence to the :meth:`parametric_95` / :meth:`historical_95` presets.
-    Instances compare equal field-wise and pickle through JSON.
-
-    Examples
-    --------
-    >>> from finstack_quant.models.factor.risk import DecompositionConfig
-    >>> cfg = DecompositionConfig.parametric(0.975).with_incremental()
-    >>> (cfg.confidence, cfg.method, cfg.compute_incremental)
-    (0.975, 'parametric', True)
-    >>> DecompositionConfig.from_json(cfg.to_json()) == cfg
-    True
-    """
-
-    @classmethod
-    def parametric(cls, confidence: float) -> DecompositionConfig:
-        """
-        Parametric configuration at an arbitrary confidence level.
-
-        Parameters
-        ----------
-        confidence : float
-            Tail confidence as a decimal probability strictly inside
-            ``(0.5, 1)``, e.g. ``0.95``.
-
-        Returns
-        -------
-        DecompositionConfig
-            Parametric config with incremental VaR disabled.
-
-        Notes
-        -----
-        This method does not raise; the confidence is validated when the
-        config is used.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.factor.risk import DecompositionConfig
-        >>> DecompositionConfig.parametric(0.9).confidence
-        0.9
-        """
-        ...
-
-    @classmethod
-    def parametric_95(cls) -> DecompositionConfig:
-        """
-        Default 95% parametric VaR decomposition config.
-
-        Returns
-        -------
-        DecompositionConfig
-            Parametric 95% config with incremental VaR disabled.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.factor.risk import DecompositionConfig
-        >>> (DecompositionConfig.parametric_95().method, DecompositionConfig.parametric_95().confidence)
-        ('parametric', 0.95)
-        """
-        ...
-
-    @classmethod
-    def parametric_99(cls) -> DecompositionConfig:
-        """
-        Default 99% parametric VaR decomposition config.
-
-        Returns
-        -------
-        DecompositionConfig
-            Parametric 99% config with incremental VaR disabled.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.factor.risk import DecompositionConfig
-        >>> DecompositionConfig.parametric_99().confidence
-        0.99
-        """
-        ...
-
-    @classmethod
-    def historical(cls, confidence: float) -> DecompositionConfig:
-        """
-        Build a historical VaR decomposition configuration.
-
-        Parameters
-        ----------
-        confidence : float
-            VaR confidence as a decimal probability strictly inside ``(0.5, 1)``.
-
-        Returns
-        -------
-        DecompositionConfig
-            Historical config at the supplied confidence.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.factor.risk import DecompositionConfig
-        >>> DecompositionConfig.historical(0.975).method
-        'historical'
-        """
-        ...
-
-    @classmethod
-    def historical_95(cls) -> DecompositionConfig:
-        """
-        Default 95% historical VaR decomposition config.
-
-        The preset :func:`historical_var_decomposition` and
-        :func:`build_stress_attribution` use when ``confidence`` is omitted.
-
-        Returns
-        -------
-        DecompositionConfig
-            Historical 95% config with incremental VaR disabled.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.factor.risk import DecompositionConfig
-        >>> (DecompositionConfig.historical_95().method, DecompositionConfig.historical_95().confidence)
-        ('historical', 0.95)
-        """
-        ...
-
-    def with_incremental(self) -> DecompositionConfig:
-        """
-        Return a copy that requests leave-one-out incremental VaR.
-
-        Returns
-        -------
-        DecompositionConfig
-            Copy with ``compute_incremental`` set.
-
-        Notes
-        -----
-        This method does not raise.
-        """
-        ...
-
-    @staticmethod
-    def from_json(json_str: str) -> DecompositionConfig:
-        """
-        Deserialize from canonical JSON.
-
-        Parameters
-        ----------
-        json_str : str
-            Object with ``confidence``, ``method`` and ``compute_incremental``.
-
-        Returns
-        -------
-        DecompositionConfig
-            Parsed configuration.
-
-        Raises
-        ------
-        ValueError
-            If the JSON is malformed or names an unknown field.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.factor.risk import DecompositionConfig
-        >>> DecompositionConfig.from_json(
-        ...     '{"confidence":0.99,"method":"historical","compute_incremental":false}'
-        ... ).method
-        'historical'
-        """
-        ...
-
-    def to_json(self) -> str:
-        """
-        Serialize to canonical JSON.
-
-        Returns
-        -------
-        str
-            Compact JSON with ``confidence``, ``method`` and ``compute_incremental``.
-
-        Raises
-        ------
-        ValueError
-            If serialization fails.
-        """
-        ...
-
-    @property
-    def confidence(self) -> float:
-        """
-        Tail confidence as a decimal probability (``0.95``, not ``95``).
-
-        Returns
-        -------
-        float
-            VaR/ES confidence level.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def method(self) -> str:
-        """
-        Decomposition method label.
-
-        Returns
-        -------
-        str
-            ``"parametric"`` or ``"historical"``.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def compute_incremental(self) -> bool:
-        """
-        Whether leave-one-out incremental VaR is requested.
-
-        Returns
-        -------
-        bool
-            ``True`` when incremental VaR is computed.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    def __eq__(self, other: object) -> bool: ...
-    def __repr__(self) -> str:
-        """Return a concise debug representation.
-        Returns
-        -------
-        str
-        """
-        ...
-
-class PositionEsContributionView:
-    """
-    One position's row in a :class:`ParametricEsDecompositionView`.
-
-    Examples
-    --------
-    >>> from finstack_quant.models.factor.risk import PositionEsContributionView
-    >>> row = PositionEsContributionView.from_json(
-    ...     '{"position_id":"A","component_es":-1.5,"marginal_es":null,"pct_contribution":0.6}'
-    ... )
-    >>> (row.position_id, row.pct_contribution)
-    ('A', 0.6)
-    """
-
-    @staticmethod
-    def from_json(json_str: str) -> PositionEsContributionView:
-        """
-        Parse from a JSON string.
-
-        Parameters
-        ----------
-        json_str : str
-            Object with ``position_id``, ``component_es``, ``marginal_es`` and
-            ``pct_contribution``.
-
-        Returns
-        -------
-        PositionEsContributionView
-            Parsed row.
-
-        Raises
-        ------
-        ValueError
-            If the JSON is malformed.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.factor.risk import PositionEsContributionView
-        >>> PositionEsContributionView.from_json(
-        ...     '{"position_id":"A","component_es":-1.0,"marginal_es":null,"pct_contribution":1.0}'
-        ... ).component_es
-        -1.0
-        """
-        ...
-
-    def to_json(self) -> str:
-        """
-        Serialize to JSON.
-
-        Returns
-        -------
-        str
-            Canonical JSON.
-
-        Raises
-        ------
-        ValueError
-            If serialization fails.
-        """
-        ...
-
-    @property
-    def position_id(self) -> str:
-        """
-        Portfolio position identifier.
-
-        Returns
-        -------
-        str
-            Position identifier.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def component_es(self) -> float:
-        """
-        Component Expected Shortfall allocated to the position.
-
-        Returns
-        -------
-        float
-            Portfolio-currency amount; losses are negative.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def marginal_es(self) -> float | None:
-        """
-        Marginal ES, when the engine produced a gradient.
-
-        Returns
-        -------
-        float | None
-            Same sign convention as :attr:`component_es`; ``None`` otherwise.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def pct_contribution(self) -> float:
-        """
-        Share of portfolio ES contributed by this position.
-
-        Returns
-        -------
-        float
-            A fraction (not a percentage); sums to ``1.0`` across positions.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    def to_dataframe(self) -> pd.DataFrame:
-        """
-        Export this row as a single-row pandas DataFrame.
-
-        Returns
-        -------
-        pd.DataFrame
-            Columns ``position_id``, ``component_es``, ``marginal_es``,
-            ``pct_contribution``.
-
-        Raises
-        ------
-        ValueError
-            If the value cannot be serialized.
-        """
-        ...
-
-    def __eq__(self, other: object) -> bool: ...
-    def __repr__(self) -> str:
-        """Return a concise debug representation.
-        Returns
-        -------
-        str
-        """
-        ...
-
-class ParametricEsDecompositionView:
-    """
-    Expected-shortfall view of a parametric position decomposition.
-
-    Returned by :func:`parametric_es_decomposition`.
-
-    Examples
-    --------
-    >>> from finstack_quant.models.factor.risk import parametric_es_decomposition
-    >>> es = parametric_es_decomposition(["A", "B"], [1.0, 2.0], [[0.04, 0.0], [0.0, 0.01]])
-    >>> (es.n_positions, round(es.portfolio_es, 6))
-    (2, -0.583423)
-    """
-
-    @staticmethod
-    def from_json(json_str: str) -> ParametricEsDecompositionView:
-        """
-        Parse from a JSON string.
-
-        Parameters
-        ----------
-        json_str : str
-            Object with ``portfolio_var``, ``portfolio_es``, ``confidence``,
-            ``n_positions`` and ``contributions``.
-
-        Returns
-        -------
-        ParametricEsDecompositionView
-            Parsed view.
-
-        Raises
-        ------
-        ValueError
-            If the JSON is malformed.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.factor.risk import ParametricEsDecompositionView
-        >>> doc = '{"portfolio_var":-1.0,"portfolio_es":-1.2,"confidence":0.95,"n_positions":0,"contributions":[]}'
-        >>> ParametricEsDecompositionView.from_json(doc).portfolio_es
-        -1.2
-        """
-        ...
-
-    def to_json(self) -> str:
-        """
-        Serialize to JSON.
-
-        Returns
-        -------
-        str
-            Canonical JSON.
-
-        Raises
-        ------
-        ValueError
-            If serialization fails.
-        """
-        ...
-
-    @property
-    def portfolio_var(self) -> float:
-        """
-        Total portfolio VaR.
-
-        Returns
-        -------
-        float
-            Portfolio-currency amount; losses are negative.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def portfolio_es(self) -> float:
-        """
-        Total portfolio Expected Shortfall.
-
-        Returns
-        -------
-        float
-            Portfolio-currency amount; losses are negative and
-            ``portfolio_es <= portfolio_var``.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def confidence(self) -> float:
-        """
-        Tail confidence as a decimal probability.
-
-        Returns
-        -------
-        float
-            Strictly inside ``(0.5, 1)``.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def n_positions(self) -> int:
-        """
-        Number of positions in the decomposition.
-
-        Returns
-        -------
-        int
-            Position count.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def contributions(self) -> list[PositionEsContributionView]:
-        """
-        Per-position ES rows.
-
-        Returns
-        -------
-        list[PositionEsContributionView]
-            One entry per position, in input order.
-
-        Notes
-        -----
-        This accessor does not raise; it returns copies of the stored rows.
-        """
-        ...
-
-    def to_dataframe(self) -> pd.DataFrame:
-        """
-        Export the per-position ES rows as a pandas DataFrame.
-
-        Returns
-        -------
-        pd.DataFrame
-            Columns ``position_id``, ``component_es``, ``marginal_es``,
-            ``pct_contribution`` (fraction, not percentage). The portfolio
-            scalars stay on their properties.
-
-        Raises
-        ------
-        ValueError
-            If pandas cannot build the frame.
-        """
-        ...
-
-    def __eq__(self, other: object) -> bool: ...
-    def __repr__(self) -> str:
-        """Return a concise debug representation.
-        Returns
-        -------
-        str
-        """
-        ...
-
 def build_stress_attribution(
     position_ids: list[str] | None,
     position_pnls: list[list[float]] | npt.NDArray[np.float64] | pd.DataFrame,
@@ -2861,8 +2253,7 @@ def build_stress_attribution(
     confidence : float | None
         Tail confidence level in ``(0.5, 1)``. The Rust engine selects
         ``floor((1 - confidence) * n_scenarios)`` tail scenarios. ``None``
-        uses the confidence of the Rust
-        :meth:`DecompositionConfig.historical_95` preset (``0.95``).
+        uses ``0.95``.
 
     Returns
     -------

@@ -12,7 +12,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 
 // MC-specific imports
-use finstack_quant_models::monte_carlo::payoff::barrier::{BarrierOptionPayoff, OptionKind};
+use finstack_quant_models::monte_carlo::payoff::barrier::BarrierOptionPayoff;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
 };
@@ -131,13 +131,6 @@ impl BarrierOptionMcPricer {
         }
     }
 
-    fn convert_option_kind(option_type: crate::instruments::OptionType) -> OptionKind {
-        match option_type {
-            crate::instruments::OptionType::Call => OptionKind::Call,
-            crate::instruments::OptionType::Put => OptionKind::Put,
-        }
-    }
-
     /// Price a barrier option using Monte Carlo.
     ///
     /// # Day Count Convention Handling
@@ -199,7 +192,7 @@ impl BarrierOptionMcPricer {
             inst.strike,
             inst.barrier,
             inst.barrier_type,
-            Self::convert_option_kind(inst.option_type),
+            inst.option_type,
             inst.rebate.map(|m| m.amount() / inst.quantity),
             inst.quantity,
             maturity_step,

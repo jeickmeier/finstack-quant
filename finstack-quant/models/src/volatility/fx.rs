@@ -274,6 +274,9 @@ impl FxVolSurfaceBuilder {
         if !self.spot.is_finite() || self.spot <= 0.0 {
             return Err(InputError::NonPositiveValue.into());
         }
+        if !self.domestic_rate.is_finite() || !self.foreign_rate.is_finite() {
+            return Err(InputError::Invalid.into());
+        }
         if self.expiries.is_empty() || self.atm_vols.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
@@ -555,7 +558,7 @@ pub fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
 /// * `vol` - Annualized Black volatility as a decimal.
 /// * `expiry` - Time to expiry in years.
 pub fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
-    finstack_quant_core::math::norm_cdf(super::black::d1_black76(forward, strike, vol, expiry))
+    finstack_quant_core::math::norm_cdf(super::black::d1_d2_black76(forward, strike, vol, expiry).0)
 }
 
 /// Evaluate an FX delta-quoted volatility artifact.
@@ -659,21 +662,7 @@ pub fn materialize_fx_delta_surface(
     builder.build()
 }
 
-#[inline]
-fn linear_clamped(xs: &[f64], ys: &[f64], x: f64) -> f64 {
-    if !x.is_finite() {
-        return f64::NAN;
-    }
-    if x <= xs[0] {
-        return ys[0];
-    }
-    if x >= xs[xs.len() - 1] {
-        return ys[ys.len() - 1];
-    }
-    let upper = xs.partition_point(|node| *node < x);
-    let weight = (x - xs[upper - 1]) / (xs[upper] - xs[upper - 1]);
-    ys[upper - 1] + weight * (ys[upper] - ys[upper - 1])
-}
+use super::source::linear_clamped;
 
 #[cfg(test)]
 mod tests {

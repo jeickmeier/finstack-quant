@@ -61,7 +61,7 @@
 //!
 //! # See Also
 //!
-//! - [`SabrModel`] for SABR smile interpolation
+//! - [`SabrParameters`] for SABR smile interpolation
 //! - [`FxVolSurfaceBuilder`] for FX delta-quoted smile materialization
 //! - [`crate::closed_form`] for analytical formulas
 
@@ -74,22 +74,18 @@ mod fx;
 pub mod heston;
 mod implied;
 pub mod local_vol;
-pub mod normal;
 pub mod rough_heston;
 pub mod sabr;
 mod source;
 pub mod svi;
 
-pub use black::{d1, d1_black76, d1_d2, d1_d2_black76};
+pub use crate::closed_form::volatility::bachelier_price_with_annuity;
+pub use black::{d1_d2, d1_d2_black76};
 pub use conventions::VolatilityConvention;
 pub use convert::convert_atm_volatility;
 pub use finstack_quant_core::math::{norm_cdf, norm_pdf};
 pub use implied::{implied_vol_bachelier, implied_vol_black};
-pub use normal::bachelier_price_with_annuity;
-pub use sabr::{
-    vega_weight, SabrCalibrationOutcome, SabrCalibrator, SabrModel, SabrParameters, SabrShift,
-    SabrSmile,
-};
+pub use sabr::{SabrCalibrationOutcome, SabrCalibrator, SabrParameters, SabrShift, SabrSmile};
 pub use source::{
     get_cube_expiry_slice_vol, get_cube_expiry_slice_vol_clamped, get_cube_normal_vol,
     get_cube_normal_vol_clamped, get_cube_vol, get_cube_vol_clamped, get_surface_vol,

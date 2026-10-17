@@ -355,7 +355,7 @@ fn rough_bergomi_streams_match_the_pricer_path_function() {
     let out = simulate_paths(&s).unwrap();
 
     let process = RoughBergomiProcess::new(params);
-    let disc = RoughBergomiEuler::new(hurst());
+    let disc = RoughBergomiEuler::new();
     let fbm_gen = RiemannLiouvilleVolterra::new(expiry, num_steps, 0.1).unwrap();
     let time_grid = TimeGrid::uniform(expiry, num_steps).unwrap();
     let root = PhiloxRng::new(seed);

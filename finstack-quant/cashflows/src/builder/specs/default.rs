@@ -204,8 +204,8 @@ impl DefaultModelSpec {
             )));
         }
 
-        use super::super::credit_rates::cpr_to_smm;
-        cpr_to_smm(cdr)
+        use super::super::credit_rates::cdr_to_mdr;
+        cdr_to_mdr(cdr)
     }
 
     /// Cumulative defaults through a seasoning month as a decimal fraction of

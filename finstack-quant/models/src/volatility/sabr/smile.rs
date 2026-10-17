@@ -1,12 +1,11 @@
 //! SABR model, smile, parameter, and calibration support.
 //!
-use super::model::SabrModel;
-use crate::volatility::black::d1_d2_black76;
+use super::parameters::SabrParameters;
 use finstack_quant_core::{Error, Result};
 
 /// SABR smile generator for creating volatility surfaces
 pub struct SabrSmile {
-    model: SabrModel,
+    params: SabrParameters,
     forward: f64,
     time_to_expiry: f64,
 }
@@ -17,6 +16,7 @@ pub struct SabrSmile {
 /// (and serialized) so every host sees the same verdict without recomputing it.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct ArbitrageValidationResult {
     /// `true` when both violation lists are empty.
     pub arbitrage_free: bool,
@@ -29,6 +29,7 @@ pub struct ArbitrageValidationResult {
 /// A butterfly spread violation at a specific strike.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct ButterflyViolation {
     /// Strike at which the violation occurs
     pub strike: f64,
@@ -41,6 +42,7 @@ pub struct ButterflyViolation {
 /// A monotonicity violation between two strikes.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct MonotonicityViolation {
     /// Lower strike
     pub strike_low: f64,
@@ -92,10 +94,16 @@ impl ArbitrageValidationResult {
 }
 
 impl SabrSmile {
-    /// Create new smile generator
-    pub fn new(model: SabrModel, forward: f64, time_to_expiry: f64) -> Self {
+    /// Create new smile generator.
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - Validated SABR parameters (`alpha`, `beta`, `nu`, `rho`, optional `shift`).
+    /// * `forward` - Forward price or rate in the same units as strikes.
+    /// * `time_to_expiry` - Time to expiry in years; must be strictly positive.
+    pub fn new(params: SabrParameters, forward: f64, time_to_expiry: f64) -> Self {
         Self {
-            model,
+            params,
             forward,
             time_to_expiry,
         }
@@ -111,9 +119,9 @@ impl SabrSmile {
         self.time_to_expiry
     }
 
-    /// Underlying SABR model.
-    pub fn model(&self) -> &SabrModel {
-        &self.model
+    /// Underlying SABR parameters.
+    pub fn parameters(&self) -> &SabrParameters {
+        &self.params
     }
 
     /// ATM implied volatility (strike = forward).
@@ -130,19 +138,18 @@ impl SabrSmile {
     ///
     /// ```
     /// use finstack_quant_models::volatility::sabr::{
-    ///     SabrParameters, SabrModel, SabrSmile,
+    ///     SabrParameters, SabrSmile,
     /// };
     ///
     /// let params = SabrParameters::new(0.2, 0.5, 0.3, -0.1).unwrap();
-    /// let model = SabrModel::new(params);
-    /// let smile = SabrSmile::new(model, 100.0, 1.0);
+    /// let smile = SabrSmile::new(params, 100.0, 1.0);
     ///
     /// let atm_vol = smile.atm_vol().unwrap();
     /// assert!(atm_vol > 0.0);
     /// ```
     #[must_use = "computed ATM volatility should be used"]
     pub fn atm_vol(&self) -> Result<f64> {
-        self.model
+        self.params
             .implied_volatility(self.forward, self.forward, self.time_to_expiry)
     }
 
@@ -161,7 +168,7 @@ impl SabrSmile {
     /// Returns an error when the expiry, forward, or `strike` is outside the
     /// model domain or the Hagan expansion produces an invalid volatility.
     pub fn implied_vol(&self, strike: f64) -> Result<f64> {
-        self.model
+        self.params
             .implied_volatility(self.forward, strike, self.time_to_expiry)
     }
 
@@ -196,17 +203,17 @@ impl SabrSmile {
     /// # Examples
     ///
     /// ```
-    /// use finstack_quant_models::volatility::sabr::{SabrModel, SabrParameters, SabrSmile};
+    /// use finstack_quant_models::volatility::sabr::{SabrParameters, SabrSmile};
     ///
     /// let params = SabrParameters::new_with_shift(0.01, 0.5, 0.3, -0.2, 0.02)?;
-    /// let smile = SabrSmile::new(SabrModel::new(params), -0.001, 1.0);
+    /// let smile = SabrSmile::new(params, -0.001, 1.0);
     /// let m = smile.log_moneyness(-0.005);
     /// assert!((m - (0.015_f64 / 0.019).ln()).abs() < 1e-15);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     #[must_use]
     pub fn log_moneyness(&self, strike: f64) -> f64 {
-        let (forward, strike) = self.model.effective_rates(self.forward, strike);
+        let (forward, strike) = self.params.effective_rates(self.forward, strike);
         if forward > 0.0 && strike > 0.0 {
             (strike / forward).ln()
         } else {
@@ -237,10 +244,10 @@ impl SabrSmile {
         let std_dev = atm_vol * self.time_to_expiry.sqrt();
         let z = finstack_quant_core::math::standard_normal_inv_cdf(delta);
         let signed_z = if is_call { z } else { -z };
-        if self.model.parameters().beta < super::model::BETA_SNAP_TOL {
+        if self.params.beta < super::model::BETA_SNAP_TOL {
             return Ok(self.forward - std_dev * signed_z);
         }
-        let shift = self.model.parameters().shift.unwrap_or(0.0);
+        let shift = self.params.shift.unwrap_or(0.0);
         let strike =
             (self.forward + shift) * (-std_dev * signed_z + 0.5 * std_dev.powi(2)).exp() - shift;
         if !strike.is_finite() {
@@ -361,9 +368,10 @@ impl SabrSmile {
         let mut prices: Vec<f64> = strikes
             .iter()
             .zip(vols.iter())
-            .map(|(&k, &vol)| bs_call_price(self.forward, k, r, vol, self.time_to_expiry))
+            .map(|(&k, &vol)| self.call_price(k, r, vol))
             .collect();
 
+        let mut modified = vec![false; prices.len()];
         for _ in 0..max_iterations {
             let mut changed = false;
 
@@ -375,6 +383,7 @@ impl SabrSmile {
                 if prices[i] > prices[i - 1] {
                     // Clamp to slightly below the previous price (absolute, not relative).
                     prices[i] = (prices[i - 1] - price_eps).max(0.0);
+                    modified[i] = true;
                     changed = true;
                 }
             }
@@ -385,6 +394,7 @@ impl SabrSmile {
                 let max_mid = convex_price_limit(strikes, &prices, i);
                 if prices[i] > max_mid {
                     prices[i] = max_mid;
+                    modified[i] = true;
                     changed = true;
                 }
             }
@@ -394,49 +404,12 @@ impl SabrSmile {
             }
         }
 
-        // Convert prices back to volatilities using implied-vol inversion.
-        //
-        // Newton non-convergence is surfaced as an error rather than silently
-        // leaving the un-repaired vol in place: a stale vol would defeat the
-        // repair and produce a smile that still contains the arbitrage the
-        // caller asked to remove.
+        // Convert modified prices back to volatilities using the canonical implied-vol
+        // solver matching the smile's quote convention.
         for i in 0..vols.len() {
-            let target_price = prices[i];
-            let k = strikes[i];
-
-            let mut vol = vols[i];
-            let mut converged = false;
-            for _ in 0..50 {
-                let price = bs_call_price(self.forward, k, r, vol, self.time_to_expiry);
-                let vega = bs_call_vega(self.forward, k, r, vol, self.time_to_expiry);
-
-                let error = price - target_price;
-                if error.abs() < 1e-10 {
-                    converged = true;
-                    break;
-                }
-
-                if vega.abs() < 1e-14 {
-                    // Vega has collapsed: Newton cannot make further progress.
-                    break;
-                }
-
-                vol -= error / vega;
-                vol = vol.clamp(0.001, 5.0);
+            if modified[i] {
+                vols[i] = self.invert_call_price(strikes[i], r, prices[i])?;
             }
-
-            if !converged {
-                let achieved = bs_call_price(self.forward, k, r, vol, self.time_to_expiry);
-                return Err(Error::Validation(format!(
-                    "SABR repair_arbitrage: implied-vol inversion did not converge at \
-                     strike {k} (target call price {target_price:.10}, achieved \
-                     {achieved:.10} at vol {vol:.6}). The repaired price may be \
-                     outside the Black-76-attainable range; widen the strike grid \
-                     or relax the repair."
-                )));
-            }
-
-            vols[i] = vol;
         }
 
         // Re-validate: the price→vol inversion can introduce tiny residuals, so
@@ -482,7 +455,7 @@ impl SabrSmile {
         let prices: Vec<f64> = strikes
             .iter()
             .zip(vols.iter())
-            .map(|(&k, &vol)| bs_call_price(self.forward, k, r, vol, self.time_to_expiry))
+            .map(|(&k, &vol)| self.call_price(k, r, vol))
             .collect();
         if prices.iter().any(|price| !price.is_finite()) {
             return Err(Error::Validation(
@@ -529,6 +502,45 @@ impl SabrSmile {
             monotonicity_violations,
         ))
     }
+
+    #[inline]
+    fn call_price(&self, strike: f64, r: f64, vol: f64) -> f64 {
+        let df = (-r * self.time_to_expiry).exp();
+        if self.params.beta < super::model::BETA_SNAP_TOL {
+            df * crate::closed_form::bachelier_call(self.forward, strike, vol, self.time_to_expiry)
+        } else {
+            let (f, k) = self.params.effective_rates(self.forward, strike);
+            df * crate::closed_form::black_call(f, k, vol, self.time_to_expiry)
+        }
+    }
+
+    fn invert_call_price(&self, strike: f64, r: f64, target_price: f64) -> Result<f64> {
+        let df = (-r * self.time_to_expiry).exp();
+        if !df.is_finite() || df <= 0.0 {
+            return Err(Error::Validation(
+                "SABR repair_arbitrage: invalid discount factor".into(),
+            ));
+        }
+        let undiscounted = target_price / df;
+        let inverted = if self.params.beta < super::model::BETA_SNAP_TOL {
+            crate::volatility::implied_vol_bachelier(
+                undiscounted,
+                self.forward,
+                strike,
+                self.time_to_expiry,
+                true,
+            )
+        } else {
+            let (f, k) = self.params.effective_rates(self.forward, strike);
+            crate::volatility::implied_vol_black(undiscounted, f, k, self.time_to_expiry, true)
+        };
+        inverted.map_err(|err| {
+            Error::Validation(format!(
+                "SABR repair_arbitrage: implied-vol inversion did not converge at strike {strike} \
+                 (target call price {target_price:.10}): {err}"
+            ))
+        })
+    }
 }
 
 fn validate_arbitrage_grid(strikes: &[f64], r: f64) -> Result<()> {
@@ -556,56 +568,19 @@ fn convex_price_limit(strikes: &[f64], prices: &[f64], i: usize) -> f64 {
     (1.0 - weight) * prices[i - 1] + weight * prices[i + 1]
 }
 
-/// Black-76 call vega for implied vol inversion.
-///
-/// Uses the forward-based Black-76 formula: `df · F · √T · N'(d1)`
-/// where `d1 = (ln(F/K) + ½σ²T) / (σ√T)` and `df = exp(-r·T)`.
-/// Carry is not an input because the forward already encodes it.
-#[inline]
-fn bs_call_vega(forward: f64, strike: f64, r: f64, vol: f64, t: f64) -> f64 {
-    if t <= 0.0 || vol <= 0.0 {
-        return 0.0;
-    }
-
-    let (d1, _d2) = d1_d2_black76(forward, strike, vol, t);
-    let pdf_d1 = finstack_quant_core::math::norm_pdf(d1);
-    let df = (-r * t).exp();
-
-    df * forward * t.sqrt() * pdf_d1
-}
-
-/// Black-76 call price for arbitrage checking.
-///
-/// Uses the forward-based Black-76 formula: `df · [F·N(d1) − K·N(d2)]`
-/// where `d1 = (ln(F/K) + ½σ²T) / (σ√T)` and `df = exp(-r·T)`.
-/// Carry is not an input because `forward` is a true forward price
-/// (spot × carry factor), so no additional drift is applied.
-#[inline]
-fn bs_call_price(forward: f64, strike: f64, r: f64, vol: f64, t: f64) -> f64 {
-    if t <= 0.0 {
-        return (forward - strike).max(0.0);
-    }
-
-    let (d1, d2) = d1_d2_black76(forward, strike, vol, t);
-    let df = (-r * t).exp();
-
-    df * (forward * finstack_quant_core::math::norm_cdf(d1)
-        - strike * finstack_quant_core::math::norm_cdf(d2))
-}
-
 #[cfg(test)]
 mod smile_tests {
     #![allow(clippy::expect_used, clippy::panic)]
 
     use super::*;
-    use crate::volatility::sabr::{SabrModel, SabrParameters};
+    use crate::volatility::sabr::SabrParameters;
 
     /// MODB-006: log-moneyness is on the shifted axis, for negative and
     /// positive forwards alike.
     #[test]
     fn log_moneyness_uses_the_displacement_shift() {
         let shifted = SabrParameters::new_with_shift(0.01, 0.5, 0.3, -0.2, 0.02).expect("params");
-        let negative = SabrSmile::new(SabrModel::new(shifted.clone()), -0.001, 1.0);
+        let negative = SabrSmile::new(shifted.clone(), -0.001, 1.0);
         let got: Vec<f64> = [-0.005, 0.0, 0.005]
             .iter()
             .map(|&k| negative.log_moneyness(k))
@@ -617,15 +592,15 @@ mod smile_tests {
         ]) {
             assert!((g - e).abs() < 1e-14, "{g} vs {e}");
         }
-        let positive = SabrSmile::new(SabrModel::new(shifted), 0.01, 1.0);
+        let positive = SabrSmile::new(shifted, 0.01, 1.0);
         assert!((positive.log_moneyness(0.005) - (0.025_f64 / 0.03).ln()).abs() < 1e-15);
         assert!((positive.log_moneyness(0.02) - (0.04_f64 / 0.03).ln()).abs() < 1e-15);
 
         let unshifted = SabrParameters::new(0.2, 0.5, 0.3, -0.1).expect("params");
-        let smile = SabrSmile::new(SabrModel::new(unshifted), 100.0, 1.0);
+        let smile = SabrSmile::new(unshifted, 100.0, 1.0);
         assert!((smile.log_moneyness(110.0) - 1.1_f64.ln()).abs() < 1e-15);
         let normal = SabrSmile::new(
-            SabrModel::new(SabrParameters::new(0.01, 0.0, 0.3, -0.1).expect("params")),
+            SabrParameters::new(0.01, 0.0, 0.3, -0.1).expect("params"),
             -0.001,
             1.0,
         );
@@ -635,7 +610,7 @@ mod smile_tests {
     #[test]
     fn uneven_strike_grid_preserves_flat_arbitrage_free_smile() {
         let params = SabrParameters::new(0.2, 1.0, 0.0, 0.0).expect("valid parameters");
-        let smile = SabrSmile::new(SabrModel::new(params), 100.0, 1.0);
+        let smile = SabrSmile::new(params, 100.0, 1.0);
         for strikes in [[99.0, 100.0, 120.0], [80.0, 100.0, 101.0]] {
             assert!(smile
                 .validate_no_arbitrage(&strikes, 0.05)
@@ -655,7 +630,7 @@ mod smile_tests {
     #[test]
     fn two_strike_repair_removes_monotonicity_arbitrage() {
         let params = SabrParameters::new(0.01, 1.0, 1.0, 0.0).expect("valid parameters");
-        let smile = SabrSmile::new(SabrModel::new(params), 100.0, 10.0);
+        let smile = SabrSmile::new(params, 100.0, 10.0);
         let strikes = [100.0, 120.0];
         let before = smile
             .validate_no_arbitrage(&strikes, 0.0)
@@ -673,7 +648,7 @@ mod smile_tests {
     #[test]
     fn arbitrage_repair_accepts_empty_and_single_strike_grids() {
         let params = SabrParameters::new(0.2, 1.0, 0.0, 0.0).expect("valid parameters");
-        let smile = SabrSmile::new(SabrModel::new(params), 100.0, 1.0);
+        let smile = SabrSmile::new(params, 100.0, 1.0);
         for strikes in [Vec::new(), vec![100.0]] {
             let repaired = smile
                 .repair_arbitrage(&strikes, 0.05, 10)
@@ -689,7 +664,7 @@ mod smile_tests {
     #[test]
     fn arbitrage_diagnostics_reject_invalid_strike_order_and_rates() {
         let params = SabrParameters::new(0.2, 1.0, 0.0, 0.0).expect("valid parameters");
-        let smile = SabrSmile::new(SabrModel::new(params), 100.0, 1.0);
+        let smile = SabrSmile::new(params, 100.0, 1.0);
         for strikes in [
             [100.0, 99.0, 120.0],
             [99.0, 100.0, 100.0],
@@ -725,32 +700,40 @@ mod smile_tests {
             * (f * finstack_quant_core::math::norm_cdf(d1)
                 - k * finstack_quant_core::math::norm_cdf(d2));
 
-        let got = bs_call_price(f, k, r, vol, t);
+        let params = SabrParameters::new(0.20, 0.5, 0.30, -0.20).expect("valid SABR params");
+        let smile = SabrSmile::new(params, f, t);
+        let got = smile.call_price(k, r, vol);
         assert!(
             (got - expected).abs() < 1e-10,
-            "bs_call_price should use Black-76: got {got:.8}, expected {expected:.8}"
+            "call_price should use Black-76: got {got:.8}, expected {expected:.8}"
         );
     }
 
-    /// Black-76 vega: df · F · √T · N'(d1).
-    /// With the old drift-on-top-of-forward, d1 was inflated, biasing vega.
     #[test]
-    fn test_bs_call_vega_matches_black76_atm() {
-        let f = 100.0_f64;
-        let k = 100.0_f64;
-        let r = 0.05_f64;
-        let vol = 0.20_f64;
-        let t = 1.0_f64;
+    fn normal_and_shifted_sabr_arbitrage_validation_and_repair() {
+        let normal_params = SabrParameters::new(0.01, 0.0, 0.25, -0.15).expect("normal params");
+        let normal_smile = SabrSmile::new(normal_params, -0.002, 1.0);
+        let strikes = [-0.010, -0.005, -0.002, 0.001, 0.005];
+        assert!(normal_smile
+            .validate_no_arbitrage(&strikes, 0.0)
+            .expect("normal arbitrage validation")
+            .is_arbitrage_free());
+        let repaired_normal = normal_smile
+            .repair_arbitrage(&strikes, 0.0, 10)
+            .expect("normal arbitrage repair");
+        assert_eq!(repaired_normal.len(), strikes.len());
 
-        let d1 = 0.5 * vol * vol * t / (vol * t.sqrt()); // = 0.1
-        let df = (-r * t).exp();
-        let expected = df * f * t.sqrt() * finstack_quant_core::math::norm_pdf(d1);
-
-        let got = bs_call_vega(f, k, r, vol, t);
-        assert!(
-            (got - expected).abs() < 1e-10,
-            "bs_call_vega should use Black-76: got {got:.8}, expected {expected:.8}"
-        );
+        let shifted_params =
+            SabrParameters::new_with_shift(0.02, 0.5, 0.25, -0.15, 0.03).expect("shifted params");
+        let shifted_smile = SabrSmile::new(shifted_params, -0.002, 1.0);
+        assert!(shifted_smile
+            .validate_no_arbitrage(&strikes, 0.0)
+            .expect("shifted arbitrage validation")
+            .is_arbitrage_free());
+        let repaired_shifted = shifted_smile
+            .repair_arbitrage(&strikes, 0.0, 10)
+            .expect("shifted arbitrage repair");
+        assert_eq!(repaired_shifted.len(), strikes.len());
     }
 
     /// When only the first interior strike violates monotonicity, the greedy repair
@@ -761,9 +744,8 @@ mod smile_tests {
     fn test_repair_arbitrage_no_cascade_on_upper_wing() {
         // Well-behaved SABR smile; we use a non-zero r to exercise the Black-76 path.
         let params = SabrParameters::new(0.20, 0.5, 0.30, -0.20).expect("valid SABR params");
-        let model = SabrModel::new(params);
         let forward = 100.0_f64;
-        let smile = SabrSmile::new(model, forward, 1.0);
+        let smile = SabrSmile::new(params, forward, 1.0);
         let r = 0.05;
 
         // A normally-behaved smile: strikes well inside the smile range.
@@ -780,7 +762,7 @@ mod smile_tests {
         let repaired_prices: Vec<f64> = strikes
             .iter()
             .zip(repaired.iter())
-            .map(|(&k, &v)| bs_call_price(forward, k, r, v, 1.0))
+            .map(|(&k, &v)| smile.call_price(k, r, v))
             .collect();
 
         for i in 1..repaired_prices.len() {
@@ -799,7 +781,7 @@ mod smile_tests {
         // cascade, a price of ~3.0 would be pulled to ~2.9988; we check that the
         // natural price is unchanged to within 1e-4 (no cascade).
         let natural_vols = smile.generate_smile(&strikes).expect("smile gen");
-        let natural_120 = bs_call_price(forward, 120.0, r, natural_vols[4], 1.0);
+        let natural_120 = smile.call_price(120.0, r, natural_vols[4]);
         let repaired_120 = repaired_prices[4];
         assert!(
             (repaired_120 - natural_120).abs() < 1e-3,
@@ -818,9 +800,8 @@ mod smile_tests {
     #[test]
     fn test_repair_arbitrage_output_is_revalidated_arbitrage_free() {
         let params = SabrParameters::new(0.22, 0.6, 0.45, -0.30).expect("valid SABR params");
-        let model = SabrModel::new(params);
         let forward = 100.0_f64;
-        let smile = SabrSmile::new(model, forward, 0.75);
+        let smile = SabrSmile::new(params, forward, 0.75);
         let r = 0.03;
 
         let strikes: Vec<f64> = (70..=130).step_by(5).map(f64::from).collect();
@@ -868,7 +849,7 @@ mod smile_tests {
         // non-convergence errors). This guards against the convergence check
         // being too strict and erroring on valid inputs.
         let params = SabrParameters::new(0.20, 0.5, 0.30, -0.20).expect("valid SABR params");
-        let smile = SabrSmile::new(SabrModel::new(params), 100.0, 1.0);
+        let smile = SabrSmile::new(params, 100.0, 1.0);
         let strikes: Vec<f64> = (80..=120).step_by(5).map(f64::from).collect();
 
         let repaired = smile
@@ -878,7 +859,7 @@ mod smile_tests {
         let prices: Vec<f64> = strikes
             .iter()
             .zip(repaired.iter())
-            .map(|(&k, &v)| bs_call_price(100.0, k, 0.05, v, 1.0))
+            .map(|(&k, &v)| smile.call_price(k, 0.05, v))
             .collect();
         for i in 1..prices.len() {
             assert!(

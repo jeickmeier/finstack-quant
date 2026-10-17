@@ -674,12 +674,6 @@ impl PyAlmgrenChrissModel {
         self.inner.delta()
     }
 
-    /// Model name for diagnostics.
-    #[getter]
-    fn model_name(&self) -> &'static str {
-        self.inner.model_name()
-    }
-
     /// Expected execution cost of ``params`` under uniform execution.
     ///
     /// Raises ``ValueError`` for non-finite or non-positive trade inputs.
@@ -780,12 +774,6 @@ impl PyKyleLambdaModel {
     #[getter]
     fn lambda_(&self) -> f64 {
         self.inner.lambda()
-    }
-
-    /// Model name for diagnostics.
-    #[getter]
-    fn model_name(&self) -> &'static str {
-        self.inner.model_name()
     }
 
     /// Expected execution cost ``0.5 * lambda * quantity^2`` plus timing risk.

@@ -192,10 +192,10 @@ impl Lookback {
     ///
     /// * `monitoring` - `Continuous { start_step }` observes every event step
     ///   from `start_step`; `Discrete { observation_steps }` observes only the
-    ///   listed (strictly increasing) contractual observation steps.
+    ///   listed contractual observation steps (sorted and deduplicated on setup).
     #[must_use]
     pub fn with_monitoring(mut self, monitoring: BarrierMonitoring) -> Self {
-        self.monitoring = monitoring;
+        self.monitoring = monitoring.normalized();
         self.bridge = None;
         self
     }
@@ -358,10 +358,10 @@ impl FloatingStrikeLookback {
     ///
     /// * `monitoring` - `Continuous { start_step }` observes every event step
     ///   from `start_step`; `Discrete { observation_steps }` observes only the
-    ///   listed (strictly increasing) contractual observation steps.
+    ///   listed contractual observation steps (sorted and deduplicated on setup).
     #[must_use]
     pub fn with_monitoring(mut self, monitoring: BarrierMonitoring) -> Self {
-        self.monitoring = monitoring;
+        self.monitoring = monitoring.normalized();
         self.bridge = None;
         self
     }

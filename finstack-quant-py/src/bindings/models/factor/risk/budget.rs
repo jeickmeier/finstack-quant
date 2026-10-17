@@ -276,7 +276,7 @@ pub(super) fn evaluate_risk_budget(
 ) -> PyResult<PyRiskBudgetResult> {
     let result = py
         .detach(move || {
-            model_risk::evaluate_risk_budget_arrays(
+            model_risk::evaluate_risk_budget(
                 position_ids,
                 &actual_var,
                 &target_var_pct,

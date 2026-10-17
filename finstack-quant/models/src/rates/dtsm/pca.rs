@@ -299,7 +299,7 @@ impl YieldPca {
         let cov = (&ct * &centered) / (m as f64 - 1.0).max(1.0);
 
         let trace = (0..n).map(|i| cov[(i, i)]).sum::<f64>();
-        if trace < 1e-30 {
+        if !trace.is_finite() || trace < 1e-30 {
             return Err(finstack_quant_core::Error::Validation(
                 "Covariance matrix is degenerate (all-zero yield changes)".into(),
             ));
@@ -486,6 +486,11 @@ impl YieldPca {
                 self.num_components()
             )));
         }
+        if shocks.iter().any(|s| !s.is_finite()) {
+            return Err(finstack_quant_core::Error::Validation(
+                "PCA scenario shocks must be finite".into(),
+            ));
+        }
 
         let n = self.tenors.len();
         let mut result = vec![0.0; n];
@@ -546,6 +551,11 @@ impl YieldPca {
                 "base_yields length {} does not match number of tenors {n}",
                 base_yields.len()
             )));
+        }
+        if base_yields.iter().any(|y| !y.is_finite()) {
+            return Err(finstack_quant_core::Error::Validation(
+                "base_yields must be finite".into(),
+            ));
         }
 
         let delta = self.scenario(shocks)?;

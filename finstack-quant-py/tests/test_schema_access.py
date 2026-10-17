@@ -39,10 +39,6 @@ SCHEMA_MODULES: dict[str, ModuleType] = {
 
 # Zero-argument accessors that return a single JSON Schema document as text.
 DOCUMENT_ACCESSORS: list[tuple[str, str]] = [
-    ("finstack_quant.models.factor.schema", "credit_calibration_config_schema"),
-    ("finstack_quant.models.factor.schema", "credit_calibration_inputs_schema"),
-    ("finstack_quant.models.factor.schema", "credit_factor_model_schema"),
-    ("finstack_quant.models.factor.schema", "factor_model_config_schema"),
     ("finstack_quant.statements.schema", "financial_model_spec_schema"),
     ("finstack_quant.statements.schema", "normalization_config_schema"),
     ("finstack_quant.statements.schema", "statement_result_schema"),
@@ -52,26 +48,6 @@ DOCUMENT_ACCESSORS: list[tuple[str, str]] = [
 
 # (module, accessor, repo-relative path of the generated schema artifact).
 COMPILED_VS_CHECKED_IN: list[tuple[str, str, str]] = [
-    (
-        "finstack_quant.models.factor.schema",
-        "credit_calibration_config_schema",
-        "finstack-quant/models/schemas/factor_model/1/credit_calibration_config.schema.json",
-    ),
-    (
-        "finstack_quant.models.factor.schema",
-        "credit_calibration_inputs_schema",
-        "finstack-quant/models/schemas/factor_model/1/credit_calibration_inputs.schema.json",
-    ),
-    (
-        "finstack_quant.models.factor.schema",
-        "credit_factor_model_schema",
-        "finstack-quant/models/schemas/factor_model/1/credit_factor_model.schema.json",
-    ),
-    (
-        "finstack_quant.models.factor.schema",
-        "factor_model_config_schema",
-        "finstack-quant/models/schemas/factor_model/1/factor_model_config.schema.json",
-    ),
     (
         "finstack_quant.statements.schema",
         "financial_model_spec_schema",
@@ -109,10 +85,6 @@ EXPECTED_EXPORTS: dict[str, list[str]] = {
         "validate",
     ],
     "finstack_quant.models.factor.schema": [
-        "credit_calibration_config_schema",
-        "credit_calibration_inputs_schema",
-        "credit_factor_model_schema",
-        "factor_model_config_schema",
         "get",
         "index",
         "validate",

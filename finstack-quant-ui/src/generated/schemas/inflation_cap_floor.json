@@ -332,7 +332,7 @@
     },
     "d_16451e0bf3b6b78178d8": {
       "additionalProperties": false,
-      "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`RecoveryModel`].\nDeserialization enforces the same parameter invariants as the constructors.",
+      "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`DynamicRecoveryModel`].\nDeserialization enforces the same parameter invariants as the constructors.",
       "properties": {
         "base_notional": {
           "description": "Base (reference) notional `N_0`.",
@@ -345,7 +345,7 @@
           "type": "number"
         },
         "model": {
-          "$ref": "#/$defs/d_6c25a9bef63bd477f037",
+          "$ref": "#/$defs/d_c428e03de1abac8e49c9",
           "description": "Recovery model governing the notional-to-recovery mapping."
         }
       },
@@ -1331,96 +1331,6 @@
           "const": "years",
           "description": "Years (Y)",
           "type": "string"
-        }
-      ]
-    },
-    "d_6c25a9bef63bd477f037": {
-      "description": "Recovery model specification.",
-      "oneOf": [
-        {
-          "const": "constant",
-          "description": "Constant recovery (ignores notional changes).",
-          "type": "string"
-        },
-        {
-          "const": "inverse_linear",
-          "description": "`R(t) = R_0 * (N_0 / N(t))` -- direct proportional dilution.",
-          "type": "string"
-        },
-        {
-          "additionalProperties": false,
-          "description": "`R(t) = R_0 * (N_0 / N(t))^alpha`, `alpha in (0, 1]` -- softened decline.",
-          "properties": {
-            "inverse_power": {
-              "properties": {
-                "exponent": {
-                  "description": "Power exponent (`alpha`).",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "exponent"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "inverse_power"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "`R(t) = max(floor, R_0 * (N_0 / N(t)))`.",
-          "properties": {
-            "floored_inverse": {
-              "properties": {
-                "floor": {
-                  "description": "Minimum recovery rate floor.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "floor"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "floored_inverse"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "`R(t) = clamp(R_0 * (1 - beta * (N(t)/N_0 - 1)), floor, R_0)`.",
-          "properties": {
-            "linear_decline": {
-              "properties": {
-                "floor": {
-                  "description": "Minimum recovery rate floor.",
-                  "format": "double",
-                  "type": "number"
-                },
-                "sensitivity": {
-                  "description": "Sensitivity of recovery to leverage increase (`beta`).",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "sensitivity",
-                "floor"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "linear_decline"
-          ],
-          "type": "object"
         }
       ]
     },
@@ -3595,6 +3505,96 @@
       "title": "Instrument Pricing Overrides",
       "type": "object"
     },
+    "d_c428e03de1abac8e49c9": {
+      "description": "Recovery model specification.",
+      "oneOf": [
+        {
+          "const": "constant",
+          "description": "Constant recovery (ignores notional changes).",
+          "type": "string"
+        },
+        {
+          "const": "inverse_linear",
+          "description": "`R(t) = R_0 * (N_0 / N(t))` -- direct proportional dilution.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`R(t) = R_0 * (N_0 / N(t))^alpha`, `alpha in (0, 1]` -- softened decline.",
+          "properties": {
+            "inverse_power": {
+              "properties": {
+                "exponent": {
+                  "description": "Power exponent (`alpha`).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "exponent"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "inverse_power"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`R(t) = max(floor, R_0 * (N_0 / N(t)))`.",
+          "properties": {
+            "floored_inverse": {
+              "properties": {
+                "floor": {
+                  "description": "Minimum recovery rate floor.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "floor"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "floored_inverse"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`R(t) = clamp(R_0 * (1 - beta * (N(t)/N_0 - 1)), floor, R_0)`.",
+          "properties": {
+            "linear_decline": {
+              "properties": {
+                "floor": {
+                  "description": "Minimum recovery rate floor.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "sensitivity": {
+                  "description": "Sensitivity of recovery to leverage increase (`beta`).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "sensitivity",
+                "floor"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "linear_decline"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "d_c8d5a8dc925586cc9b9d": {
       "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```",
       "oneOf": [
@@ -3904,7 +3904,7 @@
       ]
     },
     "d_ee4323acfdb49e4fe15b": {
-      "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n[`RawMertonModel`], so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. The serialized field set is unchanged.",
+      "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n`RawMertonModel`, so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. The serialized field set is unchanged.",
       "properties": {
         "asset_value": {
           "description": "Current firm asset value `V_0`, in the issuer's reporting currency.\nStrictly positive.",

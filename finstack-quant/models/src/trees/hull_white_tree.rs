@@ -132,6 +132,16 @@ impl HullWhiteTreeConfig {
         validation::require_with(self.sigma.is_finite() && self.sigma > 0.0, || {
             "sigma must be finite and positive".into()
         })?;
+        if let Some(schedule) = &self.volatility {
+            validation::require_with(
+                schedule.times().iter().all(|t| t.is_finite() && *t >= 0.0)
+                    && schedule.values().iter().all(|v| v.is_finite() && *v > 0.0),
+                || {
+                    "volatility schedule times must be finite >= 0 and values must be finite > 0"
+                        .into()
+                },
+            )?;
+        }
         validation::require_with(self.steps >= 2, || "steps must be at least 2".into())?;
         Ok(())
     }
@@ -698,6 +708,14 @@ impl HullWhiteTree {
         maturity_time: f64,
         discount_curve: &dyn Discounting,
     ) -> f64 {
+        if step >= self.j_mins.len()
+            || step >= self.dxs.len()
+            || step >= self.widths.len()
+            || node_idx >= self.widths[step]
+            || !maturity_time.is_finite()
+        {
+            return f64::NAN;
+        }
         let t = self.time_at_step(step);
         let tau = maturity_time - t;
 
@@ -708,11 +726,7 @@ impl HullWhiteTree {
         let x = (self.j_mins[step] + node_idx as i32) as f64 * self.dxs[step];
         let kappa = self.config.kappa;
 
-        let b = if kappa.abs() < 1e-10 {
-            tau // Limit as κ → 0
-        } else {
-            (1.0 - (-kappa * tau).exp()) / kappa
-        };
+        let b = crate::rates::hull_white::hw_b(kappa, t, maturity_time);
 
         let p_0_t = discount_curve.df(t);
         let p_0_tt = discount_curve.df(maturity_time);
@@ -731,11 +745,7 @@ impl HullWhiteTree {
             }
         } else {
             let sigma = self.config.sigma;
-            if kappa.abs() < 1e-10 {
-                sigma * sigma * t
-            } else {
-                sigma * sigma * (1.0 - (-2.0 * kappa * t).exp()) / (2.0 * kappa)
-            }
+            sigma * sigma * crate::rates::hull_white::hw_b(2.0 * kappa, 0.0, t)
         };
         let var_term = 0.5 * state_variance * b * b;
 

@@ -30,7 +30,7 @@ the asset-owned futures-option instruments, `fx/fx_digital_option`,
 | [`mod.rs`](mod.rs) | Re-exports |
 | [`black.rs`](black.rs) | `d1`, `d1_d2`, `d1_black76`, `d1_d2_black76` |
 | [`normal.rs`](normal.rs) | `bachelier_price_with_annuity` |
-| [`sabr/`](sabr/) | `SabrParameters`, `SabrModel`, `SabrCalibrator`, `SabrSmile` |
+| [`sabr/`](sabr/) | `SabrParameters`, `SabrCalibrator`, `SabrSmile` |
 | [`source.rs`](source.rs) | `VolSource` plus surface, cube, and FX delta-volatility evaluation/materialization |
 | [`arbitrage/`](arbitrage/) | Model-dependent volatility arbitrage checks |
 | [`heston.rs`](heston.rs), [`rough_heston.rs`](rough_heston.rs), [`local_vol.rs`](local_vol.rs), [`svi.rs`](svi.rs) | Stochastic/local volatility engines and fitting |

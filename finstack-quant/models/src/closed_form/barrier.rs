@@ -129,7 +129,6 @@
 //! - Monte Carlo barrier pricing for discrete monitoring and exotic payoffs
 
 use crate::types::OptionType;
-use crate::volatility::black::d1_d2;
 use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::special_functions::{log_norm_cdf, norm_cdf};
 use finstack_quant_core::types::{BarrierType, PayoutTiming};
@@ -210,15 +209,6 @@ impl BarrierParams {
 }
 
 #[inline]
-fn vanilla_intrinsic(spot: f64, strike: f64, eta: f64) -> f64 {
-    if eta > 0.0 {
-        (spot - strike).max(0.0)
-    } else {
-        (strike - spot).max(0.0)
-    }
-}
-
-#[inline]
 fn vanilla_option_price(
     spot: f64,
     strike: f64,
@@ -228,24 +218,12 @@ fn vanilla_option_price(
     vol: f64,
     eta: f64,
 ) -> f64 {
-    if time <= 0.0 {
-        return vanilla_intrinsic(spot, strike, eta);
-    }
-
-    if vol <= 0.0 {
-        let forward = spot * ((rate - div_yield) * time).exp();
-        let discount = (-rate * time).exp();
-        return if eta > 0.0 {
-            (forward - strike).max(0.0) * discount
-        } else {
-            (strike - forward).max(0.0) * discount
-        };
-    }
-
-    let (d1, d2) = d1_d2(spot, strike, rate, vol, time, div_yield);
-
-    eta * spot * (-div_yield * time).exp() * norm_cdf(eta * d1)
-        - eta * strike * (-rate * time).exp() * norm_cdf(eta * d2)
+    let option_type = if eta > 0.0 {
+        OptionType::Call
+    } else {
+        OptionType::Put
+    };
+    super::vanilla::bs_price_unchecked(spot, strike, rate, div_yield, vol, time, option_type)
 }
 
 #[inline]
@@ -846,10 +824,10 @@ mod tests {
         0x0000000000000000, 0x0000000000000000, 0x4024000000000000, 0x0000000000000000,
         0x0000000000000000, 0x0000000000000000, 0x3f4a254442570000, 0x3f4a2503d5a90000,
         0x3f4a254442570000, 0x3f4a2503d5a90000, 0x0000000000000000, 0x0000000000000000,
-        0x0000000000000000, 0x0000000000000000, 0x40072ce6f3a94ed9, 0x0000000000000000,
-        0x40072ce6f3a94ed9, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
-        0x40072ce6f3a94ed9, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
-        0x0000000000000000, 0x0000000000000000, 0x40072ce6f3a94ed9, 0x0000000000000000,
+        0x0000000000000000, 0x0000000000000000, 0x40072ce6f3a94ea0, 0x0000000000000000,
+        0x40072ce6f3a94ea0, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
+        0x40072ce6f3a94ea0, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
+        0x0000000000000000, 0x0000000000000000, 0x40072ce6f3a94ea0, 0x0000000000000000,
         0x0000000000000000, 0x0000000000000000, 0x40072ce6f3a94ea0, 0x0000000000000000,
         0x40072ce6f3a94ea0, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
         0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000, 0x7ff8000000000000,

@@ -148,40 +148,8 @@ impl PdeSolution2D {
     /// strike-concentrated grid can sit a full grid cell away from `x`.
     pub fn delta_x(&self, x: f64, y: f64) -> f64 {
         let ny = self.grid.ny();
-        let x_pts = self.grid.x().points();
-        let y_pts = self.grid.y().points();
-        let n = x_pts.len();
-
-        if n < 2 {
-            return 0.0;
-        }
-
-        let j = find_nearest(y_pts, y);
-        let i = find_nearest(x_pts, x);
-
-        if i == 0 {
-            let h = x_pts[1] - x_pts[0];
-            if h.abs() < 1e-30 {
-                return 0.0;
-            }
-            (self.values[ny + j] - self.values[j]) / h
-        } else if i >= n - 1 {
-            let h = x_pts[n - 1] - x_pts[n - 2];
-            if h.abs() < 1e-30 {
-                return 0.0;
-            }
-            (self.values[(n - 1) * ny + j] - self.values[(n - 2) * ny + j]) / h
-        } else {
-            let h_m = x_pts[i] - x_pts[i - 1];
-            let h_p = x_pts[i + 1] - x_pts[i];
-            let h_sum = h_m + h_p;
-            if h_m.abs() < 1e-30 || h_p.abs() < 1e-30 {
-                return 0.0;
-            }
-            -h_p / (h_m * h_sum) * self.values[(i - 1) * ny + j]
-                + (h_p - h_m) / (h_m * h_p) * self.values[i * ny + j]
-                + h_m / (h_p * h_sum) * self.values[(i + 1) * ny + j]
-        }
+        let j = find_nearest(self.grid.y().points(), y);
+        super::solver::delta_1d(self.grid.x().points(), x, |i| self.values[i * ny + j])
     }
 
     /// Gamma with respect to x (second derivative) at `(x, y)`.
@@ -192,30 +160,8 @@ impl PdeSolution2D {
     /// `x`, avoiding a misstated peaked gamma on a strike-concentrated grid.
     pub fn gamma_x(&self, x: f64, y: f64) -> f64 {
         let ny = self.grid.ny();
-        let x_pts = self.grid.x().points();
-        let y_pts = self.grid.y().points();
-        let n = x_pts.len();
-
-        if n < 3 {
-            return 0.0;
-        }
-
-        let j = find_nearest(y_pts, y);
-        // Centre the three-point stencil on the node nearest x.
-        let i = find_nearest(x_pts, x).clamp(1, n - 2);
-
-        let h_m = x_pts[i] - x_pts[i - 1];
-        let h_p = x_pts[i + 1] - x_pts[i];
-        let h_sum = h_m + h_p;
-
-        if h_sum.abs() < 1e-30 {
-            return 0.0;
-        }
-
-        2.0 * (self.values[(i + 1) * ny + j] / h_p
-            - self.values[i * ny + j] * (1.0 / h_m + 1.0 / h_p)
-            + self.values[(i - 1) * ny + j] / h_m)
-            / h_sum
+        let j = find_nearest(self.grid.y().points(), y);
+        super::solver::gamma_1d(self.grid.x().points(), x, |i| self.values[i * ny + j])
     }
 }
 

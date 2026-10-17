@@ -76,10 +76,35 @@ impl SabrParameters {
             };
         }
 
+        self.lognormal_expansion(forward, strike, time_to_expiry)
+    }
+
+    /// Hagan et al. (2002) lognormal (Black-76) expansion with Obloj (2008) z/χ
+    /// correction and optional displacement shift for any `β ∈ [0, 1]`.
+    #[inline]
+    pub(super) fn lognormal_expansion(
+        &self,
+        forward: f64,
+        strike: f64,
+        time_to_expiry: f64,
+    ) -> Result<f64> {
         let (effective_forward, effective_strike) = match self.shift {
             Some(shift) => (forward + shift, strike + shift),
             None => (forward, strike),
         };
+
+        if !effective_forward.is_finite()
+            || !effective_strike.is_finite()
+            || !time_to_expiry.is_finite()
+            || effective_forward <= 0.0
+            || effective_strike <= 0.0
+            || time_to_expiry <= 0.0
+        {
+            return Err(Error::Validation(format!(
+                "SABR lognormal expansion requires positive effective forward/strike and expiry; \
+                 got forward={forward:.6}, strike={strike:.6}, T={time_to_expiry:.4}"
+            )));
+        }
 
         let alpha = self.alpha;
         let nu = self.nu;
@@ -100,27 +125,7 @@ impl SabrParameters {
         };
 
         let f_mid = (effective_forward * effective_strike).sqrt();
-        let f_mid_beta = if beta_is_zero {
-            1.0
-        } else {
-            f_mid.powf(1.0 - beta)
-        };
-
-        // There is intentionally NO `nu ≈ 0` short-circuit. As ν→0 the general
-        // Hagan formula degenerates correctly on its own — z→0, and z/χ(z) → 1
-        // (see `calculate_chi_robust` and the z-guard at the ATM check below).
-        // Short-circuiting to `atm_volatility` for every strike would fabricate
-        // a perfectly FLAT smile, which is wrong for β≠1: the SABR/CEV smile
-        // is non-flat because `factor1` depends on the strike through `f_mid`.
-        // Reference: Hagan et al. (2002) eq. 2.17a.
-        let z = if beta_is_one {
-            (nu / alpha) * (effective_forward / effective_strike).ln()
-        } else if beta_is_zero {
-            (nu / alpha) * (effective_forward - effective_strike)
-        } else {
-            (nu / alpha) * (effective_forward.powf(1.0 - beta) - effective_strike.powf(1.0 - beta))
-                / (1.0 - beta)
-        };
+        let f_mid_beta = f_mid.powf(1.0 - beta);
 
         // ATM detection uses relative moneyness only. The previous
         // `z.abs() < 1e-8` clause was small both for genuine ATM (F≈K) AND
@@ -130,22 +135,17 @@ impl SabrParameters {
         let relative_diff = (effective_forward - effective_strike).abs()
             / effective_forward.abs().max(effective_strike.abs());
         if relative_diff < 1e-8 {
-            return self.atm_volatility(effective_forward, time_to_expiry);
+            return self.atm_lognormal(effective_forward, time_to_expiry, beta);
         }
 
         let log_moneyness = (effective_forward / effective_strike).ln();
 
         // Obloj (2008) correction: use geometric-mean-based z for the z/χ(z)
-        // ratio. Hagan et al. (2002) uses
-        // z = (ν/α)(F^{1-β} - K^{1-β})/(1-β), which introduces O(ε²) errors
-        // for long maturities and high vol-of-vol. The corrected formula uses
-        // z = (ν/α) * f_mid^{1-β} * ln(F/K) for 0 < β < 1. For β=0 (normal)
-        // and β=1 (lognormal), the original formula is already exact.
-        // arXiv:0708.0998v2
-        let z_corrected = if beta_is_one || beta_is_zero {
-            z
+        // ratio: z = (ν/α) * f_mid^{1-β} * ln(F/K).
+        let z_corrected = if beta_is_one {
+            (nu / alpha) * log_moneyness
         } else {
-            (nu / alpha) * f_mid.powf(1.0 - beta) * log_moneyness
+            (nu / alpha) * f_mid_beta * log_moneyness
         };
 
         let x = self.calculate_chi_robust(z_corrected)?;
@@ -153,36 +153,18 @@ impl SabrParameters {
         let factor1 = if f_mid_beta.abs() < 1e-14 {
             alpha
         } else {
-            let correction_term = if beta_is_zero {
-                1.0
-            } else {
-                1.0 + (1.0 - beta).powi(2) / 24.0 * log_moneyness.powi(2)
-                    + (1.0 - beta).powi(4) / 1920.0 * log_moneyness.powi(4)
-            };
+            let correction_term = 1.0
+                + (1.0 - beta).powi(2) / 24.0 * log_moneyness.powi(2)
+                + (1.0 - beta).powi(4) / 1920.0 * log_moneyness.powi(4);
             alpha / (f_mid_beta * correction_term)
         };
 
-        // z/χ(z) → 1 holds only as z → 0, not for an arbitrary tiny χ.
-        // Fabricating `1.0` whenever χ underflowed silently produced a wrong
-        // factor for genuinely-pathological χ. Small |z| uses the Taylor
-        // ratio; otherwise divide exactly; if χ underflowed while z is not
-        // small, error out rather than guess.
         let factor2 = self.z_over_chi(z_corrected, x)?;
 
-        // β=0 outputs *normal* (Bachelier) implied vol — `factor1 = α`
-        // (because `f_mid_beta = 1`), not the Black-vol prefactor `α/F^(1-β)`.
-        // The β=0 normal-SABR time correction is just `(2-3ρ²)/24·ν²`
-        // (Hagan/Obloj normal-vol expansion); it has NO `α²/(24·f_mid²)`
-        // leverage term. That term belongs to the lognormal/Black σ_B
-        // expansion (Hagan eq. 2.17a) — applying it here would break the exact
-        // `β=0, ν=0 ⇒ σ_N = α` Bachelier identity.
-        let time_correction = if beta_is_zero {
-            (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2)
-        } else {
-            (1.0 - beta).powi(2) / 24.0 * alpha.powi(2) / f_mid.powf(2.0 * (1.0 - beta))
-                + 0.25 * rho * beta * nu * alpha / f_mid_beta
-                + (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2)
-        };
+        let time_correction = (1.0 - beta).powi(2) / 24.0 * alpha.powi(2)
+            / f_mid.powf(2.0 * (1.0 - beta))
+            + 0.25 * rho * beta * nu * alpha / f_mid_beta
+            + (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2);
 
         let factor3 = 1.0 + time_to_expiry * time_correction;
 
@@ -205,10 +187,6 @@ impl SabrParameters {
         let alpha = self.alpha;
         let nu = self.nu;
         let rho = self.rho;
-        // Same β snap as `implied_volatility`. Snapping only β≈0 (and not
-        // β≈1) would price exact-ATM with prefactor α/F^(1−β) while
-        // neighbouring strikes use snapped β=1 and α — an ATM smile
-        // discontinuity of ~F^(−(1−β)).
         let raw_beta = self.beta;
         let beta_is_zero = raw_beta < BETA_SNAP_TOL;
         let beta_is_one = !beta_is_zero && (1.0 - raw_beta).abs() < BETA_SNAP_TOL;
@@ -224,35 +202,45 @@ impl SabrParameters {
             return Ok(0.0);
         }
 
-        // Hagan et al. (2002) eq. 2.18:
-        //   σ_ATM = α / F^(1-β) · [1 + ((1-β)²α²/24/F^(2(1-β)) + ρβνα/4/F^(1-β) + (2-3ρ²)ν²/24) · T]
-        let vol = if beta_is_zero {
-            // Normal SABR (β=0): output is *normal* (Bachelier) vol with
-            // prefactor α (not α/F). The β=0 time correction is
-            // `(2-3ρ²)ν²/24` only — the α²/(24·F²) leverage term belongs to
-            // the lognormal/Black σ_B expansion and would break
-            // `β=0, ν=0 ⇒ σ_N = α`.
-            alpha * (1.0 + time_to_expiry * (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2))
+        if beta_is_zero {
+            let vol =
+                alpha * (1.0 + time_to_expiry * (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2));
+            if vol <= 0.0 || !vol.is_finite() {
+                return Err(Error::Validation(format!(
+                    "SABR ATM volatility calculation produced invalid result={:.6} for forward={:.6}, T={:.4}",
+                    vol, forward, time_to_expiry
+                )));
+            }
+            Ok(vol)
         } else {
-            // General β ∈ (0,1], including β=1.
-            // At β=1: F^(1-β)=1, (1-β)²=0, so alpha_term→0 and rho_term→ρνα/4.
-            // At β=0.5: (1-β)²/24·α²/F^(2(1-β)) = α²/(96·F). A previous
-            // beta_is_half shortcut used α²/(24·F) — a 4× error.
-            let f_beta = if forward.abs() < 1e-14 {
-                1e-14_f64.powf(1.0 - beta)
-            } else {
-                forward.powf(1.0 - beta)
-            };
+            self.atm_lognormal(forward, time_to_expiry, beta)
+        }
+    }
 
-            let alpha_term =
-                (1.0 - beta).powi(2) / 24.0 * alpha.powi(2) / forward.powf(2.0 * (1.0 - beta));
-            let rho_term = 0.25 * rho * beta * nu * alpha / f_beta;
-            let nu_term = (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2);
+    /// Lognormal ATM implied volatility (Hagan et al. (2002) eq. 2.18).
+    #[inline]
+    fn atm_lognormal(&self, forward: f64, time_to_expiry: f64, beta: f64) -> Result<f64> {
+        let alpha = self.alpha;
+        let nu = self.nu;
+        let rho = self.rho;
 
-            let time_correction = alpha_term + rho_term + nu_term;
+        if alpha.abs() < 1e-14 {
+            return Ok(0.0);
+        }
 
-            alpha / f_beta * (1.0 + time_to_expiry * time_correction)
+        let f_beta = if forward.abs() < 1e-14 {
+            1e-14_f64.powf(1.0 - beta)
+        } else {
+            forward.powf(1.0 - beta)
         };
+
+        let alpha_term = (1.0 - beta).powi(2) / 24.0 * alpha.powi(2) / (f_beta * f_beta);
+        let rho_term = 0.25 * rho * beta * nu * alpha / f_beta;
+        let nu_term = (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2);
+
+        let time_correction = alpha_term + rho_term + nu_term;
+
+        let vol = alpha / f_beta * (1.0 + time_to_expiry * time_correction);
 
         if vol <= 0.0 || !vol.is_finite() {
             return Err(Error::Validation(format!(
@@ -311,6 +299,25 @@ impl SabrParameters {
         Ok(z / chi)
     }
 
+    /// Whether normal beta=0 dynamics or a displacement permit negative rates.
+    pub fn supports_negative_rates(&self) -> bool {
+        self.beta < BETA_SNAP_TOL || self.shift.is_some()
+    }
+
+    /// Forward and strike after applying the optional displacement shift.
+    ///
+    /// # Arguments
+    ///
+    /// * `forward` - Unshifted forward rate or price.
+    /// * `strike` - Unshifted strike in the same units as `forward`.
+    pub fn effective_rates(&self, forward: f64, strike: f64) -> (f64, f64) {
+        if let Some(shift) = self.shift {
+            (forward + shift, strike + shift)
+        } else {
+            (forward, strike)
+        }
+    }
+
     /// Reject non-positive expiry and rates that fall outside the model's
     /// (possibly shifted) domain.
     ///
@@ -319,12 +326,7 @@ impl SabrParameters {
     /// * `forward` - Unshifted forward rate or price to be expanded.
     /// * `strike` - Unshifted strike in the same units as `forward`.
     /// * `time_to_expiry` - Expiry in years; must be strictly positive.
-    pub(crate) fn validate_inputs(
-        &self,
-        forward: f64,
-        strike: f64,
-        time_to_expiry: f64,
-    ) -> Result<()> {
+    pub fn validate_inputs(&self, forward: f64, strike: f64, time_to_expiry: f64) -> Result<()> {
         if !forward.is_finite()
             || !strike.is_finite()
             || !time_to_expiry.is_finite()
@@ -363,86 +365,13 @@ impl SabrParameters {
     }
 }
 
-/// SABR model wrapping validated [`SabrParameters`].
-pub struct SabrModel {
-    params: SabrParameters,
-}
-
-impl SabrModel {
-    /// Wrap validated SABR parameters.
-    ///
-    /// # Arguments
-    ///
-    /// * `params` - Already-validated SABR parameters (α, β, ρ, ν, optional
-    ///   shift) used by every subsequent expansion call.
-    pub fn new(params: SabrParameters) -> Self {
-        Self { params }
-    }
-
-    /// Implied volatility from [`SabrParameters::implied_volatility`].
-    ///
-    /// # Arguments
-    ///
-    /// * `forward` - Forward price or rate used by the volatility or pricing model
-    /// * `strike` - Option strike in the surface's quote units (absolute or relative)
-    /// * `time_to_expiry` - Time to expiry in years; must be strictly positive.
-    #[must_use = "computed volatility should be used"]
-    #[inline]
-    pub fn implied_volatility(
-        &self,
-        forward: f64,
-        strike: f64,
-        time_to_expiry: f64,
-    ) -> Result<f64> {
-        self.params
-            .implied_volatility(forward, strike, time_to_expiry)
-    }
-
-    /// ATM implied volatility (Hagan et al. (2002) eq. 2.18).
-    #[inline]
-    pub(crate) fn atm_volatility(&self, forward: f64, time_to_expiry: f64) -> Result<f64> {
-        self.params.atm_volatility(forward, time_to_expiry)
-    }
-
-    /// Validated SABR parameters used by this model.
-    pub fn parameters(&self) -> &SabrParameters {
-        &self.params
-    }
-
-    /// Whether normal beta=0 dynamics or a displacement permit negative rates.
-    pub fn supports_negative_rates(&self) -> bool {
-        self.params.beta < BETA_SNAP_TOL || self.params.shift.is_some()
-    }
-
-    /// Forward and strike after applying the optional displacement shift.
-    ///
-    /// # Arguments
-    ///
-    /// * `forward` - Unshifted forward rate or price.
-    /// * `strike` - Unshifted strike in the same units as `forward`.
-    pub fn effective_rates(&self, forward: f64, strike: f64) -> (f64, f64) {
-        if let Some(shift) = self.params.shift {
-            (forward + shift, strike + shift)
-        } else {
-            (forward, strike)
-        }
-    }
-
-    /// Reject non-positive expiry and rates that fall outside the model's
-    /// (possibly shifted) domain.
-    ///
-    /// # Arguments
-    ///
-    /// * `forward` - Unshifted forward rate or price to be expanded.
-    /// * `strike` - Unshifted strike in the same units as `forward`.
-    /// * `time_to_expiry` - Expiry in years; must be strictly positive.
-    pub fn validate_inputs(&self, forward: f64, strike: f64, time_to_expiry: f64) -> Result<()> {
-        self.params.validate_inputs(forward, strike, time_to_expiry)
-    }
-}
-
 /// Stable Hagan chi function shared by normal and lognormal expansions.
 pub(super) fn chi(z: f64, rho: f64) -> Result<f64> {
+    if !z.is_finite() || !rho.is_finite() {
+        return Err(Error::Validation(format!(
+            "SABR chi function requires finite z and rho, got z={z}, rho={rho}"
+        )));
+    }
     // Fourth-order Taylor series around z = 0:
     // χ(z) = ln((√(1 - 2ρz + z²) + z - ρ)/(1 - ρ))
     //

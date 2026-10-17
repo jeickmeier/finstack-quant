@@ -338,6 +338,7 @@ impl CorrelationStructure {
                 correlations,
                 labels,
             } => {
+                const MATRIX_LO: f64 = -0.99;
                 let n = labels.len();
                 let mut new_corrs = correlations.clone();
                 let mut clamp_count: usize = 0;
@@ -347,7 +348,7 @@ impl CorrelationStructure {
                             let idx = i * n + j;
                             if let Some(rho) = new_corrs.get_mut(idx) {
                                 let target = *rho + delta;
-                                let clamped = target.clamp(LO, HI);
+                                let clamped = target.clamp(MATRIX_LO, HI);
                                 if (clamped - target).abs() > 1e-12 {
                                     clamp_count += 1;
                                 }
@@ -358,7 +359,7 @@ impl CorrelationStructure {
                 }
                 let clamp_info = if clamp_count > 0 {
                     Some(format!(
-                        "{clamp_count} matrix off-diagonal entr{} clamped to [{LO}, {HI}]",
+                        "{clamp_count} matrix off-diagonal entr{} clamped to [{MATRIX_LO}, {HI}]",
                         if clamp_count == 1 { "y" } else { "ies" }
                     ))
                 } else {
@@ -415,68 +416,11 @@ impl CorrelationStructure {
             CorrelationStructure::Matrix {
                 correlations,
                 labels,
-            } => {
-                let n = labels.len();
-                let expected = n * n;
-                if correlations.len() != expected {
-                    return Err(format!(
-                        "Correlation matrix size mismatch: expected {}×{}={}, got {}",
-                        n,
-                        n,
-                        expected,
-                        correlations.len()
-                    ));
-                }
-                for i in 0..n {
-                    let diag = correlations[i * n + i];
-                    if (diag - 1.0).abs() > 1e-10 {
-                        return Err(format!("Diagonal element [{i},{i}] = {diag}, expected 1.0"));
-                    }
-                    for j in (i + 1)..n {
-                        let rho_ij = correlations[i * n + j];
-                        let rho_ji = correlations[j * n + i];
-                        validate_correlation_value(rho_ij, -1.0, 1.0, &format!("[{i},{j}]"))?;
-                        if (rho_ij - rho_ji).abs() > 1e-10 {
-                            return Err(format!(
-                                "Matrix not symmetric: [{i},{j}]={rho_ij} != [{j},{i}]={rho_ji}"
-                            ));
-                        }
-                    }
-                }
-
-                // Verify positive semi-definiteness via Cholesky decomposition.
-                // If the matrix is not PSD, the Cholesky factor will encounter a
-                // negative diagonal, indicating the matrix cannot represent a valid
-                // correlation structure.
-                let mut l = vec![0.0_f64; n * n];
-                for j in 0..n {
-                    let mut sum = 0.0;
-                    for k in 0..j {
-                        sum += l[j * n + k] * l[j * n + k];
-                    }
-                    let diag = correlations[j * n + j] - sum;
-                    if diag < -1e-10 {
-                        return Err(format!(
-                            "Correlation matrix is not positive semi-definite \
-                             (negative diagonal {diag:.2e} at [{j},{j}])"
-                        ));
-                    }
-                    l[j * n + j] = diag.max(0.0).sqrt();
-                    for i in (j + 1)..n {
-                        let mut s = 0.0;
-                        for k in 0..j {
-                            s += l[i * n + k] * l[j * n + k];
-                        }
-                        l[i * n + j] = if l[j * n + j] > 1e-15 {
-                            (correlations[i * n + j] - s) / l[j * n + j]
-                        } else {
-                            0.0
-                        };
-                    }
-                }
-
-                Ok(())
-            }
+            } => finstack_quant_core::math::linalg::validate_correlation_matrix(
+                correlations,
+                labels.len(),
+            )
+            .map_err(|e| e.to_string()),
         }
     }
 

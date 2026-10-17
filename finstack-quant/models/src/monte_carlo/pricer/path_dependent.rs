@@ -555,14 +555,17 @@ impl PathDependentPricer {
             }
         }
 
-        // Mean and stderr across replicate means (valid RQMC error estimate);
-        // `num_paths` and `std_dev` keep the per-path semantics for
-        // reporting. Configuration validation guarantees at least two
-        // independent replicate means for sampling uncertainty.
+        // Unbiased point estimate across all simulated paths (`overall.mean()`),
+        // with RQMC standard error across the R independently scrambled replicate
+        // means (`replicate_means.stderr()`). When `num_paths % replicates != 0`,
+        // an unweighted mean of replicate means would overweight shorter replicates.
+        let mean = overall.mean();
+        let stderr = replicate_means.stderr();
+        let half_width = 1.96 * stderr;
         let estimate = Estimate::new(
-            replicate_means.mean(),
-            replicate_means.stderr(),
-            replicate_means.confidence_interval(0.05),
+            mean,
+            stderr,
+            (mean - half_width, mean + half_width),
             overall.count(),
         )
         .with_std_dev(overall.std_dev());
@@ -618,18 +621,19 @@ impl PathDependentPricer {
         )
     }
 
-    /// Price an arithmetic Asian call under risk-neutral GBM.
+    /// Price an arithmetic Asian option under risk-neutral GBM.
     ///
     /// Uses unit notional, arithmetic averaging, and the default post-step
     /// fixing schedule [`default_fixing_steps`]. Discounting is the flat
     /// continuous factor `exp(-rT)`.
     ///
     /// This is the canonical composition behind the host-binding
-    /// `PathDependentPricer.price_asian_call` methods; both hosts delegate here
+    /// `PathDependentPricer` Asian pricing methods; both hosts delegate here
     /// rather than assembling process, discount factor, and payoff themselves.
     ///
     /// # Arguments
     ///
+    /// * `option_type` - Call or put payoff on the arithmetic average.
     /// * `spot` - Spot level at time `0`.
     /// * `strike` - Exercise price in the same units as `spot`.
     /// * `rate` - Continuously compounded risk-free rate (decimal, annualized).
@@ -645,75 +649,7 @@ impl PathDependentPricer {
     /// factor is invalid, the uniform grid is invalid, or the underlying engine
     /// rejects the run.
     #[allow(clippy::too_many_arguments)]
-    pub fn price_gbm_asian_call(
-        &self,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        num_steps: usize,
-        currency: Currency,
-    ) -> Result<MoneyEstimate> {
-        self.price_gbm_asian(
-            crate::OptionType::Call,
-            spot,
-            strike,
-            rate,
-            div_yield,
-            vol,
-            expiry,
-            num_steps,
-            currency,
-        )
-    }
-
-    /// Price an arithmetic Asian put under risk-neutral GBM.
-    ///
-    /// Identical machinery to [`Self::price_gbm_asian_call`] with a put payoff.
-    ///
-    /// # Arguments
-    ///
-    /// * `spot` - Spot level at time `0`.
-    /// * `strike` - Exercise price in the same units as `spot`.
-    /// * `rate` - Continuously compounded risk-free rate (decimal, annualized).
-    /// * `div_yield` - Continuous dividend yield (decimal, annualized).
-    /// * `vol` - Annualized GBM volatility (decimal).
-    /// * `expiry` - Time to expiry in years; also the uniform-grid horizon.
-    /// * `num_steps` - Number of time-grid steps between `0` and `expiry`.
-    /// * `currency` - Currency stamped on the returned estimate.
-    ///
-    /// # Errors
-    ///
-    /// Same failure modes as [`Self::price_gbm_asian_call`].
-    #[allow(clippy::too_many_arguments)]
-    pub fn price_gbm_asian_put(
-        &self,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        num_steps: usize,
-        currency: Currency,
-    ) -> Result<MoneyEstimate> {
-        self.price_gbm_asian(
-            crate::OptionType::Put,
-            spot,
-            strike,
-            rate,
-            div_yield,
-            vol,
-            expiry,
-            num_steps,
-            currency,
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn price_gbm_asian(
+    pub fn price_gbm_asian(
         &self,
         option_type: crate::OptionType,
         spot: f64,
@@ -752,9 +688,8 @@ impl PathDependentPricer {
     /// Uses unit notional, arithmetic averaging over the default post-step
     /// fixing schedule [`default_fixing_steps`], and the flat continuous
     /// discount factor `exp(-rT)`: the contract of
-    /// [`Self::price_gbm_asian_call`] and [`Self::price_gbm_asian_put`], run
-    /// through [`Self::price_with_lrm_greeks`]. This is the canonical
-    /// composition behind the host-binding
+    /// [`Self::price_gbm_asian`], run through [`Self::price_with_lrm_greeks`].
+    /// This is the canonical composition behind the host-binding
     /// `PathDependentPricer.price_with_lrm_greeks` methods.
     ///
     /// # Arguments
@@ -1737,8 +1672,9 @@ mod tests {
         );
         for option_type in [crate::OptionType::Call, crate::OptionType::Put] {
             let plain = |spot: f64, vol: f64| -> f64 {
-                match option_type {
-                    crate::OptionType::Call => pricer.price_gbm_asian_call(
+                pricer
+                    .price_gbm_asian(
+                        option_type,
                         spot,
                         strike,
                         rate,
@@ -1747,21 +1683,10 @@ mod tests {
                         expiry,
                         num_steps,
                         Currency::USD,
-                    ),
-                    crate::OptionType::Put => pricer.price_gbm_asian_put(
-                        spot,
-                        strike,
-                        rate,
-                        div_yield,
-                        vol,
-                        expiry,
-                        num_steps,
-                        Currency::USD,
-                    ),
-                }
-                .expect("plain Asian price")
-                .mean
-                .amount()
+                    )
+                    .expect("plain Asian price")
+                    .mean
+                    .amount()
             };
             let greeks = pricer
                 .price_gbm_asian_with_lrm_greeks(
@@ -2060,7 +1985,17 @@ mod tests {
                 .with_parallel(false),
         );
         let estimate = pricer
-            .price_gbm_asian_call(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, 12, Currency::USD)
+            .price_gbm_asian(
+                crate::OptionType::Call,
+                100.0,
+                100.0,
+                0.05,
+                0.0,
+                0.2,
+                1.0,
+                12,
+                Currency::USD,
+            )
             .expect("Asian call pricing should succeed");
         assert!(estimate.mean.amount() > 0.0);
     }
@@ -2073,7 +2008,17 @@ mod tests {
                 .with_parallel(false),
         );
         let estimate = pricer
-            .price_gbm_asian_put(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, 12, Currency::USD)
+            .price_gbm_asian(
+                crate::OptionType::Put,
+                100.0,
+                100.0,
+                0.05,
+                0.0,
+                0.2,
+                1.0,
+                12,
+                Currency::USD,
+            )
             .expect("Asian put pricing should succeed");
         assert!(estimate.mean.amount() > 0.0);
     }
@@ -2131,7 +2076,8 @@ mod tests {
             );
             for (strike, num_steps) in [(100.0, 12), (90.0, 5), (115.0, 30)] {
                 let call = pricer
-                    .price_gbm_asian_call(
+                    .price_gbm_asian(
+                        crate::OptionType::Call,
                         100.0,
                         strike,
                         0.05,
@@ -2143,7 +2089,8 @@ mod tests {
                     )
                     .expect("call");
                 let put = pricer
-                    .price_gbm_asian_put(
+                    .price_gbm_asian(
+                        crate::OptionType::Put,
                         100.0,
                         strike,
                         0.05,

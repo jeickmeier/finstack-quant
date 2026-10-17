@@ -468,7 +468,7 @@ def test_volatility_models_have_one_canonical_host_namespace() -> None:
     volatility = importlib.import_module("finstack_quant.models.volatility")
     core_market_data = importlib.import_module("finstack_quant.core.market_data")
 
-    for name in ("SabrParameters", "SabrModel", "SabrSmile", "SabrCalibrator"):
+    for name in ("SabrParameters", "SabrSmile", "SabrCalibrator"):
         assert hasattr(volatility, name)
         assert not hasattr(models, name)
     for artifact_name, removed_methods in {

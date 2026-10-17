@@ -231,6 +231,10 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
         // heuristics to detect path boundaries.
         let n = self.num_steps;
         let step = work[2 * n] as usize;
+        if step >= n {
+            x.fill(f64::NAN);
+            return;
+        }
 
         let v_current = x[1].max(0.0);
         let z_vol = z[1];
@@ -275,6 +279,18 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
 
     fn work_size(&self, _process: &RoughHestonProcess) -> usize {
         2 * self.num_steps + 1 // drift rates + noise increments + step counter
+    }
+
+    fn applies_correlation_internally(&self) -> bool {
+        true
+    }
+
+    fn scheme_id(&self) -> &'static str {
+        "rough_heston_hybrid"
+    }
+
+    fn expected_num_steps(&self) -> Option<usize> {
+        Some(self.num_steps)
     }
 }
 

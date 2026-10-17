@@ -209,16 +209,16 @@ def test_icma_mid_coupon_duration_and_convexity() -> None:
 def test_normal_sabr_beta_zero_uses_arithmetic_moneyness() -> None:
     import math
 
-    from finstack_quant.models.volatility import SabrModel, SabrParameters
+    from finstack_quant.models.volatility import SabrParameters
 
     alpha, nu, rho, expiry = 0.008, 0.7, -0.35, 2.0
-    model = SabrModel(SabrParameters(alpha, 0.0, nu, rho))
+    params = SabrParameters(alpha, 0.0, nu, rho)
     # Hagan beta=0 normal expansion: z = nu * (F-K) / alpha.
     for forward, strike in [(-0.01, -0.006), (-0.002, 0.002), (0.01, 0.014)]:
         z = nu * (forward - strike) / alpha
         chi = math.log((math.sqrt(1 - 2 * rho * z + z * z) + z - rho) / (1 - rho))
         expected = alpha * z / chi * (1 + (2 - 3 * rho * rho) * nu * nu * expiry / 24)
-        assert model.implied_vol(forward, strike, expiry) == pytest.approx(expected, abs=1e-14)
+        assert params.implied_vol(forward, strike, expiry) == pytest.approx(expected, abs=1e-14)
 
 
 def test_sabr_fit_rejects_large_quote_error() -> None:

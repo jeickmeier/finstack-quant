@@ -100,7 +100,7 @@ def test_portfolio_risk_tearsheet_positions_kpi_without_method() -> None:
 
 
 def test_portfolio_risk_tearsheet_es_budget_bad_rows() -> None:
-    es = {"contributions": [*_ES["contributions"], None, "bad"]}
+    es = {"es_contributions": [*_ES["es_contributions"], None, "bad"]}
     budget = {**_BUDGET, "positions": [*_BUDGET["positions"], None, 42]}
     html = portfolio_risk_tearsheet(_DECOMP, es=es, budget=budget, generated=dt.date(2026, 6, 23)).to_html()
     assert "ES Contributions" in html

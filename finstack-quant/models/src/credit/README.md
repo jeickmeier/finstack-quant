@@ -31,20 +31,20 @@ routes through `market_anchored`; and by both host bindings — see
 | [`mod.rs`](mod.rs) | Re-exports |
 | [`merton/mod.rs`](merton/mod.rs) | Re-exports `MertonModel`, `AssetDynamics`, `MertonBarrierType`, `SimulatedPaths` |
 | [`merton/dynamics.rs`](merton/dynamics.rs) | `AssetDynamics`, `MertonBarrierType` |
-| [`merton/model.rs`](merton/model.rs) | `MertonModel`, `RawMertonModel`, constructors, accessors |
+| [`merton/model.rs`](merton/model.rs) | `MertonModel`, constructors, accessors |
 | [`merton/default_probability.rs`](merton/default_probability.rs) | Distance-to-default, PD, KMV default point |
 | [`merton/spreads.rs`](merton/spreads.rs) | `implied_spread`, `debt_spread`, `cds_par_spread` |
 | [`merton/calibration.rs`](merton/calibration.rs) | `from_equity`, `from_cds_spread`, `from_target_pd`, `credit_grades` |
 | [`merton/hazard_curve.rs`](merton/hazard_curve.rs) | `to_hazard_curve` |
 | [`merton/simulation.rs`](merton/simulation.rs) | `SimulatedPaths`, `simulate_paths` |
-| [`dynamic_recovery.rs`](dynamic_recovery.rs) | `DynamicRecoverySpec`, `RecoveryModel` |
+| [`dynamic_recovery.rs`](dynamic_recovery.rs) | `DynamicRecoverySpec`, `DynamicRecoveryModel` |
 | [`endogenous_hazard.rs`](endogenous_hazard.rs) | `EndogenousHazardSpec`, `LeverageHazardMap` |
 | [`toggle_exercise.rs`](toggle_exercise.rs) | `ToggleExerciseModel`, `CreditState`, `ThresholdToggle`, `StochasticToggle`, `OptimalToggle` |
-| [`market_anchored.rs`](market_anchored.rs) | `CreditVolatilityConversion` and the fractional-to-absolute credit-vol mappings |
+| [`market_anchored.rs`](market_anchored.rs) | Fractional-to-absolute credit-vol mappings (`conditional_average_hazard`, `cir_diffusion_coefficient`) |
 
 Re-exported at the `credit` root: `AssetDynamics`, `MertonBarrierType`,
 `MertonModel`, `SimulatedPaths`, `DynamicRecoverySpec`, `EndogenousHazardSpec`,
-`CreditVolatilityConversion`, `CreditState`, `CreditStateVariable`,
+`CreditState`, `CreditStateVariable`,
 `OptimalToggle`, `ThresholdDirection`, `ToggleExerciseModel`. `ThresholdToggle`
 and `StochasticToggle` are reachable through `credit::toggle_exercise::`.
 
@@ -175,7 +175,7 @@ PIK-toggle Monte Carlo bond engine does, to match the continuous-monitoring
 
 Recovery declines as PIK accrual inflates the outstanding notional.
 
-| `RecoveryModel` | `recovery_at_notional(N)` |
+| `DynamicRecoveryModel` | `recovery_at_notional(N)` |
 |-----------------|---------------------------|
 | `Constant` | `R₀` |
 | `InverseLinear` | `R₀ · (N₀ / N)` |
@@ -281,15 +281,7 @@ level relation.
 
 | Item | Notes |
 |------|-------|
-| `CreditVolatilityConversion::from_survival_window(σ_frac, sp_start, sp_end, horizon, recovery)` | Anchors on a survival ratio from the target curve |
-| `conditional_average_hazard`, `reference_spread`, `cir_diffusion_coefficient` | The individual mappings |
-| `MIN_REFERENCE_LEVEL = 1e-8` | Below this the fractional vol of a vanishing spread carries no absolute information and conversion is an error |
-
-The returned struct reports every quantity it used and produced
-(`horizon_years`, `recovery`, `reference_hazard`, `reference_spread`,
-`fractional_spread_volatility`, `absolute_spread_volatility`,
-`hazard_volatility`, `cir_diffusion`), so a relative quote cannot be dropped
-into an additive lattice unnoticed.
+| `conditional_average_hazard`, `cir_diffusion_coefficient` | The individual mappings |
 
 This is an explicit first-order **local** mapping evaluated at one reference
 hazard over one horizon. It is not a calibration: feeding the resulting `σ_λ`
@@ -337,8 +329,9 @@ schedule on the config takes precedence.
 
 ```rust
 use finstack_quant_models::credit::{
+    market_anchored::conditional_average_hazard,
     toggle_exercise::{CreditStateVariable, ThresholdDirection},
-    AssetDynamics, MertonBarrierType, CreditVolatilityConversion, DynamicRecoverySpec,
+    AssetDynamics, MertonBarrierType, DynamicRecoverySpec,
     EndogenousHazardSpec, MertonModel, ToggleExerciseModel,
 };
 
@@ -400,10 +393,10 @@ let toggle = ToggleExerciseModel::threshold(
     ThresholdDirection::Above,
 )?;
 
-// 35% relative CDS-option vol on a 3% hazard is a 1.05% absolute hazard vol.
+// Conditional average hazard over a 5-year window.
 let survival_end = (-0.03_f64 * 5.0).exp();
-let conv = CreditVolatilityConversion::from_survival_window(0.35, 1.0, survival_end, 5.0, 0.4)?;
-assert!((conv.hazard_volatility - 0.0105).abs() < 1e-12);
+let avg_hazard = conditional_average_hazard(1.0, survival_end, 5.0)?;
+assert!((avg_hazard - 0.03).abs() < 1e-12);
 # Ok::<(), finstack_quant_core::Error>(())
 ```
 
@@ -417,8 +410,7 @@ assert!((conv.hazard_volatility - 0.0105).abs() < 1e-12);
   `Serialize`/`Deserialize`/`JsonSchema`, so a whole `MertonMcConfig`
   round-trips through the wire format. `MertonModel`, `DynamicRecoverySpec`
   and `EndogenousHazardSpec` deserialize through their validating
-  constructors, so JSON cannot build a spec the constructors reject. `CreditVolatilityConversion` is a
-  plain-value diagnostic and is not serialized.
+  constructors, so JSON cannot build a spec the constructors reject.
 - Fallible constructors return `finstack_quant_core::Result<Self>` with
   `InputError` variants or `Error::Validation`.
 - Recovery is clamped to `[0, base_recovery]`; hazard to
@@ -504,7 +496,7 @@ interpolation and extrapolation.
 
 ## Extending
 
-**New recovery model.** Add a `RecoveryModel` variant, implement it in
+**New recovery model.** Add a `DynamicRecoveryModel` variant, implement it in
 `DynamicRecoverySpec::recovery_at_notional`, add a fallible convenience
 constructor, and test the formula, its edge cases, and the `[0, base_recovery]`
 clamp.

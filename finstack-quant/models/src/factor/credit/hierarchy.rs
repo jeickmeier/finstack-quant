@@ -585,6 +585,18 @@ impl FactorCorrelationMatrix {
                     row.len()
                 )));
             }
+            for (j, &val) in row.iter().enumerate() {
+                if !val.is_finite() {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "FactorCorrelationMatrix: entry [{i}][{j}] is not finite ({val})"
+                    )));
+                }
+                if i != j && val.abs() > 1.0 + 1e-10 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "FactorCorrelationMatrix: off-diagonal entry [{i}][{j}] = {val} outside [-1, 1]"
+                    )));
+                }
+            }
             let diag = row[i];
             if (diag - 1.0).abs() > 1e-9 {
                 return Err(finstack_quant_core::Error::Validation(format!(

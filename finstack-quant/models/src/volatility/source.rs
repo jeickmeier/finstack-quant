@@ -255,7 +255,7 @@ fn grid_convention(
             let shifts = shifts.ok_or_else(|| {
                 Error::Validation("shifted Black quotes are missing displacement metadata".into())
             })?;
-            let (lo, hi, weight) = segment(axis, coordinate.clamp(axis[0], axis[axis.len() - 1]))?;
+            let (lo, hi, weight) = segment_clamped(axis, coordinate);
             VolatilityConvention::ShiftedLognormal {
                 shift: (1.0 - weight) * shifts[lo] + weight * shifts[hi],
             }
@@ -297,7 +297,22 @@ fn segment(axis: &[f64], value: f64) -> Result<(usize, usize, f64)> {
 }
 
 #[inline]
-fn bilinear(q00: f64, q10: f64, q01: f64, q11: f64, t: f64, u: f64) -> f64 {
+pub(super) fn segment_clamped(axis: &[f64], value: f64) -> (usize, usize, f64) {
+    let clamped = value.clamp(axis[0], axis[axis.len() - 1]);
+    segment(axis, clamped).unwrap_or((0, 0, 0.0))
+}
+
+#[inline]
+pub(super) fn linear_clamped(xs: &[f64], ys: &[f64], x: f64) -> f64 {
+    if !x.is_finite() {
+        return f64::NAN;
+    }
+    let (lo, hi, weight) = segment_clamped(xs, x);
+    ys[lo] + weight * (ys[hi] - ys[lo])
+}
+
+#[inline]
+pub(super) fn bilinear(q00: f64, q10: f64, q01: f64, q11: f64, t: f64, u: f64) -> f64 {
     (1.0 - t) * (1.0 - u) * q00 + t * (1.0 - u) * q10 + (1.0 - t) * u * q01 + t * u * q11
 }
 

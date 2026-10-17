@@ -150,18 +150,17 @@ impl SviParams {
     ///
     /// # Errors
     ///
-    /// Returns an error if `t <= 0` or the calculated total variance is
-    /// negative. NaN values are not separately rejected by these comparisons,
-    /// so non-finite `k`, `t`, or parameters can yield NaN rather than an
-    /// error.
+    /// Returns a validation error if `k` or `t` is non-finite, `t <= 0`, or the
+    /// calculated total variance is negative or non-finite.
     pub fn implied_vol(&self, k: f64, t: f64) -> finstack_quant_core::Result<f64> {
-        if t <= 0.0 {
+        if !k.is_finite() || !t.is_finite() || t <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
-                "SVI implied vol: time-to-expiry must be positive".into(),
+                "SVI implied vol: log-moneyness must be finite and time-to-expiry must be positive"
+                    .into(),
             ));
         }
         let w = self.total_variance(k);
-        if w < 0.0 {
+        if !w.is_finite() || w < 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "SVI negative total variance w={w:.6} at k={k:.4}"
             )));

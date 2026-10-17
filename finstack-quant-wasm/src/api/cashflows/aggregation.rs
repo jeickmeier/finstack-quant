@@ -1,11 +1,11 @@
 //! Currency-preserving aggregation of dated cashflows.
 
 use super::schedule::dated_flows_arg;
-use crate::utils::input::{js_f64_seq, js_string, js_string_seq};
+use crate::utils::input::{js_f64_seq, js_string_seq};
 use crate::utils::wire::js_wire;
 use crate::utils::{parse_iso_dates, to_js_err, to_js_value};
 use finstack_quant_cashflows::aggregation::{
-    aggregate_by_period, aggregate_cashflows_checked, calendar_year_ladder, PeriodAggregation,
+    aggregate_by_period, aggregate_cashflows_checked, calendar_year_ladder,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Period;
@@ -66,28 +66,4 @@ pub fn calendar_year_ladder_js(
         )
         .map_err(to_js_err)?,
     )
-}
-
-/// Amount aggregated for one period and currency.
-///
-/// Mirrors Rust `PeriodAggregation::get_amount`; on a plain object this is
-/// `aggregation[period]?.[currency]`.
-///
-/// @param aggregation - `PeriodAggregation` wire object, as returned by `aggregateByPeriod` or `CashFlowSchedule.pvByPeriod`.
-/// @param period - Period code exactly as the aggregation spells it, for example `"2025Q1"`.
-/// @param currency - ISO-4217 currency code of the bucket to read.
-/// @returns `Money` wire object, or `undefined` when the period has no flows in that currency.
-/// @throws If `aggregation` is not a `PeriodAggregation` or `currency` is not an ISO-4217 code (kind `validation`), or `period` is not a string (kind `invalid_type`).
-#[wasm_bindgen(js_name = periodAggregationGetAmount)]
-pub fn period_aggregation_get_amount(
-    aggregation: JsValue,
-    period: JsValue,
-    currency: JsValue,
-) -> Result<JsValue, JsValue> {
-    let aggregation = js_wire::<PeriodAggregation>(&aggregation, "aggregation")?;
-    let currency = js_wire::<Currency>(&currency, "currency")?;
-    match aggregation.get_amount(&js_string(&period, "period")?, currency) {
-        Some(amount) => to_js_value(&amount),
-        None => Ok(JsValue::UNDEFINED),
-    }
 }

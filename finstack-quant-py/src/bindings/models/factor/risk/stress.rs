@@ -430,8 +430,7 @@ impl_repr_html_via_dataframe!(PyStressAttribution);
 ///         position). Losses are negative.
 ///     confidence: Tail confidence as a decimal probability strictly inside
 ///         ``(0.5, 1)``; scenarios at or below the VaR quantile are tail
-///         events. ``None`` uses the confidence of the Rust
-///         ``DecompositionConfig.historical_95()`` preset (``0.95``).
+///         events. ``None`` uses the default ``0.95``.
 ///
 /// Returns:
 ///     ``StressAttribution`` with per-position tail-loss contributions and

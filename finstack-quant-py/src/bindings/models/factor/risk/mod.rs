@@ -1,11 +1,9 @@
 //! Models-owned factor risk wrappers and pure calculation entry points.
 mod budget;
-pub(crate) mod config;
 pub(crate) mod contributions;
 mod functions;
 mod stress;
 use budget::{evaluate_risk_budget, PyPositionBudgetEntry, PyRiskBudgetResult};
-use config::PyDecompositionConfig;
 pub(crate) use contributions::PyRiskDecomposition;
 use contributions::{
     PyFactorContribution, PyPositionEsContribution, PyPositionFactorContribution,
@@ -13,7 +11,7 @@ use contributions::{
 };
 use functions::{
     historical_var_decomposition, parametric_es_decomposition, parametric_var_decomposition,
-    position_component_var, PyParametricEsDecompositionView, PyPositionEsContributionView,
+    position_component_var,
 };
 use pyo3::prelude::*;
 use stress::{
@@ -33,9 +31,6 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyStressPositionEntry>()?;
     m.add_class::<PyTailScenarioBreakdown>()?;
     m.add_class::<PyStressAttribution>()?;
-    m.add_class::<PyDecompositionConfig>()?;
-    m.add_class::<PyPositionEsContributionView>()?;
-    m.add_class::<PyParametricEsDecompositionView>()?;
     m.add(
         "DEFAULT_UTILIZATION_THRESHOLD",
         finstack_quant_models::factor::risk::DEFAULT_UTILIZATION_THRESHOLD,

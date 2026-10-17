@@ -19,6 +19,7 @@ use super::problem2d::PdeProblem2D;
 /// `op_x[j]` is the tridiagonal operator along the x-axis at y-level `j`
 /// (interior y-index). `op_y[i]` is along the y-axis at x-level `i`.
 /// The cross-derivative is stored as a flat vector of explicit contributions.
+#[derive(Debug, Clone)]
 pub struct Operators2D {
     /// Tridiagonal operators along x, one per interior y-level.
     /// `op_x[j]` has size `nx_interior`.

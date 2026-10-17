@@ -84,28 +84,15 @@ impl PdeProblem2D for HestonPde {
     }
 
     fn terminal_condition(&self, x: f64, _y: f64) -> f64 {
-        let s = x.exp();
-        if self.is_call {
-            (s - self.strike).max(0.0)
-        } else {
-            (self.strike - s).max(0.0)
-        }
+        super::bridge::vanilla_payoff(x, self.strike, self.is_call)
     }
 
     fn boundary_x_lower(&self, _y: f64, _t: f64) -> BoundaryCondition {
-        if self.is_call {
-            BoundaryCondition::Dirichlet(0.0) // Deep OTM call
-        } else {
-            BoundaryCondition::LinearInExp // Vanishing spot gamma in log coordinates
-        }
+        super::bridge::vanilla_boundary(self.is_call, false)
     }
 
     fn boundary_x_upper(&self, _y: f64, _t: f64) -> BoundaryCondition {
-        if self.is_call {
-            BoundaryCondition::LinearInExp // Vanishing spot gamma in log coordinates
-        } else {
-            BoundaryCondition::Dirichlet(0.0) // Deep OTM put
-        }
+        super::bridge::vanilla_boundary(self.is_call, true)
     }
 
     fn boundary_y_lower(&self, _x: f64, _t: f64) -> BoundaryCondition {
@@ -116,6 +103,10 @@ impl PdeProblem2D for HestonPde {
     fn boundary_y_upper(&self, _x: f64, _t: f64) -> BoundaryCondition {
         // At very high variance, option value is insensitive → linear extrapolation.
         BoundaryCondition::Linear
+    }
+
+    fn is_time_homogeneous(&self) -> bool {
+        true
     }
 }
 

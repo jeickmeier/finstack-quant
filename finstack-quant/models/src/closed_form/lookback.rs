@@ -72,15 +72,26 @@ pub fn fixed_strike_lookback_call(
     vol: f64,
     spot_max: f64,
 ) -> f64 {
-    if time <= 0.0 {
-        return (spot_max - strike).max(0.0);
-    }
-    if vol <= 0.0 {
-        let forward = spot * ((rate - div_yield) * time).exp();
-        return ((forward.max(spot_max) - strike) * (-rate * time).exp()).max(0.0);
+    if !spot.is_finite()
+        || !strike.is_finite()
+        || !time.is_finite()
+        || !rate.is_finite()
+        || !div_yield.is_finite()
+        || !vol.is_finite()
+        || !spot_max.is_finite()
+    {
+        return f64::NAN;
     }
 
     let s_max = spot_max.max(spot); // Ensure S_max ≥ S
+    if time <= 0.0 {
+        return (s_max - strike).max(0.0);
+    }
+    if vol <= 0.0 {
+        let forward = spot * ((rate - div_yield) * time).exp();
+        return ((forward.max(s_max) - strike) * (-rate * time).exp()).max(0.0);
+    }
+
     let df = (-rate * time).exp();
 
     let intrinsic_pv = (s_max - strike).max(0.0) * df;
@@ -148,15 +159,26 @@ pub fn fixed_strike_lookback_put(
     vol: f64,
     spot_min: f64,
 ) -> f64 {
-    if time <= 0.0 {
-        return (strike - spot_min).max(0.0);
-    }
-    if vol <= 0.0 {
-        let forward = spot * ((rate - div_yield) * time).exp();
-        return ((strike - forward.min(spot_min)) * (-rate * time).exp()).max(0.0);
+    if !spot.is_finite()
+        || !strike.is_finite()
+        || !time.is_finite()
+        || !rate.is_finite()
+        || !div_yield.is_finite()
+        || !vol.is_finite()
+        || !spot_min.is_finite()
+    {
+        return f64::NAN;
     }
 
     let s_min = spot_min.min(spot); // Ensure S_min ≤ S
+    if time <= 0.0 {
+        return (strike - s_min).max(0.0);
+    }
+    if vol <= 0.0 {
+        let forward = spot * ((rate - div_yield) * time).exp();
+        return ((strike - forward.min(s_min)) * (-rate * time).exp()).max(0.0);
+    }
+
     let df = (-rate * time).exp();
 
     let intrinsic_pv = (strike - s_min).max(0.0) * df;
@@ -230,15 +252,25 @@ pub fn floating_strike_lookback_call(
     vol: f64,
     spot_min: f64,
 ) -> f64 {
-    if time <= 0.0 {
-        return (spot - spot_min).max(0.0);
-    }
-    if vol <= 0.0 {
-        let forward = spot * ((rate - div_yield) * time).exp();
-        return (forward - spot_min).max(0.0) * (-rate * time).exp();
+    if !spot.is_finite()
+        || !time.is_finite()
+        || !rate.is_finite()
+        || !div_yield.is_finite()
+        || !vol.is_finite()
+        || !spot_min.is_finite()
+    {
+        return f64::NAN;
     }
 
     let s_min = spot_min.min(spot);
+    if time <= 0.0 {
+        return (spot - s_min).max(0.0);
+    }
+    if vol <= 0.0 {
+        let forward = spot * ((rate - div_yield) * time).exp();
+        return (forward - s_min.min(forward)).max(0.0) * (-rate * time).exp();
+    }
+
     let sqrt_t = time.sqrt();
     let vol_sqrt_t = vol * sqrt_t;
     let vol2 = vol * vol;
@@ -303,15 +335,25 @@ pub fn floating_strike_lookback_put(
     vol: f64,
     spot_max: f64,
 ) -> f64 {
-    if time <= 0.0 {
-        return (spot_max - spot).max(0.0);
-    }
-    if vol <= 0.0 {
-        let forward = spot * ((rate - div_yield) * time).exp();
-        return (spot_max - forward).max(0.0) * (-rate * time).exp();
+    if !spot.is_finite()
+        || !time.is_finite()
+        || !rate.is_finite()
+        || !div_yield.is_finite()
+        || !vol.is_finite()
+        || !spot_max.is_finite()
+    {
+        return f64::NAN;
     }
 
     let s_max = spot_max.max(spot);
+    if time <= 0.0 {
+        return (s_max - spot).max(0.0);
+    }
+    if vol <= 0.0 {
+        let forward = spot * ((rate - div_yield) * time).exp();
+        return (s_max.max(forward) - forward).max(0.0) * (-rate * time).exp();
+    }
+
     let maximum_premium =
         fixed_strike_lookback_call(spot, s_max, time, rate, div_yield, vol, s_max);
     (maximum_premium + s_max * (-rate * time).exp() - spot * (-div_yield * time).exp())

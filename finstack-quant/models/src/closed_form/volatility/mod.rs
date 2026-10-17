@@ -12,12 +12,11 @@ mod bachelier;
 mod black;
 
 pub use bachelier::{
-    bachelier_call, bachelier_delta_call, bachelier_delta_put, bachelier_gamma, bachelier_put,
-    bachelier_vega,
+    bachelier_call, bachelier_delta_call, bachelier_delta_put, bachelier_gamma,
+    bachelier_price_with_annuity, bachelier_put, bachelier_vega,
 };
 pub use black::{
-    black_call, black_delta_call, black_delta_put, black_gamma, black_put, black_shifted_call,
-    black_vega,
+    black_call, black_delta_call, black_delta_put, black_gamma, black_put, black_vega,
 };
 
 #[cfg(test)]
@@ -266,7 +265,7 @@ mod tests {
 
         // Shifted Black with zero shift should equal regular Black
         let regular = black_call(forward, strike, sigma, t);
-        let shifted_zero = black_shifted_call(forward, strike, sigma, t, 0.0);
+        let shifted_zero = black_call(forward, strike, sigma, t);
         assert!(
             (regular - shifted_zero).abs() < EPSILON,
             "Shifted Black with zero shift should equal regular Black"
@@ -274,7 +273,7 @@ mod tests {
 
         // Shifted Black should handle negative forward
         let negative_fwd = -0.01;
-        let shifted_price = black_shifted_call(negative_fwd, strike, sigma, t, shift);
+        let shifted_price = black_call(negative_fwd + shift, strike + shift, sigma, t);
         assert!(shifted_price >= 0.0, "Option price should be non-negative");
     }
 

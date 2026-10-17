@@ -18,7 +18,6 @@ const credit = {
 };
 
 const risk = {
-  DecompositionConfig: wasm.DecompositionConfig,
   parametricVarDecomposition: wasm.parametricVarDecomposition,
   parametricEsDecomposition: wasm.parametricEsDecomposition,
   historicalVarDecomposition: wasm.historicalVarDecomposition,

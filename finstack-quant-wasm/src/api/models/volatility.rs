@@ -1,6 +1,6 @@
 //! Product-independent volatility model and evaluator bindings for WASM.
 //!
-//! Exposes `SabrParameters`, `SabrModel`, `SabrSmile`, and `SabrCalibrator` to
+//! Exposes `SabrParameters`, `SabrSmile`, and `SabrCalibrator` to
 //! JS/TS alongside evaluators for the core data-only volatility artifacts.
 //!
 //! Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr.
@@ -16,7 +16,7 @@ use finstack_quant_models::volatility as vol;
 use finstack_quant_models::volatility::arbitrage as model_arbitrage;
 use finstack_quant_models::volatility::local_vol::LocalVolSurface;
 use finstack_quant_models::volatility::sabr::{
-    SabrCalibrator, SabrModel, SabrParameters, SabrShift, SabrSmile,
+    SabrCalibrator, SabrParameters, SabrShift, SabrSmile,
 };
 use finstack_quant_models::volatility::svi::SviParams;
 use wasm_bindgen::prelude::*;
@@ -264,35 +264,11 @@ impl JsSabrParameters {
     pub fn is_shifted(&self) -> bool {
         self.inner.is_shifted()
     }
-}
 
-impl JsSabrParameters {
-    pub(crate) fn from_inner(inner: SabrParameters) -> Self {
-        Self { inner }
-    }
-
-    fn clone_inner(&self) -> SabrParameters {
-        self.inner.clone()
-    }
-}
-
-/// Hagan-2002 SABR volatility model.
-///
-/// Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr.
-#[wasm_bindgen(js_name = SabrModel)]
-pub struct JsSabrModel {
-    inner: SabrModel,
-}
-
-#[wasm_bindgen(js_class = SabrModel)]
-impl JsSabrModel {
-    /// Create a Hagan-2002 SABR model from the supplied parameters.
-    /// @param params - SABR parameter object containing alpha, beta, nu, rho, and optional shift.
-    #[wasm_bindgen(constructor)]
-    pub fn new(params: &JsSabrParameters) -> JsSabrModel {
-        Self {
-            inner: SabrModel::new(params.clone_inner()),
-        }
+    /// Whether the parameterization admits negative forwards.
+    #[wasm_bindgen(js_name = supportsNegativeRates)]
+    pub fn supports_negative_rates(&self) -> bool {
+        self.inner.supports_negative_rates()
     }
 
     /// Implied volatility: normal decimal rate for beta=0, Black decimal volatility otherwise.
@@ -319,17 +295,15 @@ impl JsSabrModel {
             .implied_volatility(forward, strike, t)
             .map_err(to_js_err)
     }
+}
 
-    /// Parameters used by this model.
-    #[wasm_bindgen(getter)]
-    pub fn params(&self) -> JsSabrParameters {
-        JsSabrParameters::from_inner(self.inner.parameters().clone())
+impl JsSabrParameters {
+    pub(crate) fn from_inner(inner: SabrParameters) -> Self {
+        Self { inner }
     }
 
-    /// Whether the parameterization admits negative forwards.
-    #[wasm_bindgen(js_name = supportsNegativeRates)]
-    pub fn supports_negative_rates(&self) -> bool {
-        self.inner.supports_negative_rates()
+    fn clone_inner(&self) -> SabrParameters {
+        self.inner.clone()
     }
 }
 
@@ -355,9 +329,8 @@ impl JsSabrSmile {
     ) -> Result<JsSabrSmile, JsValue> {
         let forward = js_f64(&forward, "forward")?;
         let t = js_f64(&t, "t")?;
-        let model = SabrModel::new(params.clone_inner());
         Ok(Self {
-            inner: SabrSmile::new(model, forward, t),
+            inner: SabrSmile::new(params.clone_inner(), forward, t),
         })
     }
 
@@ -514,6 +487,18 @@ impl JsSabrSmile {
             .repair_arbitrage(&strikes, r, max_iterations)
             .map(Vec::into_boxed_slice)
             .map_err(to_js_err)
+    }
+
+    /// Forward price or rate the smile is built around.
+    #[wasm_bindgen(getter)]
+    pub fn forward(&self) -> f64 {
+        self.inner.forward()
+    }
+
+    /// Time to expiry of the smile, in years.
+    #[wasm_bindgen(getter)]
+    pub fn t(&self) -> f64 {
+        self.inner.time_to_expiry()
     }
 }
 
@@ -1058,21 +1043,6 @@ pub fn strike_to_delta(
     Ok(vol::strike_to_delta(strike, forward, vol, expiry))
 }
 
-#[wasm_bindgen(js_class = SabrSmile)]
-impl JsSabrSmile {
-    /// Forward price or rate the smile is built around.
-    #[wasm_bindgen(getter)]
-    pub fn forward(&self) -> f64 {
-        self.inner.forward()
-    }
-
-    /// Time to expiry of the smile, in years.
-    #[wasm_bindgen(getter)]
-    pub fn t(&self) -> f64 {
-        self.inner.time_to_expiry()
-    }
-}
-
 /// SVI total implied variance `w(k)` at a log-moneyness.
 ///
 /// Twin of the Rust and Python `SviParams.total_variance`.
@@ -1593,7 +1563,7 @@ mod tests {
         let p = SabrParameters::new_with_shift(0.05, 0.5, 0.4, -0.1, 0.02).expect("params");
         let forward = -0.005;
         let strikes = vec![-0.015, -0.01, -0.005, 0.0, 0.005];
-        let vols = SabrSmile::new(SabrModel::new(p), forward, 1.0)
+        let vols = SabrSmile::new(p, forward, 1.0)
             .generate_smile(&strikes)
             .expect("smile");
 

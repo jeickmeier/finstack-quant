@@ -77,8 +77,6 @@
 
 use super::super::process::cheyette_rough::CheyetteRoughVolProcess;
 use super::super::traits::Discretization;
-use finstack_quant_core::math::fractional::HurstExponent;
-
 /// Euler discretization for the Cheyette + rough vol process.
 ///
 /// This scheme reconstructs the stochastic volatility from the base vol curve
@@ -88,25 +86,13 @@ use finstack_quant_core::math::fractional::HurstExponent;
 ///
 /// See the [module-level documentation](self) for details on noise layout,
 /// correlation handling, and the work buffer.
-#[derive(Debug, Clone)]
-pub struct CheyetteRoughEuler {
-    /// Hurst exponent of the Riemann-Liouville Volterra driver.
-    hurst: HurstExponent,
-}
+#[derive(Debug, Clone, Default)]
+pub struct CheyetteRoughEuler;
 
 impl CheyetteRoughEuler {
     /// Create a new Cheyette rough vol Euler discretization.
-    ///
-    /// # Arguments
-    ///
-    /// * `hurst` - Validated Hurst exponent, must match the process.
-    pub fn new(hurst: HurstExponent) -> Self {
-        Self { hurst }
-    }
-
-    /// Return the stored Hurst exponent.
-    pub fn hurst(&self) -> HurstExponent {
-        self.hurst
+    pub fn new() -> Self {
+        Self
     }
 }
 
@@ -173,6 +159,14 @@ impl Discretization<CheyetteRoughVolProcess> for CheyetteRoughEuler {
     fn work_size(&self, _process: &CheyetteRoughVolProcess) -> usize {
         1 // work[0] = accumulated RL Volterra process Ỹ(t)
     }
+
+    fn applies_correlation_internally(&self) -> bool {
+        true
+    }
+
+    fn scheme_id(&self) -> &'static str {
+        "cheyette_rough_euler"
+    }
 }
 
 #[cfg(test)]
@@ -196,7 +190,7 @@ mod tests {
     #[test]
     fn test_single_step_zero_shocks() {
         let process = make_process();
-        let disc = CheyetteRoughEuler::new(HurstExponent::new(0.1).expect("valid hurst"));
+        let disc = CheyetteRoughEuler::new();
 
         let mut x = vec![0.0, 0.0];
         let z = vec![0.0, 0.0, 0.0]; // No shocks
@@ -222,7 +216,7 @@ mod tests {
     #[test]
     fn test_single_step_deterministic() {
         let process = make_process();
-        let disc = CheyetteRoughEuler::new(HurstExponent::new(0.1).expect("valid hurst"));
+        let disc = CheyetteRoughEuler::new();
         let p = process.params();
 
         let dt = 0.01_f64;
@@ -325,7 +319,7 @@ mod tests {
         // Volterra level *before* this step's increment. The step's own ΔỸ
         // (z[1]) must therefore have no effect on x or y in this step.
         let process = make_process();
-        let disc = CheyetteRoughEuler::new(HurstExponent::new(0.1).expect("valid hurst"));
+        let disc = CheyetteRoughEuler::new();
 
         let t = 0.5_f64;
         let dt = 0.01_f64;
@@ -358,7 +352,7 @@ mod tests {
         // y update: dy = [σ(t)² − 2κ·y] dt
         // This should be fully determined by sigma(t), y, kappa, and dt.
         let process = make_process();
-        let disc = CheyetteRoughEuler::new(HurstExponent::new(0.1).expect("valid hurst"));
+        let disc = CheyetteRoughEuler::new();
 
         let y0 = 0.0001_f64;
         let dt = 0.01_f64;
@@ -394,7 +388,7 @@ mod tests {
     #[test]
     fn test_work_buffer_reset_across_paths() {
         let process = make_process();
-        let disc = CheyetteRoughEuler::new(HurstExponent::new(0.1).expect("valid hurst"));
+        let disc = CheyetteRoughEuler::new();
 
         let mut x = vec![0.0, 0.0];
         let z = vec![0.0, 0.05, 0.0]; // Non-zero Volterra increment
@@ -428,7 +422,7 @@ mod tests {
     #[test]
     fn test_multiple_steps_no_nan() {
         let process = make_process();
-        let disc = CheyetteRoughEuler::new(HurstExponent::new(0.1).expect("valid hurst"));
+        let disc = CheyetteRoughEuler::new();
 
         let mut x = vec![0.0, 0.0];
         let mut work = vec![0.0];
@@ -548,7 +542,7 @@ mod tests {
         let params = CheyetteRoughVolParams::new(0.03, sigma_base, hurst, eta, 1.0, &[(0.0, 0.0)])
             .expect("valid");
         let process = CheyetteRoughVolProcess::new(params);
-        let disc = CheyetteRoughEuler::new(hurst);
+        let disc = CheyetteRoughEuler::new();
         let p = process.params();
 
         let gen = RiemannLiouvilleVolterra::new(t_end, n, h).expect("valid generator");

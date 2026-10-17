@@ -97,7 +97,7 @@ def test_implied_vol_bachelier_inverts_bachelier_price(
 
 
 def test_implied_vol_black_matches_undiscounted_black76() -> None:
-    price = black76_price(100.0, 105.0, 1.0, 1.0, 0.25, True)
+    price = black76_price(100.0, 105.0, 1.0, 0.25, 1.0, True)
     assert implied_vol_black(price, 100.0, 105.0, 1.0, True) == pytest.approx(0.25, abs=1e-12)
     assert implied_vol_black(price, 100.0, 105.0, 1.0, True) == pytest.approx(
         black76_implied_vol(100.0, 105.0, 1.0, 1.0, price, True), abs=1e-14

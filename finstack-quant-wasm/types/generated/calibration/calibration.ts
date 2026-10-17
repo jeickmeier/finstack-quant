@@ -6249,7 +6249,6 @@ export interface CapFloorCalibrationConfig {
 export interface HullWhiteCalibrationParams {
   kappa: number;
   sigma: number;
-  [k: string]: unknown;
 }
 /**
  * Cap or floor volatility quote in year fractions for the direct Hull-White calibrators.

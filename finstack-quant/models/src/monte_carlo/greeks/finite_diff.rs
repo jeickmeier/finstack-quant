@@ -305,6 +305,13 @@ where
     D: Discretization<P> + Clone,
     F: Payoff,
 {
+    if inputs.process.dim() != 1 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "finite_diff_delta requires a 1D spot process (process.dim() == 1, got {}); \
+             use finite_diff_delta_state for multi-dimensional processes",
+            inputs.process.dim()
+        )));
+    }
     require_splittable_rng(inputs.rng, "finite_diff_delta")?;
     let (initial_down, _initial_base, initial_up, h) =
         validate_central_bump(initial_spot, bump_size)?;
@@ -362,6 +369,13 @@ where
     D: Discretization<P> + Clone,
     F: Payoff,
 {
+    if inputs.process.dim() != 1 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "finite_diff_gamma requires a 1D spot process (process.dim() == 1, got {}); \
+             use finite_diff_gamma_state for multi-dimensional processes",
+            inputs.process.dim()
+        )));
+    }
     require_splittable_rng(inputs.rng, "finite_diff_gamma")?;
     let (initial_down, initial_base, initial_up, h) =
         validate_central_bump(initial_spot, bump_size)?;

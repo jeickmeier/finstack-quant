@@ -71,17 +71,34 @@ impl GbmWithDividends {
     ///
     /// # Errors
     ///
-    /// Returns an error if any dividend time is non-finite, or two dividends
-    /// share the same time after sorting.
+    /// Returns an error if any dividend time is non-finite or negative, any
+    /// cash dividend is non-finite or negative, any proportional dividend is
+    /// outside `[0, 1]`, or two dividends share the same time after sorting.
     pub fn new(
         params: GbmParams,
         mut dividends: Vec<(f64, Dividend)>,
     ) -> finstack_quant_core::Result<Self> {
-        for (i, (t, _)) in dividends.iter().enumerate() {
-            if !t.is_finite() {
+        for (i, (t, div)) in dividends.iter().enumerate() {
+            if !t.is_finite() || *t < 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "Dividend time at index {i} must be finite, got {t}"
+                    "Dividend time at index {i} must be finite and non-negative, got {t}"
                 )));
+            }
+            match div {
+                Dividend::Cash(amount) => {
+                    if !amount.is_finite() || *amount < 0.0 {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "Cash dividend at index {i} must be finite and non-negative, got {amount}"
+                        )));
+                    }
+                }
+                Dividend::Proportional(pct) => {
+                    if !pct.is_finite() || !(0.0..=1.0).contains(pct) {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "Proportional dividend at index {i} must be in [0, 1], got {pct}"
+                        )));
+                    }
+                }
             }
         }
 

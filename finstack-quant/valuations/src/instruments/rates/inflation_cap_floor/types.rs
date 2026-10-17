@@ -299,12 +299,15 @@ impl InflationCapFloor {
             self.rate_option_type,
             RateOptionType::Caplet | RateOptionType::Floorlet
         ) {
-            let pay = finstack_quant_cashflows::builder::adjust_date(
-                self.maturity,
-                self.business_day_convention,
+            let cal = finstack_quant_core::dates::calendar_by_id_strict(
                 self.calendar_id
                     .as_deref()
                     .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
+            )?;
+            let pay = finstack_quant_core::dates::adjust(
+                self.maturity,
+                self.business_day_convention,
+                cal,
             )?;
             return Ok(vec![(self.start_date, self.maturity, pay)]);
         }

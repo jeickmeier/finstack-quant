@@ -57,15 +57,6 @@ REGISTRIES: dict[str, tuple[Any, str]] = {
 # A payload no published object schema accepts, sent as JSON text by both hosts.
 INVALID_PAYLOAD = '{"not_a_field": 1}'
 NAMED_ACCESSORS: dict[str, tuple[Any, list[str]]] = {
-    "models.factor": (
-        factor.schema,
-        [
-            "credit_calibration_config_schema",
-            "credit_calibration_inputs_schema",
-            "credit_factor_model_schema",
-            "factor_model_config_schema",
-        ],
-    ),
     "statements": (
         statements.schema,
         ["financial_model_spec_schema", "normalization_config_schema", "statement_result_schema"],

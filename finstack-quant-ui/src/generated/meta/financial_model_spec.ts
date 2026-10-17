@@ -57,74 +57,6 @@ export default [
     "description": "Intentionally empty because no future dated cashflows remain."
   },
   {
-    "path": "#/$defs/d_036df5f08ee6b375c9e5",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RecoveryModel",
-    "description": "Recovery model specification."
-  },
-  {
-    "path": "#/$defs/d_036df5f08ee6b375c9e5/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RecoveryModel/oneOf/0",
-    "const": "constant",
-    "description": "Constant recovery (ignores notional changes)."
-  },
-  {
-    "path": "#/$defs/d_036df5f08ee6b375c9e5/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RecoveryModel/oneOf/1",
-    "const": "inverse_linear",
-    "description": "`R(t) = R_0 * (N_0 / N(t))` -- direct proportional dilution."
-  },
-  {
-    "path": "#/$defs/d_036df5f08ee6b375c9e5/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RecoveryModel/oneOf/2",
-    "description": "`R(t) = R_0 * (N_0 / N(t))^alpha`, `alpha in (0, 1]` -- softened decline."
-  },
-  {
-    "path": "#/$defs/d_036df5f08ee6b375c9e5/oneOf/2/properties/inverse_power",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RecoveryModel/oneOf/2/properties/inverse_power"
-  },
-  {
-    "path": "#/$defs/d_036df5f08ee6b375c9e5/oneOf/2/properties/inverse_power/properties/exponent",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RecoveryModel/oneOf/2/properties/inverse_power/properties/exponent",
-    "description": "Power exponent (`alpha`).",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_036df5f08ee6b375c9e5/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RecoveryModel/oneOf/3",
-    "description": "`R(t) = max(floor, R_0 * (N_0 / N(t)))`."
-  },
-  {
-    "path": "#/$defs/d_036df5f08ee6b375c9e5/oneOf/3/properties/floored_inverse",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RecoveryModel/oneOf/3/properties/floored_inverse"
-  },
-  {
-    "path": "#/$defs/d_036df5f08ee6b375c9e5/oneOf/3/properties/floored_inverse/properties/floor",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RecoveryModel/oneOf/3/properties/floored_inverse/properties/floor",
-    "description": "Minimum recovery rate floor.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_036df5f08ee6b375c9e5/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RecoveryModel/oneOf/4",
-    "description": "`R(t) = clamp(R_0 * (1 - beta * (N(t)/N_0 - 1)), floor, R_0)`."
-  },
-  {
-    "path": "#/$defs/d_036df5f08ee6b375c9e5/oneOf/4/properties/linear_decline",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RecoveryModel/oneOf/4/properties/linear_decline"
-  },
-  {
-    "path": "#/$defs/d_036df5f08ee6b375c9e5/oneOf/4/properties/linear_decline/properties/floor",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RecoveryModel/oneOf/4/properties/linear_decline/properties/floor",
-    "description": "Minimum recovery rate floor.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_036df5f08ee6b375c9e5/oneOf/4/properties/linear_decline/properties/sensitivity",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RecoveryModel/oneOf/4/properties/linear_decline/properties/sensitivity",
-    "description": "Sensitivity of recovery to leverage increase (`beta`).",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_05b629a957173cab6ad8",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcOverride",
     "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
@@ -443,7 +375,7 @@ export default [
   {
     "path": "#/$defs/d_0e3d1d10849038bb6f70",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoverySpec",
-    "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`RecoveryModel`].\nDeserialization enforces the same parameter invariants as the constructors."
+    "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`DynamicRecoveryModel`].\nDeserialization enforces the same parameter invariants as the constructors."
   },
   {
     "path": "#/$defs/d_0e3d1d10849038bb6f70/properties/base_notional",
@@ -461,8 +393,8 @@ export default [
     "path": "#/$defs/d_0e3d1d10849038bb6f70/properties/model",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoverySpec/properties/model",
     "description": "Recovery model governing the notional-to-recovery mapping.",
-    "ref": "#/$defs/RecoveryModel",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RecoveryModel"
+    "ref": "#/$defs/DynamicRecoveryModel",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoveryModel"
   },
   {
     "path": "#/$defs/d_0e807393633d9f0e7907",
@@ -3527,6 +3459,74 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DecimalWire"
   },
   {
+    "path": "#/$defs/d_5423b4a205e1bf13d54f",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoveryModel",
+    "description": "Recovery model specification."
+  },
+  {
+    "path": "#/$defs/d_5423b4a205e1bf13d54f/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoveryModel/oneOf/0",
+    "const": "constant",
+    "description": "Constant recovery (ignores notional changes)."
+  },
+  {
+    "path": "#/$defs/d_5423b4a205e1bf13d54f/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoveryModel/oneOf/1",
+    "const": "inverse_linear",
+    "description": "`R(t) = R_0 * (N_0 / N(t))` -- direct proportional dilution."
+  },
+  {
+    "path": "#/$defs/d_5423b4a205e1bf13d54f/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoveryModel/oneOf/2",
+    "description": "`R(t) = R_0 * (N_0 / N(t))^alpha`, `alpha in (0, 1]` -- softened decline."
+  },
+  {
+    "path": "#/$defs/d_5423b4a205e1bf13d54f/oneOf/2/properties/inverse_power",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoveryModel/oneOf/2/properties/inverse_power"
+  },
+  {
+    "path": "#/$defs/d_5423b4a205e1bf13d54f/oneOf/2/properties/inverse_power/properties/exponent",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoveryModel/oneOf/2/properties/inverse_power/properties/exponent",
+    "description": "Power exponent (`alpha`).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_5423b4a205e1bf13d54f/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoveryModel/oneOf/3",
+    "description": "`R(t) = max(floor, R_0 * (N_0 / N(t)))`."
+  },
+  {
+    "path": "#/$defs/d_5423b4a205e1bf13d54f/oneOf/3/properties/floored_inverse",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoveryModel/oneOf/3/properties/floored_inverse"
+  },
+  {
+    "path": "#/$defs/d_5423b4a205e1bf13d54f/oneOf/3/properties/floored_inverse/properties/floor",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoveryModel/oneOf/3/properties/floored_inverse/properties/floor",
+    "description": "Minimum recovery rate floor.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_5423b4a205e1bf13d54f/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoveryModel/oneOf/4",
+    "description": "`R(t) = clamp(R_0 * (1 - beta * (N(t)/N_0 - 1)), floor, R_0)`."
+  },
+  {
+    "path": "#/$defs/d_5423b4a205e1bf13d54f/oneOf/4/properties/linear_decline",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoveryModel/oneOf/4/properties/linear_decline"
+  },
+  {
+    "path": "#/$defs/d_5423b4a205e1bf13d54f/oneOf/4/properties/linear_decline/properties/floor",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoveryModel/oneOf/4/properties/linear_decline/properties/floor",
+    "description": "Minimum recovery rate floor.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_5423b4a205e1bf13d54f/oneOf/4/properties/linear_decline/properties/sensitivity",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoveryModel/oneOf/4/properties/linear_decline/properties/sensitivity",
+    "description": "Sensitivity of recovery to leverage increase (`beta`).",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_557de6d70142abc041e8",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Id",
     "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead."
@@ -4026,7 +4026,7 @@ export default [
   {
     "path": "#/$defs/d_6be6b905ad3884deeab6",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonModel",
-    "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n[`RawMertonModel`], so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. The serialized field set is unchanged."
+    "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n`RawMertonModel`, so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. The serialized field set is unchanged."
   },
   {
     "path": "#/$defs/d_6be6b905ad3884deeab6/properties/asset_value",

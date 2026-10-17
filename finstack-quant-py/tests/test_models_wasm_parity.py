@@ -414,9 +414,7 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
         ],
         "lgd.workout": lambda: [
             _json(workout().evaluate(1_000_000.0)),
-            workout().lgd(1_000_000.0),
             workout().net_recovery(1_000_000.0),
-            workout().recovery_rate(1_000_000.0),
             _json(lgd.workout_lgd(1_000_000.0, [("real_estate", 800_000.0, 0.3)], 0.05, 0.03, 2.0, 0.05)),
             lgd.WorkoutCosts.standard().total_rate,
         ],
@@ -578,14 +576,6 @@ def _factor_cases() -> dict[str, Callable[[], Any]]:
             model().covariance.n_factors,
             model().config.n_factors,
         ],
-        "factor.decomposition_config": lambda: [
-            _json(factor_risk.DecompositionConfig.parametric(0.975).with_incremental()),
-            _json(factor_risk.DecompositionConfig.parametric_95()),
-            _json(factor_risk.DecompositionConfig.parametric_99()),
-            _json(factor_risk.DecompositionConfig.historical(0.9)),
-            _json(factor_risk.DecompositionConfig.historical_95()),
-            factor_risk.DecompositionConfig.historical_95().method,
-        ],
         "factor.stress_attribution": lambda: _json(factor_risk.build_stress_attribution(["A", "B"], PNLS, 0.8)),
         "factor.position_component_var": lambda: [
             factor_risk.position_component_var(decomposition(), "A"),
@@ -603,13 +593,11 @@ def _liquidity_cases() -> dict[str, Callable[[], Any]]:
             _json(almgren().estimate_cost(_trade())),
             _json(almgren().optimal_trajectory(_trade(), 5)),
             [calibrated().gamma, calibrated().eta, calibrated().delta],
-            almgren().model_name,
         ],
         "liquidity.kyle": lambda: [
             kyle().lambda_,
             _json(kyle().estimate_cost(_trade())),
             _json(kyle().optimal_trajectory(_trade(), 4)),
-            liquidity.KyleLambdaModel(2e-7).model_name,
         ],
     }
 
@@ -773,8 +761,8 @@ def _analytic_cases() -> dict[str, Callable[[], Any]]:
     smile = [volatility.SviParams(*SVI).implied_vol(math.log(strike / 100.0), 1.0) for strike in STRIKES]
     return {
         "closed_form.forward_greeks": lambda: [
-            _json(models.black76_greeks(0.03, 0.035, 2.0, 0.25, True)),
-            _json(models.black76_greeks(0.03, 0.035, 2.0, 0.25, False)),
+            _json(models.black76_greeks(0.03, 0.035, 0.25, 2.0, True)),
+            _json(models.black76_greeks(0.03, 0.035, 0.25, 2.0, False)),
             _json(models.bachelier_greeks(0.03, 0.035, 0.0075, 2.0, True)),
             _json(models.bachelier_greeks(-0.002, 0.001, 0.0075, 2.0, False)),
             models.black_shifted_vega(-0.002, 0.001, 0.3, 2.0, 0.03),

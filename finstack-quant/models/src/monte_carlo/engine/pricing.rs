@@ -141,6 +141,23 @@ impl McEngine {
         Ok(())
     }
 
+    pub(crate) fn validate_scheme_grid<P, D>(&self, disc: &D) -> Result<()>
+    where
+        P: StochasticProcess,
+        D: Discretization<P>,
+    {
+        if let Some(expected_steps) = disc.expected_num_steps() {
+            let grid_steps = self.config.time_grid.num_steps();
+            if expected_steps != grid_steps {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "discretization '{}' was precomputed for {expected_steps} steps but time_grid has {grid_steps} steps",
+                    disc.scheme_id()
+                )));
+            }
+        }
+        Ok(())
+    }
+
     /// Validate that the payoff's event schedule fits the configured grid.
     ///
     /// A maturity or fixing step beyond the grid would silently never fire
@@ -429,6 +446,7 @@ impl McEngine {
         self.validate_rng(rng)?;
         self.validate_runtime(process, initial_state, discount_factor, None)?;
         Self::validate_scheme_pairing(process, disc)?;
+        self.validate_scheme_grid(disc)?;
         self.validate_payoff_schedule(payoff)?;
 
         let estimate = self.run_loops(
@@ -548,6 +566,7 @@ impl McEngine {
             Some(&process_params),
         )?;
         Self::validate_scheme_pairing(process, disc)?;
+        self.validate_scheme_grid(disc)?;
         self.validate_payoff_schedule(payoff)?;
 
         let capture_enabled = self.config.path_capture.enabled;

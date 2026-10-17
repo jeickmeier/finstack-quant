@@ -179,7 +179,6 @@ fn pde_rejects_exercise_dates_that_would_be_silently_dropped() {
         rate: 0.1,
         dividend: 0.0,
         strike: 100.0,
-        maturity: 1.0,
         is_call: false,
     };
     let grid = Grid1D::uniform(1.0, 6.0, 401).unwrap();

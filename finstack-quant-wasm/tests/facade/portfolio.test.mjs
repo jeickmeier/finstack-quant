@@ -1067,7 +1067,7 @@ const VAR_ROW_KEYS = [
 ];
 const ES_ROW_KEYS = ['component_es', 'marginal_es', 'position_id', 'relative_es'];
 // Parametric 95% VaR of the book above (losses negative), pinned in both hosts.
-const PARAMETRIC_VAR_95 = -0.3015066497719077;
+const PARAMETRIC_VAR_95 = -0.30150665010511113;
 
 test('models.factor.risk.parametricVarDecomposition returns the canonical PositionRiskDecomposition', () => {
   const decomposition = assertStructured(
@@ -1098,25 +1098,14 @@ test('models.factor.risk.parametricVarDecomposition returns the canonical Positi
   assert.equal(typeof explicit.var_contributions[0].incremental_var, 'number');
 });
 
-test('models.factor.risk.parametricEsDecomposition returns the ES reporting view', () => {
+test('models.factor.risk.parametricEsDecomposition returns the canonical PositionRiskDecomposition', () => {
   const decomposition = assertStructured(
     models.factor.risk.parametricEsDecomposition(VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE),
     'parametricEsDecomposition result'
   );
-  assert.deepEqual(Object.keys(decomposition).sort(), [
-    'confidence',
-    'contributions',
-    'n_positions',
-    'portfolio_es',
-    'portfolio_var',
-  ]);
+  assert.deepEqual(Object.keys(decomposition).sort(), DECOMPOSITION_KEYS);
   assert.equal(decomposition.confidence, 0.95);
-  assert.deepEqual(Object.keys(decomposition.contributions[0]).sort(), [
-    'component_es',
-    'marginal_es',
-    'pct_contribution',
-    'position_id',
-  ]);
+  assert.deepEqual(Object.keys(decomposition.es_contributions[0]).sort(), ES_ROW_KEYS);
 });
 
 test('models.factor.risk.historicalVarDecomposition returns ES rows and takes position-major P&L only', () => {

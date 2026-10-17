@@ -347,7 +347,7 @@ fn optimal_toggle_decision(o: &OptimalToggle, state: &CreditState, seed_bits: u6
         v_pik_start,
         barrier_pik,
         model_pik,
-        seed_bits ^ 0x9E37_79B9_7F4A_7C15,
+        seed_bits,
     );
 
     avg_equity_pik > avg_equity_cash
@@ -578,7 +578,8 @@ impl ToggleExerciseModel {
             }
             Self::Stochastic(s) => {
                 let value = extract_state_value(state, &s.state_variable);
-                let p = 1.0 / (1.0 + (-s.intercept - s.sensitivity * value).exp());
+                let p =
+                    crate::credit::scoring::ohlson::logistic(s.intercept + s.sensitivity * value);
                 u < p
             }
             Self::OptimalExercise(o) => {

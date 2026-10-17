@@ -18,7 +18,7 @@
 //!
 //! The module is structured in layers:
 //!
-//! 1. **Types** (`types`): `LiquidityProfile`, `LiquidityTier`, `LiquidityConfig`
+//! 1. **Types** (`types`): `LiquidityProfile`, `LiquidityTier`
 //! 2. **Estimators** (`estimators`): Pure functions on `&[f64]` slices
 //! 3. **LVaR** (`lvar`): Composes with existing VaR numbers
 //! 4. **Impact** (`impact`, `almgren_chriss`, `kyle`): Trade execution cost models
@@ -49,7 +49,6 @@ mod estimators;
 mod impact;
 mod kyle;
 mod lvar;
-mod registry;
 mod types;
 
 use finstack_quant_core::{Error, Result};
@@ -59,8 +58,7 @@ fn invalid_input(message: impl Into<String>) -> Error {
 }
 
 pub use types::{
-    days_to_liquidate, liquidity_tier, LiquidityConfig, LiquidityProfile, LiquidityTier,
-    SpreadVolatilityKind,
+    days_to_liquidate, liquidity_tier, LiquidityProfile, LiquidityTier, SpreadVolatilityKind,
 };
 
 pub use estimators::{amihud_illiquidity, roll_effective_spread};

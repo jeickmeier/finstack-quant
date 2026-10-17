@@ -187,15 +187,16 @@ impl EuropeanPricer {
         )
     }
 
-    /// Price a European call under risk-neutral GBM with flat continuous
+    /// Price a European option under risk-neutral GBM with flat continuous
     /// discounting `exp(-rT)`.
     ///
     /// This is a scalar-arg convenience for the common binding case where the
-    /// caller supplies raw floats rather than pre-built `GbmProcess` / `EuropeanCall`
+    /// caller supplies raw floats rather than pre-built `GbmProcess` / payoff
     /// instances.
     ///
     /// # Arguments
     ///
+    /// * `option_type` - Call or put payoff direction.
     /// * `spot` - Spot level at time `0`.
     /// * `strike` - Exercise price in the same units as `spot`.
     /// * `rate` - Continuously compounded risk-free rate (decimal, annualized).
@@ -210,8 +211,9 @@ impl EuropeanPricer {
     /// Returns an error when GBM parameters fail validation, the uniform grid
     /// is invalid, or the underlying engine rejects the run.
     #[allow(clippy::too_many_arguments)]
-    pub fn price_gbm_call(
+    pub fn price_gbm(
         &self,
+        option_type: crate::types::OptionType,
         spot: f64,
         strike: f64,
         rate: f64,
@@ -223,62 +225,33 @@ impl EuropeanPricer {
     ) -> Result<MoneyEstimate> {
         crate::monte_carlo::require_positive_vol(vol)?;
         let process = GbmProcess::with_params(rate, div_yield, vol)?;
-        let payoff = EuropeanCall::new(strike, 1.0, num_steps);
         let discount_factor = (-rate * expiry).exp();
-        self.price(
-            &process,
-            spot,
-            expiry,
-            num_steps,
-            &payoff,
-            currency,
-            discount_factor,
-        )
-    }
-
-    /// Price a European put under risk-neutral GBM with flat continuous
-    /// discounting `exp(-rT)`.
-    ///
-    /// # Arguments
-    ///
-    /// * `spot` - Spot level at time `0`.
-    /// * `strike` - Exercise price in the same units as `spot`.
-    /// * `rate` - Continuously compounded risk-free rate (decimal, annualized).
-    /// * `div_yield` - Continuous dividend yield (decimal, annualized).
-    /// * `vol` - Annualized GBM volatility (decimal).
-    /// * `expiry` - Time to expiry in years; also the uniform-grid horizon.
-    /// * `num_steps` - Number of time-grid steps between `0` and `expiry`.
-    /// * `currency` - Currency stamped on the returned estimate.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when GBM parameters fail validation, the uniform grid
-    /// is invalid, or the underlying engine rejects the run.
-    #[allow(clippy::too_many_arguments)]
-    pub fn price_gbm_put(
-        &self,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        num_steps: usize,
-        currency: Currency,
-    ) -> Result<MoneyEstimate> {
-        crate::monte_carlo::require_positive_vol(vol)?;
-        let process = GbmProcess::with_params(rate, div_yield, vol)?;
-        let payoff = EuropeanPut::new(strike, 1.0, num_steps);
-        let discount_factor = (-rate * expiry).exp();
-        self.price(
-            &process,
-            spot,
-            expiry,
-            num_steps,
-            &payoff,
-            currency,
-            discount_factor,
-        )
+        match option_type {
+            crate::types::OptionType::Call => {
+                let payoff = EuropeanCall::new(strike, 1.0, num_steps);
+                self.price(
+                    &process,
+                    spot,
+                    expiry,
+                    num_steps,
+                    &payoff,
+                    currency,
+                    discount_factor,
+                )
+            }
+            crate::types::OptionType::Put => {
+                let payoff = EuropeanPut::new(strike, 1.0, num_steps);
+                self.price(
+                    &process,
+                    spot,
+                    expiry,
+                    num_steps,
+                    &payoff,
+                    currency,
+                    discount_factor,
+                )
+            }
+        }
     }
 }
 
@@ -423,57 +396,30 @@ mod tests {
             .with_parallel(false);
 
         for case in cases {
-            let (result, expected) = if case.is_call {
-                (
-                    pricer
-                        .price_gbm_call(
-                            case.spot,
-                            case.strike,
-                            case.rate,
-                            case.div_yield,
-                            case.vol,
-                            case.expiry,
-                            1,
-                            Currency::USD,
-                        )
-                        .expect("call pricing should succeed"),
-                    crate::closed_form::bs_price(
-                        case.spot,
-                        case.strike,
-                        case.rate,
-                        case.div_yield,
-                        case.vol,
-                        case.expiry,
-                        crate::types::OptionType::Call,
-                    )
-                    .expect("valid Black-Scholes inputs"),
+            let option_type = crate::types::OptionType::from(case.is_call);
+            let result = pricer
+                .price_gbm(
+                    option_type,
+                    case.spot,
+                    case.strike,
+                    case.rate,
+                    case.div_yield,
+                    case.vol,
+                    case.expiry,
+                    1,
+                    Currency::USD,
                 )
-            } else {
-                (
-                    pricer
-                        .price_gbm_put(
-                            case.spot,
-                            case.strike,
-                            case.rate,
-                            case.div_yield,
-                            case.vol,
-                            case.expiry,
-                            1,
-                            Currency::USD,
-                        )
-                        .expect("put pricing should succeed"),
-                    crate::closed_form::bs_price(
-                        case.spot,
-                        case.strike,
-                        case.rate,
-                        case.div_yield,
-                        case.vol,
-                        case.expiry,
-                        crate::types::OptionType::Put,
-                    )
-                    .expect("valid Black-Scholes inputs"),
-                )
-            };
+                .expect("pricing should succeed");
+            let expected = crate::closed_form::bs_price(
+                case.spot,
+                case.strike,
+                case.rate,
+                case.div_yield,
+                case.vol,
+                case.expiry,
+                option_type,
+            )
+            .expect("valid Black-Scholes inputs");
 
             assert!(
                 result.stderr.is_finite() && result.stderr > 0.0,

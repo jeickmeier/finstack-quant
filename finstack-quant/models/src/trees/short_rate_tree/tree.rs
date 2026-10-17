@@ -156,6 +156,12 @@ impl ShortRateTree {
                 candidate.calibrate_bdt(&mut rates, discount_curve, dt)?;
             }
             ShortRateModel::BlackKarasinski => {
+                if self.config.volatility <= 0.0 {
+                    return Err(Error::Validation(format!(
+                        "Black-Karasinski volatility must be positive, got {}",
+                        self.config.volatility
+                    )));
+                }
                 let kappa = self.config.mean_reversion;
                 if kappa <= 0.0 {
                     return Err(Error::Validation(format!(

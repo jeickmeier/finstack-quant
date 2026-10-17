@@ -831,6 +831,15 @@ pub trait Discretization<P: StochasticProcess + ?Sized>: Send + Sync {
     fn scheme_id(&self) -> &'static str {
         "generic"
     }
+
+    /// Fixed number of time steps the discretization was precomputed for, if any.
+    ///
+    /// Schemes that preallocate step-indexed kernel tables (such as
+    /// `RoughHestonHybrid`) return `Some(num_steps)` so the engine can reject a
+    /// mismatched [`crate::monte_carlo::TimeGrid`] before stepping.
+    fn expected_num_steps(&self) -> Option<usize> {
+        None
+    }
 }
 
 /// Payoff computation with currency safety.
@@ -943,15 +952,6 @@ pub trait Payoff: Send + Sync + Clone {
     /// averages, random thresholds, and any other state that should not leak
     /// between paths.
     fn reset(&mut self);
-
-    /// Optional payoff-level discount factor hook.
-    ///
-    /// The generic [`crate::monte_carlo::engine::McEngine`] still expects an explicit
-    /// `discount_factor` argument and does not infer it from this method. This
-    /// hook exists for specialized pricers that own discounting internally.
-    fn discount_factor(&self) -> f64 {
-        1.0
-    }
 
     /// Optional hook invoked at the start of each path with access to RNG.
     ///

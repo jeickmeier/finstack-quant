@@ -408,6 +408,33 @@ pub struct JsFactorCovarianceForecast {
     model: finstack_quant_models::factor::credit::hierarchy::CreditFactorModel,
 }
 
+fn parse_vol_horizon(value: &JsValue, label: &str) -> Result<VolHorizon, JsValue> {
+    if value.is_object() {
+        let ptr =
+            js_sys::Reflect::get(value, &JsValue::from("__wbg_ptr")).unwrap_or(JsValue::UNDEFINED);
+        if ptr.as_f64().is_some_and(|p| p > 0.0) {
+            let kind = js_sys::Reflect::get(value, &JsValue::from("kind"))
+                .ok()
+                .and_then(|v| v.as_string());
+            match kind.as_deref() {
+                Some("one_step") => return Ok(VolHorizon::OneStep),
+                Some("unconditional") => return Ok(VolHorizon::Unconditional),
+                Some("n_steps") => {
+                    let n_val = js_sys::Reflect::get(value, &JsValue::from("n"))?;
+                    return Ok(VolHorizon::NSteps(js_uint(&n_val, label)?));
+                }
+                Some("years") => {
+                    let y_val = js_sys::Reflect::get(value, &JsValue::from("yearsValue"))?;
+                    return VolHorizon::years(js_f64(&y_val, label)?).map_err(to_js_err);
+                }
+                _ => {}
+            }
+        }
+    }
+    let horizon_json = json_text(value, label)?;
+    VolHorizon::parse(&horizon_json).map_err(to_js_err)
+}
+
 #[wasm_bindgen(js_class = FactorCovarianceForecast)]
 impl JsFactorCovarianceForecast {
     /// Wrap a `CreditFactorModel` for vol forecasting.
@@ -423,8 +450,8 @@ impl JsFactorCovarianceForecast {
     ///
     /// Returns a structured `FactorCovarianceMatrix` JavaScript object.
     ///
-    /// `horizon_json` accepts `"one_step"`, `"unconditional"`,
-    /// `'{"n_steps": N}'`, `'{"years": Y}'`, or
+    /// `horizon_json` accepts a `VolHorizon` handle, `"one_step"`,
+    /// `"unconditional"`, `'{"n_steps": N}'`, `'{"years": Y}'`, or
     /// `'{"n_steps": N, "periods_per_year": P}'` (years = N / P).
     ///
     /// # Errors
@@ -434,9 +461,7 @@ impl JsFactorCovarianceForecast {
     /// @param horizon_json - JSON-serialized forecast horizon defining the future covariance date or period.
     #[wasm_bindgen(js_name = covarianceAt)]
     pub fn covariance_at(&self, horizon_json: JsValue) -> Result<JsValue, JsValue> {
-        let horizon_json: &str = &json_text(&horizon_json, "horizonJson")?;
-        let h = finstack_quant_models::factor::credit::VolHorizon::parse(horizon_json)
-            .map_err(to_js_err)?;
+        let h = parse_vol_horizon(&horizon_json, "horizonJson")?;
         let forecast =
             finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&self.model);
         let cov = forecast.covariance_at(h).map_err(to_js_err)?;
@@ -459,9 +484,7 @@ impl JsFactorCovarianceForecast {
         horizon_json: JsValue,
     ) -> Result<f64, JsValue> {
         let issuer_id: &str = &js_string(&issuer_id, "issuerId")?;
-        let horizon_json: &str = &json_text(&horizon_json, "horizonJson")?;
-        let h = finstack_quant_models::factor::credit::VolHorizon::parse(horizon_json)
-            .map_err(to_js_err)?;
+        let h = parse_vol_horizon(&horizon_json, "horizonJson")?;
         let id = finstack_quant_core::types::IssuerId::new(issuer_id);
         let forecast =
             finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&self.model);
@@ -483,9 +506,7 @@ impl JsFactorCovarianceForecast {
         horizon_json: JsValue,
         risk_measure_json: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let horizon_json: &str = &json_text(&horizon_json, "horizonJson")?;
-        let h = finstack_quant_models::factor::credit::VolHorizon::parse(horizon_json)
-            .map_err(to_js_err)?;
+        let h = parse_vol_horizon(&horizon_json, "horizonJson")?;
         // `js_opt_wire`: the unit variants are bare wire strings (`"variance"`),
         // which are not JSON text.
         let measure: finstack_quant_models::factor::RiskMeasure =

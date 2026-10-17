@@ -603,7 +603,6 @@ impl BarrierOptionPdePricer {
             rate: inputs.rate,
             dividend: inputs.dividend,
             strike: inputs.strike,
-            maturity: inputs.maturity,
             is_call: inputs.is_call,
         };
 

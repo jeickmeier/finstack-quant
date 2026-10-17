@@ -458,7 +458,7 @@ fn test_vol_models_quantlib_parity() {
                     None,
                 )
                 .expect("checked Heston price");
-                let put = finstack_quant_models::closed_form::heston::heston_put_price_fourier(
+                let put = finstack_quant_models::closed_form::heston::heston_price(
                     *spot,
                     *strike,
                     *t,
@@ -467,6 +467,7 @@ fn test_vol_models_quantlib_parity() {
                         q: *dividend_yield,
                         model: params,
                     },
+                    finstack_quant_models::OptionType::Put,
                     None,
                 )
                 .expect("checked Heston price");
