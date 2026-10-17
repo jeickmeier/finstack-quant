@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::{Error, Result};
 
@@ -35,7 +33,7 @@ impl TreeCalibrationResult {
 pub struct ShortRateTree {
     pub(super) config: ShortRateTreeConfig,
     /// Calibrated short rates at each node: `rates[step][node]`
-    pub(super) rates: Arc<Vec<Vec<f64>>>,
+    pub(super) rates: Vec<Vec<f64>>,
     /// Time steps in years
     pub(super) time_steps: Vec<f64>,
     /// Calibration quality metrics (populated after calibration).
@@ -50,7 +48,7 @@ impl ShortRateTree {
     pub fn new(config: ShortRateTreeConfig) -> Self {
         Self {
             config,
-            rates: Arc::new(Vec::new()),
+            rates: Vec::new(),
             time_steps: Vec::new(),
             calibration_quality: None,
             bk_trinomial: None,
@@ -174,7 +172,7 @@ impl ShortRateTree {
             }
         }
 
-        candidate.rates = Arc::new(rates);
+        candidate.rates = rates;
         *self = candidate;
 
         Ok(())

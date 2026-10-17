@@ -79,7 +79,7 @@ fn invalid_later_discount_targets_fail_without_replacing_calibration() {
     ] {
         let mut tree = ShortRateTree::new(config);
         tree.calibrate(&curve, 1.0).expect("valid calibration");
-        let previous_rates = std::sync::Arc::clone(&tree.rates);
+        let previous_rates = tree.rates.clone();
         let previous_error = tree.calibration_result().expect("quality").max_error_bp;
         for target in [0.0, -0.1, f64::NAN, f64::INFINITY] {
             let invalid = InvalidLaterDiscount {
