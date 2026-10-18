@@ -10,12 +10,12 @@ description = "Equity instruments of Finstack Quant valuations: spot, options, f
 autotests = false
 
 [dependencies]
-finstack-quant-cashflows = { path = "../../cashflows", version = "0.10.0", default-features = false }
-finstack-quant-core = { path = "../../core", version = "0.10.0", default-features = false }
-finstack-quant-margin = { path = "../../margin", version = "0.10.0", default-features = false }
-finstack-quant-models = { path = "../../models", version = "0.10.0", default-features = false }
-finstack-quant-valuations-macros = { path = "../macros", version = "0.10.0" }
-finstack-quant-valuations-core = { path = "../core", version = "0.10.0", default-features = false }
+finstack-quant-cashflows = { path = "../../cashflows", version = "0.11.0", default-features = false }
+finstack-quant-core = { path = "../../core", version = "0.11.0", default-features = false }
+finstack-quant-margin = { path = "../../margin", version = "0.11.0", default-features = false }
+finstack-quant-models = { path = "../../models", version = "0.11.0", default-features = false }
+finstack-quant-valuations-macros = { path = "../macros", version = "0.11.0" }
+finstack-quant-valuations-core = { path = "../core", version = "0.11.0", default-features = false }
 indexmap = { workspace = true, features = ["serde"] }
 smallvec = { version = "1.15", default-features = false, features = ["serde"] }
 serde = { workspace = true }
@@ -26,7 +26,7 @@ tracing = { version = "0.1", default-features = false, features = ["attributes"]
 schemars = { workspace = true, optional = true }
 
 [dev-dependencies]
-finstack-quant-valuations-test-support = { path = "../test-support", version = "0.10.0" }
+finstack-quant-valuations-test-support = { path = "../test-support", version = "0.11.0" }
 time = { workspace = true, features = ["macros"] }
 
 [features]

@@ -1319,7 +1319,7 @@
   ],
   "hostContract": {
     "source": "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
-    "sha256": "4a611bde2be9acde938f74fb0cacef36ef955deb68e4d40a5be91ac322d9b7da"
+    "sha256": "91da98d63e0bd5ee3ff631e29958e056f92b060f87a8f20369504289ffe93d23"
   },
   "details": [
     {

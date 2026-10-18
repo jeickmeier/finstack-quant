@@ -18,9 +18,9 @@
         "@finstack/json-viewer",
         "@finstack/finstack-codec"
       ],
-      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.10.0"],
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.11.0"],
       "categories": ["Individual Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "use-fx-delta-samples",
@@ -40,7 +40,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -65,7 +65,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -94,7 +94,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -126,7 +126,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"

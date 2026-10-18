@@ -32,7 +32,7 @@ has its own pricing/attribution golden runner under
 
 ```toml
 [dev-dependencies]
-finstack-quant-test-utils = { path = "../test-utils", version = "0.10.0" }
+finstack-quant-test-utils = { path = "../test-utils", version = "0.11.0" }
 ```
 
 ## Public surface

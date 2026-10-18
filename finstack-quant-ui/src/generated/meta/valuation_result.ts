@@ -23,7 +23,7 @@ export default [
             },
             "version": 1
           },
-          "version": "0.10.0"
+          "version": "0.11.0"
         },
         "schema_version": 1,
         "value": {
@@ -314,7 +314,7 @@ export default [
         },
         "version": 1
       },
-      "version": "0.10.0"
+      "version": "0.11.0"
     },
     "description": "Audit stamp: numeric mode, rounding context, and FX policy in force.",
     "ref": "#/$defs/ResultsMeta",

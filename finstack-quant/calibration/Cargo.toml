@@ -11,12 +11,12 @@ autobenches = false
 autotests = false
 
 [dependencies]
-finstack-quant-core = { path = "../core", version = "0.10.0", default-features = false }
-finstack-quant-models = { path = "../models", version = "0.10.0", default-features = false }
-finstack-quant-cashflows = { path = "../cashflows", version = "0.10.0", default-features = false }
-finstack-quant-valuations-core = { path = "../valuations/core", version = "0.10.0", default-features = false }
-finstack-quant-valuations-credit = { path = "../valuations/credit", version = "0.10.0", default-features = false }
-finstack-quant-valuations-rates = { path = "../valuations/rates", version = "0.10.0", default-features = false }
+finstack-quant-core = { path = "../core", version = "0.11.0", default-features = false }
+finstack-quant-models = { path = "../models", version = "0.11.0", default-features = false }
+finstack-quant-cashflows = { path = "../cashflows", version = "0.11.0", default-features = false }
+finstack-quant-valuations-core = { path = "../valuations/core", version = "0.11.0", default-features = false }
+finstack-quant-valuations-credit = { path = "../valuations/credit", version = "0.11.0", default-features = false }
+finstack-quant-valuations-rates = { path = "../valuations/rates", version = "0.11.0", default-features = false }
 indexmap = { workspace = true, features = ["serde"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -35,9 +35,9 @@ rayon = "1.11"
 # The closed world (`InstrumentJson`, `Bond`) is test-only here: library code
 # narrows to valuations-core + rates + credit so structured credit, equity, FX
 # and exotics edits never rebuild calibration.
-finstack-quant-valuations = { path = "../valuations", version = "0.10.0", default-features = false }
-finstack-quant-test-utils = { path = "../test-utils", version = "0.10.0" }
-finstack-quant-valuations-test-support = { path = "../valuations/test-support", version = "0.10.0" }
+finstack-quant-valuations = { path = "../valuations", version = "0.11.0", default-features = false }
+finstack-quant-test-utils = { path = "../test-utils", version = "0.11.0" }
+finstack-quant-valuations-test-support = { path = "../valuations/test-support", version = "0.11.0" }
 time = { workspace = true, features = ["macros"] }
 proptest = "1.11.0"
 criterion = { workspace = true }

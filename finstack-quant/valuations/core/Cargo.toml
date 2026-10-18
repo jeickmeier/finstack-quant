@@ -9,12 +9,12 @@ authors.workspace = true
 description = "Pricing framework of Finstack Quant valuations: the Instrument trait, pricer and metric registries, market conventions and result envelopes shared by every instrument family"
 
 [dependencies]
-finstack-quant-core = { path = "../../core", version = "0.10.0", default-features = false }
-finstack-quant-cashflows = { path = "../../cashflows", version = "0.10.0", default-features = false }
-finstack-quant-covenants = { path = "../../covenants", version = "0.10.0", default-features = false }
-finstack-quant-margin = { path = "../../margin", version = "0.10.0", default-features = false }
-finstack-quant-models = { path = "../../models", version = "0.10.0", default-features = false }
-finstack-quant-valuations-macros = { path = "../macros", version = "0.10.0" }
+finstack-quant-core = { path = "../../core", version = "0.11.0", default-features = false }
+finstack-quant-cashflows = { path = "../../cashflows", version = "0.11.0", default-features = false }
+finstack-quant-covenants = { path = "../../covenants", version = "0.11.0", default-features = false }
+finstack-quant-margin = { path = "../../margin", version = "0.11.0", default-features = false }
+finstack-quant-models = { path = "../../models", version = "0.11.0", default-features = false }
+finstack-quant-valuations-macros = { path = "../macros", version = "0.11.0" }
 indexmap = { workspace = true, features = ["serde"] }
 smallvec = { version = "1.15", default-features = false, features = ["serde"] }
 serde = { workspace = true }

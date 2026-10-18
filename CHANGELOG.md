@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+Workspace version 0.11.0: the valuations split below removes and moves public Rust items (see the section that follows), so the crates, the Python wheel and the WASM package take a breaking-change version bump.
+
 ### Valuations split: the pricing framework is `finstack-quant-valuations-core`
 
 #### Added

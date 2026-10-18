@@ -26,7 +26,7 @@
         "popover"
       ],
       "categories": ["Primitive Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.10.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     },
     {
       "name": "measure-value",
@@ -49,7 +49,7 @@
       "categories": ["Primitive Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -78,7 +78,7 @@
       "categories": ["Primitive Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -101,11 +101,11 @@
         "@finstack/money-value",
         "@finstack/stamp-badge"
       ],
-      "dependencies": ["finstack-quant-wasm@0.10.0"],
+      "dependencies": ["finstack-quant-wasm@0.11.0"],
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -134,7 +134,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -154,11 +154,11 @@
         }
       ],
       "registryDependencies": ["@finstack/measure-value"],
-      "dependencies": ["finstack-quant-wasm@0.10.0"],
+      "dependencies": ["finstack-quant-wasm@0.11.0"],
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -195,7 +195,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json",
@@ -307,7 +307,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -344,7 +344,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -372,7 +372,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -398,11 +398,11 @@
         "@finstack/explanation-trace",
         "@finstack/covenant-report"
       ],
-      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.10.0"],
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.11.0"],
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -429,11 +429,11 @@
         "@finstack/finstack-codec",
         "@finstack/use-linked-selection"
       ],
-      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.10.0"],
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.11.0"],
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -513,11 +513,11 @@
         "@finstack/use-cashflows",
         "@finstack/finstack-worker"
       ],
-      "dependencies": ["@base-ui/react@1.8.0", "finstack-quant-wasm@0.10.0"],
+      "dependencies": ["@base-ui/react@1.8.0", "finstack-quant-wasm@0.11.0"],
       "categories": ["Blocks"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
@@ -622,7 +622,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -647,7 +647,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -672,7 +672,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -697,7 +697,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -729,7 +729,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.10.0",
+        "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json",
