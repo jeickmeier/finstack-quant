@@ -156,7 +156,9 @@ pub use finstack_quant_valuations_core::instruments::*;
 pub mod cashflow_export;
 
 /// Commodity derivatives.
-pub mod commodity;
+pub mod commodity {
+    pub use finstack_quant_valuations_exotics::commodity::*;
+}
 /// Generic cross-asset composite and synthetic instruments.
 pub mod composite;
 /// Credit derivatives: CDS and related instruments.

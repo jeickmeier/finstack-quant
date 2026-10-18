@@ -1,0 +1,407 @@
+//! Barrier option instrument definition.
+
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
+use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::{Monitoring, OptionType};
+
+use finstack_quant_core::types::{BarrierType, PayoutTiming};
+
+/// Barrier option with a total trade rebate and explicit contractual monitoring.
+/// Continuous monitoring uses closed-form pricing by default. Discrete monitoring
+/// observes only the supplied dates and uses Monte Carlo by default.
+#[derive(
+    PartialEq,
+    Clone,
+    Debug,
+    finstack_quant_valuations_macros::FinancialBuilder,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct BarrierOption {
+    /// Unique instrument identifier
+    pub id: InstrumentId,
+    /// Underlying asset ticker symbol
+    pub underlying_ticker: String,
+    /// Strike price
+    pub strike: f64,
+    /// Barrier level: the absolute underlying price that triggers the
+    /// knock-in/out, in the same quote units as `strike`.
+    pub barrier: f64,
+    /// Total contractual trade rebate in the payoff currency, independent of
+    /// notional. Knock-outs pay on a hit according to `rebate_timing`;
+    /// knock-ins pay at expiry only if no hit occurred.
+    pub rebate: Option<Money>,
+    /// Timing of the knock-out rebate payment.
+    ///
+    /// `at_hit` (default, market standard) pays the rebate the moment a
+    /// knock-out barrier is breached; `at_expiry` defers payment to expiry.
+    /// Knock-in rebates always pay at expiry (a no-hit is only known then),
+    /// so this setting does not affect them. The analytical pricer values
+    /// at-hit rebates via the discounted first-passage closed form. Monte
+    /// Carlo applies at-hit when `rebate_timing == AtHit` via
+    /// `with_rebate_at_hit`; the crate primitive defaults to at-expiry.
+    #[builder(default)]
+    #[serde(default)]
+    pub rebate_timing: PayoutTiming,
+    /// Option type (call or put)
+    pub option_type: OptionType,
+    /// Barrier type (up/down, in/out)
+    pub barrier_type: BarrierType,
+    /// Option expiry date
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub expiry: Date,
+    /// Terminal underlying fixing observed at expiry, in the same quote units
+    /// as `strike`.
+    ///
+    /// Required when valuing after expiry so the realized intrinsic value is
+    /// invariant to later market spot updates. At expiry, the current market
+    /// spot is used when this field is absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expiry_fixing: Option<f64>,
+    /// Observed barrier state for expired options.
+    ///
+    /// Historical barrier monitoring must be supplied explicitly for expired
+    /// options because terminal spot alone does not reveal whether the barrier
+    /// was breached intralife and then reversed.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_barrier_breached: Option<bool>,
+    /// Number of underlying units the option is written on; PV and Greeks scale linearly with it.
+    pub quantity: f64,
+    /// Currency of the strike, premium and present value.
+    pub currency: Currency,
+    /// Day count convention
+    pub day_count: finstack_quant_core::dates::DayCount,
+    /// Contractual monitoring: continuous or an explicit, strictly increasing
+    /// set of observation dates no later than expiry. Discrete pricing does not
+    /// interpolate hits between those dates.
+    #[builder(default)]
+    #[serde(default)]
+    pub monitoring: Monitoring,
+    /// Discount curve ID for present value calculations
+    pub discount_curve_id: CurveId,
+    /// Spot price identifier
+    pub spot_id: PriceId,
+    /// Volatility surface ID
+    pub vol_surface_id: CurveId,
+    /// Optional dividend-yield scalar ID
+    pub div_yield_id: Option<PriceId>,
+    /// Instrument-owned pricing inputs.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+    )]
+    pub instrument_pricing_overrides:
+        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+    )]
+    pub metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+    )]
+    pub scenario_pricing_overrides:
+        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+    /// Attributes for scenario selection and grouping
+    pub attributes: Attributes,
+}
+
+impl BarrierOption {
+    /// Create a canonical example barrier option (up-and-out call).
+    ///
+    /// Uses continuous contractual monitoring by default.
+    pub fn example() -> finstack_quant_core::Result<Self> {
+        use finstack_quant_core::currency::Currency;
+        use finstack_quant_core::dates::DayCount;
+        use time::macros::date;
+        BarrierOption::builder()
+            .id(InstrumentId::new("BAR-SPX-UO-CALL"))
+            .underlying_ticker("SPX".to_string())
+            .strike(4500.0)
+            .barrier(5000.0)
+            .rebate(Money::from((50_i64, Currency::USD)))
+            .option_type(finstack_quant_valuations_core::instruments::OptionType::Call)
+            .barrier_type(BarrierType::UpAndOut)
+            .expiry(date!(2024 - 12 - 20))
+            .expiry_fixing_opt(None)
+            .observed_barrier_breached_opt(None)
+            .quantity(100_000.0)
+            .currency(Currency::USD)
+            .day_count(DayCount::Act365F)
+            .monitoring(Monitoring::Continuous)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .spot_id("SPX-SPOT".into())
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
+            .attributes(Attributes::new())
+            .build()
+    }
+
+    pub(crate) fn validate_monitoring_state(&self, as_of: Date) -> finstack_quant_core::Result<()> {
+        use finstack_quant_valuations_core::instruments::Instrument;
+        self.validate_invariants()?;
+        if let Monitoring::Discrete { observation_dates } = &self.monitoring {
+            if observation_dates.iter().any(|date| *date < as_of)
+                && self.observed_barrier_breached.is_none()
+            {
+                return Err(finstack_quant_core::Error::Validation(
+                    "BarrierOption requires observed_barrier_breached for past observation dates"
+                        .to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Price the total trade payoff and rebate with the GBM Monte Carlo engine.
+    ///
+    /// # Arguments
+    ///
+    /// - `market`: Market context containing the instrument's spot, volatility,
+    ///   discount curve and optional dividend-yield inputs. Volatilities and
+    ///   yields are decimal annualized values; spot is in the payoff currency.
+    /// - `as_of`: Valuation date defining the start of the remaining simulation.
+    ///   Discrete monitoring uses the contract's exact observation dates;
+    ///   continuous monitoring uses a Brownian bridge between simulation steps.
+    ///
+    /// # Returns
+    /// Present value in the notional currency. Rebate Money is the total trade
+    /// payment and is discounted according to its contractual payment timing.
+    ///
+    /// # Errors
+    /// Returns an error for missing market inputs, invalid parameters or missing
+    /// observed barrier state for monitoring dates before `as_of`.
+    pub fn npv_mc(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        use crate::exotics::barrier_option::pricer;
+        pricer::compute_pv(self, market, as_of)
+    }
+}
+
+impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
+    for BarrierOption
+{
+    impl_instrument_base!(
+        finstack_quant_valuations_core::pricer::InstrumentType::BarrierOption,
+        crate::exotics::EXOTICS
+    );
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        use finstack_quant_core::validation;
+        // Strike and barrier must satisfy the closed-form model domain
+        // (`validate_barrier_inputs` rejects non-positive values with a NaN
+        // sentinel); rejecting them here surfaces a `Validation` error at the
+        // instrument boundary instead of panicking inside `Money::new`.
+        validation::validate_f64_positive(self.strike, "BarrierOption strike")?;
+        validation::validate_f64_positive(self.quantity, "BarrierOption quantity")?;
+        validation::validate_f64_positive(self.barrier, "BarrierOption barrier")?;
+        if let Some(rebate) = self.rebate {
+            if rebate.currency() != self.currency {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: self.currency,
+                    actual: rebate.currency(),
+                });
+            }
+            // A zero rebate is economically identical to `None` and stays
+            // accepted; only negative or non-finite amounts are rejected.
+            validation::validate_f64_non_negative(rebate.amount(), "BarrierOption rebate")?;
+        }
+        if let Monitoring::Discrete { observation_dates } = &self.monitoring {
+            validation::require_with(!observation_dates.is_empty(), || {
+                "BarrierOption discrete monitoring requires observation_dates".to_string()
+            })?;
+            validation::validate_sorted_strict(
+                observation_dates,
+                "BarrierOption observation_dates",
+            )?;
+            validation::require_with(
+                observation_dates.iter().all(|date| *date <= self.expiry),
+                || "BarrierOption observation_dates must not be after expiry".to_string(),
+            )?;
+        }
+        if let Some(fixing) = self.expiry_fixing {
+            validation::validate_f64_positive(fixing, "BarrierOption expiry_fixing")?;
+        }
+        Ok(())
+    }
+
+    fn default_model(&self) -> finstack_quant_valuations_core::pricer::ModelKey {
+        if matches!(self.monitoring, Monitoring::Discrete { .. }) {
+            finstack_quant_valuations_core::pricer::ModelKey::MonteCarloGBM
+        } else {
+            finstack_quant_valuations_core::pricer::ModelKey::BarrierBSContinuous
+        }
+    }
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_market_scalar_id(self.spot_id.as_str());
+        deps.add_volatility_dependency(
+            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                Some(self.spot_id.clone()),
+                Some(self.strike),
+            ),
+        );
+        if let Some(dividend_yield) = &self.div_yield_id {
+            deps.add_market_scalar_id(dividend_yield.as_str());
+        }
+        Ok(deps)
+    }
+
+    /// Compute the present value with explicit monitoring semantics.
+    ///
+    /// Continuous monitoring selects analytical pricing; discrete dates select MC.
+    fn base_value(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        if matches!(self.monitoring, Monitoring::Discrete { .. }) {
+            return self.npv_mc(market, as_of);
+        }
+
+        use crate::exotics::barrier_option::pricer::BarrierOptionAnalyticalPricer;
+        use finstack_quant_valuations_core::pricer::Pricer;
+
+        let pricer = BarrierOptionAnalyticalPricer::new();
+        let result = pricer
+            .price_dyn(self, market, as_of)
+            .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
+        Ok(result.value)
+    }
+
+    fn expiry(&self) -> Option<Date> {
+        Some(self.expiry)
+    }
+
+    /// Roll the observed barrier state with spot held at its `as_of` level.
+    ///
+    /// State is recorded when the rolled pricing needs it: a discrete
+    /// observation date before `rolled_date`, or a roll to expiry. When no
+    /// state is recorded, the copy records the barrier as breached exactly
+    /// when the `as_of` spot is at or beyond it. Before expiry, continuous
+    /// monitoring needs no recorded state: the pricer reads a breach from the
+    /// held spot itself, as it does at `as_of`.
+    ///
+    /// # Arguments
+    /// * `market` - Market at `as_of` supplying the `spot_id` level held over the roll.
+    /// * `as_of` - Valuation date the roll starts from.
+    /// * `rolled_date` - Date theta reprices at, capped at expiry.
+    fn theta_observed_state(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> finstack_quant_core::Result<
+        Option<
+            Box<dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument>,
+        >,
+    > {
+        if self.observed_barrier_breached.is_some() || as_of >= self.expiry {
+            return Ok(None);
+        }
+        let monitored = rolled_date >= self.expiry
+            || matches!(
+                &self.monitoring,
+                Monitoring::Discrete { observation_dates }
+                    if observation_dates.iter().any(|date| *date < rolled_date)
+            );
+        if !monitored {
+            return Ok(None);
+        }
+        let spot = super::pricer::resolve_spot(self, market)?;
+        let breached = if self.barrier_type.is_up() {
+            spot >= self.barrier
+        } else {
+            spot <= self.barrier
+        };
+        let mut observed = self.clone();
+        observed.observed_barrier_breached = Some(breached);
+        Ok(Some(Box::new(observed)))
+    }
+
+    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+}
+
+finstack_quant_valuations_core::impl_empty_cashflow_provider!(
+    BarrierOption,
+    finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
+);
+
+#[cfg(test)]
+mod tests {
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::scalars::MarketScalar;
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::money::Money;
+
+    #[test]
+    fn expired_barrier_requires_observed_state() {
+        let mut option = super::BarrierOption::example().expect("BarrierOption example is valid");
+        option.monitoring = super::Monitoring::Continuous;
+        option.observed_barrier_breached = None;
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(option.expiry)
+                    .knots([(0.0, 1.0), (1.0, 1.0)])
+                    .build()
+                    .expect("discount curve"),
+            )
+            .insert_surface(
+                VolSurface::from_grid(
+                    "SPX-VOL",
+                    &[0.0, 1.0],
+                    &[4000.0, 6000.0],
+                    &[0.2, 0.2, 0.2, 0.2],
+                )
+                .expect("surface"),
+            )
+            .insert_price("SPX-DIV", MarketScalar::Unitless(0.0))
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::Price(Money::from((5100_i64, Currency::USD))),
+            );
+
+        let err =
+            finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::value(
+                &option,
+                &market,
+                option.expiry,
+            )
+            .expect_err("expired barrier should require observed barrier state");
+        assert!(
+            format!("{err}").contains("observed_barrier_breached"),
+            "unexpected error: {err}"
+        );
+    }
+}

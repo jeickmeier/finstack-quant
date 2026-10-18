@@ -105,11 +105,6 @@ mod future_option;
 #[path = "instruments/swaption/mod.rs"]
 mod swaption;
 
-/// Exotic-rate MC/LSMC harness validation tests
-/// (see `instruments/exotic_harness/mod.rs`)
-#[path = "instruments/exotic_harness/mod.rs"]
-mod exotic_harness;
-
 // Credit Derivatives
 
 /// Credit Default Swap (CDS) tests - Single-name protection
@@ -134,10 +129,6 @@ mod cds_tranche;
 #[path = "instruments/equity/mod.rs"]
 mod equity;
 
-/// Barrier option tests - Knock-in/knock-out options
-#[path = "instruments/barrier_option/mod.rs"]
-mod barrier_option;
-
 /// Basket option tests - Multi-underlying options
 #[path = "instruments/basket/mod.rs"]
 mod basket;
@@ -145,10 +136,6 @@ mod basket;
 /// Equity option tests - Vanilla and exotic equity options
 #[path = "instruments/equity_option/mod.rs"]
 mod equity_option;
-
-/// Lookback option tests
-#[path = "instruments/lookback_option/mod.rs"]
-mod lookback_option;
 
 /// Total Return Swap (TRS) tests - Equity and asset swaps
 #[path = "instruments/trs/mod.rs"]

@@ -1,0 +1,47 @@
+//! Rho calculator for lookback options.
+//!
+//! Computes rho (interest rate sensitivity) via finite differences: bump the
+//! discount curve by the resolved `rate_bump_bp` (default 1bp), reprice, and
+//! report the PV change per 1bp.
+//!
+//! Units & sign:
+//! - Rho is per +1bp parallel discount move
+//! - Rho = (PV(rate + bump) − PV(base)) / rate_bump_bp
+//! - Positive Rho means the instrument gains value when rates go up
+
+use crate::exotics::lookback_option::LookbackOption;
+use finstack_quant_core::Result;
+use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
+use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
+
+/// Rho calculator for lookback options.
+pub struct RhoCalculator;
+
+impl MetricCalculator for RhoCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
+        let option: &LookbackOption = context.instrument_as()?;
+        let as_of = context.as_of;
+        let base_pv = context.base_value.amount();
+
+        let t = option.day_count.year_fraction(
+            as_of,
+            option.expiry,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )?;
+        if t <= 0.0 {
+            return Ok(0.0);
+        }
+
+        let curves_bumped =
+            bump_discount_curve_parallel(&context.curves, &option.discount_curve_id, bump_bp)?;
+
+        // Reprice with bumped curve
+        let pv_bumped = option.value(&curves_bumped, as_of)?.amount();
+
+        // Rho per 1bp = (PV(rate + bump) − PV(base)) / bump_bp
+        Ok((pv_bumped - base_pv) / bump_bp)
+    }
+}

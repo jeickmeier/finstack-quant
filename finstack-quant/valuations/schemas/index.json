@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 1003263,
+      "bytes": 1003226,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -227,7 +227,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json",
-      "bytes": 14623,
+      "bytes": 14628,
       "kind": "input",
       "path": "schemas/instruments/1/commodity/commodity_forward.schema.json",
       "summary": "Forward on a commodity reference price.",
@@ -254,7 +254,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json",
-      "bytes": 14489,
+      "bytes": 14476,
       "kind": "input",
       "path": "schemas/instruments/1/commodity/commodity_spot_option.schema.json",
       "summary": "Option on spot commodity with observed-spot exercise and explicit cash or physical settlement.",
@@ -272,7 +272,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swap.schema.json",
-      "bytes": 10107,
+      "bytes": 10112,
       "kind": "input",
       "path": "schemas/instruments/1/commodity/commodity_swap.schema.json",
       "summary": "Fixed-versus-floating commodity swap on an average price.",
@@ -281,7 +281,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json",
-      "bytes": 9478,
+      "bytes": 9483,
       "kind": "input",
       "path": "schemas/instruments/1/commodity/commodity_swaption.schema.json",
       "summary": "Option to enter a commodity swap.",
@@ -290,7 +290,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1011176,
+      "bytes": 1011139,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -488,7 +488,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1010153,
+      "bytes": 1010116,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -497,7 +497,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json",
-      "bytes": 15303,
+      "bytes": 15277,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/callable_range_accrual.schema.json",
       "summary": "Range accrual with issuer call rights.",
@@ -515,7 +515,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json",
-      "bytes": 12511,
+      "bytes": 12485,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/range_accrual.schema.json",
       "summary": "Coupon accruing only on days the index sits inside a range.",
@@ -767,7 +767,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1101267,
+      "bytes": 1101230,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -947,7 +947,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1012784,
+      "bytes": 1012747,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",
