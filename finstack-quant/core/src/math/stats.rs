@@ -1067,7 +1067,8 @@ pub fn compensated_variance(xs: &[f64], mean: f64) -> f64 {
 /// # Arguments
 ///
 /// * `xs` - First sample; only the first `min(xs.len(), ys.len())` pairs are used.
-/// * `ys` - Second sample.
+/// * `ys` - Second sample, paired index-by-index with `xs`; entries beyond the
+///   shorter slice's length are ignored.
 /// * `mean_x` - Sample mean of `xs`.
 /// * `mean_y` - Sample mean of `ys`.
 #[must_use]
