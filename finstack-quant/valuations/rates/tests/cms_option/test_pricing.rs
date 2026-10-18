@@ -602,3 +602,125 @@ fn replication_greeks_reprice_with_the_replication_pricer() {
         );
     }
 }
+
+/// Independent oracle for the CMS-option vanna (per vol point): the central
+/// difference, under a parallel vol shift, of the Black delta of the
+/// convexity-adjusted forward exactly as the pricer builds it — σ(F) drives the
+/// Hagan convexity adjustment, σ(K) drives the Black payoff. Seasoned periods
+/// carry no vol dependence and are skipped.
+fn vanna_oracle(inst: &CmsOption, market: &MarketContext, as_of: Date) -> f64 {
+    use finstack_quant_core::dates::{DateExt, DayCountContext};
+    use finstack_quant_core::math::norm_cdf;
+    use finstack_quant_valuations_rates::cms_option::pricer::convexity_adjustment_with_frequency;
+
+    let disc = market
+        .get_discount(inst.discount_curve_id.as_str())
+        .unwrap();
+    let surface = market.get_surface(inst.vol_surface_id.as_str()).unwrap();
+    let reference = inst.reference_swap();
+    let strike: f64 = inst.strike.to_string().parse().unwrap();
+    let h = 1e-5;
+    let mut expected_vanna = 0.0;
+    for (i, fixing) in inst.fixing_dates.iter().copied().enumerate() {
+        if inst.payment_dates[i] <= as_of || fixing < as_of {
+            continue;
+        }
+        let t = DayCount::Act365F
+            .year_fraction(as_of, fixing, DayCountContext::default())
+            .unwrap();
+        if t <= 1e-6 {
+            continue;
+        }
+        let start = reference.reference_swap_start(fixing).unwrap();
+        let end = start
+            .add_months(inst.cms_tenor.months().expect("month tenor") as i32)
+            .expect("valid date shift");
+        let (forward, _) = reference
+            .forward_rate_and_annuity(market, as_of, start, end)
+            .unwrap();
+        let strike_vol =
+            finstack_quant_models::volatility::get_surface_vol_clamped(&surface, t, strike);
+        let atm_vol =
+            finstack_quant_models::volatility::get_surface_vol_clamped(&surface, t, forward);
+        let delta = |shift: f64| {
+            let convexity = convexity_adjustment_with_frequency(
+                atm_vol + shift,
+                t,
+                inst.cms_tenor.to_years(),
+                forward,
+                reference.payments_per_year().unwrap(),
+                (inst.payment_dates[i] - start).whole_days() as f64 / 365.0,
+            );
+            let adjusted = forward + convexity;
+            let sigma = strike_vol + shift;
+            let d1 = ((adjusted / strike).ln() + 0.5 * sigma * sigma * t) / (sigma * t.sqrt());
+            norm_cdf(d1)
+        };
+        let df = disc.df_on_date(inst.payment_dates[i]).unwrap() / disc.df_on_date(as_of).unwrap();
+        expected_vanna += df * inst.accrual_fractions[i] * (delta(h) - delta(-h)) / (2.0 * h)
+            * 0.01
+            * inst.notional.amount();
+    }
+    expected_vanna
+}
+
+fn vanna_of(inst: &CmsOption, market: &MarketContext, as_of: Date) -> f64 {
+    let result = inst
+        .price_with_metrics(
+            market,
+            as_of,
+            &[MetricId::Vanna],
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
+        )
+        .expect("vanna");
+    result
+        .measures
+        .get(MetricId::Vanna.as_str())
+        .copied()
+        .expect("vanna measure")
+}
+
+/// On a skewed surface the analytic vanna must differentiate the price the
+/// pricer actually produces: convexity adjustment on σ(F), Black payoff on σ(K).
+#[test]
+fn vanna_uses_atm_vol_for_convexity_on_skewed_surface() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let market = skewed_vol_market(as_of, 0.20, 0.35);
+    let mut inst = CmsOption::example().expect("example");
+    inst.strike = Decimal::try_from(0.02).expect("valid decimal");
+
+    let analytical = vanna_of(&inst, &market, as_of);
+    let expected = vanna_oracle(&inst, &market, as_of);
+    assert!(
+        (analytical - expected).abs() < 1e-6 * expected.abs(),
+        "vanna on a skewed surface must use σ(F) for the convexity term: \
+         expected {expected}, got {analytical}"
+    );
+}
+
+/// A CMS option with a fixed-but-unpaid coupon has vanna equal to that of its
+/// remaining unfixed periods; the seasoned period has no vol dependence.
+#[test]
+fn vanna_skips_seasoned_fixed_period() {
+    let as_of = Date::from_calendar_date(2025, Month::April, 1).unwrap();
+    let inst = CmsOption::example().expect("example");
+    let fixing = inst.fixing_dates[0];
+    assert!(fixing < as_of && inst.payment_dates[0] > as_of);
+    let market = with_cms_fixing(standard_market(as_of), fixing, 0.04);
+
+    let seasoned = vanna_of(&inst, &market, as_of);
+
+    let mut remaining = inst.clone();
+    remaining.fixing_dates.remove(0);
+    remaining.payment_dates.remove(0);
+    remaining.accrual_fractions.remove(0);
+    let unfixed = vanna_of(&remaining, &market, as_of);
+
+    assert!(seasoned.is_finite() && unfixed.abs() > 0.0);
+    assert!(
+        (seasoned - unfixed).abs() < 1e-9 * unfixed.abs(),
+        "seasoned vanna {seasoned} must equal the unfixed-period vanna {unfixed}"
+    );
+    let expected = vanna_oracle(&inst, &market, as_of);
+    assert!((seasoned - expected).abs() < 1e-6 * expected.abs());
+}

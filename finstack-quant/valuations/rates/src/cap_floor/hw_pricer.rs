@@ -224,12 +224,17 @@ impl CapFloorHullWhitePricer {
 
         let periods = cap_floor.pricing_periods()?;
 
+        let net_result = |option_value: Money| {
+            cap_floor
+                .net_of_premium(option_value, market, as_of)
+                .map(|pv| ValuationResult::stamped(cap_floor.id.as_str(), as_of, pv))
+                .map_err(|error| {
+                    PricingError::from_core(error, PricingErrorContext::from_instrument(cap_floor))
+                })
+        };
+
         if periods.is_empty() {
-            return Ok(ValuationResult::stamped(
-                cap_floor.id.as_str(),
-                as_of,
-                Money::from((0_i64, cap_floor.notional.currency())),
-            ));
+            return net_result(Money::from((0_i64, cap_floor.notional.currency())));
         }
 
         let strike = cap_floor.strike_f64()?;
@@ -337,13 +342,11 @@ impl CapFloorHullWhitePricer {
             total_pv += caplet_pv;
         }
 
-        Ok(ValuationResult::stamped(
-            cap_floor.id.as_str(),
-            as_of,
+        net_result(
             Money::new(total_pv, cap_floor.notional.currency()).map_err(|error| {
                 PricingError::from_core(error, PricingErrorContext::from_instrument(cap_floor))
             })?,
-        ))
+        )
     }
 }
 
@@ -732,6 +735,38 @@ mod tests {
             .insert_price(&kappa_key, MarketScalar::Unitless(0.05))
             .insert_price(&sigma_key, MarketScalar::Unitless(0.01));
         (as_of, cap, market)
+    }
+
+    /// The HW1F price is net of an unsettled premium, exactly as the Black76
+    /// pricer and `CapFloor::base_value` are.
+    #[test]
+    fn hw_cap_floor_price_is_net_of_future_premium() {
+        let (as_of, mut cap, market) = example_cap_market();
+        let gross = CapFloorHullWhitePricer
+            .price_internal(&cap, &market, as_of)
+            .expect("gross HW price")
+            .value
+            .amount();
+        let payment_date = date(2024, 1, 2);
+        cap.premium = Some((
+            payment_date,
+            Money::new(25_000.0, Currency::USD).expect("premium"),
+        ));
+        let net = CapFloorHullWhitePricer
+            .price_internal(&cap, &market, as_of)
+            .expect("net HW price")
+            .value
+            .amount();
+        let df = market
+            .get_discount(cap.discount_curve_id.as_str())
+            .expect("discount")
+            .df_between_dates(as_of, payment_date)
+            .expect("premium DF");
+        assert!(
+            (net - (gross - 25_000.0 * df)).abs() < 1.0e-8,
+            "HW net {net} must equal gross {gross} minus premium PV {}",
+            25_000.0 * df
+        );
     }
 
     /// When the `MarketContext` carries a fitted `{curve}_CAPFLOOR_HW1F_*`
