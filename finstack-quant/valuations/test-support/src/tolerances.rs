@@ -25,7 +25,7 @@
 //! # Example Usage
 //!
 //! ```rust,ignore
-//! use crate::common::tolerances;
+//! use finstack_quant_valuations_test_support::tolerances;
 //! use finstack_quant_test_utils::assert::approx_eq;
 //!
 //! // For analytical put-call parity check

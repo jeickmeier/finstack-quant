@@ -8,7 +8,6 @@
 //!   negative for a callable loan and exactly zero when there is no call
 //!   schedule.
 
-use crate::instruments::common::test_helpers::flat_discount_curve;
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
@@ -20,6 +19,7 @@ use finstack_quant_valuations::instruments::fixed_income::term_loan::{
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_test_support::test_helpers::flat_discount_curve;
 use time::macros::date;
 
 /// Build a 5Y bullet 6% fixed-rate loan, optionally with an upfront fee and/or

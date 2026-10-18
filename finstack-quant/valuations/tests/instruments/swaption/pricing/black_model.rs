@@ -1,12 +1,12 @@
 //! Black model pricing tests with manual formula validation
 
-use crate::instruments::common::test_helpers::tolerances;
 use crate::instruments::swaption::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations_test_support::test_helpers::tolerances;
 
 #[test]
 fn test_atm_payer_swaption_pricing() {

@@ -1,13 +1,13 @@
 //! FX barrier expiry metadata and the shared theta horizon.
 
-use crate::instruments::test_support::date::date;
-use crate::instruments::test_support::discount_forward_curves::flat_discount_with_tenor;
-use crate::instruments::test_support::volatility::flat_vol_surface;
 use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_valuations::instruments::{FxBarrierOption, Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_test_support::date::date;
+use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
+use finstack_quant_valuations_test_support::volatility::flat_vol_surface;
 
 #[test]
 fn fx_barrier_generic_theta_horizon_caps_at_expiry() -> finstack_quant_core::Result<()> {

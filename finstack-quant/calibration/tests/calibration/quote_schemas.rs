@@ -6,7 +6,6 @@
 //! - `market/quotes/inflation.rs`
 //! - `market/quotes/vol.rs`
 
-use crate::calibration::common::tolerances;
 use finstack_quant_calibration::quotes::cds::CdsQuote;
 use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
 use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
@@ -21,6 +20,7 @@ use finstack_quant_valuations::instruments::OptionType;
 use finstack_quant_valuations::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, InflationSwapConventionId, XccyConventionId,
 };
+use finstack_quant_valuations_test_support::tolerances;
 use std::str::FromStr;
 
 fn d(y: i32, m: time::Month, day: u8) -> Date {

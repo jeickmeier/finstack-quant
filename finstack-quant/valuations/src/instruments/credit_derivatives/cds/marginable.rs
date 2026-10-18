@@ -95,15 +95,9 @@ impl Marginable for CreditDefaultSwap {
 
 #[cfg(test)]
 mod tests {
-    #[allow(dead_code, unused_imports)]
-    mod discount_forward_curve_support {
-        include!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/support/discount_forward_curves.rs"
-        ));
-    }
     use super::*;
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_valuations_test_support::discount_forward_curves as discount_forward_curve_support;
 
     #[test]
     fn cds_marginable_uses_explicit_sector_classification() {

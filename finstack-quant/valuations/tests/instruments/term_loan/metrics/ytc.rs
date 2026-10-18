@@ -13,7 +13,7 @@ use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverri
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
-use crate::instruments::common::test_helpers::flat_discount_curve;
+use finstack_quant_valuations_test_support::test_helpers::flat_discount_curve;
 
 #[test]
 fn test_ytc_callable_loan() {

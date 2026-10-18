@@ -35,9 +35,7 @@ use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;
 
-#[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
-#[path = "../tests/support/discount_forward_curves.rs"]
-mod discount_forward_curve_support;
+use finstack_quant_valuations_test_support::discount_forward_curves as discount_forward_curve_support;
 
 fn as_of() -> Date {
     Date::from_calendar_date(2025, Month::January, 1).unwrap()

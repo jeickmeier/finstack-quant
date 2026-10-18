@@ -1,4 +1,4 @@
-//! Shared test helpers and fixtures for common module tests.
+//! Shared curve builders, standard markets and comparison helpers for instrument tests.
 //!
 //! Provides:
 //! - Standard market data fixtures
@@ -10,7 +10,7 @@
 //! # Usage
 //!
 //! ```rust,ignore
-//! use crate::instruments::common::test_helpers::*;
+//! use finstack_quant_valuations_test_support::test_helpers::*;
 //!
 //! // Use standard test dates
 //! let as_of = dates::TODAY;
@@ -34,7 +34,6 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 pub use finstack_quant_test_utils::assert::approx_eq;
 use time::macros::date;
-use time::Month;
 
 /// Tolerance tiers for different test categories.
 ///
@@ -55,7 +54,7 @@ use time::Month;
 /// # Examples
 ///
 /// ```rust,ignore
-/// use crate::instruments::common::test_helpers::tolerances;
+/// use finstack_quant_valuations_test_support::test_helpers::tolerances;
 ///
 /// // Use appropriate tolerance for test type
 /// assert!((actual - expected).abs() < tolerances::NUMERICAL);
@@ -114,7 +113,7 @@ pub mod tolerances {
 /// # Examples
 ///
 /// ```rust,ignore
-/// use crate::instruments::common::test_helpers::dates;
+/// use finstack_quant_valuations_test_support::test_helpers::dates;
 ///
 /// let as_of = dates::TODAY;
 /// let maturity = dates::five_years_hence();
@@ -153,6 +152,10 @@ pub mod dates {
     }
 
     /// Create a date with explicit year offset from TODAY
+    ///
+    /// # Arguments
+    ///
+    /// * `years` - Whole years added to `TODAY` (2024-01-01); negative values move back.
     pub fn years_hence(years: i32) -> Date {
         Date::from_ordinal_date(2024 + years, 1).expect("valid date")
     }
@@ -179,6 +182,13 @@ pub fn scaled_tolerance(base_tol: f64, value: f64, min_abs: f64) -> f64 {
 /// Assert Money values are approximately equal.
 ///
 /// Verifies currency matches and amounts are within tolerance.
+///
+/// # Arguments
+///
+/// * `actual` - Value produced by the code under test.
+/// * `expected` - Reference value; its currency must match `actual`.
+/// * `tolerance` - Maximum absolute difference between the two amounts.
+/// * `msg` - Label printed when the assertion fails.
 pub fn assert_money_eq(actual: Money, expected: Money, tolerance: f64, msg: &str) {
     assert_eq!(
         actual.currency(),
@@ -195,6 +205,11 @@ pub fn assert_money_eq(actual: Money, expected: Money, tolerance: f64, msg: &str
 ///
 /// Uses `dates::TODAY` as base date and LogLinear interpolation.
 /// For more control, use `flat_discount_curve()` or `flat_discount_curve_with_day_count()`.
+///
+/// # Arguments
+///
+/// * `rate` - Continuously compounded zero rate, as a decimal, applied at every knot.
+/// * `curve_id` - Identifier the market context is keyed by.
 pub fn flat_curve(rate: f64, curve_id: &str) -> DiscountCurve {
     let base = dates::TODAY;
     let t_max = 30.0; // 30 years
@@ -215,9 +230,9 @@ pub fn flat_curve(rate: f64, curve_id: &str) -> DiscountCurve {
 ///
 /// # Arguments
 ///
-/// * `rate` - Continuously compounded rate
-/// * `base_date` - Curve base date
-/// * `curve_id` - Curve identifier
+/// * `rate` - Continuously compounded zero rate, as a decimal, applied at every knot.
+/// * `base_date` - Curve base date; knot times are measured from it.
+/// * `curve_id` - Identifier the market context is keyed by.
 ///
 /// # Examples
 ///
@@ -237,10 +252,10 @@ pub fn flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> Discou
 ///
 /// # Arguments
 ///
-/// * `rate` - Continuously compounded rate
-/// * `base_date` - Curve base date
-/// * `curve_id` - Curve identifier
-/// * `day_count` - Day count convention for the curve
+/// * `rate` - Continuously compounded zero rate, as a decimal, applied at every knot.
+/// * `base_date` - Curve base date; knot times are measured from it.
+/// * `curve_id` - Identifier the market context is keyed by.
+/// * `day_count` - Day count convention the curve converts dates to year fractions with.
 ///
 /// # Examples
 ///
@@ -290,9 +305,9 @@ pub fn flat_discount_curve_with_day_count(
 ///
 /// # Arguments
 ///
-/// * `rate` - Forward rate level
-/// * `base_date` - Curve base date
-/// * `curve_id` - Curve identifier
+/// * `rate` - Simple forward rate, as a decimal, written at every knot.
+/// * `base_date` - Curve base date; knot times are measured from it.
+/// * `curve_id` - Identifier the market context is keyed by.
 ///
 /// # Examples
 ///
@@ -307,11 +322,11 @@ pub fn flat_forward_curve(rate: f64, base_date: Date, curve_id: &str) -> Forward
 ///
 /// # Arguments
 ///
-/// * `rate` - Forward rate level
-/// * `base_date` - Curve base date
-/// * `curve_id` - Curve identifier
-/// * `tenor` - Forward rate tenor in years (e.g., 0.25 for 3M)
-/// * `day_count` - Day count convention
+/// * `rate` - Simple forward rate, as a decimal, written at every knot.
+/// * `base_date` - Curve base date; knot times are measured from it.
+/// * `curve_id` - Identifier the market context is keyed by.
+/// * `tenor` - Index tenor of the forward rate in years (e.g., 0.25 for 3M)
+/// * `day_count` - Day count convention the curve converts dates to year fractions with.
 ///
 /// # Examples
 ///
@@ -345,10 +360,10 @@ pub fn flat_forward_curve_with_tenor(
 ///
 /// # Arguments
 ///
-/// * `base_rate` - Starting rate at short end
-/// * `long_rate` - Rate at long end (30Y)
-/// * `base_date` - Curve base date
-/// * `curve_id` - Curve identifier
+/// * `base_rate` - Simple forward rate, as a decimal, at the short end of the curve.
+/// * `long_rate` - Simple forward rate, as a decimal, at the 30-year knot; interpolated between.
+/// * `base_date` - Curve base date; knot times are measured from it.
+/// * `curve_id` - Identifier the market context is keyed by.
 pub fn sloped_forward_curve(
     base_rate: f64,
     long_rate: f64,
@@ -381,10 +396,10 @@ pub fn sloped_forward_curve(
 ///
 /// # Arguments
 ///
-/// * `hazard_rate` - Flat hazard rate (e.g., 0.01 for 1%)
-/// * `recovery` - Recovery rate (e.g., 0.40 for 40%)
-/// * `base_date` - Curve base date
-/// * `curve_id` - Curve identifier
+/// * `hazard_rate` - Flat annual default intensity, as a decimal (e.g., 0.01 for 1%).
+/// * `recovery` - Recovery rate on default as a decimal fraction of notional (e.g., 0.40 for 40%).
+/// * `base_date` - Curve base date; knot times are measured from it.
+/// * `curve_id` - Identifier the market context is keyed by.
 ///
 /// # Examples
 ///
@@ -410,11 +425,11 @@ pub fn flat_hazard_curve(
 ///
 /// # Arguments
 ///
-/// * `hazard_rate` - Flat hazard rate
-/// * `recovery` - Recovery rate
-/// * `base_date` - Curve base date
-/// * `curve_id` - Curve identifier
-/// * `knot_times` - Array of knot times in years
+/// * `hazard_rate` - Flat annual default intensity, as a decimal, applied at every knot.
+/// * `recovery` - Recovery rate on default as a decimal fraction of notional.
+/// * `base_date` - Curve base date; knot times are measured from it.
+/// * `curve_id` - Identifier the market context is keyed by.
+/// * `knot_times` - Knot times in years from `base_date`, ascending.
 pub fn flat_hazard_curve_with_knots(
     hazard_rate: f64,
     recovery: f64,
@@ -436,6 +451,10 @@ pub fn flat_hazard_curve_with_knots(
 /// Create a standard upward-sloping discount curve.
 ///
 /// Useful for testing instruments sensitive to curve shape.
+///
+/// # Arguments
+///
+/// * `curve_id` - Identifier the market context is keyed by.
 pub fn upward_curve(curve_id: &str) -> DiscountCurve {
     let base = dates::TODAY;
 
@@ -479,8 +498,8 @@ pub fn standard_market() -> MarketContext {
 ///
 /// # Arguments
 ///
-/// * `base_date` - Market date
-/// * `rate` - Flat rate for all curves (simplifies par swap construction)
+/// * `base_date` - Valuation date of the context and base date of both curves.
+/// * `rate` - Continuously compounded rate, as a decimal, used for the discount and the forward curve (simplifies par swap construction).
 pub fn usd_swap_market(base_date: Date, rate: f64) -> MarketContext {
     let disc = flat_discount_curve(rate, base_date, "USD-OIS");
     let fwd = flat_forward_curve(rate, base_date, "USD-SOFR-3M");
@@ -494,9 +513,9 @@ pub fn usd_swap_market(base_date: Date, rate: f64) -> MarketContext {
 ///
 /// # Arguments
 ///
-/// * `base_date` - Market date
-/// * `disc_rate` - Discount curve rate
-/// * `fwd_rate` - Forward curve rate
+/// * `base_date` - Valuation date of the context and base date of both curves.
+/// * `disc_rate` - Continuously compounded zero rate, as a decimal, of the `USD-OIS` discount curve.
+/// * `fwd_rate` - Simple forward rate, as a decimal, of the `USD-SOFR-3M` projection curve.
 pub fn usd_swap_market_split(base_date: Date, disc_rate: f64, fwd_rate: f64) -> MarketContext {
     let disc = flat_discount_curve(disc_rate, base_date, "USD-OIS");
     let fwd = flat_forward_curve(fwd_rate, base_date, "USD-SOFR-3M");
@@ -510,10 +529,10 @@ pub fn usd_swap_market_split(base_date: Date, disc_rate: f64, fwd_rate: f64) -> 
 ///
 /// # Arguments
 ///
-/// * `base_date` - Market date
-/// * `disc_rate` - Discount curve rate
-/// * `hazard_rate` - Hazard rate
-/// * `recovery` - Recovery rate
+/// * `base_date` - Valuation date of the context and base date of both curves.
+/// * `disc_rate` - Continuously compounded zero rate, as a decimal, of the discount curve.
+/// * `hazard_rate` - Flat annual default intensity of the hazard curve, as a decimal.
+/// * `recovery` - Recovery rate on default as a decimal fraction of notional.
 pub fn credit_market(
     base_date: Date,
     disc_rate: f64,
@@ -527,16 +546,28 @@ pub fn credit_market(
 }
 
 /// Create test money in USD
+///
+/// # Arguments
+///
+/// * `amount` - Monetary amount in US dollars.
 pub fn usd(amount: f64) -> Money {
     Money::new(amount, Currency::USD).expect("valid money fixture")
 }
 
 /// Create test money in EUR
+///
+/// # Arguments
+///
+/// * `amount` - Monetary amount in euros.
 pub fn eur(amount: f64) -> Money {
     Money::new(amount, Currency::EUR).expect("valid money fixture")
 }
 
 /// Create test money in GBP
+///
+/// # Arguments
+///
+/// * `amount` - Monetary amount in pounds sterling.
 #[allow(dead_code)]
 pub fn gbp(amount: f64) -> Money {
     Money::new(amount, Currency::GBP).expect("valid money fixture")
@@ -548,6 +579,11 @@ pub fn standard_day_count() -> DayCount {
 }
 
 /// Calculate year fraction for testing
+///
+/// # Arguments
+///
+/// * `start` - First date of the accrual period, inclusive.
+/// * `end` - Last date of the accrual period, exclusive; measured with the standard test day count.
 pub fn year_fraction(start: Date, end: Date) -> f64 {
     use finstack_quant_core::dates::DayCountContext;
     standard_day_count()
@@ -556,6 +592,15 @@ pub fn year_fraction(start: Date, end: Date) -> f64 {
 }
 
 /// Black-Scholes analytical solution for European call (for validation)
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying price.
+/// * `strike` - Option strike in the same units as `spot`.
+/// * `rate` - Continuously compounded risk-free rate, as a decimal.
+/// * `vol` - Annualised volatility, as a decimal.
+/// * `time` - Time to expiry in years.
+/// * `div_yield` - Continuous dividend yield, as a decimal.
 pub fn black_scholes_call(
     spot: f64,
     strike: f64,
@@ -581,6 +626,15 @@ pub fn black_scholes_call(
 }
 
 /// Black-Scholes analytical solution for European put (for validation)
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying price.
+/// * `strike` - Option strike in the same units as `spot`.
+/// * `rate` - Continuously compounded risk-free rate, as a decimal.
+/// * `vol` - Annualised volatility, as a decimal.
+/// * `time` - Time to expiry in years.
+/// * `div_yield` - Continuous dividend yield, as a decimal.
 pub fn black_scholes_put(
     spot: f64,
     strike: f64,
@@ -600,6 +654,7 @@ pub fn black_scholes_put(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use time::Month;
 
     // Tolerance Tests
 

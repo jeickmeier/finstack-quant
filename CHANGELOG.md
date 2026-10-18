@@ -4,6 +4,10 @@
 
 ### Valuations split: the pricing framework is `finstack-quant-valuations-core`
 
+#### Added
+
+- Dev-only crate `finstack-quant-valuations-test-support` (`finstack-quant/valuations/test-support`): the market-context builders, fixtures, tolerance constants, parity assertions (`assert_parity!`) and one-line curve/surface constructors that the valuations integration tests and inline tests shared through `#[path]` and `include!`. It depends on `finstack-quant-core` only, so every instrument-family crate can dev-depend on it; instrument builders (`tests/support/{rates,credit,equity_fx_options}.rs`, `TestOptionBuilder`) stay with the crate that owns the instrument.
+
 #### Changed
 
 - New crate `finstack-quant-valuations-core` (`finstack-quant/valuations/core`) holds the pricing framework: the `Instrument` trait and its hooks, `PricingOptions` and the pricing overrides, the shared parameter types and kernels (`instruments::common_impl`, hidden), the per-flow cashflow exporter engine (`instruments::cashflow_export::export_cashflows`), `pricer::{InstrumentType, ModelKey, PricerKey, Pricer, PricerRegistry, PricingDispatch, Family, parse_model_key}`, the metric framework and universal calculators, `results`, `market`, `recalibration`, `constants`, `error` and the embedded conventions, contract specs, product defaults and listed-product catalog. `finstack-quant-valuations` depends on it and re-exports every item under its previous path (`finstack_quant_valuations::instruments::Instrument`, `::metrics::MetricId`, `::results::ValuationResult`, the exported macros, …), so downstream crates and the bindings are unchanged. The umbrella keeps the instrument families, `instruments::{json_loader, composite}`, `pricer::{json, FAMILIES, STANDARD, standard_pricer_registry}`, `metrics::standard_registry`, the JSON cashflow-export entry points, `schema` and the benches and integration tests.

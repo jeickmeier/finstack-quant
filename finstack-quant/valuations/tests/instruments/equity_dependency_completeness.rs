@@ -93,7 +93,7 @@ fn test_commodity_spot_option_equity_dependencies_complete() {
     }
     for id in curve_deps.forward_curves.iter() {
         market = market.insert(
-            crate::instruments::test_support::commodity_curves::flat_price_curve(
+            finstack_quant_valuations_test_support::commodity_curves::flat_price_curve(
                 id.as_str(),
                 as_of,
                 100.0,

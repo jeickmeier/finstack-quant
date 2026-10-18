@@ -116,9 +116,12 @@ pub fn compare_values(
 }
 
 /// Assert parity using an explicit tolerance configuration and description.
+///
+/// Expands to a [`ParityResult`] so callers can inspect the diagnostics.
+#[macro_export]
 macro_rules! assert_parity {
     ($finstack:expr, $reference:expr, $config:expr, $msg:expr) => {{
-        let result = $crate::instruments::parity::compare_values($finstack, $reference, $config);
+        let result = $crate::parity::compare_values($finstack, $reference, $config);
         assert!(
             result.passed,
             "Parity check failed for '{}': {}",

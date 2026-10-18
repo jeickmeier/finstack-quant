@@ -49,7 +49,10 @@ and the closed world around them.
 
 Supporting directories: [`tests/`](tests/README.md) (integration tests,
 including the `core_framework` module that exercises the framework over
-built-in instruments), [`benches/`](benches/README.md),
+built-in instruments), [`test-support/`](test-support/README.md) (the dev-only
+`finstack-quant-valuations-test-support` crate: market builders, fixtures,
+tolerances and parity assertions shared by every valuations test tree),
+[`benches/`](benches/README.md),
 [`schemas/`](schemas/README.md), `examples/`, `data/assumptions/`
 (structured-credit / TBA assumptions) and `core/data/` (conventions, contract
 specs, product defaults, listed-product catalog), all compiled in with

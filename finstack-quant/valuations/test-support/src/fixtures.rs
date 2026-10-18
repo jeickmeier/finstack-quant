@@ -96,6 +96,11 @@ pub fn usd_discount_curve(base_date: Date, curve_id: &str) -> DiscountCurve {
 /// | 0Y    | 1.00 | N/A               |
 /// | 1Y    | 0.98 | 2.02%             |
 /// | 5Y    | 0.90 | 2.11%             |
+///
+/// # Arguments
+///
+/// * `base_date` - Valuation date the knot times are measured from.
+/// * `curve_id` - Identifier the market context is keyed by (for example `USD-OIS`).
 pub fn usd_discount_curve_minimal(base_date: Date, curve_id: &str) -> DiscountCurve {
     DiscountCurve::builder(curve_id)
         .base_date(base_date)
@@ -123,6 +128,11 @@ pub fn usd_discount_curve_minimal(base_date: Date, curve_id: &str) -> DiscountCu
 /// | 6M    | 0.9775 | 4.55%             |
 /// | 1Y    | 0.9550 | 4.60%             |
 /// | 2Y    | 0.9100 | 4.72%             |
+///
+/// # Arguments
+///
+/// * `base_date` - Valuation date the knot times are measured from.
+/// * `curve_id` - Identifier the market context is keyed by (for example `USD-OIS`).
 pub fn usd_discount_curve_monotone_convex(base_date: Date, curve_id: &str) -> DiscountCurve {
     DiscountCurve::builder(curve_id)
         .base_date(base_date)
@@ -141,12 +151,20 @@ pub fn usd_discount_curve_monotone_convex(base_date: Date, curve_id: &str) -> Di
 // Market Context Fixtures
 
 /// Creates a market context with a standard USD-OIS discount curve.
+///
+/// # Arguments
+///
+/// * `base_date` - Valuation date of the context and base date of its `USD-OIS` curve.
 pub fn market_context_with_usd_discount(base_date: Date) -> MarketContext {
     let curve = usd_discount_curve(base_date, "USD-OIS");
     MarketContext::new().insert(curve)
 }
 
 /// Creates a market context with a minimal USD-OIS discount curve.
+///
+/// # Arguments
+///
+/// * `base_date` - Valuation date of the context and base date of its `USD-OIS` curve.
 pub fn market_context_with_minimal_discount(base_date: Date) -> MarketContext {
     let curve = usd_discount_curve_minimal(base_date, "USD-OIS");
     MarketContext::new().insert(curve)

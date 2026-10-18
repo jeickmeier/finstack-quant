@@ -21,6 +21,7 @@ members = [
     "finstack-quant/valuations",
     "finstack-quant/valuations/core",
     "finstack-quant/valuations/macros",
+    "finstack-quant/valuations/test-support",
     "finstack-quant/features",
     "finstack-quant/portfolio",
     "finstack-quant/scenarios",

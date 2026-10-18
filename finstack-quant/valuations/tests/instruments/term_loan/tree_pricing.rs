@@ -13,7 +13,9 @@ use finstack_quant_valuations::instruments::fixed_income::term_loan::{
 use rust_decimal::Decimal;
 use time::macros::date;
 
-use crate::instruments::common::test_helpers::{flat_discount_curve, flat_forward_curve};
+use finstack_quant_valuations_test_support::test_helpers::{
+    flat_discount_curve, flat_forward_curve,
+};
 
 fn build_callable_loan(as_of: Date) -> TermLoan {
     let maturity = date!(2030 - 01 - 01);

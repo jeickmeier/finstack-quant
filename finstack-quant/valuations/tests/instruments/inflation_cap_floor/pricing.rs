@@ -3,7 +3,6 @@
 use crate::instruments::inflation_swap::fixtures::{
     flat_discount, flat_inflation_curve, simple_index,
 };
-use crate::instruments::test_support::volatility::flat_vol_surface;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor, TenorUnit,
@@ -17,6 +16,7 @@ use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::RateOptionType;
 use finstack_quant_valuations::pricer::ModelKey;
+use finstack_quant_valuations_test_support::volatility::flat_vol_surface;
 use rust_decimal::Decimal;
 use time::{Duration, Month};
 

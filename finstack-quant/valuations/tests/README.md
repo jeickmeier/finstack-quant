@@ -46,18 +46,14 @@ Single-file targets:
 tests/
 ├── <target>.rs             # one cargo integration target each (see above)
 │
-├── common/                 # Shared fixtures for calibration / market / metrics
-│   ├── fixtures.rs         # base_date, USD discount curves, standard notional
-│   ├── tolerances.rs       # TIGHT / STANDARD / LOOSE / PERCENT_* constants
-│   ├── assertions.rs       # assert_approx_eq, assert_relative_eq, range/sign helpers
-│   └── builders.rs         # TestMarketBuilder, TestOptionBuilder
+├── common/                 # Equity-option builders for the metrics target
+│   └── builders.rs         # TestOptionBuilder, simple_call_option, simple_put_option
 │
-├── support/                # Narrow builders shared across several targets
-│   ├── date.rs             # date(y, m, d)
-│   ├── discount_forward_curves.rs, commodity_curves.rs, volatility.rs
-│   ├── rates.rs, credit.rs, equity_fx_options.rs
-│   ├── calibration.rs      # quote-set and MarketContext splitting helpers
-│   └── metrics_risk_test_utils.rs  # include!()d by src/ unit tests, not by a target
+├── support/                # Instrument builders shared across several targets
+│   ├── rates.rs            # usd_irs_swap
+│   ├── credit.rs           # CDS builders and calibrated hazard curves (needs calibration)
+│   ├── equity_fx_options.rs
+│   └── calibration.rs      # quote-set and MarketContext splitting helpers
 │
 ├── instruments/            # 48 instrument dirs + contract tests + generated fixtures
 ├── calibration/            # incl. term_structures/ property tests
@@ -75,38 +71,34 @@ tests/
 
 ## Shared helpers
 
-There are two independent helper trees; which one you get depends on the target.
-
-**`common/`** is wired into `calibration`, `market`, and `metrics` via
-`#[path = "common/mod.rs"] mod common;`. It also glob re-exports its submodules
-at the module root, so `crate::common::TIGHT` and `crate::common::tolerances::TIGHT`
-both resolve; prefer the qualified form.
+Market-data builders, fixtures, tolerances, assertions and the parity helpers
+live in the dev-only crate
+[`finstack-quant-valuations-test-support`](../test-support/README.md), which
+every valuations crate dev-depends on. Import them by crate path from any
+target or `#[cfg(test)]` module:
 
 ```rust
-use crate::common::fixtures::{base_date, usd_discount_curve, STANDARD_NOTIONAL};
-use crate::common::assertions::{assert_approx_eq, assert_relative_eq};
-use crate::common::builders::{TestMarketBuilder, TestOptionBuilder};
-use crate::common::tolerances::{TIGHT, STANDARD, LOOSE};
+use finstack_quant_valuations_test_support::fixtures::{base_date, usd_discount_curve, STANDARD_NOTIONAL};
+use finstack_quant_valuations_test_support::builders::{test_market, TestMarketBuilder};
+use finstack_quant_valuations_test_support::tolerances::{TIGHT, STANDARD, LOOSE};
+use finstack_quant_valuations_test_support::test_helpers::{dates, flat_discount_curve};
+use finstack_quant_valuations_test_support::{assert_parity, parity::ParityConfig};
 ```
 
-**`instruments/common/`** is a different module with a different tolerance
-vocabulary, wired only into the `instruments` target as `crate::common`. See
-[`instruments/common/README.md`](instruments/common/README.md). Do not mix the
-two names up: `tolerances::STANDARD` and `tolerances::ANALYTICAL` come from
-different files.
+Two tolerance vocabularies coexist there: `tolerances::{TIGHT, STANDARD, LOOSE,
+PERCENT_*}` and `test_helpers::tolerances::{ANALYTICAL, NUMERICAL, ...}`. Do
+not mix them up.
 
-**`support/`** holds small builders that several targets need. Each target
-declares the ones it wants explicitly, so the local module name differs per
-target — `crate::test_support::*` in `instruments`,
-`crate::calibration_support::*` in `calibration`, `crate::credit_support::*` and
-`crate::option_support::*` in `metrics`. Check the target's entry-point `.rs`
-file for the local name. One file here, `metrics_risk_test_utils.rs`, is not
-wired into any target at all: `src/metrics/risk/{hvar,var_calculator}.rs`
-`include!()` it into their own `#[cfg(test)]` modules.
+**`support/`** holds the instrument builders that stay with this crate because
+they build instruments or need `finstack-quant-calibration` (`credit.rs`). Each
+target declares the ones it wants explicitly, so the local module name differs
+per target — `crate::instruments::test_support::*` in `instruments`,
+`crate::credit_support::*` and `crate::option_support::*` in `metrics`. Check
+the target's entry-point `.rs` file for the local name.
 
 ## Tolerance policy
 
-`common/tolerances.rs` — used by `calibration`, `market`, `metrics`:
+`test-support/src/tolerances.rs` — used by the `metrics` and `core_framework` targets:
 
 | Constant | Value | Use case |
 |----------|-------|----------|
@@ -116,7 +108,7 @@ wired into any target at all: `src/metrics/risk/{hvar,var_calculator}.rs`
 | `PERCENT_001` / `PERCENT_01` / `PERCENT_1` / `PERCENT_5` | 1e-4 / 1e-3 / 1e-2 / 5e-2 | Relative bands |
 | `NEAR_ZERO` | 1e-8 | Near-zero guard for relative-tolerance fallback |
 
-`instruments/common/test_helpers.rs` — used by `instruments`:
+`test-support/src/test_helpers.rs` (`tolerances` submodule) — used by `instruments`:
 `ANALYTICAL` (1e-6), `NUMERICAL` (1e-4), `CURVE_PRICING` (5e-3), `RELATIVE`
 (1e-2), `BUMP_VS_ANALYTICAL` (1.5e-2), `STATISTICAL` (2e-2).
 
@@ -128,8 +120,8 @@ methodology difference that justifies it.
 ## Determinism
 
 - No test derives a date from the system clock. Dates come from
-  `time::macros::date!`, from `common::fixtures::base_date()`, or from
-  `test_helpers::dates::TODAY`. The one `SystemTime::now()` call in the tree
+  `time::macros::date!`, from `fixtures::base_date()`, or from
+  `test_helpers::dates::TODAY` (both in the test-support crate). The one `SystemTime::now()` call in the tree
   (`instruments/registry_coverage.rs`) only names a scratch directory.
 - Monte Carlo and copula paths take explicit seeds; `portfolio_loss` asserts
   that repeated runs are bit-identical.

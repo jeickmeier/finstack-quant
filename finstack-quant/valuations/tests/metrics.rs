@@ -18,7 +18,7 @@
 
 // Shared Test Utilities
 
-/// Common test utilities: fixtures, tolerances, assertions, builders
+/// Equity-option builders (market builders live in `finstack_quant_valuations_test_support`).
 #[path = "common/mod.rs"]
 mod common;
 
@@ -27,13 +27,7 @@ mod common;
 #[allow(unused_imports)]
 pub(crate) use crate::instruments::test_support::credit as credit_support;
 #[allow(unused_imports)]
-pub(crate) use crate::instruments::test_support::date as date_support;
-#[allow(unused_imports)]
-pub(crate) use crate::instruments::test_support::discount_forward_curves as discount_forward_curve_support;
-#[allow(unused_imports)]
 pub(crate) use crate::instruments::test_support::equity_fx_options as option_support;
-#[allow(unused_imports)]
-pub(crate) use crate::instruments::test_support::volatility as volatility_support;
 
 // Metrics Tests
 

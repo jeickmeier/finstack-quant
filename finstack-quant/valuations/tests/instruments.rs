@@ -4,12 +4,10 @@
 
 // Common Test Infrastructure
 
-/// Common test utilities, helpers, models, and shared functionality.
-/// Includes a parity helper for documented reference-value comparisons.
+/// Shared parameter and registry contract tests.
 ///
-/// Tests should import [`parity::ParityConfig`] explicitly.
-/// The `assert_parity!` macro is available via `#[macro_use]` below.
-#[macro_use]
+/// Curve builders, tolerances and the parity helpers come from
+/// `finstack_quant_valuations_test_support`.
 #[path = "instruments/common/mod.rs"]
 mod common;
 #[path = "instruments/compounding_leg_wire_keys.rs"]
@@ -46,9 +44,6 @@ mod unit_suffix_wire_keys;
 #[path = "support/mod.rs"]
 #[allow(dead_code, unused_imports)]
 pub(crate) mod test_support;
-
-// Re-export parity helpers for explicit imports and macro expansion.
-pub use common::parity;
 
 // Fixed Income Instruments
 

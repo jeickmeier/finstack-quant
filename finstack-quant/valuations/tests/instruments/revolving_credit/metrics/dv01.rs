@@ -13,7 +13,9 @@ use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
-use crate::instruments::common::test_helpers::{flat_discount_curve, flat_forward_curve};
+use finstack_quant_valuations_test_support::test_helpers::{
+    flat_discount_curve, flat_forward_curve,
+};
 
 #[test]
 fn test_dv01_sensitivity() {

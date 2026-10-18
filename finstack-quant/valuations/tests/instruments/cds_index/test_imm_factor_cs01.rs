@@ -14,7 +14,7 @@ use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::Instrument;
 use time::Month;
 
-use crate::instruments::common::test_helpers::flat_discount_curve;
+use finstack_quant_valuations_test_support::test_helpers::flat_discount_curve;
 
 fn flat_discount(
     id: &'static str,

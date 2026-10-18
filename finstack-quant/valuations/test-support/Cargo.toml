@@ -1,0 +1,18 @@
+[package]
+name = "finstack-quant-valuations-test-support"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Dev-only market-data builders, fixtures, tolerances and parity assertions shared by the valuations crates' integration tests"
+publish = false
+
+[dependencies]
+finstack-quant-core = { path = "../../core", version = "0.10.0", default-features = false }
+finstack-quant-test-utils = { path = "../../test-utils", version = "0.10.0" }
+time = { workspace = true, features = ["macros"] }
+
+[lints]
+workspace = true

@@ -1,9 +1,5 @@
 //! Pricing tests for commodity options.
 
-use crate::instruments::test_support::commodity_curves::flat_price_curve;
-use crate::instruments::test_support::date::date;
-use crate::instruments::test_support::discount_forward_curves::flat_discount_with_tenor;
-use crate::instruments::test_support::volatility::flat_vol_surface;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -18,6 +14,10 @@ use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{
     ExerciseStyle, InstrumentPricingOverrides, OptionType, SettlementType,
 };
+use finstack_quant_valuations_test_support::commodity_curves::flat_price_curve;
+use finstack_quant_valuations_test_support::date::date;
+use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
+use finstack_quant_valuations_test_support::volatility::flat_vol_surface;
 
 fn bs_price(
     spot: f64,

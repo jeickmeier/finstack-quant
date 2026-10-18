@@ -1,6 +1,6 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
-use crate::metrics::common::builders::{test_market, test_option};
+use crate::metrics::common::builders::test_option;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -19,6 +19,7 @@ use finstack_quant_valuations::instruments::{
     OptionGreekKind, OptionGreeksProvider, OptionGreeksRequest,
 };
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_test_support::builders::test_market;
 use std::sync::Arc;
 use time::macros::date;
 

@@ -38,6 +38,7 @@ rayon = "1.11"
 
 [dev-dependencies]
 finstack-quant-test-utils = { path = "../test-utils", version = "0.10.0" }
+finstack-quant-valuations-test-support = { path = "test-support", version = "0.10.0" }
 finstack-quant-calibration = { path = "../calibration", version = "0.10.0" }
 time = { workspace = true, features = ["macros"] }
 proptest = "1.11.0"

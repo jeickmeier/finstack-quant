@@ -27,7 +27,6 @@
 //! 4. **testFRAconsistency**: Consistency across different strikes
 //! 5. **testFRAbuySell**: Buy/sell symmetry
 
-use crate::instruments::parity::ParityConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -38,6 +37,8 @@ use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
 use finstack_quant_valuations::instruments::rates::irs::PayReceive;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_test_support::assert_parity;
+use finstack_quant_valuations_test_support::parity::ParityConfig;
 use rust_decimal::Decimal;
 use time::macros::date;
 

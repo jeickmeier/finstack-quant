@@ -22,8 +22,10 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 use finstack_quant_valuations::instruments::PayReceive;
 use time::macros::date;
 
-use crate::instruments::common::test_helpers::{flat_discount_curve, flat_forward_curve};
 use crate::instruments::test_support::rates::usd_irs_swap;
+use finstack_quant_valuations_test_support::test_helpers::{
+    flat_discount_curve, flat_forward_curve,
+};
 
 const CLOSE: Date = date!(2024 - 01 - 01);
 const MATURITY: Date = date!(2030 - 01 - 01);

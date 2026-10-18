@@ -8,13 +8,15 @@
 //! - Theta calculation
 //! - Edge cases
 
-use crate::instruments::common::test_helpers::{dates, usd_swap_market, usd_swap_market_split};
 use crate::instruments::test_support::rates as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::rates::irs::{InterestRateSwap, PayReceive};
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations_test_support::test_helpers::{
+    dates, usd_swap_market, usd_swap_market_split,
+};
 use rust_decimal_macros::dec;
 
 #[test]

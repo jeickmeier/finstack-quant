@@ -5,9 +5,6 @@
 //! the calculator's own stencil (±1 vol-point parallel surface bump, ±1% spot
 //! bump) and normalizes the vol axis in vol points.
 
-use crate::instruments::test_support::date::date;
-use crate::instruments::test_support::discount_forward_curves::flat_discount_with_tenor;
-use crate::instruments::test_support::volatility::flat_vol_surface;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::bumps::{
     BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
@@ -20,6 +17,9 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::{Attributes, Instrument, OptionType, PricingOptions};
 use finstack_quant_valuations::instruments::{FxBarrierOption, Monitoring};
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_test_support::date::date;
+use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
+use finstack_quant_valuations_test_support::volatility::flat_vol_surface;
 
 fn bump_surface_vol_absolute(
     context: &MarketContext,

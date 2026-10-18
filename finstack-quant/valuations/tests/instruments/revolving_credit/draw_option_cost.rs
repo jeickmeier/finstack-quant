@@ -20,7 +20,9 @@ use finstack_quant_valuations::instruments::{
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
-use crate::instruments::common::test_helpers::{flat_discount_curve, flat_forward_curve};
+use finstack_quant_valuations_test_support::test_helpers::{
+    flat_discount_curve, flat_forward_curve,
+};
 
 const AS_OF: Date = date!(2024 - 01 - 15);
 const MATURITY: Date = date!(2027 - 01 - 15);

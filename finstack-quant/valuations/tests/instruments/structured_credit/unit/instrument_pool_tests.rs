@@ -24,7 +24,9 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use time::macros::date;
 
-use crate::instruments::common::test_helpers::{flat_discount_curve, flat_forward_curve};
+use finstack_quant_valuations_test_support::test_helpers::{
+    flat_discount_curve, flat_forward_curve,
+};
 
 pub(crate) fn usd(amount: f64) -> Money {
     Money::new(amount, Currency::USD).expect("valid money fixture")

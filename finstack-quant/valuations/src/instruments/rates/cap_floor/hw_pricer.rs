@@ -466,20 +466,8 @@ pub(crate) fn resolve_capfloor_hw1f_model_params(
 
 #[cfg(test)]
 mod tests {
-    #[allow(dead_code, unused_imports)]
-    mod date_support {
-        include!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/support/date.rs"
-        ));
-    }
-    #[allow(dead_code, unused_imports)]
-    mod discount_forward_curve_support {
-        include!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/support/discount_forward_curves.rs"
-        ));
-    }
+    use finstack_quant_valuations_test_support::date as date_support;
+    use finstack_quant_valuations_test_support::discount_forward_curves as discount_forward_curve_support;
 
     use super::*;
     use crate::instruments::rates::cap_floor::pricing::projection::resolve_optioned_coupon;

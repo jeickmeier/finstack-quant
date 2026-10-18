@@ -26,7 +26,7 @@ use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
 use time::macros::date;
 
-use crate::instruments::common::test_helpers::flat_discount_curve;
+use finstack_quant_valuations_test_support::test_helpers::flat_discount_curve;
 
 fn build_floating_loan(
     call_schedule: Option<LoanCallSchedule>,

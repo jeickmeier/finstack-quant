@@ -349,6 +349,13 @@ def crate_directory(source_root: Path, crate: str) -> Path:
     direct = Path("finstack-quant") / crate
     if (source_root / direct).is_dir():
         return direct
+    # The parent crate name may itself be hyphenated and so may the child
+    # (``valuations-fixed-income``): try every split, longest parent first.
+    parts = crate.split("-")
+    for cut in range(len(parts) - 1, 0, -1):
+        candidate = Path("finstack-quant") / "-".join(parts[:cut]) / "-".join(parts[cut:])
+        if (source_root / candidate).is_dir():
+            return candidate
     parent, _, child = crate.rpartition("-")
     return Path("finstack-quant") / parent / child
 

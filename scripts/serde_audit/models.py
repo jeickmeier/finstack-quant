@@ -9,7 +9,7 @@ import platform
 
 CAPABILITIES = ("Serialize", "Deserialize", "JsonSchema")
 CONTRACT_SUFFIXES = ("Spec", "Envelope", "Result")
-NON_PRODUCT_CRATES = frozenset({"test-utils", "valuations-macros"})
+NON_PRODUCT_CRATES = frozenset({"test-utils", "valuations-macros", "valuations-test-support"})
 CURRENT_TARGET_IS_UNIX = os.name == "posix"
 CURRENT_TARGET_ARCH = {
     "arm64": "aarch64",

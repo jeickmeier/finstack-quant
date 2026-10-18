@@ -1,36 +1,33 @@
 # Instrument test infrastructure
 
-Shared fixtures, tolerance constants, and parity helpers for the `instruments`
-integration test binary, plus tests for the cross-instrument machinery that has
-no single owning instrument directory (the pricer registry, market conventions,
-the `Discounting` contract, the two-factor rates-credit lattice).
+Tests for the cross-instrument machinery that has no single owning instrument
+directory (the pricer registry, market conventions, the `Discounting`
+contract, the rates-credit lattice baselines).
 
 This directory is not a standalone test target. It is pulled into
 [`tests/instruments.rs`](../../instruments.rs) as `mod common` via
-`#[macro_use] #[path = "instruments/common/mod.rs"]`, so every instrument
-submodule reaches it as `crate::common::...`.
+`#[path = "instruments/common/mod.rs"]`. The fixtures, tolerance tiers and
+parity helpers that used to live here are in the dev-only crate
+[`finstack-quant-valuations-test-support`](../../../test-support/README.md).
 
 ## Layout
 
 | Path | Contents |
 |------|----------|
-| `mod.rs` | Module wiring; re-exports `parity` and `#[macro_use]`s `assert_parity!` |
-| `test_helpers.rs` | Curve/market/`Money` builders, tolerance tiers, assertion helpers, reference Black-Scholes formulas |
-| `parity.rs` | `ParityConfig` / `compare_values` / `assert_parity!` for documented reference comparisons |
+| `mod.rs` | Module wiring |
 | `parameters/test_conventions.rs` | `BondConvention` lookup and `FromStr` behavior |
 | `pricer/registry.rs` | `InstrumentType`, `ModelKey`, `PricerKey`, `PricingError`, and `PricerRegistry` lookup/batch coverage |
 | `test_discountable.rs` | `finstack_quant_core::market_data::traits::Discounting` NPV contract against a mock flat curve |
-| `test_rates_credit_tree.rs` | Two-factor rates+credit binomial tree: closed-form parity, correlation monotonicity, curve-reproducing calibration |
 | `test_callable_credit_baseline.rs` | Pinned PV/OAS baselines for callable bond and callable term loan on the rates-credit lattice |
 | `test_callable_floating_resets.rs` | Node-dependent floating resets on the same lattice; FRN-invariance identity |
 
 ## Fixtures and helpers
 
-`test_helpers.rs` is the single source for instrument-test fixtures. The main
-entry points:
+`finstack_quant_valuations_test_support::test_helpers` is the single source for
+instrument-test fixtures. The main entry points:
 
 ```rust
-use crate::common::test_helpers::{
+use finstack_quant_valuations_test_support::test_helpers::{
     flat_discount_curve,   // (rate, base_date, curve_id) -> DiscountCurve
     flat_forward_curve,    // (rate, base_date, curve_id) -> ForwardCurve
     flat_hazard_curve,     // (hazard_rate, recovery, base_date, curve_id) -> HazardCurve
@@ -63,18 +60,19 @@ pass. Values are defined in `test_helpers::tolerances`.
 `scaled_tolerance(base_tol, value, min_abs)` gives a relative tolerance with an
 absolute floor, for property tests where the magnitude varies.
 
-Note that the other test binaries (`calibration`, `market`, `metrics`) use a
-different, unrelated set of constants from [`tests/common/tolerances.rs`](../../common/tolerances.rs)
-(`TIGHT`, `STANDARD`, `LOOSE`, `PERCENT_*`). The two modules are not
-interchangeable; use whichever one your test binary wires in.
+Note that the `metrics` target uses a different, unrelated set of constants
+from `finstack_quant_valuations_test_support::tolerances` (`TIGHT`, `STANDARD`,
+`LOOSE`, `PERCENT_*`). The two modules are not interchangeable.
 
 ## Parity comparisons
 
-`parity.rs` compares a computed value against an externally sourced reference
-using a relative tolerance with a near-zero absolute fallback:
+`finstack_quant_valuations_test_support::parity` compares a computed value
+against an externally sourced reference using a relative tolerance with a
+near-zero absolute fallback:
 
 ```rust
-use crate::parity::ParityConfig;
+use finstack_quant_valuations_test_support::assert_parity;
+use finstack_quant_valuations_test_support::parity::ParityConfig;
 
 assert_parity!(computed, reference, ParityConfig::default(), "Bond PV");
 assert_parity!(computed, reference, ParityConfig::tight(), "closed-form check");
@@ -107,7 +105,7 @@ cargo nextest run -p finstack-quant-valuations --test valuations instruments::co
 
 # One area
 cargo nextest run -p finstack-quant-valuations --test valuations instruments::common::pricer::
-cargo nextest run -p finstack-quant-valuations --test valuations instruments::common::test_rates_credit_tree::
+cargo nextest run -p finstack-quant-valuations --test valuations instruments::common::test_callable_credit_baseline::
 ```
 
 Nothing in this module is `#[ignore]`d; it all runs on the default path.

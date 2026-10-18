@@ -13,7 +13,7 @@ use finstack_quant_valuations::instruments::fixed_income::term_loan::{
 use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
 
-use crate::instruments::common::test_helpers::flat_discount_curve;
+use finstack_quant_valuations_test_support::test_helpers::flat_discount_curve;
 
 #[test]
 fn test_zero_coupon_loan() {
