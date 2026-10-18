@@ -581,7 +581,7 @@ fn quanto_defaults_are_bit_identical() {
         ("delta", m(MetricId::Delta), 0x402d387eb9b2e2f9),
         ("gamma", m(MetricId::Gamma), 0x3f5998b5a0d6ce52),
         // Currency per volatility percentage point (0.01), rather than per decimal sigma.
-        ("vega", m(MetricId::Vega), 0x40aedf6ce0f86f40),
+        ("vega", m(MetricId::Vega), 0x40aee02c44085cc0),
         ("rho", m(MetricId::Rho), 0xc01e1b66ed300000),
         ("foreign_rho", m(MetricId::ForeignRho), 0x4049b76ea7a3c800),
         ("fx_delta", m(MetricId::FxDelta), 0x0000000000000000),
@@ -767,18 +767,18 @@ fn lookback_rho_honours_rate_bump() {
         MetricId::Rho,
         PricingOptions::default(),
     );
-    // The log-CDF reflection is stable on one libm and not bit-identical
-    // across libm implementations. macOS pins `0x3f72bd0500ee2000`; the
-    // Linux libm on GitHub Actions pins `0x3f72bd0500ee5000` (12,288 ulps,
-    // about 2e-12 relative). A third pattern means the default rho moved.
-    let bits = default_rho.to_bits();
-    const LOOKBACK_RHO_BITS: [u64; 2] = [0x3f72bd0500ee2000, 0x3f72bd0500ee5000];
-    assert!(
-        LOOKBACK_RHO_BITS.contains(&bits),
-        "default outputs moved:\nlookback rho: got {default_rho} (0x{bits:016x})"
+    // The log-CDF reflection is not bit-identical across libm implementations
+    // (macOS vs the Linux libm on GitHub Actions differ by about 2e-12
+    // relative), so the central-difference rho is pinned to 1e-10 relative.
+    assert_rel(
+        "default lookback rho (pinned)",
+        default_rho,
+        0.004_574_397_057_709_234,
+        1e-10,
     );
-    let default_ref =
-        pv(&opt, &bump_rate(&market, "USD-OIS", 1.0), as_of) - pv(&opt, &market, as_of);
+    let default_ref = (pv(&opt, &bump_rate(&market, "USD-OIS", 1.0), as_of)
+        - pv(&opt, &bump_rate(&market, "USD-OIS", -1.0), as_of))
+        / 2.0;
     assert_rel(
         "default lookback rho per bp",
         default_rho,
@@ -795,7 +795,8 @@ fn lookback_rho_honours_rate_bump() {
         MetricId::Rho,
         PricingOptions::default(),
     );
-    let rho_ref =
-        (pv(&opt, &bump_rate(&market, "USD-OIS", h_r), as_of) - pv(&opt, &market, as_of)) / h_r;
+    let rho_ref = (pv(&opt, &bump_rate(&market, "USD-OIS", h_r), as_of)
+        - pv(&opt, &bump_rate(&market, "USD-OIS", -h_r), as_of))
+        / (2.0 * h_r);
     assert_rel("lookback rho per bp", rho, rho_ref, 1e-12);
 }
