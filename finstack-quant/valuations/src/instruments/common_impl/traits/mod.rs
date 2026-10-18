@@ -19,35 +19,9 @@
 //!
 //! # Examples
 //!
-//! ## Basic Instrument Usage
-//!
-//! ```rust
-//! use finstack_quant_valuations::instruments::Bond;
-//! use finstack_quant_valuations::instruments::Instrument;
-//! use finstack_quant_core::currency::Currency;
-//! use finstack_quant_core::money::Money;
-//! use finstack_quant_core::dates::create_date;
-//! use finstack_quant_core::types::Rate;
-//! use time::Month;
-//!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let issue = create_date(2025, Month::January, 15)?;
-//! let maturity = create_date(2030, Month::January, 15)?;
-//! let bond = Bond::fixed(
-//!     "BOND-001",
-//!     Money::from((1_000_000_i64, Currency::USD)),
-//!     Rate::from_percent(5.0).expect("valid rate fixture"),
-//!     issue,
-//!     maturity,
-//!     finstack_quant_core::dates::StubKind::None,
-//!     "USD-OIS"
-//! )?;
-//!
-//! // Instrument trait methods
-//! assert_eq!(bond.id(), "BOND-001");
-//! # Ok(())
-//! # }
-//! ```
+//! The [`Instrument`] documentation implements the trait for a one-payment
+//! note and prices it; the instrument families in the umbrella crate are the
+//! full-scale implementations.
 
 mod instrument;
 #[macro_use]

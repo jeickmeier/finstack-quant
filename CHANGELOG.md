@@ -11,6 +11,7 @@
 
 #### Changed
 
+- `PricingDispatch::from_model(model, registry)` takes the registry the explicit model is resolved in instead of reaching for the standard one; the Python and WASM VaR entry points pass `STANDARD.shared_pricers()`.
 - Pricing with `PricingOptions::registry` or `metric_registry` unset resolves the instrument's family registries instead of the merged standard ones. For every built-in instrument type the family registers the same models and metrics as the standard registry (`tests/registry_snapshot.rs` pins both), so results are unchanged. An `Instrument` implemented outside the crate now needs an explicit registry (or its own `value`) for registry pricing, where it previously failed the pricer's downcast.
 - `standard_pricer_registry()` and `metrics::standard_registry()` return the `STANDARD` family's registries; the asset-class registration modules under `src/pricer/` are replaced by the family files. `XccySwap` registers with the rates family and `QuantoOption` with FX; the `ExpectedLoss` owner entry is registered by the family whose pricers publish it (`Bond` by fixed income, `StructuredCredit` by structured credit).
 

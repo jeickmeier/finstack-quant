@@ -17,17 +17,32 @@
 //!
 //! # Quick Example
 //!
-//! ```rust
-//! use finstack_quant_valuations::instruments::rates::RATES;
-//! use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, PricerKey};
+//! A family is a `static` built from its two registration functions. The
+//! registries are built on first use and shared afterwards; the universal
+//! metric calculators are part of every family's metric registry.
 //!
-//! let pricers = RATES.pricers();
-//! assert!(pricers
+//! ```rust
+//! use finstack_quant_valuations::metrics::{MetricId, MetricRegistry, MetricRegistryError};
+//! use finstack_quant_valuations::pricer::{
+//!     Family, InstrumentType, ModelKey, PricerKey, PricerRegistry, PricingError,
+//! };
+//!
+//! fn no_pricers(_: &mut PricerRegistry) -> Result<(), PricingError> {
+//!     Ok(())
+//! }
+//! fn no_metrics(_: &mut MetricRegistry) -> Result<(), MetricRegistryError> {
+//!     Ok(())
+//! }
+//!
+//! static EMPTY: Family = Family::new("empty", no_pricers, no_metrics);
+//!
+//! assert_eq!(EMPTY.name(), "empty");
+//! assert!(EMPTY
+//!     .pricers()
 //!     .get_pricer(PricerKey::new(InstrumentType::Irs, ModelKey::Discounting))
-//!     .is_some());
-//! assert!(pricers
-//!     .get_pricer(PricerKey::new(InstrumentType::Bond, ModelKey::Discounting))
 //!     .is_none());
+//! // Universal metrics (theta, carry) come with every family.
+//! assert!(EMPTY.metrics().has_metric(MetricId::Theta));
 //! ```
 
 use std::sync::{Arc, OnceLock};

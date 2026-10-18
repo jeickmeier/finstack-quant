@@ -187,13 +187,15 @@ impl MetricRegistry {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_valuations::metrics::{standard_registry, MetricId};
+    /// use finstack_quant_valuations::metrics::MetricId;
+    /// use finstack_quant_valuations::pricer::Family;
     ///
-    /// let registry = standard_registry();
-    /// let names = ["dv01".to_string(), "accrued_interest".to_string()];
+    /// // The universal registry resolves the standard ids it registers.
+    /// let registry = Family::unregistered().metrics();
+    /// let names = ["theta".to_string(), "carry_total".to_string()];
     /// let ids = registry.resolve_metric_ids(&names)?;
-    /// assert_eq!(ids[0], MetricId::Dv01);
-    /// assert!(registry.resolve_metric_ids(&["dv011".to_string()]).is_err());
+    /// assert_eq!(ids[0], MetricId::Theta);
+    /// assert!(registry.resolve_metric_ids(&["theta1".to_string()]).is_err());
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn resolve_metric_ids(

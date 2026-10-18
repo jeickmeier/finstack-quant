@@ -259,7 +259,7 @@ mod repo_day_count_wire {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;
+/// use finstack_quant_valuations::contract_specs::BondFutureSpecs;
 ///
 /// // UST 10-year contract specs
 /// let specs = BondFutureSpecs::default(); // UST 10Y defaults
@@ -337,7 +337,7 @@ impl BondFutureSpecs {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;
+    /// use finstack_quant_valuations::contract_specs::BondFutureSpecs;
     ///
     /// let specs = BondFutureSpecs::ust_10y();
     /// assert_eq!(specs.standard_coupon, 0.06);
@@ -363,7 +363,7 @@ impl BondFutureSpecs {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;
+    /// use finstack_quant_valuations::contract_specs::BondFutureSpecs;
     ///
     /// let specs = BondFutureSpecs::ust_5y();
     /// assert_eq!(specs.standard_maturity_years, 5.0);
@@ -389,7 +389,7 @@ impl BondFutureSpecs {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;
+    /// use finstack_quant_valuations::contract_specs::BondFutureSpecs;
     ///
     /// let specs = BondFutureSpecs::ust_2y();
     /// assert_eq!(specs.standard_maturity_years, 2.0);
@@ -419,7 +419,7 @@ impl BondFutureSpecs {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;
+    /// use finstack_quant_valuations::contract_specs::BondFutureSpecs;
     ///
     /// let specs = BondFutureSpecs::bund();
     /// assert_eq!(specs.standard_coupon, 0.06);
@@ -451,7 +451,7 @@ impl BondFutureSpecs {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;
+    /// use finstack_quant_valuations::contract_specs::BondFutureSpecs;
     ///
     /// let specs = BondFutureSpecs::gilt();
     /// assert_eq!(specs.standard_coupon, 0.04);  // 4%, not 6%

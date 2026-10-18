@@ -22,33 +22,85 @@ use super::pricing_options::PricingOptions;
 ///
 /// # Examples
 ///
+/// A minimal instrument: one payment of `notional` on `maturity`, valued
+/// off its discount curve. Everything else on the trait has a default.
+///
 /// ```rust
-/// use finstack_quant_valuations::instruments::Bond;
-/// use finstack_quant_valuations::instruments::Instrument;
-/// # use finstack_quant_core::currency::Currency;
-/// # use finstack_quant_core::money::Money;
-/// # use finstack_quant_core::dates::create_date;
-/// # use finstack_quant_core::types::Rate;
-/// # use time::Month;
+/// use finstack_quant_cashflows::builder::CashFlowSchedule;
+/// use finstack_quant_cashflows::primitives::CFKind;
+/// use finstack_quant_cashflows::{schedule_from_dated_flows, CashflowScheduleSource, ScheduleBuildOpts};
+/// use finstack_quant_core::dates::{Date, DayCount};
+/// use finstack_quant_core::market_data::context::MarketContext;
+/// use finstack_quant_core::market_data::term_structures::DiscountCurve;
+/// use finstack_quant_core::money::Money;
+/// use finstack_quant_core::types::{Attributes, CurveId};
+/// use finstack_quant_core::{currency::Currency, Result};
+/// use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
+/// use finstack_quant_valuations::pricer::InstrumentType;
+/// use std::any::Any;
+/// use time::macros::date;
 ///
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # let issue = create_date(2025, Month::January, 15)?;
-/// # let maturity = create_date(2030, Month::January, 15)?;
-/// let bond = Bond::fixed(
-///     "BOND-001",
-///     Money::from((1_000_000_i64, Currency::USD)),
-///     Rate::from_percent(5.0).expect("valid rate fixture"),
-///     issue,
-///     maturity,
-///     finstack_quant_core::dates::StubKind::None,
-///     "USD-OIS"
-/// )?;
+/// #[derive(Clone)]
+/// struct ZeroNote {
+///     id: String,
+///     notional: Money,
+///     maturity: Date,
+///     curve: CurveId,
+///     attributes: Attributes,
+/// }
 ///
-/// let instrument: Box<dyn Instrument> = Box::new(bond);
-/// assert_eq!(instrument.id(), "BOND-001");
-/// assert_eq!(instrument.clone_box().id(), "BOND-001");
-/// # Ok(())
-/// # }
+/// impl CashflowScheduleSource for ZeroNote {
+///     fn raw_cashflow_schedule(&self, _: &MarketContext, _: Date) -> Result<CashFlowSchedule> {
+///         Ok(schedule_from_dated_flows(
+///             vec![(self.maturity, self.notional)],
+///             CFKind::Notional,
+///             DayCount::Act365F,
+///             ScheduleBuildOpts { notional_hint: Some(self.notional), ..Default::default() },
+///         ))
+///     }
+/// }
+///
+/// impl Instrument for ZeroNote {
+///     fn id(&self) -> &str { &self.id }
+///     fn key(&self) -> InstrumentType { InstrumentType::Bond }
+///     fn as_any(&self) -> &dyn Any { self }
+///     fn as_any_mut(&mut self) -> &mut dyn Any { self }
+///     fn attributes(&self) -> &Attributes { &self.attributes }
+///     fn attributes_mut(&mut self) -> &mut Attributes { &mut self.attributes }
+///     fn clone_box(&self) -> Box<dyn Instrument> { Box::new(self.clone()) }
+///     fn expiry(&self) -> Option<Date> { Some(self.maturity) }
+///     fn market_dependencies(&self) -> Result<MarketDependencies> {
+///         let mut deps = MarketDependencies::new();
+///         deps.curves.discount_curves.push(self.curve.clone());
+///         Ok(deps)
+///     }
+///     fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
+///         let curve = market.get_discount(&self.curve)?;
+///         let df = curve.df_between_dates(as_of, self.maturity)?;
+///         self.notional.checked_mul_f64(df)
+///     }
+/// }
+///
+/// let note = ZeroNote {
+///     id: "NOTE-1".into(),
+///     notional: Money::from((1_000_000_i64, Currency::USD)),
+///     maturity: date!(2027-01-01),
+///     curve: "USD-OIS".into(),
+///     attributes: Attributes::default(),
+/// };
+/// let market = MarketContext::new().insert(
+///     DiscountCurve::builder("USD-OIS")
+///         .base_date(date!(2026-01-01))
+///         .knots([(0.0, 1.0), (1.0, 0.95)])
+///         .build()?,
+/// );
+/// let value = note.value(&market, date!(2026-01-01))?;
+/// assert_eq!(value.currency(), Currency::USD);
+/// assert!((value.amount() - 950_000.0).abs() < 1.0);
+///
+/// let boxed: Box<dyn Instrument> = Box::new(note);
+/// assert_eq!(boxed.clone_box().id(), "NOTE-1");
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub trait Instrument: CashflowProvider + Send + Sync {
     /// Get the instrument's unique identifier.
@@ -61,34 +113,6 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     ///
     /// String slice containing the instrument ID
     ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_valuations::instruments::Bond;
-    /// use finstack_quant_valuations::instruments::Instrument;
-    /// # use finstack_quant_core::currency::Currency;
-    /// # use finstack_quant_core::money::Money;
-    /// # use finstack_quant_core::dates::create_date;
-    /// # use finstack_quant_core::types::Rate;
-    /// # use time::Month;
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let issue = create_date(2025, Month::January, 15)?;
-    /// # let maturity = create_date(2030, Month::January, 15)?;
-    /// let bond = Bond::fixed(
-    ///     "US-TREASURY-5Y-001",
-    ///     Money::from((1_000_000_i64, Currency::USD)),
-    ///     Rate::from_percent(5.0).expect("valid rate fixture"),
-    ///     issue,
-    ///     maturity,
-    ///     finstack_quant_core::dates::StubKind::None,
-    ///     "USD-OIS"
-    /// )?;
-    ///
-    /// assert_eq!(bond.id(), "US-TREASURY-5Y-001");
-    /// # Ok(())
-    /// # }
-    /// ```
     fn id(&self) -> &str;
 
     /// Get the strongly-typed instrument key for pricer dispatch.
@@ -101,29 +125,6 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     ///
     /// `InstrumentType` enum variant (e.g., `InstrumentType::Bond`)
     ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_valuations::instruments::Bond;
-    /// use finstack_quant_valuations::instruments::Instrument;
-    /// use finstack_quant_valuations::pricer::InstrumentType;
-    /// # use finstack_quant_core::currency::Currency;
-    /// # use finstack_quant_core::money::Money;
-    /// # use finstack_quant_core::dates::create_date;
-    /// # use finstack_quant_core::types::Rate;
-    /// # use time::Month;
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let issue = create_date(2025, Month::January, 15)?;
-    /// # let maturity = create_date(2030, Month::January, 15)?;
-    /// let bond = Bond::fixed("BOND-001", Money::from((1_000_000_i64, Currency::USD)),
-    ///     Rate::from_percent(5.0).expect("valid rate fixture"), issue, maturity,
-    ///     finstack_quant_core::dates::StubKind::None, "USD-OIS")?;
-    ///
-    /// assert_eq!(bond.key(), InstrumentType::Bond);
-    /// # Ok(())
-    /// # }
-    /// ```
     fn key(&self) -> InstrumentType;
 
     /// The registration family whose pricers and metrics serve this
@@ -149,30 +150,6 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     ///
     /// Reference to `dyn Any` for dynamic type checking
     ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_valuations::instruments::Bond;
-    /// use finstack_quant_valuations::instruments::Instrument;
-    /// # use finstack_quant_core::currency::Currency;
-    /// # use finstack_quant_core::money::Money;
-    /// # use finstack_quant_core::dates::create_date;
-    /// # use finstack_quant_core::types::Rate;
-    /// # use time::Month;
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let issue = create_date(2025, Month::January, 15)?;
-    /// # let maturity = create_date(2030, Month::January, 15)?;
-    /// let bond = Bond::fixed("BOND-001", Money::from((1_000_000_i64, Currency::USD)),
-    ///     Rate::from_percent(5.0).expect("valid rate fixture"), issue, maturity,
-    ///     finstack_quant_core::dates::StubKind::None, "USD-OIS")?;
-    ///
-    /// let instrument: &dyn Instrument = &bond;
-    /// let concrete_bond: Option<&Bond> = instrument.as_any().downcast_ref::<Bond>();
-    /// assert!(concrete_bond.is_some());
-    /// # Ok(())
-    /// # }
-    /// ```
     fn as_any(&self) -> &dyn Any;
 
     /// Access to the concrete type for mutable downcasting.
@@ -339,30 +316,6 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     ///
     /// Boxed clone of the instrument
     ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_valuations::instruments::Bond;
-    /// use finstack_quant_valuations::instruments::Instrument;
-    /// # use finstack_quant_core::currency::Currency;
-    /// # use finstack_quant_core::money::Money;
-    /// # use finstack_quant_core::dates::create_date;
-    /// # use finstack_quant_core::types::Rate;
-    /// # use time::Month;
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let issue = create_date(2025, Month::January, 15)?;
-    /// # let maturity = create_date(2030, Month::January, 15)?;
-    /// let bond = Bond::fixed("BOND-001", Money::from((1_000_000_i64, Currency::USD)),
-    ///     Rate::from_percent(5.0).expect("valid rate fixture"), issue, maturity,
-    ///     finstack_quant_core::dates::StubKind::None, "USD-OIS")?;
-    ///
-    /// let instrument: Box<dyn Instrument> = Box::new(bond);
-    /// let cloned = instrument.clone_box();
-    /// assert_eq!(cloned.id(), instrument.id());
-    /// # Ok(())
-    /// # }
-    /// ```
     fn clone_box(&self) -> Box<dyn Instrument>;
 
     /// Returns a normalized instrument for computing spread/yield metrics.
@@ -479,34 +432,6 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// fails. Implementations may defensively validate, but canonical validation
     /// belongs to the public wrapper lifecycle.
     ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_valuations::instruments::Bond;
-    /// use finstack_quant_valuations::instruments::Instrument;
-    /// use finstack_quant_core::market_data::context::MarketContext;
-    /// # use finstack_quant_core::currency::Currency;
-    /// # use finstack_quant_core::money::Money;
-    /// # use finstack_quant_core::dates::create_date;
-    /// # use finstack_quant_core::types::Rate;
-    /// # use time::Month;
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let issue = create_date(2025, Month::January, 15)?;
-    /// # let maturity = create_date(2030, Month::January, 15)?;
-    /// let bond = Bond::fixed("BOND-001", Money::from((1_000_000_i64, Currency::USD)),
-    ///     Rate::from_percent(5.0).expect("valid rate fixture"), issue, maturity,
-    ///     finstack_quant_core::dates::StubKind::None, "USD-OIS")?;
-    ///
-    /// let market = MarketContext::new();
-    /// let as_of = create_date(2025, Month::January, 1)?;
-    ///
-    /// // Fast NPV-only calculation
-    /// // let pv = bond.value(&market, as_of)?;
-    /// // assert_eq!(pv.currency(), Currency::USD);
-    /// # Ok(())
-    /// # }
-    /// ```
     /// # Override contract
     ///
     /// - Market quotes and model configuration are consumed here when relevant.
@@ -895,17 +820,6 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// - `Some(Date)` for instruments with a defined expiry/maturity
     /// - `None` for instruments without a clear expiry (e.g., equity spot positions)
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use finstack_quant_valuations::instruments::Bond;
-    /// use finstack_quant_valuations::instruments::Instrument;
-    ///
-    /// let bond = Bond::example().unwrap();
-    /// if let Some(maturity) = bond.expiry() {
-    ///     println!("Bond matures on: {}", maturity);
-    /// }
-    /// ```
     fn expiry(&self) -> Option<Date> {
         None
     }

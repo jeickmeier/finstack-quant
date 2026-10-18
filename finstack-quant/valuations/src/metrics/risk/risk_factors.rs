@@ -120,22 +120,10 @@ impl RiskFactorType {
 ///
 /// Vector of risk factors that affect this instrument's valuation
 ///
-/// # Examples
-///
-/// ```
-/// use finstack_quant_valuations::instruments::Bond;
-/// use finstack_quant_valuations::metrics::risk::extract_risk_factors;
-/// use finstack_quant_core::market_data::context::MarketContext;
-///
-/// # fn main() -> finstack_quant_core::Result<()> {
-/// let bond = Bond::example().unwrap();
-/// let market = MarketContext::new();
-/// let factors = extract_risk_factors(&bond, &market)?;
-/// // factors will include discount curve rates at standard tenors
-/// # let _ = factors;
-/// # Ok(())
-/// # }
-/// ```
+/// For a fixed-rate bond the factors are its discount curve's rates at the
+/// standard tenors; the `core_framework` integration tests
+/// (`tests/core/risk_factors.rs`) show the extraction over the built-in
+/// instruments.
 pub fn extract_risk_factors<I>(
     instrument: &I,
     market: &MarketContext,

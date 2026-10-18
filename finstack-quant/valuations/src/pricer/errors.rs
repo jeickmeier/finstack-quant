@@ -32,23 +32,29 @@ impl PricingErrorContext {
 
     /// Create context from an instrument, capturing ID and type.
     ///
+    /// Equivalent to [`new`](Self::new) followed by
+    /// [`instrument_id`](Self::instrument_id) with the instrument's id and
+    /// [`instrument_type`](Self::instrument_type) with its key.
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument` - Instrument whose `id()` and `key()` are recorded.
+    ///
     /// # Example
     ///
     /// ```
-    /// use finstack_quant_valuations::instruments::Bond;
     /// use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, PricingErrorContext};
     ///
-    /// # fn main() -> finstack_quant_core::Result<()> {
-    /// let bond = Bond::example()?;
-    /// let ctx = PricingErrorContext::from_instrument(&bond)
+    /// // What `from_instrument(&bond)` records for a bond with id "BOND-001".
+    /// let ctx = PricingErrorContext::new()
+    ///     .instrument_id("BOND-001")
+    ///     .instrument_type(InstrumentType::Bond)
     ///     .model(ModelKey::Discounting)
     ///     .curve_id("USD-OIS");
     ///
+    /// assert_eq!(ctx.instrument_id.as_deref(), Some("BOND-001"));
     /// assert_eq!(ctx.instrument_type, Some(InstrumentType::Bond));
-    /// assert_eq!(ctx.model, Some(ModelKey::Discounting));
     /// assert_eq!(ctx.curve_ids, vec!["USD-OIS".to_string()]);
-    /// # Ok(())
-    /// # }
     /// ```
     pub fn from_instrument(instrument: &dyn Priceable) -> Self {
         Self {
@@ -59,30 +65,51 @@ impl PricingErrorContext {
     }
 
     /// Set the instrument ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Identifier of the instrument the error concerns.
     pub fn instrument_id(mut self, id: impl Into<String>) -> Self {
         self.instrument_id = Some(id.into());
         self
     }
 
     /// Set the instrument type.
+    ///
+    /// # Arguments
+    ///
+    /// * `typ` - Registry key of the instrument the error concerns.
     pub fn instrument_type(mut self, typ: InstrumentType) -> Self {
         self.instrument_type = Some(typ);
         self
     }
 
     /// Set the pricing model.
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - Model the failing valuation was dispatched to.
     pub fn model(mut self, model: ModelKey) -> Self {
         self.model = Some(model);
         self
     }
 
     /// Add a curve/surface ID to the context.
+    ///
+    /// # Arguments
+    ///
+    /// * `curve_id` - Market-data identifier involved in the failing operation.
     pub fn curve_id(mut self, curve_id: impl Into<String>) -> Self {
         self.curve_ids.push(curve_id.into());
         self
     }
 
     /// Add multiple curve/surface IDs to the context.
+    ///
+    /// # Arguments
+    ///
+    /// * `curve_ids` - Market-data identifiers involved in the failing operation,
+    ///   appended in iteration order.
     pub fn curve_ids(mut self, curve_ids: impl IntoIterator<Item = impl Into<String>>) -> Self {
         self.curve_ids
             .extend(curve_ids.into_iter().map(|s| s.into()));
