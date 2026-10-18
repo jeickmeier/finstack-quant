@@ -370,6 +370,23 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
 
+      # The baseline benchmarks the base's library code with the PR head's
+      # benchmark sources. Both sides then run identical fixtures, which is the
+      # fairer measurement, and a PR that repairs a bench fixture broken on the
+      # base can go green on its own: with the base's fixtures the baseline
+      # bench binary would panic before the fix is ever reached (PR #98). The
+      # base's bench files are removed first so a fixture the head deleted does
+      # not survive. A head bench change that needs library API the base lacks
+      # fails here at the baseline build, so land such API first.
+      - name: Restore PR head benchmark sources
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$HEAD_SHA"
+          git rm -rq --ignore-unmatch -- 'finstack-quant/*/benches/*'
+          git checkout "$HEAD_SHA" -- 'finstack-quant/*/benches/*'
+          git status --short -- 'finstack-quant/*/benches/*'
+
       - name: Establish base benchmark
         run: PYTHONPATH="$RUNNER_TEMP/pr-bench" python3 "$RUNNER_TEMP/pr-bench/scripts/pr_benchmarks.py" baseline
 
