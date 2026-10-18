@@ -370,6 +370,25 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
 
+      # The baseline benchmarks the base's library code with the PR head's
+      # benchmark sources. Both sides then run identical fixtures, which is the
+      # fairer measurement, and a PR that repairs a bench fixture broken on the
+      # base can go green on its own: with the base's fixtures the baseline
+      # bench binary would panic before the fix is ever reached (PR #98). The
+      # head's files are overlaid, never removed: every crate lists its benches
+      # as explicit `[[bench]]` entries with `autobenches = false`, so deleting a
+      # bench file the base manifest still names would break the base manifest,
+      # and only the four `--bench` targets in pr_benchmarks.py compile anyway.
+      # A head bench change that needs library API the base lacks fails here at
+      # the baseline build, so land such API first.
+      - name: Restore PR head benchmark sources
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$HEAD_SHA"
+          git checkout "$HEAD_SHA" -- 'finstack-quant/*/benches/*'
+          git status --short -- 'finstack-quant/*/benches/*'
+
       - name: Establish base benchmark
         run: PYTHONPATH="$RUNNER_TEMP/pr-bench" python3 "$RUNNER_TEMP/pr-bench/scripts/pr_benchmarks.py" baseline
 
