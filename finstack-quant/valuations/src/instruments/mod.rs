@@ -168,7 +168,9 @@ pub mod exotics;
 /// Fixed income instruments: bonds, loans, MBS, and structured products.
 pub mod fixed_income;
 /// FX instruments and FX derivatives.
-pub mod fx;
+pub mod fx {
+    pub use finstack_quant_valuations_fx::*;
+}
 /// Interest rate derivatives and money market instruments.
 pub mod rates;
 

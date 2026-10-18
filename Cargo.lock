@@ -1063,6 +1063,7 @@ dependencies = [
  "finstack-quant-models",
  "finstack-quant-test-utils",
  "finstack-quant-valuations-core",
+ "finstack-quant-valuations-fx",
  "finstack-quant-valuations-macros",
  "finstack-quant-valuations-test-support",
  "indexmap",
@@ -1104,6 +1105,23 @@ dependencies = [
  "thiserror",
  "time",
  "tracing",
+]
+
+[[package]]
+name = "finstack-quant-valuations-fx"
+version = "0.10.0"
+dependencies = [
+ "finstack-quant-cashflows",
+ "finstack-quant-core",
+ "finstack-quant-models",
+ "finstack-quant-test-utils",
+ "finstack-quant-valuations-core",
+ "finstack-quant-valuations-macros",
+ "finstack-quant-valuations-test-support",
+ "schemars",
+ "serde",
+ "serde_json",
+ "time",
 ]
 
 [[package]]

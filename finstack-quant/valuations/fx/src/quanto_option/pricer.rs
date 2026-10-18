@@ -1,0 +1,581 @@
+//! Quanto option pricers.
+//!
+//! Only analytical pricing is supported. Monte Carlo pricing has been removed
+//! because the quanto drift adjustment model cannot be correctly represented
+//! in a simple 1D MC simulation without a 2D correlated equity/FX process.
+
+use crate::quanto_option::types::QuantoOption;
+use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
+use finstack_quant_core::money::Money;
+use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::pricer::{
+    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
+};
+use finstack_quant_valuations_core::results::ValuationResult;
+
+use finstack_quant_models::closed_form::quanto::{quanto_call, quanto_put};
+
+/// Helper to collect inputs for quanto option pricing.
+fn collect_quanto_inputs(
+    inst: &QuantoOption,
+    curves: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<(f64, f64, f64, f64, f64, f64, f64)> {
+    use finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df;
+
+    let t = inst
+        .day_count
+        .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
+
+    // Recover continuously-compounded rates from *date-based* discount factors,
+    // mirroring `shared.rs::collect_fx_option_inputs_no_vol`. `curve.zero(t)`
+    // interpolates on the curve's own time axis, so the rate it returns does
+    // not satisfy `e^{-r·t} = df_between_dates(as_of, expiry)` whenever
+    // `as_of != base_date` or the instrument and curve day-counts differ.
+    // Using `df_between_dates` + `zero_rate_from_df` keeps the recovered rate
+    // consistent with the actual discount factor over the option's life.
+    let disc_curve = curves.get_discount(inst.domestic_discount_curve_id.as_str())?;
+    let df_dom = disc_curve.df_between_dates(as_of, inst.expiry)?;
+    let r_dom = zero_rate_from_df(df_dom, t, "QuantoOption domestic discount")?;
+
+    let for_curve = curves.get_discount(inst.foreign_discount_curve_id.as_str())?;
+    let df_for = for_curve.df_between_dates(as_of, inst.expiry)?;
+    let r_for = zero_rate_from_df(df_for, t, "QuantoOption foreign discount")?;
+
+    let spot_scalar = curves.get_price(&inst.spot_id)?;
+    let spot = finstack_quant_valuations_core::metrics::scalar_numeric_value(spot_scalar);
+
+    let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+        curves,
+        inst.div_yield_id.as_ref(),
+    )?;
+
+    let sigma_equity =
+        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
+            &inst.instrument_pricing_overrides.market_quotes,
+            curves,
+            inst.vol_surface_id.as_str(),
+            t,
+            inst.strike,
+        )?;
+
+    // The quanto drift adjustment uses ATM-forward FX vol, so absolute-strike
+    // surfaces must be queried at the CIRP forward rather than moneyness 1.0.
+    let sigma_fx = if let Some(fx_vol_surface_id) = &inst.fx_vol_surface_id {
+        let fx_vol_surface = curves.get_surface(fx_vol_surface_id.as_str())?;
+        fx_vol_surface.require_quote_type(VolQuoteType::BlackLognormal)?;
+        fx_vol_surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
+        let fx_spot = resolve_quanto_fx_spot(inst, curves, as_of);
+        match fx_spot {
+            Some(s_fx) if s_fx.is_finite() && s_fx > 0.0 => {
+                let atm_fwd_fx = s_fx * ((r_dom - r_for) * t).exp();
+                debug_assert!(
+                    atm_fwd_fx.is_finite() && atm_fwd_fx > 0.0,
+                    "ATM forward FX must be positive finite, got {atm_fwd_fx} \
+                     (spot={s_fx}, r_dom={r_dom}, r_for={r_for}, t={t})"
+                );
+                finstack_quant_models::volatility::get_surface_vol_clamped(
+                    &fx_vol_surface,
+                    t,
+                    atm_fwd_fx,
+                )
+            }
+            _ => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "QuantoOption '{}': FX spot is required to select ATM-forward FX volatility; configure fx_spot_id or populate the FX matrix",
+                    inst.id
+                )));
+            }
+        }
+    } else {
+        return Err(finstack_quant_core::Error::from(
+            finstack_quant_core::InputError::NotFound {
+                id: "fx_vol_surface_id".to_string(),
+            },
+        ));
+    };
+
+    Ok((spot, r_dom, r_for, q, sigma_equity, sigma_fx, t))
+}
+
+/// Resolve the FX spot for the quanto's base/quote pair, preferring an
+/// explicit scalar id (`fx_spot_id`) over the market `FxMatrix`. Returns
+/// `None` when neither source is available, letting the caller decide
+/// whether to fall back to a moneyness-1.0 lookup.
+fn resolve_quanto_fx_spot(inst: &QuantoOption, curves: &MarketContext, as_of: Date) -> Option<f64> {
+    use finstack_quant_core::money::fx::FxQuery;
+    if let Some(fx_id) = &inst.fx_spot_id {
+        if let Ok(scalar) = curves.get_price(fx_id) {
+            return Some(finstack_quant_valuations_core::metrics::scalar_numeric_value(scalar));
+        }
+    }
+    let fx = curves.fx()?;
+    let quote = FxQuery::new(inst.base_currency, inst.quote_currency, as_of);
+    fx.rate(quote).ok().map(|q| q.rate)
+}
+
+fn payoff_scale(inst: &QuantoOption) -> finstack_quant_core::Result<f64> {
+    // `inst.validate()` already ran at construction (builder + serde
+    // `try_from` go through `validate`). Greek calculators that bump
+    // instrument fields directly (e.g. `Correlation01Calculator`) validate
+    // the bumped field locally. Re-running the full validation on every
+    // pricing call cost ~3-4x for vanna/volga which call `value()` 4x.
+    match (inst.quantity, inst.payoff_fx_rate) {
+        (Some(quantity), Some(fx_rate)) => Ok(quantity * fx_rate),
+        (None, None) => Ok(inst.notional.amount() / inst.strike),
+        _ => Err(finstack_quant_core::Error::Validation(
+            "QuantoOption requires both quantity and payoff_fx_rate when either is supplied"
+                .to_string(),
+        )),
+    }
+}
+
+/// Quanto option analytical pricer.
+pub(crate) struct QuantoOptionAnalyticalPricer;
+
+impl QuantoOptionAnalyticalPricer {
+    /// Create a new analytical quanto option pricer
+    pub(crate) fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for QuantoOptionAnalyticalPricer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Pricer for QuantoOptionAnalyticalPricer {
+    fn key(&self) -> PricerKey {
+        PricerKey::new(InstrumentType::QuantoOption, ModelKey::QuantoBS)
+    }
+
+    fn price_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> std::result::Result<ValuationResult, PricingError> {
+        let quanto = expect_inst::<QuantoOption>(instrument, InstrumentType::QuantoOption)?;
+
+        if as_of > quanto.expiry {
+            return Ok(ValuationResult::stamped(
+                quanto.id(),
+                as_of,
+                Money::from((0_i64, quanto.quote_currency)),
+            ));
+        }
+
+        if as_of >= quanto.expiry {
+            let spot = finstack_quant_valuations_core::metrics::scalar_numeric_value(
+                market.get_price(&quanto.spot_id)?,
+            );
+            let scale = payoff_scale(quanto)?;
+            let strike = quanto.strike;
+            let intrinsic_unit = match quanto.option_type {
+                finstack_quant_valuations_core::instruments::OptionType::Call => {
+                    (spot - strike).max(0.0)
+                }
+                finstack_quant_valuations_core::instruments::OptionType::Put => {
+                    (strike - spot).max(0.0)
+                }
+            };
+            return Ok(ValuationResult::stamped(
+                quanto.id(),
+                as_of,
+                Money::new(intrinsic_unit * scale, quanto.quote_currency).map_err(|error| {
+                    finstack_quant_valuations_core::pricer::PricingError::from_core(
+                        error,
+                        finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(quanto),
+                    )
+                })?,
+            ));
+        }
+
+        let (spot, r_dom, r_for, q, sigma_equity, sigma_fx, t) =
+            collect_quanto_inputs(quanto, market, as_of)?;
+
+        if t <= 0.0 {
+            // Expiry convention: settle at intrinsic (consistent with the
+            // FxOption/digital/barrier siblings) rather than returning 0.
+            // The quanto payoff converts the foreign-currency intrinsic at
+            // the contractual fixed FX rate via `payoff_scale`.
+            let scale = payoff_scale(quanto)?;
+            let strike = quanto.strike;
+            let intrinsic_unit = match quanto.option_type {
+                finstack_quant_valuations_core::instruments::OptionType::Call => {
+                    (spot - strike).max(0.0)
+                }
+                finstack_quant_valuations_core::instruments::OptionType::Put => {
+                    (strike - spot).max(0.0)
+                }
+            };
+            return Ok(ValuationResult::stamped(
+                quanto.id(),
+                as_of,
+                Money::new(intrinsic_unit * scale, quanto.quote_currency).map_err(|error| {
+                    finstack_quant_valuations_core::pricer::PricingError::from_core(
+                        error,
+                        finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(quanto),
+                    )
+                })?,
+            ));
+        }
+
+        let price = match quanto.option_type {
+            finstack_quant_valuations_core::instruments::OptionType::Call => quanto_call(
+                spot,
+                quanto.strike,
+                t,
+                r_dom,
+                r_for,
+                q,
+                sigma_equity,
+                sigma_fx,
+                quanto.correlation,
+            ),
+            finstack_quant_valuations_core::instruments::OptionType::Put => quanto_put(
+                spot,
+                quanto.strike,
+                t,
+                r_dom,
+                r_for,
+                q,
+                sigma_equity,
+                sigma_fx,
+                quanto.correlation,
+            ),
+        };
+
+        let scale = payoff_scale(quanto)?;
+        let pv = Money::new(price * scale, quanto.quote_currency).map_err(|error| {
+            finstack_quant_valuations_core::pricer::PricingError::from_core(
+                error,
+                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
+                    quanto,
+                ),
+            )
+        })?;
+        Ok(ValuationResult::stamped(quanto.id(), as_of, pv))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_core::market_data::scalars::MarketScalar;
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+    use time::macros::date;
+
+    /// Item 3 regression: `r_dom`/`r_for` must be recovered from *date-based*
+    /// discount factors so that `e^{-r·t} == df_between_dates(as_of, expiry)`.
+    /// The fixture uses a discount curve whose `base_date` precedes `as_of`,
+    /// which makes the prior `curve.zero(t)` (time-axis interpolation) disagree
+    /// with the actual discount factor over the option's life.
+    #[test]
+    fn quanto_inputs_use_date_based_discount_rates() {
+        let curve_base = date!(2025 - 01 - 02);
+        let as_of = date!(2025 - 07 - 01);
+        let expiry = date!(2026 - 07 - 01);
+
+        // Non-flat curves: the instantaneous forward rate rises across tenors,
+        // so `df(t2)/df(t1) != df(t2 - t1)` and the curve-axis `zero()` lookup
+        // genuinely disagrees with date-based discounting.
+        let usd = DiscountCurve::builder("USD-OIS")
+            .base_date(curve_base)
+            .day_count(DayCount::Act365F)
+            .knots([
+                (0.0, 1.0),
+                (0.5, (-0.01_f64).exp()),
+                (1.5, (-0.09_f64).exp()),
+                (3.0, (-0.30_f64).exp()),
+            ])
+            .build()
+            .expect("usd curve");
+        let jpy = DiscountCurve::builder("JPY-OIS")
+            .base_date(curve_base)
+            .day_count(DayCount::Act365F)
+            .knots([
+                (0.0, 1.0),
+                (0.5, (-0.002_f64).exp()),
+                (1.5, (-0.012_f64).exp()),
+                (3.0, (-0.045_f64).exp()),
+            ])
+            .build()
+            .expect("jpy curve");
+        let eq_vol = VolSurface::builder("NKY-VOL")
+            .expiries(&[2.0])
+            .strikes(&[35000.0])
+            .row(&[0.22])
+            .build()
+            .expect("equity vol");
+        let fx_vol = VolSurface::builder("JPYUSD-VOL")
+            .expiries(&[2.0])
+            .strikes(&[1.0])
+            .row(&[0.10])
+            .build()
+            .expect("fx vol");
+        let market = MarketContext::new()
+            .insert(usd)
+            .insert(jpy)
+            .insert_surface(eq_vol)
+            .insert_surface(fx_vol)
+            .insert_price(
+                "NKY-SPOT",
+                MarketScalar::Price(Money::from((34000_i64, Currency::JPY))),
+            )
+            .insert_price("JPYUSD-SPOT", MarketScalar::Unitless(0.0068));
+
+        let quanto = QuantoOption::builder()
+            .id(InstrumentId::new("QUANTO-DISC"))
+            .underlying_ticker("NKY".to_string())
+            .strike(35_000.0)
+            .option_type(finstack_quant_valuations_core::instruments::OptionType::Call)
+            .expiry(expiry)
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .base_currency(Currency::JPY)
+            .quote_currency(Currency::USD)
+            .correlation(-0.2)
+            .day_count(DayCount::Act365F)
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .foreign_discount_curve_id(CurveId::new("JPY-OIS"))
+            .spot_id("NKY-SPOT".into())
+            .vol_surface_id(CurveId::new("NKY-VOL"))
+            .div_yield_id_opt(None)
+            .fx_spot_id_opt(Some("JPYUSD-SPOT".into()))
+            .fx_vol_surface_id_opt(Some(CurveId::new("JPYUSD-VOL")))
+            .attributes(Attributes::new())
+            .build()
+            .expect("quanto");
+
+        let (_spot, r_dom, r_for, _q, _se, _sf, t) =
+            collect_quanto_inputs(&quanto, &market, as_of).expect("inputs");
+
+        let df_dom = market
+            .get_discount("USD-OIS")
+            .expect("usd")
+            .df_between_dates(as_of, expiry)
+            .expect("df dom");
+        let df_for = market
+            .get_discount("JPY-OIS")
+            .expect("jpy")
+            .df_between_dates(as_of, expiry)
+            .expect("df for");
+
+        assert!(
+            ((-r_dom * t).exp() - df_dom).abs() < 1e-12,
+            "recovered r_dom must satisfy e^(-r·t)=df_between_dates: \
+             e^(-r·t)={} df={df_dom}",
+            (-r_dom * t).exp()
+        );
+        assert!(
+            ((-r_for * t).exp() - df_for).abs() < 1e-12,
+            "recovered r_for must satisfy e^(-r·t)=df_between_dates: \
+             e^(-r·t)={} df={df_for}",
+            (-r_for * t).exp()
+        );
+
+        // The buggy time-axis lookup disagrees: `zero(t)` reads df at curve
+        // time `t` (anchored at base_date), not the option's `as_of→expiry` df.
+        let bug_r_dom = market.get_discount("USD-OIS").expect("usd").zero(t);
+        assert!(
+            ((-bug_r_dom * t).exp() - df_dom).abs() > 1e-4,
+            "fixture must expose the curve-axis bug for the domestic rate"
+        );
+    }
+
+    /// Expiry-day convention: a quanto valued at `t <= 0` settles at the
+    /// quanto-adjusted intrinsic (payoff converted at the fixed FX rate),
+    /// matching the FxOption/digital/barrier siblings, not 0.
+    #[test]
+    fn quanto_settles_at_intrinsic_on_expiry_day() {
+        let curve_base = date!(2025 - 01 - 02);
+        let expiry = date!(2026 - 07 - 01);
+        let as_of = expiry; // valuation on the expiry day → t == 0
+
+        let usd = DiscountCurve::builder("USD-OIS")
+            .base_date(curve_base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (3.0, (-0.09_f64).exp())])
+            .build()
+            .expect("usd curve");
+        let jpy = DiscountCurve::builder("JPY-OIS")
+            .base_date(curve_base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (3.0, (-0.03_f64).exp())])
+            .build()
+            .expect("jpy curve");
+        let eq_vol = VolSurface::builder("NKY-VOL")
+            .expiries(&[2.0])
+            .strikes(&[35000.0])
+            .row(&[0.22])
+            .build()
+            .expect("equity vol");
+        let fx_vol = VolSurface::builder("JPYUSD-VOL")
+            .expiries(&[2.0])
+            .strikes(&[1.0])
+            .row(&[0.10])
+            .build()
+            .expect("fx vol");
+        let market = MarketContext::new()
+            .insert(usd)
+            .insert(jpy)
+            .insert_surface(eq_vol)
+            .insert_surface(fx_vol)
+            .insert_price(
+                "NKY-SPOT",
+                MarketScalar::Price(Money::from((36_000_i64, Currency::JPY))),
+            );
+
+        let quanto = QuantoOption::builder()
+            .id(InstrumentId::new("QUANTO-EXPIRY"))
+            .underlying_ticker("NKY".to_string())
+            .strike(35_000.0)
+            .option_type(finstack_quant_valuations_core::instruments::OptionType::Call)
+            .expiry(expiry)
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .base_currency(Currency::JPY)
+            .quote_currency(Currency::USD)
+            .correlation(-0.2)
+            .day_count(DayCount::Act365F)
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .foreign_discount_curve_id(CurveId::new("JPY-OIS"))
+            .spot_id("NKY-SPOT".into())
+            .vol_surface_id(CurveId::new("NKY-VOL"))
+            .div_yield_id_opt(None)
+            .fx_vol_surface_id_opt(Some(CurveId::new("JPYUSD-VOL")))
+            .attributes(Attributes::new())
+            .build()
+            .expect("quanto");
+
+        let result = QuantoOptionAnalyticalPricer::new()
+            .price_dyn(&quanto, &market, as_of)
+            .expect("expiry-day valuation");
+
+        // Intrinsic (36 000 − 35 000) × payoff_scale, where the default
+        // payoff_scale is notional / strike.
+        let expected = 1_000.0 * (1_000_000.0 / 35_000.0);
+        assert!(
+            (result.value.amount() - expected).abs() < 1e-9,
+            "expiry-day quanto must settle at quanto-adjusted intrinsic: \
+             got {}, expected {expected}",
+            result.value.amount()
+        );
+
+        // OTM put on the same fixture is worthless at expiry.
+        let mut put = quanto;
+        put.option_type = finstack_quant_valuations_core::instruments::OptionType::Put;
+        let put_result = QuantoOptionAnalyticalPricer::new()
+            .price_dyn(&put, &market, as_of)
+            .expect("expiry-day put valuation");
+        assert!(
+            put_result.value.amount().abs() < 1e-12,
+            "OTM expiry-day quanto put must be worthless, got {}",
+            put_result.value.amount()
+        );
+    }
+
+    /// Audit P2b regression: FX vol must be sampled at the ATM forward FX
+    /// rate, not at the moneyness-1.0 wing. The fixture uses an absolute-
+    /// strike FX surface where the ATM-forward column carries a different
+    /// vol than the strike=1.0 column; the resolved `sigma_fx` must match
+    /// the ATM-forward vol.
+    #[test]
+    fn quanto_fx_vol_uses_atm_forward_strike() {
+        let as_of = date!(2026 - 01 - 02);
+        let expiry = date!(2027 - 01 - 02);
+
+        // Flat curves so the ATM-forward FX equals the spot:
+        //   F_fx = S_fx · exp((r_dom − r_for) · t) = 1.10 · 1 = 1.10.
+        // The surface stores **high** vol at 1.10 (ATM) and **low** vol at
+        // 1.00 (wing). The previous `value_clamped(t, 1.0)` would pick the
+        // wing vol and silently understate the quanto adjustment.
+        let usd = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (2.0, 1.0)])
+            .build()
+            .expect("usd flat curve");
+        let eur = DiscountCurve::builder("EUR-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (2.0, 1.0)])
+            .build()
+            .expect("eur flat curve");
+
+        // Smile / skew surface: vol = 0.05 at 1.00, 0.20 at 1.10, 0.05 at 1.20.
+        let fx_vol = VolSurface::builder("EURUSD-VOL")
+            .expiries(&[1.0])
+            .strikes(&[1.00, 1.10, 1.20])
+            .row(&[0.05, 0.20, 0.05])
+            .build()
+            .expect("smile fx vol");
+
+        let eq_vol = VolSurface::builder("AAPL-VOL")
+            .expiries(&[1.0])
+            .strikes(&[100.0])
+            .row(&[0.30])
+            .build()
+            .expect("equity vol");
+
+        // Explicit FX spot via the optional `fx_spot_id` scalar — no FX
+        // matrix needed. This is the standard production path.
+        let market = MarketContext::new()
+            .insert(usd)
+            .insert(eur)
+            .insert_surface(eq_vol)
+            .insert_surface(fx_vol)
+            .insert_price(
+                "AAPL-SPOT",
+                MarketScalar::Price(Money::from((100_i64, Currency::EUR))),
+            )
+            .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10));
+
+        let quanto = QuantoOption::builder()
+            .id(InstrumentId::new("QUANTO-ATM"))
+            .underlying_ticker("AAPL".to_string())
+            .strike(100.0)
+            .option_type(finstack_quant_valuations_core::instruments::OptionType::Call)
+            .expiry(expiry)
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .correlation(-0.5)
+            .day_count(DayCount::Act365F)
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
+            .spot_id("AAPL-SPOT".into())
+            .vol_surface_id(CurveId::new("AAPL-VOL"))
+            .div_yield_id_opt(None)
+            .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
+            .fx_vol_surface_id_opt(Some(CurveId::new("EURUSD-VOL")))
+            .attributes(Attributes::new())
+            .build()
+            .expect("quanto");
+
+        let (_spot, _r_dom, _r_for, _q, _se, sigma_fx, _t) =
+            collect_quanto_inputs(&quanto, &market, as_of).expect("inputs");
+
+        // ATM forward is 1.10 (flat curves), where the surface holds 0.20.
+        assert!(
+            (sigma_fx - 0.20).abs() < 1e-12,
+            "sigma_fx must be sampled at the ATM-forward strike (=1.10, σ=0.20); got {sigma_fx}"
+        );
+        // Sanity: the bug-fixed value is materially different from the
+        // wing-1.0 vol (0.05) that the prior `value_clamped(t, 1.0)`
+        // returned for this absolute-strike surface.
+        assert!(
+            (sigma_fx - 0.05).abs() > 0.01,
+            "sigma_fx must differ from the legacy moneyness=1.0 wing vol (0.05); got {sigma_fx}"
+        );
+    }
+}

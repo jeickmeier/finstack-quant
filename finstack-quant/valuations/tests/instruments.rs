@@ -176,17 +176,9 @@ mod fx_barrier_option;
 #[path = "instruments/fx_spot/mod.rs"]
 mod fx_spot;
 
-/// FX swap tests - FX forward and swap transactions
-#[path = "instruments/fx_swap/mod.rs"]
-mod fx_swap;
-
 /// FX variance swap tests - Volatility exposure on FX
 #[path = "instruments/fx_variance_swap/mod.rs"]
 mod fx_variance_swap;
-
-/// Quanto option tests - Cross-currency quanto-adjusted equity options
-#[path = "instruments/quanto_option/mod.rs"]
-mod quanto_option;
 
 /// NDF tests - Non-deliverable forwards for restricted currencies
 #[path = "instruments/ndf/mod.rs"]

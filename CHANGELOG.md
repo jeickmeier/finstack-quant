@@ -6,6 +6,7 @@
 
 #### Added
 
+- `finstack-quant-valuations-fx` (`finstack-quant/valuations/fx`): the FX instrument family — `FxSpot`, `FxForward`, `FxSwap`, `Ndf`, `FxFuture`, `FxFutureOption`, `FxOption`, `FxBarrierOption`, `FxDigitalOption`, `FxTouchOption`, `FxVarianceSwap`, `QuantoOption` and the `FX` family static — as a crate depending on valuations-core only. The umbrella re-exports it as `finstack_quant_valuations::instruments::fx` and keeps the flat re-exports, so public paths are unchanged; doc examples inside the moved files import `finstack_quant_valuations_fx`, which changes `description` text in the generated schemas and nothing else.
 - Dev-only crate `finstack-quant-valuations-test-support` (`finstack-quant/valuations/test-support`): the market-context builders, fixtures, tolerance constants, parity assertions (`assert_parity!`) and one-line curve/surface constructors that the valuations integration tests and inline tests shared through `#[path]` and `include!`. It depends on `finstack-quant-core` only, so every instrument-family crate can dev-depend on it; instrument builders (`tests/support/{rates,credit,equity_fx_options}.rs`, `TestOptionBuilder`) stay with the crate that owns the instrument.
 
 #### Changed
