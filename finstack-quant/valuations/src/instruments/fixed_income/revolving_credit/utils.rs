@@ -498,39 +498,6 @@ pub(super) fn apply_draw_repay_event(
     }
 }
 
-/// Linearly interpolate a rate from sorted knot points with flat extrapolation.
-///
-/// Uses `partition_point` for O(log n) interval lookup. Degenerate inputs are
-/// handled defensively: empty inputs yield `0.0`, mismatched lengths use the
-/// common prefix, and a zero-width interval (duplicate knots) returns the
-/// left-hand rate instead of dividing by zero.
-///
-/// # Arguments
-///
-/// * `t` - Query time in years (same clock as `times`).
-/// * `times` - Sorted (non-decreasing) knot times in years.
-/// * `rates` - Rates at each knot (decimal, e.g. `0.05` for 5%).
-pub(super) fn interpolate_rate(t: f64, times: &[f64], rates: &[f64]) -> f64 {
-    if times.is_empty() || rates.is_empty() {
-        return 0.0;
-    }
-    if times.len() == 1 || rates.len() == 1 || t <= times[0] {
-        return rates[0];
-    }
-    let n = times.len().min(rates.len());
-    if t >= times[n - 1] {
-        return rates[n - 1];
-    }
-    let idx = times[..n].partition_point(|&time| time <= t);
-    let i = idx.saturating_sub(1);
-    let width = times[i + 1] - times[i];
-    if width <= 0.0 {
-        return rates[i];
-    }
-    let alpha = (t - times[i]) / width;
-    rates[i] + alpha * (rates[i + 1] - rates[i])
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1069,18 +1036,5 @@ mod tests {
             .expect_err("should fail")
             .to_string()
             .contains("exceed commitment"));
-    }
-
-    #[test]
-    fn interpolate_rate_handles_duplicate_knots_without_nan() {
-        let times = [0.0, 1.0, 1.0, 2.0];
-        let rates = [0.01, 0.02, 0.03, 0.04];
-        let v = interpolate_rate(1.0, &times, &rates);
-        assert!(v.is_finite());
-        assert!((v - 0.03).abs() < 1e-15);
-        assert!((interpolate_rate(0.5, &times, &rates) - 0.015).abs() < 1e-15);
-        assert!((interpolate_rate(-1.0, &times, &rates) - 0.01).abs() < 1e-15);
-        assert!((interpolate_rate(5.0, &times, &rates) - 0.04).abs() < 1e-15);
-        assert_eq!(interpolate_rate(1.0, &[], &[]), 0.0);
     }
 }

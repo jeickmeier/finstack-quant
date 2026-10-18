@@ -78,6 +78,8 @@ pub mod rough_heston;
 pub mod sabr;
 mod source;
 pub mod svi;
+/// Carr-Madan discrete variance replication for variance swaps.
+pub mod variance_replication;
 
 pub use crate::closed_form::volatility::bachelier_price_with_annuity;
 pub use black::{d1_d2, d1_d2_black76};

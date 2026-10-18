@@ -1,7 +1,7 @@
 //! Three-factor Monte Carlo path generation for revolving credit facilities.
 //!
 //! Generates correlated paths for utilization, interest rates, and credit spreads
-//! using the existing `RevolvingCreditProcess` infrastructure.
+//! using the existing `CreditLineProcess` infrastructure.
 //!
 //! # Variance Reduction
 //!
@@ -20,9 +20,9 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 
-use crate::instruments::fixed_income::revolving_credit::pricing::monte_carlo_discretization::RevolvingCreditDiscretization;
-use crate::instruments::fixed_income::revolving_credit::pricing::monte_carlo_process::{
-    CreditSpreadParams, InterestRateSpec, RevolvingCreditProcess, RevolvingCreditProcessParams,
+use finstack_quant_models::monte_carlo::discretization::credit_line::CreditLineDiscretization;
+use finstack_quant_models::monte_carlo::process::credit_line::{
+    CreditLineProcess, CreditLineProcessParams, CreditSpreadParams, InterestRateSpec,
     UtilizationParams,
 };
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
@@ -42,7 +42,7 @@ use finstack_quant_cashflows::builder::RateSpec;
 /// Generate 3-factor MC paths using the existing process infrastructure.
 ///
 /// This function creates correlated paths for utilization, interest rates, and credit spreads
-/// by simulating the `RevolvingCreditProcess` across the payment schedule.
+/// by simulating the `CreditLineProcess` across the payment schedule.
 ///
 /// # Arguments
 ///
@@ -236,7 +236,7 @@ pub fn generate_three_factor_paths(
 
     // Create 3-factor process with correlation
     let mut process_params =
-        RevolvingCreditProcessParams::new(util_params, interest_rate_spec, credit_spread_params);
+        CreditLineProcessParams::new(util_params, interest_rate_spec, credit_spread_params);
 
     if let Some(corr_matrix) = &mc_config.correlation_matrix {
         process_params = process_params.with_correlation(*corr_matrix);
@@ -250,7 +250,7 @@ pub fn generate_three_factor_paths(
 
     process_params = process_params.with_time_offset(rate_time_offset);
 
-    let process = RevolvingCreditProcess::new(process_params);
+    let process = CreditLineProcess::new(process_params);
 
     // Whether the short-rate trajectory is genuinely stochastic (Hull-White
     // with σ > 0). The pricer uses this to choose pathwise bank-account
@@ -296,7 +296,7 @@ pub fn generate_three_factor_paths(
     let time_grid = TimeGrid::from_times(refined.times.iter().map(|t| t - sim_start).collect())?;
     let times_ref: &[f64] = &refined.times;
 
-    let disc = RevolvingCreditDiscretization::new(process.correlation())?;
+    let disc = CreditLineDiscretization::new(process.correlation())?;
 
     let num_paths = run.num_paths;
     let num_steps = time_grid.num_steps();

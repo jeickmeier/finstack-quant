@@ -1,9 +1,7 @@
 //! Cliquet option Monte Carlo pricer.
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::equity::cliquet_option::monte_carlo::CliquetCallPayoff;
 use crate::instruments::equity::cliquet_option::types::{CliquetOption, CliquetPayoffType};
-use crate::instruments::equity::piecewise_gbm::PiecewiseExactGbm;
 use crate::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -13,7 +11,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::engine::McEngine;
+use finstack_quant_models::monte_carlo::payoff::cliquet::CliquetCallPayoff;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
+use finstack_quant_models::monte_carlo::process::piecewise_gbm::PiecewiseExactGbm;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::TimeGrid;
 

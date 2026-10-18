@@ -19,7 +19,6 @@ pub(crate) mod rates_credit;
 pub mod swap_legs;
 mod trs;
 pub(crate) mod variance_observations;
-pub mod variance_replication;
 
 #[doc(hidden)]
 pub use generic::GenericInstrumentPricer;

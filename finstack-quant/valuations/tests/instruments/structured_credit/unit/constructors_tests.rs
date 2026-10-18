@@ -1,13 +1,11 @@
 //! Tests for structured credit constructors and behavioral overrides.
 
 use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_cashflows::builder::{clamped_cdr_to_mdr, clamped_cpr_to_smm};
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    clamped_cdr_to_mdr, clamped_cpr_to_smm,
-};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, CreditModelConfig, DealFees, DealType, PoolAsset, StructuredCredit, Tranche,
     TrancheStructure,

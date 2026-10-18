@@ -14,14 +14,16 @@
 //! - PSA (Public Securities Association). "Standard Prepayment Model", 1985.
 //! - Moody's Investors Service. "WARF®: Measuring Portfolio Credit Risk in CLOs."
 
+use finstack_quant_cashflows::builder::{
+    clamped_cdr_to_mdr, clamped_cpr_to_smm, clamped_mdr_to_cdr, psa_to_cpr,
+};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_models::credit::moodys_warf_factor;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    clamped_cdr_to_mdr, clamped_cpr_to_smm, clamped_mdr_to_cdr, psa_to_cpr, AssetPool, DealType,
-    PoolAsset,
+    AssetPool, DealType, PoolAsset,
 };
 use time::Month;
 

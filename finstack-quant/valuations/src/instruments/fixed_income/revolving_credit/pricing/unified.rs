@@ -54,7 +54,7 @@ pub(crate) const DEFAULT_UTIL_CREDIT_CORR: f64 = 0.3;
 /// market-anchored credit-spread process.
 ///
 /// Utilization–credit dependence enters the model **only** through the factor
-/// correlation of the Brownian shocks (see `monte_carlo_process`), so
+/// correlation of the Brownian shocks (see `finstack_quant_models::monte_carlo::process::credit_line`), so
 /// [`DEFAULT_UTIL_CREDIT_CORR`] has a pricing effect only when the credit
 /// factor genuinely diffuses. The previously synthesized `implied_vol = 1e-10`
 /// froze the credit factor, which would leave a default correlation silently

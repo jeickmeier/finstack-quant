@@ -343,3 +343,88 @@ mod tests {
         }
     }
 }
+
+fn convert_clamped(rate: f64, convert: fn(f64) -> finstack_quant_core::Result<f64>) -> f64 {
+    convert(rate.clamp(0.0, 1.0)).unwrap_or(f64::NAN)
+}
+
+/// Annual CPR to monthly SMM with the input clamped into `[0, 1]`.
+///
+/// Projection loops feed shocked or interpolated rates that may stray just
+/// outside the unit interval; clamping keeps them on the valid branch instead
+/// of failing the whole simulation.
+///
+/// # Arguments
+///
+/// * `cpr` - Annual conditional prepayment rate as a decimal; clamped into `[0, 1]`.
+#[inline]
+#[must_use]
+pub fn clamped_cpr_to_smm(cpr: f64) -> f64 {
+    convert_clamped(cpr, cpr_to_smm)
+}
+
+/// Monthly SMM to annual CPR with the input clamped into `[0, 1]`.
+///
+/// # Arguments
+///
+/// * `smm` - Single monthly mortality as a decimal; clamped into `[0, 1]`.
+#[inline]
+#[must_use]
+pub fn clamped_smm_to_cpr(smm: f64) -> f64 {
+    convert_clamped(smm, smm_to_cpr)
+}
+
+/// Annual CDR to monthly MDR with the input clamped into `[0, 1]`.
+///
+/// # Arguments
+///
+/// * `cdr` - Annual conditional default rate as a decimal; clamped into `[0, 1]`.
+#[inline]
+#[must_use]
+pub fn clamped_cdr_to_mdr(cdr: f64) -> f64 {
+    convert_clamped(cdr, cdr_to_mdr)
+}
+
+/// Monthly MDR to annual CDR with the input clamped into `[0, 1]`.
+///
+/// # Arguments
+///
+/// * `mdr` - Monthly default rate as a decimal; clamped into `[0, 1]`.
+#[inline]
+#[must_use]
+pub fn clamped_mdr_to_cdr(mdr: f64) -> f64 {
+    convert_clamped(mdr, mdr_to_cdr)
+}
+
+/// Standard PSA curve CPR with a non-negative speed and the result capped at one.
+///
+/// # Arguments
+///
+/// * `speed_multiplier` - PSA speed as a multiple of the standard curve (`1.5` is 150 % PSA); negative values count as zero.
+/// * `month` - Seasoning in months since origination.
+#[inline]
+#[must_use]
+pub fn psa_to_cpr(speed_multiplier: f64, month: u32) -> f64 {
+    psa_cpr(speed_multiplier.max(0.0), month).min(1.0)
+}
+
+#[cfg(test)]
+mod clamped_tests {
+    use super::*;
+
+    #[test]
+    fn clamped_conversions_stay_on_the_unit_branch() {
+        assert_eq!(clamped_cpr_to_smm(0.0), 0.0);
+        assert!((clamped_cpr_to_smm(1.5) - 1.0).abs() < 1e-12);
+        assert!(clamped_cpr_to_smm(-0.2) == 0.0);
+        assert!((clamped_smm_to_cpr(clamped_cpr_to_smm(0.06)) - 0.06).abs() < 1e-12);
+        assert!((clamped_mdr_to_cdr(clamped_cdr_to_mdr(0.02)) - 0.02).abs() < 1e-12);
+    }
+
+    #[test]
+    fn psa_to_cpr_clamps_speed_and_result() {
+        assert_eq!(psa_to_cpr(-1.0, 30), 0.0);
+        assert_eq!(psa_to_cpr(50.0, 30), 1.0);
+        assert!((psa_to_cpr(1.0, 30) - psa_cpr(1.0, 30)).abs() < 1e-15);
+    }
+}

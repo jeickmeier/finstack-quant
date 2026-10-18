@@ -3,13 +3,23 @@
 //! Cliquet options have periodic resets where the strike is reset to the current
 //! spot at reset dates, effectively creating a series of forward-starting options.
 
+use crate::monte_carlo::traits::PathState;
+use crate::monte_carlo::traits::Payoff;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Error as CoreError;
-use finstack_quant_models::monte_carlo::traits::PathState;
-use finstack_quant_models::monte_carlo::traits::Payoff;
 
-use super::types::CliquetPayoffType;
+/// Cliquet payoff aggregation type.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum CliquetPayoffType {
+    /// Additive: Sum of period returns
+    #[default]
+    Additive,
+    /// Multiplicative: Product of (1 + period returns) - 1
+    Multiplicative,
+}
 
 /// Cliquet call option payoff.
 ///
@@ -335,7 +345,7 @@ mod tests {
 
     #[test]
     fn coarse_step_spanning_multiple_reset_dates_captures_all() {
-        use finstack_quant_models::monte_carlo::traits::state_keys;
+        use crate::monte_carlo::traits::state_keys;
 
         // A coarse MC grid has steps that each span several reset dates. Every
         // due reset must record a spot so reset_spots has one entry per reset.

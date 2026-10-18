@@ -6,6 +6,7 @@ use crate::instruments::equity::EquityPathModel;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
+pub use finstack_quant_models::monte_carlo::payoff::cliquet::CliquetPayoffType;
 use time::macros::date;
 
 /// Cliquet option instrument.
@@ -119,18 +120,6 @@ pub struct CliquetOption {
     #[builder(default)]
     #[serde(default)]
     pub payoff_type: CliquetPayoffType,
-}
-
-/// Cliquet payoff aggregation type.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum CliquetPayoffType {
-    /// Additive: Sum of period returns
-    #[default]
-    Additive,
-    /// Multiplicative: Product of (1 + period returns) - 1
-    Multiplicative,
 }
 
 /// Mirror of `CliquetOption` used by serde to apply `validate()` after

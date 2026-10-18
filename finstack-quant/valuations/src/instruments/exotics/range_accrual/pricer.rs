@@ -16,7 +16,6 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::common_impl::vol_resolution::resolve_sigma_at;
-use crate::instruments::exotics::range_accrual::monte_carlo::RangeAccrualPayoff;
 use crate::instruments::exotics::range_accrual::types::RangeAccrual;
 use crate::pricer::{expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError};
 use crate::results::ValuationResult;
@@ -24,6 +23,7 @@ use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
+use finstack_quant_models::monte_carlo::payoff::range_accrual::RangeAccrualPayoff;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
 };

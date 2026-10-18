@@ -1,9 +1,8 @@
 //! Autocallable Monte Carlo pricer.
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::equity::autocallable::monte_carlo::AutocallablePayoff;
 use crate::instruments::equity::autocallable::types::Autocallable;
-use crate::instruments::equity::piecewise_gbm::{bootstrap_forward_gbm, PiecewiseExactGbm};
+use crate::instruments::equity::piecewise_gbm::bootstrap_forward_gbm;
 use crate::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -13,7 +12,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::engine::McEngine;
+use finstack_quant_models::monte_carlo::payoff::autocallable::AutocallablePayoff;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
+use finstack_quant_models::monte_carlo::process::piecewise_gbm::PiecewiseExactGbm;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::TimeGrid;
 

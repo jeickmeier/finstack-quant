@@ -35,11 +35,11 @@ use super::instrument_flows::{
 };
 use super::pool_flow_source::{PerNameResolution, PeriodShockSource};
 use super::*;
-use crate::instruments::fixed_income::revolving_credit::pricing::monte_carlo_discretization::{
-    ou_exact_step, spread_linked_target,
-};
 use crate::instruments::fixed_income::revolving_credit::MC_CLOCK_DAY_COUNT;
 use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_models::monte_carlo::discretization::credit_line::{
+    ou_exact_step, spread_linked_target,
+};
 use finstack_quant_models::monte_carlo::discretization::QeCir;
 use finstack_quant_models::monte_carlo::traits::Discretization;
 

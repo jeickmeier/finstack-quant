@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Model kernels moved from valuations to `finstack-quant-models` and `finstack-quant-cashflows`
+
+#### Changed
+
+- `finstack_quant_models::volatility::variance_replication` (Carr-Madan replication, from `valuations::instruments::pricing::variance_replication`); `finstack_quant_models::monte_carlo::process::credit_line` and `monte_carlo::discretization::credit_line` (the revolver three-factor process, `RevolvingCreditProcess`/`RevolvingCreditProcessParams`/`RevolvingCreditDiscretization` renamed `CreditLineProcess`/`CreditLineProcessParams`/`CreditLineDiscretization`); `finstack_quant_models::monte_carlo::process::piecewise_gbm` (`PiecewiseGbmProcess`, `PiecewiseExactGbm`, `GbmCheckpoint`, `bootstrap_forward_gbm`); `finstack_quant_models::monte_carlo::payoff::{range_accrual, cliquet, autocallable}` with `CliquetPayoffType` and `FinalPayoffType`.
+- `finstack_quant_cashflows::builder::{clamped_cpr_to_smm, clamped_smm_to_cpr, clamped_cdr_to_mdr, clamped_mdr_to_cdr, psa_to_cpr}` replace the copies in `valuations::instruments::fixed_income::structured_credit` and the private ones in `models::credit::pool`.
+
 ### Curve-time, validation, FX-date and unit helpers moved to `finstack-quant-core`
 
 #### Added

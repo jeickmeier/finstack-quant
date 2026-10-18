@@ -8,12 +8,7 @@
 
 pub(crate) mod amortization;
 pub(crate) mod rate_helpers;
-pub(crate) mod rates;
 pub(crate) mod simulation;
 pub(crate) mod validation;
 
-pub(crate) use rates::frequency_periods_per_year;
-pub use rates::{
-    clamped_cdr_to_mdr, clamped_cpr_to_smm, clamped_mdr_to_cdr, clamped_smm_to_cpr, psa_to_cpr,
-};
 pub use validation::{validate_tiers, ValidationError};

@@ -1,4 +1,4 @@
-//! Discretization scheme for revolving credit multi-factor process.
+//! Discretization scheme for the credit-line multi-factor process.
 //!
 //! Handles three correlated factors:
 //! - Utilization: exact OU transition, clamped to [0, 1]
@@ -8,9 +8,9 @@
 //! When correlation is present, applies Cholesky decomposition to generate
 //! correlated Brownian motions.
 
-use super::monte_carlo_process::{InterestRateSpec, RevolvingCreditProcess};
+use crate::monte_carlo::process::credit_line::{CreditLineProcess, InterestRateSpec};
+use crate::monte_carlo::traits::Discretization;
 use finstack_quant_core::math::linalg::{cholesky_correlation, CholeskyError};
-use finstack_quant_models::monte_carlo::traits::Discretization;
 
 /// Discretization scheme for revolving credit process.
 ///
@@ -21,13 +21,13 @@ use finstack_quant_models::monte_carlo::traits::Discretization;
 ///
 /// Correlation is handled via pivoted Cholesky decomposition when present.
 #[derive(Debug, Clone)]
-pub struct RevolvingCreditDiscretization {
+pub struct CreditLineDiscretization {
     /// Pivoted Cholesky factor of correlation matrix (if correlation is used), in
     /// original variable order [utilization, rate, credit].
     cholesky_factor: Option<finstack_quant_core::math::linalg::CorrelationFactor>,
 }
 
-impl RevolvingCreditDiscretization {
+impl CreditLineDiscretization {
     /// Create a new discretization scheme.
     ///
     /// # Arguments
@@ -62,7 +62,7 @@ impl RevolvingCreditDiscretization {
 
     /// Create from process (test convenience method).
     #[cfg(test)]
-    pub fn from_process(process: &RevolvingCreditProcess) -> finstack_quant_core::Result<Self> {
+    pub fn from_process(process: &CreditLineProcess) -> finstack_quant_core::Result<Self> {
         Self::new(process.correlation())
     }
 }
@@ -81,7 +81,7 @@ impl RevolvingCreditDiscretization {
 /// * `sigma` - Annualized volatility; `0.0` gives the deterministic drift.
 /// * `dt` - Step length in years.
 /// * `z` - Standard normal shock.
-pub(crate) fn ou_exact_step(x: f64, theta: f64, kappa: f64, sigma: f64, dt: f64, z: f64) -> f64 {
+pub fn ou_exact_step(x: f64, theta: f64, kappa: f64, sigma: f64, dt: f64, z: f64) -> f64 {
     let exp_kappa_dt = (-kappa * dt).exp();
     let std = if (kappa * dt).abs() < 1e-8 {
         sigma * dt.sqrt()
@@ -101,7 +101,7 @@ pub(crate) fn ou_exact_step(x: f64, theta: f64, kappa: f64, sigma: f64, dt: f64,
 /// * `spread` - Current simulated spread (decimal).
 /// * `spread_0` - Initial spread the relative change is measured from; a
 ///   non-positive value disables the link.
-pub(crate) fn spread_linked_target(
+pub fn spread_linked_target(
     theta: f64,
     spread_sensitivity: f64,
     spread: f64,
@@ -113,10 +113,10 @@ pub(crate) fn spread_linked_target(
     (theta + spread_sensitivity * (spread / spread_0 - 1.0)).clamp(0.0, 1.0)
 }
 
-impl Discretization<RevolvingCreditProcess> for RevolvingCreditDiscretization {
+impl Discretization<CreditLineProcess> for CreditLineDiscretization {
     fn step(
         &self,
-        process: &RevolvingCreditProcess,
+        process: &CreditLineProcess,
         t: f64,
         dt: f64,
         x: &mut [f64],
@@ -278,7 +278,7 @@ impl Discretization<RevolvingCreditProcess> for RevolvingCreditDiscretization {
         x[2] = v_next;
     }
 
-    fn work_size(&self, _process: &RevolvingCreditProcess) -> usize {
+    fn work_size(&self, _process: &CreditLineProcess) -> usize {
         // Need space for correlated shocks (3) + any additional workspace
         if self.cholesky_factor.is_some() {
             3 // For z_corr
@@ -290,23 +290,23 @@ impl Discretization<RevolvingCreditProcess> for RevolvingCreditDiscretization {
 
 #[cfg(test)]
 mod tests {
-    use super::super::monte_carlo_process::{
-        CreditSpreadParams, InterestRateSpec, RevolvingCreditProcess, RevolvingCreditProcessParams,
+    use super::*;
+    use crate::monte_carlo::process::credit_line::{
+        CreditLineProcess, CreditLineProcessParams, CreditSpreadParams, InterestRateSpec,
         UtilizationParams,
     };
-    use super::*;
-    use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
+    use crate::monte_carlo::process::ou::HullWhite1FParams;
 
     #[test]
     fn test_discretization_creation() {
-        let disc = RevolvingCreditDiscretization::new(None).expect("should succeed");
+        let disc = CreditLineDiscretization::new(None).expect("should succeed");
         assert!(disc.cholesky_factor.is_none());
     }
 
     #[test]
     fn test_discretization_with_correlation() {
         let correlation = [[1.0, 0.2, 0.1], [0.2, 1.0, 0.3], [0.1, 0.3, 1.0]];
-        let disc = RevolvingCreditDiscretization::new(Some(&correlation)).expect("should succeed");
+        let disc = CreditLineDiscretization::new(Some(&correlation)).expect("should succeed");
         assert!(disc.cholesky_factor.is_some());
     }
 
@@ -316,9 +316,9 @@ mod tests {
         let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
 
-        let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread);
-        let process = RevolvingCreditProcess::new(params);
-        let disc = RevolvingCreditDiscretization::from_process(&process).expect("should succeed");
+        let params = CreditLineProcessParams::new(utilization, interest_rate, credit_spread);
+        let process = CreditLineProcess::new(params);
+        let disc = CreditLineDiscretization::from_process(&process).expect("should succeed");
 
         let mut x = [0.5, 0.05, 0.015];
         let z = [0.0, 0.0, 0.0]; // No shocks
@@ -350,9 +350,9 @@ mod tests {
         let utilization = UtilizationParams::new(2.0, 0.5, 0.2).expect("valid utilization params");
         let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
-        let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread);
-        let process = RevolvingCreditProcess::new(params);
-        let disc = RevolvingCreditDiscretization::from_process(&process).expect("ok");
+        let params = CreditLineProcessParams::new(utilization, interest_rate, credit_spread);
+        let process = CreditLineProcess::new(params);
+        let disc = CreditLineDiscretization::from_process(&process).expect("ok");
 
         // A large step so the exact transition and the Euler scheme diverge
         // visibly, but with z = 0 so only the (deterministic) mean is tested.
@@ -390,15 +390,15 @@ mod tests {
     /// so the clamp essentially never fires) must recover the exact mean.
     #[test]
     fn utilization_step_unbiased_mean_across_shocks() {
-        use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-        use finstack_quant_models::monte_carlo::traits::RandomStream;
+        use crate::monte_carlo::rng::philox::PhiloxRng;
+        use crate::monte_carlo::traits::RandomStream;
 
         let utilization = UtilizationParams::new(1.0, 0.5, 0.05).expect("valid utilization params");
         let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
-        let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread);
-        let process = RevolvingCreditProcess::new(params);
-        let disc = RevolvingCreditDiscretization::from_process(&process).expect("ok");
+        let params = CreditLineProcessParams::new(utilization, interest_rate, credit_spread);
+        let process = CreditLineProcess::new(params);
+        let disc = CreditLineDiscretization::from_process(&process).expect("ok");
 
         let dt = 1.0 / 12.0;
         let kappa = 1.0_f64;
@@ -446,9 +446,9 @@ mod tests {
         };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
 
-        let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread);
-        let process = RevolvingCreditProcess::new(params);
-        let disc = RevolvingCreditDiscretization::from_process(&process).expect("should succeed");
+        let params = CreditLineProcessParams::new(utilization, interest_rate, credit_spread);
+        let process = CreditLineProcess::new(params);
+        let disc = CreditLineDiscretization::from_process(&process).expect("should succeed");
 
         let mut x = [0.5, 0.04, 0.015];
         let z = [0.0, 0.0, 0.0]; // No shocks

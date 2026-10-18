@@ -34,7 +34,6 @@
 //!
 
 pub(crate) mod metrics;
-pub mod monte_carlo;
 pub(crate) mod pricer;
 pub(crate) mod types;
 

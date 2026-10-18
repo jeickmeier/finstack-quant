@@ -3,10 +3,10 @@
 //! Range accrual products pay coupons based on the number of days the underlying
 //! stays within a specified range.
 
+use crate::monte_carlo::traits::PathState;
+use crate::monte_carlo::traits::Payoff;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_models::monte_carlo::traits::PathState;
-use finstack_quant_models::monte_carlo::traits::Payoff;
 
 /// Range accrual payoff.
 ///
@@ -276,7 +276,7 @@ impl Payoff for RangeAccrualPayoff {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_models::monte_carlo::traits::state_keys;
+    use crate::monte_carlo::traits::state_keys;
 
     #[test]
     fn test_range_accrual_creation() {

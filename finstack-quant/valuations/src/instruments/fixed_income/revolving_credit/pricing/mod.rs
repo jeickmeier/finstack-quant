@@ -4,8 +4,6 @@
 //! Path generation lives in [`path_generator`].
 
 mod components;
-pub mod monte_carlo_discretization;
-pub mod monte_carlo_process;
 pub mod path_generator;
 mod path_pricing;
 mod results;

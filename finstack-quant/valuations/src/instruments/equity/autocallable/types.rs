@@ -41,31 +41,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use time::macros::date;
 
-/// Final payoff type for autocallable products.
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
-pub enum FinalPayoffType {
-    /// Capital protection: max(floor, participation_rate * min(S_T/S_0, cap_level))
-    CapitalProtection {
-        /// Minimum return floor (e.g., 1.0 for 100% protection)
-        floor: f64,
-        /// Decimal multiplier on the capped performance ratio (1.0 = 100%).
-        participation_rate: f64,
-    },
-    /// Participation: 1 + participation_rate * max(0, min(S_T/S_0, cap_level) - 1)
-    Participation {
-        /// Decimal multiplier on the capped upside (1.0 = 100% participation).
-        participation_rate: f64,
-    },
-    /// Knock-in put: Put option if barrier breached, otherwise return principal
-    KnockInPut {
-        /// Put strike as a ratio of the initial level (`1.0` = 100%, the same
-        /// units as `final_barrier`); the put loss is
-        /// `max(strike_ratio - S_T / S_0, 0)`.
-        strike_ratio: f64,
-    },
-}
+pub use finstack_quant_models::monte_carlo::payoff::autocallable::FinalPayoffType;
 
 /// Autocallable structured product instrument.
 #[derive(

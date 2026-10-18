@@ -1,4 +1,4 @@
-//! Multi-factor stochastic process for revolving credit facility Monte Carlo pricing.
+//! Multi-factor stochastic process for credit lines (revolving facilities) in Monte Carlo pricing.
 //!
 //! Combines three correlated stochastic factors:
 //! - Utilization rate (mean-reverting OU process)
@@ -19,13 +19,11 @@
 //!
 //! Where W_1, W_2, W_3 are correlated Brownian motions.
 
-use finstack_quant_models::monte_carlo::paths::ProcessParams;
-use finstack_quant_models::monte_carlo::process::cir::CirParams;
-use finstack_quant_models::monte_carlo::process::metadata::ProcessMetadata;
-use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
-use finstack_quant_models::monte_carlo::traits::StochasticProcess;
-
-use super::super::utils::interpolate_rate;
+use crate::monte_carlo::paths::ProcessParams;
+use crate::monte_carlo::process::cir::CirParams;
+use crate::monte_carlo::process::metadata::ProcessMetadata;
+use crate::monte_carlo::process::ou::HullWhite1FParams;
+use crate::monte_carlo::traits::StochasticProcess;
 
 /// Parameters for utilization process (mean-reverting OU).
 #[derive(Debug, Clone)]
@@ -145,7 +143,9 @@ impl CreditSpreadParams {
 }
 
 /// Interest rate process specification.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum InterestRateSpec {
     /// Fixed rate (constant, no dynamics)
     Fixed {
@@ -238,7 +238,7 @@ impl InterestRateSpec {
 
 /// Revolving credit multi-factor process parameters.
 #[derive(Debug, Clone)]
-pub struct RevolvingCreditProcessParams {
+pub struct CreditLineProcessParams {
     /// Utilization process parameters
     pub utilization: UtilizationParams,
     /// Interest rate specification (fixed or floating)
@@ -253,7 +253,7 @@ pub struct RevolvingCreditProcessParams {
     pub time_offset: f64,
 }
 
-impl RevolvingCreditProcessParams {
+impl CreditLineProcessParams {
     /// Create new process parameters.
     pub fn new(
         utilization: UtilizationParams,
@@ -356,18 +356,18 @@ impl RevolvingCreditProcessParams {
 /// the unified pricer); set `util_credit_corr: Some(0.0)` or supply a full
 /// `correlation_matrix` in `McConfig` to override.
 #[derive(Debug, Clone)]
-pub struct RevolvingCreditProcess {
-    params: RevolvingCreditProcessParams,
+pub struct CreditLineProcess {
+    params: CreditLineProcessParams,
 }
 
-impl RevolvingCreditProcess {
+impl CreditLineProcess {
     /// Create a new revolving credit process.
-    pub fn new(params: RevolvingCreditProcessParams) -> Self {
+    pub fn new(params: CreditLineProcessParams) -> Self {
         Self { params }
     }
 
     /// Get process parameters.
-    pub fn get_params(&self) -> &RevolvingCreditProcessParams {
+    pub fn get_params(&self) -> &CreditLineProcessParams {
         &self.params
     }
 
@@ -377,7 +377,7 @@ impl RevolvingCreditProcess {
     }
 }
 
-impl StochasticProcess for RevolvingCreditProcess {
+impl StochasticProcess for CreditLineProcess {
     fn dim(&self) -> usize {
         3
     }
@@ -435,12 +435,8 @@ impl StochasticProcess for RevolvingCreditProcess {
         })
     }
 
-    fn populate_path_state(
-        &self,
-        x: &[f64],
-        state: &mut finstack_quant_models::monte_carlo::traits::PathState,
-    ) {
-        use finstack_quant_models::monte_carlo::traits::state_keys;
+    fn populate_path_state(&self, x: &[f64], state: &mut crate::monte_carlo::traits::PathState) {
+        use crate::monte_carlo::traits::state_keys;
         if !x.is_empty() {
             state.set(state_keys::SPOT, x[0]);
         }
@@ -453,7 +449,7 @@ impl StochasticProcess for RevolvingCreditProcess {
     }
 }
 
-impl ProcessMetadata for RevolvingCreditProcess {
+impl ProcessMetadata for CreditLineProcess {
     fn metadata(&self) -> ProcessParams {
         let mut params = ProcessParams::new("RevolvingCredit");
 
@@ -517,6 +513,39 @@ impl ProcessMetadata for RevolvingCreditProcess {
             "credit_spread".to_string(),
         ])
     }
+}
+
+/// Linearly interpolate a rate from sorted knot points with flat extrapolation.
+///
+/// Uses `partition_point` for O(log n) interval lookup. Degenerate inputs are
+/// handled defensively: empty inputs yield `0.0`, mismatched lengths use the
+/// common prefix, and a zero-width interval (duplicate knots) returns the
+/// left-hand rate instead of dividing by zero.
+///
+/// # Arguments
+///
+/// * `t` - Query time in years (same clock as `times`).
+/// * `times` - Sorted (non-decreasing) knot times in years.
+/// * `rates` - Rates at each knot (decimal, e.g. `0.05` for 5%).
+pub fn interpolate_rate(t: f64, times: &[f64], rates: &[f64]) -> f64 {
+    if times.is_empty() || rates.is_empty() {
+        return 0.0;
+    }
+    if times.len() == 1 || rates.len() == 1 || t <= times[0] {
+        return rates[0];
+    }
+    let n = times.len().min(rates.len());
+    if t >= times[n - 1] {
+        return rates[n - 1];
+    }
+    let idx = times[..n].partition_point(|&time| time <= t);
+    let i = idx.saturating_sub(1);
+    let width = times[i + 1] - times[i];
+    if width <= 0.0 {
+        return rates[i];
+    }
+    let alpha = (t - times[i]) / width;
+    rates[i] + alpha * (rates[i + 1] - rates[i])
 }
 
 #[cfg(test)]
@@ -585,7 +614,7 @@ mod tests {
         let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
 
-        let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread);
+        let params = CreditLineProcessParams::new(utilization, interest_rate, credit_spread);
         let state = params.initial_state(0.5);
 
         assert_eq!(state[0], 0.5); // utilization
@@ -604,7 +633,7 @@ mod tests {
         };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
 
-        let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread);
+        let params = CreditLineProcessParams::new(utilization, interest_rate, credit_spread);
         let state = params.initial_state(0.5);
 
         assert_eq!(state[0], 0.5); // utilization
@@ -620,7 +649,7 @@ mod tests {
             rates: vec![0.01, 0.03, 0.05],
         };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
-        let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread)
+        let params = CreditLineProcessParams::new(utilization, interest_rate, credit_spread)
             .with_time_offset(0.25);
 
         let state = params.initial_state_at(0.5, 0.50);
@@ -707,8 +736,8 @@ mod tests {
         let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
 
-        let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread);
-        let process = RevolvingCreditProcess::new(params);
+        let params = CreditLineProcessParams::new(utilization, interest_rate, credit_spread);
+        let process = CreditLineProcess::new(params);
 
         let x = [0.5, 0.05, 0.015];
         let mut drift = [0.0; 3];
@@ -731,8 +760,8 @@ mod tests {
         let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
 
-        let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread);
-        let process = RevolvingCreditProcess::new(params);
+        let params = CreditLineProcessParams::new(utilization, interest_rate, credit_spread);
+        let process = CreditLineProcess::new(params);
 
         let x = [0.5, 0.05, 0.015];
         let mut diffusion = [0.0; 3];
@@ -755,8 +784,8 @@ mod tests {
         let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
 
-        let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread);
-        let process_no_corr = RevolvingCreditProcess::new(params);
+        let params = CreditLineProcessParams::new(utilization, interest_rate, credit_spread);
+        let process_no_corr = CreditLineProcess::new(params);
         assert!(process_no_corr.factor_correlation().is_none());
 
         let utilization2 = UtilizationParams::new(0.5, 0.6, 0.1).expect("valid utilization params");
@@ -764,12 +793,24 @@ mod tests {
         let credit_spread2 = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
         let correlation = [[1.0, 0.2, 0.1], [0.2, 1.0, 0.3], [0.1, 0.3, 1.0]];
 
-        let params2 =
-            RevolvingCreditProcessParams::new(utilization2, interest_rate2, credit_spread2)
-                .with_correlation(correlation);
-        let process_corr = RevolvingCreditProcess::new(params2);
+        let params2 = CreditLineProcessParams::new(utilization2, interest_rate2, credit_spread2)
+            .with_correlation(correlation);
+        let process_corr = CreditLineProcess::new(params2);
         let corr = process_corr.factor_correlation().expect("correlation set");
         assert_eq!(corr.len(), 9);
         assert!((corr[1] - 0.2).abs() < 1e-12);
+    }
+
+    #[test]
+    fn interpolate_rate_handles_duplicate_knots_without_nan() {
+        let times = [0.0, 1.0, 1.0, 2.0];
+        let rates = [0.01, 0.02, 0.03, 0.04];
+        let v = interpolate_rate(1.0, &times, &rates);
+        assert!(v.is_finite());
+        assert!((v - 0.03).abs() < 1e-15);
+        assert!((interpolate_rate(0.5, &times, &rates) - 0.015).abs() < 1e-15);
+        assert!((interpolate_rate(-1.0, &times, &rates) - 0.01).abs() < 1e-15);
+        assert!((interpolate_rate(5.0, &times, &rates) - 0.04).abs() < 1e-15);
+        assert_eq!(interpolate_rate(1.0, &[], &[]), 0.0);
     }
 }

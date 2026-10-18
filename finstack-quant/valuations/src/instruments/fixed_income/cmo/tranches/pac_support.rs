@@ -7,7 +7,7 @@
 
 use crate::instruments::fixed_income::cmo::types::PacCollar;
 use crate::instruments::fixed_income::mbs_passthrough::pricer::pool_month_step;
-use crate::instruments::fixed_income::structured_credit::{clamped_cpr_to_smm, psa_to_cpr};
+use finstack_quant_cashflows::builder::{clamped_cpr_to_smm, psa_to_cpr};
 
 /// Dated contractual PAC principal target, in the tranche currency's major units.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -214,7 +214,7 @@ fn project_principal_stream(
 /// Convert PSA speed to SMM for a given month.
 ///
 /// Delegates to the registry-backed canonical PSA curve
-/// (`utils::rates::psa_to_cpr`) and the canonical CPR→SMM conversion,
+/// (`finstack_quant_cashflows::builder::psa_to_cpr`) and the canonical CPR→SMM conversion,
 /// keeping PAC/Support projection consistent with the rest of the workspace.
 #[inline]
 fn psa_to_smm(speed_multiplier: f64, month: u32) -> f64 {

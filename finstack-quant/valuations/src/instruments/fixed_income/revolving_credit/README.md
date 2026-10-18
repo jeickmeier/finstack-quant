@@ -50,8 +50,6 @@ revolving_credit/
 │   ├── stochastic.rs                 # MC orchestration, statistics, expected cashflows
 │   ├── components.rs                 # upfront-fee PV
 │   ├── path_generator.rs             # 3-factor path generation (Philox, optional antithetic)
-│   ├── monte_carlo_process.rs        # utilization / rate / spread process definitions
-│   └── monte_carlo_discretization.rs # discretization schemes
 └── metrics/              # utilization_rate, available_capacity, weighted_average_cost, CS01
 ```
 

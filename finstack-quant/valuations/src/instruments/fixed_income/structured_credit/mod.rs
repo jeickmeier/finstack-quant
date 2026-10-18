@@ -27,6 +27,7 @@ pub(crate) mod metrics;
 pub(crate) mod pricing;
 pub(crate) mod types;
 pub(crate) mod utils;
+pub use utils::{validate_tiers, ValidationError};
 
 pub use types::{
     calculate_pool_stats, AdvanceRate, AdvancingPolicy, AfcSpec, AllocationMode, AssetPool,
@@ -52,11 +53,6 @@ pub use types::{
 pub use types::{
     DefaultModelSpec, MarketConditions, PrepaymentModelSpec, RecoveryModelSpec,
     StructuredCreditTranche,
-};
-
-pub use utils::{
-    clamped_cdr_to_mdr, clamped_cpr_to_smm, clamped_mdr_to_cdr, clamped_smm_to_cpr, psa_to_cpr,
-    validate_tiers, ValidationError,
 };
 
 pub use pricing::{execute_waterfall, generate_cashflows, run_simulation};

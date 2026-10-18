@@ -6,7 +6,6 @@ use crate::instruments::fixed_income::structured_credit::types::{
     AssetPool, CoverageRules, CoverageTestSpec, CoverageTestType, LiveCollateral, PoolAsset,
     Tranche, TrancheStructure,
 };
-use crate::instruments::fixed_income::structured_credit::utils::frequency_periods_per_year;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
@@ -475,7 +474,7 @@ fn rate_and_accrual(tranche: &Tranche, context: &TestContext<'_>) -> Result<(f64
     let accrual = if context.period_start.is_some() {
         projection_accrual
     } else {
-        1.0 / frequency_periods_per_year(tranche.frequency)
+        1.0 / tranche.frequency.payments_per_year()
     };
     Ok((rate, accrual))
 }
@@ -1619,7 +1618,7 @@ mod haircut_tests {
             .coupon
             .try_rate_for_period(as_of, coupon_end, coupon_accrual, as_of, &market)
             .expect("market-aware coupon");
-        let tau = 1.0 / frequency_periods_per_year(tranches.tranches[0].frequency);
+        let tau = 1.0 / (tranches.tranches[0].frequency).payments_per_year();
         let total_due = 100_000.0 * all_in_rate * tau;
         let expected = (total_due - collections / trigger_level) / (all_in_rate * tau);
 
