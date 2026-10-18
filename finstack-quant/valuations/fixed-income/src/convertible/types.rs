@@ -659,6 +659,32 @@ impl ConvertibleBond {
             .build()
     }
 
+    /// Underlying share price from the scalar stored under `spot_id`.
+    ///
+    /// A unitless scalar is read as a price in the bond's currency; a
+    /// currency-tagged price must be in the bond's notional currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::CurrencyMismatch` when the price is quoted in a
+    /// currency other than the notional currency.
+    pub(crate) fn spot_value(
+        &self,
+        scalar: &finstack_quant_core::market_data::scalars::MarketScalar,
+    ) -> finstack_quant_core::Result<f64> {
+        use finstack_quant_core::market_data::scalars::MarketScalar;
+        match scalar {
+            MarketScalar::Unitless(value) => Ok(*value),
+            MarketScalar::Price(money) if money.currency() == self.notional.currency() => {
+                Ok(money.amount())
+            }
+            MarketScalar::Price(money) => Err(Error::CurrencyMismatch {
+                expected: self.notional.currency(),
+                actual: money.currency(),
+            }),
+        }
+    }
+
     /// Calculate policy-specific equity conversion value divided by notional.
     ///
     /// # Arguments
@@ -671,11 +697,7 @@ impl ConvertibleBond {
         market: &finstack_quant_core::market_data::context::MarketContext,
     ) -> finstack_quant_core::Result<f64> {
         finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
-        let spot_price = market.get_price(&self.spot_id)?;
-        let spot = match spot_price {
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => money.amount(),
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
-        };
+        let spot = self.spot_value(market.get_price(&self.spot_id)?)?;
 
         pricing::calculate_parity(self, spot)
     }
@@ -695,11 +717,7 @@ impl ConvertibleBond {
         bond_price: f64,
     ) -> finstack_quant_core::Result<f64> {
         finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
-        let spot_price = market.get_price(&self.spot_id)?;
-        let spot = match spot_price {
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => money.amount(),
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
-        };
+        let spot = self.spot_value(market.get_price(&self.spot_id)?)?;
 
         let conversion_value = pricing::compute_conversion_value(self, spot)?;
         if !bond_price.is_finite()
@@ -936,6 +954,32 @@ mod tests {
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_valuations_core::instruments::common_impl::parameters::convertible::DilutionEvent;
     use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+
+    #[test]
+    fn parity_and_conversion_premium_reject_foreign_currency_spot() {
+        use finstack_quant_core::market_data::context::MarketContext;
+        use finstack_quant_core::market_data::scalars::MarketScalar;
+
+        let bond = ConvertibleBond::example().expect("example");
+        assert_eq!(bond.notional.currency(), Currency::USD);
+        let market = MarketContext::new().insert_price(
+            bond.spot_id.as_str(),
+            MarketScalar::Price(Money::new(50.0, Currency::EUR).expect("money")),
+        );
+
+        let expected = Error::CurrencyMismatch {
+            expected: Currency::USD,
+            actual: Currency::EUR,
+        };
+        assert_eq!(bond.parity(&market), Err(expected.clone()));
+        assert_eq!(bond.conversion_premium(&market, 1_000.0), Err(expected));
+
+        let usd_market = MarketContext::new().insert_price(
+            bond.spot_id.as_str(),
+            MarketScalar::Price(Money::new(50.0, Currency::USD).expect("money")),
+        );
+        assert!(bond.parity(&usd_market).is_ok());
+    }
 
     #[test]
     fn market_dependencies_use_typed_equity_ids_only() {
